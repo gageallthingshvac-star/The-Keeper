@@ -150,14 +150,14 @@
   }
   .tab-item:active { opacity: 0.5; }
   .tab-icon {
-    width: 26px; height: 26px;
+    width: 28px; height: 28px;
     display: flex; align-items: center; justify-content: center;
     line-height: 1;
-    transition: transform 0.22s cubic-bezier(0.34,1.56,0.64,1), color 0.18s ease;
+    transition: transform 0.24s cubic-bezier(0.34,1.56,0.64,1), color 0.18s ease, filter 0.2s ease;
     position: relative;
     border-radius: 8px;
   }
-  .tab-item.active .tab-icon { transform: scale(1.12); }
+  .tab-item.active .tab-icon { transform: scale(1.14); filter: drop-shadow(0 2px 6px currentColor); }
   .tab-label {
     font-size: 9px;
     font-weight: 500;
@@ -349,7 +349,7 @@ const C = {
   gold: "#0A84FF",
   indigo: "#5E5CE6"
 };
-const DEPLOY_VER = "v16.15";
+const DEPLOY_VER = "v16.16";
 const ACCENTS = {
   blue:     { name: "Blue",     v: "#0A84FF" },
   green:    { name: "Green",    v: "#30D158" },
@@ -1212,7 +1212,7 @@ const Card = ({
     background: C.card,
     borderRadius: 22,
     border: `1px solid ${C.line}`,
-    boxShadow: "rgba(0,0,0,0.6) 0 10px 32px -14px, rgba(0,0,0,0.22) 0 2px 8px -2px"
+    boxShadow: "rgba(0,0,0,0.65) 0 12px 36px -14px, rgba(0,0,0,0.24) 0 2px 8px -2px, inset 0 1px 0 rgba(255,255,255,0.10)"
   }
 }, React.createElement("div", {
   className: "relative"
@@ -2540,8 +2540,10 @@ React.createElement("header", {
       letterSpacing: "0.2em",
       color: C.mute
     }
-  }, prettyDate(date)), React.createElement("h1", {
-    className: "mt-1 text-4xl",
+  }, prettyDate(date)), React.createElement("div", {
+    style: { fontFamily: body, fontSize: 13, color: "rgba(255,255,255,0.38)", marginTop: 7, letterSpacing: "0.01em" }
+  }, (() => { const h = new Date(now).getHours(); return h < 12 ? "Good morning, Gage" : h < 17 ? "Good afternoon, Gage" : "Good evening, Gage"; })()), React.createElement("h1", {
+    className: "mt-0.5 text-4xl",
     style: {
       fontFamily: display,
       fontWeight: 700,
@@ -2560,11 +2562,11 @@ React.createElement("header", {
     className: "tnum",
     style: {
       fontFamily: display,
-      fontWeight: 300,
-      fontSize: 30,
+      fontWeight: 200,
+      fontSize: 32,
       lineHeight: 1,
-      color: C.text,
-      letterSpacing: "-0.02em"
+      color: "rgba(255,255,255,0.92)",
+      letterSpacing: "-0.03em"
     }
   }, clock), clockParts.ampm && React.createElement("span", {
     style: {
@@ -2617,11 +2619,12 @@ React.createElement("header", {
     className: "uppercase",
     style: {
       fontFamily: mono,
-      fontSize: "0.6875rem",
-      letterSpacing: "0.06em",
-      color: C.mute
+      fontSize: "0.65rem",
+      letterSpacing: "0.1em",
+      color: C.rust,
+      textTransform: "uppercase"
     }
-  }, "From her"), React.createElement("span", {
+  }, "From Mabry ♥"), React.createElement("span", {
     style: {
       fontFamily: body,
       color: C.rust,
@@ -2695,14 +2698,14 @@ React.createElement("header", {
     React.createElement("div", { style:{ display:"flex", justifyContent:"center", marginBottom:10 }, dangerouslySetInnerHTML:{ __html: buildBlossomSVG(weeks.w, true, false) } }),
     React.createElement("div", { style:{ display:"flex", gap:8, marginBottom:10 } },
       [["Days", overdue ? "0" : cd.d, C.text], ["Hrs", String(cd.h).padStart(2,"0"), C.mute], ["Min", String(cd.m).padStart(2,"0"), C.mute], ["Sec", String(cd.s).padStart(2,"0"), C.gold]].map(([lab, val, col]) =>
-        React.createElement("div", { key:lab, style:{ flex:1, borderRadius:12, padding:"8px 0", textAlign:"center", background:C.bg0, border:"1px solid "+C.line } },
+        React.createElement("div", { key:lab, style:{ flex:1, borderRadius:12, padding:"8px 0", textAlign:"center", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", backdropFilter:"blur(8px)", WebkitBackdropFilter:"blur(8px)" } },
           React.createElement("div", { style:{ fontFamily:display, fontWeight:600, fontSize:18, color:col, fontVariantNumeric:"tabular-nums" } }, overdue ? "—" : val),
           React.createElement("div", { style:{ fontFamily:mono, fontSize:9, letterSpacing:"0.08em", color:C.mute, textTransform:"uppercase" } }, lab)
         )
       )
     ),
-    React.createElement("div", { style:{ height:4, borderRadius:8, background:C.bg0, overflow:"hidden", marginBottom:10 } },
-      React.createElement("div", { style:{ height:"100%", borderRadius:8, background:C.olive, width:(weeks.w/40*100)+"%", transition:"width 700ms ease" } })
+    React.createElement("div", { style:{ height:5, borderRadius:8, background:"rgba(255,255,255,0.06)", overflow:"hidden", marginBottom:12 } },
+      React.createElement("div", { style:{ height:"100%", borderRadius:8, background:"linear-gradient(90deg,"+C.rust+","+C.rust+"cc)", width:(weeks.w/40*100)+"%", transition:"width 700ms ease" } })
     ),
     React.createElement("div", { style:{ display:"flex", alignItems:"center", justifyContent:"space-between" } },
       React.createElement("div", null,
@@ -2727,12 +2730,24 @@ React.createElement("header", {
     className: "relative z-[1] mx-auto max-w-md px-5",
     style: { paddingTop: "max(2.5rem, env(safe-area-inset-top))", paddingBottom: "calc(100px + env(safe-area-inset-bottom, 0px))" }
   },
-    React.createElement("h1", {
-      style: { fontFamily: display, fontWeight: 700, fontSize: 32, letterSpacing: "-0.025em",
-               background: "linear-gradient(140deg,#ffffff 0%,rgba(255,255,255,0.68) 100%)",
-               WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-               backgroundClip: "text", lineHeight: 1.06, marginBottom: 24 }
-    }, "Mabry"),
+    React.createElement("div", {
+      style: { display:"flex", alignItems:"center", gap:14, marginBottom:28 }
+    },
+    React.createElement("div", {
+      style: { width:52, height:52, borderRadius:"50%", background:"linear-gradient(140deg,"+C.rust+","+C.rust+"aa)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, boxShadow:"0 0 0 2px rgba(0,0,0,0.8), 0 0 0 3.5px "+C.rust+", 0 6px 20px "+C.rust+"44" }
+    }, React.createElement("span", { style:{ fontFamily:display, fontWeight:700, fontSize:22, color:"#fff" } }, "M")),
+    React.createElement("div", null,
+      React.createElement("h1", {
+        style: { fontFamily: display, fontWeight: 700, fontSize: 26, letterSpacing: "-0.02em",
+                 background: "linear-gradient(140deg,#ffffff 0%,rgba(255,255,255,0.7) 100%)",
+                 WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                 backgroundClip: "text", lineHeight: 1.1, margin: 0 }
+      }, "Mabry"),
+      React.createElement("div", {
+        style: { fontFamily:body, fontSize:11, color:C.mute, marginTop:3, display:"flex", alignItems:"center", gap:5 }
+      }, React.createElement("span", { style:{ display:"inline-block", width:6, height:6, borderRadius:"50%", background:C.olive, flexShrink:0 } }), "Partner · Your person")
+    )
+  ),
     React.createElement("div", {
     key: "messages",
     className: "rise"
@@ -3067,12 +3082,22 @@ React.createElement("header", {
     className: "relative z-[1] mx-auto max-w-md px-5",
     style: { paddingTop: "max(2.5rem, env(safe-area-inset-top))", paddingBottom: "calc(100px + env(safe-area-inset-bottom, 0px))" }
   },
-    React.createElement("h1", {
-      style: { fontFamily: display, fontWeight: 700, fontSize: 32, letterSpacing: "-0.025em",
-               background: "linear-gradient(140deg,#ffffff 0%,rgba(255,255,255,0.68) 100%)",
-               WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-               backgroundClip: "text", lineHeight: 1.06, marginBottom: 24 }
-    }, "Settings"),
+    React.createElement("div", {
+      style: { display:"flex", alignItems:"center", gap:14, marginBottom:28 }
+    },
+    React.createElement("div", {
+      style: { width:52, height:52, borderRadius:"50%", background:"linear-gradient(140deg,#5E5CE6,#BF5AF2)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, boxShadow:"0 0 0 2px rgba(0,0,0,0.8), 0 0 0 3.5px #5E5CE6, 0 6px 20px #5E5CE666" }
+    }, React.createElement("span", { style:{ fontFamily:display, fontWeight:700, fontSize:22, color:"#fff" } }, "G")),
+    React.createElement("div", null,
+      React.createElement("h1", {
+        style: { fontFamily: display, fontWeight: 700, fontSize: 26, letterSpacing: "-0.02em",
+                 background: "linear-gradient(140deg,#ffffff 0%,rgba(255,255,255,0.7) 100%)",
+                 WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                 backgroundClip: "text", lineHeight: 1.1, margin: 0 }
+      }, "Gage"),
+      React.createElement("div", { style:{ fontFamily:body, fontSize:11, color:C.mute, marginTop:3 } }, "The Keeper · ", DEPLOY_VER)
+    )
+  ),
     React.createElement("div", {
     key: "settings",
     className: "rise space-y-4"
