@@ -349,7 +349,7 @@ const C = {
   gold: "#0A84FF",
   indigo: "#5E5CE6"
 };
-const DEPLOY_VER = "v16.13";
+const DEPLOY_VER = "v16.14";
 const ACCENTS = {
   blue:     { name: "Blue",     v: "#0A84FF" },
   green:    { name: "Green",    v: "#30D158" },
@@ -1308,11 +1308,9 @@ function BottomTabBar({ tab, openScreen, closeScreen, paired, unread }) {
     return React.createElement("button", {
       key: t.id,
       className: `tab-item${active ? " active" : ""}`,
-      onClick: (e) => {
-        if (t.id === "today") {
-          if (tab !== "today") closeScreen();
-        } else {
-          if (tab !== t.id) openScreen(t.id, e);
+      onClick: () => {
+        if (tab !== t.id) {
+          sfx.open(); haptic(12); setTab(t.id);
         }
       }
     },
@@ -1524,38 +1522,41 @@ function BaseCamp() {
   }, [sound]);
   const handleSwipeTouchStart = useCallback((e) => {
     const t = e.touches[0];
-    swipeTouchRef.current = { startX:t.clientX, startY:t.clientY, startTime:Date.now(), locked:false };
+    swipeTouchRef.current = { startX:t.clientX, startY:t.clientY, startTime:Date.now(), locked:false, active:true };
     setDragOffset(0);
     setIsDragging(true);
   }, []);
   const handleSwipeTouchMove = useCallback((e) => {
-    if (!swipeTouchRef.current || swipeTouchRef.current.locked) return;
-    const {startX,startY} = swipeTouchRef.current;
+    const ref = swipeTouchRef.current;
+    if (!ref || !ref.active || ref.locked) return;
+    const {startX, startY} = ref;
     const t = e.touches[0];
-    const dx = t.clientX-startX, dy = t.clientY-startY;
+    const dx = t.clientX - startX;
+    const dy = t.clientY - startY;
     if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 8) {
-      swipeTouchRef.current.locked = true;
+      ref.locked = true;
       setDragOffset(0); setIsDragging(false); return;
     }
     if (Math.abs(dx) < 3) return;
     e.preventDefault();
-    const i = SWIPE_TABS.indexOf(tab);
+    const i = SWIPE_TABS.indexOf(ref.tab || tab);
     let d = dx;
     if ((i === 0 && dx > 0) || (i === SWIPE_TABS.length-1 && dx < 0)) {
-      d = Math.sign(dx) * Math.sqrt(Math.abs(dx)) * 10;
+      d = Math.sign(dx) * Math.pow(Math.abs(dx), 0.5) * 10;
     }
     setDragOffset(d);
-  }, [tab, isDragging]);
+  }, [tab]);
   const handleSwipeTouchEnd = useCallback((e) => {
     setIsDragging(false);
-    const {startX,startTime,locked} = swipeTouchRef.current;
-    if (locked) { setDragOffset(0); return; }
+    const ref = swipeTouchRef.current;
+    if (!ref || ref.locked) { setDragOffset(0); return; }
+    ref.active = false;
     const t = e.changedTouches[0];
-    const dx = t.clientX - startX;
-    const dt = Date.now() - startTime;
-    const velocity = Math.abs(dx) / dt;
+    const dx = t.clientX - ref.startX;
+    const dt = Date.now() - ref.startTime;
+    const velocity = dt > 0 ? Math.abs(dx) / dt : 0;
     const i = SWIPE_TABS.indexOf(tab);
-    if (Math.abs(dx) > 55 || (velocity > 0.25 && Math.abs(dx) > 20)) {
+    if (Math.abs(dx) > 50 || (velocity > 0.3 && Math.abs(dx) > 15)) {
       if (dx < 0 && i < SWIPE_TABS.length-1) {
         sfx.open(); haptic(12); setTab(SWIPE_TABS[i+1]);
       } else if (dx > 0 && i > 0) {
@@ -1563,9 +1564,21 @@ function BaseCamp() {
       }
     }
     setDragOffset(0);
-  }, [tab, sound, isDragging]);
+  }, [tab, sound]);
   const [navHidden, setNavHidden] = useState(true);
   const lastY = useRef(0);
+  // Store tab in swipeTouchRef so touchmove handler always has fresh value
+  useEffect(() => {
+    if (swipeTouchRef.current) swipeTouchRef.current.tab = tab;
+  }, [tab]);
+  // Attach touchmove with passive:false so preventDefault works
+  useEffect(() => {
+    const el = document.getElementById("root");
+    if (!el) return;
+    const onMove = (e) => handleSwipeTouchMove(e);
+    el.addEventListener("touchmove", onMove, { passive: false });
+    return () => el.removeEventListener("touchmove", onMove);
+  }, [handleSwipeTouchMove]);
   const inputRefs = useRef({});
   useEffect(() => {
     (async () => {
@@ -2425,9 +2438,9 @@ function BaseCamp() {
     s: Math.floor(rem % 60000 / 1000)
   };
   return React.createElement("div", {
-    className: "relative min-h-screen",
-    style: { background:"transparent", paddingBottom:"calc(90px + env(safe-area-inset-bottom, 0px))" },
-    onTouchStart: handleSwipeTouchStart, onTouchMove: handleSwipeTouchMove, onTouchEnd: handleSwipeTouchEnd
+    className: "relative",
+    style: { background:"transparent", height:"100dvh", overflow:"hidden", display:"flex", flexDirection:"column" },
+    onTouchStart: handleSwipeTouchStart, onTouchEnd: handleSwipeTouchEnd
   }, React.createElement(PullIndicator, {
     pull: ptrPull,
     busy: ptrBusy,
@@ -2504,8 +2517,7 @@ function BaseCamp() {
       }, "Let’s go")
     )
   ), React.createElement("div", {
-    style: { position:"relative", width:"100%", overflow:"hidden",
-             height:"calc(100vh - 80px - env(safe-area-inset-bottom, 0px))" }
+    style: { position:"relative", width:"100%", overflow:"hidden", flex:1 }
   },
   React.createElement("div", {
     style: { position:"absolute", inset:0, overflowY:"auto", WebkitOverflowScrolling:"touch",
