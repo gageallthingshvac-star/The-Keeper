@@ -352,7 +352,7 @@ const C = {
   gold: "#0A84FF",
   indigo: "#5E5CE6"
 };
-const DEPLOY_VER = "v16.19";
+const DEPLOY_VER = "v16.20";
 const ACCENTS = {
   blue:     { name: "Blue",     v: "#0A84FF" },
   green:    { name: "Green",    v: "#30D158" },
@@ -1525,9 +1525,9 @@ function BaseCamp() {
   }, [sound]);
   const handleSwipeTouchStart = useCallback((e) => {
     const t = e.touches[0];
-    swipeTouchRef.current = { startX:t.clientX, startY:t.clientY, startTime:Date.now(), locked:false, active:true, dragging:false };
+    // Object.assign preserves .tab (set by the tab-sync useEffect)
+    Object.assign(swipeTouchRef.current, { startX:t.clientX, startY:t.clientY, startTime:Date.now(), locked:false, active:true, dragging:false });
     setDragOffset(0);
-    // isDragging stays false until we confirm horizontal intent
   }, []);
   const handleSwipeTouchMove = useCallback((e) => {
     const ref = swipeTouchRef.current;
