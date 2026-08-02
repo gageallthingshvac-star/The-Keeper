@@ -36,6 +36,7 @@
   input, textarea, select { box-sizing: border-box; max-width: 100%; }
   input[type="time"], input[type="date"] { -webkit-appearance: none; appearance: none; }
   input[type="date"] { -webkit-appearance: none; }
+  html,body{overscroll-behavior:none;}
 
   /* ── Apple Liquid Glass — enhanced ── */
   .glass {
@@ -353,7 +354,7 @@ const C = {
   gold: "#0A84FF",
   indigo: "#5E5CE6"
 };
-const DEPLOY_VER = "v16.8";
+const DEPLOY_VER = "v16.9";
 const ACCENTS = {
   blue:     { name: "Blue",     v: "#0A84FF" },
   green:    { name: "Green",    v: "#30D158" },
@@ -1607,10 +1608,18 @@ function BaseCamp() {
       setBabyPhotos(bph);
       // Jobs — seed with DEFAULT_JOBS on first launch
       const savedJobs = await load("jobs", null);
-      setJobs(savedJobs === null ? DEFAULT_JOBS : savedJobs);
+      if (savedJobs === null) { setJobs(DEFAULT_JOBS); }
+      else {
+        let gone = []; try { gone = JSON.parse(localStorage.getItem("keeper_deleted_jobs")||"[]"); } catch(e){}
+        const ids = new Set(savedJobs.map(j=>j.id));
+        const fresh = DEFAULT_JOBS.filter(d=>!ids.has(d.id) && gone.indexOf(d.id)<0);
+        const merged = fresh.length ? savedJobs.concat(fresh) : savedJobs;
+        setJobs(merged);
+        if (fresh.length) save("jobs", merged);
+      }
       const storedPin = localStorage.getItem("jobs_pin");
       if (storedPin) setJobPin(storedPin);
-      if (!localStorage.getItem("keeper_seen_v16")) setWhatsNewOpen(true);
+      if (localStorage.getItem("keeper_seen_ver") !== DEPLOY_VER) setWhatsNewOpen(true);
       // One-time deploy update banner
       const lastVer = localStorage.getItem("keeper_deploy_ver");
       if (lastVer && lastVer !== DEPLOY_VER) { setShowUpdateBanner(true); setTimeout(() => setShowUpdateBanner(false), 3800); }
@@ -2443,7 +2452,7 @@ function BaseCamp() {
   whatsNewOpen && React.createElement("div", {
     key: "wn-overlay",
     style: { position:"fixed",inset:0,zIndex:999,background:"rgba(0,0,0,0.68)",display:"flex",alignItems:"flex-end",backdropFilter:"blur(3px)" },
-    onClick: () => { localStorage.setItem("keeper_seen_v16","1"); setWhatsNewOpen(false); }
+    onClick: () => { localStorage.setItem("keeper_seen_ver", DEPLOY_VER); setWhatsNewOpen(false); }
   },
     React.createElement("div", {
       style: { width:"100%",background:"rgba(22,22,24,0.97)",borderTop:"1px solid rgba(255,255,255,0.1)",borderRadius:"24px 24px 0 0",padding:"32px 24px",paddingBottom:"max(32px,env(safe-area-inset-bottom))",backdropFilter:"blur(50px) saturate(1.4)",animation:"whatsNewUp 0.5s cubic-bezier(0.32,0.72,0,1) both",WebkitBackdropFilter:"blur(50px) saturate(1.4)" },
@@ -2452,7 +2461,7 @@ function BaseCamp() {
       React.createElement("div", { style:{ textAlign:"center",marginBottom:28 } },
         React.createElement("div", { style:{ fontSize:40,marginBottom:10,lineHeight:1 } }, "\uD83C\uDF38"),
         React.createElement("div", { style:{ fontFamily:display,fontWeight:600,fontSize:22,color:C.text,marginBottom:6 } }, "What’s New in The Keeper"),
-        React.createElement("div", { style:{ fontFamily:body,fontSize:13,color:C.mute } }, "Version 15 — just for you")
+        React.createElement("div", { style:{ fontFamily:body,fontSize:13,color:C.mute } }, ("Version " + DEPLOY_VER))
       ),
       [["\uD83D\uDCAC","Real-time messaging","Send and receive messages with her in real time"],
        ["\u2601\uFE0F","Cloud sync","Your data stays in sync across every device"],
@@ -2468,7 +2477,7 @@ function BaseCamp() {
         );
       }),
       React.createElement("button", {
-        onClick: () => { localStorage.setItem("keeper_seen_v16","1"); setWhatsNewOpen(false); },
+        onClick: () => { localStorage.setItem("keeper_seen_ver", DEPLOY_VER); setWhatsNewOpen(false); },
         style: { width:"100%",marginTop:26,padding:"15px 0",background:C.rust,borderRadius:16,fontFamily:body,fontWeight:600,fontSize:16,color:contrastFor(C.rust),border:"none",cursor:"pointer",boxShadow:"0 4px 24px "+C.rust+"44" }
       }, "Let’s go")
     )
@@ -4121,7 +4130,7 @@ function BaseCamp() {
       ),
       React.createElement(Card,null,
         [
-          {icon:"📍",label:"Address",val:job.address},
+          {icon:"📍",label:"Address",val:job.address?React.createElement("a",{href:"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(job.address),target:"_blank",rel:"noopener",style:{color:C.text,textDecoration:"underline",textUnderlineOffset:"2px"}},job.address):job.address},
           job.contractor&&{icon:"🏗",label:"Contractor",val:job.contractor},
           job.system&&{icon:"❄️",label:"System",val:job.system},
           job.wire&&{icon:"🔌",label:"Wire",val:job.wire},
@@ -4144,7 +4153,7 @@ function BaseCamp() {
       ),
       React.createElement("div",{style:{paddingTop:4,paddingBottom:4,textAlign:"center"}},
         React.createElement("button",{
-          onClick:()=>{if(!window.confirm("Delete "+job.name+"?"))return;saveJobs(jobs.filter(j=>j.id!==job.id));setSelectedJob(null);},
+          onClick:()=>{if(!window.confirm("Delete "+job.name+"?"))return;try{if(/^job_/.test(job.id)){var g=JSON.parse(localStorage.getItem("keeper_deleted_jobs")||"[]");if(g.indexOf(job.id)<0){g.push(job.id);localStorage.setItem("keeper_deleted_jobs",JSON.stringify(g));}}}catch(e){}saveJobs(jobs.filter(j=>j.id!==job.id));setSelectedJob(null);},
           style:{fontFamily:body,fontSize:14,color:"#FF453A",background:"rgba(255,69,58,0.08)",padding:"12px 32px",borderRadius:22,border:"1px solid rgba(255,69,58,0.22)",cursor:"pointer",touchAction:"manipulation",WebkitTapHighlightColor:"transparent"}
         },"Delete Job")
       )
