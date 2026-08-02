@@ -23,7 +23,7 @@
   @keyframes bannerSlideIn{from{opacity:0;transform:translateY(-14px) scale(0.95)}to{opacity:1;transform:translateY(0) scale(1)}}
   @keyframes bannerFadeOut{from{opacity:1;transform:scale(1)}to{opacity:0;transform:scale(0.92)}}
   @keyframes shimmy{0%,100%{transform:scale(1) rotate(0deg)}25%{transform:scale(1.07) rotate(-3deg)}75%{transform:scale(1.07) rotate(3deg)}}
-  @keyframes petalDrift{0%{opacity:.75;transform:translateY(0) translateX(0) rotate(0deg)}100%{opacity:0;transform:translateY(180px) translateX(var(--pdrift,28px)) rotate(520deg)}}
+
   @keyframes whatsNewUp{from{opacity:0;transform:translateY(110%)}to{opacity:1;transform:translateY(0)}}
   @keyframes wsFadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
   @keyframes cardRise{from{opacity:0;transform:translateY(18px) scale(0.98)}to{opacity:1;transform:translateY(0) scale(1)}}
@@ -40,38 +40,26 @@
   /* ── Apple Liquid Glass — enhanced ── */
   .glass {
     position: relative;
-    backdrop-filter: blur(32px) saturate(1.85) brightness(1.04);
-    -webkit-backdrop-filter: blur(32px) saturate(1.85) brightness(1.04);
+    backdrop-filter: blur(40px) saturate(2.2) brightness(1.07);
+    -webkit-backdrop-filter: blur(40px) saturate(2.2) brightness(1.07);
     box-shadow:
-      rgba(255,255,255,0.22) 0px 1px 0px inset,
+      rgba(255,255,255,0.38) 0px 1px 0px inset,
+      rgba(255,255,255,0.13) 0px -1px 0px inset,
+      rgba(255,255,255,0.11) 1px 0px 0px inset,
+      rgba(255,255,255,0.11) -1px 0px 0px inset,
       rgba(255,255,255,0.07) 0px 0px 0px 0.5px inset,
-      rgba(255,255,255,0.04) 0px -1px 0px inset,
-      rgba(0,0,0,0.65) 0px 16px 40px -18px,
-      rgba(0,0,0,0.25) 0px 4px 12px -4px;
+      rgba(0,0,0,0.74) 0px 24px 56px -20px,
+      rgba(0,0,0,0.32) 0px 8px 22px -4px,
+      rgba(0,0,0,0.14) 0px 2px 6px 0px;
   }
   .glass::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    background: linear-gradient(
-      160deg,
-      rgba(255,255,255,0.14) 0%,
-      rgba(255,255,255,0.04) 30%,
-      rgba(255,255,255,0) 55%
-    );
+    content:""; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+    background:linear-gradient(148deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.09) 26%, rgba(255,255,255,0.02) 56%, rgba(0,0,0,0.05) 100%);
   }
-  /* Edge refraction shimmer */
   .glass::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    background: linear-gradient(108deg, transparent 38%, rgba(255,255,255,0.09) 50%, transparent 62%);
-    background-size: 260% 100%;
-    background-position: 200% 0;
+    content:""; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+    background:linear-gradient(112deg, transparent 30%, rgba(255,255,255,0.18) 50%, transparent 70%);
+    background-size:300% 100%; background-position:200% 0;
   }
   .limits .glass {
     backdrop-filter: blur(48px) saturate(2.4) brightness(1.08);
@@ -286,7 +274,11 @@
     0%{opacity:0;transform:translateY(10px);}
     100%{opacity:1;transform:translateY(0);}
   }
-  .page-enter { animation: pageEnter 0.32s cubic-bezier(0.22,1,0.36,1) both; }
+  .page-enter       { animation: pageEnter    0.34s cubic-bezier(0.22,1,0.36,1) both; }
+  .page-slide-right { animation: slideInRight 0.36s cubic-bezier(0.25,1,0.5,1) both; }
+  .page-slide-left  { animation: slideInLeft  0.36s cubic-bezier(0.25,1,0.5,1) both; }
+  @keyframes slideInRight { from{transform:translateX(100vw);opacity:.5} to{transform:translateX(0);opacity:1} }
+  @keyframes slideInLeft  { from{transform:translateX(-100vw);opacity:.5} to{transform:translateX(0);opacity:1} }
 
   /* ── Standard keyframes ── */
   @keyframes bcpulse {
@@ -357,7 +349,7 @@ const C = {
   gold: "#0A84FF",
   indigo: "#5E5CE6"
 };
-const DEPLOY_VER = "v16.10";
+const DEPLOY_VER = "v16.11";
 const ACCENTS = {
   blue:     { name: "Blue",     v: "#0A84FF" },
   green:    { name: "Green",    v: "#30D158" },
@@ -1497,23 +1489,21 @@ function BaseCamp() {
   const [closing, setClosing] = useState(false);
   const [ripple, setRipple] = useState(null);
   const [tabAnimKey, setTabAnimKey] = useState(0);
-  const openScreen = useCallback((k, e) => {
-    try {
-      const el = e && e.currentTarget;
-      const r = el && el.getBoundingClientRect ? el.getBoundingClientRect() : null;
-      if (r) {
-        setOriginRect({ x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height });
-      } else {
-        // Default origin: bottom-center (like pressing a home-screen icon from the dock area)
-        setOriginRect({ x: window.innerWidth / 2, y: window.innerHeight - 40, w: 44, h: 44 });
-      }
-    } catch {
-      setOriginRect({ x: window.innerWidth / 2, y: window.innerHeight - 40, w: 44, h: 44 });
+  const [slideClass, setSlideClass] = useState("page-enter");
+  const swipeTouchRef = useRef({ startX:0, startY:0, startTime:0 });
+  const SWIPE_TABS = ["today","messages","jobs","settings"];
+  const openScreen = useCallback((k, e, swipe) => {
+    if (!swipe) {
+      try {
+        const el = e && e.currentTarget;
+        const r = el && el.getBoundingClientRect ? el.getBoundingClientRect() : null;
+        if (r) { setOriginRect({ x:r.left+r.width/2, y:r.top+r.height/2, w:r.width, h:r.height }); }
+        else { setOriginRect({ x:window.innerWidth/2, y:window.innerHeight-40, w:44, h:44 }); }
+      } catch { setOriginRect({ x:window.innerWidth/2, y:window.innerHeight-40, w:44, h:44 }); }
     }
-    sfx.open();
-    haptic(12);
-    setTabAnimKey(n => n + 1);
-    setTab(k);
+    sfx.open(); haptic(12);
+    setSlideClass(swipe==="left"?"page-slide-right":swipe==="right"?"page-slide-left":"page-enter");
+    setTabAnimKey(n=>n+1); setTab(k);
   }, [sound]);
   const closeScreen = useCallback(() => {
     sfx.back();
@@ -1526,6 +1516,19 @@ function BaseCamp() {
       // Keep originRect so next open re-uses same launch point
     }, 380);
   }, [sound]);
+  const handleSwipeTouchStart = useCallback((e) => {
+    const t = e.touches[0];
+    swipeTouchRef.current = { startX:t.clientX, startY:t.clientY, startTime:Date.now() };
+  }, []);
+  const handleSwipeTouchEnd = useCallback((e) => {
+    const {startX,startY,startTime} = swipeTouchRef.current;
+    const t = e.changedTouches[0];
+    const dx = t.clientX-startX, dy = t.clientY-startY;
+    if (Date.now()-startTime>500 || Math.abs(dx)<48 || Math.abs(dx)<Math.abs(dy)*1.3) return;
+    const i = SWIPE_TABS.indexOf(tab);
+    if (dx<0) { const nxt=SWIPE_TABS[i+1]; if(nxt) openScreen(nxt,null,"left"); }
+    else { if(i>0) openScreen(SWIPE_TABS[i-1],null,"right"); else if(tab!=="today") closeScreen(); }
+  }, [tab,openScreen,closeScreen]);
   const [navHidden, setNavHidden] = useState(true);
   const lastY = useRef(0);
   const inputRefs = useRef({});
@@ -2388,10 +2391,8 @@ function BaseCamp() {
   };
   return React.createElement("div", {
     className: "relative min-h-screen",
-    style: {
-      background: "transparent",
-      paddingBottom: "calc(90px + env(safe-area-inset-bottom, 0px))"
-    }
+    style: { background:"transparent", paddingBottom:"calc(90px + env(safe-area-inset-bottom, 0px))" },
+    onTouchStart: handleSwipeTouchStart, onTouchEnd: handleSwipeTouchEnd
   }, React.createElement(PullIndicator, {
     pull: ptrPull,
     busy: ptrBusy,
@@ -2637,13 +2638,9 @@ function BaseCamp() {
     }
   }, "Couldn't reach the server — pull down to try again.")), React.createElement(Card, null,
     React.createElement("div", { style:{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 } },
-      React.createElement(Eyebrow, { color:"#f9b4d0" }, "Week ", weeks.w, " · ", treeName),
-      React.createElement("button", { onClick:waterTree, className:"press", style:{ display:"flex", alignItems:"center", gap:6, padding:"6px 12px", borderRadius:10, border:"1.5px solid "+(wateredToday?C.line:C.rust), background:wateredToday?"transparent":C.rust+"18", cursor:wateredToday?"default":"pointer", fontFamily:body, fontSize:12, color:wateredToday?C.mute:C.rust } },
-        React.createElement("span", null, wateredToday ? "💧" : "🪣"),
-        wateredToday ? "Watered" : "Water"
-      )
+      React.createElement(Eyebrow, { color:"#f9b4d0" }, "Week ", weeks.w, " · ", treeName)
     ),
-    React.createElement("div", { style:{ display:"flex", justifyContent:"center", marginBottom:10 }, dangerouslySetInnerHTML:{ __html: buildBlossomSVG(weeks.w, true, isWatering) } }),
+    React.createElement("div", { style:{ display:"flex", justifyContent:"center", marginBottom:10 }, dangerouslySetInnerHTML:{ __html: buildBlossomSVG(weeks.w, true, false) } }),
     React.createElement("div", { style:{ display:"flex", gap:8, marginBottom:10 } },
       [["Days", overdue ? "0" : cd.d, C.text], ["Hrs", String(cd.h).padStart(2,"0"), C.mute], ["Min", String(cd.m).padStart(2,"0"), C.mute], ["Sec", String(cd.s).padStart(2,"0"), C.gold]].map(([lab, val, col]) =>
         React.createElement("div", { key:lab, style:{ flex:1, borderRadius:12, padding:"8px 0", textAlign:"center", background:C.bg0, border:"1px solid "+C.line } },
@@ -2666,55 +2663,7 @@ function BaseCamp() {
         React.createElement("div", { style:{ fontFamily:body, fontSize:13, color:C.text } }, new Date(due+"T12:00:00").toLocaleDateString(undefined,{month:"short",day:"numeric"}))
       )
     )
-))), waterPrompt && React.createElement("div", {
-    className: "fixed inset-0 z-50 flex items-center justify-center px-6",
-    style: {
-      background: "rgba(10,8,5,0.6)",
-      backdropFilter: "blur(4px)",
-      WebkitBackdropFilter: "blur(4px)"
-    },
-    onClick: () => setWaterPrompt(false)
-  }, React.createElement("div", {
-    className: "w-full max-w-sm rounded-2xl p-6 text-center",
-    style: {
-      background: C.card,
-      border: `1px solid ${C.line}`,
-      boxShadow: "0 20px 50px rgba(0,0,0,0.6)"
-    },
-    onClick: e => e.stopPropagation()
-  }, React.createElement("div", {
-    className: "text-5xl"
-  }, "💧"), React.createElement("h2", {
-    className: "mt-2 text-2xl",
-    style: {
-      fontFamily: display,
-      fontWeight: 600,
-      color: C.text
-    }
-  }, "Water check"), React.createElement("div", {
-    className: "mt-1 text-sm",
-    style: {
-      fontFamily: mono,
-      color: C.mute
-    }
-  }, day.water || 0, " of 8 today"), React.createElement("button", {
-    onClick: logWater,
-    className: "mt-5 w-full rounded-xl py-3 text-sm",
-    style: {
-      fontFamily: mono,
-      letterSpacing: "0.06em",
-      background: C.stone + "22",
-      color: C.stone,
-      border: `1px solid ${C.stone}`
-    }
-  }, "LOG A GLASS"), React.createElement("button", {
-    onClick: () => setWaterPrompt(false),
-    className: "mt-2 w-full rounded-xl py-2 text-sm",
-    style: {
-      fontFamily: mono,
-      color: C.mute
-    }
-  }, "NOT NOW"))), flash && React.createElement("div", {
+))), flash && React.createElement("div", {
     className: "pointer-events-none fixed inset-x-0 z-40 flex justify-center px-6",
     style: {
       bottom: "6.5rem"
@@ -2769,7 +2718,7 @@ function BaseCamp() {
     })()
   }, React.createElement("div", {
     key: tabAnimKey,
-    className: "relative z-[1] mx-auto max-w-md px-5 page-enter",
+    className: `relative z-[1] mx-auto max-w-md px-5 ${slideClass}`,
     style: {
       paddingTop: "max(2.5rem, env(safe-area-inset-top))",
       paddingBottom: "calc(100px + env(safe-area-inset-bottom, 0px))"
