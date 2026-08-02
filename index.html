@@ -40,14 +40,18 @@
   /* ── Apple Liquid Glass — enhanced ── */
   .glass {
     position: relative;
-    backdrop-filter: blur(32px) saturate(1.85) brightness(1.04);
-    -webkit-backdrop-filter: blur(32px) saturate(1.85) brightness(1.04);
+    background: linear-gradient(135deg, rgba(30,30,38,0.17), rgba(14,14,20,0.26)) !important;
+    backdrop-filter: blur(2px) saturate(1.8) brightness(1.07);
+    -webkit-backdrop-filter: blur(2px) saturate(1.8) brightness(1.07);
+    border: 1px solid rgba(255,255,255,0.22);
     box-shadow:
-      rgba(255,255,255,0.22) 0px 1px 0px inset,
-      rgba(255,255,255,0.07) 0px 0px 0px 0.5px inset,
-      rgba(255,255,255,0.04) 0px -1px 0px inset,
-      rgba(0,0,0,0.65) 0px 16px 40px -18px,
-      rgba(0,0,0,0.25) 0px 4px 12px -4px;
+      inset 0 0 0 1px rgba(255,255,255,0.14),
+      inset 0 1.5px 1px rgba(255,255,255,0.60),
+      inset 2px 0 2px -1px rgba(255,255,255,0.30),
+      inset -2px 0 2px -1px rgba(255,255,255,0.14),
+      inset 0 -4px 6px -3px rgba(0,0,0,0.42),
+      0 20px 44px -18px rgba(0,0,0,0.68),
+      0 6px 16px -6px rgba(0,0,0,0.38);
   }
   .glass::before {
     content: "";
@@ -55,12 +59,8 @@
     inset: 0;
     border-radius: inherit;
     pointer-events: none;
-    background: linear-gradient(
-      160deg,
-      rgba(255,255,255,0.14) 0%,
-      rgba(255,255,255,0.04) 30%,
-      rgba(255,255,255,0) 55%
-    );
+    background: linear-gradient(145deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.08) 10%, rgba(255,255,255,0) 26%);
+    mix-blend-mode: screen;
   }
   /* Edge refraction shimmer */
   .glass::after {
@@ -69,9 +69,7 @@
     inset: 0;
     border-radius: inherit;
     pointer-events: none;
-    background: linear-gradient(108deg, transparent 38%, rgba(255,255,255,0.09) 50%, transparent 62%);
-    background-size: 260% 100%;
-    background-position: 200% 0;
+    box-shadow: inset 0 0 0 0.5px rgba(255,255,255,0.45);
   }
   .limits .glass {
     backdrop-filter: blur(48px) saturate(2.4) brightness(1.08);
@@ -91,8 +89,8 @@
   /* ── Apple Liquid Glass SVG refraction (Chromium) ── */
   @supports (backdrop-filter: url(#lg-filter)) {
     .glass {
-      backdrop-filter: blur(10px) saturate(190%) brightness(1.07) url(#lg-filter);
-      -webkit-backdrop-filter: blur(10px) saturate(190%) brightness(1.07) url(#lg-filter);
+      backdrop-filter: blur(2px) saturate(180%) brightness(1.07) url(#lg-filter);
+      -webkit-backdrop-filter: blur(2px) saturate(180%) brightness(1.07) url(#lg-filter);
     }
     .limits .glass {
       backdrop-filter: blur(18px) saturate(240%) brightness(1.10) url(#lg-filter);
@@ -318,11 +316,9 @@
 <!-- Apple Liquid Glass SVG displacement filter (real refraction in Chromium) -->
 <svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
   <defs>
-    <filter id="lg-filter" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
-      <feTurbulence type="fractalNoise" baseFrequency="0.014 0.009" numOctaves="3" seed="7" result="noise"/>
-      <feGaussianBlur in="noise" stdDeviation="1.5" result="blurred"/>
-      <feDisplacementMap in="SourceGraphic" in2="blurred" scale="48" xChannelSelector="R" yChannelSelector="G" result="displaced"/>
-      <feComposite in="displaced" in2="SourceGraphic" operator="in"/>
+    <filter id="lg-filter" x="0%" y="0%" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feImage href="data:image/png;base64,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" x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="map"/>
+      <feDisplacementMap in="SourceGraphic" in2="map" scale="66" xChannelSelector="R" yChannelSelector="G"/>
     </filter>
   </defs>
 </svg>
@@ -357,7 +353,7 @@ const C = {
   gold: "#0A84FF",
   indigo: "#5E5CE6"
 };
-const DEPLOY_VER = "v16.5";
+const DEPLOY_VER = "v16.6";
 const ACCENTS = {
   blue:     { name: "Blue",     v: "#0A84FF" },
   green:    { name: "Green",    v: "#30D158" },
