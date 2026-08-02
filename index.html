@@ -36,23 +36,18 @@
   input, textarea, select { box-sizing: border-box; max-width: 100%; }
   input[type="time"], input[type="date"] { -webkit-appearance: none; appearance: none; }
   input[type="date"] { -webkit-appearance: none; }
-  html,body{overscroll-behavior:none;}
 
   /* ── Apple Liquid Glass — enhanced ── */
   .glass {
     position: relative;
-    background: linear-gradient(135deg, rgba(22,22,29, var(--glass-a, 0.30)), rgba(10,10,16, calc(var(--glass-a, 0.30) + 0.10))) !important;
-    backdrop-filter: blur(11px) saturate(1.8) brightness(1.08);
-    -webkit-backdrop-filter: blur(11px) saturate(1.8) brightness(1.08);
-    border: 1px solid rgba(255,255,255,0.22);
+    backdrop-filter: blur(32px) saturate(1.85) brightness(1.04);
+    -webkit-backdrop-filter: blur(32px) saturate(1.85) brightness(1.04);
     box-shadow:
-      inset 0 0 0 1px rgba(255,255,255,0.14),
-      inset 0 1.5px 1px rgba(255,255,255,0.60),
-      inset 2px 0 2px -1px rgba(255,255,255,0.30),
-      inset -2px 0 2px -1px rgba(255,255,255,0.14),
-      inset 0 -4px 6px -3px rgba(0,0,0,0.42),
-      0 20px 44px -18px rgba(0,0,0,0.68),
-      0 6px 16px -6px rgba(0,0,0,0.38);
+      rgba(255,255,255,0.22) 0px 1px 0px inset,
+      rgba(255,255,255,0.07) 0px 0px 0px 0.5px inset,
+      rgba(255,255,255,0.04) 0px -1px 0px inset,
+      rgba(0,0,0,0.65) 0px 16px 40px -18px,
+      rgba(0,0,0,0.25) 0px 4px 12px -4px;
   }
   .glass::before {
     content: "";
@@ -60,8 +55,12 @@
     inset: 0;
     border-radius: inherit;
     pointer-events: none;
-    background: linear-gradient(145deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.08) 10%, rgba(255,255,255,0) 26%);
-    mix-blend-mode: screen;
+    background: linear-gradient(
+      160deg,
+      rgba(255,255,255,0.14) 0%,
+      rgba(255,255,255,0.04) 30%,
+      rgba(255,255,255,0) 55%
+    );
   }
   /* Edge refraction shimmer */
   .glass::after {
@@ -70,7 +69,9 @@
     inset: 0;
     border-radius: inherit;
     pointer-events: none;
-    box-shadow: inset 0 0 0 0.5px rgba(255,255,255,0.45);
+    background: linear-gradient(108deg, transparent 38%, rgba(255,255,255,0.09) 50%, transparent 62%);
+    background-size: 260% 100%;
+    background-position: 200% 0;
   }
   .limits .glass {
     backdrop-filter: blur(48px) saturate(2.4) brightness(1.08);
@@ -90,8 +91,8 @@
   /* ── Apple Liquid Glass SVG refraction (Chromium) ── */
   @supports (backdrop-filter: url(#lg-filter)) {
     .glass {
-      backdrop-filter: blur(11px) saturate(180%) brightness(1.08) url(#lg-filter);
-      -webkit-backdrop-filter: blur(11px) saturate(180%) brightness(1.08) url(#lg-filter);
+      backdrop-filter: blur(10px) saturate(190%) brightness(1.07) url(#lg-filter);
+      -webkit-backdrop-filter: blur(10px) saturate(190%) brightness(1.07) url(#lg-filter);
     }
     .limits .glass {
       backdrop-filter: blur(18px) saturate(240%) brightness(1.10) url(#lg-filter);
@@ -317,9 +318,11 @@
 <!-- Apple Liquid Glass SVG displacement filter (real refraction in Chromium) -->
 <svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
   <defs>
-    <filter id="lg-filter" x="0%" y="0%" width="100%" height="100%" color-interpolation-filters="sRGB">
-      <feImage href="data:image/png;base64,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" x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="map"/>
-      <feDisplacementMap in="SourceGraphic" in2="map" scale="94" xChannelSelector="R" yChannelSelector="G"/>
+    <filter id="lg-filter" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.014 0.009" numOctaves="3" seed="7" result="noise"/>
+      <feGaussianBlur in="noise" stdDeviation="1.5" result="blurred"/>
+      <feDisplacementMap in="SourceGraphic" in2="blurred" scale="48" xChannelSelector="R" yChannelSelector="G" result="displaced"/>
+      <feComposite in="displaced" in2="SourceGraphic" operator="in"/>
     </filter>
   </defs>
 </svg>
@@ -354,7 +357,7 @@ const C = {
   gold: "#0A84FF",
   indigo: "#5E5CE6"
 };
-const DEPLOY_VER = "v16.9";
+const DEPLOY_VER = "v16.10";
 const ACCENTS = {
   blue:     { name: "Blue",     v: "#0A84FF" },
   green:    { name: "Green",    v: "#30D158" },
@@ -620,13 +623,6 @@ const DEFAULT_JOBS = [
   { id:"job_gosey", name:"Gosey Hill / Franklin", address:"4260 Gosey Hill Rd, Franklin, TN", contractor:"", system:"", status:"PENDING", history:"", billing:"", notes:"Needs Airtable card. Trim out.", wire:"", createdAt:Date.now() },
   { id:"job_perrybaker", name:"Perry Baker", address:"Unknown (materials: 960 Gravely Run Rd, McEwen)", contractor:"", system:"", status:"PENDING", history:"", billing:"", notes:"Trim out. Address unknown. Needs Airtable card.", wire:"", createdAt:Date.now() },
   { id:"job_samreid", name:"Sammy Reid", address:"Unknown", contractor:"", system:"", status:"PENDING", history:"", billing:"", notes:"Trim out. Address unknown. Needs Airtable card.", wire:"", createdAt:Date.now() },
-  { id:"job_boggs", name:"Bryan & Katie Boggs", address:"3235 Mecklenburg Dr, Columbia, TN 38401", contractor:"Direct — maintenance agreement", system:"Gas pack change out (~4-ton). Match existing tonnage + furnace BTU; verify curb fit.", status:"PENDING", history:"Scheduled Fri 7/24, 11 AM (~5 hr).", billing:"", notes:"Confirm tonnage for payroll. Contacts (731) 803-4846 / (931) 446-5296. Check gas line + electrical reconnect, thermostat reuse.", wire:"Gas pack 4-ton ~#8 — verify nameplate MOP. No O/B (no reversing valve).", createdAt:Date.now() },
-  { id:"job_shaw203", name:"Shaw — Lot 203 Cantor Farms", address:"Lot 203 Cantor Farms, John Sharp Rd, Spring Hill, TN 37174", contractor:"Shaw", system:"Trim out + set package unit", status:"PENDING", history:"Companion to 307/308.", billing:"", notes:"Material: bag / partial bag of 6\" flex. 1-ton holdback at trim-out final.", wire:"", createdAt:Date.now() },
-  { id:"job_shaw4b", name:"Shaw — Lot 4B (ERV / humidity)", address:"Lot 4B (Shaw), Cantor Farms area", contractor:"Shaw", system:"ERV (no humidifier) — humidity stuck ~72%", status:"IN PROGRESS", history:"Diagnostic 7/20 w/ Dad + Yancey.", billing:"", notes:"⚠️ Follow-up: extend whip + add sealtight (Logan). ERV ventilates, doesn't dehumidify — verify mode/balance; confirm AC dehumidifying.", wire:"", createdAt:Date.now() },
-  { id:"job_hatcher", name:"Hatcher Lane — Furnace Change Out", address:"1503 Hatcher Lane, Columbia, TN", contractor:"M&A / JC", system:"Two 4-ton furnaces, change out only", status:"PENDING", history:"", billing:"", notes:"Tonnage pending — confirm rate with Yancey (credits < 8).", wire:"", createdAt:Date.now() },
-  { id:"job_lot183", name:"Lot 183 — Mini Split Install", address:"Lot 183, John Sharp Rd, Spring Hill, TN 37174", contractor:"Shaw", system:"Daikin Entra single head 12k (1 ton), 18 SEER2, R32", status:"PENDING", history:"Line set installed wk Jul 20–26. Changed from 2-head 9k+12k to single 12k.", billing:"", notes:"1 ton for payroll. Heat range 5°F–65°F; no low-ambient cooling below 50°F.", wire:"Small load — size per nameplate (#14/#12). Inverter, no O/B terminal.", createdAt:Date.now() },
-  { id:"job_lot177", name:"Lot 177 — Daikin Mini Split Rough In", address:"Lot 177, Sharps Manor", contractor:"", system:"Daikin mini split, 12k single head (1 ton), 18 SEER", status:"PENDING", history:"Rough in.", billing:"", notes:"1 ton for payroll. Confirm subdivision.", wire:"Small load — size per nameplate (#14/#12). Inverter, no O/B terminal.", createdAt:Date.now() },
-  { id:"job_hagood", name:"Hagood — Rough In", address:"1112 Robin Hood Rd, Lewisburg, TN", contractor:"", system:"Rough in", status:"PENDING", history:"Rough-in ~7/17.", billing:"", notes:"Tonnage pending. Trim-out to come.", wire:"", createdAt:Date.now() },
 ];
 const DEFAULT_PREP = ["Install the car seat (get it checked)", "Pack the hospital bag", "Set up the crib", "Wash the baby clothes", "Pick a pediatrician", "Tour / pre-register at the hospital", "Stock diapers & wipes", "Freezer meals for the first weeks", "Test smoke & CO detectors", "Baby-proof outlets & cords", "Nail down the name", "Sort the finances / buffer"];
 const QUOTES = ["Certainty is the enemy of growth. Stay a little unsure.", "You don't have thoughts — you practice them. Choose which to rehearse.", "The mind obeys the questions you feed it. Ask better ones.", "Comfort is a slow surrender. Choose the harder good.", "Most cages are unlocked. Few people push the door.", "What you avoid runs your life from the shadows.", "You are the habit you keep repeating.", "Freedom is fewer wants, not more stuff.", "The obstacle and the way are the same road.", "A man is what he does when no metric is watching.", "Time isn't running out; it's running through. Notice it.", "You can't think your way into a life you have to live your way into.", "The quality of your attention is the quality of your life.", "Meaning is built, not found. Pick up the tools.", "Suffering you choose is training. Suffering you resist is damage.", "The self you defend is the self you can't grow past.", "Wisdom is seeing the second and third thing that happens.", "Control the controllable, release the rest, act anyway.", "Every yes is a quiet no to something else. Spend carefully.", "Silence is where your real opinions live. Visit often.", "A man plants trees whose shade he'll never sit in. Start planting.", "The days are long, the years are short. Spend them on what lasts.", "Legacy isn't what you leave for them — it's what you leave in them.", "Discipline is just love with a longer time horizon.", "Your kid won't remember what you bought. They'll remember if you showed up.", "Be the calm your family borrows when theirs runs out.", "The house doesn't have to be finished. The foundation does.", "Small, boring, consistent — that's how you build a life and a child.", "Character is what holds when the paycheck and the mood don't.", "The best inheritance is a steady father.", "What you tolerate, you teach.", "Strength is staying — soft, steady, and there."];
@@ -1309,8 +1305,7 @@ function BottomTabBar({ tab, openScreen, closeScreen, paired, unread }) {
     { id: "today",    label: "Home"     },
     { id: "messages", label: "Messages", badge: unread  },
     { id: "jobs",     label: "Jobs"      },
-    { id: "baby",     label: "Baby"      },
-    { id: "camp",     label: "Keeper"    },
+
     { id: "settings", label: "Settings"  },
   ];
   return React.createElement("nav", {
@@ -1436,7 +1431,6 @@ function BaseCamp() {
     C.cardHi = `rgba(44,44,46,${alphaHi})`;
     AI.panel = C.card;
     AI.panelSoft = C.cardHi;
-    try { document.documentElement.style.setProperty('--glass-a', (0.55 - g * 0.43).toFixed(3)); } catch(e){}
   };
   const setGlassLevel = g => {
     applyGlass(g);
@@ -1608,18 +1602,10 @@ function BaseCamp() {
       setBabyPhotos(bph);
       // Jobs — seed with DEFAULT_JOBS on first launch
       const savedJobs = await load("jobs", null);
-      if (savedJobs === null) { setJobs(DEFAULT_JOBS); }
-      else {
-        let gone = []; try { gone = JSON.parse(localStorage.getItem("keeper_deleted_jobs")||"[]"); } catch(e){}
-        const ids = new Set(savedJobs.map(j=>j.id));
-        const fresh = DEFAULT_JOBS.filter(d=>!ids.has(d.id) && gone.indexOf(d.id)<0);
-        const merged = fresh.length ? savedJobs.concat(fresh) : savedJobs;
-        setJobs(merged);
-        if (fresh.length) save("jobs", merged);
-      }
+      setJobs(savedJobs === null ? DEFAULT_JOBS : savedJobs);
       const storedPin = localStorage.getItem("jobs_pin");
       if (storedPin) setJobPin(storedPin);
-      if (localStorage.getItem("keeper_seen_ver") !== DEPLOY_VER) setWhatsNewOpen(true);
+      if (!localStorage.getItem("keeper_seen_v16")) setWhatsNewOpen(true);
       // One-time deploy update banner
       const lastVer = localStorage.getItem("keeper_deploy_ver");
       if (lastVer && lastVer !== DEPLOY_VER) { setShowUpdateBanner(true); setTimeout(() => setShowUpdateBanner(false), 3800); }
@@ -2452,7 +2438,7 @@ function BaseCamp() {
   whatsNewOpen && React.createElement("div", {
     key: "wn-overlay",
     style: { position:"fixed",inset:0,zIndex:999,background:"rgba(0,0,0,0.68)",display:"flex",alignItems:"flex-end",backdropFilter:"blur(3px)" },
-    onClick: () => { localStorage.setItem("keeper_seen_ver", DEPLOY_VER); setWhatsNewOpen(false); }
+    onClick: () => { localStorage.setItem("keeper_seen_v16","1"); setWhatsNewOpen(false); }
   },
     React.createElement("div", {
       style: { width:"100%",background:"rgba(22,22,24,0.97)",borderTop:"1px solid rgba(255,255,255,0.1)",borderRadius:"24px 24px 0 0",padding:"32px 24px",paddingBottom:"max(32px,env(safe-area-inset-bottom))",backdropFilter:"blur(50px) saturate(1.4)",animation:"whatsNewUp 0.5s cubic-bezier(0.32,0.72,0,1) both",WebkitBackdropFilter:"blur(50px) saturate(1.4)" },
@@ -2461,7 +2447,7 @@ function BaseCamp() {
       React.createElement("div", { style:{ textAlign:"center",marginBottom:28 } },
         React.createElement("div", { style:{ fontSize:40,marginBottom:10,lineHeight:1 } }, "\uD83C\uDF38"),
         React.createElement("div", { style:{ fontFamily:display,fontWeight:600,fontSize:22,color:C.text,marginBottom:6 } }, "What’s New in The Keeper"),
-        React.createElement("div", { style:{ fontFamily:body,fontSize:13,color:C.mute } }, ("Version " + DEPLOY_VER))
+        React.createElement("div", { style:{ fontFamily:body,fontSize:13,color:C.mute } }, "Version 15 — just for you")
       ),
       [["\uD83D\uDCAC","Real-time messaging","Send and receive messages with her in real time"],
        ["\u2601\uFE0F","Cloud sync","Your data stays in sync across every device"],
@@ -2477,7 +2463,7 @@ function BaseCamp() {
         );
       }),
       React.createElement("button", {
-        onClick: () => { localStorage.setItem("keeper_seen_ver", DEPLOY_VER); setWhatsNewOpen(false); },
+        onClick: () => { localStorage.setItem("keeper_seen_v16","1"); setWhatsNewOpen(false); },
         style: { width:"100%",marginTop:26,padding:"15px 0",background:C.rust,borderRadius:16,fontFamily:body,fontWeight:600,fontSize:16,color:contrastFor(C.rust),border:"none",cursor:"pointer",boxShadow:"0 4px 24px "+C.rust+"44" }
       }, "Let’s go")
     )
@@ -2649,156 +2635,38 @@ function BaseCamp() {
       fontFamily: mono,
       color: C.rust
     }
-  }, "Couldn't reach the server — pull down to try again.")), React.createElement("button", {
-    onClick: () => openScreen("baby"),
-    className: "glass press w-full p-5 text-left",
-    style: {
-      background: C.card,
-      border: `1px solid ${C.line}`,
-      borderRadius: 18
-    }
-  }, React.createElement("div", {
-    className: "flex items-baseline justify-between"
-  }, React.createElement(Eyebrow, {
-    color: C.olive
-  }, "Week ", weeks.w), React.createElement("span", {
-    className: "text-xs",
-    style: {
-      fontFamily: mono,
-      letterSpacing: "0.08em",
-      color: C.mute
-    }
-  }, sizeFor(weeks.w).name, " ›")), React.createElement("div", {
-    className: "flex items-baseline gap-2"
-  }, React.createElement("span", {
-    className: "tnum",
-    style: {
-      fontFamily: display,
-      fontWeight: 600,
-      fontSize: 40,
-      lineHeight: 1,
-      color: C.text
-    }
-  }, overdue ? "0" : cd.d), React.createElement("span", {
-    className: "text-sm",
-    style: {
-      fontFamily: body,
-      color: C.mute
-    }
-  }, overdue ? "any day now" : "days to go")), React.createElement("div", {
-    className: "mt-4 h-1.5 w-full overflow-hidden rounded-full",
-    style: {
-      background: C.bg0
-    }
-  }, React.createElement("div", {
-    className: "h-full rounded-full",
-    style: {
-      width: `${weeks.w / 40 * 100}%`,
-      background: C.olive,
-      transition: "width 700ms cubic-bezier(0.22,1,0.36,1)"
-    }
-  }))), React.createElement(Card, null, React.createElement("div", {
-    className: "mb-3 flex items-end justify-between"
-  }, React.createElement(Eyebrow, {
-    color: C.rust
-  }, "Before the baby"), React.createElement("span", {
-    className: "text-xs",
-    style: {
-      fontFamily: mono,
-      letterSpacing: "0.06em",
-      color: C.mute
-    }
-  }, prepDone, " / ", prep.length)), React.createElement("div", {
-    className: "mb-3 h-1.5 w-full overflow-hidden rounded-full",
-    style: {
-      background: C.bg0
-    }
-  }, React.createElement("div", {
-    className: "h-full rounded-full",
-    style: {
-      width: `${prep.length ? prepDone / prep.length * 100 : 0}%`,
-      background: C.rust,
-      transition: "width 500ms cubic-bezier(0.22,1,0.36,1)"
-    }
-  })), React.createElement("div", {
-    className: "space-y-1"
-  }, prep.map(item => React.createElement("div", {
-    key: item.id,
-    className: "flex items-center gap-3"
-  }, React.createElement(CheckCircle, {
-    done: item.done,
-    color: C.rust,
-    onClick: () => {
-      sfx.tick();
-      haptic(6);
-      savePrep(prep.map(x => x.id === item.id ? {
-        ...x,
-        done: true
-      } : x));
-      setTimeout(() => setPrep(cur => {
-        const next = cur.filter(x => x.id !== item.id);
-        save("prep", next);
-        return next;
-      }), 450);
-    }
-  }), React.createElement("input", {
-    ref: el => inputRefs.current["p" + item.id] = el,
-    value: item.text,
-    onChange: e => savePrep(prep.map(x => x.id === item.id ? {
-      ...x,
-      text: e.target.value
-    } : x)),
-    onKeyDown: e => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        const it = {
-          id: uid(),
-          text: "",
-          done: false
-        };
-        const next = [...prep];
-        next.splice(next.findIndex(x => x.id === item.id) + 1, 0, it);
-        savePrep(next);
-        setTimeout(() => inputRefs.current["p" + it.id]?.focus(), 0);
-      }
-      if (e.key === "Backspace" && item.text === "") {
-        e.preventDefault();
-        const idx = prep.findIndex(x => x.id === item.id);
-        const prev = prep[idx - 1];
-        savePrep(prep.filter(x => x.id !== item.id));
-        setTimeout(() => inputRefs.current["p" + prev?.id]?.focus(), 0);
-      }
-    },
-    placeholder: "Add a to-do",
-    className: "w-full py-1.5 text-sm outline-none",
-    style: {
-      fontFamily: body,
-      background: "transparent",
-      color: item.done ? C.mute : C.text,
-      textDecorationLine: item.done ? "line-through" : "none",
-      textDecorationColor: C.mute
-    }
-  })))), React.createElement("button", {
-    onClick: () => {
-      const it = {
-        id: uid(),
-        text: "",
-        done: false
-      };
-      savePrep([...prep, it]);
-      setTimeout(() => inputRefs.current["p" + it.id]?.focus(), 0);
-    },
-    className: "mt-2 flex items-center gap-2 text-sm",
-    style: {
-      fontFamily: body,
-      color: C.rust
-    }
-  }, React.createElement("span", {
-    className: "grid h-5 w-5 place-items-center rounded-full text-xs",
-    style: {
-      border: `1.5px solid ${C.rust}`
-    }
-  }, "+"), "Add")))), waterPrompt && React.createElement("div", {
+  }, "Couldn't reach the server — pull down to try again.")), React.createElement(Card, null,
+    React.createElement("div", { style:{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 } },
+      React.createElement(Eyebrow, { color:"#f9b4d0" }, "Week ", weeks.w, " · ", treeName),
+      React.createElement("button", { onClick:waterTree, className:"press", style:{ display:"flex", alignItems:"center", gap:6, padding:"6px 12px", borderRadius:10, border:"1.5px solid "+(wateredToday?C.line:C.rust), background:wateredToday?"transparent":C.rust+"18", cursor:wateredToday?"default":"pointer", fontFamily:body, fontSize:12, color:wateredToday?C.mute:C.rust } },
+        React.createElement("span", null, wateredToday ? "💧" : "🪣"),
+        wateredToday ? "Watered" : "Water"
+      )
+    ),
+    React.createElement("div", { style:{ display:"flex", justifyContent:"center", marginBottom:10 }, dangerouslySetInnerHTML:{ __html: buildBlossomSVG(weeks.w, true, isWatering) } }),
+    React.createElement("div", { style:{ display:"flex", gap:8, marginBottom:10 } },
+      [["Days", overdue ? "0" : cd.d, C.text], ["Hrs", String(cd.h).padStart(2,"0"), C.mute], ["Min", String(cd.m).padStart(2,"0"), C.mute], ["Sec", String(cd.s).padStart(2,"0"), C.gold]].map(([lab, val, col]) =>
+        React.createElement("div", { key:lab, style:{ flex:1, borderRadius:12, padding:"8px 0", textAlign:"center", background:C.bg0, border:"1px solid "+C.line } },
+          React.createElement("div", { style:{ fontFamily:display, fontWeight:600, fontSize:18, color:col, fontVariantNumeric:"tabular-nums" } }, overdue ? "—" : val),
+          React.createElement("div", { style:{ fontFamily:mono, fontSize:9, letterSpacing:"0.08em", color:C.mute, textTransform:"uppercase" } }, lab)
+        )
+      )
+    ),
+    React.createElement("div", { style:{ height:4, borderRadius:8, background:C.bg0, overflow:"hidden", marginBottom:10 } },
+      React.createElement("div", { style:{ height:"100%", borderRadius:8, background:C.olive, width:(weeks.w/40*100)+"%", transition:"width 700ms ease" } })
+    ),
+    React.createElement("div", { style:{ display:"flex", alignItems:"center", justifyContent:"space-between" } },
+      React.createElement("div", null,
+        React.createElement("div", { style:{ fontFamily:display, fontWeight:500, fontSize:16, color:C.text } }, sizeFor(weeks.w).name),
+        React.createElement("div", { style:{ fontFamily:body, fontSize:12, color:C.mute } }, "~", sizeFor(weeks.w).inch, "\" · ", sizeFor(weeks.w).cm, " cm")
+      ),
+      overdue ? React.createElement("div", { style:{ fontFamily:display, fontWeight:600, fontSize:15, color:C.text } }, "Any day now 🌸") :
+      React.createElement("div", { style:{ textAlign:"right" } },
+        React.createElement("div", { style:{ fontFamily:mono, fontSize:10, letterSpacing:"0.1em", color:C.mute, textTransform:"uppercase" } }, "due"),
+        React.createElement("div", { style:{ fontFamily:body, fontSize:13, color:C.text } }, new Date(due+"T12:00:00").toLocaleDateString(undefined,{month:"short",day:"numeric"}))
+      )
+    )
+))), waterPrompt && React.createElement("div", {
     className: "fixed inset-0 z-50 flex items-center justify-center px-6",
     style: {
       background: "rgba(10,8,5,0.6)",
@@ -2939,7 +2807,7 @@ function BaseCamp() {
       transform: "translateX(-50%)",
       whiteSpace: "nowrap"
     }
-  }, tab === "baby" ? "The Baby" : tab === "camp" ? "Ask the Keeper" : tab === "settings" ? "Settings" : tab === "messages" ? "Mabry" : tab === "jobs" ? (selectedJob ? "Job Details" : editingJob ? (editingJob.id ? "Edit Job" : "New Job") : "Jobs") : "")
+  }, tab === "settings" ? "Settings" : tab === "messages" ? "Mabry" : tab === "jobs" ? (selectedJob ? "Job Details" : editingJob ? (editingJob.id ? "Edit Job" : "New Job") : "Jobs") : "")
   ), tab === "messages" && React.createElement("div", {
     key: "messages",
     className: "rise"
@@ -3289,775 +3157,7 @@ function BaseCamp() {
       left: sound ? 26 : 2,
       transition: "left 220ms cubic-bezier(0.34,1.56,0.64,1)"
     }
-  }))))), tab === "baby" && React.createElement("div", {
-    key: "baby",
-    className: "rise space-y-4"
-  }, React.createElement(Card, null,
-      React.createElement("div", { style:{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 } },
-        React.createElement(Eyebrow, { color:"#f9b4d0" }, "Your Tree"),
-        React.createElement("span", { style:{ fontFamily:"'Cormorant Garamond','Georgia',serif", fontStyle:"italic", fontWeight:400, fontSize:20, color:"#f9b4d0", letterSpacing:"0.02em" } }, treeName)
-      ),
-      showTreeNamePrompt && React.createElement("div", { style:{ marginBottom:16, padding:"12px 14px", background:C.bg0, borderRadius:14, border:"1px solid "+C.rust+"44" } },
-        React.createElement("div", { style:{ fontFamily:body, fontSize:13, color:C.mute, marginBottom:8 } }, "What would you like to name your tree?"),
-        React.createElement("div", { style:{ display:"flex", gap:8 } },
-          React.createElement("input", { value:treeNameDraft, onChange:function(e){ setTreeNameDraft(e.target.value); }, onKeyDown:function(e){ if(e.key==="Enter") saveTreeName(treeNameDraft); }, placeholder:"e.g. Rosie", style:{ flex:1, padding:"8px 12px", borderRadius:10, background:C.cardHi, border:"1px solid "+C.rust, color:C.text, fontFamily:body, fontSize:14, outline:"none" } }),
-          React.createElement("button", { onClick:function(){ saveTreeName(treeNameDraft); }, style:{ padding:"8px 16px", borderRadius:10, background:C.rust, color:contrastFor(C.rust), fontFamily:body, fontSize:13, fontWeight:600, border:"none", cursor:"pointer", flexShrink:0 } }, "Name it ✨")
-        )
-      ),
-      React.createElement("div", { style:{ display:"flex", justifyContent:"center", position:"relative" }, dangerouslySetInnerHTML:{ __html: buildBlossomSVG(weeks.w, true, isWatering) } }),
-      React.createElement("div", { style:{ textAlign:"center", marginTop:6, fontFamily:body, fontSize:12, color:C.mute } }, "Week " + weeks.w + " · " + Math.round(Math.min(1, weeks.w/40) * BDATA.length) + " blossoms"),
-      React.createElement("div", { style:{ marginTop:14, display:"flex", flexDirection:"column", alignItems:"center", gap:6 } },
-        React.createElement("button", { onClick:waterTree, className:"press", style:{ display:"flex", alignItems:"center", gap:8, padding:"10px 22px", borderRadius:14, border:"1.5px solid "+(wateredToday?C.line:C.rust), background:wateredToday?"transparent":C.rust+"18", cursor:wateredToday?"default":"pointer", fontFamily:body, fontSize:14, color:wateredToday?C.mute:C.rust, transition:"all 220ms ease" } },
-          React.createElement("span", { style:{ fontSize:18, lineHeight:1 } }, wateredToday ? "💧" : "🪣"),
-          wateredToday ? "Watered today 💧" : "Water " + treeName
-        ),
-        wateringStreak > 0 && React.createElement("div", { style:{ fontFamily:body, fontSize:12, color:C.mute } }, "Watered " + wateringStreak + " day" + (wateringStreak!==1?"s":"") + " in a row 🔥"),
-        waterMsg && React.createElement("div", { key:waterMsg, style:{ fontFamily:body, fontSize:14, color:"#f9b4d0", animation:"wsFadeIn 0.4s ease" } }, waterMsg)
-      )
-    ), React.createElement(Card, null, React.createElement("div", {
-    className: "mb-3 flex items-center justify-between"
-  }, React.createElement(Eyebrow, {
-    color: C.olive
-  }, "Countdown"), React.createElement("div", {
-    className: "text-right"
-  }, React.createElement("div", {
-    className: "text-xs uppercase",
-    style: {
-      fontFamily: mono,
-      letterSpacing: "0.1em",
-      color: C.mute
-    }
-  }, "due"), React.createElement("input", {
-    type: "date",
-    value: due,
-    onChange: e => {
-      setDue(e.target.value);
-      save("settings", {
-        due: e.target.value
-      });
-    },
-    className: "rounded-lg px-1 py-0.5 text-sm outline-none",
-    style: {
-      fontFamily: body,
-      color: C.olive,
-      background: "transparent"
-    }
-  }))), overdue ? React.createElement("div", {
-    className: "py-2 text-3xl",
-    style: {
-      fontFamily: display,
-      fontWeight: 600,
-      color: C.text
-    }
-  }, "Any day now.") : React.createElement("div", {
-    className: "flex gap-2"
-  }, [["Days", cd.d], ["Hrs", cd.h], ["Min", cd.m], ["Sec", cd.s]].map(([lab, val]) => React.createElement("div", {
-    key: lab,
-    className: "min-w-0 flex-1 rounded-xl py-3 text-center",
-    style: {
-      background: C.bg0,
-      border: `1px solid ${C.line}`
-    }
-  }, React.createElement("div", {
-    style: {
-      fontFamily: display,
-      fontWeight: 600,
-      fontSize: 22,
-      color: lab === "Sec" ? C.gold : C.text,
-      fontVariantNumeric: "tabular-nums"
-    }
-  }, lab === "Days" ? val : String(val).padStart(2, "0")), React.createElement("div", {
-    className: "text-xs uppercase",
-    style: {
-      fontFamily: mono,
-      letterSpacing: "0.08em",
-      color: C.mute
-    }
-  }, lab)))), React.createElement("div", {
-    className: "mt-3 text-sm",
-    style: {
-      fontFamily: body,
-      color: C.mute
-    }
-  }, "week ", weeks.w, " · due ", new Date(due + "T12:00:00").toLocaleDateString(undefined, {
-    month: "long",
-    day: "numeric"
-  })), React.createElement("div", {
-    className: "mt-3 h-1.5 w-full overflow-hidden rounded-full",
-    style: {
-      background: C.bg0
-    }
-  }, React.createElement("div", {
-    className: "h-full rounded-full transition-all",
-    style: {
-      width: `${weeks.w / 40 * 100}%`,
-      background: C.olive
-    }
-  }))), React.createElement("div", {
-    className: "flex gap-4"
-  }, React.createElement(Card, {
-    className: "flex-1"
-  }, React.createElement(Eyebrow, {
-    color: C.tan
-  }, "Size"), React.createElement("div", {
-    className: "text-xl",
-    style: {
-      fontFamily: display,
-      fontWeight: 500,
-      color: C.text
-    }
-  }, sizeFor(weeks.w).name), React.createElement("div", {
-    className: "mt-1 text-sm",
-    style: {
-      fontFamily: body,
-      color: C.mute
-    }
-  }, "~", sizeFor(weeks.w).inch, "″ · ", sizeFor(weeks.w).cm, " cm")), React.createElement(Card, {
-    className: "flex-1"
-  }, React.createElement(Eyebrow, {
-    color: C.whiskey
-  }, "Kicks today"), React.createElement("div", {
-    className: "flex items-center justify-between"
-  }, React.createElement("button", {
-    onClick: () => patchDay({
-      kicks: Math.max(0, day.kicks - 1)
-    }),
-    className: "grid h-9 w-9 place-items-center rounded-full text-lg",
-    style: {
-      background: C.bg0,
-      color: C.mute
-    }
-  }, "–"), React.createElement("span", {
-    className: "text-2xl",
-    style: {
-      fontFamily: display,
-      fontWeight: 600,
-      color: C.text
-    }
-  }, day.kicks), React.createElement("button", {
-    onClick: () => patchDay({
-      kicks: day.kicks + 1
-    }),
-    className: "grid h-9 w-9 place-items-center rounded-full text-lg",
-    style: {
-      background: C.whiskey + "22",
-      color: C.whiskey
-    }
-  }, "+")))), React.createElement(Card, null, React.createElement(Eyebrow, {
-    color: C.olive
-  }, "This week — week ", weeks.w), React.createElement("p", {
-    className: "text-base leading-snug",
-    style: {
-      fontFamily: body,
-      color: C.text
-    }
-  }, devFor(weeks.w))), React.createElement(Card, null, React.createElement(Eyebrow, {
-    color: C.whiskey
-  }, "Bucket list"), React.createElement("div", {
-    className: "space-y-2"
-  }, bucket.map(item => React.createElement("div", {
-    key: item.id,
-    className: "flex items-start gap-3"
-  }, React.createElement("div", {
-    className: "pt-0.5"
-  }, React.createElement(CheckCircle, {
-    done: item.done,
-    color: C.whiskey,
-    onClick: () => saveBucket(bucket.map(x => x.id === item.id ? {
-      ...x,
-      done: !x.done
-    } : x))
-  })), React.createElement("input", {
-    ref: el => inputRefs.current["b" + item.id] = el,
-    value: item.text,
-    onChange: e => saveBucket(bucket.map(x => x.id === item.id ? {
-      ...x,
-      text: e.target.value
-    } : x)),
-    onKeyDown: e => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        const it = {
-          id: uid(),
-          text: "",
-          done: false
-        };
-        const next = [...bucket];
-        next.splice(next.findIndex(x => x.id === item.id) + 1, 0, it);
-        saveBucket(next);
-        setTimeout(() => inputRefs.current["b" + it.id]?.focus(), 0);
-      }
-      if (e.key === "Backspace" && item.text === "") {
-        e.preventDefault();
-        const i = bucket.findIndex(x => x.id === item.id);
-        const prev = bucket[i - 1];
-        saveBucket(bucket.filter(x => x.id !== item.id));
-        setTimeout(() => inputRefs.current["b" + prev?.id]?.focus(), 0);
-      }
-    },
-    placeholder: "Something to do someday",
-    className: "w-full py-1 text-sm outline-none",
-    style: {
-      fontFamily: body,
-      background: "transparent",
-      color: item.done ? C.mute : C.text,
-      textDecoration: item.done ? "line-through" : "none"
-    }
-  })))), React.createElement("button", {
-    onClick: () => {
-      const it = {
-        id: uid(),
-        text: "",
-        done: false
-      };
-      saveBucket([...bucket, it]);
-      setTimeout(() => inputRefs.current["b" + it.id]?.focus(), 0);
-    },
-    className: "mt-3 flex items-center gap-2 text-sm",
-    style: {
-      fontFamily: body,
-      color: C.whiskey
-    }
-  }, React.createElement("span", {
-    className: "grid h-5 w-5 place-items-center rounded-full text-xs",
-    style: {
-      border: `1.5px solid ${C.whiskey}`
-    }
-  }, "+"), "Add something")), React.createElement(Card, null, React.createElement("div", {
-    className: "mb-3 flex items-center justify-between"
-  }, React.createElement(Eyebrow, {
-    color: C.whiskey
-  }, "Name ideas"), React.createElement("button", {
-    onClick: randomName,
-    className: "mb-3 text-xs",
-    style: {
-      fontFamily: body,
-      color: C.stone
-    }
-  }, "Spin")), picked && React.createElement("div", {
-    key: spinKey,
-    className: "mb-3 rounded-xl py-4 text-center",
-    style: {
-      background: C.bg0,
-      border: `1px solid ${C.whiskey}`,
-      animation: "bcPop 350ms ease"
-    }
-  }, React.createElement("div", {
-    style: {
-      fontFamily: display,
-      fontWeight: 600,
-      fontSize: 24,
-      color: C.text
-    }
-  }, picked), React.createElement("div", {
-    className: "mt-1 text-xs uppercase",
-    style: {
-      fontFamily: mono,
-      letterSpacing: "0.14em",
-      color: C.mute
-    }
-  }, "tonight's contender")), React.createElement("div", {
-    className: "mb-2 flex gap-1"
-  }, [["all", "All"], ["boy", "Boy"], ["girl", "Girl"]].map(([k, l]) => React.createElement("button", {
-    key: k,
-    onClick: () => setNameFilter(k),
-    className: "flex-1 rounded-lg py-1.5 text-xs",
-    style: {
-      fontFamily: body,
-      background: nameFilter === k ? C.cardHi : C.bg0,
-      color: nameFilter === k ? C.text : C.mute,
-      border: `1px solid ${nameFilter === k ? C.line : "transparent"}`
-    }
-  }, l))), React.createElement("div", {
-    className: "space-y-1"
-  }, filteredNames.map(item => React.createElement("div", {
-    key: item.id,
-    className: "flex items-center gap-2"
-  }, React.createElement("button", {
-    onClick: () => cycleGender(item.id),
-    "aria-label": "Cycle gender tag",
-    className: "grid h-6 w-6 shrink-0 place-items-center rounded-md text-xs",
-    style: {
-      fontFamily: mono,
-      background: C.bg0,
-      color: item.gender === "boy" ? C.indigo : item.gender === "girl" ? C.rust : C.mute,
-      border: `1px solid ${C.line}`
-    }
-  }, item.gender === "boy" ? "B" : item.gender === "girl" ? "G" : "—"), React.createElement("input", {
-    ref: el => inputRefs.current["n" + item.id] = el,
-    value: item.text,
-    onChange: e => saveNames(names.map(x => x.id === item.id ? {
-      ...x,
-      text: e.target.value
-    } : x)),
-    onKeyDown: e => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        addName(item.id);
-      }
-      if (e.key === "Backspace" && item.text === "") {
-        e.preventDefault();
-        const i = names.findIndex(x => x.id === item.id);
-        const prev = names[i - 1];
-        saveNames(names.filter(x => x.id !== item.id));
-        setTimeout(() => inputRefs.current["n" + prev?.id]?.focus(), 0);
-      }
-    },
-    placeholder: "Add a name",
-    className: "w-full py-1.5 text-sm outline-none",
-    style: {
-      fontFamily: body,
-      background: "transparent",
-      color: C.text
-    }
-  }), React.createElement("button", {
-    onClick: () => saveNames(names.map(x => x.id === item.id ? {
-      ...x,
-      fav: !x.fav
-    } : x)),
-    "aria-label": "Favorite",
-    className: "shrink-0 text-sm",
-    style: {
-      color: item.fav ? C.gold : C.line
-    }
-  }, "★")))), React.createElement("button", {
-    onClick: () => addName(),
-    className: "mt-2 flex items-center gap-2 text-sm",
-    style: {
-      fontFamily: body,
-      color: C.whiskey
-    }
-  }, React.createElement("span", {
-    className: "grid h-5 w-5 place-items-center rounded-full text-xs",
-    style: {
-      border: `1.5px solid ${C.whiskey}`
-    }
-  }, "+"), "Add")), React.createElement("div", {
-    className: "rounded-2xl p-4",
-    style: {
-      background: C.cardHi,
-      border: `1px solid ${C.line}`
-    }
-  }, React.createElement("div", {
-    className: "text-sm leading-relaxed",
-    style: {
-      fontFamily: body,
-      color: C.mute
-    }
-  }, "Sizes are ballpark averages, not measurements. The real numbers — and the ones that matter — come from her prenatal visits through ", new Date(due + "T12:00:00").toLocaleDateString(undefined, {
-    month: "long"
-  }), ".")), React.createElement(Card, null,
-      React.createElement("div", { style:{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 } },
-        React.createElement(Eyebrow, { color:C.whiskey }, "Photos"),
-        babyPhotos.length < 10 && React.createElement("button", { onClick:function(){ var el=document.getElementById("bc-photo-in"); el&&el.click(); }, style:{ fontFamily:body, fontSize:13, color:C.stone, padding:"4px 12px", borderRadius:8, border:"1px solid "+C.line, background:C.bg0, cursor:"pointer" } }, "+ Add")
-      ),
-      babyPhotos.length === 0 && React.createElement("div", { style:{ display:"flex", flexDirection:"column", alignItems:"center", padding:"28px 0", gap:10 } },
-        React.createElement("div", { style:{ fontSize:32 } }, "🌸"),
-        React.createElement("div", { style:{ fontFamily:body, fontSize:13, color:C.mute, textAlign:"center", lineHeight:1.7 } }, "Your photos will live here.", React.createElement("br"), "Tap + Add to get started.")
-      ),
-      babyPhotos.length > 0 && React.createElement("div", { style:{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 } },
-        babyPhotos.map(function(photo, idx){ return React.createElement("button", { key:idx, onClick:function(){ setPhotoFull(photo); }, className:"press", style:{ padding:0, border:"none", background:"none", cursor:"pointer", borderRadius:12, overflow:"hidden", aspectRatio:"1/1", display:"block" } }, React.createElement("img", { src:photo, alt:"", style:{ width:"100%", height:"100%", objectFit:"cover", display:"block" } })); })
-      ),
-      React.createElement("input", { id:"bc-photo-in", type:"file", accept:"image/*", style:{ display:"none" },
-        onChange:function(e){
-          var file=e.target.files[0]; if(!file) return;
-          if(babyPhotos.length>=10){ setFlash("Gallery full — max 10 photos"); return; }
-          var reader=new FileReader();
-          reader.onload=function(ev){ var img=new window.Image(); img.onload=function(){ var canvas=document.createElement("canvas"),maxW=900,sc=Math.min(1,maxW/img.width); canvas.width=img.width*sc; canvas.height=img.height*sc; canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height); var data=canvas.toDataURL("image/jpeg",0.72); saveBabyPhotos(babyPhotos.concat([data])); sfx.pop(); }; img.src=ev.target.result; }; reader.readAsDataURL(file); e.target.value="";
-        }
-      }),
-      photoFull && React.createElement("div", { onClick:function(){ setPhotoFull(null); }, style:{ position:"fixed", inset:0, zIndex:998, background:"rgba(0,0,0,0.92)", display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(8px)" } },
-        React.createElement("img", { src:photoFull, alt:"", style:{ maxWidth:"95vw", maxHeight:"90vh", borderRadius:16, objectFit:"contain", boxShadow:"0 8px 64px rgba(0,0,0,0.8)" }, onClick:function(e){ e.stopPropagation(); } }),
-        React.createElement("button", { onClick:function(){ setPhotoFull(null); }, style:{ position:"fixed", top:20, right:20, width:36, height:36, borderRadius:"50%", background:"rgba(255,255,255,0.15)", border:"none", cursor:"pointer", fontSize:18, color:"#fff", display:"flex", alignItems:"center", justifyContent:"center" } }, "✕")
-      )
-    )), tab === "camp" && React.createElement("div", {
-    key: "camp",
-    className: "rise space-y-4"
-  }, React.createElement(Card, null, React.createElement("div", {
-    className: "mb-3 flex items-center justify-between"
-  }, React.createElement(Eyebrow, {
-    color: AI.clay
-  }, "Ask the Keeper"), React.createElement("button", {
-    onClick: () => setShowEndpoint(v => !v),
-    className: "mb-3 text-sm",
-    style: {
-      color: C.mute
-    }
-  }, "⚙")), (showEndpoint || !aiUrl) && React.createElement("div", {
-    className: "mb-3"
-  }, React.createElement("div", {
-    className: "mb-1 text-xs uppercase",
-    style: {
-      fontFamily: mono,
-      letterSpacing: "0.1em",
-      color: C.mute
-    }
-  }, "Endpoint URL"), React.createElement("input", {
-    value: aiDraft,
-    onChange: e => setAiDraft(e.target.value),
-    placeholder: "https://your-worker.workers.dev",
-    className: "w-full rounded-xl px-3 py-2 text-sm outline-none",
-    style: {
-      fontFamily: body,
-      color: C.text,
-      background: C.bg0,
-      border: `1px solid ${C.line}`
-    }
-  }), React.createElement("button", {
-    onClick: saveAiUrl,
-    className: "mt-2 rounded-full px-5 py-2 text-sm",
-    style: {
-      fontFamily: body,
-      background: AI.clay,
-      color: contrastFor(AI.clay)
-    }
-  }, "Save"), React.createElement("p", {
-    className: "mt-2 text-xs leading-relaxed",
-    style: {
-      fontFamily: body,
-      color: C.mute
-    }
-  }, "Paste the Worker URL from setup. Your API key stays on the server — never in this app."), React.createElement("div", {
-    className: "mt-4 mb-1 text-xs uppercase",
-    style: {
-      fontFamily: mono,
-      letterSpacing: "0.1em",
-      color: C.mute
-    }
-  }, "Pairing code"), React.createElement("input", {
-    value: pairDraft,
-    onChange: e => setPairDraft(e.target.value),
-    placeholder: "same long code in both apps",
-    className: "w-full rounded-xl px-3 py-2 text-sm outline-none",
-    style: {
-      fontFamily: body,
-      color: C.text,
-      background: C.bg0,
-      border: `1px solid ${C.line}`
-    }
-  }), React.createElement("button", {
-    onClick: savePair,
-    className: "mt-2 rounded-full px-5 py-2 text-sm",
-    style: {
-      fontFamily: body,
-      background: AI.clay,
-      color: contrastFor(AI.clay)
-    }
-  }, "Pair"), React.createElement("p", {
-    className: "mt-2 text-xs leading-relaxed",
-    style: {
-      fontFamily: body,
-      color: C.mute
-    }
-  }, "Same room code in both apps = real two-way chat. Messages are stored in the relay and persist across sessions.")), aiUrl && React.createElement(React.Fragment, null, React.createElement("div", {
-    className: "mb-3 space-y-3 rounded-2xl px-3.5 py-3",
-    style: {
-      maxHeight: 360,
-      overflowY: "auto",
-      background: AI.panel,
-      border: `1px solid ${AI.line}`
-    }
-  }, aiMessages.length === 0 && React.createElement("p", {
-    className: "text-sm leading-relaxed",
-    style: {
-      fontFamily: body,
-      color: AI.mute
-    }
-  }, "Ask anything — prep, gear, budgeting, mindset, being a first-time dad. It knows where you are and what's still on your lists, and it can add to them for you."), aiMessages.map((m, i) => {
-    if (m.role === "note") return React.createElement("div", {
-      key: i,
-      className: "flex items-center gap-2 py-1"
-    }, React.createElement("span", {
-      className: "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px]",
-      style: {
-        background: AI.claySoft,
-        color: AI.clay
-      }
-    }, "✓"), React.createElement("span", {
-      className: "text-xs",
-      style: {
-        fontFamily: body,
-        color: AI.mute
-      }
-    }, m.content), i === aiMessages.length - 1 && aiUndo && React.createElement("button", {
-      onClick: undoAi,
-      className: "text-xs",
-      style: {
-        fontFamily: body,
-        color: AI.clay,
-        textDecoration: "underline",
-        textUnderlineOffset: 2
-      }
-    }, "undo"));
-    if (m.role === "user") return React.createElement("div", {
-      key: i,
-      className: "flex justify-end"
-    }, React.createElement("div", {
-      className: "max-w-[85%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed",
-      style: {
-        fontFamily: body,
-        background: AI.clay,
-        color: contrastFor(AI.clay),
-        whiteSpace: "pre-wrap",
-        boxShadow: `0 2px 10px ${AI.clay}44`
-      }
-    }, m.content));
-    return React.createElement("div", {
-      key: i,
-      className: "py-1"
-    }, React.createElement("div", {
-      className: "text-[15px] leading-[1.65]",
-      style: {
-        fontFamily: aiSerif,
-        color: AI.text,
-        whiteSpace: "pre-wrap"
-      }
-    }, m.content));
-  }), aiBusy && React.createElement("div", {
-    className: "flex items-center gap-1.5 pl-1"
-  }, [0, 1, 2].map(i => React.createElement("span", {
-    key: i,
-    className: "inline-block h-1.5 w-1.5 rounded-full",
-    style: {
-      background: AI.clay,
-      animation: `bcpulse 1.1s ${i * 0.16}s infinite ease-in-out`
-    }
-  })))), aiMessages.length === 0 && React.createElement("div", {
-    className: "mb-3 flex flex-wrap gap-2"
-  }, AI_PROMPTS.map(p => React.createElement("button", {
-    key: p,
-    onClick: () => askWith(p),
-    className: "rounded-full px-3 py-1.5 text-xs",
-    style: {
-      fontFamily: body,
-      background: AI.panelSoft,
-      color: AI.text,
-      border: `1px solid ${AI.line}`
-    }
-  }, p))), React.createElement("div", {
-    className: "flex gap-2"
-  }, React.createElement("input", {
-    value: aiInput,
-    onChange: e => setAiInput(e.target.value),
-    onKeyDown: e => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        askAI();
-      }
-    },
-    placeholder: "Ask, or tell it what to add…",
-    className: "min-w-0 flex-1 rounded-full px-4 py-2.5 text-sm outline-none",
-    style: {
-      fontFamily: body,
-      color: AI.text,
-      background: AI.panel,
-      border: `1px solid ${AI.line}`
-    }
-  }), React.createElement("button", {
-    onClick: askAI,
-    disabled: aiBusy || !aiInput.trim(),
-    className: "shrink-0 rounded-full px-5 py-2.5 text-sm",
-    style: {
-      fontFamily: body,
-      background: aiBusy || !aiInput.trim() ? AI.panelSoft : AI.clay,
-      color: aiBusy || !aiInput.trim() ? AI.mute : contrastFor(AI.clay)
-    }
-  }, "Send")), aiMessages.length > 0 && React.createElement("button", {
-    onClick: () => setAiMessages([]),
-    className: "mt-2 text-xs",
-    style: {
-      fontFamily: body,
-      color: AI.mute
-    }
-  }, "Clear chat"))), React.createElement(Card, null, React.createElement(Eyebrow, {
-    color: C.rust
-  }, "Grill & smoke — pull temps"), React.createElement("div", {
-    className: "space-y-1"
-  }, GRILL.map(([item, temp, note]) => React.createElement("div", {
-    key: item,
-    className: "flex items-baseline justify-between gap-2 border-b py-1.5",
-    style: {
-      borderColor: C.line
-    }
-  }, React.createElement("span", {
-    className: "text-sm",
-    style: {
-      fontFamily: body,
-      color: C.text
-    }
-  }, item), React.createElement("span", {
-    className: "shrink-0 text-right"
-  }, React.createElement("span", {
-    style: {
-      fontFamily: mono,
-      color: C.whiskey
-    }
-  }, temp), React.createElement("span", {
-    className: "ml-2 text-xs",
-    style: {
-      fontFamily: body,
-      color: C.mute
-    }
-  }, note)))))), React.createElement(Card, null, React.createElement(Eyebrow, {
-    color: C.whiskey
-  }, "Timer"), React.createElement("div", {
-    className: "text-center text-5xl",
-    style: {
-      fontFamily: display,
-      fontWeight: 600,
-      color: timerRunning ? C.whiskey : C.text,
-      fontVariantNumeric: "tabular-nums"
-    }
-  }, fmtTimer(timerLeft)), React.createElement("div", {
-    className: "mt-3 flex justify-center gap-2"
-  }, [["−1m", -60], ["+30s", 30], ["+1m", 60], ["+5m", 300]].map(([lab, sec]) => React.createElement("button", {
-    key: lab,
-    onClick: () => setTimerLeft(t => Math.max(0, t + sec)),
-    className: "flex-1 rounded-lg py-1.5 text-xs",
-    style: {
-      fontFamily: mono,
-      background: C.bg0,
-      color: C.mute,
-      border: `1px solid ${C.line}`
-    }
-  }, lab))), React.createElement("div", {
-    className: "mt-3 grid grid-cols-5 gap-2"
-  }, [1, 3, 5, 10, 15, 20, 30, 45, 60, 90].map(m => React.createElement("button", {
-    key: m,
-    onClick: () => startTimer(m),
-    className: "rounded-lg py-2 text-sm",
-    style: {
-      fontFamily: mono,
-      background: C.bg0,
-      color: C.text,
-      border: `1px solid ${C.line}`
-    }
-  }, m, "m"))), React.createElement("div", {
-    className: "mt-3 flex gap-2"
-  }, React.createElement("button", {
-    onClick: () => setTimerRunning(r => !r),
-    disabled: timerLeft === 0,
-    className: "flex-1 rounded-xl py-2.5 text-sm",
-    style: {
-      fontFamily: mono,
-      letterSpacing: "0.08em",
-      background: C.whiskey + "22",
-      color: timerLeft === 0 ? C.line : C.whiskey,
-      border: `1px solid ${timerLeft === 0 ? C.line : C.whiskey}`
-    }
-  }, timerRunning ? "PAUSE" : "START"), React.createElement("button", {
-    onClick: () => {
-      setTimerRunning(false);
-      setTimerLeft(0);
-    },
-    className: "flex-1 rounded-xl py-2.5 text-sm",
-    style: {
-      fontFamily: mono,
-      letterSpacing: "0.08em",
-      background: C.bg0,
-      color: C.mute,
-      border: `1px solid ${C.line}`
-    }
-  }, "RESET"))), React.createElement(Card, null, React.createElement(Eyebrow, {
-    color: C.stone
-  }, "Hydration"), React.createElement("div", {
-    className: "flex items-center justify-between mb-3"
-  }, React.createElement("div", null,
-    React.createElement("div", { style: { fontFamily: display, fontWeight: 600, fontSize: 32, color: C.text, lineHeight: 1 } }, day.water || 0, React.createElement("span", { style: { fontFamily: body, fontSize: 16, color: C.mute, marginLeft: 4 } }, "/ 8")),
-    React.createElement("div", { style: { fontFamily: body, fontSize: 12, color: C.mute, marginTop: 2 } }, "glasses today")
-  ), React.createElement("button", {
-    onClick: logWater,
-    disabled: (day.water || 0) >= 12,
-    className: "press grid place-items-center rounded-full",
-    style: { width: 52, height: 52, background: C.stone + "22", border: `1.5px solid ${C.stone}`, color: C.stone, fontSize: 22 }
-  }, "💧")), React.createElement("div", {
-    className: "w-full h-2 rounded-full overflow-hidden mb-3",
-    style: { background: C.bg0 }
-  }, React.createElement("div", {
-    style: { height: "100%", borderRadius: 9999, background: C.stone, width: `${Math.min(100, ((day.water || 0) / 8) * 100)}%`, transition: "width 0.4s ease" }
-  })), React.createElement("div", {
-    className: "border-t pt-3",
-    style: { borderColor: C.line }
-  }, React.createElement("div", {
-    className: "flex items-center justify-between mb-2"
-  }, React.createElement("span", { style: { fontFamily: body, fontSize: 13, color: C.text } }, "Reminders"), React.createElement("button", {
-    onClick: waterCfg.on ? () => { const next = { ...waterCfg, on: false }; setWaterCfg(next); save("waterCfg", next); } : enableWaterReminders,
-    className: "press relative h-7 w-12 rounded-full shrink-0",
-    style: { background: waterCfg.on ? C.stone : C.cardHi, border: `1px solid ${C.line}`, transition: "background 200ms ease" }
-  }, React.createElement("span", {
-    className: "absolute top-0.5 h-5 w-5 rounded-full",
-    style: { background: "#fff", left: waterCfg.on ? 22 : 2, transition: "left 220ms cubic-bezier(0.34,1.56,0.64,1)" }
-  }))), waterCfg.on && React.createElement("div", {
-    className: "flex gap-2"
-  }, [["1h", 60], ["90m", 90], ["2h", 120], ["3h", 180]].map(([lab, mins]) => React.createElement("button", {
-    key: mins,
-    onClick: () => setWaterEvery(mins),
-    className: "flex-1 rounded-lg py-1.5 text-xs",
-    style: {
-      fontFamily: mono,
-      background: waterCfg.everyMin === mins ? C.stone + "22" : C.bg0,
-      color: waterCfg.everyMin === mins ? C.stone : C.mute,
-      border: `1px solid ${waterCfg.everyMin === mins ? C.stone : C.line}`
-    }
-  }, lab))))), React.createElement(Card, null, React.createElement(Eyebrow, {
-    color: C.tan
-  }, "Backup & Cloud Sync"), React.createElement("p", {
-    className: "mb-3 text-sm leading-relaxed",
-    style: {
-      fontFamily: body,
-      color: C.mute
-    }
-  }, "Your data auto-syncs to the relay so it survives a phone swap or Safari cache wipe. You can also grab a local file backup anytime."),
-  cloudSyncAt > 0 && React.createElement("div", {
-    className: "mb-3 flex items-center gap-1.5 text-xs",
-    style: { fontFamily: body, color: C.olive }
-  }, "☁ Synced ", noteAge(cloudSyncAt)),
-  React.createElement("div", {
-    className: "flex gap-2"
-  }, React.createElement("button", {
-    onClick: backupData,
-    className: "flex-1 rounded-xl py-2.5 text-sm",
-    style: {
-      fontFamily: mono,
-      letterSpacing: "0.06em",
-      background: C.tan + "22",
-      color: C.tan,
-      border: `1px solid ${C.tan}`
-    }
-  }, "BACK UP"), React.createElement("label", {
-    className: "flex-1 cursor-pointer rounded-xl py-2.5 text-center text-sm",
-    style: {
-      fontFamily: mono,
-      letterSpacing: "0.06em",
-      background: C.bg0,
-      color: C.text,
-      border: `1px solid ${C.line}`
-    }
-  }, "RESTORE", React.createElement("input", {
-    type: "file",
-    accept: "application/json,.json",
-    className: "hidden",
-    onChange: e => {
-      restoreData(e.target.files[0]);
-      e.target.value = "";
-    }
-  }))), React.createElement("div", {
-    className: "mt-4 mb-1 text-xs uppercase",
-    style: { fontFamily: mono, letterSpacing: "0.1em", color: C.mute }
-  }, "Relay URL"), React.createElement("input", {
-    value: relayDraft,
-    onChange: e => setRelayDraft(e.target.value),
-    placeholder: DEFAULT_RELAY_URL,
-    className: "w-full rounded-xl px-3 py-2 text-sm outline-none",
-    style: { fontFamily: body, color: C.text, background: C.bg0, border: `1px solid ${C.line}` }
-  }), React.createElement("button", {
-    onClick: saveRelayUrl,
-    className: "mt-2 rounded-full px-5 py-2 text-sm",
-    style: { fontFamily: body, background: C.tan + "44", color: C.tan }
-  }, "Save relay URL"), React.createElement("p", {
-    className: "mt-1 text-xs",
-    style: { fontFamily: body, color: C.mute }
-  }, "The keeper-relay worker handles messaging + cloud sync. Leave as-is unless you're self-hosting."))), tab === "jobs" && (() => {
+  }))))), tab === "jobs" && (() => {
   const JF = {"active":["IN PROGRESS","PENDING","HOLD"],"scheduled":["SCHEDULED"],"done":["DONE"],"all":null};
   const filtJobs = jobs.filter(j => {
     const ok = jobFilter === "all" ? true : (JF[jobFilter]||[]).includes(j.status);
@@ -4130,7 +3230,7 @@ function BaseCamp() {
       ),
       React.createElement(Card,null,
         [
-          {icon:"📍",label:"Address",val:job.address?React.createElement("a",{href:"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(job.address),target:"_blank",rel:"noopener",style:{color:C.text,textDecoration:"underline",textUnderlineOffset:"2px"}},job.address):job.address},
+          {icon:"📍",label:"Address",val:job.address},
           job.contractor&&{icon:"🏗",label:"Contractor",val:job.contractor},
           job.system&&{icon:"❄️",label:"System",val:job.system},
           job.wire&&{icon:"🔌",label:"Wire",val:job.wire},
@@ -4153,7 +3253,7 @@ function BaseCamp() {
       ),
       React.createElement("div",{style:{paddingTop:4,paddingBottom:4,textAlign:"center"}},
         React.createElement("button",{
-          onClick:()=>{if(!window.confirm("Delete "+job.name+"?"))return;try{if(/^job_/.test(job.id)){var g=JSON.parse(localStorage.getItem("keeper_deleted_jobs")||"[]");if(g.indexOf(job.id)<0){g.push(job.id);localStorage.setItem("keeper_deleted_jobs",JSON.stringify(g));}}}catch(e){}saveJobs(jobs.filter(j=>j.id!==job.id));setSelectedJob(null);},
+          onClick:()=>{if(!window.confirm("Delete "+job.name+"?"))return;saveJobs(jobs.filter(j=>j.id!==job.id));setSelectedJob(null);},
           style:{fontFamily:body,fontSize:14,color:"#FF453A",background:"rgba(255,69,58,0.08)",padding:"12px 32px",borderRadius:22,border:"1px solid rgba(255,69,58,0.22)",cursor:"pointer",touchAction:"manipulation",WebkitTapHighlightColor:"transparent"}
         },"Delete Job")
       )
