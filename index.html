@@ -42,8 +42,8 @@
   /* ── Apple Liquid Glass — enhanced ── */
   .glass {
     position: relative;
-    backdrop-filter: blur(48px) saturate(2.4) brightness(1.08);
-    -webkit-backdrop-filter: blur(48px) saturate(2.4) brightness(1.08);
+    backdrop-filter: blur(44px) saturate(1.8) brightness(1.06);
+    -webkit-backdrop-filter: blur(44px) saturate(1.8) brightness(1.06);
     box-shadow:
       rgba(255,255,255,0.38) 0px 1px 0px inset,
       rgba(255,255,255,0.13) 0px -1px 0px inset,
@@ -103,10 +103,10 @@
     border-radius: 100px;
     backdrop-filter: blur(64px) saturate(2.6) brightness(1.1);
     -webkit-backdrop-filter: blur(64px) saturate(2.6) brightness(1.1);
-    background: rgba(9,9,11,0.52);
+    background: rgba(22,22,24,0.78);
     box-shadow:
-      rgba(255,255,255,0.28) 0px 1px 0px inset,
-      rgba(255,255,255,0.09) 0px 0px 0px 0.5px inset,
+      rgba(255,255,255,0.18) 0px 0.5px 0px inset,
+      rgba(255,255,255,0.07) 0px 0px 0px 0.5px inset,
       rgba(0,0,0,0.62) 0 12px 40px -6px,
       rgba(0,0,0,0.35) 0 4px 14px -4px;
     overflow: hidden;
@@ -153,7 +153,7 @@
   .tab-item:active { opacity: 0.5; }
   .tab-item.active .tab-icon { background: rgba(255,255,255,0.09); border-radius: 10px; padding: 4px; width: 36px; height: 36px; }
   .tab-icon {
-    width: 28px; height: 28px;
+    width: 26px; height: 26px;
     display: flex; align-items: center; justify-content: center;
     line-height: 1;
     transition: transform 0.24s cubic-bezier(0.34,1.56,0.64,1), color 0.18s ease, filter 0.2s ease;
@@ -162,9 +162,9 @@
   }
   .tab-item.active .tab-icon { transform: scale(1.14); filter: drop-shadow(0 2px 6px currentColor); }
   .tab-label {
-    font-size: 10.5px;
+    font-size: 11px;
     font-weight: 500;
-    letter-spacing: 0.02em;
+    letter-spacing: 0;
     transition: color 0.18s ease, opacity 0.18s ease;
     line-height: 1;
   }
@@ -181,11 +181,11 @@
 
   /* ── Press feedback ── */
   .press {
-    transition: transform 0.12s cubic-bezier(0.34,1.56,0.64,1), opacity 0.1s ease;
+    transition: transform 0.08s cubic-bezier(0.4,0,0.2,1), opacity 0.08s ease;
     cursor: pointer;
     -webkit-user-select: none; user-select: none;
   }
-  .press:active { transform: scale(0.95); opacity: 0.8; }
+  .press:active { transform: scale(0.97); opacity: 0.88; }
 
   /* ── Card stagger rise ── */
   .card-0 { animation: cardRise 0.42s cubic-bezier(0.22,1,0.36,1) 0.06s both; }
@@ -361,7 +361,7 @@ const C = {
   gold: "#0A84FF",
   indigo: "#5E5CE6"
 };
-const DEPLOY_VER = "v16.25";
+const DEPLOY_VER = "v16.29";
 const ACCENTS = {
   blue:     { name: "Blue",     v: "#0A84FF" },
   green:    { name: "Green",    v: "#30D158" },
@@ -1219,12 +1219,12 @@ const Card = ({
   stagger = -1,
   accent
 }) => React.createElement("div", {
-  className: `glass relative overflow-hidden p-5 ${stagger >= 0 ? "card-"+Math.min(6,stagger) : ""} ${className}`,
+  className: `glass relative overflow-hidden p-4 ${stagger >= 0 ? "card-"+Math.min(6,stagger) : ""} ${className}`,
   style: {
     background: C.card,
     borderRadius: 22,
-    border: `1px solid ${C.line}`,
-    boxShadow: "rgba(0,0,0,0.65) 0 12px 36px -14px, rgba(0,0,0,0.24) 0 2px 8px -2px, inset 0 1px 0 rgba(255,255,255,0.15)"
+    border: `0.5px solid rgba(84,84,88,0.45)`,
+    boxShadow: "rgba(0,0,0,0.55) 0 8px 28px -12px, rgba(0,0,0,0.18) 0 2px 6px -2px, inset 0 0.5px 0 rgba(255,255,255,0.18)"
   }
 }, React.createElement("div", {
   className: "relative"
@@ -1235,9 +1235,10 @@ const Eyebrow = ({
 }) => React.createElement("div", {
   className: "mb-2.5 uppercase",
   style: {
-    fontFamily: mono,
-    fontSize: "0.6875rem",
-    letterSpacing: "0.08em",
+    fontFamily: body,
+    fontSize: "0.75rem",
+    fontWeight: 600,
+    letterSpacing: "0.04em",
     color: color || C.mute
   }
 }, children);
@@ -1330,7 +1331,7 @@ function BottomTabBar({ tab, openScreen, closeScreen, paired, unread }) {
       TAB_ICONS[t.id](active),
       t.badge && React.createElement("div", { className: "tab-badge" })
     ),
-    React.createElement("div", { className: "tab-label", style: { color: active ? accent : "rgba(255,255,255,0.38)", fontWeight: active ? 700 : 400 } }, t.label)
+    React.createElement("div", { className: "tab-label", style: { color: active ? accent : "rgba(255,255,255,0.38)", fontWeight: active ? 600 : 400 } }, t.label)
   )}));
 }
 
@@ -2536,7 +2537,7 @@ function BaseCamp() {
   React.createElement("div", {
     style: { position:"absolute", inset:0, overflowY:"auto", WebkitOverflowScrolling:"touch",
              transform: pageTransform(0),
-             transition: isDragging ? "none" : "transform 0.38s cubic-bezier(0.22,1,0.36,1)",
+             transition: isDragging ? "none" : "transform 0.32s cubic-bezier(0.2,0,0,1)",
              willChange: "transform" }
   },
   React.createElement("div", {
@@ -2551,22 +2552,23 @@ React.createElement("header", {
     className: "text-xs uppercase",
     style: {
       fontFamily: body,
-      letterSpacing: "0.18em",
-      color: "rgba(255,255,255,0.52)"
+      letterSpacing: "0.12em",
+      color: "rgba(255,255,255,0.48)"
     }
   }, prettyDate(date)), React.createElement("div", {
     style: { fontFamily: body, fontSize: 13, color: "rgba(255,255,255,0.38)", marginTop: 6, marginBottom: 1, letterSpacing: "0.015em" }
   }, (() => { const h = new Date(now).getHours(); return h < 12 ? "Good morning, Gage 👋" : h < 17 ? "Good afternoon, Gage ☀️" : "Good evening, Gage 🌙"; })()), React.createElement("h1", {
-    className: "mt-0.5 text-4xl",
+    className: "mt-0.5",
     style: {
       fontFamily: display,
+      fontSize: 34,
       fontWeight: 700,
       background: `linear-gradient(140deg, ${C.rust} 0%, #ffffff 55%, rgba(255,255,255,0.72) 100%)`,
       WebkitBackgroundClip: "text",
       WebkitTextFillColor: "transparent",
       backgroundClip: "text",
-      letterSpacing: "-0.025em",
-      lineHeight: 1.06
+      letterSpacing: "-0.03em",
+      lineHeight: 1.04
     }
   }, "The Keeper"), React.createElement("div", { style:{ fontFamily:body, fontSize:10, color:C.mute, letterSpacing:"0.14em", marginTop:5, textTransform:"uppercase" } }, DEPLOY_VER)), React.createElement("div", {
     className: "flex shrink-0 flex-col items-end gap-1.5 pt-1"
@@ -2622,7 +2624,7 @@ React.createElement("header", {
       border: `1px solid ${C.line}`,
       borderLeft: `4px solid ${C.rust}`,
       borderRadius: 20,
-      boxShadow: `0 4px 20px ${C.rust}18, 0 8px 28px rgba(0,0,0,0.45)`
+      boxShadow: `0 2px 12px rgba(0,0,0,0.35), 0 6px 24px rgba(0,0,0,0.25), inset 0 0.5px 0 rgba(255,255,255,0.14)`
     }
   }, React.createElement("button", {
     onClick: e => openScreen("messages", e),
@@ -2677,9 +2679,9 @@ React.createElement("header", {
     style: {
       fontFamily: body,
       color: C.text,
-      background: "rgba(255,255,255,0.07)",
-      border: "1px solid rgba(255,255,255,0.12)",
-      backdropFilter: "blur(12px)"
+      background: "rgba(118,118,128,0.18)",
+      border: "none",
+      backdropFilter: "none"
     }
   }), React.createElement("button", {
     onClick: () => {
@@ -2688,14 +2690,15 @@ React.createElement("header", {
       pushNote();
     },
     disabled: noteBusy || !myNote.trim(),
-    className: "shrink-0 rounded-full px-4 py-2 text-sm flex items-center justify-center",
+    className: "shrink-0 grid place-items-center",
+    style: { width:32, height:32, borderRadius:"50%", background:C.rust, flexShrink:0, fontSize:16, fontWeight:700, color:contrastFor(C.rust) },
     style: {
       fontFamily: body,
       fontWeight: 500,
       background: noteBusy || !myNote.trim() ? C.cardHi : C.rust,
       color: noteBusy || !myNote.trim() ? C.mute : contrastFor(C.rust)
     }
-  }, "→")), myNoteMeta && myNoteMeta.note || myNoteSent > 0 ? React.createElement("div", {
+  }, "↑")), myNoteMeta && myNoteMeta.note || myNoteSent > 0 ? React.createElement("div", {
     className: "mt-1.5 text-xs",
     style: {
       fontFamily: mono,
@@ -2714,7 +2717,7 @@ React.createElement("header", {
     React.createElement("div", { style:{ display:"flex", justifyContent:"center", marginBottom:12, maxWidth:240, margin:"0 auto 12px", filter:"drop-shadow(0 0 28px rgba(249,180,208,0.45))" }, dangerouslySetInnerHTML:{ __html: buildBlossomSVG(weeks.w, true, false) } }),
     React.createElement("div", { style:{ display:"flex", gap:8, marginBottom:10 } },
       [["Days", overdue ? "0" : cd.d, C.text], ["Hrs", String(cd.h).padStart(2,"0"), C.mute], ["Min", String(cd.m).padStart(2,"0"), C.mute], ["Sec", String(cd.s).padStart(2,"0"), "#f9b4d0"]].map(([lab, val, col]) =>
-        React.createElement("div", { key:lab, style:{ flex:1, borderRadius:12, padding:"8px 0", textAlign:"center", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", backdropFilter:"blur(8px)", WebkitBackdropFilter:"blur(8px)" } },
+        React.createElement("div", { key:lab, style:{ flex:1, borderRadius:14, padding:"12px 0", textAlign:"center", background:"rgba(255,255,255,0.06)", border:"0.5px solid rgba(255,255,255,0.1)", backdropFilter:"blur(8px)", WebkitBackdropFilter:"blur(8px)" } },
           React.createElement("div", { style:{ fontFamily:display, fontWeight:600, fontSize:24, color:col, fontVariantNumeric:"tabular-nums" } }, overdue ? "—" : val),
           React.createElement("div", { style:{ fontFamily:mono, fontSize:9, letterSpacing:"0.08em", color:C.mute, textTransform:"uppercase" } }, lab)
         )
@@ -2728,7 +2731,7 @@ React.createElement("header", {
         React.createElement("div", { style:{ fontFamily:display, fontWeight:500, fontSize:16, color:C.text } }, sizeFor(weeks.w).name),
         React.createElement("div", { style:{ fontFamily:body, fontSize:12, color:C.mute } }, "~", sizeFor(weeks.w).inch, "\" · ", sizeFor(weeks.w).cm, " cm")
       ),
-      overdue ? React.createElement("div", { style:{ fontFamily:display, fontWeight:600, fontSize:15, color:"#f9b4d0", letterSpacing:"-0.01em", fontStyle:"italic" } }, "Any day now 🌸") :
+      overdue ? React.createElement("div", { style:{ fontFamily:body, fontWeight:500, fontSize:15, color:"#f9b4d0", letterSpacing:"0" } }, "Any day now 🌸") :
       React.createElement("div", { style:{ textAlign:"right" } },
         React.createElement("div", { style:{ fontFamily:mono, fontSize:10, letterSpacing:"0.1em", color:C.mute, textTransform:"uppercase" } }, "due"),
         React.createElement("div", { style:{ fontFamily:body, fontSize:13, color:C.text } }, new Date(due+"T12:00:00").toLocaleDateString(undefined,{month:"short",day:"numeric"}))
@@ -2739,7 +2742,7 @@ React.createElement("header", {
   React.createElement("div", {
     style: { position:"absolute", inset:0, overflowY:"auto", WebkitOverflowScrolling:"touch",
              transform: pageTransform(1),
-             transition: isDragging ? "none" : "transform 0.38s cubic-bezier(0.22,1,0.36,1)",
+             transition: isDragging ? "none" : "transform 0.32s cubic-bezier(0.2,0,0,1)",
              willChange: "transform" }
   },
   React.createElement("div", {
@@ -2754,10 +2757,8 @@ React.createElement("header", {
     }, React.createElement("span", { style:{ fontFamily:display, fontWeight:700, fontSize:22, color:"#fff" } }, "M")),
     React.createElement("div", null,
       React.createElement("h1", {
-        style: { fontFamily: display, fontWeight: 700, fontSize: 26, letterSpacing: "-0.02em",
-                 background: "linear-gradient(140deg,#ffffff 0%,rgba(255,255,255,0.7) 100%)",
-                 WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-                 backgroundClip: "text", lineHeight: 1.1, margin: 0 }
+        style: { fontFamily: display, fontWeight: 600, fontSize: 17, letterSpacing: "-0.01em",
+                 color: C.text, lineHeight: 1.2, margin: 0 }
       }, "Mabry"),
       React.createElement("div", {
         style: { fontFamily:body, fontSize:11, color:C.mute, marginTop:3, display:"flex", alignItems:"center", gap:5 }
@@ -2882,7 +2883,7 @@ React.createElement("header", {
   React.createElement("div", {
     style: { position:"absolute", inset:0, overflowY:"auto", WebkitOverflowScrolling:"touch",
              transform: pageTransform(2),
-             transition: isDragging ? "none" : "transform 0.38s cubic-bezier(0.22,1,0.36,1)",
+             transition: isDragging ? "none" : "transform 0.32s cubic-bezier(0.2,0,0,1)",
              willChange: "transform" }
   },
   React.createElement("div", {
@@ -2990,7 +2991,7 @@ React.createElement("header", {
         ].filter(Boolean).map((r,i,a)=>React.createElement("div",{key:r.label,style:{display:"flex",alignItems:"flex-start",gap:12,paddingTop:i>0?14:0,paddingBottom:i<a.length-1?14:0,borderBottom:i<a.length-1?"1px solid "+C.line:"none"}},
           React.createElement("span",{style:{fontSize:18,lineHeight:1.5,flexShrink:0}},r.icon),
           React.createElement("div",{style:{flex:1,minWidth:0}},
-            React.createElement("div",{style:{fontFamily:mono,fontSize:11,color:C.mute,marginBottom:4,letterSpacing:"0.07em",textTransform:"uppercase"}},r.label),
+            React.createElement("div",{style:{fontFamily:body,fontSize:12,fontWeight:400,color:C.mute,marginBottom:3,letterSpacing:"0.01em",textTransform:"none"}},r.label),
             React.createElement("div",{style:{fontFamily:body,fontSize:15,color:C.text,lineHeight:1.45,wordBreak:"break-word"}},r.val)
           )
         ))
@@ -3042,12 +3043,11 @@ React.createElement("header", {
   return React.createElement("div",{key:"jl"},
     React.createElement("h1",{style:{fontFamily:display,fontWeight:800,fontSize:32,color:C.text,letterSpacing:"-0.04em",lineHeight:1.05,marginBottom:18,marginTop:4}},"Jobs"),
     React.createElement("div",{style:{position:"relative",marginBottom:14}},
-      React.createElement("span",{style:{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",fontSize:14,pointerEvents:"none",opacity:0.4,lineHeight:1}},"🔍"),
-      React.createElement("input",{value:jobSearch,onChange:e=>setJobSearch(e.target.value),placeholder:"Search jobs...",style:{width:"100%",padding:"12px 14px 12px 42px",background:"rgba(255,255,255,0.06)",border:"1px solid "+C.line,borderRadius:20,fontFamily:body,fontSize:16,color:C.text,outline:"none",WebkitAppearance:"none",display:"block",boxSizing:"border-box"}}), React.createElement("span",{style:{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",fontSize:16,opacity:0.35,pointerEvents:"none"}},"🔍")),
-    React.createElement("div",{style:{display:"flex",gap:10,marginBottom:20,overflowX:"auto",paddingBottom:2,WebkitOverflowScrolling:"touch"}},
+      React.createElement("input",{value:jobSearch,onChange:e=>setJobSearch(e.target.value),placeholder:"Search jobs...",style:{width:"100%",padding:"12px 14px 12px 42px",background:"rgba(118,118,128,0.18)",border:"none",borderRadius:12,fontFamily:body,fontSize:16,color:C.text,outline:"none",WebkitAppearance:"none",display:"block",boxSizing:"border-box"}}), React.createElement("span",{style:{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",fontSize:16,opacity:0.35,pointerEvents:"none"}},"🔍")),
+    React.createElement("div",{style:{display:"flex",gap:0,marginBottom:20,padding:"2px",borderRadius:10,background:"rgba(118,118,128,0.24)",WebkitTapHighlightColor:"transparent"}},
       [["all","All"],["active","Active"],["scheduled","Sched"],["done","Done"]].map(([key,lbl])=>React.createElement("button",{
         key,onClick:()=>{haptic(3);setJobFilter(key);},
-        style:{flexShrink:0,minWidth:0,padding:"10px 18px",borderRadius:22,background:jobFilter===key?C.rust:"rgba(255,255,255,0.05)",color:jobFilter===key?contrastFor(C.rust):C.mute,border:"1.5px solid "+(jobFilter===key?C.rust:"rgba(255,255,255,0.08)"),fontFamily:body,fontSize:13,fontWeight:jobFilter===key?600:400,cursor:"pointer",transition:"all 0.2s cubic-bezier(0.22,1,0.36,1)",boxShadow:jobFilter===key?"0 4px 16px "+C.rust+"55":"none",whiteSpace:"nowrap",display:"inline-flex",gap:5,alignItems:"center",touchAction:"manipulation",WebkitTapHighlightColor:"transparent"}
+        style:{flex:1,minWidth:0,padding:"7px 8px",borderRadius:8,background:jobFilter===key?"rgba(255,255,255,0.12)":"transparent",color:jobFilter===key?"#fff":C.mute,border:"none",fontFamily:body,fontSize:13,fontWeight:jobFilter===key?600:500,cursor:"pointer",transition:"background 0.18s ease, color 0.18s ease",boxShadow:jobFilter===key?"0 1px 4px rgba(0,0,0,0.35), inset 0 0.5px 0 rgba(255,255,255,0.18)":"none",whiteSpace:"nowrap",display:"inline-flex",gap:4,alignItems:"center",justifyContent:"center",touchAction:"manipulation",WebkitTapHighlightColor:"transparent"}
       },lbl,React.createElement("span",{style:{fontSize:11,opacity:0.65}},sCounts[key])))
     ),
     filtJobs.length===0&&React.createElement("div",{style:{textAlign:"center",padding:"64px 24px 40px",display:"flex",flexDirection:"column",alignItems:"center",gap:10}},
@@ -3060,13 +3060,13 @@ React.createElement("header", {
         return React.createElement("button",{
           key:job.id,onClick:()=>{haptic(4);setSelectedJob(job.id);},
           className:"press",
-          style:{width:"100%",textAlign:"left",background:C.card,border:"1px solid "+C.line,borderRadius:20,padding:0,cursor:"pointer",overflow:"hidden",display:"block",boxShadow:"rgba(0,0,0,0.52) 0 8px 24px -8px, inset 0 1px 0 rgba(255,255,255,0.06)",WebkitTapHighlightColor:"transparent",touchAction:"manipulation"}
+          style:{width:"100%",textAlign:"left",background:C.card,border:"0.5px solid rgba(84,84,88,0.38)",borderRadius:14,padding:0,cursor:"pointer",overflow:"hidden",display:"block",boxShadow:"rgba(0,0,0,0.3) 0 4px 16px -6px, inset 0 0.5px 0 rgba(255,255,255,0.12)",WebkitTapHighlightColor:"transparent",touchAction:"manipulation"}
         },
           React.createElement("div",{style:{display:"flex",alignItems:"stretch",minHeight:82}},
-            React.createElement("div",{style:{width:6,flexShrink:0,background:col,borderRadius:"20px 0 0 20px",boxShadow:"2px 0 8px "+col+"66"}}),
+            React.createElement("div",{style:{width:4,flexShrink:0,background:col,borderRadius:"16px 0 0 16px"}}),
             React.createElement("div",{style:{flex:1,padding:"15px 16px",display:"flex",flexDirection:"column",gap:5,overflow:"hidden"}},
               React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}},
-                React.createElement("div",{style:{fontFamily:display,fontWeight:700,fontSize:17,color:C.text,letterSpacing:"-0.02em",lineHeight:1.2,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},job.name),
+                React.createElement("div",{style:{fontFamily:body,fontWeight:600,fontSize:17,color:C.text,letterSpacing:"-0.01em",lineHeight:1.2,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},job.name),
                 React.createElement("div",{style:{flexShrink:0,display:"inline-flex",alignItems:"center",gap:4,padding:"3px 8px",borderRadius:10,background:col+"18"}},
                   React.createElement("div",{style:{width:6,height:6,borderRadius:"50%",background:col,flexShrink:0}}),
                   React.createElement("span",{style:{fontFamily:mono,fontSize:10,fontWeight:700,color:col,letterSpacing:"0.05em",whiteSpace:"nowrap"}},job.status)
@@ -3092,7 +3092,7 @@ React.createElement("header", {
   React.createElement("div", {
     style: { position:"absolute", inset:0, overflowY:"auto", WebkitOverflowScrolling:"touch",
              transform: pageTransform(3),
-             transition: isDragging ? "none" : "transform 0.38s cubic-bezier(0.22,1,0.36,1)",
+             transition: isDragging ? "none" : "transform 0.32s cubic-bezier(0.2,0,0,1)",
              willChange: "transform" }
   },
   React.createElement("div", {
@@ -3103,7 +3103,7 @@ React.createElement("header", {
       style: { display:"flex", alignItems:"center", gap:14, marginBottom:28 }
     },
     React.createElement("div", {
-      style: { width:52, height:52, borderRadius:"50%", background:"linear-gradient(140deg,#5E5CE6,#BF5AF2)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, boxShadow:"0 0 0 2px rgba(0,0,0,0.85), 0 0 0 4px #5E5CE6, 0 8px 28px #5E5CE688" }
+      style: { width:56, height:56, borderRadius:"50%", background:"linear-gradient(135deg,#636AFF,#D26BF0)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, boxShadow:"0 0 0 2px rgba(0,0,0,0.85), 0 0 0 4px #5E5CE6, 0 8px 28px #5E5CE688" }
     }, React.createElement("span", { style:{ fontFamily:display, fontWeight:700, fontSize:22, color:"#fff" } }, "G")),
     React.createElement("div", null,
       React.createElement("h1", {
@@ -3117,7 +3117,7 @@ React.createElement("header", {
   ),
     React.createElement("div", {
     key: "settings",
-    className: "rise space-y-4"
+    className: "rise space-y-3"
   }, React.createElement(Card, null, React.createElement(Eyebrow, {color: C.rust}, "Accent color"), React.createElement("div", {
     className: "grid grid-cols-6 gap-2.5"
   }, Object.entries(ACCENTS).map(([k, a]) => React.createElement("button", {
@@ -3387,10 +3387,10 @@ React.createElement("header", {
       fontFamily: body,
       letterSpacing: "0.01em",
       color: C.text,
-      background: "rgba(44,44,46,0.92)",
-      backdropFilter: "blur(20px)",
-      WebkitBackdropFilter: "blur(20px)",
-      border: `1px solid ${C.line}`,
+      background: "rgba(36,36,38,0.95)",
+      backdropFilter: "blur(40px) saturate(1.8)",
+      WebkitBackdropFilter: "blur(40px) saturate(1.8)",
+      border: "0.5px solid rgba(84,84,88,0.5)",
       boxShadow: "0 10px 32px rgba(0,0,0,0.65), 0 2px 8px rgba(0,0,0,0.4)"
     }
   }, flash)),
