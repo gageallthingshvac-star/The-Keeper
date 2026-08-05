@@ -30,7 +30,7 @@
   @keyframes tabPop{0%{transform:scale(1)}40%{transform:scale(0.82)}70%{transform:scale(1.12)}100%{transform:scale(1)}}
   @keyframes dotPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.6;transform:scale(0.7)}}
   @keyframes pinShake{0%,100%{transform:translateX(0)}15%,55%{transform:translateX(-9px)}35%,75%{transform:translateX(9px)}}
-  html, body { margin: 0; background: #000; -webkit-text-size-adjust: 100%; overscroll-behavior-y: none; }
+  html, body { margin: 0; background: #000; -webkit-text-size-adjust: 100%; overscroll-behavior-y: none; -webkit-font-smoothing: antialiased; }
   ::-webkit-scrollbar { display: none; }
   * { scrollbar-width: none; -ms-overflow-style: none; }
   * { -webkit-tap-highlight-color: transparent; }
@@ -93,13 +93,15 @@
   /* ── iOS 18 floating pill tab bar ── */
   .tab-bar {
     position: fixed;
-    left: 6px;
-    right: 6px;
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+    left: 8px;
+    right: 8px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
     z-index: 60;
     display: flex;
     align-items: center;
     height: 68px;
+    backdrop-filter: blur(20px) saturate(1.4);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
     border-radius: 100px;
     backdrop-filter: blur(64px) saturate(2.6) brightness(1.1);
     -webkit-backdrop-filter: blur(64px) saturate(2.6) brightness(1.1);
@@ -365,7 +367,7 @@ const C = {
   gold: "#0A84FF",
   indigo: "#5E5CE6"
 };
-const DEPLOY_VER = "v16.34";
+const DEPLOY_VER = "v16.44";
 const ACCENTS = {
   blue:     { name: "Blue",     v: "#0A84FF" },
   green:    { name: "Green",    v: "#30D158" },
@@ -1202,7 +1204,7 @@ const Card = ({
   stagger = -1,
   accent
 }) => React.createElement("div", {
-  className: `glass relative overflow-hidden p-4 ${stagger >= 0 ? "card-"+Math.min(6,stagger) : ""} ${className}`,
+  className: `glass relative overflow-hidden p-4 ${stagger >= 0 ? "card-"+Math.min(5,stagger) : ""} ${className}`,
   style: {
     background: C.card,
     borderRadius: 22,
@@ -1216,10 +1218,10 @@ const Eyebrow = ({
   children,
   color
 }) => React.createElement("div", {
-  className: "mb-2.5 uppercase",
+  className: "mb-3 uppercase",
   style: {
     fontFamily: body,
-    fontSize: "0.75rem",
+    fontSize: "0.7rem",
     fontWeight: 600,
     letterSpacing: "0.04em",
     color: color || C.mute
@@ -1255,7 +1257,7 @@ const fieldStyle = {
   fontFamily: body,
   color: C.text,
   background: C.bg0,
-  border: `1px solid ${C.line}`
+  border: `0.5px solid ${C.line}`
 };
 /* ── Bottom Tab Bar — SF-style SVG icons ── */
 const TAB_ICONS = {
@@ -1295,13 +1297,13 @@ function BottomTabBar({ tab, openScreen, closeScreen, paired, unread, msgInput, 
     style: { boxShadow: "0 -0.5px 0 rgba(84,84,88,0.55)", fontFamily: "-apple-system, 'SF Pro Text', system-ui, sans-serif",
              display:"flex", flexDirection:"column", alignItems:"stretch",
              justifyContent:"flex-end", padding: onMessages ? "8px 12px 0" : "0",
-             height: onMessages ? 116 : 68,
+             height: onMessages ? 118 : 68,
              transition: "height 0.38s cubic-bezier(0.2,0,0,1), padding 0.38s cubic-bezier(0.2,0,0,1)", willChange:"height" }
   },
   onMessages && React.createElement("div", {
     style: { display:"flex", gap:8, marginBottom:8, alignItems:"center",
              opacity: onMessages ? 1 : 0, transition:"opacity 0.2s ease 0.15s",
-             borderTop: "0.5px solid rgba(84,84,88,0.55)", paddingTop:8 }
+             borderTop: "0.5px solid rgba(84,84,88,0.45)", paddingTop:6, marginTop:2 }
   },
     React.createElement("input", {
       value: msgInput, onChange: e => setMsgInput(e.target.value),
@@ -1338,7 +1340,7 @@ function BottomTabBar({ tab, openScreen, closeScreen, paired, unread, msgInput, 
       TAB_ICONS[t.id](active),
       t.badge && React.createElement("div", { className: "tab-badge" })
     ),
-    React.createElement("div", { className: "tab-label", style: { color: active ? accent : "rgba(255,255,255,0.38)", fontWeight: active ? 600 : 400 } }, t.label)
+    React.createElement("div", { className: "tab-label", style: { fontSize:"10px", color: active ? accent : "rgba(255,255,255,0.4)", fontWeight: active ? 600 : 400 } }, t.label)
   )})));
 }
 
@@ -2450,15 +2452,15 @@ function BaseCamp() {
     style: { position:"relative", width:"100%", overflow:"hidden", flex:1 }
   },
   React.createElement("div", {
-    style: { position:"absolute", inset:0, overflowY:"auto", WebkitOverflowScrolling:"touch",
+    style: { position:"absolute", inset:0, overflowY:"auto", WebkitOverflowScrolling:"touch", overscrollBehavior:"contain",
              transform: pageTransform(0),
-             transition: isDragging ? "none" : "transform 0.32s cubic-bezier(0.2,0,0,1)",
+             transition: isDragging ? "none" : "transform 0.3s cubic-bezier(0.25,0.46,0.45,0.94), opacity 0.2s ease",
              willChange: "transform" }
   },
   React.createElement("div", {
     className: "relative z-[1] mx-auto max-w-md",
     style: { paddingTop: "max(2.5rem, env(safe-area-inset-top))",
-             paddingBottom: `calc(${tab === "messages" ? 160 : 108}px + env(safe-area-inset-bottom, 0px))`,
+             paddingBottom: `calc(${tab === "messages" ? 164 : 108}px + env(safe-area-inset-bottom, 0px))`,
              paddingLeft: "max(20px, calc(env(safe-area-inset-left, 0px) + 16px))",
              paddingRight: "max(20px, calc(env(safe-area-inset-right, 0px) + 16px))",
              transition: "padding-bottom 0.38s cubic-bezier(0.2,0,0,1)" }
@@ -2535,39 +2537,39 @@ React.createElement("header", {
     }
   }, sound ? "♪" : "✕")))), true && React.createElement("div", {
     key: "today",
-    className: "space-y-4"
+    className: "space-y-5"
   }, paired && React.createElement("div", {
     className: "glass card-0 p-5",
     style: {
       background: C.card,
       border: `1px solid ${C.line}`,
-      borderLeft: `4px solid ${C.rust}`,
+      borderLeft: `2.5px solid ${C.rust}`,
       borderRadius: 20,
-      boxShadow: `0 2px 12px rgba(0,0,0,0.35), 0 6px 24px rgba(0,0,0,0.25), inset 0 0.5px 0 rgba(255,255,255,0.14)`
+      boxShadow: `0 1px 8px rgba(0,0,0,0.3), 0 4px 20px rgba(0,0,0,0.2), inset 0 0.5px 0 rgba(255,255,255,0.12)`
     }
   }, React.createElement("button", {
     onClick: e => openScreen("messages", e),
     className: "press w-full text-left"
   }, React.createElement("div", {
-    className: "mb-2.5 flex items-center justify-between"
+    className: "mb-2.5 flex items-center justify-between", style:{ position:"relative" }
   }, React.createElement("span", {
     className: "uppercase",
     style: {
       fontFamily: mono,
       fontSize: "0.72rem",
-      letterSpacing: "0.12em",
+      letterSpacing: "0.10em",
       color: C.rust,
       textTransform: "uppercase"
     }
-  }, "Messages"), React.createElement("span", {
+  }, "♥ Mabry"), React.createElement("span", {
     style: {
       fontFamily: body,
       color: C.rust,
       fontSize: 14,
       fontWeight: 500
     }
-  }, "Messages ›")), theirNote && theirNote.note ? React.createElement(React.Fragment, null, React.createElement("p", {
-    className: "text-base leading-snug",
+  }, threadMsgs.some(m => m.side === "hers" && m.at > (threadSeen.his_seen_at || 0)) ? "● Messages" : "Messages →")), theirNote && theirNote.note ? React.createElement(React.Fragment, null, React.createElement("p", {
+    className: "text-[15px] leading-relaxed",
     style: {
       fontFamily: display,
       color: C.text
@@ -2591,27 +2593,27 @@ React.createElement("header", {
       fontFamily: mono,
       color: myNoteMeta && myNoteMeta.seenAt ? C.olive : C.mute
     }
-  }, myNoteMeta && myNoteMeta.seenAt ? `Seen ${noteAge(myNoteMeta.seenAt)}` : `Sent ${noteAge(myNoteMeta && myNoteMeta.updatedAt || myNoteSent)} · not read yet`) : null, noteError && React.createElement("div", {
+  }, myNoteMeta && myNoteMeta.seenAt ? `Seen ${noteAge(myNoteMeta.seenAt)}` : `Sent ${noteAge(myNoteMeta && myNoteMeta.updatedAt || myNoteSent)}`) : null, noteError && React.createElement("div", {
     className: "mt-1.5 text-xs",
     style: {
       fontFamily: mono,
       color: C.rust
     }
   }, "Couldn't reach the server — pull down to try again.")), React.createElement(Card, null,
-    React.createElement("div", { style:{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 } },
-      React.createElement(Eyebrow, { color:"#f9b4d0" }, "Week ", weeks.w, " · ", treeName)
+    React.createElement("div", { style:{ display:"flex", alignItems:"center", justifyContent:"center", gap:8, marginBottom:12 } },
+      React.createElement(Eyebrow, { color:"#f9b4d0" }, "Week ", React.createElement("span", {style:{fontWeight:700}}, weeks.w), " · ", treeName)
     ),
-    React.createElement("div", { style:{ display:"flex", justifyContent:"center", marginBottom:12, maxWidth:240, margin:"0 auto 12px", filter:"drop-shadow(0 0 28px rgba(249,180,208,0.45))" }, dangerouslySetInnerHTML:{ __html: buildBlossomSVG(weeks.w, true, false) } }),
-    React.createElement("div", { style:{ display:"flex", gap:8, marginBottom:10 } },
-      [["Days", overdue ? "0" : cd.d, C.text], ["Hrs", String(cd.h).padStart(2,"0"), C.mute], ["Min", String(cd.m).padStart(2,"0"), C.mute], ["Sec", String(cd.s).padStart(2,"0"), "#f9b4d0"]].map(([lab, val, col]) =>
-        React.createElement("div", { key:lab, style:{ flex:1, borderRadius:14, padding:"12px 0", textAlign:"center", background:"rgba(255,255,255,0.06)", border:"0.5px solid rgba(255,255,255,0.1)", backdropFilter:"blur(8px)", WebkitBackdropFilter:"blur(8px)" } },
-          React.createElement("div", { style:{ fontFamily:display, fontWeight:600, fontSize:24, color:col, fontVariantNumeric:"tabular-nums" } }, overdue ? "—" : val),
+    React.createElement("div", { style:{ display:"flex", justifyContent:"center", marginBottom:12, maxWidth:240, margin:"0 auto 12px", filter:"drop-shadow(0 0 32px rgba(249,180,208,0.5)) drop-shadow(0 2px 8px rgba(0,0,0,0.4))" }, dangerouslySetInnerHTML:{ __html: buildBlossomSVG(weeks.w, true, false) } }),
+    React.createElement("div", { style:{ display:"flex", gap:6, marginBottom:12 } },
+      [["Days", overdue ? "0" : cd.d, C.text], ["Hrs", String(cd.h).padStart(2,"0"), C.mute], ["Min", String(cd.m).padStart(2,"0"), C.mute], ["Sec", String(cd.s).padStart(2,"0"), C.rust]].map(([lab, val, col]) =>
+        React.createElement("div", { key:lab, style:{ flex:1, borderRadius:14, padding:"14px 0", textAlign:"center", background:"rgba(255,255,255,0.06)", border:"0.5px solid rgba(255,255,255,0.12)", backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(8px)" } },
+          React.createElement("div", { style:{ fontFamily:display, fontWeight:600, fontSize:24, color:col, fontVariantNumeric:"tabular-nums", fontFeatureSettings:"'tnum'" } }, overdue ? "✓" : val),
           React.createElement("div", { style:{ fontFamily:mono, fontSize:9, letterSpacing:"0.08em", color:C.mute, textTransform:"uppercase" } }, lab)
         )
       )
     ),
-    React.createElement("div", { style:{ height:5, borderRadius:8, background:"rgba(255,255,255,0.06)", overflow:"hidden", marginBottom:12 } },
-      React.createElement("div", { style:{ height:"100%", borderRadius:8, background:"linear-gradient(90deg,"+C.rust+","+C.rust+"cc)", width:(weeks.w/40*100)+"%", transition:"width 700ms ease" } })
+    React.createElement("div", { style:{ height:4, borderRadius:8, background:"rgba(255,255,255,0.05)", overflow:"hidden", marginBottom:14 } },
+      React.createElement("div", { style:{ height:"100%", borderRadius:8, background:"linear-gradient(90deg,"+C.rust+","+C.rust+"aa)", width:(weeks.w/40*100)+"%", transition:"width 700ms ease" } })
     ),
     React.createElement("div", { style:{ display:"flex", alignItems:"center", justifyContent:"space-between" } },
       React.createElement("div", null,
@@ -2660,12 +2662,12 @@ React.createElement("header", {
     className: "rise"
   },
   React.createElement("div", {
-    style: { minHeight: "50vh", paddingBottom: 8 }
+    style: { minHeight: "50vh", paddingBottom: 8, paddingLeft: 4, paddingRight: 4, animation: "rise 0.25s ease both" }
   },
     threadMsgs.length === 0 && React.createElement("div", {
-      style: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "50vh", gap: 10 }
+      style: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "55vh", gap: 12 }
     },
-      React.createElement("div", { style: { fontSize: 40, lineHeight: 1, opacity: 0.45 } }, "💬"),
+      React.createElement("div", { style: { fontSize: 44, lineHeight: 1, opacity: 0.35, filter:"drop-shadow(0 4px 12px rgba(255,255,255,0.1))" } }, "💬"),
       React.createElement("p", { style: { fontFamily: body, color: C.mute, fontSize: 14, margin: "6px 0 0", textAlign: "center", lineHeight: 1.6 } }, "Start the conversation ♥")
     ),
     (() => {
@@ -2688,7 +2690,7 @@ React.createElement("header", {
         return React.createElement("div", { key: m.id || i },
           showTime && React.createElement("div", {
             style: { textAlign: "center", fontSize: 11, color: C.mute, fontFamily: body, margin: "18px 0 8px", letterSpacing: "0.02em", opacity: 0.75 }
-          }, new Date(m.at).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })),
+          }, new Date(m.at).toLocaleDateString() === new Date().toLocaleDateString() ? new Date(m.at).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"}) : new Date(m.at).toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})),
           React.createElement("div", {
             style: { display: "flex", alignItems: "flex-end", justifyContent: mine ? "flex-end" : "flex-start", marginBottom: mb, gap: 6 }
           },
@@ -2705,7 +2707,7 @@ React.createElement("header", {
               style: {
                 maxWidth: "78%", padding: "11px 16px", fontSize: 16, lineHeight: 1.46,
                 fontFamily: body,
-                background: mine ? C.rust : C.cardHi,
+                background: mine ? C.rust : `${C.cardHi}ee`,
                 color: mine ? contrastFor(C.rust) : C.text,
                 borderTopLeftRadius: tl, borderTopRightRadius: tr,
                 borderBottomLeftRadius: bl, borderBottomRightRadius: br,
@@ -2815,7 +2817,7 @@ React.createElement("header", {
   }, React.createElement("span", {
     className: "grid place-items-center rounded-full",
     style: {
-      width: 42, height: 42,
+      width: 44, height: 44,
       background: a.v,
       boxShadow: accentKey === k ? `0 0 0 2.5px rgba(0,0,0,0.85), 0 0 0 4.5px ${a.v}, 0 4px 14px ${a.v}55` : `0 2px 8px ${a.v}44`
     }
@@ -2843,7 +2845,7 @@ React.createElement("header", {
     className: "h-16 w-full rounded-xl",
     style: {
       background: wp.css,
-      border: bgKey === k ? `2px solid ${C.rust}` : `1px solid ${C.line}`,
+      border: bgKey === k ? `2.5px solid ${C.rust}` : `0.5px solid ${C.line}`,
       boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)"
     }
   }), React.createElement("span", {
@@ -2859,7 +2861,7 @@ React.createElement("header", {
     }, Object.entries(PHOTO_SCENES).map(function(entry){
       var k=entry[0], sc=entry[1];
       return React.createElement("button", { key:k, onClick:function(){ sfx.tick(); haptic(6); setTheme(accentKey,k); }, className:"press flex flex-col items-center gap-1.5" },
-        React.createElement("span", { style:{ display:"block", height:72, width:"100%", borderRadius:12, overflow:"hidden", border:bgKey===k?"2.5px solid "+C.rust:"1px solid "+C.line } },
+        React.createElement("span", { style:{ display:"block", height:76, width:"100%", borderRadius:14, overflow:"hidden", border:bgKey===k?"2.5px solid "+C.rust:"1px solid "+C.line } },
           React.createElement("img", { src:sc.url.replace("w=1080","w=400"), alt:sc.name, loading:"lazy", style:{ width:"100%", height:"100%", objectFit:"cover", opacity:bgKey===k?1:0.72, display:"block" } })
         ),
         React.createElement("span", { className:"text-[10px]", style:{ fontFamily:body, color:bgKey===k?C.text:C.mute, textAlign:"center", lineHeight:1.3 } }, sc.name)
