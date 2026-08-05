@@ -180,6 +180,10 @@
   }
 
   /* ── Press feedback ── */
+  @keyframes morphExpand {
+    from { height: 68px; }
+    to   { height: 118px; }
+  }
   .press {
     transition: transform 0.08s cubic-bezier(0.4,0,0.2,1), opacity 0.08s ease;
     cursor: pointer;
@@ -361,7 +365,7 @@ const C = {
   gold: "#0A84FF",
   indigo: "#5E5CE6"
 };
-const DEPLOY_VER = "v16.29";
+const DEPLOY_VER = "v16.33";
 const ACCENTS = {
   blue:     { name: "Blue",     v: "#0A84FF" },
   green:    { name: "Green",    v: "#30D158" },
@@ -607,27 +611,6 @@ const LISTS = [{
   name: "Home",
   color: "#A79A87"
 }];
-const JOB_STATUSES = { "IN PROGRESS":"#FF9F0A", "PENDING":"#0A84FF", "HOLD":"#FF453A", "SCHEDULED":"#5AC8FA", "DONE":"#30D158" };
-const DEFAULT_JOBS = [
-  { id:"job_eglinton", name:"Jesse Eglinton", address:"224 Potts Rd, Hohenwald, TN", contractor:"STM Co", system:"2.5-ton split", status:"IN PROGRESS", history:"Rough-in May 19; finish rough-in Jun 15; penetrations cut Jul 30.", billing:"", notes:"Penetrations done 7/30, needs full completion. \"Split w Friday, see paper 8th–12th\".", wire:"", createdAt:Date.now() },
-  { id:"job_valdez", name:"Matt Valdez (Creekside Special)", address:"3494 Old Hwy 47 E, Burns, TN", contractor:"STM Contracting — #3746/#3747", system:"Furnace + condenser; ~20 ft exhaust / 30 ft intake PVC; hood vent w/ butterfly damper", status:"PENDING", history:"Rough-in credit wk Jul 6–12 (2.5 ton). Condenser set + venting 7/21 & 7/24. Hood vent finish 7/14.", billing:"Invoiced 7/17. Labor $4,700, billed 90% = $4,230. Trim-out holdback $470.", notes:"Confirm vent pipe dia (2\" vs 3\"), wall vs roof penetration, condenser tonnage + brand for O/B.", wire:"2.5-ton typically #10 — verify nameplate MOP.", createdAt:Date.now() },
-  { id:"job_kennedy", name:"Tim Kennedy", address:"669 Trezevant Rd, Atwood, TN 38316", contractor:"", system:"TWO systems: 1.5-ton downstairs + 2.5-ton upstairs. Basement dehu.", status:"HOLD", history:"Partial rough-in 7/21 (no condenser set). 1,408 sq ft main + 1,315 basement.", billing:"HOLD $6,750. Dehu model TBD.", notes:"3 line sets on site; bring extra refrigerant (long runs); 2 condensers back-right corner, one on back porch; bathroom closet = chase; gravity drain in basement (no pump).", wire:"", createdAt:Date.now() },
-  { id:"job_shaw307", name:"Shaw — Lot 307 Cantor Farms", address:"John Sharp Rd, Spring Hill, TN 37174", contractor:"Shaw", system:"4-ton gas pack + 1.5-ton HP condenser (American Standard). Second 1.5-ton condenser on job.", status:"PENDING", history:"Rough-in 5/26. 5B⇄307 swap 7/22 (gas pack relocated). First condenser set; second 1.5-ton NOT set.", billing:"", notes:"Need to source + set second 1.5-ton condenser (ditch).", wire:"Gas pack ~#8; 1.5-ton #10 — verify nameplate.", createdAt:Date.now() },
-  { id:"job_shaw308", name:"Shaw — Lot 308 Cantor Farms", address:"John Sharp Rd, Spring Hill, TN", contractor:"Shaw", system:"5.5 ton total — two systems (4 ton + 1.5 ton)", status:"PENDING", history:"Rough-in 7/10. Roof holes + caps supplied 7/13 (roofer James Shaw, 931-626-9110).", billing:"", notes:"PENDING trim-out. Set-by ~8/12, cabinets 8/26.", wire:"", createdAt:Date.now() },
-  { id:"job_baillargeon", name:"STM — Baillargeon", address:"3189 Greens Mill Rd, Spring Hill, TN 37174", contractor:"STM Co — Job #3747", system:"5-ton rough-in", status:"PENDING", history:"Rough-in 7/6 (10-ton job total: 5 rough + 5 trim, 1-ton holdback). Roof PVC boots + roofer meet 7/13.", billing:"$900 holdback. Drain kit needed (RXGY-CK).", notes:"Not yet scheduled.", wire:"", createdAt:Date.now() },
-  { id:"job_kovach", name:"Maddie Kovach", address:"1072 Columbia Hwy, Hohenwald, TN 38462", contractor:"", system:"Final HVAC / trim out", status:"SCHEDULED", history:"Via Corey's line.", billing:"", notes:"Thu 8/6, 8 AM–4 PM. ⚠️ Confirm final electric is done before rolling.", wire:"", createdAt:Date.now() },
-  { id:"job_kbaker", name:"Kerry Baker", address:"3691 Tennessee City Rd, McEwen, TN 37101", contractor:"Summertown / STM", system:"Ruud 2-ton split heat pump + bath fans + ERV", status:"PENDING", history:"Rough-in 7/9 (4-ton job total, credit 3 that week).", billing:"", notes:"PENDING trim-out. DIFFERENT from Perry Baker.", wire:"Ruud → reversing valve on B (energized in heat).", createdAt:Date.now() },
-  { id:"job_parrish", name:"Dillon Parrish", address:"1520 Builey Rd, Reagan, TN 38368", contractor:"", system:"2.5-ton heat pump, 1,680 sq ft", status:"PENDING", history:"Install 7/1.", billing:"$3,710 labor — NOT YET INVOICED. Confirm with Dad.", notes:"", wire:"", createdAt:Date.now() },
-  { id:"job_tdale", name:"Taylor Dale", address:"1330 Old Williamsport Pike, Columbia, TN 38401", contractor:"STM Contracting", system:"2.5 ton", status:"PENDING", history:"Rough-in 4/13. Trim-out 7/13.", billing:"$480 holdback — confirm released.", notes:"", wire:"", createdAt:Date.now() },
-  { id:"job_lane", name:"Julie Lane", address:"1025 Hargis Rd, McEwen, TN", contractor:"Shaw", system:"2-ton gas rough-in", status:"SCHEDULED", history:"Kevin & Chris, Fri 7/31 10 AM–12 PM.", billing:"", notes:"", wire:"", createdAt:Date.now() },
-  { id:"job_chambers", name:"Scottie Chambers", address:"1458 Jones Creek Rd, Dickson, TN 37055", contractor:"Shaw", system:"2.5-ton heat pump rough-in", status:"SCHEDULED", history:"Kevin & Chris.", billing:"", notes:"⚠️ Possible duplicate of existing Summertown Dickson card — verify.", wire:"", createdAt:Date.now() },
-  { id:"job_whaley", name:"Jeff Whaley", address:"2328 Panhandle Rd, Wartrace, TN", contractor:"", system:"2.5-ton heat pump rough-in + hood vent", status:"SCHEDULED", history:"", billing:"", notes:"Keep hood cap 3 ft above combustion intake (2018 IRC).", wire:"", createdAt:Date.now() },
-  { id:"job_veritas23", name:"Shaw — Veritas Lot 23", address:"Kobi Hollow Rd area", contractor:"Shaw", system:"Units TBD", status:"SCHEDULED", history:"Kevin & Chris Fri–Mon.", billing:"", notes:"No Veritas unit rule on file — confirm before ordering/wiring.", wire:"", createdAt:Date.now() },
-  { id:"job_leoma", name:"STM Co — Leoma", address:"6520 Fall River Rd, Leoma, TN 38468", contractor:"STM Co", system:"Rough-in", status:"SCHEDULED", history:"Return visit.", billing:"", notes:"", wire:"", createdAt:Date.now() },
-  { id:"job_gosey", name:"Gosey Hill / Franklin", address:"4260 Gosey Hill Rd, Franklin, TN", contractor:"", system:"", status:"PENDING", history:"", billing:"", notes:"Needs Airtable card. Trim out.", wire:"", createdAt:Date.now() },
-  { id:"job_perrybaker", name:"Perry Baker", address:"Unknown (materials: 960 Gravely Run Rd, McEwen)", contractor:"", system:"", status:"PENDING", history:"", billing:"", notes:"Trim out. Address unknown. Needs Airtable card.", wire:"", createdAt:Date.now() },
-  { id:"job_samreid", name:"Sammy Reid", address:"Unknown", contractor:"", system:"", status:"PENDING", history:"", billing:"", notes:"Trim out. Address unknown. Needs Airtable card.", wire:"", createdAt:Date.now() },
-];
 const DEFAULT_PREP = ["Install the car seat (get it checked)", "Pack the hospital bag", "Set up the crib", "Wash the baby clothes", "Pick a pediatrician", "Tour / pre-register at the hospital", "Stock diapers & wipes", "Freezer meals for the first weeks", "Test smoke & CO detectors", "Baby-proof outlets & cords", "Nail down the name", "Sort the finances / buffer"];
 const QUOTES = ["Certainty is the enemy of growth. Stay a little unsure.", "You don't have thoughts — you practice them. Choose which to rehearse.", "The mind obeys the questions you feed it. Ask better ones.", "Comfort is a slow surrender. Choose the harder good.", "Most cages are unlocked. Few people push the door.", "What you avoid runs your life from the shadows.", "You are the habit you keep repeating.", "Freedom is fewer wants, not more stuff.", "The obstacle and the way are the same road.", "A man is what he does when no metric is watching.", "Time isn't running out; it's running through. Notice it.", "You can't think your way into a life you have to live your way into.", "The quality of your attention is the quality of your life.", "Meaning is built, not found. Pick up the tools.", "Suffering you choose is training. Suffering you resist is damage.", "The self you defend is the self you can't grow past.", "Wisdom is seeing the second and third thing that happens.", "Control the controllable, release the rest, act anyway.", "Every yes is a quiet no to something else. Spend carefully.", "Silence is where your real opinions live. Visit often.", "A man plants trees whose shade he'll never sit in. Start planting.", "The days are long, the years are short. Spend them on what lasts.", "Legacy isn't what you leave for them — it's what you leave in them.", "Discipline is just love with a longer time horizon.", "Your kid won't remember what you bought. They'll remember if you showed up.", "Be the calm your family borrows when theirs runs out.", "The house doesn't have to be finished. The foundation does.", "Small, boring, consistent — that's how you build a life and a child.", "Character is what holds when the paycheck and the mood don't.", "The best inheritance is a steady father.", "What you tolerate, you teach.", "Strength is staying — soft, steady, and there."];
 const todayKey = () => new Date().toISOString().slice(0, 10);
@@ -1293,30 +1276,53 @@ const TAB_ICONS = {
   camp: (active) => React.createElement("svg", { width: 24, height: 24, viewBox: "0 0 24 24", fill: "none", xmlns: "http://www.w3.org/2000/svg" },
     React.createElement("path", { d: "M12 2l2.4 6H20l-4.8 3.6L17 18l-5-3.6L7 18l1.8-6.4L4 8h5.6L12 2z", stroke: "currentColor", strokeWidth: active ? 2 : 1.6, fill: active ? "currentColor" : "none", fillOpacity: active ? 0.15 : 0, strokeLinejoin: "round" })
   ),
-  jobs: (active) => React.createElement("svg", { width: 24, height: 24, viewBox: "0 0 24 24", fill: "none", xmlns: "http://www.w3.org/2000/svg" },
-    React.createElement("rect", { x: 2, y: 7, width: 20, height: 14, rx: 2, stroke: "currentColor", strokeWidth: active ? 2 : 1.6, fill: active ? "currentColor" : "none", fillOpacity: active ? 0.12 : 0 }),
-    React.createElement("path", { d: "M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2", stroke: "currentColor", strokeWidth: active ? 2 : 1.6, strokeLinecap: "round" }),
-    React.createElement("line", { x1: 12, y1: 12, x2: 12, y2: 16, stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" }),
-    React.createElement("line", { x1: 10, y1: 14, x2: 14, y2: 14, stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" })
-  ),
+
   settings: (active) => React.createElement("svg", { width: 24, height: 24, viewBox: "0 0 24 24", fill: "none", xmlns: "http://www.w3.org/2000/svg" },
     React.createElement("circle", { cx: 12, cy: 12, r: 3, stroke: "currentColor", strokeWidth: active ? 2 : 1.6, fill: active ? "currentColor" : "none", fillOpacity: active ? 0.2 : 0 }),
     React.createElement("path", { d: "M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z", stroke: "currentColor", strokeWidth: 1.4, strokeLinejoin: "round" })
   )
 };
-function BottomTabBar({ tab, openScreen, closeScreen, paired, unread }) {
+function BottomTabBar({ tab, openScreen, closeScreen, paired, unread, msgInput, setMsgInput, onSend }) {
   const accent = C.rust || "#0A84FF";
   const tabs = [
     { id: "today",    label: "Home"     },
     { id: "messages", label: "Messages", badge: unread  },
-    { id: "jobs",     label: "Jobs"      },
-
     { id: "settings", label: "Settings"  },
   ];
+  const onMessages = tab === "messages";
   return React.createElement("nav", {
     className: "tab-bar",
-    style: { fontFamily: "-apple-system, 'SF Pro Text', system-ui, sans-serif" }
-  }, tabs.map(t => {
+    style: { boxShadow: "0 -0.5px 0 rgba(84,84,88,0.55)", fontFamily: "-apple-system, 'SF Pro Text', system-ui, sans-serif",
+             display:"flex", flexDirection:"column", alignItems:"stretch",
+             justifyContent:"flex-end", padding: onMessages ? "8px 12px 0" : "0",
+             height: onMessages ? 116 : 68,
+             transition: "height 0.38s cubic-bezier(0.2,0,0,1), padding 0.38s cubic-bezier(0.2,0,0,1)", willChange:"height" }
+  },
+  onMessages && React.createElement("div", {
+    style: { display:"flex", gap:8, marginBottom:8, alignItems:"center",
+             opacity: onMessages ? 1 : 0, transition:"opacity 0.2s ease 0.15s",
+             borderTop: "0.5px solid rgba(84,84,88,0.55)", paddingTop:8 }
+  },
+    React.createElement("input", {
+      value: msgInput, onChange: e => setMsgInput(e.target.value),
+      onKeyDown: e => { if (e.key === "Enter" && msgInput.trim()) { onSend(msgInput); } },
+      placeholder: "Say something to Mabry…",
+      autoComplete: "off", spellCheck: false,
+      style: { flex:1, background:"rgba(255,255,255,0.1)", border:"none", outline:"none",
+               borderRadius:22, padding:"9px 16px", fontFamily:"-apple-system,sans-serif",
+               fontSize:16, color:"#fff", WebkitAppearance:"none", minWidth:0, caretColor: accent }
+    }),
+    React.createElement("button", {
+      onClick: () => { if (msgInput.trim()) onSend(msgInput); },
+      disabled: !msgInput.trim(),
+      style: { width:34, height:34, borderRadius:"50%", flexShrink:0, fontSize:18, fontWeight:700, border:"none", cursor:"pointer",
+               background: msgInput.trim() ? accent : "rgba(118,118,128,0.3)",
+               color: msgInput.trim() ? "#fff" : "rgba(255,255,255,0.35)",
+               transition:"background 0.18s ease" }
+    }, "↑")
+  ),
+  React.createElement("div", { style:{ display:"flex", flex:"none", height:68, alignItems:"center", width:"100%" } },
+  tabs.map(t => {
     const active = tab === t.id;
     return React.createElement("button", {
       key: t.id,
@@ -1332,7 +1338,7 @@ function BottomTabBar({ tab, openScreen, closeScreen, paired, unread }) {
       t.badge && React.createElement("div", { className: "tab-badge" })
     ),
     React.createElement("div", { className: "tab-label", style: { color: active ? accent : "rgba(255,255,255,0.38)", fontWeight: active ? 600 : 400 } }, t.label)
-  )}));
+  )})));
 }
 
 function BaseCamp() {
@@ -1391,15 +1397,7 @@ function BaseCamp() {
   const [themeVer, setThemeVer] = useState(0);
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
   const [showUpdateBanner, setShowUpdateBanner] = useState(false);
-  // ── Jobs ──
-  const [jobs, setJobs] = useState([]);
-  const [jobSearch, setJobSearch] = useState("");
-  const [jobFilter, setJobFilter] = useState("active");
-  const [selectedJob, setSelectedJob] = useState(null);
-  const [editingJob, setEditingJob] = useState(null);
-  const [jobPin, setJobPin] = useState(null);
-  const [jobUnlocked, setJobUnlocked] = useState(false);
-  const [pinDraft, setPinDraft] = useState("");
+
   const [pinError, setPinError] = useState(false);
   const [pinMode, setPinMode] = useState("enter"); // "enter" | "set" | "confirm"
   const [pinConfirm, setPinConfirm] = useState("");
@@ -1504,7 +1502,7 @@ function BaseCamp() {
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const swipeTouchRef = useRef({ startX:0, startY:0, startTime:0 });
-  const SWIPE_TABS = ["today","messages","jobs","settings"];
+  const SWIPE_TABS = ["today","messages","settings"];
   const pageTransform = (i) => {
     const base = (i - SWIPE_TABS.indexOf(tab)) * 100;
     return `translateX(calc(${base}vw + ${dragOffset}px))`;
@@ -1667,9 +1665,7 @@ function BaseCamp() {
       const bph = await load("babyPhotos", []);
       setBabyPhotos(bph);
       // Jobs — seed with DEFAULT_JOBS on first launch
-      const savedJobs = await load("jobs", null);
-      setJobs(savedJobs === null ? DEFAULT_JOBS : savedJobs);
-      const storedPin = localStorage.getItem("jobs_pin");
+            const storedPin = localStorage.getItem("jobs_pin");
       if (storedPin) setJobPin(storedPin);
       if (!localStorage.getItem("keeper_seen_v16")) setWhatsNewOpen(true);
       // One-time deploy update banner
@@ -1888,88 +1884,7 @@ function BaseCamp() {
   };
   const saveBabyPhotos = (photos) => { setBabyPhotos(photos); save("babyPhotos", photos); };
   // ── Jobs helpers ──
-  const saveJobs = j => { setJobs(j); save("jobs", j); };
-  const saveJobPin = pin => { setJobPin(pin); localStorage.setItem("jobs_pin", pin); };
-  const jobsForAI = () => jobs.filter(j => j.status !== "DONE").map(j => `${j.name} | ${j.address} | ${j.status}${j.billing ? " | "+j.billing : ""}${j.notes ? " | "+j.notes : ""}`).join("\n");
-  // Auto-lock jobs when app goes to background
-  useEffect(() => {
-    const onVis = () => { if (document.hidden) setJobUnlocked(false); };
-    document.addEventListener("visibilitychange", onVis);
-    return () => document.removeEventListener("visibilitychange", onVis);
-  }, []);
-  const notesBase = (() => {
-    try {
-      return relayUrl ? new URL("/note", relayUrl).toString() : "";
-    } catch {
-      return "";
-    }
-  })();
-  const paired = !!(pairCode && notesBase);
-  const pullNote = useCallback(async () => {
-    if (!pairCode || !notesBase) return;
-    const bust = "&t=" + Date.now();
-    const url = side => `${notesBase}?code=${encodeURIComponent(pairCode)}&side=${side}${bust}`;
-    try {
-      const [theirs, mine] = await Promise.all([fetch(url("hers"), {
-        cache: "no-store"
-      }).then(r => r.json()), fetch(url("his"), {
-        cache: "no-store"
-      }).then(r => r.json())]);
-      if (theirs && typeof theirs.note === "string") {
-        setTheirNote(theirs);
-        if (theirs.note && !theirs.seenAt) {
-          fetch(notesBase + "/seen", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              code: pairCode,
-              side: "hers"
-            })
-          }).catch(() => {});
-        }
-      }
-      if (mine && typeof mine.note === "string") setMyNoteMeta(mine);
-      setNoteError(false);
-    } catch {
-      setNoteError(true);
-    }
-  }, [pairCode, notesBase]);
-  const pushNote = async () => {
-    if (!paired || noteBusy) return;
-    setNoteBusy(true);
-    try {
-      const r = await fetch(notesBase, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          code: pairCode,
-          side: "his",
-          note: myNote.trim()
-        })
-      });
-      const d = await r.json();
-      if (d && d.error) setFlash("Couldn't send it — " + d.error);else {
-        setMyNoteSent(d.updatedAt || Date.now());
-        setMyNoteMeta({
-          note: myNote.trim(),
-          updatedAt: d.updatedAt || Date.now(),
-          seenAt: 0
-        });
-        setNoteError(false);
-        setFlash(myNote.trim() ? "Sent." : "Cleared.");
-        pullNote();
-      }
-    } catch {
-      setNoteError(true);
-      setFlash("Couldn't send it. Check your signal.");
-    }
-    setNoteBusy(false);
-  };
-  const threadBase = (() => {
+      const threadBase = (() => {
     try {
       return relayUrl ? new URL("/thread", relayUrl).toString() : "";
     } catch {
@@ -2378,7 +2293,6 @@ function BaseCamp() {
       prepTotal: prep.length,
       favoriteNames: names.filter(n => n.fav && n.text.trim()).map(n => n.text),
       bucketOpen: bucket.filter(b => !b.done && b.text.trim()).length,
-      activeJobs: jobUnlocked ? jobsForAI() : null
     };
     try {
       const res = await fetch(aiUrl, {
@@ -2542,7 +2456,7 @@ function BaseCamp() {
   },
   React.createElement("div", {
     className: "relative z-[1] mx-auto max-w-md px-5",
-    style: { paddingTop: "max(2.5rem, env(safe-area-inset-top))", paddingBottom: "calc(108px + env(safe-area-inset-bottom, 0px))" }
+    style: { paddingTop: "max(2.5rem, env(safe-area-inset-top))", paddingBottom: `calc(${tab === "messages" ? 160 : 108}px + env(safe-area-inset-bottom, 0px))`, transition: "padding-bottom 0.38s cubic-bezier(0.2,0,0,1)" }
   },
 React.createElement("header", {
     className: "mb-6 flex items-start justify-between gap-3"
@@ -2665,40 +2579,7 @@ React.createElement("header", {
       fontFamily: body,
       color: C.mute
     }
-  }, "No messages yet ♥ say hi")), React.createElement("div", {
-    className: "mt-3 flex gap-2"
-  }, React.createElement("input", {
-    value: myNote,
-    onChange: e => setMyNote(e.target.value),
-    onKeyDown: e => {
-      if (e.key === "Enter") pushNote();
-    },
-    maxLength: 280,
-    placeholder: "Message Mabry…",
-    className: "min-w-0 flex-1 rounded-full px-4 py-2.5 text-sm outline-none",
-    style: {
-      fontFamily: body,
-      color: C.text,
-      background: "rgba(118,118,128,0.18)",
-      border: "none",
-      backdropFilter: "none"
-    }
-  }), React.createElement("button", {
-    onClick: () => {
-      sfx.pop();
-      haptic(10);
-      pushNote();
-    },
-    disabled: noteBusy || !myNote.trim(),
-    className: "shrink-0 grid place-items-center",
-    style: { width:32, height:32, borderRadius:"50%", background:C.rust, flexShrink:0, fontSize:16, fontWeight:700, color:contrastFor(C.rust) },
-    style: {
-      fontFamily: body,
-      fontWeight: 500,
-      background: noteBusy || !myNote.trim() ? C.cardHi : C.rust,
-      color: noteBusy || !myNote.trim() ? C.mute : contrastFor(C.rust)
-    }
-  }, "↑")), myNoteMeta && myNoteMeta.note || myNoteSent > 0 ? React.createElement("div", {
+  }, "No messages yet ♥ say hi")), , myNoteMeta && myNoteMeta.note || myNoteSent > 0 ? React.createElement("div", {
     className: "mt-1.5 text-xs",
     style: {
       fontFamily: mono,
@@ -2883,215 +2764,6 @@ React.createElement("header", {
   React.createElement("div", {
     style: { position:"absolute", inset:0, overflowY:"auto", WebkitOverflowScrolling:"touch",
              transform: pageTransform(2),
-             transition: isDragging ? "none" : "transform 0.32s cubic-bezier(0.2,0,0,1)",
-             willChange: "transform" }
-  },
-  React.createElement("div", {
-    className: "relative z-[1] mx-auto max-w-md px-5",
-    style: { paddingTop: "max(2.5rem, env(safe-area-inset-top))", paddingBottom: "calc(100px + env(safe-area-inset-bottom, 0px))" }
-  },
-    (selectedJob || editingJob) ? React.createElement("div", {
-      style: { display:"flex", alignItems:"center", marginBottom:24, position:"relative" }
-    },
-      React.createElement("button", {
-        onClick: () => { setSelectedJob(null); setEditingJob(null); },
-        className: "press flex items-center gap-1.5",
-        style: { fontFamily:body, fontSize:15, fontWeight:600, color:C.rust,
-                 padding:"8px 16px 8px 12px", background:C.rust+"20",
-                 borderRadius:22, border:"1px solid "+C.rust+"28", flexShrink:0 }
-      }, React.createElement("span",{style:{fontSize:20,lineHeight:1,marginTop:-1}},"\u2039"), "Jobs"),
-      React.createElement("h1", {
-        style: { fontFamily:display, fontWeight:700, fontSize:17, color:C.text,
-                 position:"absolute", left:"50%", transform:"translateX(-50%)", whiteSpace:"nowrap" }
-      }, selectedJob ? "Job Details" : editingJob ? (editingJob.id ? "Edit Job" : "New Job") : "Jobs")
-    ) : React.createElement("h1", {
-      style: { fontFamily: display, fontWeight: 700, fontSize: 32, letterSpacing: "-0.025em",
-               background: "linear-gradient(140deg,#ffffff 0%,rgba(255,255,255,0.68) 100%)",
-               WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-               backgroundClip: "text", lineHeight: 1.06, marginBottom: 24 }
-    }, "Jobs"),
-    (() => {
-  const JF = {"active":["IN PROGRESS","PENDING","HOLD"],"scheduled":["SCHEDULED"],"done":["DONE"],"all":null};
-  const filtJobs = jobs.filter(j => {
-    const ok = jobFilter === "all" ? true : (JF[jobFilter]||[]).includes(j.status);
-    const q = jobSearch.toLowerCase().trim();
-    return ok && (!q || [j.name,j.address||"",j.contractor||"",j.notes||""].some(s=>s.toLowerCase().includes(q)));
-  });
-  const PinDots = (n,err) => React.createElement("div",{style:{display:"flex",gap:18,marginBottom:44}},
-    [0,1,2,3].map(i=>React.createElement("div",{key:i,style:{width:16,height:16,borderRadius:"50%",background:err?"#FF453A":i<n?C.rust:"transparent",border:"2.5px solid "+(err?"#FF453A":i<n?C.rust:"rgba(255,255,255,0.28)"),transition:"background 0.12s ease"}}))
-  );
-  const PinPad = (onDigit,onDel) => React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(3,80px)",gridTemplateRows:"repeat(4,80px)",gap:10}},
-    ["1","2","3","4","5","6","7","8","9","","0","⌫"].map((k,idx)=>{
-      if(!k) return React.createElement("div",{key:"blank_"+idx});
-      const isDel = k==="⌫";
-      return React.createElement("button",{key:k,onClick:()=>isDel?onDel():onDigit(k),
-        style:{width:80,height:80,borderRadius:"50%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.08)",fontFamily:isDel?body:display,fontSize:isDel?22:30,fontWeight:400,color:C.text,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",transition:"opacity 0.08s ease",userSelect:"none"}
-      },k);
-    })
-  );
-  if(!jobPin){
-    const go = d => {
-      const nxt = pinDraft+d; if(nxt.length>4) return; setPinDraft(nxt);
-      if(nxt.length===4){ haptic(6); setTimeout(()=>{
-        if(pinMode==="set"){ setPinConfirm(nxt); setPinDraft(""); setPinMode("confirm"); }
-        else { if(nxt===pinConfirm){ saveJobPin(nxt); setPinDraft(""); setJobUnlocked(true); setPinMode("enter"); setPinError(false); }
-          else { setPinError(true); setPinDraft(""); setTimeout(()=>{ setPinError(false); setPinMode("set"); setPinConfirm(""); },800); } }
-      },100); }
-    };
-    return React.createElement("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",paddingTop:64,paddingBottom:40}},
-      React.createElement("div",{style:{width:64,height:64,borderRadius:"50%",background:C.rust+"20",border:"1.5px solid "+C.rust+"44",display:"flex",alignItems:"center",justifyContent:"center",fontSize:30,marginBottom:20}},"🔒"),
-      React.createElement("div",{style:{fontFamily:display,fontWeight:700,fontSize:22,color:C.text,letterSpacing:"-0.02em",marginBottom:8,textAlign:"center"}},pinMode==="set"?"Create a PIN":"Confirm PIN"),
-      React.createElement("div",{style:{fontFamily:body,fontSize:14,color:pinError?"#FF453A":C.mute,marginBottom:40,textAlign:"center",transition:"color 0.2s ease"}},
-        pinError?"PINs don’t match — try again":pinMode==="set"?"4 digits to lock your jobs":"Enter it again to confirm"
-      ),
-      PinDots(pinDraft.length,pinError),
-      PinPad(go,()=>setPinDraft(d=>d.slice(0,-1)))
-    );
-  }
-  if(!jobUnlocked){
-    const go = d => {
-      const nxt = pinDraft+d; if(nxt.length>4) return; setPinDraft(nxt);
-      if(nxt.length===4){ haptic(6); setTimeout(()=>{
-        if(nxt===jobPin){ setJobUnlocked(true); setPinDraft(""); setPinError(false); }
-        else { setPinError(true); setPinDraft(""); setTimeout(()=>setPinError(false),700); }
-      },100); }
-    };
-    return React.createElement("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",paddingTop:64,paddingBottom:40}},
-      React.createElement("div",{style:{width:64,height:64,borderRadius:"50%",background:pinError?"rgba(255,69,58,0.15)":"rgba(255,255,255,0.06)",border:"1.5px solid "+(pinError?"rgba(255,69,58,0.45)":C.line),display:"flex",alignItems:"center",justifyContent:"center",fontSize:30,marginBottom:20,animation:pinError?"pinShake 0.45s ease":"none",transition:"background 0.2s,border-color 0.2s"}},"🔒"),
-      React.createElement("div",{style:{fontFamily:display,fontWeight:700,fontSize:22,color:C.text,letterSpacing:"-0.02em",marginBottom:8}},"Jobs"),
-      React.createElement("div",{style:{fontFamily:body,fontSize:14,color:pinError?"#FF453A":C.mute,marginBottom:40,transition:"color 0.2s ease"}},
-        pinError?"Wrong PIN — try again":"Enter your PIN"
-      ),
-      PinDots(pinDraft.length,pinError),
-      PinPad(go,()=>setPinDraft(d=>d.slice(0,-1))),
-      React.createElement("button",{
-        onClick:()=>{setJobPin(null);localStorage.removeItem("jobs_pin");setPinMode("set");setPinConfirm("");setPinDraft("");},
-        style:{marginTop:28,fontFamily:body,fontSize:13,color:C.mute,background:"transparent",border:"none",cursor:"pointer",padding:"10px 20px",touchAction:"manipulation",WebkitTapHighlightColor:"transparent"}
-      },"Forgot PIN?")
-    );
-  }
-  if(selectedJob){
-    const job=jobs.find(j=>j.id===selectedJob); if(!job){setSelectedJob(null);return null;}
-    const col=JOB_STATUSES[job.status]||C.mute;
-    return React.createElement("div",{key:"jd",className:"rise space-y-3"},
-      React.createElement(Card,null,
-        React.createElement("div",{style:{fontFamily:display,fontWeight:800,fontSize:26,color:C.text,letterSpacing:"-0.04em",lineHeight:1.15,marginBottom:14}},job.name),
-        React.createElement("div",{style:{display:"inline-flex",alignItems:"center",gap:6,padding:"5px 12px 5px 10px",borderRadius:20,background:col+"18",border:"1px solid "+col+"40"}},
-          React.createElement("div",{style:{width:8,height:8,borderRadius:"50%",background:col,flexShrink:0}}),
-          React.createElement("span",{style:{fontFamily:mono,fontSize:11,fontWeight:700,color:col,letterSpacing:"0.07em"}},job.status)
-        )
-      ),
-      React.createElement(Card,null,
-        [
-          {icon:"📍",label:"Address",val:job.address},
-          job.contractor&&{icon:"🏗",label:"Contractor",val:job.contractor},
-          job.system&&{icon:"❄️",label:"System",val:job.system},
-          job.wire&&{icon:"🔌",label:"Wire",val:job.wire},
-          job.billing&&{icon:"💰",label:"Billing",val:job.billing},
-        ].filter(Boolean).map((r,i,a)=>React.createElement("div",{key:r.label,style:{display:"flex",alignItems:"flex-start",gap:12,paddingTop:i>0?14:0,paddingBottom:i<a.length-1?14:0,borderBottom:i<a.length-1?"1px solid "+C.line:"none"}},
-          React.createElement("span",{style:{fontSize:18,lineHeight:1.5,flexShrink:0}},r.icon),
-          React.createElement("div",{style:{flex:1,minWidth:0}},
-            React.createElement("div",{style:{fontFamily:body,fontSize:12,fontWeight:400,color:C.mute,marginBottom:3,letterSpacing:"0.01em",textTransform:"none"}},r.label),
-            React.createElement("div",{style:{fontFamily:body,fontSize:15,color:C.text,lineHeight:1.45,wordBreak:"break-word"}},r.val)
-          )
-        ))
-      ),
-      job.notes&&React.createElement(Card,null,
-        React.createElement("div",{style:{fontFamily:mono,fontSize:10,color:C.mute,marginBottom:8,letterSpacing:"0.08em",textTransform:"uppercase"}},"Notes"),
-        React.createElement("div",{style:{fontFamily:body,fontSize:14,color:C.text,lineHeight:1.7,whiteSpace:"pre-wrap"}},job.notes)
-      ),
-      job.history&&React.createElement(Card,null,
-        React.createElement("div",{style:{fontFamily:mono,fontSize:10,color:C.mute,marginBottom:8,letterSpacing:"0.08em",textTransform:"uppercase"}},"History"),
-        React.createElement("div",{style:{fontFamily:body,fontSize:14,color:C.text,lineHeight:1.7,whiteSpace:"pre-wrap"}},job.history)
-      ),
-      React.createElement("div",{style:{paddingTop:4,paddingBottom:4,textAlign:"center"}},
-        React.createElement("button",{
-          onClick:()=>{if(!window.confirm("Delete "+job.name+"?"))return;saveJobs(jobs.filter(j=>j.id!==job.id));setSelectedJob(null);},
-          style:{fontFamily:body,fontSize:14,color:"#FF453A",background:"rgba(255,69,58,0.08)",padding:"12px 32px",borderRadius:22,border:"1px solid rgba(255,69,58,0.22)",cursor:"pointer",touchAction:"manipulation",WebkitTapHighlightColor:"transparent"}
-        },"Delete Job")
-      )
-    );
-  }
-  if(editingJob){
-    const isNew=!editingJob.id;
-    return React.createElement("div",{key:"je",className:"rise space-y-4"},
-      React.createElement(Card,null,
-        React.createElement("div",{style:{fontFamily:mono,fontSize:10,color:C.mute,marginBottom:12,letterSpacing:"0.08em",textTransform:"uppercase"}},"Status"),
-        React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:8}},
-          Object.entries(JOB_STATUSES).map(([s,col])=>React.createElement("button",{
-            key:s,onClick:()=>setEditingJob(j=>({...j,status:s})),
-            style:{padding:"8px 14px",borderRadius:20,background:editingJob.status===s?col+"22":C.bg0,border:"1.5px solid "+(editingJob.status===s?col:C.line),color:editingJob.status===s?col:C.mute,fontFamily:mono,fontSize:11,fontWeight:700,letterSpacing:"0.07em",cursor:"pointer",touchAction:"manipulation",WebkitTapHighlightColor:"transparent"}
-          },s))
-        )
-      ),
-      React.createElement(Card,null,
-        [{k:"name",label:"Customer Name",ph:"Full name"},{k:"address",label:"Address",ph:"Street, City, State"},{k:"contractor",label:"Contractor",ph:"Company name"},{k:"system",label:"System",ph:"e.g. 2.5-ton split"},{k:"wire",label:"Wire Run",ph:"Details"},{k:"billing",label:"Billing",ph:"Invoice / amount"}].map((f,i,a)=>React.createElement("div",{key:f.k,style:{paddingTop:i>0?14:0,paddingBottom:i<a.length-1?14:0,borderBottom:i<a.length-1?"1px solid "+C.line:"none"}},
-          React.createElement("div",{style:{fontFamily:mono,fontSize:10,color:C.mute,marginBottom:5,letterSpacing:"0.08em",textTransform:"uppercase"}},f.label),
-          React.createElement("input",{value:editingJob[f.k]||"",onChange:e=>{const v=e.target.value;setEditingJob(j=>({...j,[f.k]:v}));},placeholder:f.ph,style:{width:"100%",background:"transparent",border:"none",outline:"none",fontFamily:body,fontSize:16,color:C.text,padding:0,WebkitAppearance:"none",display:"block"}})
-        ))
-      ),
-      React.createElement(Card,null,
-        React.createElement("div",{style:{fontFamily:mono,fontSize:10,color:C.mute,marginBottom:6,letterSpacing:"0.08em",textTransform:"uppercase"}},"Notes"),
-        React.createElement("textarea",{value:editingJob.notes||"",onChange:e=>{const v=e.target.value;setEditingJob(j=>({...j,notes:v}));},placeholder:"Job notes, materials, issues...",rows:4,style:{width:"100%",background:"transparent",border:"none",outline:"none",fontFamily:body,fontSize:16,color:C.text,resize:"none",padding:0,lineHeight:1.6,display:"block"}}),
-        React.createElement("div",{style:{height:1,background:C.line,margin:"14px 0"}}),
-        React.createElement("div",{style:{fontFamily:mono,fontSize:10,color:C.mute,marginBottom:6,letterSpacing:"0.08em",textTransform:"uppercase"}},"History / Site Notes"),
-        React.createElement("textarea",{value:editingJob.history||"",onChange:e=>{const v=e.target.value;setEditingJob(j=>({...j,history:v}));},placeholder:"Previous visits, work done...",rows:3,style:{width:"100%",background:"transparent",border:"none",outline:"none",fontFamily:body,fontSize:16,color:C.text,resize:"none",padding:0,lineHeight:1.6,display:"block"}})
-      )
-    );
-  }
-  const sCounts={all:jobs.length,active:jobs.filter(j=>["IN PROGRESS","PENDING","HOLD"].includes(j.status)).length,scheduled:jobs.filter(j=>j.status==="SCHEDULED").length,done:jobs.filter(j=>j.status==="DONE").length};
-  return React.createElement("div",{key:"jl"},
-    React.createElement("h1",{style:{fontFamily:display,fontWeight:800,fontSize:32,color:C.text,letterSpacing:"-0.04em",lineHeight:1.05,marginBottom:18,marginTop:4}},"Jobs"),
-    React.createElement("div",{style:{position:"relative",marginBottom:14}},
-      React.createElement("input",{value:jobSearch,onChange:e=>setJobSearch(e.target.value),placeholder:"Search jobs...",style:{width:"100%",padding:"12px 14px 12px 42px",background:"rgba(118,118,128,0.18)",border:"none",borderRadius:12,fontFamily:body,fontSize:16,color:C.text,outline:"none",WebkitAppearance:"none",display:"block",boxSizing:"border-box"}}), React.createElement("span",{style:{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",fontSize:16,opacity:0.35,pointerEvents:"none"}},"🔍")),
-    React.createElement("div",{style:{display:"flex",gap:0,marginBottom:20,padding:"2px",borderRadius:10,background:"rgba(118,118,128,0.24)",WebkitTapHighlightColor:"transparent"}},
-      [["all","All"],["active","Active"],["scheduled","Sched"],["done","Done"]].map(([key,lbl])=>React.createElement("button",{
-        key,onClick:()=>{haptic(3);setJobFilter(key);},
-        style:{flex:1,minWidth:0,padding:"7px 8px",borderRadius:8,background:jobFilter===key?"rgba(255,255,255,0.12)":"transparent",color:jobFilter===key?"#fff":C.mute,border:"none",fontFamily:body,fontSize:13,fontWeight:jobFilter===key?600:500,cursor:"pointer",transition:"background 0.18s ease, color 0.18s ease",boxShadow:jobFilter===key?"0 1px 4px rgba(0,0,0,0.35), inset 0 0.5px 0 rgba(255,255,255,0.18)":"none",whiteSpace:"nowrap",display:"inline-flex",gap:4,alignItems:"center",justifyContent:"center",touchAction:"manipulation",WebkitTapHighlightColor:"transparent"}
-      },lbl,React.createElement("span",{style:{fontSize:11,opacity:0.65}},sCounts[key])))
-    ),
-    filtJobs.length===0&&React.createElement("div",{style:{textAlign:"center",padding:"64px 24px 40px",display:"flex",flexDirection:"column",alignItems:"center",gap:10}},
-      React.createElement("div",{style:{fontSize:52,opacity:0.3,marginBottom:8}},"🛠️"),
-      React.createElement("div",{style:{fontFamily:body,fontSize:14,color:C.mute,lineHeight:1.5}},jobSearch?"No jobs matching “"+jobSearch+"”":"No jobs in this category")
-    ),
-    React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:12}},
-      filtJobs.map(job=>{
-        const col=JOB_STATUSES[job.status]||C.mute;
-        return React.createElement("button",{
-          key:job.id,onClick:()=>{haptic(4);setSelectedJob(job.id);},
-          className:"press",
-          style:{width:"100%",textAlign:"left",background:C.card,border:"0.5px solid rgba(84,84,88,0.38)",borderRadius:14,padding:0,cursor:"pointer",overflow:"hidden",display:"block",boxShadow:"rgba(0,0,0,0.3) 0 4px 16px -6px, inset 0 0.5px 0 rgba(255,255,255,0.12)",WebkitTapHighlightColor:"transparent",touchAction:"manipulation"}
-        },
-          React.createElement("div",{style:{display:"flex",alignItems:"stretch",minHeight:82}},
-            React.createElement("div",{style:{width:4,flexShrink:0,background:col,borderRadius:"16px 0 0 16px"}}),
-            React.createElement("div",{style:{flex:1,padding:"15px 16px",display:"flex",flexDirection:"column",gap:5,overflow:"hidden"}},
-              React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}},
-                React.createElement("div",{style:{fontFamily:body,fontWeight:600,fontSize:17,color:C.text,letterSpacing:"-0.01em",lineHeight:1.2,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},job.name),
-                React.createElement("div",{style:{flexShrink:0,display:"inline-flex",alignItems:"center",gap:4,padding:"3px 8px",borderRadius:10,background:col+"18"}},
-                  React.createElement("div",{style:{width:6,height:6,borderRadius:"50%",background:col,flexShrink:0}}),
-                  React.createElement("span",{style:{fontFamily:mono,fontSize:10,fontWeight:700,color:col,letterSpacing:"0.05em",whiteSpace:"nowrap"}},job.status)
-                )
-              ),
-              React.createElement("div",{style:{fontFamily:body,fontSize:14,color:C.mute,lineHeight:1.3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},job.address||"—"),
-              job.contractor&&React.createElement("div",{style:{fontFamily:body,fontSize:12,color:C.mute,opacity:0.6}},job.contractor)
-            )
-          )
-        );
-      })
-    ),
-    React.createElement("div",{style:{height:90}}),
-    React.createElement("button",{
-      onClick:()=>{haptic(5);setEditingJob({id:"",name:"",address:"",contractor:"",system:"",status:"PENDING",history:"",billing:"",notes:"",wire:"",createdAt:Date.now()});},
-      className:"press",
-      style:{position:"fixed",bottom:"calc(82px + env(safe-area-inset-bottom,0px))",right:20,width:58,height:58,borderRadius:"50%",background:C.rust,border:"none",cursor:"pointer",boxShadow:"0 4px 20px "+C.rust+"88,0 2px 8px rgba(0,0,0,0.4)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,color:contrastFor(C.rust),zIndex:10,WebkitTapHighlightColor:"transparent",touchAction:"manipulation",fontWeight:300}
-    },"+")
-  );
-})()
-  )
-  ),
-  React.createElement("div", {
-    style: { position:"absolute", inset:0, overflowY:"auto", WebkitOverflowScrolling:"touch",
-             transform: pageTransform(3),
              transition: isDragging ? "none" : "transform 0.32s cubic-bezier(0.2,0,0,1)",
              willChange: "transform" }
   },
@@ -3398,6 +3070,8 @@ React.createElement("header", {
     tab,
     openScreen,
     closeScreen,
+    msgInput: myNote, setMsgInput: setMyNote,
+    onSend: () => { const v = myNote.trim(); if (v) { pushNote(); setMyNote(""); } },
     paired,
     unread: threadMsgs.some(m => m.side === "hers" && m.at > (threadSeen.his_seen_at || 0))
   }),
