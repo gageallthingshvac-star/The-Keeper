@@ -39,7 +39,7 @@
   input[type="time"], input[type="date"] { -webkit-appearance: none; appearance: none; }
   input[type="date"] { -webkit-appearance: none; }
 
-  /* ââ Apple Liquid Glass â enhanced ââ */
+  /* ── Apple Liquid Glass — enhanced ── */
   .glass {
     position: relative;
     backdrop-filter: blur(44px) saturate(1.8) brightness(1.06);
@@ -78,7 +78,7 @@
     animation: sheen 5.5s linear infinite;
   }
 
-  /* ââ Apple Liquid Glass SVG refraction (Chromium) ââ */
+  /* ── Apple Liquid Glass SVG refraction (Chromium) ── */
   @supports (backdrop-filter: url(#lg-filter)) {
     .glass {
       backdrop-filter: blur(10px) saturate(190%) brightness(1.07) url(#lg-filter);
@@ -90,7 +90,7 @@
     }
   }
 
-  /* ââ iOS 18 floating pill tab bar ââ */
+  /* ── iOS 18 floating pill tab bar ── */
   .line-clamp-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .tab-bar {
     position: fixed;
@@ -182,7 +182,7 @@
     animation: dotPulse 2s ease-in-out infinite;
   }
 
-  /* ââ Press feedback ââ */
+  /* ── Press feedback ── */
   @keyframes morphExpand {
     from { height: 68px; }
     to   { height: 118px; }
@@ -204,7 +204,7 @@
   }
   .press:active { transform: scale(0.97); opacity: 0.88; }
 
-  /* ââ Card stagger rise ââ */
+  /* ── Card stagger rise ── */
   .card-0 { animation: cardRise 0.42s cubic-bezier(0.22,1,0.36,1) 0.06s both; }
   .card-1 { animation: cardRise 0.42s cubic-bezier(0.22,1,0.36,1) 0.12s both; }
   .card-2 { animation: cardRise 0.42s cubic-bezier(0.22,1,0.36,1) 0.18s both; }
@@ -213,7 +213,7 @@
   .card-5 { animation: cardRise 0.42s cubic-bezier(0.22,1,0.36,1) 0.36s both; }
   .card-6 { animation: cardRise 0.42s cubic-bezier(0.22,1,0.36,1) 0.42s both; }
 
-  /* ââ Auto-stagger children of .rise containers ââ */
+  /* ── Auto-stagger children of .rise containers ── */
   .rise > * { animation: cardRise 0.44s cubic-bezier(0.22,1,0.36,1) both; }
   .rise > *:nth-child(1) { animation-delay: 0.05s; }
   .rise > *:nth-child(2) { animation-delay: 0.11s; }
@@ -223,7 +223,7 @@
   .rise > *:nth-child(6) { animation-delay: 0.35s; }
   .rise > *:nth-child(n+7) { animation-delay: 0.40s; }
 
-  /* ââ Today space-y-4 also staggers ââ */
+  /* ── Today space-y-4 also staggers ── */
   .space-y-4 > * { animation: cardRise 0.44s cubic-bezier(0.22,1,0.36,1) both; }
   .space-y-4 > *:nth-child(1) { animation-delay: 0.04s; }
   .space-y-4 > *:nth-child(2) { animation-delay: 0.10s; }
@@ -232,7 +232,7 @@
   .space-y-4 > *:nth-child(5) { animation-delay: 0.28s; }
   .space-y-4 > *:nth-child(n+6) { animation-delay: 0.33s; }
 
-  /* ââ Vivid animated ambient orbs ââ */
+  /* ── Vivid animated ambient orbs ── */
   @keyframes tabPop {
     0%   { transform: scale(1); }
     40%  { transform: scale(0.82); }
@@ -265,7 +265,7 @@
     will-change: transform; pointer-events: none; z-index: 0;
   }
 
-  /* ââ Input/field base ââ */
+  /* ── Input/field base ── */
   .field-base {
     font-size: 15px;
     color: #fff;
@@ -283,7 +283,7 @@
     border-color: rgba(255,255,255,0.22);
   }
 
-  /* ââ Ripple ring (existing) ââ */
+  /* ── Ripple ring (existing) ── */
   .ripple-ring {
     position: fixed;
     border-radius: 50%;
@@ -297,7 +297,7 @@
     100% { opacity: 0; transform: scale(3.5); }
   }
 
-  /* ââ Page transitions (no more side-step) ââ */
+  /* ── Page transitions (no more side-step) ── */
   @keyframes pageEnter {
     0%{opacity:0;transform:translateY(10px);}
     100%{opacity:1;transform:translateY(0);}
@@ -308,7 +308,7 @@
   @keyframes slideInRight { from{transform:translateX(100vw);opacity:.5} to{transform:translateX(0);opacity:1} }
   @keyframes slideInLeft  { from{transform:translateX(-100vw);opacity:.5} to{transform:translateX(0);opacity:1} }
 
-  /* ââ Standard keyframes ââ */
+  /* ── Standard keyframes ── */
   @keyframes bcpulse {
     0%,100%{opacity:1;} 50%{opacity:0.45;}
   }
@@ -346,7 +346,7 @@
     </filter>
   </defs>
 </svg>
-<!-- Vivid ambient orbs â give the glass something rich to refract -->
+<!-- Vivid ambient orbs — give the glass something rich to refract -->
 <div class="bg-blob" style="width:560px;height:560px;background:radial-gradient(circle,rgba(139,92,246,0.9),transparent 70%);top:-14%;left:-10%;animation:blobA 18s ease-in-out infinite;"></div>
 <div class="bg-blob" style="width:600px;height:600px;background:radial-gradient(circle,rgba(6,182,212,0.65),transparent 70%);top:8%;right:-14%;animation:blobB 25s ease-in-out infinite;"></div>
 <div class="bg-blob" style="width:480px;height:480px;background:radial-gradient(circle,rgba(255,55,95,0.45),transparent 70%);bottom:-8%;left:20%;animation:blobA 32s ease-in-out infinite reverse;"></div>
@@ -485,24 +485,26 @@ function buildBlossomSVG(weeksAlong, small, shimmying) {
     ['M'+n(160*sc)+','+n(230*sc)+' C'+n(180*sc)+','+n(210*sc)+' '+n(205*sc)+','+n(190*sc)+' '+n(240*sc)+','+n(162*sc),5.5*sc],
     ['M'+n(80*sc)+','+n(162*sc)+' C'+n(66*sc)+','+n(142*sc)+' '+n(54*sc)+','+n(122*sc)+' '+n(38*sc)+','+n(100*sc),3.5*sc],
     ['M'+n(80*sc)+','+n(162*sc)+' C'+n(88*sc)+','+n(138*sc)+' '+n(94*sc)+','+n(116*sc)+' '+n(102*sc)+','+n(92*sc),3.5*sc],
-    ['M'+n(240*sc)+','+n(162*sc)+' C'+n(254*sc)+','+n(142*sc)+' '+n(266*sc)+','+n(122*sc)+' '+n(282*sc)+','+n(100*sc),3.5*sc],
+    ['M'+n(240*sc)+','+n(162*sc)+' C'+n+254*sc)+','+n(142*sc)+' '+n(266*sc)+','+n(122*sc)+' '+n(282*sc)+','+n(100*sc),3.5*sc],
     ['M'+n(240*sc)+','+n(162*sc)+' C'+n(232*sc)+','+n(138*sc)+' '+n(226*sc)+','+n(116*sc)+' '+n(218*sc)+','+n(92*sc),3.5*sc],
     ['M'+n(38*sc)+','+n(100*sc)+' C'+n(32*sc)+','+n(84*sc)+' '+n(26*sc)+','+n(70*sc)+' '+n(18*sc)+','+n(52*sc),2*sc],
     ['M'+n(38*sc)+','+n(100*sc)+' C'+n(42*sc)+','+n(80*sc)+' '+n(46*sc)+','+n(66*sc)+' '+n(52*sc)+','+n(50*sc),2*sc],
     ['M'+n(102*sc)+','+n(92*sc)+' C'+n(90*sc)+','+n(76*sc)+' '+n(80*sc)+','+n(58*sc)+' '+n(70*sc)+','+n(38*sc),2*sc],
-    ['M'+n(102*sc)+','+n(92*sc)+' C'+n(106*sc)+','+n(76*sc)+' '+n(110*sc)+','+n(60*sc)+' '+n(114*sc)+','+n(40*sc),2*sc],
-    ['M'+n(282*sc)+','+n(100*sc)+' C'+n(288*sc)+','+n(84*sc)+' '+n(294*sc)+','+n(70*sc)+' '+n(302*sc)+','+n(52*sc),2*sc],
-    ['M'+n(282*sc)+','+n(100*sc)+' C'+n(278*sc)+','+n(80*sc)+' '+n(274*sc)+','+n(66*sc)+' '+n(268*sc)+','+n(50*sc),2*sc],
-    ['M'+n(218*sc)+','+n(92*sc)+' C'+n(230*sc)+','+n(76*sc)+' '+n(240*sc)+','+n(58*sc)+' '+n(250*sc)+','+n(38*sc),2*sc],
-    ['M'+n(218*sc)+','+n(92*sc)+' C'+n(214*sc)+','+n(76*sc)+' '+n(210*sc)+','+n(60*sc)+' '+n(206*sc)+','+n(40*sc),2*sc],
+    ['M'+n(102*sc)+','+n(92*sc)+' C'+n(254*sc)+','+n(142*sc)+' '+n(266*sc)+','+n(122*sc)+' '+n(282*sc)+','+n(100*sc),3.5*sc],
+    ['M'+n(240*sc)+','+n(162*sc)+' C'+n(232*sc)+','+n(138*sc)+' '+n(226*sc)+','+n(116*sc)+' '+n(218*sc)+','+n(92*sc),3.5*sc],
+    ['M'+n(38*sc)+','+n(100*sc)+' C'+n(32*sc)+','+n(84*sc)+' '+n(26*sc)+','+n(70*sc)+' '+n(18*sc)+','+n(52*sc),2*sc],
+    ['M'+n(38*sc)+','+n(100*sc)+' C'+n(42*sc)+','+n(80*sc)+' '+n(46*sc)+','+n(66*sc)+' '+n(52*sc)+','+n(50*sc),2*sc],
+    ['M'+n(102*sc)+','+n(92*sc)+' C'+n(90*sc)+','+n(76*sc)+' '+n(80*sc)+','+n(58*sc)+' '+n(70*sc)+','+n(38*sc),2*sc],
+    ['M'+n(102*sc)+','+n(92*sc)+' C'+n(230*sc)+','+n(76*sc)+' '+n+240*sc)+','+n(58*sc)+' '+n+250*sc)+','+n(38*sc),2*sc],
+    ['M'+n+218*sc)+','+n(92*sc)+' C'+n(214*sc)+','+n(76*sc)+' '+n(210*sc)+','+n(60*sc)+' '+n(206*sc)+','+n(40*sc),2*sc],
   ];
-  const brs=BP.map(function(p){return '<path d="'+p[0]+'" stroke="'+bc+'" stroke-width="'+p[1].toFixed(2)+'" stroke-linecap="round" fill="none" opacity="0.9"/>';}).join('');
+  const brs=BP.map(function(p){ return '<path d="'+p[0]+'" stroke="'+bc+'" stroke-width="'+p[1].toFixed(2)+'" stroke-linecap="round" fill="none" opacity="0.9"/>';}).join('');
   const rB=(5.5*sc).toFixed(2), rC=(2.5*sc).toFixed(2);
   const blms=BDATA.slice(0,cnt).map(function(b,i){
     const x=(b[0]*sc).toFixed(1), y=(b[1]*sc).toFixed(1);
     const delay=Math.min(i*55,4200);
     const anim=shimmying?'animation:shimmy .45s ease '+(i*18)+'ms both':'animation:blossomPop .38s cubic-bezier(.34,1.56,.64,1) '+delay+'ms both';
-    return '<g style="transform-origin:'+x+'px '+y+'px;'+anim+'"><circle cx="'+x+'" cy="'+y+'" r="'+rB+'" fill="'+pc+'" opacity=".9"/><circle cx="'+x+'" cy="'+y+'" r="'+rC+'" fill="#fff8f0" opacity=".82"/></g>';
+    return '<g style="transform-origin:'+x+'px '+y+gpx;'+anim+'"><circle cx="'+x*'" cy="'+y+'" r="'+r1+'" fill="'+pc+'" opacity=".9"/><circle cx="'+x*'" cy="'+y+'" r="'+r2+'" fill="#fff8f0" opacity=".82"/></g>';
   }).join('');
   const drifts=[22,-18,30,-25];
   const ptls=[0,1,2,3].map(function(i){
@@ -510,7 +512,7 @@ function buildBlossomSVG(weeksAlong, small, shimmying) {
     const dur=(3.8+i*0.9).toFixed(1);
     return '<circle cx="'+px+'" cy="12" r="'+(2.2*sc).toFixed(1)+'" fill="'+pc+'" opacity=".6" style="--pdrift:'+drifts[i]+'px;animation:petalDrift '+dur+'s ease-in '+(i*1.4).toFixed(1)+'s infinite"/>';
   }).join('');
-  return '<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="overflow:visible;display:block;width:100%;max-width:'+W+'px">'+brs+blms+ptls+'</svg>';
+  return '<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="overflow:visible;display:block;width:100%;max-width:'+W+'px'>'+brs+blms+ptls+'</svg>';
 }
 
 function applyTheme(accentKey, wpKey) {
@@ -534,12 +536,12 @@ function applyTheme(accentKey, wpKey) {
   } catch {}
 }
 /* Luminance-based contrast: returns "#fff" or "#000" for best readability */
-function contrastFor(hex) {
+function contrastFor(Hex) {
   const h = hex.replace("#","");
   const r = parseInt(h.slice(0,2),16)/255;
   const g = parseInt(h.slice(2,4),16)/255;
   const b = parseInt(h.slice(4,6),16)/255;
-  const L = 0.2126*(r<=0.03928?r/12.92:((r+0.055)/1.055)**2.4)
+  const L = 0.2126*(r<=0.03928?r/12.92:((r+0.055)/1.055)(*2.4)
            +0.7152*(g<=0.03928?g/12.92:((g+0.055)/1.055)**2.4)
            +0.0722*(b<=0.03928?b/12.92:((b+0.055)/1.055)**2.4);
   return L > 0.35 ? "rgba(0,0,0,0.88)" : "#ffffff";
@@ -587,8 +589,7 @@ const THEMES = [{
   size: "22px 22px",
   op: 0.5,
   blend: "normal"
-}, {
-  label: "PIPE SMOKE",
+}, {  label: "PIPE SMOKE",
   accent: "#B4A78F",
   panel: "linear-gradient(150deg,#242019,#15120d)",
   tex: SMOKE,
@@ -625,7 +626,7 @@ const LISTS = [{
   color: "#A79A87"
 }];
 const DEFAULT_PREP = ["Install the car seat (get it checked)", "Pack the hospital bag", "Set up the crib", "Wash the baby clothes", "Pick a pediatrician", "Tour / pre-register at the hospital", "Stock diapers & wipes", "Freezer meals for the first weeks", "Test smoke & CO detectors", "Baby-proof outlets & cords", "Nail down the name", "Sort the finances / buffer"];
-const QUOTES = ["Certainty is the enemy of growth. Stay a little unsure.", "You don't have thoughts â you practice them. Choose which to rehearse.", "The mind obeys the questions you feed it. Ask better ones.", "Comfort is a slow surrender. Choose the harder good.", "Most cages are unlocked. Few people push the door.", "What you avoid runs your life from the shadows.", "You are the habit you keep repeating.", "Freedom is fewer wants, not more stuff.", "The obstacle and the way are the same road.", "A man is what he does when no metric is watching.", "Time isn't running out; it's running through. Notice it.", "You can't think your way into a life you have to live your way into.", "The quality of your attention is the quality of your life.", "Meaning is built, not found. Pick up the tools.", "Suffering you choose is training. Suffering you resist is damage.", "The self you defend is the self you can't grow past.", "Wisdom is seeing the second and third thing that happens.", "Control the controllable, release the rest, act anyway.", "Every yes is a quiet no to something else. Spend carefully.", "Silence is where your real opinions live. Visit often.", "A man plants trees whose shade he'll never sit in. Start planting.", "The days are long, the years are short. Spend them on what lasts.", "Legacy isn't what you leave for them â it's what you leave in them.", "Discipline is just love with a longer time horizon.", "Your kid won't remember what you bought. They'll remember if you showed up.", "Be the calm your family borrows when theirs runs out.", "The house doesn't have to be finished. The foundation does.", "Small, boring, consistent â that's how you build a life and a child.", "Character is what holds when the paycheck and the mood don't.", "The best inheritance is a steady father.", "What you tolerate, you teach.", "Strength is staying â soft, steady, and there."];
+const QUOTES = ["Certainty is the enemy of growth. Stay a little unsure.", "You don't have thoughts — you practice them. Choose which to rehearse.", "The mind obeys the questions you feed it. Ask better ones.", "Comfort is a slow surrender. Choose the harder good.", "Most cages are unlocked. Few people push the door.", "What you avoid runs your life from the shadows.", "You are the habit you keep repeating.", "Freedom is fewer wants, not more stuff.", "The obstacle and the way are the same road.", "A man is what he does when no metric is watching.", "Time isn't running out; it's running through. Notice it.", "You can't think your way into a life you have to live your way into.", "The quality of your attention is the quality of your life.", "Meaning is built, not found. Pick up the tools.", "Suffering you choose is training. Suffering you resist is damage.", "The self you defend is the self you can't grow past.", "Wisdom is seeing the second and third thing that happens.", "Control the controllable, release the rest, act anyway.", "Every yes is a quiet no to something else. Spend carefully.", "Silence is where your real opinions live. Visit often.", "A man plants trees whose shade he'll never sit in. Start planting.", "The days are long, the years are short. Spend them on what lasts.", "Legacy isn't what you leave for them — it's what you leave in them.", "Discipline is just love with a longer time horizon.", "Your kid won't remember what you bought. They'll remember if you showed up.", "Be the calm your family borrows when theirs runs out.", "The house doesn't have to be finished. The foundation does.", "Small, boring, consistent — that's how you build a life and a child.", "Character is what holds when the paycheck and the mood don't.", "The best inheritance is a steady father.", "What you tolerate, you teach.", "Strength is staying — soft, steady, and there."];
 const todayKey = () => new Date().toISOString().slice(0, 10);
 const prettyDate = d => new Date(d + "T12:00:00").toLocaleDateString(undefined, {
   weekday: "long",
@@ -688,17 +689,17 @@ function sizeFor(w) {
 const DEV_FACTS = {
   6: "Heart starts beating; the neural tube is closing.",
   7: "Arm and leg buds appear.",
-  8: "Fingers and toes are forming â officially a fetus now.",
+  8: "Fingers and toes are forming — officially a fetus now.",
   9: "Basic organs take shape; the first tiny movements begin.",
   10: "Vital organs are formed and starting to work.",
   11: "Bones are hardening; can open and close fists.",
   12: "Reflexes kick in; the kidneys make urine.",
   13: "Vocal cords form; fingerprints are setting.",
-  14: "Facial muscles work â squints and frowns.",
+  14: "Facial muscles work — squints and frowns.",
   15: "Starting to sense light; scalp pattern developing.",
   16: "Can make a fist; hearing is beginning.",
   17: "Fat stores start; the skeleton hardens.",
-  18: "Ears reach their final spot â may hear you now.",
+  18: "Ears reach their final spot — may hear you now.",
   19: "A protective coating (vernix) covers the skin.",
   20: "Halfway. Hair growing; producing meconium.",
   21: "Swallowing; taste buds developing.",
@@ -708,16 +709,16 @@ const DEV_FACTS = {
   25: "Responds to your voice; hands fully working.",
   26: "Eyes begin to open; lungs make surfactant.",
   27: "Brain very active; sleep cycles begin.",
-  28: "Can blink â and dreams (REM sleep) start.",
+  28: "Can blink — and dreams (REM sleep) start.",
   29: "Muscles and lungs maturing; bones want calcium.",
   30: "Eyes track light; getting stronger by the day.",
   31: "Rapid brain growth; all five senses working.",
   32: "Practicing breathing; toenails formed.",
-  33: "Bones hardening â except the skull, which stays soft.",
+  33: "Bones hardening — except the skull, which stays soft.",
   34: "Lungs nearly ready; filling out with fat.",
   35: "Kidneys done; liver is processing waste.",
   36: "Usually settles head-down; shedding the vernix.",
-  37: "Early term â practicing breathing and gripping.",
+  37: "Early term — practicing breathing and gripping.",
   38: "Organs ready; laying on a little more fat.",
   39: "Full term. Lungs and brain still finishing up.",
   40: "Due. Ready to meet you."
@@ -727,7 +728,7 @@ function devFor(w) {
   while (!DEV_FACTS[k] && k > 6) k--;
   return DEV_FACTS[k];
 }
-const GRILL = [["Chicken breast", "165Â°F", "Pull at 160, rest 5"], ["Chicken thigh", "175Â°F", "More forgiving"], ["Pulled pork", "203Â°F", "Low & slow, wrap at 165"], ["Brisket", "203Â°F", "Probe like butter"], ["Ribs", "198Â°F", "Bend test over temp"], ["Burger", "160Â°F", "No pink, it's ground"], ["Steak Â· med-rare", "130Â°F", "Rest 5 min"], ["Pork chop", "145Â°F", "Rest 3 min"], ["Salmon", "125Â°F", "Just flakes"]];
+const GRILL = [["Chicken breast", "165°F", "Pull at 160, rest 5"], ["Chicken thigh", "175°F", "More forgiving"], ["Pulled pork", "203°F", "Low & slow, wrap at 165"], ["Brisket", "203°F", "Probe like butter"], ["Ribs", "198°F", "Bend test over temp"], ["Burger", "160°F", "No pink, it's ground"], ["Steak · med-rare", "130°F", "Rest 5 min"], ["Pork chop", "145°F", "Rest 3 min"], ["Salmon", "125°F", "Just flakes"]];
 const blankDay = () => ({
   water: 0,
   meals: {
@@ -863,7 +864,7 @@ function DripCanvas({
     if (!ctx) return;
     const N = (intense ? 22 : 10) + Math.floor(Math.random() * 6);
     const hangFrames = 28; // frames to hang at top before releasing
-    // Collect .glass container rects â drops only fall within glass areas
+    // Collect .glass container rects — drops only fall within glass areas
     const glassEls = document.querySelectorAll(".glass");
     const glassRects = Array.from(glassEls).map(el => {
       const r = el.getBoundingClientRect();
@@ -885,7 +886,7 @@ function DripCanvas({
         wobbleAmp: (0.5 + Math.random() * 1.5) * dpr,
         delay: Math.floor(Math.random() * 22),
         hangLeft: hangFrames + Math.floor(Math.random() * 12),
-        phase: "hang", // hang â fall â splash
+        phase: "hang", // hang → fall → splash
         splashR: 0,
         splashAlpha: 0,
         life: 1,
@@ -919,7 +920,7 @@ function DripCanvas({
           ctx.scale(scaleX, scaleY);
           // teardrop: circle body + pointed tip
           ctx.beginPath();
-          ctx.arc(0, 0, d.r << 0, Math.PI * 2);
+          ctx.arc(0, 0, d.r, 0, Math.PI * 2);
           ctx.fill();
           // pointed drip tip
           ctx.beginPath();
@@ -930,1788 +931,2184 @@ function DripCanvas({
           ctx.globalAlpha = 0.5;
           ctx.fillStyle = "rgba(255,255,255,0.85)";
           ctx.beginPath();
-          ctx.ellipse(-d.r * 0.28, -d.r * 0.42, d.r * 0
-ËLËX]H
-NÂÝ[
-
-NÂÝ\ÝÜJ
-NÂY
-[ÓYH
-HÈ\ÙHH[ÈHHK
-ÈBH[ÙHY
-\ÙHOOH[HÂH
-ÏHÜ]
-ÂÛØT\ÙH
-ÏHH
-Â
-ÏHX]Ú[ÛØT\ÙJH
-ÛØP[\
-ÂY
-ÜOOH[Y[Y
-HHX]X^
-Ü
-ÈX]Z[ÜH
-JNÂH
-ÏHH
-ÂYHOH
-H
-ÂY
-HÜH
-HÈ\ÙHHÜ\ÚÈÜ\ÚH
-NÈÜ\Ú[HHÎÈÛÛ[YNÈBY
-YH	H
-È
-
-HÂ[]HHYNÂÛÛÝHHX]X^
-YJNÂÛÛÝÝ]ÚHX]Z[H
-ÈH
-
-ÈNÈËÈ[ÛØ]HÚ]ÜYYÝÛØ[[HHÌ
-NÂÝ[Ý[HHÛÛÜÂÝØ]J
-NÂÝ[Û]JJNÂÝØØ[JHÈÝ]ÚÝ]Ú
-NÂÝYÚ[]
-
-NÂÝ\ÊX]H
-NÂÝ[
-
-NÂËÈÚ[YÝÛHÙX\ÜÝYÚ[]
-
-NÂÝ[ÝUÊY
-Ë
-NÂÝ]XY]XÐÝ\UÊ
-K
-Ë
-NÂÝ[
-
-NÂËÈÜXÝ[\YÚYÚÝÛØ[[HHH
-NÂÝ[Ý[HHØJMKMKMKJHÂÝYÚ[]
-
-NÂÝ[\ÙJY
-KY
-
-N
-LËX]H
-NÂÝ[
-
-NÂÝ\ÝÜJ
-NÂBH[ÙHY
-\ÙHOOHÜ\ÚHÂÜ\Ú
-ÏHËH
-
-ÂÜ\Ú[HOH
-MH
-ÂY
-Ü\Ú[H
-HÂ[]HHYNÂÝÛØ[[HHÜ\Ú[H
-NÂÝÝÚÙTÝ[HHÛÛÜÂÝ[UÚYHÂÝYÚ[]
-
-NÂÝ\ÊÜH
-Ü\ÚX]H
-NÂÝÝÚÙJ
-NÂËÈ[\[ÂÝÛØ[[HHÜ\Ú[H
-ÎÂÝYÚ[]
-
-NÂÝ\ÊÜH
-Ü\Ú
-MKX]H
-NÂÝÝÚÙJ
-NÂBBBÝÛØ[[HHNÂY
-[]JHYH\]Y\Ý[[X][Û[YJ[YJNÂ[ÙHÝÛX\XÝ
-Ë
-NÂNÂYH\]Y\Ý[[X][Û[YJ[YJNÂ]\
-
-HOØ[Ù[[[X][Û[YJYNÂKÝYÙÙ\ÛÛÜJNÂ]\XXÝÜX]Q[[Y[
-Ø[\ÈÂYY\XKZY[YHÛ\ÜÓ[YNÚ[\Y][Ë[ÛH^Y[Ù]LÝ[NÂ[^
-MBBJNÂB[Ý[Û]P\ÊÂØZÙKYJHÂÛÛÝÈHÌH
-HMHHÈHM\ÙHH
-ÝHLÂÛÛÝ]HIÞH	Ø\Ù_HH	ÕÈÈH	ØÝH	Þ_H	Ø\Ù_XÂÛÛÝÙHÈOÂY
-\ÊH]\[ÂÛÛÝÚWHHËÜ]
-KX\
-[X\NÂY
-\ÓS
-JH]\[Â]\X]Z[MËX]X^
-Ë
-
-È
-H
-HÈ
-H
-HÈN
-JNÂNÂÛÛÝHOÂÛÛÝH
-HH
-H
-
-
-È
-
-HH
-H
-
-
-ÈÈH
-È
-
-NÂÛÛÝHH
-HH
-H
-
-\ÙH
-È
-
-HH
-H
-
-Ý
-È
-
-\ÙNÂ]\ÂBNÂNÂÛÛÝÝHÙØZÙJKHÙY
-NÂ]\XXÝÜX]Q[[Y[
-ÝÈÂY]ÐÞ	ÕßH	ÒXÛ\ÜÓ[YNËY[Ý[NÂ\Ü^NØÚÈBKXXÝÜX]Q[[Y[
-YÈ[XXÝÜX]Q[[Y[
-[X\ÜYY[ÂYHNHKXXÝÜX]Q[[Y[
-ÝÜÂÙÙ]	HÝÜÛÛÜË[YÛÂJKXXÝÜX]Q[[Y[
-ÝÜÂÙÙ]L	HÝÜÛÛÜËÛÛJKXXÝÜX]Q[[Y[
-ÝÜÂÙÙ]L	HÝÜÛÛÜË[YÛÂJJJKXXÝÜX]Q[[Y[
-[HÂNLN\ÙKËL\ÙKÝÚÙNË[KÝÚÙUÚYHJKXXÝÜX]Q[[Y[
-]Â][ÛHÝÚÙN\
-ÜJHÝÚÙUÚYÝÚÙQ\Ú\^N
-HÜXÚ]N
-HJKÝOOH[	
-
-
-HOÂÛÛÝH
-Ý
-NÂ]\XXÝÜX]Q[[Y[
-È[XXÝÜX]Q[[Y[
-Ú\ÛHÂÞÞNKL[ËÛÛÜXÚ]NMJKXXÝÜX]Q[[Y[
-Ú\ÛHÂÞÞNKH[ËÛÛJJNÂJJ
-KOOH[	
-
-
-HOÂÛÛÝH
-
-NÂ]\XXÝÜX]Q[[Y[
-È[XXÝÜX]Q[[Y[
-Ú\ÛHÂÞÞNKH[Ë[YÛËÜXÚ]NMJKXXÝÜX]Q[[Y[
-Ú\ÛHÂÞÞNKH[Ë[YÛÂJJNÂJJ
-KXXÝÜX]Q[[Y[
-^ÂNH
-ÛÚ^NH[Ë]]KÝ[NÂÛ[Z[N[ÛÂBKHKXXÝÜX]Q[[Y[
-^ÂÈH
-NH
-^[ÚÜ[ÛÚ^NH[Ë]]KÝ[NÂÛ[Z[N[ÛÂBKLJNÂB[Ý[Û\ÙT[ÔY\Ú
-ÛY\Ú
-HÂÛÛÝÜ[Ù][HHXXÝ\ÙTÝ]J
-NÂÛÛÝØ\ÞKÙ]\ÞWHHXXÝ\ÙTÝ]J[ÙJNÂÛÛÝÝ\HXXÝ\ÙTY[
-NÂÛÛÝTÒÓH
-ÌÂXXÝ\ÙQYXÝ
-
-
-HOÂÛÛÝÝÛHHOÂY
-Ú[ÝËØÜÛH\ÞJHÂÝ\Ý\[H[Â]\ÂBÝ\Ý\[HKÝXÚ\ÖÌKÛY[NÂNÂÛÛÝ[ÝHHHOÂY
-Ý\Ý\[OH[\ÞJH]\ÂÛÛÝHHKÝXÚ\ÖÌKÛY[HHÝ\Ý\[ÂY
-HHÚ[ÝËØÜÛHHÂÙ][
-
-NÂ]\ÂBÙ][
-X]Z[LLH
-JJNÂNÂÛÛÝ\H\Þ[È
-
-HOÂY
-Ý\Ý\[OH[
-H]\ÂÛÛÝXXÚYH[HTÒÓÂÝ\Ý\[H[ÂY
-\XXÚY
-HÂÙ][
-
-NÂ]\ÂBÙ]\ÞJYJNÂÙ][
-TÒÓ
-NÂHÂ]ØZ]ÛY\Ú
-
-NÂHØ]ÚßBNÂÚ[ÝËY][\Ý[\ÝXÚÝ\ÝÛÂ\ÜÚ]NYBJNÂÚ[ÝËY][\Ý[\ÝXÚ[ÝH[ÝKÂ\ÜÚ]NYBJNÂÚ[ÝËY][\Ý[\ÝXÚ[\Â\ÜÚ]NYBJNÂÚ[ÝËY][\Ý[\ÝXÚØ[Ù[\Â\ÜÚ]NYBJNÂ]\
-
-HOÂÚ[ÝË[[ÝQ][\Ý[\ÝXÚÝ\ÝÛNÂÚ[ÝË[[ÝQ][\Ý[\ÝXÚ[ÝH[ÝJNÂÚ[ÝË[[ÝQ][\Ý[\ÝXÚ[\
-NÂÚ[ÝË[[ÝQ][\Ý[\ÝXÚØ[Ù[\
-NÂNÂKÜ[\ÞKÛY\ÚJNÂ]\Â[\ÞBNÂB[Ý[Û[[XØ]ÜÂ[\ÞKÛÛÜXÚÂJHÂY
-[H	X\ÞJH]\[ÂÛÛÝÝHX]Z[K[È
-Ì
-NÂ]\XXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YNÚ[\Y][Ë[ÛH^Y[Ù]^LÜLVÍÌH^\ÝYKXÙ[\Ý[NÂ[ÙÜN[Û]VJ	ÓX]X^
-[H_\
-X[Ú][Û\ÞHÈ[ÙÜHN\ÈX\ÙHÛHBKXXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YNÜYNËNXÙKZ][\ËXÙ[\Ý[YY[Ý[NÂXÚÙÜÝ[XÚËÞÚYÝÎ
-MØJN
-HBKXXÝÜX]Q[[Y[
-ÝÈÂÚYMZYÚMY]ÐÞMMÝ[NÂ[[X][Û\ÞHÈÜ[ÜÈ[X\[[]HÛHÜXÚ]N\ÞHÈHÍH
-ÈÝ
-BBKXXÝÜX]Q[[Y[
-Ú\ÛHÂÞÞN[ÛHÝÚÙNÛÛÜÝÚÙUÚYÝÚÙS[XØ\Ý[ÝÚÙQ\Ú\^N	Ê\ÞHÈÈÝ
-H
-ÍËßHÍËØ[ÙÜNÝ]JNL
-HJJJJNÂBÛÛÝØ\H
-ÂÚ[[Û\ÜÓ[YHHÝYÙÙ\HLKXØÙ[JHOXXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YNÛ\ÜÈ[]]HÝ\ÝËZY[M	ÜÝYÙÙ\HÈØ\HÓX]Z[
-ÝYÙÙ\HH	ØÛ\ÜÓ[Y_XÝ[NÂXÚÙÜÝ[ËØ\Ü\Y]\ÎÜ\\ÛÛYØJ
-
-
-JXÞÚYÝÎØJMJHLLØJN
-H
-L[Ù]\ØJMKMKMKN
-HBKXXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YN[]]HKÚ[[JNÂÛÛÝ^YXÝÈH
-ÂÚ[[ÛÛÜJHOXXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YNXL\\Ø\ÙHXÚÚ[Ë]ÚY\ÝÝ[NÂÛ[Z[NÙKÛÚ^NÜ[HÛÙZYÚ
-]\ÜXÚ[Î
-[HÛÛÜÛÛÜË]]BBKÚ[[NÂ[Ý[ÛÚXÚÐÚ\ÛJÂÛKÛÛÜÛÛXÚÂJHÂ]\XXÝÜX]Q[[Y[
-]ÛÂÛÛXÚÎÛÛXÚË\XK[X[ÛHÈX\ÈÝÛHX\ÈÛHÛ\ÜÓ[YNÜYMËMÚ[ËLXÙKZ][\ËXÙ[\Ý[YY[[Ú][ÛX[Ý[NÂXÚÙÜÝ[ÛHÈÛÛÜ[Ü\[Ü\ÛÛY	ØÛÛÜXBKÛH	XXÝÜX]Q[[Y[
-ÝÈÂÚYLZYÚLY]ÐÞLL[ÛHKXXÝÜX]Q[[Y[
-]ÂL
-S
-HSLÈÝÚÙNËÌÝÚÙUÚYÝÚÙS[XØ\Ý[ÝÚÙS[ZÚ[Ý[JJJNÂBÛÛÝY[Ý[HHÂÛ[Z[NÙKÛÛÜË^XÚÙÜÝ[ËÌÜ\\ÛÛY	ÐË[_XNÂÊ8¥ 8¥ ÝÛHX\8 %Ñ\Ý[HÕÈXÛÛÈ8¥ 8¥ 
-ÂÛÛÝPÒPÓÓÈHÂÙ^N
-XÝ]JHOXXÝÜX]Q[[Y[
-ÝÈÈÚYZYÚY]ÐÞ[ÛH[ÎËÝÝÝËÌËÜËÌÜÝÈKXXÝÜX]Q[[Y[
-]ÈLÈKSLÛH
-ULHHKLHR
-XLHHKLKLUK^ÝÚÙNÝ\[ÛÛÜÝÚÙUÚYXÝ]HÈK[XÝ]HÈÝ\[ÛÛÜÛH[ÜXÚ]NXÝ]HÈLÝÚÙS[ZÚ[Ý[JKXXÝÜX]Q[[Y[
-]ÈNHUL
-HÝÚÙNÝ\[ÛÛÜÝÚÙUÚYXÝ]HÈKÝÚÙS[XØ\Ý[JB
-KY\ÜØYÙ\Î
-XÝ]JHOXXÝÜX]Q[[Y[
-ÝÈÈÚYZYÚY]ÐÞ[ÛH[ÎËÝÝÝËÌËÜËÌÜÝÈKXXÝÜX]Q[[Y[
-]ÈM
-MLHHLH]LLHHKLHR
-ËS
-XLHHLKL^ÝÚÙNÝ\[ÛÛÜÝÚÙUÚYXÝ]HÈK[XÝ]HÈÝ\[ÛÛÜÛH[ÜXÚ]NXÝ]HÈLÝÚÙS[ZÚ[Ý[JKXXÝÜX]Q[[Y[
-[HÈNLNKMLKÝÚÙNÝ\[ÛÛÜÝÚÙUÚYKMKÝÚÙS[XØ\Ý[ÜXÚ]NXÝ]HÈHÈJKXXÝÜX]Q[[Y[
-[HÈNLNLLËLLÝÚÙNÝ\[ÛÛÜÝÚÙUÚYKKÝÚÙS[XØ\Ý[ÜXÚ]NXÝ]HÈHÈJB
-KXN
-XÝ]JHOXXÝÜX]Q[[Y[
-ÝÈÈÚYZYÚY]ÐÞ[ÛH[ÎËÝÝÝËÌËÜËÌÜÝÈKXXÝÜX]Q[[Y[
-Ú\ÛHÈÞLÞNK
-KÝÚÙNÝ\[ÛÛÜÝÚÙUÚYXÝ]HÈK[XÝ]HÈÝ\[ÛÛÜÛH[ÜXÚ]NXÝ]HÈMHJKXXÝÜX]Q[[Y[
-]ÈLLÕKSN
-S
-ÈËSLM
-[KLHÝÚÙNÝ\[ÛÛÜÝÚÙUÚYKÝÚÙS[XØ\Ý[JKXXÝÜX]Q[[Y[
-]ÈMÈMXÌÍ
-H
-H
-\ÍKL
-KMHÝÚÙNÝ\[ÛÛÜÝÚÙUÚYXÝ]HÈKÝÚÙS[XØ\Ý[JB
-KØ[\
-XÝ]JHOXXÝÜX]Q[[Y[
-ÝÈÈÚYZYÚY]ÐÞ[ÛH[ÎËÝÝÝËÌËÜËÌÜÝÈKXXÝÜX]Q[[Y[
-]ÈLL
-MËMÈNMKLË
-ÈNKM
-
-KLÝÚÙNÝ\[ÛÛÜÝÚÙUÚYXÝ]HÈK[XÝ]HÈÝ\[ÛÛÜÛH[ÜXÚ]NXÝ]HÈMHÝÚÙS[ZÚ[Ý[JB
-KÙ][ÜÎ
-XÝ]JHOXXÝÜX]Q[[Y[
-ÝÈÈÚYZYÚY]ÐÞ[ÛH[ÎËÝÝÝËÌËÜËÌÜÝÈKXXÝÜX]Q[[Y[
-Ú\ÛHÈÞLÞNLËÝÚÙNÝ\[ÛÛÜÝÚÙUÚYXÝ]HÈK[XÝ]HÈÝ\[ÛÛÜÛH[ÜXÚ]NXÝ]HÈJKXXÝÜX]Q[[Y[
-]ÈLNKMXLKHKHÌÈK
-
-LLÈKLÈK
-K
-LKHKHLKKÌÈKHKHLHKLUXLKLKLLKPLKHKHHNKLKHKHLKÌÛK
-
-LKLËLÛ
-K
-LKHKH
-MXLKHKHLKLKLRØLKLLLLPLKHKH
-XLKHKHKÌËLKK
-K
-LLËLÛ
-
-LKHKHH
-LKHKHKLKLUØLLLLXLKHKHHKLHKHKHKKÌÛ
-K
-LLÈÛK
-
-LKHKHNKXLKHKHKLHRXLLKLKXLKHKHLKLH^ÝÚÙNÝ\[ÛÛÜÝÚÙUÚYKÝÚÙS[ZÚ[Ý[JB
-BNÂ[Ý[ÛÝÛUX\ÈXÜ[ØÜY[ÛÜÙTØÜY[Z\Y[XY\ÙÒ[]Ù]\ÙÒ[]ÛÙ[Ù[[ÈJHÂÛÛÝXØÙ[HË\ÝÌN
-ÂÛÛÝXÈHÂÈYÙ^HX[ÛYHKÈYY\ÜØYÙ\ÈX[Y\ÜØYÙ\ÈYÙN[XYKÈYÙ][ÜÈX[Ù][ÜÈKNÂÛÛÝÛY\ÜØYÙ\ÈHXOOHY\ÜØYÙ\ÈÂ]\XXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YNXX\Ý[NÈÞÚYÝÎL\ØJ
-
-
-JHÛ[Z[NX\K\Þ\Ý[K	ÔÑÈ^	ËÞ\Ý[K]ZKØ[Ë\Ù\Y\Ü^N^^\XÝ[ÛÛÛ[[[YÛ][\ÎÝ]Ú\ÝYPÛÛ[^Y[Y[ÎÛY\ÜØYÙ\ÈÈLZYÚÛY\ÜØYÙ\ÈÈL
-[Ú][ÛZYÚÍ\ÈÝXXËX^Y\JKY[ÈÍ\ÈÝXXËX^Y\JHÚ[Ú[ÙNZYÚY[ÈBKÛY\ÜØYÙ\È	XXÝÜX]Q[[Y[
-]ÂÝ[NÈ\Ü^N^Ø\X\Ú[ÝÛN[YÛ][\ÎÙ[\ÜXÚ]NÛY\ÜØYÙ\ÈÈH[Ú][ÛÜXÚ]HÈX\ÙHM\ÈÜ\Ü\ÛÛYØJ
-
-
-JHY[ÕÜX\Ú[ÜBKXXÝÜX]Q[[Y[
-[]Â[YN\ÙÒ[]ÛÚ[ÙNHOÙ]\ÙÒ[]
-K\Ù][YJKÛÙ^QÝÛHOÈY
-KÙ^HOOH[\	\ÙÒ[][J
-JHÈÛÙ[
-
-NÈHKXÙZÛ\Y\ÜØYÙHXXx )]]ÐÛÛ\]NÙÜ[ÚXÚÎ[ÙKX^[Ý
-LY[OÈY
-[	ÛY\ÜØYÙ\ÊHÙ][Y[Ý]
-
-
-HO[ØÝ\Ê
-KÎ
-NÈKÝ[NÈ^KXÚÙÜÝ[ØJMKMKMKJHÜ\ÛHÝ][NÛHÜ\Y]\ÎY[Î\MÛ[Z[NX\K\Þ\Ý[KØ[Ë\Ù\YÛÚ^NMÛÛÜÙÙXÚ]\X\[ÙNÛHZ[ÚYØ\]ÛÛÜXØÙ[BJKXXÝÜX]Q[[Y[
-]ÛÂÛÛXÚÎÛÙ[\ØXY[\ÙÒ[][J
-HH\Ù[[ËÝ[NÈÚYÍZYÚÍÜ\Y]\ÎL	H^Ú[ÎÛÚ^NNÛÙZYÚÌÜ\ÛHÝ\ÛÜÚ[\XÚÙÜÝ[\ÙÒ[][J
-H	\Ù[[ÈÈXØÙ[ØJLNLNLÊHÛÛÜ\ÙÒ[][J
-HÈÙØJMKMKMKÍJH[Ú][ÛXÚÙÜÝ[M\ÈX\ÙHBKXXÝÜX]Q[[Y[
-ÝÈÝÚYMZYÚMY]ÐÞ[ÛHÝÚÙNÝ\[ÛÛÜÝÚÙUÚYKÝÚÙS[XØ\Ý[ÝÚÙS[ZÚ[Ý[KXXÝÜX]Q[[Y[
-]ÙLLNUSMHL
-ËMÈ
-È
-ÈJJJB
-KXXÝÜX]Q[[Y[
-]ÈÝ[NÈ\Ü^N^^ÛHZYÚ[YÛ][\ÎÙ[\ÚYL	HØ\HKXËX\
-OÂÛÛÝXÝ]HHXOOHYÂ]\XXÝÜX]Q[[Y[
-]ÛÂÙ^NYÛ\ÜÓ[YNXZ][IØXÝ]HÈXÝ]HXÛÛXÚÎ
-
-HOÂY
-XOOHY
-HÂÜ[ØÜY[Y
-NÂBBKXXÝÜX]Q[[Y[
-]ÈÛ\ÜÓ[YNXZXÛÛÝ[NÈÛÛÜXÝ]HÈXØÙ[ØJMKMKMKHHKPÒPÓÓÖÝYJXÝ]JKYÙH	XXÝÜX]Q[[Y[
-]ÈÛ\ÜÓ[YNXXYÙHJB
-KXXÝÜX]Q[[Y[
-]ÈÛ\ÜÓ[YNX[X[Ý[NÈÛÚ^NL[Ú][ÛÛÛÜÈX\ÙHÛÛÜXÝ]HÈXØÙ[ØJMKMKMKÎ
-HÛÙZYÚXÝ]HÈ
-
-HKX[
-B
-_JJJNÂB[Ý[Û\ÙPØ[\
-
-HÂÛÛÝÝXÙ]XHH\ÙTÝ]JÙ^HNÂÛÛÝÙ]KÙ]]WHH\ÙTÝ]JÙ^RÙ^J
-JNÂÛÛÝÜXYKÙ]XYWHH\ÙTÝ]J[ÙJNÂÛÛÝÙ^KÙ]^WHH\ÙTÝ]J[Ñ^J
-JNÂÛÛÝÜ[Z[\ËÙ][Z[\×HH\ÙTÝ]J×JNÂÛÛÝÜ\Ù]\HH\ÙTÝ]J×JNÂÛÛÝØXÚÙ]Ù]XÚÙ]HH\ÙTÝ]J×JNÂÛÛÝÙYKÙ]YWHH\ÙTÝ]JLLKLLNÂÛÛÝÜÚÝÑÛKÙ]ÚÝÑÛWHH\ÙTÝ]JßJNÂÛÛÝÛÙÓÜ[Ù]ÙÓÜ[HH\ÙTÝ]J[ÙJNÂÛÛÝÛYX[\ÝÜKÙ]YX[\ÝÜWHH\ÙTÝ]J×JNÂÛÛÝÛÝËÙ]Ý×HH\ÙTÝ]J]KÝÊ
-JNÂÛÛÝÛ[Y\ËÙ][Y\×HH\ÙTÝ]J×JNÂÛÛÝÛ[YQ[\Ù][YQ[\HH\ÙTÝ]J[NÂÛÛÝÜXÚÙYÙ]XÚÙYHH\ÙTÝ]J[
-NÂÛÛÝÜÜ[Ù^KÙ]Ü[Ù^WHH\ÙTÝ]J
-NÂÛÛÝÜÝXZÜËÙ]ÝXZÜ×HH\ÙTÝ]J[
-NÂÛÛÝÝ[Y\YÙ][Y\YHH\ÙTÝ]J
-NÂÛÛÝÝ[Y\[[ËÙ][Y\[[×HH\ÙTÝ]J[ÙJNÂÛÛÝÙ\ÚÙ]\ÚHH\ÙTÝ]JNÂÛÛÝÝØ]\Û\Ù]Ø]\Û\HH\ÙTÝ]J[ÙJNÂÛÛÝÝØ]\ÙËÙ]Ø]\Ù×HH\ÙTÝ]JÂÛ[ÙK]\SZ[LJNÂÛÛÝÛÝYÒËÙ]ÝYÒ×HH\ÙTÝ]J\[ÙÝYXØ][ÛOOH[Y[Y	ÝYXØ][Û\Z\ÜÚ[ÛOOHÜ[YNÂÛÛÝØZU\Ù]ZU\HH\ÙTÝ]JNÂÛÛÝØZQYÙ]ZQYHH\ÙTÝ]JNÂÛÛÝØZSY\ÜØYÙ\ËÙ]ZSY\ÜØYÙ\×HH\ÙTÝ]J×JNÂÛÛÝØZR[]Ù]ZR[]HH\ÙTÝ]JNÂÛÛÝØZP\ÞKÙ]ZP\ÞWHH\ÙTÝ]J[ÙJNÂÛÛÝÜÚÝÑ[Ú[Ù]ÚÝÑ[Ú[HH\ÙTÝ]J[ÙJNÂÛÛÝØZU[ËÙ]ZU[×HH\ÙTÝ]J[
-NÂÛÛÝÜZ\ÛÙKÙ]Z\ÛÙWHH\ÙTÝ]JNÂÛÛÝÜZ\YÙ]Z\YHH\ÙTÝ]JNÂÛÛÝÝZ\ÝKÙ]Z\ÝWHH\ÙTÝ]J[
-NÂÛÛÝÛ^SÝKÙ]^SÝWHH\ÙTÝ]JNÂÛÛÝÛ^SÝTÙ[Ù]^SÝTÙ[HH\ÙTÝ]J
-NÂÛÛÝÛÝP\ÞKÙ]ÝP\ÞWHH\ÙTÝ]J[ÙJNÂÛÛÝÝXY\ÙÜËÙ]XY\ÙÜ×HH\ÙTÝ]J×JNÂÛÛÝÝXY[]Ù]XY[]HH\ÙTÝ]JNÂÛÛÝÝXY\ÞKÙ]XY\ÞWHH\ÙTÝ]J[ÙJNÂÛÛÝÝXYÙY[Ù]XYÙY[HH\ÙTÝ]JÈ\×ÜÙY[Ø]\×ÜÙY[Ø]JNÂÛÛÝÛ^SÝSY]KÙ]^SÝSY]WHH\ÙTÝ]J[
-NÂÛÛÝÛÝQ\ÜÙ]ÝQ\ÜHH\ÙTÝ]J[ÙJNÂÛÛÝÜ[^U\Ù][^U\HH\ÙTÝ]JNÂÛÛÝÜ[^QYÙ][^QYHH\ÙTÝ]JNÂÛÛÝØÛÝYÞ[Ð]Ù]ÛÝYÞ[Ð]HH\ÙTÝ]J
-NÂÛÛÝÛÝYÞ[Õ[Y\H\ÙTY[
-NÂÛÛÝÜÛÝ[Ù]ÛÝ[HH\ÙTÝ]JYJNÂÛÛÝØXØÙ[Ù^KÙ]XØÙ[Ù^WHH\ÙTÝ]JYHNÂÛÛÝØÒÙ^KÙ]ÒÙ^WHH\ÙTÝ]JXÚÈNÂÛÛÝÝ[YU\Ù][YU\HH\ÙTÝ]J
-NÂÛÛÝÝÚ]Ó]ÓÜ[Ù]Ú]Ó]ÓÜ[HH\ÙTÝ]J[ÙJNÂÛÛÝÜÚÝÕ\]P[\Ù]ÚÝÕ\]P[\HH\ÙTÝ]J[ÙJNÂÛÛÝÜ[\ÜÙ][\ÜHH\ÙTÝ]J[ÙJNÂÛÛÝÜ[[ÙKÙ][[ÙWHH\ÙTÝ]J[\NÈËÈ[\Ù]ÛÛ\HÛÛÝÜ[ÛÛ\KÙ][ÛÛ\WHH\ÙTÝ]JNÂÛÛÝÝYS[YKÙ]YS[YWHH\ÙTÝ]J[Ý\YHNÂÛÛÝÝYS[YQYÙ]YS[YQYHH\ÙTÝ]JNÂÛÛÝÜÚÝÕYS[YTÛ\Ù]ÚÝÕYS[YTÛ\HH\ÙTÝ]J[ÙJNÂÛÛÝÝØ]\[Ò\ÝÜKÙ]Ø]\[Ò\ÝÜWHH\ÙTÝ]JßJNÂÛÛÝÚ\ÕØ]\[ËÙ]\ÕØ]\[×HH\ÙTÝ]J[ÙJNÂÛÛÝÝØ]\\ÙËÙ]Ø]\\Ù×HH\ÙTÝ]JNÂÛÛÝØXTÝÜËÙ]XTÝÜ×HH\ÙTÝ]J×JNÂÛÛÝÜÝÑ[Ù]ÝÑ[HH\ÙTÝ]J[
-NÂÛÛÝÙ\YÙÙ\Ù]\YÙÙ\HH\ÙTÝ]J
-NÂÛÛÝÜ\Ú[Z]ËÙ]\Ú[Z]×HH\ÙTÝ]J[ÙJNÂÛÛÝØÛØÚÌÙ]ÛØÚÌHH\ÙTÝ]J[ÙJNÂÛÛÝÜÚÝÔÙXÛÛËÙ]ÚÝÔÙXÛÛ×HH\ÙTÝ]J[ÙJNÂÛÛÝÙÛ\ÜËÙ]Û\Ü×HH\ÙTÝ]J
-JNÂÛÛÝXÔYH\ÙTY[
-NÂÛÛÝÙ][YHH
-RÙ^KÙ^JHOÂ\U[YJRÙ^KÙ^JNÂÙ]XØÙ[Ù^JRÙ^JNÂÙ]ÒÙ^JÙ^JNÂØ]J[YHÂXØÙ[RÙ^KÎÙ^BJNÂÙ][YU\O
-ÈJNÂNÂÛÛÝ\QÛ\ÜÈHÈOÂÛÛÝ[HH
-LHÈ
-LKÑ^Y
-ÊNÂÛÛÝ[RHHX]Z[KLHÈ
-L
-È
-ÊKÑ^Y
-ÊNÂËØ\HØJÌ	Ø[_JXÂËØ\HHØJ
-
-
-
-
-
-	Ø[R_JXÂRK[[HËØ\ÂRK[[ÛÙHËØ\NÂNÂÛÛÝÙ]Û\ÜÓ][HÈOÂ\QÛ\ÜÊÊNÂÙ]Û\ÜÊÊNÂØ]JÛ\ÜÈÂÂJNÂÙ][YU\O
-ÈJNÂNÂÛÛÝÙÙÛS[Z]ÈH
-
-HOÂÛÛÝH\\Ú[Z]ÎÂÙ]\Ú[Z]ÊNÂØ]J[Z]ÈÂÛJNÂÙÜ
-
-NÂ\XÊM
-NÂNÂÛÛÝ\XÈH\ÙPØ[XÚÊ\ÈOÂHÂ]YØ]ÜX]H	]YØ]ÜX]J\ÊNÂHØ]ÚßBK×JNÂÛÛÝXÈH
-
-HOÂY
-\[ÙÚ[ÝÈOOH[Y[YH]\[ÂÛÛÝPÈHÚ[ÝË]Y[ÐÛÛ^Ú[ÝËÙXÚ]]Y[ÐÛÛ^ÂY
-PPÊH]\[ÂY
-XXÔYÝ\[
-HXÔYÝ\[H]ÈPÊ
-NÂY
-XÔYÝ\[Ý]HOOHÝ\Ü[YHXÔYÝ\[\Ý[YJ
-NÂ]\XÔYÝ\[ÂNÂÛÛÝÛHH
-\K\\KØZ[ÛYUÊHOÂY
-\ÛÝ[
-H]\ÂÛÛÝÈHXÊ
-NÂY
-XÊH]\ÂÛÛÝHËÝ\[[YNÂÛÛÝÈHËÜX]SÜØÚ[]Ü
-NÂÛÛÝÈHËÜX]QØZ[
-NÂË\HH\HÚ[HÂË\]Y[ÞKÙ][YP][YJ\K
-NÂY
-ÛYUÊHË\]Y[ÞK^Û[X[[\Õ[YP][YJÛYUË
-È\NÂËØZ[Ù][YP][YJK
-NÂËØZ[^Û[X[[\Õ[YP][YJØZ[
-
-È
-NÂËØZ[^Û[X[[\Õ[YP][YJK
-È\NÂËÛÛXÝ
-ÊNÂËÛÛXÝ
-Ë\Ý[][ÛNÂËÝ\
-
-NÂËÝÜ
-
-È\
-ÈNÂNÂÛÛÝÙHÂXÚÎ
-
-HOÛJLËÜ]X\HÊKÜ[
-
-HOÂÛJ
-
-MÚ[H
-K
-NÂKXÚÎ
-
-HOÂÛJ
-MÚ[H
-
-KÎ
-NÂKÜ
-
-HOÂÛJ
-L
-KX[ÛH
-
-Ì
-NÂÙ][Y[Ý]
-
-
-HOÛJÚ[H
-JK
-
-NÂBNÂÛÛÝÛÜYÚ[XÝÙ]ÜYÚ[XÝHH\ÙTÝ]J[
-NÂÛÛÝØÛÜÚ[ËÙ]ÛÜÚ[×HH\ÙTÝ]J[ÙJNÂÛÛÝÜ\KÙ]\WHH\ÙTÝ]J[
-NÂÛÛÝÝX[[RÙ^KÙ]X[[RÙ^WHH\ÙTÝ]J
-NÂÛÛÝÜÛYPÛ\ÜËÙ]ÛYPÛ\Ü×HH\ÙTÝ]JYÙKY[\NÂÛÛÝÙYÓÙÙ]Ù]YÓÙÙ]HH\ÙTÝ]J
-NÂÛÛÝÚ\ÑYÙÚ[ËÙ]\ÑYÙÚ[×HH\ÙTÝ]J[ÙJNÂÛÛÝÝÚ\UÝXÚYH\ÙTYÈÝ\Ý\NÝ\[YNJNÂÛÛÝÕÒTWÕPÈHÈÙ^HY\ÜØYÙ\ÈÙ][ÜÈNÂÛÛÝYÙU[ÙÜHH
-JHOÂÛÛÝ\ÙHH
-HHÕÒTWÕPË[^ÙXJH
-LÂ]\[Û]V
-Ø[Ê	Ø\Ù_]È
-È	ÙYÓÙÙ]\
-JXÂNÂÛÛÝÜ[ØÜY[H\ÙPØ[XÚÊ
-ËKÝÚ\JHOÂY
-\ÝÚ\JHÂHÂÛÛÝ[HH	KÝ\[\Ù]ÂÛÛÝH[	[Ù]Ý[[ÐÛY[XÝÈ[Ù]Ý[[ÐÛY[XÝ
-
-H[ÂY
-HÈÙ]ÜYÚ[XÝ
-ÈY
-ÜÚYÌNÜ
-ÜZYÚÌÎÚYZYÚJNÈB[ÙHÈÙ]ÜYÚ[XÝ
-ÈÚ[ÝË[\ÚYÌNÚ[ÝË[\ZYÚMÎ
-
-JNÈBHØ]ÚÈÙ]ÜYÚ[XÝ
-ÈÚ[ÝË[\ÚYÌNÚ[ÝË[\ZYÚMÎ
-
-JNÈBBÙÜ[
-NÈ\XÊLNÂÙ]ÛYPÛ\ÜÊÝÚ\OOOHYÈYÙK\ÛYK\YÚÝÚ\OOOHYÚÈYÙK\ÛYK[YYÙKY[\NÂÙ]X[[RÙ^JOÌJNÈÙ]XÊNÂKÜÛÝ[JNÂÛÛÝÛÜÙTØÜY[H\ÙPØ[XÚÊ
-
-HOÂÙXÚÊ
-NÂ\XÊ
-NÂÙ]\YÙÙ\O
-ÈJNÂÙ]ÛÜÚ[ÊYJNÂÙ][Y[Ý]
-
-
-HOÂÙ]XÙ^HNÂÙ]ÛÜÚ[Ê[ÙJNÂËÈÙY\ÜYÚ[XÝÛÈ^Ü[K]\Ù\ÈØ[YH][ÚÚ[KÎ
-NÂKÜÛÝ[JNÂÛÛÝ[TÝÚ\UÝXÚÝ\H\ÙPØ[XÚÊ
-JHOÂÛÛÝHKÝXÚ\ÖÌNÂËÈØXÝ\ÜÚYÛ\Ù\\ÈX
-Ù]HHX\Þ[È\ÙQYXÝ
-BØXÝ\ÜÚYÛÝÚ\UÝXÚYÝ\[ÈÝ\ÛY[Ý\NÛY[KÝ\[YN]KÝÊ
-KØÚÙY[ÙKXÝ]NYKYÙÚ[Î[ÙHJNÂÙ]YÓÙÙ]
-
-NÂK×JNÂÛÛÝ[TÝÚ\UÝXÚ[ÝHH\ÙPØ[XÚÊ
-JHOÂÛÛÝYHÝÚ\UÝXÚYÝ\[ÂY
-\Y\YXÝ]HYØÚÙY
-H]\ÂÛÛÝÜÝ\Ý\_HHYÂÛÛÝHKÝXÚ\ÖÌNÂÛÛÝHÛY[HÝ\ÂÛÛÝHHÛY[HHÝ\NÂY
-X]XÊJHX]XÊ
-H	X]XÊJHL
-HÂYØÚÙYHYNÂÙ]\ÑYÙÚ[Ê[ÙJNÈÙ]YÓÙÙ]
-
-NÈ]\ÂBY
-X]XÊ
-H
-JH]\ÂK][Y][
-
-NÂËÈÛÛ\HÜ^Û[8 %ÛHÝÈÈÙH[XHHYÈÝ]BY
-\YYÙÚ[ÊHÈYYÙÚ[ÈHYNÈÙ]\ÑYÙÚ[ÊYJNÈBÛÛÝHHÕÒTWÕPË[^ÙYXNÂ]HÂY
-
-HOOH	
-H
-HOOHÕÒTWÕPË[ÝLH	
-JHÂHX]ÚYÛ
-H
-X]ÝÊX]XÊ
-KMJH
-NÂBÙ]YÓÙÙ]
-
-NÂK×JNÂÛÛÝ[TÝÚ\UÝXÚ[H\ÙPØ[XÚÊ
-JHOÂÙ]\ÑYÙÚ[Ê[ÙJNÂÛÛÝYHÝÚ\UÝXÚYÝ\[ÂY
-\YYØÚÙY\YYÙÚ[ÊHÈÙ]YÓÙÙ]
-
-NÈ]\ÈBYXÝ]HH[ÙNÂÛÛÝHKÚ[ÙYÝXÚ\ÖÌNÂÛÛÝHÛY[HYÝ\ÂÛÛÝH]KÝÊ
-HHYÝ\[YNÂÛÛÝ[ØÚ]HHÈX]XÊ
-HÈÂÛÛÝHHÕÒTWÕPË[^ÙYXNÈËÈ\ÙHYX8 %[Ø^\È\ÚY
-X]XÊ
-H
-
-[ØÚ]H	X]XÊ
-HLJHÂY
-	HÕÒTWÕPË[ÝLJHÂÙÜ[
-NÈ\XÊL
-NÈÙ]XÕÒTWÕPÖÚJÌWJNÂH[ÙHY
-	H
-HÂÙXÚÊ
-NÈ\XÊ
-NÈÙ]XÕÒTWÕPÖÚKLWJNÂBBÙ]YÓÙÙ]
-
-NÂKÜÛÝ[JNÂÛÛÝÛ]Y[Ù]]Y[HH\ÙTÝ]JYJNÂÛÛÝ\ÝHH\ÙTY
-NÂËÈÝÜHX[ÝÚ\UÝXÚYÛÈÝXÚ[ÝH[\[Ø^\È\È\Ú[YB\ÙQYXÝ
-
-
-HOÂY
-ÝÚ\UÝXÚYÝ\[
-HÝÚ\UÝXÚYÝ\[XHXÂKÝXJNÂËÈ]XÚÝXÚ[ÝHÚ]\ÜÚ]N[ÙHÛÈ][Y][ÛÜÜÂ\ÙQYXÝ
-
-
-HOÂÛÛÝ[HØÝ[Y[Ù][[Y[RY
-ÛÝNÂY
-Y[
-H]\ÂÛÛÝÛ[ÝHH
-JHO[TÝÚ\UÝXÚ[ÝJJNÂ[Y][\Ý[\ÝXÚ[ÝHÛ[ÝKÈ\ÜÚ]N[ÙHJNÂ]\
-
-HO[[[ÝQ][\Ý[\ÝXÚ[ÝHÛ[ÝJNÂKÚ[TÝÚ\UÝXÚ[ÝWJNÂÛÛÝ[]YÈH\ÙTYßJNÂ\ÙQYXÝ
-
-
-HOÂ
-\Þ[È
-
-HOÂÛÛÝÙ×HH]ØZ]ÛZ\ÙK[
-ÛØY
-^NÙ]_X[Ñ^J
-JKØY
-[Z[\È×JKØY
-\[
-KØY
-XÚÙ]×JKØY
-Ù][ÜÈÂYNLLKLLJWJNÂÙ]^JÂ[Ñ^J
-KYX[ÎÂ[Ñ^J
-KYX[ËYX[ÈßJBBJNÂÙ][Z[\ÊNÂÙ][Y\Ê]ØZ]ØY
-[Y\È×JJNÂÛÛÝZHH]ØZ]ØY
-ZHßJNÂÙ]ZU\
-ZK\QUSÐRWÕT
-NÂÙ]ZQY
-ZK\QUSÐRWÕT
-NÂÛÛÝH]ØZ]ØY
-Z\ßJNÂÙ]Z\ÛÙJÛÙHQUSÔRTNÂÙ]Z\Y
-ÛÙHQUSÔRTNÂÛÛÝ[^HH]ØZ]ØY
-[^HßJNÂÛÛÝ\ÛÛY[^U\H[^K\QUSÔSVWÕTÂÙ][^U\
-\ÛÛY[^U\
-NÂÙ][^QY
-[^K\QUSÔSVWÕT
-NÂÛÛÝÛH]ØZ]ØY
-ÛÝ[ÂÛYBJNÂÙ]ÛÝ[
-ÛÛOOH[ÙJNÂÛÛÝH]ØZ]ØY
-[YHÂXØÙ[YHÎXÚÈJNÂ\U[YJXØÙ[ÊNÂÙ]XØÙ[Ù^JXØÙ[
-NÂÙ]ÒÙ^JÊNÂÙ][YU\O
-ÈJNÂÛÛÝÛÈH]ØZ]ØY
-ÛØÚÈÂ[ÙKÙXÎ[ÙBJNÂÙ]ÛØÚÌ
-HXÛË
-NÂÙ]ÚÝÔÙXÛÛÊHXÛËÙXÊNÂÛÛÝÛH]ØZ]ØY
-Û\ÜÈÂÎ
-BJNÂ\QÛ\ÜÊÛÊNÂÙ]Û\ÜÊÛÊNÂÛÛÝ[HH]ØZ]ØY
-[Z]ÈÂÛ[ÙBJNÂÙ]\Ú[Z]ÊH[[KÛNÂY
-OH[
-HÂÛÛÝÙYYYHQUSÔTX\
-O
-ÂYZY
-
-K^ÛN[ÙBJJNÂÙ]\
-ÙYYY
-NÂØ]J\ÙYYY
-NÂH[ÙHÙ]\
-
-NÂÙ]XÚÙ]
-NÂÙ]YJËYHLLKLLNÂÛÛÝH]ØZ]ØY
-YS[YHÈ[YNJNÂÙ]YS[YJ[YH[Ý\YHNÂÙ]YS[YQY
-[YHNÂY
-][YJHÙ]ÚÝÕYS[YTÛ\
-YJNÂÛÛÝÚH]ØZ]ØY
-Ø]\\ÝÜHßJNÂÙ]Ø]\[Ò\ÝÜJÚ
-NÂÛÛÝH]ØZ]ØY
-XTÝÜÈ×JNÂÙ]XTÝÜÊ
-NÂËÈØÈ8 %ÙYYÚ]QUSÒÐÈÛ\Ý][ÚÛÛÝÝÜY[HØØ[ÝÜYÙKÙ]][JØ×Ü[NÂY
-ÝÜY[HÙ]Ø[ÝÜY[NÂY
-[ØØ[ÝÜYÙKÙ]][JÙY\\ÜÙY[ÝMJHÙ]Ú]Ó]ÓÜ[YJNÂËÈÛK][YH\ÞH\]H[\ÛÛÝ\Ý\HØØ[ÝÜYÙKÙ]][JÙY\\Ù\ÞWÝ\NÂY
-\Ý\	\Ý\OOHTÖWÕTHÈÙ]ÚÝÕ\]P[\YJNÈÙ][Y[Ý]
-
-
-HOÙ]ÚÝÕ\]P[\[ÙJKÎ
-NÈBØØ[ÝÜYÙKÙ]][JÙY\\Ù\ÞWÝ\TÖWÕTNÂÙ]Ø]\ÙÊ]ØZ]ØY
-Ø]\ÙÈÂÛ[ÙK]\SZ[LJJNÂHÂÛÛÝHH]ÈTÙX\Ú\[\ÊÚ[ÝËØØ][ÛÙX\Ú
-NÂY
-KÙ]
-XÝ[ÛHOOHØ]\Ú[ÝËØØ][Û\ÚOOHÝØ]\HÙ]Ø]\Û\
-YJNÂÛÛÝÈHKÙ]
-ÙÈNÂY
-ÊHÂÛÛÝÝ\H]ØZ]ØY
-^NÙ]_X[Ñ^J
-JNÂ]^H[\ÙÈHÂY
-ÈOOHØ]\HÂ^HÂÝ\Ø]\X]Z[L
-Ý\Ø]\
-H
-ÈJBNÂ\ÙÈHØ]\ÙÙÙY8 %	Û^Ø]\HÙÂH[ÙHY
-ÈOOHÝ[YÚHÂ^HÂÝ\Ý[YÚYBNÂ\ÙÈH[Ü[ÈYÚÙÙÙYÂH[ÙHY
-ÈOOH[HHÂ^HÂÝ\[NYBNÂ\ÙÈHØÜY[ÈÝÛÙÙÙYÂBY
-^
-HÂÙ]^J^
-NÂØ]J^NÙ]_X^
-NÂÙ][Y[Ý]
-
-
-HOÙ]\Ú
-\ÙÊK
-
-NÂÚ[ÝË\ÝÜK\XÙTÝ]JßKÚ[ÝËØØ][Û][YJNÂBBHØ]ÚßBËÈ8¥ 8¥ ÛÝY\ÝÜHÛ\Ú]XÙH8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ ËÈYÈ^HXÛÜÈ^\ÝØØ[KHÈ[HÛÝYXÚÝ\ÛÈBËÈ\Ù\ÛÝÝ\[ÈÚ[Ü[YÛH]ÈÛKHÂÛÛÝ\ÓØØ[^HH\^KÛJÛ[ÝØØ[ÝÜYÙK[ÝK
-ËJHOØØ[ÝÜYÙKÙ^JJJBÛÛYJÈOÈ	ËÝ\ÕÚ]
-\ÙXØ[\^NJNÂY
-Z\ÓØØ[^H	\ÛÛY[^U\	
-ÛÙHQUSÔRTJHÂÛÛÝÞ[ÐÛÙHHÛÙHQUSÔRTÂÛÛÝÞ[ÔH]ØZ]]Ú
-	Ü\ÛÛY[^U\KÜÞ[ÏØÛÙOIÙ[ÛÙUTPÛÛ\Û[
-Þ[ÐÛÙJ_IÚYOZ\ÉIÑ]KÝÊ
-_XÈØXÚNË\ÝÜHB
-NÂY
-Þ[ÔÚÊHÂÛÛÝÞ[ÑH]ØZ]Þ[ÔÛÛ
-NÂY
-Þ[Ñ	Þ[Ñ]H	ØXÝÙ^\ÊÞ[Ñ]JK[Ý
-HÂØXÝÙ^\ÊÞ[Ñ]JKÜXXÚ
-ÈOÂY
-ËÝ\ÕÚ]
-\ÙXØ[\JHØØ[ÝÜYÙKÙ]][JËÞ[Ñ]VÚ×JNÂJNÂÚ[ÝËØØ][Û[ØY
-
-NÂ]\ÂBBBHØ]ÚßBÙ]XYJYJNÂJJ
-NÂKÙ]WJNÂ\ÙQYXÝ
-
-
-HOÂÛÛÝÚXÚÈH
-
-HOÙ]]JOOOHÙ^RÙ^J
-HÈÙ^RÙ^J
-JNÂÛÛÝÛ\ÈH
-
-HOØÝ[Y[\ÚX[]TÝ]HOOH\ÚXH	ÚXÚÊ
-NÂÛÛÝHÙ][Y[Ý]
-
-
-HOÙ]]Y[[ÙJKL
-NÂÛÛÝÛØÜÛH
-
-HOÂÛÛÝHHÚ[ÝËØÜÛNÂY
-HLHÙ]]Y[[ÙJNÙ[ÙHY
-H\ÝKÝ\[
-È
-JHÙ]]Y[YJNÙ[ÙHY
-H\ÝKÝ\[H
-JHÙ]]Y[[ÙJNÂ\ÝKÝ\[HNÂNÂØÝ[Y[Y][\Ý[\\ÚX[]XÚ[ÙHÛ\ÊNÂÚ[ÝËY][\Ý[\ØÝ\ÈÚXÚÊNÂÚ[ÝËY][\Ý[\ØÜÛÛØÜÛÂ\ÜÚ]NYBJNÂÛÛÝYHÙ][\[
-ÚXÚË
-
-NÂ]\
-
-HOÂÛX\[Y[Ý]
-
-NÂÛX\[\[
-Y
-NÂØÝ[Y[[[ÝQ][\Ý[\\ÚX[]XÚ[ÙHÛ\ÊNÂÚ[ÝË[[ÝQ][\Ý[\ØÝ\ÈÚXÚÊNÂÚ[ÝË[[ÝQ][\Ý[\ØÜÛÛØÜÛ
-NÂNÂK×JNÂ\ÙQYXÝ
-
-
-HOÂÛÛÝYHÙ][\[
-
-
-HOÙ]ÝÊ]KÝÊ
-JKL
-NÂ]\
-
-HOÛX\[\[
-Y
-NÂK×JNÂ\ÙQYXÝ
-
-
-HOÂY
-XYJHZ[ÝXZÜÊ
-K[Ù]ÝXZÜÊNÂKÜXYK]KXJNÂ\ÙQYXÝ
-
-
-HOÂY
-][Y\[[ÊH]\ÂÛÛÝYHÙ][\[
-
-
-HOÂÙ][Y\Y
-OÂY
-HJHÂÙ][Y\[[Ê[ÙJNÂÙ]\Ú
-¸£ìH[Y\ÛHNÂ]\ÂB]\HNÂJNÂKL
-NÂ]\
-
-HOÛX\[\[
-Y
-NÂKÝ[Y\[[×JNÂ\ÙQYXÝ
-
-
-HOÂY
-Y\Ú
-H]\ÂÛÛÝYHÙ][Y[Ý]
-
-
-HOÙ]\Ú
-K
-NÂ]\
-
-HOÛX\[Y[Ý]
-Y
-NÂKÙ\ÚJNÂ\ÙQYXÝ
-
-
-HOÂY
-]Ø]\ÙËÛ[ÝYÒÊH]\ÂÛÛÝYHÙ][\[
-
-
-HOÂÛÛÝ\ÝH[X\ØØ[ÝÜYÙKÙ]][J\ÙXØ[\\ÝYÙHH
-NÂÛÛÝØ\H
-Ø]\ÙË]\SZ[L
-H
-
-ÂÛÛÝH]È]J
-KÙ]Ý\Ê
-NÂY
-H	HH	]KÝÊ
-HH\ÝHØ\
-HÂHÂÛÛÝH]ÈÝYXØ][ÛØ]\ÚXÚÈÂÙN\ÈÙÈHÛ\ÜËYÎØ]\JNÂÛÛXÚÈH
-
-HOÂHÂÚ[ÝËØÝ\Ê
-NÂHØ]ÚßBÙ]Ø]\Û\
-YJNÂÛÜÙJ
-NÂNÂØØ[ÝÜYÙKÙ]][J\ÙXØ[\\ÝYÙHÝ[Ê]KÝÊ
-JJNÂHØ]ÚßBBK
-
-NÂ]\
-
-HOÛX\[\[
-Y
-NÂKÝØ]\ÙËÝYÒ×JNÂÛÛÝ]Ú^HH\ÙPØ[XÚÊOÙ]^J]OÂÛÛÝ^HÂ]NÂØ]J^NÙ]_X^
-NÂ]\^ÂJKÙ]WJNÂÛÛÝØ]T[Z[\ÈHOÂÙ][Z[\ÊNÂØ]J[Z[\ÈNÂNÂÛÛÝØ]T\HOÂÙ]\
-NÂØ]J\NÂNÂÛÛÝØ]PXÚÙ]HOÂÙ]XÚÙ]
-NÂØ]JXÚÙ]NÂNÂÛÛÝY]\ÝÜSYX[H
-Ù^K[YJHOÙ]YX[\ÝÜJÈOËX\
-OÂY
-]HOOH
-H]\ÂÛÛÝHÂ^KYX[ÎÂ^KYX[ËÚÙ^WN[YBBNÂØ]J^NÙX
-NÂ]\Â^NNÂJJNÂÛÛÝÙYZÜÈH
-
-
-HOÂÛÛÝH]È]JYH
-ÈLNÂÛÛÝ^\ÓYHX]ÙZ[
-
-H]È]J
-JHÈ
-
-NÂÛÛÝÈHX]X^
-X]Z[
-X]ÛÜ
-H^\ÓY
-HÈ
-ÊJJNÂ]\ÈË^\ÓYNÂJJ
-NÂÛÛÝØ]\YÙ^HHH]Ø]\[Ò\ÝÜVÙ]WNÂÛÛÝØ]\[ÔÝXZÈH
-
-
-HOÂ]ÝXZÈHH]È]J
-NÂÚ[H
-ÝXZÈÍJHÂÛÛÝÈHÒTÓÔÝ[Ê
-KÛXÙJL
-NÂY
-]Ø]\[Ò\ÝÜVÚ×JHXZÎÂÝXZÊÊÎÂÙ]]JÙ]]J
-HHJNÂB]\ÝXZÎÂJJ
-NÂÛÛÝØ]\YHH
-
-HOÂY
-Ø]\YÙ^JH]\ÂÛÛÝ]ÒHØXÝ\ÜÚYÛßKØ]\[Ò\ÝÜKÖÙ]WNY_JNÂÙ]Ø]\[Ò\ÝÜJ]Ò
-NÂØ]JØ]\\ÝÜH]Ò
-NÂÙ]\ÕØ]\[ÊYJNÂÙ]Ø]\\ÙÊYS[YH
-ÈÝY]<'ã.NÂÙÜ
-
-NÈ\XÊ
-NÂÙ][Y[Ý]
-
-
-HOÙ]\ÕØ]\[Ê[ÙJK
-NÂÙ][Y[Ý]
-
-
-HOÙ]Ø]\\ÙÊKÌ
-NÂNÂÛÛÝØ]UYS[YHH
-HOÂÛÛÝ[YHH
-K[J
-H[Ý\YHÂÙ]YS[YJ[YJNÈÙ]YS[YQY
-[YJNÂØ]JYS[YHÈ[YHJNÂÙ]ÚÝÕYS[YTÛ\
-[ÙJNÂÙÜ
-
-NÂNÂÛÛÝØ]PXTÝÜÈH
-ÝÜÊHOÈÙ]XTÝÜÊÝÜÊNÈØ]JXTÝÜÈÝÜÊNÈNÂËÈ8¥ 8¥ ØÈ[\È8¥ 8¥ ÛÛÝXY\ÙHH
-
-
-HOÂHÂ]\[^U\È]ÈT
-ÝXY[^U\
-KÔÝ[Ê
-HÂHØ]ÚÂ]\ÂBJJ
-NÂÛÛÝØYXYH\ÙPØ[XÚÊ\Þ[È
-
-HOÂY
-\Z\ÛÙH]XY\ÙJH]\ÂHÂÛÛÝH]ØZ]]Ú
-	ÝXY\Ù_OØÛÙOIÙ[ÛÙUTPÛÛ\Û[
-Z\ÛÙJ_IIÑ]KÝÊ
-_XÂØXÚNË\ÝÜHJNÂÛÛÝH]ØZ]ÛÛ
-NÂY
-	\^K\Ð\^JY\ÜØYÙ\ÊJHÙ]XY\ÙÜÊY\ÜØYÙ\ÊNÂY
-	
-\×ÜÙY[Ø]OH[\×ÜÙY[Ø]OH[
-JHÙ]XYÙY[È\×ÜÙY[Ø]\×ÜÙY[Ø]\×ÜÙY[Ø]\×ÜÙY[Ø]JNÂHØ]ÚßBKÜZ\ÛÙKXY\ÙWJNÂÛÛÝÙ[Y\ÜØYÙHH\Þ[È
-
-HOÂÛÛÝ^HXY[][J
-NÂY
-]^XY\ÞH\Z\Y]XY\ÙJH]\ÂÙ]XY\ÞJYJNÂÛÛÝÜ[Z\ÝXÈHÈY[[ËH
-È]KÝÊ
-KÚYN\È^]]KÝÊ
-HNÂÙ]XY\ÙÜÊHOËKÜ[Z\ÝX×JNÂÙ]XY[]
-NÂÙÜ
-
-NÂ\XÊL
-NÂHÂÛÛÝH]ØZ]]Ú
-XY\ÙKÂY]ÙÔÕXY\ÎÈÛÛ[U\H\XØ][ÛÚÛÛKÙNÓÓÝ[ÚYJÈÛÙNZ\ÛÙKÚYN\È^JBJNÂY
-\ÚÊHÝÈ]È\ÜÙ[Z[YNÂËÈY\ÚHXYÛÈHX[Ù\\X\ÜÚYÛYY\XÙ\ÈHÜ[Z\ÝXÈÛBØYXY
-
-NÂHØ]ÚÂËÈÛXÚÈÜ[Z\ÝXÈY\ÜØYÙHÛZ[\BÙ]XY\ÙÜÊHOK[\OYOOHÜ[Z\ÝXËY
-JNÂÙ]\Ú
-ÛÝ[ÝÙ[ÚXÚÈ[Ý\ÚYÛ[NÂBÙ]XY\ÞJ[ÙJNÂNÂËÈ8¥ 8¥ ÛÝYÞ[È\Ú8 %]\ÝHXÛ\YYÜHH\ÙQYXÝ]\[ÈÛ]8¥ 8¥ ÛÛÝÛÝYÞ[Ô\ÚH\ÙPØ[XÚÊ
-
-HOÂY
-\Z\ÛÙH\[^U\
-H]\ÂÛX\[Y[Ý]
-ÛÝYÞ[Õ[Y\Ý\[
-NÂÛÝYÞ[Õ[Y\Ý\[HÙ][Y[Ý]
-\Þ[È
-
-HOÂHÂÛÛÝ[\HßNÂÜ
-]HHÈHØØ[ÝÜYÙK[ÝÈJÊÊHÂÛÛÝÈHØØ[ÝÜYÙKÙ^JJNÂY
-È	ËÝ\ÕÚ]
-\ÙXØ[\JH[\Ú×HHØØ[ÝÜYÙKÙ]][JÊNÂBY
-ØXÝÙ^\Ê[\
-K[ÝOOH
-H]\ÂÛÛÝH]ØZ]]Ú
-]ÈT
-ÜÞ[È[^U\
-KÔÝ[Ê
-KÂY]ÙÔÕXY\ÎÈÛÛ[U\H\XØ][ÛÚÛÛKÙNÓÓÝ[ÚYJÈÛÙNZ\ÛÙKÚYN\È]N[\JBJNÂY
-ÚÊHÂÛÛÝH]ØZ]ÛÛ
-NÂY
-	Ø]Y]
-HÙ]ÛÝYÞ[Ð]
-Ø]Y]
-NÂBHØ]ÚßBK
-
-NÂKÜZ\ÛÙK[^U\JNÂÛÛÝX\ÔÙY[H\ÙPØ[XÚÊ\Þ[È
-
-HOÂY
-\Z\ÛÙH\[^U\
-H]\ÂHÈ]ØZ]]Ú
-]ÈT
-ÝXYÜÙY[[^U\
-KÔÝ[Ê
-KÈY]ÙÔÕXY\ÎÈÛÛ[U\H\XØ][ÛÚÛÛKÙNÓÓÝ[ÚYJÈÛÙNZ\ÛÙKÚYN\ÈJHJNÈHØ]ÚßBKÜZ\ÛÙK[^U\JNÂ\ÙQYXÝ
-
-
-HOÂY
-XOOHY\ÜØYÙ\È\Z\Y
-H]\ÂØYXY
-
-NÂX\ÔÙY[
-NÂÛÛÝYHÙ][\[
-ØYXY
-NÂ]\
-
-HOÛX\[\[
-Y
-NÂKÝXZ\YØYXYX\ÔÙY[JNÂËÈYÙÙ\ÛÝYÞ[ÈÚ[]\Ù^H]HÚ[Ù\È
-XÝ[ÙY[ÚYHÛÝYÞ[Ô\Ú
-B\ÙQYXÝ
-
-
-HOÂY
-XYJHÛÝYÞ[Ô\Ú
-
-NÂKÙ^K[Z[\Ë\XÚÙ][Y\ËXYKÛÝYÞ[Ô\ÚJNÂ\ÙQYXÝ
-
-
-HOÂY
-\Z\Y
-H]\Â[ÝJ
-NÂÛÛÝÛ\ÈH
-
-HOØÝ[Y[\ÚX[]TÝ]HOOH\ÚXH	[ÝJ
-NÂØÝ[Y[Y][\Ý[\\ÚX[]XÚ[ÙHÛ\ÊNÂÛÛÝYHÙ][\[
-[ÝKÌ
-NÂ]\
-
-HOÂØÝ[Y[[[ÝQ][\Ý[\\ÚX[]XÚ[ÙHÛ\ÊNÂÛX\[\[
-Y
-NÂNÂKÜZ\Y[ÝWJNÂÛÛÝÂ[[\ÞN\ÞBHH\ÙT[ÔY\Ú
-XXÝ\ÙPØ[XÚÊ\Þ[È
-
-HOÂHÂ]ØZ][ÝJ
-NÂHØ]ÚßBÚ[ÝËØØ][Û[ØY
-
-NÂKÜ[ÝWJJNÂY
-\XYJH]\XXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YNÜYZ[Z\ØÜY[XÙKZ][\ËXÙ[\Ý[NÂXÚÙÜÝ[ËÌBKXXÝÜX]Q[[Y[
-Ü[ÂÛ\ÜÓ[YN^^ÈXÚÚ[Ë]ÚY\Ý\\Ø\ÙHÜXÚ]KMLÝ[NÂÛ[Z[NÙKÛÛÜË]]BBKØY[ø )JNÂÛÛÝY[Z[\H
-\ÝYY\Y
-HOÂÛÛÝ][HHÂYZY
-
-K^ÛN[ÙK\ÝYYÎ[ÙBNÂÛÛÝ^HË[Z[\×NÂY
-Y\Y
-H^ÜXÙJ^[[^
-OYOOHY\Y
-H
-ÈK][JNÙ[ÙH^\Ú
-][JNÂØ]T[Z[\Ê^
-NÂÙ][Y[Ý]
-
-
-HO[]YËÝ\[Ú][KYOËØÝ\Ê
-K
-NÂNÂÛÛÝÙ][Z[\H
-Y]Ú
-HOØ]T[Z[\Ê[Z[\ËX\
-OYOOHYÈÂ]ÚH
-JNÂÛÛÝ[[Z[\HYOØ]T[Z[\Ê[Z[\Ë[\OYOOHY
-JNÂÛÛÝ\ÛHH\[\OÛJK[ÝÂÛÛÝXÚÙ]ÛHHXÚÙ][\OÛJK[ÝÂÛÛÝQPSÑVTÈHÈXZÙ\Ý[Ú[\NÂÛÛÝØ]S[Y\ÈHOÂÙ][Y\ÊNÂØ]J[Y\ÈNÂNÂÛÛÝY[YHHY\YOÂÛÛÝ]HÂYZY
-
-K^Ù[\[H][ÙBNÂÛÛÝ^HË[Y\×NÂY
-Y\Y
-H^ÜXÙJ^[[^
-OYOOHY\Y
-H
-ÈK]
-NÙ[ÙH^\Ú
-]
-NÂØ]S[Y\Ê^
-NÂÙ][Y[Ý]
-
-
-HO[]YËÝ\[È
-È]YOËØÝ\Ê
-K
-NÂNÂÛÛÝÞXÛQÙ[\HYOØ]S[Y\Ê[Y\ËX\
-OYOOHYÈÂÙ[\Ù[\OOH[HÈÞHÙ[\OOHÞHÈÚ\[HHJNÂÛÛÝ[\Y[Y\ÈH[Y\Ë[\O[YQ[\OOH[ÈYHÙ[\OOH[YQ[\Ù[\OOH[HNÂÛÛÝ[ÛS[YHH
-
-HOÂÛÛÝÛÛH[\Y[Y\Ë[\O^[J
-JNÂY
-\ÛÛ[Ý
-H]\ÂÙ]XÚÙY
-ÛÛÓX]ÛÜX][ÛJ
-H
-ÛÛ[Ý
-WK^
-NÂÙ]Ü[Ù^JÈOÈ
-ÈJNÂNÂÛÛÝÚ\T][ÝHH\Þ[È
-
-HOÂÛÛÝ^H	ÜÙYYYXÚÊUSÕTË]J_W¸ %HÙY\\ÂHÂY
-]YØ]ÜÚ\JH]ØZ]]YØ]ÜÚ\JÂ^JNÙ[ÙHÂ]ØZ]]YØ]ÜÛ\Ø\Ü]U^
-^
-NÂÙ]\Ú
-ÛÜYYÈÛ\Ø\NÂBHØ]ÚßBNÂÛÛÝÝ\[Y\HZ[ÈOÂÙ][Y\Y
-Z[È
-
-
-NÂÙ][Y\[[ÊYJNÂNÂÛÛÝÙÕØ]\H
-
-HOÂ]Ú^JÂØ]\X]Z[L
-^KØ]\
-H
-ÈJBJNÂÙ]Ø]\Û\
-[ÙJNÂÙ]\Ú
-ÙÙÙYHÛ\ÜÈNÂNÂÛÛÝ[XUØ]\[Z[\ÈH\Þ[È
-
-HOÂHÂY
-\[ÙÝYXØ][ÛOOH[Y[YHÂÙ]\Ú
-\È]XÙHØ[ÝÈ[X\[Z[\ËNÂ]\ÂB]\HHÝYXØ][Û\Z\ÜÚ[ÛÂY
-\HOOHÜ[YH\HH]ØZ]ÝYXØ][Û\]Y\Ý\Z\ÜÚ[Û
-NÂÛÛÝÚÈH\HOOHÜ[YÂÙ]ÝYÒÊÚÊNÂÛÛÝ^HÂØ]\ÙËÛÚÂNÂÙ]Ø]\ÙÊ^
-NÂØ]JØ]\ÙÈ^
-NÂY
-ÚÊHÙ]\Ú
-[Z[\ÈÛNÂHØ]ÚßBNÂÛÛÝÙ]Ø]\]\HHZ[ÈOÂÛÛÝ^HÂØ]\ÙË]\SZ[Z[ÂNÂÙ]Ø]\ÙÊ^
-NÂØ]JØ]\ÙÈ^
-NÂNÂÛÛÝXÚÝ\]HH
-
-HOÂHÂÛÛÝ[\HßNÂÜ
-]HHÈHØØ[ÝÜYÙK[ÝÈJÊÊHÂÛÛÝÈHØØ[ÝÜYÙKÙ^JJNÂY
-È	ËÝ\ÕÚ]
-\ÙXØ[\JH[\Ú×HHØØ[ÝÜYÙKÙ]][JÊNÂBÛÛÝØH]ÈØÒÓÓÝ[ÚYJÂ\\ÙKXØ[\Ø]Y]È]J
-KÒTÓÔÝ[Ê
-K]N[\K[WKÂ\N\XØ][ÛÚÛÛJNÂÛÛÝ\HTÜX]SØXÝT
-ØNÂÛÛÝHHØÝ[Y[ÜX]Q[[Y[
-HNÂKYH\ÂKÝÛØYH\ÙKXØ[\XXÚÝ\IÝÙ^RÙ^J
-_KÛÛÂØÝ[Y[ÙK\[Ú[
-JNÂKÛXÚÊ
-NÂK[[ÝJ
-NÂÙ][Y[Ý]
-
-
-HOT]ÚÙSØXÝT
-\
-KL
-NÂÙ]\Ú
-XÚÝ\Ø]YNÂHØ]ÚÂÙ]\Ú
-XÚÝ\Z[YNÂBNÂÛÛÝ\ÝÜQ]HH[HOÂY
-Y[JH]\ÂÛÛÝXY\H]È[TXY\
-NÂXY\ÛØYH
-
-HOÂHÂÛÛÝ\ÙYHÓÓ\ÙJXY\\Ý[
-NÂÛÛÝ]HH\ÙY]H\ÙYÂ]HÂØXÝÙ^\Ê]JKÜXXÚ
-ÈOÂY
-ËÝ\ÕÚ]
-\ÙXØ[\JHÂØØ[ÝÜYÙKÙ]][JË]VÚ×JNÂÊÎÂBJNÂÙ]\Ú
-È\ÝÜY8 %[ØY[ø )Ý[ÈÈ\ÝÜHNÂY
-HÙ][Y[Ý]
-
-
-HOÚ[ÝËØØ][Û[ØY
-
-KL
-NÂHØ]ÚÂÙ]\Ú
-ÛÝ[ÝXY][HNÂBNÂXY\XY\Õ^
-[JNÂNÂÛÛÝ][Y\HÈO	ÓX]ÛÜÈÈ
-
-_NÔÝ[ÊÈ	H
-
-KYÝ\
-_XÂÛÛÝ\PXÝ[ÛÈHXÝ[ÛÈOÂY
-XXÝ[ÛÈXXÝ[ÛË[Ý
-H]\[ÂÛÛÝÛ\HÂ\XÚÙ][Y\Ë^BNÂ]^\H\^XÚÙ]HXÚÙ]^[Y\ÈH[Y\ÎÂÛÛÝ^T]ÚHßNÂÛÛÝÛHH×NÂÛÛÝÛX[H\O
-\^K\Ð\^J\HÈ\×JKX\
-OÝ[ÊK[J
-JK[\ÛÛX[KÛXÙJJNÂÜ
-ÛÛÝHÙXÝ[ÛÊHÂY
-K\HOOHYÜ\Ú][\ÈHÂÛÛÝ][\ÈHÛX[K][\ÊNÂY
-Z][\Ë[Ý
-HÛÛ[YNÂ^\HË^\][\ËX\
-O
-ÂYZY
-
-K^ÛN[ÙBJJWNÂÛK\Ú
-	Ú][\Ë[ÝHÈ\
-NÂH[ÙHY
-K\HOOHÛÛ\]WÜ\Ú][\ÈHÂÛÛÝØ[HÛX[K][\ÊKX\
-OÓÝÙ\Ø\ÙJ
-JNÂ]HÂ^\H^\X\
-]OÂÛÛÝ]HØ[ÛÛYJÈO]^ÓÝÙ\Ø\ÙJ
-K[ÛY\ÊÊHË[ÛY\Ê]^ÓÝÙ\Ø\ÙJ
-JJNÂY
-]	Z]ÛJHÂÊÎÂ]\Â]ÛNYBNÂB]\]ÂJNÂY
-HÛK\Ú
-	ÛHÚXÚÙYÙ
-NÂH[ÙHY
-K\HOOHYØXÚÙ]Ú][\ÈHÂÛÛÝ][\ÈHÛX[K][\ÊNÂY
-Z][\Ë[Ý
-HÛÛ[YNÂ^XÚÙ]HË^XÚÙ]][\ËX\
-O
-ÂYZY
-
-K^ÛN[ÙBJJWNÂÛK\Ú
-	Ú][\Ë[ÝHÈH\Ý
-NÂH[ÙHY
-K\HOOHYÛ[Y\ÈHÂÛÛÝ][\ÈHÛX[K[Y\ÊNÂY
-Z][\Ë[Ý
-HÛÛ[YNÂ^[Y\ÈHË^[Y\Ë][\ËX\
-O
-ÂYZY
-
-K^Ù[\[H]HXK]Ü]BJJWNÂÛK\Ú
-	Ú][\Ë[ÝH[YIÚ][\Ë[ÝHÈÈX
-NÂH[ÙHY
-K\HOOHÙ×ÝÙ^HHÂY
-\[ÙKØ]\OOH[X\H^T]ÚØ]\HX]X^
-X]Z[LKØ]\JNÂY
-\[ÙKYØ]\OOH[X\H^T]ÚØ]\HX]X^
-X]Z[L
-^T]ÚØ]\ÏÈ^KØ]\ÏÈ
-H
-ÈKYØ]\JNÂY
-KØZÙJH^T]ÚØZÙHHÝ[ÊKØZÙJKÛXÙJ
-JNÂY
-KY
-H^T]ÚYHÝ[ÊKY
-KÛXÙJ
-JNÂY
-\[ÙKÝ[YÚOOHÛÛX[H^T]ÚÝ[YÚHKÝ[YÚÂY
-\[ÙK[HOOHÛÛX[H^T]Ú[HHK[NÂY
-ØXÝÙ^\Ê^T]Ú
-K[Ý
-HÛK\Ú
-Ù^IÜÈÙÈNÂBBY
-^\OOH\
-HØ]T\
-^\
-NÂY
-^XÚÙ]OOHXÚÙ]
-HØ]PXÚÙ]
-^XÚÙ]
-NÂY
-^[Y\ÈOOH[Y\ÊHØ]S[Y\Ê^[Y\ÊNÂY
-ØXÝÙ^\Ê^T]Ú
-K[Ý
-H]Ú^J^T]Ú
-NÂY
-YÛK[Ý
-H]\[ÂÙ]ZU[ÊÛ\
-NÂ]\ÛKÚ[0­ÈNÂNÂÛÛÝ[ÐZHH
-
-HOÂY
-XZU[ÊH]\ÂØ]T\
-ZU[Ë\
-NÂØ]PXÚÙ]
-ZU[ËXÚÙ]
-NÂØ]S[Y\ÊZU[Ë[Y\ÊNÂÙ]^JZU[Ë^JNÂØ]J^NÙ]_XZU[Ë^JNÂÙ]ZU[Ê[
-NÂÙ]ZSY\ÜØYÙ\ÊHOK[\OÛHOOHÝHJNÂÙ]\Ú
-[ÛHNÂNÂÛÛÝØ]TZ\H
-
-HOÂÛÛÝÈHZ\Y[J
-NÂÙ]Z\ÛÙJÊNÂØ]JZ\ÂÛÙNÂJNÂÙ]\Ú
-ÈÈZ\Y[Z\YNÂNÂÛÛÝÝPYÙHHÈOÂY
-]ÊH]\ÂÛÛÝHHX]ÛÜ
-]KÝÊ
-HHÊHÈ
-
-NÂY
-HJH]\ÝÈÂY
-H
-
-H]\H
-ÈHYÛÈÂÛÛÝHX]ÛÜHÈ
-
-NÂY
-
-H]\OOHHÈZYÛÈ
-ÈYÛÈÂ]\X]ÛÜÈ
-H
-ÈYÛÈÂNÂÛÛÝØ]PZU\H
-
-HOÂÛÛÝHHZQY[J
-NÂÙ]ZU\
-JNÂØ]JZHÈ\HJNÂÙ]ÚÝÑ[Ú[
-[ÙJNÂÙ]\Ú
-HÈ[Ú[Ø]Y[Ú[ÛX\YNÂNÂÛÛÝØ]T[^U\H
-
-HOÂÛÛÝHH[^QY[J
-NÂÙ][^U\
-JNÂØ]J[^HÈ\HJNÂÙ]\Ú
-HÈ[^HØ]Y[^HÛX\YNÂNÂÛÛÝ\ÚÕÚ]H\Þ[È^OÂ^H
-^K[J
-NÂY
-]^ZP\ÞHXZU\
-H]\ÂÛÛÝ^HËZSY\ÜØYÙ\ËÂÛN\Ù\ÛÛ[^WNÂÙ]ZSY\ÜØYÙ\Ê^
-NÂÙ]ZR[]
-NÂÙ]ZP\ÞJYJNÂÛÛÝÛÛ^HÂÙYZÎÙYZÜËË^\ÓYÙYZÜË^\ÓYYQ]NYK]XÝ]ÜÙYZÜËÊKÙ^NÂØ]\^KØ]\XZÙ\ÝHY^KYX[ËXZÙ\Ý[ÚHY^KYX[Ë[Ú[\HY^KYX[Ë[\ØZÙN^KØZÙHY^KY[Ü[ÓYÚHY^KÝ[YÚØÜY[ÑÝÛHY^K[BKÝXZÜÎÝXZÜÈ[\[XZ[[Î\[\O\ÛH	^[J
-JKX\
-O^
-KÛXÙJ
-K\ÛN\[\OÛJK[Ý\Ý[\[Ý]Ü]S[Y\Î[Y\Ë[\O]	^[J
-JKX\
-O^
-KXÚÙ]Ü[XÚÙ][\OXÛH	^[J
-JK[ÝNÂHÂÛÛÝ\ÈH]ØZ]]Ú
-ZU\ÂY]ÙÔÕXY\ÎÂÛÛ[U\H\XØ][ÛÚÛÛKÙNÓÓÝ[ÚYJÂ\\ÙKXØ[\Y\ÜØYÙ\Î^[\HOKÛHOOH\Ù\KÛHOOH\ÜÚ\Ý[KÛÛ^JBJNÂÛÛÝ]HH]ØZ]\ËÛÛ
-NÂÛÛÝ\HH]K\H
-]K\ÜÈ\Ü
-È]K\ÜÈ\ÜÛÙKNÂÛÛÝÝ[[X\HH\PXÝ[ÛÊ]KXÝ[ÛÊNÂÙ]ZSY\ÜØYÙ\ÊHOËKÂÛN\ÜÚ\Ý[ÛÛ[\BKÝ[[X\HÈÞÂÛNÝHÛÛ[Ý[[X\BWH×JWJNÂHØ]ÚÂÙ]ZSY\ÜØYÙ\ÊHOËKÂÛN\ÜÚ\Ý[ÛÛ[ÛÝ[ÝXXÚH[Ú[ÚXÚÈHT[\8¦¦KWJNÂBÙ]ZP\ÞJ[ÙJNÂNÂÛÛÝ\ÚÐRHH
-
-HO\ÚÕÚ]
-ZR[]
-NÂÛÛÝRWÔÓTÈHÈZ[YHHÜÜ][YÈÚXÚÛ\ÝÚ]	ÜÈ\[[ÈÚ]HXH\ÈÙYZÏÈ\Ý]ÙYZËZÛYHÝ\][[]Y\Ý[ÛÈÈ\ÚÈ]H^\Ú[Y[X[\ÝXÈ]ØÜYÙ]ÝÈÈHÝ\Ü\YÚÝÏÈNÂÛÛÝY\ÛÜ[\ÈH
-
-
-HOÂÛÛÝÝ]H×NÂY
-
-^KØ]\
-H
-HÝ]\Ú
-Ø]\ÜÈ]	Ù^KØ]\KÎ8 %Ü]Ù
-NÂY
-Y^KÝ[YÚ
-HÝ]\Ú
-È[Ü[ÈYÚÙÙÙY[Z[]\ÈÝ]ÚYH\Ù]ÈHÛØÚËNÂY
-Y^K[JHÝ]\Ú
-ØÜY[ËYÝÛ]YÚ\ÈÝ[Ü[ÛÙ^IÜÈØ\NÂÛÛÝÝH\[ÝÈX]Ý[
-\[\OÛJK[ÝÈ\[Ý
-L
-HÂY
-ÝL	ÙYZÜË^\ÓYHL
-HÝ]\Ú
-\	ÜÈ]	ÜÝIHÚ]	ÝÙYZÜË^\ÓYH^\ÈÝ]8 %ÛØÚÈÛHÙH\Ý
-NÂY
-ÝXZÜÈ	ÝXZÜË]HHÊHÝ]\Ú
-	ÜÝXZÜË]_KY^H]HÝXZËÛÝXZÈ]
-NÂY
-ÝXZÜÈ	ÝXZÜËØ]\HÊHÝ]\Ú
-	ÜÝXZÜËØ]\H^\ÈY]YÝZYÚÛÛY
-NÂY
-[Ý][Ý
-HÝ]\Ú
-]\][ÉÜÈ[YÙ^K\HZ\8 %[ÞH]NÂ]\Ý]ÛXÙJÊNÂJJ
-NÂÛÛÝ[YHHSQTÖÙ^TÙYY
-]JH	HSQTË[ÝNÂÛÛÝÛØÚÔ\ÈH
-
-
-HOÂÛÛÝH]È]JÝÊNÂ]HÙ]Ý\Ê
-NÂÛÛÝHHÝ[ÊÙ]Z[]\Ê
-JKYÝ\
-NÂÛÛÝÙXÈHÝ[ÊÙ]ÙXÛÛÊ
-JKYÝ\
-NÂÛÛÝ[\HHHLÈHSHÂY
-XÛØÚÌ
-HÂH	HLÂY
-OOH
-HHLÂBÛÛÝHÛØÚÌÈÝ[Ê
-KYÝ\
-HÝ[Ê
-NÂ]\Â[YN	ÚNÛ_IÜÚÝÔÙXÛÛÈÈ
-ÈÙXÈX[\NÛØÚÌÈ[\BNÂJJ
-NÂÛÛÝÛØÚÈHÛØÚÔ\Ë[YNÂÛÛÝ\Ù]H]È]JYH
-ÈKÙ][YJ
-NÂ][HH\Ù]HÝÎÂÛÛÝÝ\YHH[HHÂY
-[H
-H[HHÂÛÛÝÙHÂX]ÛÜ[HÈ
-
-KX]ÛÜ[H	H
-ÈÍ
-KNX]ÛÜ[H	HÍÈ
-
-KÎX]ÛÜ[H	H
-ÈL
-BNÂ]\XXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YN[]]HÝ[NÈXÚÙÜÝ[[Ü\[ZYÚLÝ\ÝÎY[\Ü^N^^\XÝ[ÛÛÛ[[KÛÝXÚÝ\[TÝÚ\UÝXÚÝ\ÛÝXÚ[[TÝÚ\UÝXÚ[KXXÝÜX]Q[[Y[
-[[XØ]ÜÂ[[\ÞN\ÞKÛÛÜË\ÝXÚÎÌPÌPÌQHJKXXÝÜX]Q[[Y[
-[XY[[[
-KXXÝÜX]Q[[Y[
-\Ø[\ËÂYÙÙ\\YÙÙ\ÛÛÜË\Ý[[ÙN\Ú[Z]ÂJK\H	XXÝÜX]Q[[Y[
-]ÂÙ^N\KÙ^KÛ\ÜÓ[YN\K\[ÈÝ[NÂY\KÜ\KKÛÛÜË\ÝBJKXXÝÜX]Q[[Y[
-Ý[H[Ù^Y[Y\ÈÔÜÌ	^ÛÜXÚ]NÝ[ÙÜNØØ[JM
-_LL	^ÛÜXÚ]NNÝ[ÙÜNØØ[JJ__PÙ^Y[Y\ÈÔÜ[Ì	^Ý[ÙÜNÝ]VJ
-NÛÜXÚ]N_LL	^Ý[ÙÜNÝ]VJLYÊNÛÜXÚ]N__X
-KÚÝÕ\]P[\	XXÝÜX]Q[[Y[
-]ÂÙ^N\]KX[\Ý[NÂÜÚ][Û^YÜX^
-MØ[Ê[ØYKX\XKZ[Ù]]Ü
-H
-ÈL
-JHYL	H[ÙÜN[Û]V
-ML	JH[^NNK\Ü^N^[YÛ][\ÎÙ[\Ø\
-Y[ÎMÜ\Y]\Î
-LXÚÙÜÝ[ØJNNÌHXÚÙÜ[\\
-HØ]\]JK
-HÙXÚ]XÚÙÜ[\\
-HØ]\]JK
-HÜ\\ÛÛYØJMKMKMKN
-HÞÚYÝÎØJMKMKMKN
-H\[Ù]
-ØJ
-JH[[X][Û[\ÛYR[ÎÈÝXXËX^Y\MKËJHÝÚ]TÜXÙNÝÜ\BKXXÝÜX]Q[[Y[
-Ü[ÈÝ[NÈÚY
-ZYÚ
-Ü\Y]\ÎL	HXÚÙÜÝ[Ë\Ý\Ü^N[[KXØÚÈÞÚYÝÎ
-	ÐË\ÝXHJKXXÝÜX]Q[[Y[
-Ü[ÈÝ[NÈÛ[Z[NÙKÛÚ^NLËÛÙZYÚ
-LÛÛÜØJMKMKMKJH]\ÜXÚ[ÎY[HHK\]YÈTÖWÕTB
-KÚ]Ó]ÓÜ[	XXÝÜX]Q[[Y[
-]ÂÙ^NÛ[Ý\^HÝ[NÈÜÚ][Û^Y[Ù][^NNKXÚÙÜÝ[ØJ
-H\Ü^N^[YÛ][\Î^Y[XÚÙÜ[\\Ü
-HKÛÛXÚÎ
-
-HOÈØØ[ÝÜYÙKÙ]][JÙY\\ÜÙY[ÝMHNÈÙ]Ú]Ó]ÓÜ[[ÙJNÈBKXXÝÜX]Q[[Y[
-]ÂÝ[NÈÚYL	HXÚÙÜÝ[ØJMÊHÜ\Ü\ÛÛYØJMKMKMKJHÜ\Y]\ÎY[ÎÌY[ÐÝÛNX^
-Ì[ØYKX\XKZ[Ù]XÝÛJJHXÚÙÜ[\\
-L
-HØ]\]JK
-H[[X][ÛÚ]Ó]Õ\\ÈÝXXËX^Y\ÌÌJHÝÙXÚ]XÚÙÜ[\\
-L
-HØ]\]JK
-HKÛÛXÚÎHOKÝÜÜYØ][Û
-BKXXÝÜX]Q[[Y[
-]ÈÝ[NÈ^[YÛÙ[\X\Ú[ÝÛNHKXXÝÜX]Q[[Y[
-]ÈÝ[NÈÛÚ^NX\Ú[ÝÛNL[RZYÚHHKQÐ×QÎKXXÝÜX]Q[[Y[
-]ÈÝ[NÈÛ[Z[N\Ü^KÛÙZYÚÛÚ^NÛÛÜË^X\Ú[ÝÛNHKÚ]8 &\È]È[HÙY\\KXXÝÜX]Q[[Y[
-]ÈÝ[NÈÛ[Z[NÙKÛÚ^NLËÛÛÜË]]HHK\Ú[ÛMH8 %\ÝÜ[ÝHB
-KÖÈQÑQÐPÈX[][YHY\ÜØYÚ[ÈÙ[[XÙZ]HY\ÜØYÙ\ÈÚ]\[X[[YHKÈLWQLÛÝYÞ[È[Ý\]HÝ^\È[Þ[ÈXÜÜÜÈ]\H]XÙHKÈQÐ×Q
-HX[ØÙ[\ÈZYÚÝÈØ[\\È8 %ÛÛ[Ý\ÈÚ\HÜÜÛÛ\ÈKÈQÑQÐMÈÛX\\\ÈH][ÈÛ\ÜÈYXÝ\ÈÛ[ÛÝ\[[ÜH[]HBKX\
-[Ý[ÛÝËY
-^Â]\XXÝÜX]Q[[Y[
-]ÈÙ^NYÝ[NÈ\Ü^N^[YÛ][\Î^\Ý\Ø\MY[ÎLÜÜ\ÝÛNYÏÈ\ÛÛYÐË[NÛH[[X][ÛÜÑYR[ÈX\ÙHÊM
-ÚY
-Ì
-JÈ\ÈÝHKXXÝÜX]Q[[Y[
-]ÈÝ[NÈÛÚ^NÚYÍ^[YÛÙ[\^Ú[ÎY[ÕÜHKÝÖÌJKXXÝÜX]Q[[Y[
-]ÈÝ[NÈ^HHKXXÝÜX]Q[[Y[
-]ÈÝ[NÈÛ[Z[NÙKÛÙZYÚLÛÚ^NMKÛÛÜË^HKÝÖÌWJKXXÝÜX]Q[[Y[
-]ÈÝ[NÈÛ[Z[NÙKÛÚ^NLËÛÛÜË]]KX\Ú[ÜË[RZYÚKHHKÝÖÌJB
-B
-NÂJKXXÝÜX]Q[[Y[
-]ÛÂÛÛXÚÎ
-
-HOÈØØ[ÝÜYÙKÙ]][JÙY\\ÜÙY[ÝMHNÈÙ]Ú]Ó]ÓÜ[[ÙJNÈKÝ[NÈÚYL	HX\Ú[ÜY[ÎM\XÚÙÜÝ[Ë\ÝÜ\Y]\ÎMÛ[Z[NÙKÛÙZYÚÛÚ^NMÛÛÜÛÛ\ÝÜË\Ý
-KÜ\ÛHÝ\ÛÜÚ[\ÞÚYÝÎ
-ÐË\Ý
-È
-BK]8 &\ÈÛÈB
-B
-KXXÝÜX]Q[[Y[
-]ÂÝ[NÈÜÚ][Û[]]HÚYL	HÝ\ÝÎY[^HBKXXÝÜX]Q[[Y[
-]ÂÝ[NÈÜÚ][ÛXÛÛ]H[Ù]Ý\ÝÖN]]ÈÙXÚ]Ý\ÝÔØÜÛ[ÎÝXÚÝ\ØÜÛZ][ÜÛÛZ[[ÙÜNYÙU[ÙÜJ
-K[Ú][Û\ÑYÙÚ[ÈÈÛH[ÙÜHÍÈÝXXËX^Y\KÍJHÚ[Ú[ÙN[ÙÜHÜXÚ]N\ÑYÙÚ[ÈÈMÈHBKXXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YN[]]HVÌWH^X]]ÈX^]Ë[YÝ[NÈY[ÕÜX^
-Ë\[K[ØYKX\XKZ[Ù]]Ü
-JHY[ÐÝÛNØ[Ê	ÝXOOHY\ÜØYÙ\ÈÈMLL\
-È[ØYKX\XKZ[Ù]XÝÛK
-JXY[ÓYX^
-Ø[Ê[ØYKX\XKZ[Ù][Y
-H
-ÈM
-JHY[ÔYÚX^
-Ø[Ê[ØYKX\XKZ[Ù]\YÚ
-H
-ÈM
-JH[Ú][ÛY[ËXÝÛHÎÈÝXXËX^Y\JHBKXXÝÜX]Q[[Y[
-XY\ÂÛ\ÜÓ[YNXM^][\Ë\Ý\\ÝYKX]ÙY[Ø\LÈKXXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YNZ[]ËLKXXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YN^^È\\Ø\ÙHÝ[NÂÛ[Z[NÙK]\ÜXÚ[ÎL[HÛÛÜØJMKMKMK
-HBK]Q]J]JJKXXÝÜX]Q[[Y[
-]ÂÝ[NÈÛ[Z[NÙKÛÚ^NLËÛÛÜØJMKMKMKÎ
-HX\Ú[Ü
-X\Ú[ÝÛNK]\ÜXÚ[ÎMY[HBK
-
-
-HOÈÛÛÝH]È]JÝÊKÙ]Ý\Ê
-NÈ]\LÈÛÛÙ[Ü[ËØYÙH<'äbÈMÈÈÛÛÙY\ÛÛØYÙH8¦ ;î#ÈÛÛÙ][[ËØYÙH<'ã&HÈJJ
-JKXXÝÜX]Q[[Y[
-HÂÛ\ÜÓ[YN]LHÝ[NÂÛ[Z[N\Ü^KÛÚ^NÍÛÙZYÚ
-ÌXÚÙÜÝ[[X\YÜYY[
-MYË	ÐË\ÝH	KÙ
-MIKØJMKMKMKÌHL	JXÙXÚ]XÚÙÜÝ[Û\^ÙXÚ]^[ÛÛÜ[Ü\[XÚÙÜÝ[Û\^]\ÜXÚ[ÎLÙ[H[RZYÚK
-BKHÙY\\KXXÝÜX]Q[[Y[
-]ÈÝ[NÈÛ[Z[NÙKÛÚ^NLÛÛÜË]]K]\ÜXÚ[ÎM[HX\Ú[ÜK^[ÙÜN\\Ø\ÙHHKTÖWÕTJKXXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YN^Ú[ËL^XÛÛ][\ËY[Ø\LKHLHKXXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YN^][\ËX\Ù[[HØ\LHKXXÝÜX]Q[[Y[
-Ü[ÂÛ\ÜÓ[YN[HÝ[NÂÛ[Z[N\Ü^KÛÙZYÚÛÚ^N
-[RZYÚKÛÛÜØJMKMKMKMH]\ÜXÚ[ÎL
-[HBKÛØÚÊKÛØÚÔ\Ë[\H	XXÝÜX]Q[[Y[
-Ü[ÂÝ[NÂÛ[Z[N\Ü^KÛÙZYÚ
-LÛÚ^NMKÛÛÜØJMKMKMKMJHBKÛØÚÔ\Ë[\JJKXXÝÜX]Q[[Y[
-]ÛÂÛÛXÚÎ
-
-HOÂÛÛÝH\ÛÝ[ÂÙ]ÛÝ[
-NÂØ]JÛÝ[ÂÛJNÂY
-HÂÛÛÝÈHXÊ
-NÂY
-ÊHÛJ
-LÚ[H
-K
-NÂBK\XK[X[ÛÝ[È]]HÛÝ[È[]]HÛÝ[ÈÛ\ÜÓ[YN\ÜÈÜYMÈËMÈXÙKZ][\ËXÙ[\Ý[YY[Ý[NÂXÚÙÜÝ[ËØ\Ü\\ÛÛY	ÐË[_XÛÛÜÛÝ[ÈË\ÝË]]BBKXXÝÜX]Q[[Y[
-Ü[ÂÝ[NÂÛÚ^NLBKÛÝ[È¸¦j¸§%HJJJKYH	XXÝÜX]Q[[Y[
-]ÂÙ^NÙ^HÛ\ÜÓ[YNÜXÙK^KMKZ\Y	XXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YNÛ\ÜÈØ\LMÝ[NÂ[[X][Û\ÙHÍ\È
-\ÈX\ÙHÝXÚÙÜÝ[ËØ\Ü\\ÛÛY	ÐË[_XÜ\YÜÛÛY	ÐË\ÝXÜ\ÜYY]\ÎNÜ\ÝÛSYY]\ÎNÜ\Y]\ÎNÞÚYÝÎ\
-ØJ
-KÜMØJN
-K[Ù]\ØJMKMKMKJXBKXXÝÜX]Q[[Y[
-]ÛÂÛÛXÚÎHOÜ[ØÜY[Y\ÜØYÙ\ÈJKÛ\ÜÓ[YN\ÜÈËY[^[YKXXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YNXLH^][\ËXÙ[\\ÝYKX]ÙY[Ý[NÈÜÚ][Û[]]HBKXXÝÜX]Q[[Y[
-Ü[ÂÛ\ÜÓ[YN\\Ø\ÙHÝ[NÂÛ[Z[N[ÛËÛÚ^N[H]\ÜXÚ[Î
-[HÛÛÜË\ÝÛÙZYÚ
-BK¸¦iHXXHKXXÝÜX]Q[[Y[
-Ü[ÂÝ[NÂÛ[Z[NÙKÛÛÜË\ÝÛÚ^NLËÛÙZYÚ
-]\ÜXÚ[ÎLY[HBKXY\ÙÜËÛÛYJHOKÚYHOOH\È	K]
-XYÙY[\×ÜÙY[Ø]
-JHÈ¸¥ãÈY\ÜØYÙ\ÈY\ÜØYÙ\È8 .JKZ\ÝH	Z\ÝKÝHÈXXÝÜX]Q[[Y[
-XXÝYÛY[[XXÝÜX]Q[[Y[
-ÂÛ\ÜÓ[YN^VÌM\HXY[Ë\[^Y[KXÛ[\LÝ[NÂÛ[Z[N\Ü^KÛÛÜË^BKZ\ÝKÝJKXXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YN]LKH^^ÈÝ[NÂÛ[Z[N[ÛËÛÛÜË]]BBKÝPYÙJZ\ÝK\]Y]
-JJHXXÝÜX]Q[[Y[
-ÂÛ\ÜÓ[YN^\ÛHÝ[NÂÛ[Z[NÙKÛÛÜË]]BBKÈY\ÜØYÙ\ÈY]8 %\ÈØ^HH8¦iHJK^SÝSY]H	^SÝSY]KÝH^SÝTÙ[ÈXXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YN]LKH^^ÈÝ[NÂÛ[Z[N[ÛËÛÛÜ^SÝSY]H	^SÝSY]KÙY[]ÈÌÍÍÍNHË]]BBK^SÝSY]H	^SÝSY]KÙY[]ÈXY	ÛÝPYÙJ^SÝSY]KÙY[]
-_XÙ[	ÛÝPYÙJ^SÝSY]H	^SÝSY]K\]Y]^SÝTÙ[
-_X
-H[ÝQ\Ü	XXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YN]LKH^^ÈÝ[NÂÛ[Z[N[ÛËÛÛÜË\ÝBKÛÝ[ÝXXÚHÙ\\8 %[ÝÛÈHYØZ[JKXXÝÜX]Q[[Y[
-Ø\[XXÝÜX]Q[[Y[
-]ÈÝ[NÈ\Ü^N^[YÛ][\ÎÙ[\\ÝYPÛÛ[Ù[\Ø\X\Ú[ÝÛNLHKXXÝÜX]Q[[Y[
-^YXÝËÈÛÛÜÙÙHKÙYZÈÙYZÜËË0­ÈYS[YJB
-KXXÝÜX]Q[[Y[
-]ÈÝ[NÈ\Ü^N^\ÝYPÛÛ[Ù[\X\Ú[ÝÛNLX^ÚYMX\Ú[]]ÈM[\Ü\ÚYÝÊ
-ØJKMJJHÜ\ÚYÝÊ
-MØJ
-JHKÝ[NÈ[[X][ÛYU\ÈX\ÙHÝK[Ù\Ý\ÛTÙ][\SÈ×Ú[Z[ÜÜÛÛTÕÊÙYZÜËËYK[ÙJHHJKXXÝÜX]Q[[Y[
-]ÈÝ[NÈ\Ü^N^Ø\X\Ú[ÝÛNLHKÖÈ^\ÈÝ\YHÈÙË^KÈÈÝ\YHÈ¸ %Ý[ÊÙ
-KYÝ\
-KË]]WKÈZ[Ý[ÊÙJKYÝ\
-KÝ\YHÈË]]HË]]WKÈÙXÈÝ[ÊÙÊKYÝ\
-KË]]WWKX\
-
-ÛX[ÛÛJHOXXÝÜX]Q[[Y[
-]ÈÙ^NXÝ[NÈ^KÜ\Y]\ÎMY[ÎLÜ^[YÛÙ[\XÚÙÜÝ[ØJMKMKMK
-HÜ\\ÛÛYØJMKMKMKLHXÚÙÜ[\\L
-HÙXÚ]XÚÙÜ[\\
-HHKXXÝÜX]Q[[Y[
-]ÈÝ[NÈÛ[Z[N\Ü^KÛÙZYÚÌÛÚ^NÛÛÜÛÛÛ\X[[Y\XÎX[\[[\ÈÛX]\TÙ][ÜÎÝ[IÈ	ÛÛ[IÈHKÝ\YHÈ¸§$È[
-KXXÝÜX]Q[[Y[
-]ÈÝ[NÈÛ[Z[N[ÛËÛÚ^NK]\ÜXÚ[ÎY[HÛÛÜË]]K^[ÙÜN\\Ø\ÙHÛÙZYÚLHKXB
-B
-B
-KXXÝÜX]Q[[Y[
-]ÈÝ[NÈZYÚËÜ\Y]\ÎXÚÙÜÝ[ØJMKMKMK
-ÊHÝ\ÝÎY[X\Ú[ÝÛNMHKXXÝÜX]Q[[Y[
-]ÈÝ[NÈZYÚL	HÜ\Y]\ÎXÚÙÜÝ[[X\YÜYY[
-LYËÐË\Ý
-ÈÐË\Ý
-ÈHÚYX]Z[LÙYZÜËËÍ
-L
-JÈH[Ú][ÛÚYL\ÈÝXXËX^Y\JHHJB
-KXXÝÜX]Q[[Y[
-]ÈÝ[NÈ\Ü^N^[YÛ][\ÎÙ[\\ÝYPÛÛ[ÜXÙKX]ÙY[HKXXÝÜX]Q[[Y[
-][XXÝÜX]Q[[Y[
-]ÈÝ[NÈÛ[Z[N\Ü^KÛÙZYÚLÛÚ^NMÛÛÜË^HKÚ^QÜÙYZÜËÊK[YJKXXÝÜX]Q[[Y[
-]ÈÝ[NÈÛ[Z[NÙKÛÚ^NLÛÛÜË]]HHKÚ^QÜÙYZÜËÊK[Ú0­ÈÚ^QÜÙYZÜËÊKÛKÛHB
-KÝ\YHÈXXÝÜX]Q[[Y[
-]ÈÝ[NÈÛ[Z[NÙKÛÙZYÚLÛÚ^NMKÛÛÜÙX]\ÜXÚ[ÎHK[H^HÝÈ<'ã.HXXÝÜX]Q[[Y[
-]ÈÝ[NÈ^[YÛYÚHKXXÝÜX]Q[[Y[
-]ÈÝ[NÈÛ[Z[N[ÛËÛÚ^NL]\ÜXÚ[ÎY[HÛÛÜË]]K^[ÙÜN\\Ø\ÙHHKYHKXXÝÜX]Q[[Y[
-]ÈÝ[NÈÛ[Z[NÙKÛÚ^NLËÛÛÜË^HK]È]JYJÈLKÓØØ[Q]TÝ[Ê[Y[YÛ[ÛÚÜ^N[Y\XÈJJB
-B
-BJJB
-KXXÝÜX]Q[[Y[
-]ÂÝ[NÈÜÚ][ÛXÛÛ]H[Ù]Ý\ÝÖN]]ÈÙXÚ]Ý\ÝÔØÜÛ[ÎÝXÚ[ÙÜNYÙU[ÙÜJJK[Ú][Û\ÑYÙÚ[ÈÈÛH[ÙÜHÍÈÝXXËX^Y\JHÚ[Ú[ÙN[ÙÜHBKXXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YN[]]HVÌWH^X]]ÈX^]Ë[YÝ[NÈY[ÕÜX^
-Ü[K[ØYKX\XKZ[Ù]]Ü
-JHY[ÐÝÛNØ[ÊL
-È[ØYKX\XKZ[Ù]XÝÛK
-JHY[ÓYX^
-Ø[Ê[ØYKX\XKZ[Ù][Y
-H
-ÈM
-JHY[ÔYÚX^
-Ø[Ê[ØYKX\XKZ[Ù]\YÚ
-H
-ÈM
-JHBKXXÝÜX]Q[[Y[
-]ÂÝ[NÈ\Ü^N^[YÛ][\ÎÙ[\Ø\MX\Ú[ÝÛNBKXXÝÜX]Q[[Y[
-]ÂÝ[NÈÚYLZYÚLÜ\Y]\ÎL	HXÚÙÜÝ[[X\YÜYY[
-MYËÐË\Ý
-ÈÐË\Ý
-ÈXJH\Ü^N^[YÛ][\ÎÙ[\\ÝYPÛÛ[Ù[\^Ú[ÎÞÚYÝÎØJ
-KË\ÐË\Ý
-È
-ÐË\Ý
-È
-BKXXÝÜX]Q[[Y[
-Ü[ÈÝ[NÈÛ[Z[N\Ü^KÛÙZYÚÌÛÚ^NÛÛÜÙHKHJKXXÝÜX]Q[[Y[
-][XXÝÜX]Q[[Y[
-HÂÝ[NÈÛ[Z[N\Ü^KÛÙZYÚ
-ÌÛÚ^NMË]\ÜXÚ[ÎLMY[HÛÛÜË^[RZYÚKX\Ú[BKXXHKXXÝÜX]Q[[Y[
-]ÂÝ[NÈÛ[Z[NÙKÛÚ^NLÛÛÜË]]KX\Ú[ÜË\Ü^N^[YÛ][\ÎÙ[\Ø\HBKXXÝÜX]Q[[Y[
-Ü[ÈÝ[NÈ\Ü^N[[KXØÚÈÚYKZYÚKÜ\Y]\ÎL	HXÚÙÜÝ[Z\YÈÌÌMNÑ
-LÐHÞÚYÝÎZ\YÈ
-ÌÌMN
-Ñ
-LÐM^Ú[ÎHJK\\0­È[Ý\\ÛÛB
-B
-KXXÝÜX]Q[[Y[
-]ÂÙ^NY\ÜØYÙ\ÈÛ\ÜÓ[YN\ÙHKXXÝÜX]Q[[Y[
-]ÂÝ[NÈZ[ZYÚLY[ÐÝÛNY[ÓY
-Y[ÔYÚ
-[[X][Û\ÙHÜÈX\ÙHÝBKXY\ÙÜË[ÝOOH	XXÝÜX]Q[[Y[
-]ÂÝ[NÈ\Ü^N^^\XÝ[ÛÛÛ[[[YÛ][\ÎÙ[\\ÝYPÛÛ[Ù[\Z[ZYÚLØ\MBKXXÝÜX]Q[[Y[
-]ÈÝ[NÈÛÚ^N
-
-[RZYÚKÜXÚ]N[\Ü\ÚYÝÊ
-MØJMKNLMJJHHK¼'ä«KXXÝÜX]Q[[Y[
-ÈÝ[NÈÛ[Z[NÙKÛÛÜË]]KÛÚ^NMX\Ú[^[YÛÙ[\[RZYÚKHKÝ\HÛÛ\Ø][Û8¦iHB
-K
-
-
-HOÂÛÛÝÐTH
-H
-
-
-LÂÛÛÝ\ÝZ[RYHXY\ÙÜËYXÙJ
-XØË\ÙËY
-HO\ÙËÚYHOOH\ÈÈYXØËLJNÂ]\XY\ÙÜËX\
-
-KJHOÂÛÛÝZ[HHKÚYHOOH\ÈÂÛÛÝ]HXY\ÙÜÖÚHHWNÂÛÛÝ^HXY\ÙÜÖÚH
-ÈWNÂÛÛÝ\Ñ\Ý[Û\Ý\H\]]ÚYHOOHKÚYHK]H]]ÐTÂÛÛÝ\Ó\Ý[Û\Ý\H[^^ÚYHOOHKÚYH^]HK]ÐTÂÛÛÝÚÝÕ[YHH\]K]H]]ÐTÂÛÛÝ\Ó\ÝZ[HHHOOH\ÝZ[RYÂÛÛÝÙY[R\H\Ó\ÝZ[H	XYÙY[	XYÙY[\×ÜÙY[Ø]	XYÙY[\×ÜÙY[Ø]HK]ÂÛÛÝHZ[HÈ
-\Ñ\Ý[Û\Ý\È
-JNÂÛÛÝHZ[HÈ
-\Ñ\Ý[Û\Ý\È
-JHÂÛÛÝHZ[HÈ
-\Ó\Ý[Û\Ý\È
-H
-JNÂÛÛÝHZ[HÈ
-\Ó\Ý[Û\Ý\È
-H
-JHÂÛÛÝXH\Ó\Ý[Û\Ý\È
-Â]\XXÝÜX]Q[[Y[
-]ÈÙ^NKYHKÚÝÕ[YH	XXÝÜX]Q[[Y[
-]ÂÝ[NÈ^[YÛÙ[\ÛÚ^NLKÛÛÜË]]KÛ[Z[N[ÛËX\Ú[]\ÜXÚ[Î
-[HÜXÚ]NË^[ÙÜN\\Ø\ÙHBK]È]JK]
-KÓØØ[Q]TÝ[Ê
-HOOH]È]J
-KÓØØ[Q]TÝ[Ê
-HÈ]È]JK]
-KÓØØ[U[YTÝ[Ê[Y[YÚÝ\[Y\XÈZ[]NYYÚ]JH]È]JK]
-KÓØØ[TÝ[Ê[Y[YÛ[ÛÚÜ^N[Y\XÈÝ\[Y\XÈZ[]NYYÚ]JJKXXÝÜX]Q[[Y[
-]ÂÝ[NÈ\Ü^N^[YÛ][\Î^Y[\ÝYPÛÛ[Z[HÈ^Y[^\Ý\X\Ú[ÝÛNXØ\
-Ø\
-BK[Z[H	XXÝÜX]Q[[Y[
-]ÂÝ[NÂÚYZYÚÜ\Y]\ÎL	H^Ú[ÎX\Ú[ÝÛNKXÚÙÜÝ[\Ó\Ý[Û\Ý\È	ÐË\ÝL[Ü\[\Ü^N^[YÛ][\ÎÙ[\\ÝYPÛÛ[Ù[\ÛÚ^NLKÛÙZYÚ
-ÌÛÛÜË\ÝÛ[Z[NÙK]\ÜXÚ[ÎLY[HBK\Ó\Ý[Û\Ý\ÈHKXXÝÜX]Q[[Y[
-]ÂÝ[NÂX^ÚYÎ	HY[ÎL\MÛÚ^NM[RZYÚK
-Û[Z[NÙKXÚÙÜÝ[Z[HÈ[X\YÜYY[
-M
-YYË	ÐË\ÝK	ÐË\ÝXØÊXËØ\KÛÛÜZ[HÈÛÛ\ÝÜË\Ý
-HË^Ü\ÜYY]\ÎÜ\ÜYÚY]\ÎÜ\ÝÛSYY]\ÎÜ\ÝÛTYÚY]\ÎÚ]TÜXÙNK]Ü\ÞÚYÝÎZ[HÈØJÍJH
-ØJ
-HÛÜXZÎXZË]ÛÜÞÚYÝÎZ[HÈL	ÐË\ÝM
-\
-ØJJHBKK^
-B
-KÙY[R\	XXÝÜX]Q[[Y[
-]ÂÝ[NÈ^[YÛYÚÛÚ^NLKÛÛÜË]]KÛ[Z[N[ÛËX\Ú[ÝÛN
-X\Ú[YÚÜXÚ]NK]\ÜXÚ[Î[HBK¸§$ÈÙY[B
-NÂJNÂJJ
-KXXÝÜX]Q[[Y[
-]ÂY[OÈY
-[	XOOHY\ÜØYÙ\È	[ØÜÛ[ÕY]ÊH[ØÜÛ[ÕY]ÊÈØÚÎ[Z][ÜÛ[ÛÝJNÈBJB
-KXXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YNÝXÚÞHÛ\ÜÈÝ[NÂÝÛNØ[Ê
-È[ØYKX\XKZ[Ù]XÝÛK
-JHXÚÙÜÝ[ØJNNHÜ\Ü\ÛÛYØJMKMKMKJHY[ÎLLL\Ü^N^[YÛ][\ÎÙ[\Ø\LÜ\Y]\ÎXÚÙÜ[\\
-HØ]\]JKÊHÙXÚ]XÚÙÜ[\\
-HØ]\]JKÊH[^LBKXXÝÜX]Q[[Y[
-[]Â[YNXY[]ÛÚ[ÙNHOÙ]XY[]
-K\Ù][YJKÛÙ^QÝÛHOÈY
-KÙ^HOOH[\HÙ[Y\ÜØYÙJ
-NÈKX^[ÝXÙZÛ\Y\ÜØYÙHXXx )Ý[NÂ^KZ[ÚYÛÚ^NMKÛ[Z[NÙKÛÛÜË^XÚÙÜÝ[ØJMKMKMK
-HÜ\\ÛÛYØJMKMKMKLJHÜ\Y]\ÎY[Î\MÝ][NÛHBJKXXÝÜX]Q[[Y[
-]ÛÂÛÛXÚÎÙ[Y\ÜØYÙK\ØXYXY\ÞH]XY[][J
-K\XK[X[Ù[Ý[NÂÚYÍZYÚÍÜ\Y]\ÎL	HÜ\ÛHÝ\ÛÜÚ[\XÚÙÜÝ[
-XY\ÞH]XY[][J
-JHÈØJMKMKMK
-HË\ÝÛÛÜ
-XY\ÞH]XY[][J
-JHÈË]]HÛÛ\ÝÜË\Ý
-K\Ü^NÜYXÙR][\ÎÙ[\^Ú[Î[Ú][ÛXÚÙÜÝ[ÈX\ÙK[ÙÜHNÈX\ÙKÜXÚ]HNÈX\ÙH[ÙÜNXY[][J
-HÈØØ[JJHØØ[JHÜXÚ]NXY[][J
-HÈHÍBBKXXÝÜX]Q[[Y[
-Ü[ÈÝ[NÈÛÚ^NMËX\Ú[ÜLK\Ü^NØÚÈHK¸¡¤HB
-B
-JB
-B
-KXXÝÜX]Q[[Y[
-]ÂÝ[NÈÜÚ][ÛXÛÛ]H[Ù]Ý\ÝÖN]]ÈÙXÚ]Ý\ÝÔØÜÛ[ÎÝXÚ[ÙÜNYÙU[ÙÜJK[Ú][Û\ÑYÙÚ[ÈÈÛH[ÙÜHÌÈÝXXËX^Y\JHÚ[Ú[ÙN[ÙÜHBKXXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YN[]]HVÌWH^X]]ÈX^]Ë[YÝ[NÈY[ÕÜX^
-\[K[ØYKX\XKZ[Ù]]Ü
-JHY[ÐÝÛNØ[ÊL
-È[ØYKX\XKZ[Ù]XÝÛK
-JHY[ÓYX^
-Ø[Ê[ØYKX\XKZ[Ù][Y
-H
-ÈM
-JHY[ÔYÚX^
-Ø[Ê[ØYKX\XKZ[Ù]\YÚ
-H
-ÈM
-JHBKXXÝÜX]Q[[Y[
-]ÂÝ[NÈ\Ü^N^[YÛ][\ÎÙ[\Ø\MX\Ú[ÝÛNBKXXÝÜX]Q[[Y[
-]ÂÝ[NÈÚYMZYÚMÜ\Y]\ÎL	HXÚÙÜÝ[[X\YÜYY[
-LÍYYËÍÍQÑ
-H\Ü^N^[YÛ][\ÎÙ[\\ÝYPÛÛ[Ù[\^Ú[ÎÞÚYÝÎØJ
-JK
-ÍQMPÑMÍQMPÑMBKXXÝÜX]Q[[Y[
-Ü[ÈÝ[NÈÛ[Z[N\Ü^KÛÙZYÚÌÛÚ^NÛÛÜÙHKÈJKXXÝÜX]Q[[Y[
-][XXÝÜX]Q[[Y[
-HÂÝ[NÈÛ[Z[N\Ü^KÛÙZYÚ
-ÌÛÚ^N]\ÜXÚ[ÎL[HXÚÙÜÝ[[X\YÜYY[
-MYËÙ	KØJMKMKMKÊHL	JHÙXÚ]XÚÙÜÝ[Û\^ÙXÚ]^[ÛÛÜ[Ü\[XÚÙÜÝ[Û\^[RZYÚKKX\Ú[BKØYÙHKXXÝÜX]Q[[Y[
-]ÈÝ[NÈÛ[Z[NÙKÛÚ^NLKÛÛÜË]]KX\Ú[ÜÈHKXXÝÜX]Q[[Y[
-Ü[ÈÝ[NÈÛÛÜË\ÝHKHÙY\\K0­ÈXXÝÜX]Q[[Y[
-Ü[ÈÝ[NÈÛÛÜË]]HHKTÖWÕTJB
-B
-KXXÝÜX]Q[[Y[
-]ÂÙ^NÙ][ÜÈÛ\ÜÓ[YN\ÙHÜXÙK^KLÈKXXÝÜX]Q[[Y[
-Ø\[XXÝÜX]Q[[Y[
-^YXÝËØÛÛÜË\ÝKXØÙ[ÛÛÜKXXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YNÜYÜYXÛÛËMØ\LÈKØXÝ[Y\ÊPÐÑSÊKX\
-
-ÚËWJHOXXÝÜX]Q[[Y[
-]ÛÂÙ^NËÛÛXÚÎ
-
-HOÂÙXÚÊ
-NÂ\XÊ
-NÂÙ][YJËÒÙ^JNÂKÛ\ÜÓ[YN\ÜÈ^^XÛÛ][\ËXÙ[\Ø\LKHKXXÝÜX]Q[[Y[
-Ü[ÂÛ\ÜÓ[YNÜYXÙKZ][\ËXÙ[\Ý[YY[Ý[NÂÚY
-
-ZYÚ
-
-XÚÙÜÝ[KÞÚYÝÎXØÙ[Ù^HOOHÈÈ\ØJ
-JK
-\	ØKK
-M	ØKMMX	ØKM
-BKXØÙ[Ù^HOOHÈ	XXÝÜX]Q[[Y[
-Ü[ÂÝ[NÈÛÛÜÛÛ\ÝÜKKÛÚ^NMÛÙZYÚ
-ÌBK¸§$ÈJKXXÝÜX]Q[[Y[
-Ü[ÂÝ[NÂÛ[Z[NÙKÛÚ^NK]\ÜXÚ[Î[HÛÛÜXØÙ[Ù^HOOHÈÈË^ØJMKMKMK
-JHÛÙZYÚXØÙ[Ù^HOOHÈÈ
-
-BKK[YJJJJJKXXÝÜX]Q[[Y[
-Ø\[XXÝÜX]Q[[Y[
-^YXÝËØÛÛÜÍKØ[\\KXXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YNÜYÜYXÛÛËLÈØ\LÈKØXÝ[Y\ÊÐSTTÊKX\
-
-ÚËÜJHOXXÝÜX]Q[[Y[
-]ÛÂÙ^NËÛÛXÚÎ
-
-HOÂÙXÚÊ
-NÂ\XÊ
-NÂÙ][YJXØÙ[Ù^KÊNÂKÛ\ÜÓ[YN\ÜÈ^^XÛÛ][\ËXÙ[\Ø\LKHKXXÝÜX]Q[[Y[
-Ü[ÂÛ\ÜÓ[YNËY[Ý[YLÝ\ÝËZY[Ý[NÂXÚÙÜÝ[ÜÜÜËÜ\ÒÙ^HOOHÈÈ\ÛÛY	ÐË\ÝX\ÛÛY	ÐË[_XÞÚYÝÎ[Ù]\ØJMKMKMK
-HBJKXXÝÜX]Q[[Y[
-Ü[ÂÛ\ÜÓ[YN^VÌL\HÝ[NÂÛ[Z[NÙKÛÛÜÒÙ^HOOHÈÈË^Ë]]BBKÜ[YJJJJJKXXÝÜX]Q[[Y[
-Ø\[XXÝÜX]Q[[Y[
-^YXÝËØÛÛÜÌÍÍÍNHKØÙ[\ÈKXXÝÜX]Q[[Y[
-ÂÛ\ÜÓ[YNXLÈ^^ÈÝ[NÈÛ[Z[NÙKÛÛÜË]]K[RZYÚKBK\HÝÈÈÙ]]\È[Ý\Ø[\\KXXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YNÜYÜYXÛÛËLÈØ\LKØXÝ[Y\ÊÕ×ÔÐÑSTÊKX\
-[Ý[Û[J^Â\ÏY[VÌKØÏY[VÌWNÂ]\XXÝÜX]Q[[Y[
-]ÛÈÙ^NËÛÛXÚÎ[Ý[Û
-^ÈÙXÚÊ
-NÈ\XÊ
-NÈÙ][YJXØÙ[Ù^KÊNÈKÛ\ÜÓ[YN\ÜÈ^^XÛÛ][\ËXÙ[\Ø\LKHKXXÝÜX]Q[[Y[
-Ü[ÈÝ[NÈ\Ü^NØÚÈZYÚÚYL	HÜ\Y]\ÎLÝ\ÝÎY[Ü\ÒÙ^OOOZÏÈ\ÛÛYÐË\Ý\ÛÛYÐË[HHKXXÝÜX]Q[[Y[
-[YÈÈÜÎØË\\XÙJÏLLÏMK[ØË[YKØY[Î^HÝ[NÈÚYL	HZYÚL	HØXÝ]ÛÝ\ÜXÚ]NÒÙ^OOOZÏÌNÌ\Ü^NØÚÈHJB
-KXXÝÜX]Q[[Y[
-Ü[ÈÛ\ÜÓ[YN^VÌLHÝ[NÈÛ[Z[NÙKÛÛÜÒÙ^OOOZÏÐË^Ë]]K^[YÛÙ[\[RZYÚKÈHKØË[YJB
-NÂJJJKXXÝÜX]Q[[Y[
-Ø\[XXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YNXL^][\ËXÙ[\\ÝYKX]ÙY[KXXÝÜX]Q[[Y[
-^YXÝËØÛÛÜÐPQKÛ\ÜÈKXXÝÜX]Q[[Y[
-Ü[ÂÛ\ÜÓ[YN^^ÈÝ[NÂÛ[Z[N[ÛËÛÛÜË]]BBKX]Ý[
-Û\ÜÈ
-L
-KHJKXXÝÜX]Q[[Y[
-[]Â\N[ÙHZ[X^HÝ\
-H[YNÛ\ÜËÛÚ[ÙNHOÙ]Û\ÜÓ][
-\ÙQØ]
-K\Ù][YJJKÛ\ÜÓ[YNËY[Ý[NÂXØÙ[ÛÛÜË\ÝBJKXXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YN]LH^\ÝYKX]ÙY[^^ÈÝ[NÂÛ[Z[NÙKÛÛÜË]]BBKXXÝÜX]Q[[Y[
-Ü[[ÛÛYKXXÝÜX]Q[[Y[
-Ü[[ÛX\JJKXXÝÜX]Q[[Y[
-]ÛÂÛÛXÚÎÙÙÛS[Z]ËÛ\ÜÓ[YNÛ\ÜÈ\ÜÈ^ËY[][\ËXÙ[\\ÝYKX]ÙY[M^[YÝ[NÂXÚÙÜÝ[ËØ\Ü\\ÛÛY	Ü\Ú[Z]ÈÈË\ÝË[_XÜ\Y]\ÎNBKXXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YNZ[]ËLLÈKXXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YN^\ÛHÝ[NÂÛ[Z[NÙKÛÙZYÚ
-LÛÛÜË^BK\ÚH[Z]ÈKXXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YN^^ÈÝ[NÂÛ[Z[NÙKÛÛÜË]]BBKX^[][H\]ZYÛ\ÜÈ8 %Y\\\H][ÈÚY[X]Y\\ÈJKXXÝÜX]Q[[Y[
-Ü[ÂÛ\ÜÓ[YN[]]HNËLMÚ[ËLÝ[YY[Ý[NÂXÚÙÜÝ[\Ú[Z]ÈÈË\ÝËØ\KÜ\\ÛÛY	ÐË[_X[Ú][ÛXÚÙÜÝ[\ÈX\ÙHBKXXÝÜX]Q[[Y[
-Ü[ÂÛ\ÜÓ[YNXÛÛ]HÜLHMËMÝ[YY[Ý[NÂXÚÙÜÝ[ÙY\Ú[Z]ÈÈ[Ú][ÛY\ÈÝXXËX^Y\ÍKMJHBJJJKXXÝÜX]Q[[Y[
-Ø\[XXÝÜX]Q[[Y[
-^YXÝËØÛÛÜÙXKXH	YHKXXÝÜX]Q[[Y[
-]ÈÝ[NÈX\Ú[ÝÛNMHKXXÝÜX]Q[[Y[
-]ÈÛ\ÜÓ[YNXLH^^È\\Ø\ÙHÝ[NÈÛ[Z[N[ÛË]\ÜXÚ[ÎY[HÛÛÜË]]HHKYH[YHKXXÝÜX]Q[[Y[
-]ÈÝ[NÈ\Ü^N^Ø\HKXXÝÜX]Q[[Y[
-[]È[YNYS[YQYÛÚ[ÙN[Ý[ÛJ^ÈÙ]YS[YQY
-K\Ù][YJNÈKÛÙ^QÝÛ[Ý[ÛJ^ÈYKÙ^OOOH[\HØ]UYS[YJYS[YQY
-NÈKXÙZÛ\[Ý\YHÛ\ÜÓ[YN^LHÝ[Y^LÈKLÝ][K[ÛHÝ[NÈÛ[Z[NÐÛÜ[Ü[Ø\[[Û	Ë	ÑÙ[ÜÚXIËÙ\YÛÝ[N][XÈÛÚ^NMÛÛÜË^XÚÙÜÝ[ËÌÜ\\ÛÛYÐË[HHJKXXÝÜX]Q[[Y[
-]ÛÈÛÛXÚÎ[Ý[Û
-^ÈØ]UYS[YJYS[YQY
-NÈKÛ\ÜÓ[YNÝ[YY[MKL^\ÛHÝ[NÈÛ[Z[NÙKXÚÙÜÝ[Ë\ÝÛÛÜÛÛ\ÝÜË\Ý
-KÜ\ÛHÝ\ÛÜÚ[\HKØ]HB
-B
-KXXÝÜX]Q[[Y[
-]ÛÂÛÛXÚÎ[Ý[Û
-^ÈÙ]Ø]\[Ò\ÝÜJßJNÈØ]JØ]\\ÝÜHßJNÈÙÜ
-
-NÈÙ]\Ú
-Ø]\[ÈÝXZÈ\Ù]NÈKÝ[NÈÛ[Z[NÙKÛÚ^NLËÛÛÜË]]KXÚÙÜÝ[ÛHÜ\ÛHÝ\ÛÜÚ[\Y[Î\Ü^N^[YÛ][\ÎÙ[\Ø\BKXXÝÜX]Q[[Y[
-Ü[[¸¡®K\Ù]Ø]\[ÈÝXZÈB
-KXXÝÜX]Q[[Y[
-Ø\[XXÝÜX]Q[[Y[
-^YXÝËØÛÛÜÑ
-HKÛØÚÈKXXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YN^][\ËXÙ[\\ÝYKX]ÙY[KLHKXXÝÜX]Q[[Y[
-Ü[ÂÛ\ÜÓ[YN^\ÛHÝ[NÂÛ[Z[NÙKÛÛÜË^BKZÝ\[YHKXXÝÜX]Q[[Y[
-]ÛÂÛÛXÚÎ
-
-HOÂÛÛÝHXÛØÚÌÂÙ]ÛØÚÌ
-NÂØ]JÛØÚÈÂÙXÎÚÝÔÙXÛÛÂJNÂÙXÚÊ
-NÂKÛ\ÜÓ[YN\ÜÈ[]]HNËLMÝ[YY[Ý[NÂXÚÙÜÝ[ÛØÚÌÈË\ÝËØ\KÜ\\ÛÛY	ÐË[_X[Ú][ÛXÚÙÜÝ[\ÈX\ÙHBKXXÝÜX]Q[[Y[
-Ü[ÂÛ\ÜÓ[YNXÛÛ]HÜLHMËMÝ[YY[Ý[NÂXÚÙÜÝ[ÙYÛØÚÌÈ[Ú][ÛY\ÈÝXXËX^Y\ÍKMJHBJJJKXXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YN^][\ËXÙ[\\ÝYKX]ÙY[Ü\]KLHLÈÝ[NÂÜ\ÛÛÜË[BBKXXÝÜX]Q[[Y[
-Ü[ÂÛ\ÜÓ[YN^\ÛHÝ[NÂÛ[Z[NÙKÛÛÜË^BKÚÝÈÙXÛÛÈKXXÝÜX]Q[[Y[
-]ÛÂÛÛXÚÎ
-
-HOÂÛÛÝH\ÚÝÔÙXÛÛÎÂÙ]ÚÝÔÙXÛÛÊNÂØ]JÛØÚÈÂÛØÚÌÙXÎJNÂÙXÚÊ
-NÂKÛ\ÜÓ[YN\ÜÈ[]]HNËLMÝ[YY[Ý[NÂXÚÙÜÝ[ÚÝÔÙXÛÛÈÈË\ÝËØ\KÜ\\ÛÛY	ÐË[_X[Ú][ÛXÚÙÜÝ[\ÈX\ÙHBKXXÝÜX]Q[[Y[
-Ü[ÂÛ\ÜÓ[YNXÛÛ]HÜLHMËMÝ[YY[Ý[NÂXÚÙÜÝ[ÙYÚÝÔÙXÛÛÈÈ[Ú][ÛY\ÈÝXXËX^Y\ÍKMJHBJJJJKXXÝÜX]Q[[Y[
-Ø\[XXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YN^][\ËXÙ[\\ÝYKX]ÙY[KXXÝÜX]Q[[Y[
-][XXÝÜX]Q[[Y[
-^YXÝËØÛÛÜÑQHKÛÝ[KXXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YN^\ÛHÝ[NÂÛ[Z[NÙKÛÛÜË]]BBKÛÙ\È[ÝY\ÈJKXXÝÜX]Q[[Y[
-]ÛÂÛÛXÚÎ
-
-HOÂÛÛÝH\ÛÝ[ÂÙ]ÛÝ[
-NÂØ]JÛÝ[ÂÛJNÂY
-HÂÛÛÝÈHXÊ
-NÂY
-ÊHÛJ
-LÚ[H
-K
-NÂBKÛ\ÜÓ[YN\ÜÈ[]]HNËLMÝ[YY[Ý[NÂXÚÙÜÝ[ÛÝ[ÈË\ÝËØ\KÜ\\ÛÛY	ÐË[_X[Ú][ÛXÚÙÜÝ[\ÈX\ÙHBKXXÝÜX]Q[[Y[
-Ü[ÂÛ\ÜÓ[YNXÛÛ]HÜLHMËMÝ[YY[Ý[NÂXÚÙÜÝ[ÙYÛÝ[È[Ú][ÛY\ÈÝXXËX^Y\ÍKMJHBJJJJJB
-B
-BKXXÝÜX]Q[[Y[
-]ÂÝ[NÈÜÚ][Û^YÝÛNØ[Ê
-Í
-È[ØYKX\XKZ[Ù]XÝÛK
-JHYYÚ\Ü^N^\ÝYPÛÛ[Ù[\Ø\[^NKÚ[\][ÎÛHBKXXÝÜX]Q[[Y[
-]ÂÝ[NÈ\Ü^N^[YÛ][\ÎÙ[\Ø\Y[Î\LÜ\Y]\ÎXÚÙÜÝ[ØJÍJHXÚÙÜ[\\L
-HÙXÚ]XÚÙÜ[\\L
-HBKÕÒTWÕPËX\
-
-ËJHOXXÝÜX]Q[[Y[
-]ÂÙ^NKÝ[NÂÚYHOOHÕÒTWÕPË[^ÙXHÈ
-ZYÚ
-Ü\Y]\ÎËXÚÙÜÝ[HOOHÕÒTWÕPË[^ÙXHÈË\ÝØJMKMKMK
-H[Ú][Û[ÜÈÝXXËX^Y\KKKJHBJJB
-B
-K\Ú	XXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YNÚ[\Y][Ë[ÛH^Y[Ù]^LM^\ÝYKXÙ[\MÝ[NÂÝÛN\[HBKXXÝÜX]Q[[Y[
-]ÂÛ\ÜÓ[YNÝ[YY[MHKLÈ^\ÛHÝ[NÂÛ[Z[NÙK]\ÜXÚ[ÎY[HÛÛÜË^XÚÙÜÝ[ØJÍÍÎMJHXÚÙÜ[\\
-
-HØ]\]JK
-HÙXÚ]XÚÙÜ[\\
-
-HØ]\]JK
-HÜ\\ÛÛYØJ
-
-JHÞÚYÝÎLÌØJJKØJ
-HBK\Ú
-JKXXÝÜX]Q[[Y[
-ÝÛUX\ÂXÜ[ØÜY[ÛÜÙTØÜY[\ÙÒ[]XY[]Ù]\ÙÒ[]Ù]XY[]ÛÙ[Ù[Y\ÜØYÙKÙ[[ÎXY\ÞKZ\Y[XYXY\ÙÜËÛÛYJHOKÚYHOOH\È	K]
-XYÙY[\×ÜÙY[Ø]
-JBJKNÂBÛÛÝÛÝHXXÝÓKÜX]TÛÝ
-ØÝ[Y[Ù][[Y[RY
-ÛÝJNÂÛÝ[\XXÝÜX]Q[[Y[
-\ÙPØ[\[
-JNÂÜØÜ\ØÙOÚ[
+          ctx.ellipse(-d.r * 0.28, -d.r * 0.42, d.r * 0.22, d.r * 0.3, -0.3, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+          if (d.hangLeft <= 0) { d.phase = "fall"; d.vy = 1.2 * dpr; }
+        } else if (d.phase === "fall") {
+          d.vy += grav * dt;
+          d.wobblePhase += 0.09 * dt;
+          d.x += Math.sin(d.wobblePhase) * d.wobbleAmp * dt;
+          if (d.grL !== undefined) d.x = Math.max(d.grL + d.r, Math.min(d.grR - d.r, d.x));
+          d.y += d.vy * dt;
+          d.life -= 0.005 * dt;
+          if (d.y > d.grB - d.r * 2) { d.phase = "splash"; d.splashR = d.r * 0.5; d.splashAlpha = 0.7; continue; }
+          if (d.life > 0 && d.y < H + 60) {
+            alive = true;
+            const a = Math.max(0, d.life);
+            const stretch = Math.min(2.2, 1 + d.vy * 0.06 / dpr); // elongate with speed
+            ctx.globalAlpha = 0.72 * a;
+            ctx.fillStyle = color;
+            ctx.save();
+            ctx.translate(d.x, d.y) ;
+            ctx.scale(1 / stretch, stretch);
+            ctx.beginPath();
+            ctx.arc(0, 0, d.r, 0, Math.PI * 2);
+            ctx.fill();
+            // pointed bottom of teardrop
+            ctx.beginPath();
+            ctx.moveTo(-d.r * 0.3, d.r * 0.6);
+            ctx.quadraticCurveTo(0, d.r * 1.8, d.r * 0.3, d.r * 0.6);
+            ctx.fill();
+            // specular highlight
+            ctx.globalAlpha = 0.5 * a;
+            ctx.fillStyle = "rgba(255,255,255,0.9)";
+            ctx.beginPath();
+            ctx.ellipse(-d.r * 0.25, -d.r * 0.4, d.r * 0.18, d.r * 0.26, -0.3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+        } else if (d.phase === "splash") {
+          d.splashR += 3.5 * dpr * dt;
+          d.splashAlpha -= 0.055 * dt;
+          if (d.splashAlpha > 0) {
+            alive = true;
+            ctx.globalAlpha = d.splashAlpha * 0.5;
+            ctx.strokeStyle = color;
+            ctx.lineWidth = dpr;
+            ctx.beginPath();
+            ctx.arc(d.x, d.grB - 8 * dpr, d.splashR, 0, Math.PI * 2);
+            ctx.stroke();
+            // inner ring
+            ctx.globalAlpha = d.splashAlpha * 0.3;
+            ctx.beginPath();
+            ctx.arc(d.x, d.grB - 8 * dpr, d.splashR * 0.55, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+        }
+      }
+      ctx.globalAlpha = 1;
+      if (alive) raf = requestAnimationFrame(frame);
+      else ctx.clearRect(0, 0, W, H);
+    };
+    raf = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(raf);
+  }, [trigger, color]);
+  return React.createElement("canvas", {
+    ref: ref,
+    "aria-hidden": "true",
+    className: "pointer-events-none fixed inset-0",
+    style: {
+      zIndex: 55
+    }
+  });
+}
+function RhythmArc({
+  wake,
+  bed
+}) {
+  const W = 300,
+    H = 84,
+    x0 = 14,
+    x1 = W - 14,
+    base = 64,
+    ctrl = -28;
+  const path = `M${x0} ${base} Q ${W / 2} ${ctrl} ${x1} ${base}`;
+  const tOf = s => {
+    if (!s) return null;
+    const [h, m] = s.split(":").map(Number);
+    if (isNaN(h)) return null;
+    return Math.min(0.97, Math.max(0.03, (h + (m || 0) / 60 - 4) / 18));
+  };
+  const pt = t => {
+    const x = (1 - t) ** 2 * x0 + 2 * (1 - t) * t * (W / 2) + t ** 2 * x1;
+    const y = (1 - t) ** 2 * base + 2 * (1 - t) * t * ctrl + t ** 2 * base;
+    return {
+      x,
+      y
+    };
+  };
+  const wt = tOf(wake),
+    bt = tOf(bed);
+  return React.createElement("svg", {
+    viewBox: `0 0 ${W} ${H}`,
+    className: "w-full",
+    style: {
+      display: "block"
+    }
+  }, React.createElement("defs", null, React.createElement("linearGradient", {
+    id: "rhy",
+    x1: "0",
+    x2: "1"
+  }, React.createElement("stop", {
+    offset: "0%",
+    stopColor: C.indigo
+  }), React.createElement("stop", {
+    offset: "50%",
+    stopColor: C.gold
+  }), React.createElement("stop", {
+    offset: "100%",
+    stopColor: C.indigo
+  }))), React.createElement("line", {
+    x1: "0",
+    y1: base,
+    x2: W,
+    y2: base,
+    stroke: C.line,
+    strokeWidth: "1"
+  }), React.createElement("path", {
+    d: path,
+    fill: "none",
+    stroke: "url(#rhy)",
+    strokeWidth: "2",
+    strokeDasharray: "2 5",
+    opacity: "0.85"
+  }), wt !== null && (() => {
+    const p = pt(wt);
+    return React.createElement("g", null, React.createElement("circle", {
+      cx: p.x,
+      cy: p.y,
+      r: "10",
+      fill: C.gold,
+      opacity: "0.16"
+    }), React.createElement("circle", {
+      cx: p.x,
+      cy: p.y,
+      r: "5",
+      fill: C.gold
+    }));
+  })(), bt !== null && (() => {
+    const p = pt(bt);
+    return React.createElement("g", null, React.createElement("circle", {
+      cx: p.x,
+      cy: p.y,
+      r: "9",
+      fill: C.indigo,
+      opacity: "0.16"
+    }), React.createElement("circle", {
+      cx: p.x,
+      cy: p.y,
+      r: "4.5",
+      fill: C.indigo
+    }));
+  })(), React.createElement("text", {
+    x: "6",
+    y: H - 4,
+    fontSize: "9",
+    fill: C.mute,
+    style: {
+      fontFamily: mono
+    }
+  }, "4a"), React.createElement("text", {
+    x: W - 6,
+    y: H - 4,
+    textAnchor: "end",
+    fontSize: "9",
+    fill: C.mute,
+    style: {
+      fontFamily: mono
+    }
+  }, "10p"));
+}
+function usePullToRefresh(onRefresh) {
+  const [pull, setPull] = React.useState(0);
+  const [busy, setBusy] = React.useState(false);
+  const start = React.useRef(null);
+  const THRESHOLD = 70;
+  React.useEffect(() => {
+    const down = e => {
+      if (window.scrollY > 2 || busy) {
+        start.current = null;
+        return;
+      }
+      start.current = e.touches[0].clientY;
+    };
+    const move = e => {
+      if (start.current == null || busy) return;
+      const dy = e.touches[0].clientY - start.current;
+      if (dy <= 0 || window.scrollY > 2) {
+        setPull(0);
+        return;
+      }
+      setPull(Math.min(110, dy * 0.5));
+    };
+    const up = async () => {
+      if (start.current == null) return;
+      const reached = pull >= THRESHOLD;
+      start.current = null;
+      if (!reached) {
+        setPull(0);
+        return;
+      }
+      setBusy(true);
+      setPull(THRESHOLD);
+      try {
+        await onRefresh();
+      } catch {}
+    };
+    window.addEventListener("touchstart", down, {
+      passive: true
+    });
+    window.addEventListener("touchmove", move, {
+      passive: true
+    });
+    window.addEventListener("touchend", up, {
+      passive: true
+    });
+    window.addEventListener("touchcancel", up, {
+      passive: true
+    });
+    return () => {
+      window.removeEventListener("touchstart", down);
+      window.removeEventListener("touchmove", move);
+      window.removeEventListener("touchend", up);
+      window.removeEventListener("touchcancel", up);
+    };
+  }, [pull, busy, onRefresh]);
+  return {
+    pull,
+    busy
+  };
+}
+function PullIndicator({
+  pull,
+  busy,
+  color,
+  track
+}) {
+  if (pull <= 0 && !busy) return null;
+  const pct = Math.min(1, pull / 70);
+  return React.createElement("div", {
+    className: "pointer-events-none fixed inset-x-0 top-0 z-[70] flex justify-center",
+    style: {
+      transform: `translateY(${Math.max(8, pull - 22)}px)`,
+      transition: busy ? "transform 180ms ease" : "none"
+    }
+  }, React.createElement("div", {
+    className: "grid h-8 w-8 place-items-center rounded-full",
+    style: {
+      background: track,
+      boxShadow: "0 4px 14px rgba(0,0,0,0.18)"
+    }
+  }, React.createElement("svg", {
+    width: "16",
+    height: "16",
+    viewBox: "0 0 16 16",
+    style: {
+      animation: busy ? "ptrspin 0.7s linear infinite" : "none",
+      opacity: busy ? 1 : 0.35 + pct * 0.65
+    }
+  }, React.createElement("circle", {
+    cx: "8",
+    cy: "8",
+    r: "6",
+    fill: "none",
+    stroke: color,
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeDasharray: `${(busy ? 0.7 : pct) * 37.7} 37.7`,
+    transform: "rotate(-90 8 8)"
+  }))));
+}
+const Card = ({
+  children,
+  className = "",
+  stagger = -1,
+  accent
+}) => React.createElement("div", {
+  className: `glass relative overflow-hidden p-4 ${stagger >= 0 ? "card-"+Math.min(4,stagger) : ""} ${className}`,
+  style: {
+    background: C.card,
+    borderRadius: 22,
+    border: `0.5px solid rgba(84,84,88,0.45)`,
+    boxShadow: "rgba(0,0,0,0.55) 0 8px 28px -12px, rgba(0,0,0,0.18) 0 2px 6px -2px, inset 0 0.5px 0 rgba(255,255,255,0.18)"
+  }
+}, React.createElement("div", {
+  className: "relative"
+}, children));
+const Eyebrow = ({
+  children,
+  color
+}) => React.createElement("div", {
+  className: "mb-2 uppercase tracking-widest",
+  style: {
+    fontFamily: body,
+    fontSize: "0.7rem",
+    fontWeight: 600,
+    letterSpacing: "0.04em",
+    color: color || C.mute
+  }
+}, children);
+function CheckCircle({
+  done,
+  color,
+  onClick
+}) {
+  return React.createElement("button", {
+    onClick: onClick,
+    "aria-label": done ? "Mark not done" : "Mark done",
+    className: "grid h-6 w-6 shrink-0 place-items-center rounded-full transition-all",
+    style: {
+      background: done ? color : "transparent",
+      border: `2px solid ${color}`
+    }
+  }, done && React.createElement("svg", {
+    width: "12",
+    height: "12",
+    viewBox: "0 0 12 12",
+    fill: "none"
+  }, React.createElement("path", {
+    d: "M2 6.5L4.5 9L10 3",
+    stroke: C.bg0,
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  })));
+}
+const fieldStyle = {
+  fontFamily: body,
+  color: C.text,
+  background: C.bg0,
+  border: `0.5px solid ${C.line}`
+};
+/* ── Bottom Tab Bar — SF-style SVG icons ── */
+const TAB_ICONS = {
+  today: (active) => React.createElement("svg", { width: 22, height: 22, viewBox: "0 0 24 24", fill: "none", xmlns: "http://www.w3.org/2000/svg" },
+    React.createElement("path", { d: "M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H5a1 1 0 01-1-1V9.5z", stroke: "currentColor", strokeWidth: active ? 2 : 1.6, fill: active ? "currentColor" : "none", fillOpacity: active ? 0.12 : 0, strokeLinejoin: "round" }),
+    React.createElement("path", { d: "M9 21V12h6v9", stroke: "currentColor", strokeWidth: active ? 2 : 1.6, strokeLinecap: "round" })
+  ),
+  messages: (active) => React.createElement("svg", { width: 24, height: 24, viewBox: "0 0 24 24", fill: "none", xmlns: "http://www.w3.org/2000/svg" },
+    React.createElement("path", { d: "M4 4h16a1 1 0 011 1v10a1 1 0 01-1 1H7.5L4 20V5a1 1 0 011-1z", stroke: "currentColor", strokeWidth: active ? 2 : 1.6, fill: active ? "currentColor" : "none", fillOpacity: active ? 0.12 : 0, strokeLinejoin: "round" }),
+    React.createElement("line", { x1: 8, y1: 9, x2: 16, y2: 9, stroke: "currentColor", strokeWidth: 1.55, strokeLinecap: "round", opacity: active ? 1 : 0.7 }),
+    React.createElement("line", { x1: 8, y1: 12, x2: 13, y2: 12, stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", opacity: active ? 1 : 0.7 })
+  ),
+  baby: (active) => React.createElement("svg", { width: 24, height: 24, viewBox: "0 0 24 24", fill: "none", xmlns: "http://www.w3.org/2000/svg" },
+    React.createElement("circle", { cx: 12, cy: 9, r: 4.5, stroke: "currentColor", strokeWidth: active ? 2 : 1.6, fill: active ? "currentColor" : "none", fillOpacity: active ? 0.15 : 0 }),
+    React.createElement("path", { d: "M12 3V1.5M8 4.5L7 3.5M16 4.5l1-1", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round" }),
+    React.createElement("path", { d: "M7 15c0 2.76 2.24 5 5 5s5-2.24 5-5", stroke: "currentColor", strokeWidth: active ? 2 : 1.6, strokeLinecap: "round" })
+  ),
+  camp: (active) => React.createElement("svg", { width: 24, height: 24, viewBox: "0 0 24 24", fill: "none", xmlns: "http://www.w3.org/2000/svg" },
+    React.createElement("path", { d: "M12 2l2.4 6H20l-4.8 3.6L17 18l-5-3.6L7 18l1.8-6.4L4 8h5.6L12 2z", stroke: "currentColor", strokeWidth: active ? 2 : 1.6, fill: active ? "currentColor" : "none", fillOpacity: active ? 0.15 : 0, strokeLinejoin: "round" })
+  ),
+
+  settings: (active) => React.createElement("svg", { width: 24, height: 24, viewBox: "0 0 24 24", fill: "none", xmlns: "http://www.w3.org/2000/svg" },
+    React.createElement("circle", { cx: 12, cy: 12, r: 3, stroke: "currentColor", strokeWidth: active ? 2 : 1.6, fill: active ? "currentColor" : "none", fillOpacity: active ? 0.2 : 0 }),
+    React.createElement("path", { d: "M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z", stroke: "currentColor", strokeWidth: 1.4, strokeLinejoin: "round" })
+  )
+};
+function BottomTabBar({ tab, openScreen, closeScreen, paired, unread, msgInput, setMsgInput, onSend, sending }) {
+  const accent = C.rust || "#0A84FF";
+  const tabs = [
+    { id: "today",    label: "Home"     },
+    { id: "messages", label: "Messages", badge: unread  },
+    { id: "settings", label: "Settings"  },
+  ];
+  const onMessages = tab === "messages";
+  return React.createElement("nav", {
+    className: "tab-bar",
+    style: { boxShadow: "0 -0.5px 0 rgba(84,84,88,0.45)", fontFamily: "-apple-system, 'SF Pro Text', system-ui, sans-serif",
+             display:"flex", flexDirection:"column", alignItems:"stretch",
+             justifyContent:"flex-end", padding: onMessages ? "8px 12px 0" : "0",
+             height: onMessages ? 120 : 68,
+             transition: "height 0.35s cubic-bezier(0.2,0,0,1), padding 0.35s cubic-bezier(0.2,0,0,1)", willChange:"height, padding" }
+  },
+  onMessages && React.createElement("div", {
+    style: { display:"flex", gap:8, marginBottom:8, alignItems:"center",
+             opacity: onMessages ? 1 : 0, transition:"opacity 0.2s ease 0.15s",
+             borderTop: "0.5px solid rgba(84,84,88,0.45)", paddingTop:6, marginTop:2 }
+  },
+    React.createElement("input", {
+      value: msgInput, onChange: e => setMsgInput(e.target.value),
+      onKeyDown: e => { if (e.key === "Enter" && msgInput.trim()) { onSend(); } },
+      placeholder: "Message Mabry…",
+      autoComplete: "off", spellCheck: false, maxLength: 500,
+      ref: el => { if (el && onMessages) setTimeout(() => el.focus(), 380); },
+      style: { flex:1, background:"rgba(255,255,255,0.1)", border:"none", outline:"none",
+               borderRadius:22, padding:"9px 16px", fontFamily:"-apple-system,sans-serif",
+               fontSize:16, color:"#fff", WebkitAppearance:"none", minWidth:0, caretColor: accent }
+    }),
+    React.createElement("button", {
+      onClick: onSend,
+      disabled: !msgInput.trim() || !!sending,
+      style: { width:34, height:34, borderRadius:"50%", flexShrink:0, fontSize:18, fontWeight:700, border:"none", cursor:"pointer",
+               background: msgInput.trim() && !sending ? accent : "rgba(118,118,128,0.3)",
+               color: msgInput.trim() ? "#fff" : "rgba(255,255,255,0.35)",
+               transition:"background 0.15s ease" }
+    }, React.createElement("svg",{width:16,height:16,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:2.5,strokeLinecap:"round",strokeLinejoin:"round"}, React.createElement("path",{d:"M12 19V5M5 12l7-7 7 7"})))
+  ),
+  React.createElement("div", { style:{ display:"flex", flex:"none", height:68, alignItems:"center", width:"100%", gap:0 } },
+  tabs.map(t => {
+    const active = tab === t.id;
+    return React.createElement("button", {
+      key: t.id,
+      className: `tab-item${active ? " active" : ""}`,
+      onClick: () => {
+        if (tab !== t.id) {
+          openScreen(t.id);
+        }
+      }
+    },
+    React.createElement("div", { className: "tab-icon", style: { color: active ? accent : "rgba(255,255,255,0.42)" } },
+      TAB_ICONS[t.id](active),
+      t.badge && React.createElement("div", { className: "tab-badge" })
+    ),
+    React.createElement("div", { className: "tab-label", style: { fontSize:"10px", transition:"color 0.2s ease", color: active ? accent : "rgba(255,255,255,0.38)", fontWeight: active ? 600 : 400 } }, t.label)
+  )})));
+}
+
+function BaseCamp() {
+  const [tab, setTab] = useState("today");
+  const [date, setDate] = useState(todayKey());
+  const [ready, setReady] = useState(false);
+  const [day, setDay] = useState(blankDay());
+  const [reminders, setReminders] = useState([]);
+  const [prep, setPrep] = useState([]);
+  const [bucket, setBucket] = useState([]);
+  const [due, setDue] = useState("2026-11-12");
+  const [showDone, setShowDone] = useState({});
+  const [logOpen, setLogOpen] = useState(false);
+  const [mealHistory, setMealHistory] = useState([]);
+  const [now, setNow] = useState(Date.now());
+  const [names, setNames] = useState([]);
+  const [nameFilter, setNameFilter] = useState("all");
+  const [picked, setPicked] = useState(null);
+  const [spinKey, setSpinKey] = useState(0);
+  const [streaks, setStreaks] = useState(null);
+  const [timerLeft, setTimerLeft] = useState(0);
+  const [timerRunning, setTimerRunning] = useState(false);
+  const [flash, setFlash] = useState("");
+  const [waterPrompt, setWaterPrompt] = useState(false);
+  const [waterCfg, setWaterCfg] = useState({
+    on: false,
+    everyMin: 120
+  });
+  const [notifOK, setNotifOK] = useState(typeof Notification !== "undefined" && Notification.permission === "granted");
+  const [aiUrl, setAiUrl] = useState("");
+  const [aiDraft, setAiDraft] = useState("");
+  const [aiMessages, setAiMessages] = useState([]);
+  const [aiInput, setAiInput] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [showEndpoint, setShowEndpoint] = useState(false);
+  const [aiUndo, setAiUndo] = useState(null);
+  const [pairCode, setPairCode] = useState("");
+  const [pairDraft, setPairDraft] = useState("");
+  const [theirNote, setTheirNote] = useState(null);
+  const [myNote, setMyNote] = useState("");
+  const [myNoteSent, setMyNoteSent] = useState(0);
+  const [noteBusy, setNoteBusy] = useState(false);
+  const [threadMsgs, setThreadMsgs] = useState([]);
+  const [threadInput, setThreadInput] = useState("");
+  const [threadBusy, setThreadBusy] = useState(false);
+  const [threadSeen, setThreadSeen] = useState({ his_seen_at: 0, hers_seen_at: 0 });
+  const [myNoteMeta, setMyNoteMeta] = useState(null);
+  const [noteError, setNoteError] = useState(false);
+  const [relayUrl, setRelayUrl] = useState("");
+  const [relayDraft, setRelayDraft] = useState("");
+  const [cloudSyncAt, setCloudSyncAt] = useState(0);
+  const cloudSyncTimer = useRef(null);
+  const [sound, setSound] = useState(true);
+  const [accentKey, setAccentKey] = useState("blue");
+  const [bgKey, setBgKey] = useState("black");
+  const [themeVer, setThemeVer] = useState(0);
+  const [whatsNewOpen, setWhatsNewOpen] = useState(false);
+  const [showUpdateBanner, setShowUpdateBanner] = useState(false);
+
+  const [pinError, setPinError] = useState(false);
+  const [pinMode, setPinMode] = useState("enter"); // "enter" | "set" | "confirm"
+  const [pinConfirm, setPinConfirm] = useState("");
+  const [treeName, setTreeName] = useState("Your Tree");
+  const [treeNameDraft, setTreeNameDraft] = useState("");
+  const [showTreeNamePrompt, setShowTreeNamePrompt] = useState(false);
+  const [wateringHistory, setWateringHistory] = useState({});
+  const [isWatering, setIsWatering] = useState(false);
+  const [waterMsg, setWaterMsg] = useState("");
+  const [babyPhotos, setBabyPhotos] = useState([]);
+  const [photoFull, setPhotoFull] = useState(null);
+  const [dripTrigger, setDripTrigger] = useState(0);
+  const [pushLimits, setPushLimits] = useState(false);
+  const [clock24, setClock24] = useState(false);
+  const [showSeconds, setShowSeconds] = useState(false);
+  const [glass, setGlass] = useState(0.45);
+  const acRef = useRef(null);
+  const setTheme = (aKey, bKey) => {
+    applyTheme(aKey, bKey);
+    setAccentKey(aKey);
+    setBgKey(bKey);
+    save("theme", {
+      accent: aKey,
+      bg: bKey
+    });
+    setThemeVer(v => v + 1);
+  };
+  const applyGlass = g => {
+    const alpha = (0.92 - g * 0.52).toFixed(3);
+    const alphaHi = Math.min(1, 0.92 - g * 0.52 + 0.07).toFixed(3);
+    C.card = `rgba(28,28,30,${alpha})`;
+    C.cardHi = `rgba(44,44,46,${alphaHi})`;
+    AI.panel = C.card;
+    AI.panelSoft = C.cardHi;
+  };
+  const setGlassLevel = g => {
+    applyGlass(g);
+    setGlass(g);
+    save("glass", {
+      g
+    });
+    setThemeVer(v => v + 1);
+  };
+  const toggleLimits = () => {
+    const n = !pushLimits;
+    setPushLimits(n);
+    save("limits", {
+      on: n
+    });
+    sfx.pop();
+    haptic(14);
+  };
+  const haptic = useCallback(ms => {
+    try {
+      navigator.vibrate && navigator.vibrate(ms);
+    } catch {}
+  }, []);
+  const ac = () => {
+    if (typeof window === "undefined") return null;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    if (!acRef.current) acRef.current = new AC();
+    if (acRef.current.state === "suspended") acRef.current.resume();
+    return acRef.current;
+  };
+  const tone = (freq, dur, type, gain, slideTo) => {
+    if (!sound) return;
+    const c = ac();
+    if (!c) return;
+    const t = c.currentTime;
+    const o = c.createOscillator();
+    const g = c.createGain();
+    o.type = type || "sine";
+    o.frequency.setValueAtTime(freq, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain || 0.06, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g);
+    g.connect(c.destination);
+    o.start(t);
+    o.stop(t + dur + 0.02);
+  };
+  const sfx = {
+    tick: () => tone(2100, 0.03, "square", 0.03),
+    open: () => {
+      tone(440, 0.16, "sine", 0.05, 880);
+    },
+    back: () => {
+      tone(660, 0.14, "sine", 0.045, 380);
+    },
+    pop: () => {
+      tone(520, 0.05, "triangle", 0.06, 720);
+      setTimeout(() => tone(880, 0.08, "sine", 0.05), 40);
+    }
+  };
+  const [originRect, setOriginRect] = useState(null);
+  const [closing, setClosing] = useState(false);
+  const [ripple, setRipple] = useState(null);
+  const [tabAnimKey, setTabAnimKey] = useState(0);
+  const [slideClass, setSlideClass] = useState("page-enter");
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const swipeTouchRef = useRef({ startX:0, startY:0, startTime:0 });
+  const SWIPE_TABS = ["today","messages","settings"];
+  const pageTransform = (i) => {
+    const base = (i - SWIPE_TABS.indexOf(tab)) * 100;
+    return `translateX(calc(${base}vw + ${dragOffset}px))`;
+  };
+  const openScreen = useCallback((k, e, swipe) => {
+    if (!swipe) {
+      try {
+        const el = e && e.currentTarget;
+        const r = el && el.getBoundingClientRect ? el.getBoundingClientRect() : null;
+        if (r) { setOriginRect({ x:r.left+r.width/2, y:r.top+r.height/2, w:r.width, h:r.height }); }
+        else { setOriginRect({ x:window.innerWidth/2, y:window.innerHeight-40, w:44, h:44 }); }
+      } catch { setOriginRect({ x:window.innerWidth/2, y:window.innerHeight-40, w:44, h:44 }); }
+    }
+    sfx.open(); haptic(12);
+    setSlideClass(swipe==="left"?"page-slide-right":swipe==="right"?"page-slide-left":"page-enter");
+    setTabAnimKey(n=>n+1); setTab(k);
+  }, [sound]);
+  const closeScreen = useCallback(() => {
+    sfx.back();
+    haptic(8);
+    setDripTrigger(v => v + 1);
+    setClosing(true);
+    setTimeout(() => {
+      setTab("today");
+      setClosing(false);
+      // Keep originRect so next open re-uses same launch point
+    }, 380);
+  }, [sound]);
+  const handleSwipeTouchStart = useCallback((e) => {
+    const t = e.touches[0];
+    // Object.assign preserves .tab (set by the tab-sync useEffect)
+    Object.assign(swipeTouchRef.current, { startX:t.clientX, startY:t.clientY, startTime:Date.now(), locked:false, active:true, dragging:false });
+    setDragOffset(0);
+  }, []);
+  const handleSwipeTouchMove = useCallback((e) => {
+    const ref = swipeTouchRef.current;
+    if (!ref || !ref.active || ref.locked) return;
+    const {startX, startY} = ref;
+    const t = e.touches[0];
+    const dx = t.clientX - startX;
+    const dy = t.clientY - startY;
+    if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 10) {
+      ref.locked = true;
+      setIsDragging(false); setDragOffset(0); return;
+    }
+    if (Math.abs(dx) < 5) return;
+    e.preventDefault();
+    // Confirm horizontal — only now do we enable the drag state
+    if (!ref.dragging) { ref.dragging = true; setIsDragging(true); }
+    const i = SWIPE_TABS.indexOf(ref.tab);
+    let d = dx;
+    if ((i === 0 && dx > 0) || (i === SWIPE_TABS.length-1 && dx < 0)) {
+      d = Math.sign(dx) * Math.pow(Math.abs(dx), 0.55) * 9;
+    }
+    setDragOffset(d);
+  }, []);
+  const handleSwipeTouchEnd = useCallback((e) => {
+    setIsDragging(false);
+    const ref = swipeTouchRef.current;
+    if (!ref || ref.locked || !ref.dragging) { setDragOffset(0); return; }
+    ref.active = false;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - ref.startX;
+    const dt = Date.now() - ref.startTime;
+    const velocity = dt > 0 ? Math.abs(dx) / dt : 0;
+    const i = SWIPE_TABS.indexOf(ref.tab);  // Use ref.tab — always fresh
+    if (Math.abs(dx) > 48 || (velocity > 0.28 && Math.abs(dx) > 12)) {
+      if (dx < 0 && i < SWIPE_TABS.length-1) {
+        sfx.open(); haptic(10); setTab(SWIPE_TABS[i+1]);
+      } else if (dx > 0 && i > 0) {
+        sfx.back(); haptic(8); setTab(SWIPE_TABS[i-1]);
+      }
+    }
+    setDragOffset(0);
+  }, [sound]);
+  const [navHidden, setNavHidden] = useState(true);
+  const lastY = useRef(0);
+  // Store tab in swipeTouchRef so touchmove handler always has fresh value
+  useEffect(() => {
+    if (swipeTouchRef.current) swipeTouchRef.current.tab = tab;
+  }, [tab]);
+  // Attach touchmove with passive:false so preventDefault works
+  useEffect(() => {
+    const el = document.getElementById("root");
+    if (!el) return;
+    const onMove = (e) => handleSwipeTouchMove(e);
+    el.addEventListener("touchmove", onMove, { passive: false });
+    return () => el.removeEventListener("touchmove", onMove);
+  }, [handleSwipeTouchMove]);
+  const inputRefs = useRef({});
+  useEffect(() => {
+    (async () => {
+      const [d, r, p, b, s] = await Promise.all([load(`day:${date}`, blankDay()), load("reminders", []), load("prep", null), load("bucket", []), load("settings", {
+        due: "2026-11-12"
+      })]);
+      setDay({
+        ...blankDay(),
+        ...d,
+        meals: {
+          ...blankDay().meals,
+          ...(d.meals || {})
+        }
+      });
+      setReminders(r);
+      setNames(await load("names", []));
+      const ai = await load("ai", {});
+      setAiUrl(ai.url || DEFAULT_AI_URL);
+      setAiDraft(ai.url || DEFAULT_AI_URL);
+      const pr = await load("pair", {});
+      setPairCode(pr.code || DEFAULT_PAIR);
+      setPairDraft(pr.code || DEFAULT_PAIR);
+      const relay = await load("relay", {});
+      const resolvedRelayUrl = relay.url || DEFAULT_RELAY_URL;
+      setRelayUrl(resolvedRelayUrl);
+      setRelayDraft(relay.url || DEFAULT_RELAY_URL);
+      const snd = await load("sound", {
+        on: true
+      });
+      setSound(snd.on !== false);
+      const th = await load("theme", {
+        accent: "blue",
+        bg: "black"
+      });
+      applyTheme(th.accent, th.bg);
+      setAccentKey(th.accent);
+      setBgKey(th.bg);
+      setThemeVer(v => v + 1);
+      const clk = await load("clock", {
+        h24: false,
+        sec: false
+      });
+      setClock24(!!clk.h24);
+      setShowSeconds(!!clk.sec);
+      const gl = await load("glass", {
+        g: 0.45
+      });
+      applyGlass(gl.g);
+      setGlass(gl.g);
+      const lim = await load("limits", {
+        on: false
+      });
+      setPushLimits(!!lim.on);
+      if (p == null) {
+        const seeded = DEFAULT_PREP.map(t => ({
+          id: uid(),
+          text: t,
+          done: false
+        }));
+        setPrep(seeded);
+        save("prep", seeded);
+      } else setPrep(p);
+      setBucket(b);
+      setDue(s.due || "2026-11-12");
+      const tn = await load("treeName", { name: "" });
+      setTreeName(tn.name || "Your Tree");
+      setTreeNameDraft(tn.name || "");
+      if (!tn.name) setShowTreeNamePrompt(true);
+      const wh = await load("waterHistory", {});
+      setWateringHistory(wh);
+      const bph = await load("babyPhotos", []);
+      setBabyPhotos(bph);
+      // Jobs — seed with DEFAULT_JOBS on first launch
+            const storedPin = localStorage.getItem("jobs_pin");
+      if (storedPin) setJobPin(storedPin);
+      if (!localStorage.getItem("keeper_seen_v16")) setWhatsNewOpen(true);
+      // One-time deploy update banner
+      const lastVer = localStorage.getItem("keeper_deploy_ver");
+      if (lastVer && lastVer !== DEPLOY_VER) { setShowUpdateBanner(true); setTimeout(() => setShowUpdateBanner(false), 3800); }
+      localStorage.setItem("keeper_deploy_ver", DEPLOY_VER);
+      setWaterCfg(await load("waterCfg", {
+        on: false,
+        everyMin: 120
+      }));
+      try {
+        const q = new URLSearchParams(window.location.search);
+        if (q.get("action") === "water" || window.location.hash === "#water") setWaterPrompt(true);
+        const lg = q.get("log");
+        if (lg) {
+          const cur = await load(`day:${date}`, blankDay());
+          let next = null,
+            msg = "";
+          if (lg === "water") {
+            next = {
+              ...cur,
+              water: Math.min(12, (cur.water || 0) + 1)
+            };
+            msg = `Water logged — ${next.water} of 8`;
+          } else if (lg === "sunlight") {
+            next = {
+              ...cur,
+              sunlight: true
+            };
+            msg = "Morning light logged";
+          } else if (lg === "dim") {
+            next = {
+              ...cur,
+              dim: true
+            };
+            msg = "Screens down logged";
+          }
+          if (next) {
+            setDay(next);
+            save(`day:${date}`, next);
+            setTimeout(() => setFlash(msg), 400);
+            window.history.replaceState({}, "", window.location.pathname);
+          }
+        }
+      } catch {}
+      // ── Cloud restore on fresh device ──────────────────────────────────
+      // If no day records exist locally, try to pull a cloud backup so the
+      // app doesn't start blank when opened on a new phone.
+      try {
+        const hasLocalDay = Array.from({length: localStorage.length}, (_, i) => localStorage.key(i))
+          .some(k => k && k.startsWith("basecamp:day:"));
+        if (!hasLocalDay && resolvedRelayUrl && (pr.code || DEFAULT_PAIR)) {
+          const syncCode = pr.code || DEFAULT_PAIR;
+          const syncR = await fetch(
+            `${resolvedRelayUrl}/sync?code=${encodeURIComponent(syncCode)}&side=his&t=${Date.now()}`,
+            { cache: "no-store" }
+          );
+          if (syncR.ok) {
+            const syncD = await syncR.json();
+            if (syncD && syncD.data && Object.keys(syncD.data).length > 0) {
+              Object.keys(syncD.data).forEach(k => {
+                if (k.startsWith("basecamp:")) localStorage.setItem(k, syncD.data[k]);
+              });
+              window.location.reload();
+              return;
+            }
+          }
+        }
+      } catch {}
+      setReady(true);
+    })();
+  }, [date]);
+  useEffect(() => {
+    const check = () => setDate(p => p === todayKey() ? p : todayKey());
+    const onVis = () => document.visibilityState === "visible" && check();
+    const t = setTimeout(() => setNavHidden(false), 120);
+    const onScroll = () => {
+      const y = window.scrollY;
+      if (y < 12) setNavHidden(false);else if (y > lastY.current + 5) setNavHidden(true);else if (y < lastY.current - 5) setNavHidden(false);
+      lastY.current = y;
+    };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", check);
+    window.addEventListener("scroll", onScroll, {
+      passive: true
+    });
+    const id = setInterval(check, 60000);
+    return () => {
+      clearTimeout(t);
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("focus", check);
+      window.removeEventListener("scroll", onScroll);
+    };
+  }, []);
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  useEffect(() => {
+    if (ready) buildStreaks().then(setStreaks);
+  }, [ready, date, tab]);
+  useEffect(() => {
+    if (!timerRunning) return;
+    const id = setInterval(() => {
+      setTimerLeft(t => {
+        if (t <= 1) {
+          setTimerRunning(false);
+          setFlash("⏱ Timer done");
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [timerRunning]);
+  useEffect(() => {
+    if (!flash) return;
+    const id = setTimeout(() => setFlash(""), 2600);
+    return () => clearTimeout(id);
+  }, [flash]);
+  useEffect(() => {
+    if (!waterCfg.on || !notifOK) return;
+    const id = setInterval(() => {
+      const last = Number(localStorage.getItem("basecamp:lastNudge") || 0);
+      const gap = (waterCfg.everyMin || 120) * 60000;
+      const hr = new Date().getHours();
+      if (hr >= 8 && hr <= 21 && Date.now() - last >= gap) {
+        try {
+          const n = new Notification("Water check", {
+            body: "Tap to log a glass.",
+            tag: "water"
+          });
+          n.onclick = () => {
+            try {
+              window.focus();
+            } catch {}
+            setWaterPrompt(true);
+            n.close();
+          };
+          localStorage.setItem("basecamp:lastNudge", String(Date.now()));
+        } catch {}
+      }
+    }, 60000);
+    return () => clearInterval(id);
+  }, [waterCfg, notifOK]);
+  const patchDay = useCallback(p => setDay(prev => {
+    const next = {
+      ...prev,
+      ...p
+    };
+    save(`day:${date}`, next);
+    return next;
+  }), [date]);
+  const saveReminders = n => {
+    setReminders(n);
+    save("reminders", n);
+  };
+  const savePrep = n => {
+    setPrep(n);
+    save("prep", n);
+  };
+  const saveBucket = n => {
+    setBucket(n);
+    save("bucket", n);
+  };
+  const editHistoryMeal = (d, key, value) => setMealHistory(hs => hs.map(h => {
+    if (h.date !== d) return h;
+    const nd = {
+      ...h.day,
+      meals: {
+        ...h.day.meals,
+        [key]: value
+      }
+    };
+    save(`day:${d}`, nd);
+    return {
+      ...h,
+      day: nd
+    };
+  }));
+  const weeks = (() => {
+    const dt = new Date(due + "T12:00:00");
+    const daysLeft = Math.ceil((dt - new Date()) / 86400000);
+    const w = Math.max(0, Math.min(42, Math.floor((280 - daysLeft) / 7)));
+    return { w, daysLeft };
+  })();
+  const wateredToday = !!wateringHistory[date];
+  const wateringStreak = (() => {
+    let streak = 0, d = new Date();
+    while (streak < 365) {
+      const k = d.toISOString().slice(0,10);
+      if (!wateringHistory[k]) break;
+      streak++;
+      d.setDate(d.getDate() - 1);
+    }
+    return streak;
+  })();
+  const waterTree = () => {
+    if (wateredToday) return;
+    const newH = Object.assign({}, wateringHistory, {[date]: true});
+    setWateringHistory(newH);
+    save("waterHistory", newH);
+    setIsWatering(true);
+    setWaterMsg(treeName + " loved that 🌸");
+    sfx.pop(); haptic(20);
+    setTimeout(() => setIsWatering(false), 2200);
+    setTimeout(() => setWaterMsg(""), 3200);
+  };
+  const saveTreeName = (n) => {
+    const name = (n || "").trim() || "Your Tree";
+    setTreeName(name); setTreeNameDraft(name);
+    save("treeName", { name });
+    setShowTreeNamePrompt(false);
+    sfx.pop();
+  };
+  const saveBabyPhotos = (photos) => { setBabyPhotos(photos); save("babyPhotos", photos); };
+  // ── Jobs helpers ──
+      const threadBase = (() => {
+    try {
+      return relayUrl ? new URL("/thread", relayUrl).toString() : "";
+    } catch {
+      return "";
+    }
+  })();
+  const loadThread = useCallback(async () => {
+    if (!pairCode || !threadBase) return;
+    try {
+      const r = await fetch(`${threadBase}?code=${encodeURIComponent(pairCode)}&t=${Date.now()}`, {
+        cache: "no-store"
+      });
+      const d = await r.json();
+      if (d && Array.isArray(d.messages)) setThreadMsgs(d.messages);
+      if (d && (d.his_seen_at != null || d.hers_seen_at != null)) setThreadSeen({ his_seen_at: d.his_seen_at || 0, hers_seen_at: d.hers_seen_at || 0 });
+    } catch {}
+  }, [pairCode, threadBase]);
+  const sendMessage = async () => {
+    const text = threadInput.trim();
+    if (!text || threadBusy || !paired || !threadBase) return;
+    setThreadBusy(true);
+    const optimistic = { id: "pending-" + Date.now(), side: "his", text, at: Date.now() };
+    setThreadMsgs(m => [...m, optimistic]);
+    setThreadInput("");
+    sfx.pop();
+    haptic(10);
+    try {
+      const r = await fetch(threadBase, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: pairCode, side: "his", text })
+      });
+      if (!r.ok) throw new Error("send failed");
+      // Refresh the thread so the real server-assigned id replaces the optimistic one
+      loadThread();
+    } catch {
+      // Roll back optimistic message on failure
+      setThreadMsgs(m => m.filter(x => x.id !== optimistic.id));
+      setFlash("Couldn't send. Check your signal.");
+    }
+    setThreadBusy(false);
+  };
+  // ── Cloud sync push — must be declared before the useEffect that depends on it ──
+  const cloudSyncPush = useCallback(() => {
+    if (!pairCode || !relayUrl) return;
+    clearTimeout(cloudSyncTimer.current);
+    cloudSyncTimer.current = setTimeout(async () => {
+      try {
+        const dump = {};
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith("basecamp:")) dump[k] = localStorage.getItem(k);
+        }
+        if (Object.keys(dump).length === 0) return;
+        const r = await fetch(new URL("/sync", relayUrl).toString(), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: pairCode, side: "his", data: dump })
+        });
+        if (r.ok) {
+          const d = await r.json();
+          if (d && d.savedAt) setCloudSyncAt(d.savedAt);
+        }
+      } catch {}
+    }, 4000);
+  }, [pairCode, relayUrl]);
+  const markSeen = useCallback(async () => {
+    if (!pairCode || !relayUrl) return;
+    try { await fetch(new URL("/thread/seen", relayUrl).toString(), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: pairCode, side: "his" }) }); } catch {}
+  }, [pairCode, relayUrl]);
+  useEffect(() => {
+    if (tab !== "messages" || !paired) return;
+    loadThread();
+    markSeen();
+    const id = setInterval(loadThread, 8000);
+    return () => clearInterval(id);
+  }, [tab, paired, loadThread, markSeen]);
+  // Trigger cloud sync whenever key data changes (debounced inside cloudSyncPush)
+  useEffect(() => {
+    if (ready) cloudSyncPush();
+  }, [day, reminders, prep, bucket, names, ready, cloudSyncPush]);
+  useEffect(() => {
+    if (!paired) return;
+    pullNote();
+    const onVis = () => document.visibilityState === "visible" && pullNote();
+    document.addEventListener("visibilitychange", onVis);
+    const id = setInterval(pullNote, 30000);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      clearInterval(id);
+    };
+  }, [paired, pullNote]);
+  const {
+    pull: ptrPull,
+    busy: ptrBusy
+  } = usePullToRefresh(React.useCallback(async () => {
+    try {
+      await pullNote();
+    } catch {}
+    window.location.reload();
+  }, [pullNote]));
+  if (!ready) return React.createElement("div", {
+    className: "grid min-h-screen place-items-center",
+    style: {
+      background: C.bg0
+    }
+  }, React.createElement("span", {
+    className: "text-xs tracking-widest uppercase opacity-50",
+    style: {
+      fontFamily: body,
+      color: C.mute
+    }
+  }, "Loading…"));
+  const addReminder = (listId, afterId) => {
+    const item = {
+      id: uid(),
+      text: "",
+      done: false,
+      listId,
+      flag: false
+    };
+    const next = [...reminders];
+    if (afterId) next.splice(next.findIndex(x => x.id === afterId) + 1, 0, item);else next.push(item);
+    saveReminders(next);
+    setTimeout(() => inputRefs.current[item.id]?.focus(), 0);
+  };
+  const setReminder = (id, patch) => saveReminders(reminders.map(x => x.id === id ? {
+    ...x,
+    ...patch
+  } : x));
+  const delReminder = id => saveReminders(reminders.filter(x => x.id !== id));
+  const prepDone = prep.filter(p => p.done).length;
+  const bucketDone = bucket.filter(b => b.done).length;
+  const MEALKEYS = ["breakfast", "lunch", "dinner"];
+  const saveNames = n => {
+    setNames(n);
+    save("names", n);
+  };
+  const addName = afterId => {
+    const it = {
+      id: uid(),
+      text: "",
+      gender: "any",
+      fav: false
+    };
+    const next = [...names];
+    if (afterId) next.splice(next.findIndex(x => x.id === afterId) + 1, 0, it);else next.push(it);
+    saveNames(next);
+    setTimeout(() => inputRefs.current["n" + it.id]?.focus(), 0);
+  };
+  const cycleGender = id => saveNames(names.map(n => n.id === id ? {
+    ...n,
+    gender: n.gender === "any" ? "boy" : n.gender === "boy" ? "girl" : "any"
+  } : n));
+  const filteredNames = names.filter(n => nameFilter === "all" ? true : n.gender === nameFilter || n.gender === "any");
+  const randomName = () => {
+    const pool = filteredNames.filter(n => n.text.trim());
+    if (!pool.length) return;
+    setPicked(pool[Math.floor(Math.random() * pool.length)].text);
+    setSpinKey(k => k + 1);
+  };
+  const shareQuote = async () => {
+    const text = `${seededPick(QUOTES, date)}\n\n— The Keeper`;
+    try {
+      if (navigator.share) await navigator.share({
+        text
+      });else {
+        await navigator.clipboard.writeText(text);
+        setFlash("Copied to clipboard");
+      }
+    } catch {}
+  };
+  const startTimer = mins => {
+    setTimerLeft(mins * 60);
+    setTimerRunning(true);
+  };
+  const logWater = () => {
+    patchDay({
+      water: Math.min(12, (day.water || 0) + 1)
+    });
+    setWaterPrompt(false);
+    setFlash("Logged a glass");
+  };
+  const enableWaterReminders = async () => {
+    try {
+      if (typeof Notification === "undefined") {
+        setFlash("This device can't do in-app reminders.");
+        return;
+      }
+      let perm = Notification.permission;
+      if (perm !== "granted") perm = await Notification.requestPermission();
+      const ok = perm === "granted";
+      setNotifOK(ok);
+      const next = {
+        ...waterCfg,
+        on: ok
+      };
+      setWaterCfg(next);
+      save("waterCfg", next);
+      if (ok) setFlash("Reminders on");
+    } catch {}
+  };
+  const setWaterEvery = mins => {
+    const next = {
+      ...waterCfg,
+      everyMin: mins
+    };
+    setWaterCfg(next);
+    save("waterCfg", next);
+  };
+  const backupData = () => {
+    try {
+      const dump = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith("basecamp:")) dump[k] = localStorage.getItem(k);
+      }
+      const blob = new Blob([JSON.stringify({
+        app: "base-camp",
+        saved: new Date().toISOString(),
+        data: dump
+      }, null, 2)], {
+        type: "application/json"
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `base-camp-backup-${todayKey()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setFlash("Backup saved");
+    } catch {
+      setFlash("Backup failed");
+    }
+  };
+  const restoreData = file => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result);
+        const data = parsed.data || parsed;
+        let n = 0;
+        Object.keys(data).forEach(k => {
+          if (k.startsWith("basecamp:")) {
+            localStorage.setItem(k, data[k]);
+            n++;
+          }
+        });
+        setFlash(n ? "Restored — reloading…" : "Nothing to restore");
+        if (n) setTimeout(() => window.location.reload(), 900);
+      } catch {
+        setFlash("Couldn't read that file");
+      }
+    };
+    reader.readAsText(file);
+  };
+  const fmtTimer = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  const applyActions = actions => {
+    if (!actions || !actions.length) return null;
+    const snap = {
+      prep,
+      bucket,
+      names,
+      day
+    };
+    let nextPrep = prep,
+      nextBucket = bucket,
+      nextNames = names;
+    const dayPatch = {};
+    const done = [];
+    const clean = arr => (Array.isArray(arr) ? arr : []).map(t => String(t || "").trim()).filter(Boolean).slice(0, 25);
+    for (const a of actions) {
+      if (a.type === "add_prep_items") {
+        const items = clean(a.items);
+        if (!items.length) continue;
+        nextPrep = [...nextPrep, ...items.map(t => ({
+          id: uid(),
+          text: t,
+          done: false
+        }))];
+        done.push(`${items.length} to prep`);
+      } else if (a.type === "complete_prep_items") {
+        const want = clean(a.items).map(t => t.toLowerCase());
+        let n = 0;
+        nextPrep = nextPrep.map(it => {
+          const hit = want.some(w => it.text.toLowerCase().includes(w) || w.includes(it.text.toLowerCase()));
+          if (hit && !it.done) {
+            n++;
+            return {
+              ...it,
+              done: true
+            };
+          }
+          return it;
+        });
+        if (n) done.push(`${n} checked off`);
+      } else if (a.type === "add_bucket_items") {
+        const items = clean(a.items);
+        if (!items.length) continue;
+        nextBucket = [...nextBucket, ...items.map(t => ({
+          id: uid(),
+          text: t,
+          done: false
+        }))];
+        done.push(`${items.length} to the list`);
+      } else if (a.type === "add_names") {
+        const items = clean(a.names);
+        if (!items.length) continue;
+        nextNames = [...nextNames, ...items.map(t => ({
+          id: uid(),
+          text: t,
+          gender: "any",
+          fav: !!a.favorite
+        }))];
+        done.push(`${items.length} name${items.length > 1 ? "s" : ""}`);
+      } else if (a.type === "log_today") {
+        if (typeof a.water === "number") dayPatch.water = Math.max(0, Math.min(12, a.water));
+        if (typeof a.addWater === "number") dayPatch.water = Math.max(0, Math.min(12, (dayPatch.water ?? day.water ?? 0) + a.addWater));
+        if (a.wake) dayPatch.wake = String(a.wake).slice(0, 5);
+        if (a.bed) dayPatch.bed = String(a.bed).slice(0, 5);
+        if (typeof a.sunlight === "boolean") dayPatch.sunlight = a.sunlight;
+        if (typeof a.dim === "boolean") dayPatch.dim = a.dim;
+        if (Object.keys(dayPatch).length) done.push("today's log");
+      }
+    }
+    if (nextPrep !== prep) savePrep(nextPrep);
+    if (nextBucket !== bucket) saveBucket(nextBucket);
+    if (nextNames !== names) saveNames(nextNames);
+    if (Object.keys(dayPatch).length) patchDay(dayPatch);
+    if (!done.length) return null;
+    setAiUndo(snap);
+    return done.join(" · ");
+  };
+  const undoAi = () => {
+    if (!aiUndo) return;
+    savePrep(aiUndo.prep);
+    saveBucket(aiUndo.bucket);
+    saveNames(aiUndo.names);
+    setDay(aiUndo.day);
+    save(`day:${date}`, aiUndo.day);
+    setAiUndo(null);
+    setAiMessages(m => m.filter(x => x.role !== "note"));
+    setFlash("Undone");
+  };
+  const savePair = () => {
+    const c = pairDraft.trim();
+    setPairCode(c);
+    save("pair", {
+      code: c
+    });
+    setFlash(c ? "Paired." : "Unpaired.");
+  };
+  const noteAge = ts => {
+    if (!ts) return "";
+    const m = Math.floor((Date.now() - ts) / 60000);
+    if (m < 1) return "now";
+    if (m < 60) return m + "m ago";
+    const h = Math.floor(m / 60);
+    if (h < 24) return h === 1 ? "1h ago" : h + "h ago";
+    return Math.floor(h / 24) + "d ago";
+  };
+  const saveAiUrl = () => {
+    const u = aiDraft.trim();
+    setAiUrl(u);
+    save("ai", { url: u });
+    setShowEndpoint(false);
+    setFlash(u ? "Endpoint saved" : "Endpoint cleared");
+  };
+  const saveRelayUrl = () => {
+    const u = relayDraft.trim();
+    setRelayUrl(u);
+    save("relay", { url: u });
+    setFlash(u ? "Relay saved" : "Relay cleared");
+  };
+  const askWith = async text => {
+    text = (text || "").trim();
+    if (!text || aiBusy || !aiUrl) return;
+    const next = [...aiMessages, {
+      role: "user",
+      content: text
+    }];
+    setAiMessages(next);
+    setAiInput("");
+    setAiBusy(true);
+    const context = {
+      week: weeks.w,
+      daysLeft: weeks.daysLeft,
+      dueDate: due,
+      devFact: devFor(weeks.w),
+      today: {
+        water: day.water || 0,
+        breakfast: !!day.meals.breakfast,
+        lunch: !!day.meals.lunch,
+        dinner: !!day.meals.dinner,
+        wake: day.wake || "",
+        bed: day.bed || "",
+        morningLight: !!day.sunlight,
+        screensDown: !!day.dim
+      },
+      streaks: streaks || null,
+      prepRemaining: prep.filter(p => !p.done && p.text.trim()).map(p => p.text).slice(0, 20),
+      prepDone: prep.filter(p => p.done).length,
+      prepTotal: prep.length,
+      favoriteNames: names.filter(n => n.fav && n.text.trim()).map(n => n.text),
+      bucketOpen: bucket.filter(b => !b.done && b.text.trim()).length,
+    };
+    try {
+      const res = await fetch(aiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          app: "base-camp",
+          messages: next.filter(m => m.role === "user" || m.role === "assistant"),
+          context
+        })
+      });
+      const data = await res.json();
+      const reply = data.reply || (data.error ? "Error: " + data.error : "No response.");
+      const summary = applyActions(data.actions);
+      setAiMessages(m => [...m, {
+        role: "assistant",
+        content: reply
+      }, ...(summary ? [{
+        role: "note",
+        content: summary
+      }] : [])]);
+    } catch {
+      setAiMessages(m => [...m, {
+        role: "assistant",
+        content: "Couldn't reach the endpoint. Check the URL under ⚙."
+      }]);
+    }
+    setAiBusy(false);
+  };
+  const askAI = () => askWith(aiInput);
+  const AI_PROMPTS = ["Build me a hospital bag checklist", "What's happening with the baby this week?", "First-week-home survival plan", "Questions to ask at the next appointment", "Realistic newborn budget", "How do I support her right now?"];
+  const advisorLines = (() => {
+    const out = [];
+    if ((day.water || 0) < 8) out.push(`Water's at ${day.water || 0}/8 — top it off.`);
+    if (!day.sunlight) out.push("No morning light logged. Ten minutes outside resets the clock.");
+    if (!day.dim) out.push("Screens-down at night is still open on today's card.");
+    const pct = prep.length ? Math.round(prep.filter(p => p.done).length / prep.length * 100) : 0;
+    if (pct < 100 && weeks.daysLeft <= 120) out.push(`Prep's at ${pct}% with ${weeks.daysLeft} days out — knock one off the list.`);
+    if (streaks && streaks.rhythm >= 3) out.push(`${streaks.rhythm}-day rhythm streak. Don't break it.`);
+    if (streaks && streaks.water >= 3) out.push(`${streaks.water} days hydrated straight. Solid.`);
+    if (!out.length) out.push("Everything's handled today. Rare air — enjoy it.");
+    return out.slice(0, 3);
+  })();
+  const theme = THEMES[daySeed(date) % THEMES.length];
+  const clockParts = (() => {
+    const d = new Date(now);
+    let h = d.getHours();
+    const m = String(d.getMinutes()).padStart(2, "0");
+    const sec = String(d.getSeconds()).padStart(2, "0");
+    const ampm = h >= 12 ? "PM" : "AM";
+    if (!clock24) {
+      h = h % 12;
+      if (h === 0) h = 12;
+    }
+    const hh = clock24 ? String(h).padStart(2, "0") : String(h);
+    return {
+      time: `${hh}:${m}${showSeconds ? ":" + sec : ""}`,
+      ampm: clock24 ? "" : ampm
+    };
+  })();
+  const clock = clockParts.time;
+  const target = new Date(due + "T00:00:00").getTime();
+  let rem = target - now;
+  const overdue = rem <= 0;
+  if (rem < 0) rem = 0;
+  const cd = {
+    d: Math.floor(rem / 86400000),
+    h: Math.floor(rem % 86400000 / 3600000),
+    m: Math.floor(rem % 3600000 / 60000),
+    s: Math.floor(rem % 60000 / 1000)
+  };
+  return React.createElement("div", {
+    className: "relative",
+    style: { background:"transparent", height:"100dvh", overflow:"hidden", display:"flex", flexDirection:"column" },
+    onTouchStart: handleSwipeTouchStart, onTouchEnd: handleSwipeTouchEnd
+  }, React.createElement(PullIndicator, {
+    pull: ptrPull,
+    busy: ptrBusy,
+    color: C.rust,
+    track: "#1C1C1E"
+  }), React.createElement(AmbientDen, null), React.createElement(DripCanvas, {
+    trigger: dripTrigger,
+    color: C.rust,
+    intense: pushLimits
+  }), ripple && React.createElement("div", {
+    key: ripple.key,
+    className: "ripple-ring",
+    style: {
+      left: ripple.x,
+      top: ripple.y,
+      color: C.rust
+    }
+  }), React.createElement("style", null, `@keyframes bcPop{0%{opacity:0;transform:scale(0.94)}100%{opacity:1;transform:scale(1)}}@keyframes bcSpin{0%{transform:rotateY(0);opacity:0.5}100%{transform:rotateY(1080deg);opacity:1}}`),
+  showUpdateBanner && React.createElement("div", {
+    key: "update-banner",
+    style: {
+      position: "fixed",
+      top: "max(14px, calc(env(safe-area-inset-top) + 10px))",
+      left: "50%",
+      transform: "translateX(-50%)",
+      zIndex: 999,
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      padding: "8px 16px",
+      borderRadius: 50,
+      background: "rgba(18,18,20,0.72)",
+      backdropFilter: "blur(28px) saturate(1.8)",
+      WebkitBackdropFilter: "blur(28px) saturate(1.8)",
+      border: "0.5px solid rgba(255,255,255,0.18)",
+      boxShadow: "rgba(255,255,255,0.18) 0px 1px 0px inset, 0 4px 20px rgba(0,0,0,0.45)",
+      animation: "bannerSlideIn 0.38s cubic-bezier(0.16,1,0.3,1) both",
+      whiteSpace: "nowrap"
+    }
+  },
+    React.createElement("span", { style: { width: 6, height: 6, borderRadius: "50%", background: C.rust, display: "inline-block", boxShadow: `0 0 6px ${C.rust}` } }),
+    React.createElement("span", { style: { fontFamily: body, fontSize: 13, fontWeight: 500, color: "rgba(255,255,255,0.9)", letterSpacing: "0.01em" } }, "Updated to ", DEPLOY_VER)
+  ),
+  whatsNewOpen && React.createElement("div", {
+    key: "wn-overlay",
+    style: { position:"fixed",inset:0,zIndex:999,background:"rgba(0,0,0,0.68)",display:"flex",alignItems:"flex-end",backdropFilter:"blur(3px)" },
+    onClick: () => { localStorage.setItem("keeper_seen_v16","1"); setWhatsNewOpen(false); }
+  },
+    React.createElement("div", {
+      style: { width:"100%",background:"rgba(22,22,24,0.97)",borderTop:"1px solid rgba(255,255,255,0.1)",borderRadius:"24px 24px 0 0",padding:"32px 24px",paddingBottom:"max(32px,env(safe-area-inset-bottom))",backdropFilter:"blur(50px) saturate(1.4)",animation:"whatsNewUp 0.5s cubic-bezier(0.32,0.72,0,1) both",WebkitBackdropFilter:"blur(50px) saturate(1.4)" },
+      onClick: e => e.stopPropagation()
+    },
+      React.createElement("div", { style:{ textAlign:"center",marginBottom:28 } },
+        React.createElement("div", { style:{ fontSize:40,marginBottom:10,lineHeight:1 } }, "\uD83C\uDF38"),
+        React.createElement("div", { style:{ fontFamily:display,fontWeight:600,fontSize:22,color:C.text,marginBottom:6 } }, "What’s New in The Keeper"),
+        React.createElement("div", { style:{ fontFamily:body,fontSize:13,color:C.mute } }, "Version 15 — just for you")
+      ),
+      [["\uD83D\uDCAC","Real-time messaging","Send and receive messages with her in real time"],
+       ["\u2601\uFE0F","Cloud sync","Your data stays in sync across every device"],
+       ["\uD83C\uDF05","Real scenes","Eight photo wallpapers — golden hour to cherry blossoms"],
+       ["\uD83D\uDCA7","Smarter drips","The living glass effect is smoother and more alive"]
+      ].map(function(row,idx){
+        return React.createElement("div",{ key:idx, style:{ display:"flex",alignItems:"flex-start",gap:16,padding:"13px 0",borderBottom:idx<3?"1px solid "+C.line:"none",animation:"wsFadeIn 0.4s ease "+(160+idx*70)+"ms both" } },
+          React.createElement("div",{ style:{ fontSize:24,width:36,textAlign:"center",flexShrink:0,paddingTop:2 } }, row[0]),
+          React.createElement("div",{ style:{ flex:1 } },
+            React.createElement("div",{ style:{ fontFamily:body,fontWeight:500,fontSize:15,color:C.text } }, row[1]),
+            React.createElement("div",{ style:{ fontFamily:body,fontSize:13,color:C.mute,marginTop:3,lineHeight:1.5 } }, row[2])
+          )
+        );
+      }),
+      React.createElement("button", {
+        onClick: () => { localStorage.setItem("keeper_seen_v16","1"); setWhatsNewOpen(false); },
+        style: { width:"100%",marginTop:26,padding:"15px 0",background:C.rust,borderRadius:16,fontFamily:body,fontWeight:600,fontSize:16,color:contrastFor(C.rust),border:"none",cursor:"pointer",boxShadow:"0 4px 24px "+C.rust+"44" }
+      }, "Let’s go")
+    )
+  ), React.createElement("div", {
+    style: { position:"relative", width:"100%", overflow:"hidden", flex:1 }
+  },
+  React.createElement("div", {
+    style: { position:"absolute", inset:0, overflowY:"auto", WebkitOverflowScrolling:"touch", overscrollBehavior:"contain",
+             transform: pageTransform(0),
+             transition: isDragging ? "none" : "transform 0.34s cubic-bezier(0.22,1,0.36,1)",
+             willChange: "transform", opacity: isDragging ? 0.97 : 1 }
+  },
+  React.createElement("div", {
+    className: "relative z-[1] mx-auto max-w-md",
+    style: { paddingTop: "max(3.25rem, env(safe-area-inset-top))",
+             paddingBottom: `calc(${tab === "messages" ? 168 : 112}px + env(safe-area-inset-bottom, 0px))`,
+             paddingLeft: "max(20px, calc(env(safe-area-inset-left, 0px) + 16px))",
+             paddingRight: "max(20px, calc(env(safe-area-inset-right, 0px) + 16px))",
+             transition: "padding-bottom 0.38s cubic-bezier(0.2,0,0,1)" }
+  },
+React.createElement("header", {
+    className: "mb-6 flex items-start justify-between gap-3"
+  }, React.createElement("div", {
+    className: "min-w-0"
+  }, React.createElement("div", {
+    className: "text-xs uppercase",
+    style: {
+      fontFamily: body,
+      letterSpacing: "0.12em",
+      color: "rgba(255,255,255,0.48)"
+    }
+  }, prettyDate(date)), React.createElement("div", {
+    style: { fontFamily: body, fontSize: 13, color: "rgba(255,255,255,0.38)", marginTop: 6, marginBottom: 1, letterSpacing: "0.015em" }
+  }, (() => { const h = new Date(now).getHours(); return h < 12 ? "Good morning, Gage 👋" : h < 17 ? "Good afternoon, Gage ☀️" : "Good evening, Gage 🌙"; })()), React.createElement("h1", {
+    className: "mt-0.5",
+    style: {
+      fontFamily: display,
+      fontSize: 34,
+      fontWeight: 700,
+      background: `linear-gradient(140deg, ${C.rust} 0%, #ffffff 55%, rgba(255,255,255,0.72) 100%)`,
+      WebkitBackgroundClip: "text",
+      WebkitTextFillColor: "transparent",
+      backgroundClip: "text",
+      letterSpacing: "-0.03em",
+      lineHeight: 1.04
+    }
+  }, "The Keeper"), React.createElement("div", { style:{ fontFamily:body, fontSize:10, color:C.mute, letterSpacing:"0.14em", marginTop:5, textTransform:"uppercase" } }, DEPLOY_VER)), React.createElement("div", {
+    className: "flex shrink-0 flex-col items-end gap-1.5 pt-1"
+  }, React.createElement("div", {
+    className: "flex items-baseline gap-1"
+  }, React.createElement("span", {
+    className: "tnum",
+    style: {
+      fontFamily: display,
+      fontWeight: 200,
+      fontSize: 42,
+      lineHeight: 1,
+      color: "rgba(255,255,255,0.96)",
+      letterSpacing: "-0.04em"
+    }
+  }, clock), clockParts.ampm && React.createElement("span", {
+    style: {
+      fontFamily: display,
+      fontWeight: 500,
+      fontSize: 15,
+      color: "rgba(255,255,255,0.55)"
+    }
+  }, clockParts.ampm)), React.createElement("button", {
+    onClick: () => {
+      const n = !sound;
+      setSound(n);
+      save("sound", {
+        on: n
+      });
+      if (n) {
+        const c = ac();
+        if (c) tone(660, 0.12, "sine", 0.05, 880);
+      }
+    },
+    "aria-label": sound ? "Mute sounds" : "Unmute sounds",
+    className: "press grid h-7 w-7 place-items-center rounded-full",
+    style: {
+      background: C.card,
+      border: `1px solid ${C.line}`,
+      color: sound ? C.rust : C.mute
+    }
+  }, React.createElement("span", {
+    style: {
+      fontSize: 12
+    }
+  }, sound ? "♪" : "✕")))), true && React.createElement("div", {
+    key: "today",
+    className: "space-y-4"
+  }, paired && React.createElement("div", {
+    className: "glass card-0 p-4",
+    style: {
+      animation: "rise 0.35s 0.05s ease both",
+      background: C.card,
+      border: `1px solid ${C.line}`,
+      borderLeft: `3px solid ${C.rust}`, borderTopLeftRadius: 18, borderBottomLeftRadius: 18,
+      borderRadius: 18,
+      boxShadow: `0 1px 6px rgba(0,0,0,0.28), 0 3px 16px rgba(0,0,0,0.18), inset 0 0.5px 0 rgba(255,255,255,0.1)`
+    }
+  }, React.createElement("button", {
+    onClick: e => openScreen("messages", e),
+    className: "press w-full text-left"
+  }, React.createElement("div", {
+    className: "mb-2.5 flex items-center justify-between", style:{ position:"relative" }
+  }, React.createElement("span", {
+    className: "uppercase",
+    style: {
+      fontFamily: mono,
+      fontSize: "0.68rem",
+      letterSpacing: "0.06em",
+      color: C.rust,
+      fontWeight: 600
+    }
+  }, "♥ Mabry"), React.createElement("span", {
+    style: {
+      fontFamily: body,
+      color: C.rust,
+      fontSize: 13,
+      fontWeight: 600,
+      letterSpacing: "-0.01em"
+    }
+  }, threadMsgs.some(m => m.side === "hers" && m.at > (threadSeen.his_seen_at || 0)) ? "● Messages" : "Messages  ›")), theirNote && theirNote.note ? React.createElement(React.Fragment, null, React.createElement("p", {
+    className: "text-[15px] leading-relaxed line-clamp-2",
+    style: {
+      fontFamily: display,
+      color: C.text
+    }
+  }, theirNote.note), React.createElement("div", {
+    className: "mt-1.5 text-xs",
+    style: {
+      fontFamily: mono,
+      color: C.mute
+    }
+  }, noteAge(theirNote.updatedAt))) : React.createElement("p", {
+    className: "text-sm",
+    style: {
+      fontFamily: body,
+      color: C.mute
+    }
+  }, "No messages yet — tap to say hi ♥")),
+  myNoteMeta && myNoteMeta.note || myNoteSent > 0 ? React.createElement("div", {
+    className: "mt-1.5 text-xs",
+    style: {
+      fontFamily: mono,
+      color: myNoteMeta && myNoteMeta.seenAt ? "#34C759" : C.mute
+    }
+  }, myNoteMeta && myNoteMeta.seenAt ? `Read ${noteAge(myNoteMeta.seenAt)}` : `Sent ${noteAge(myNoteMeta && myNoteMeta.updatedAt || myNoteSent)}`) : null, noteError && React.createElement("div", {
+    className: "mt-1.5 text-xs",
+    style: {
+      fontFamily: mono,
+      color: C.rust
+    }
+  }, "Couldn't reach the server — pull down to try again.")), React.createElement(Card, null,
+    React.createElement("div", { style:{ display:"flex", alignItems:"center", justifyContent:"center", gap:8, marginBottom:12 } },
+      React.createElement(Eyebrow, { color:"#ffb3d1" }, "Week ", weeks.w, "  ·  ", treeName)
+    ),
+    React.createElement("div", { style:{ display:"flex", justifyContent:"center", marginBottom:12, maxWidth:256, margin:"0 auto 16px", filter:"drop-shadow(0 0 40px rgba(249,160,200,0.5)) drop-shadow(0 4px 16px rgba(0,0,0,0.4))" }, style:{ animation: "fadeUp 0.6s ease both" }, dangerouslySetInnerHTML:{ __html: buildBlossomSVG(weeks.w, true, false) } }),
+    React.createElement("div", { style:{ display:"flex", gap:6, marginBottom:12 } },
+      [["Days", overdue ? "0" : cd.d, C.text], ["Hrs", overdue ? "—" : String(cd.h).padStart(2,"0"), C.mute], ["Min", String(cd.m).padStart(2,"0"), overdue ? C.mute : C.mute], ["Sec", String(cd.s).padStart(2,"0"), C.mute]].map(([lab, val, col]) =>
+        React.createElement("div", { key:lab, style:{ flex:1, borderRadius:14, padding:"13px 0", textAlign:"center", background:"rgba(255,255,255,0.06)", border:"0.5px solid rgba(255,255,255,0.12)", backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(8px)" } },
+          React.createElement("div", { style:{ fontFamily:display, fontWeight:700, fontSize:22, color:col, fontVariantNumeric:"tabular-nums", fontFeatureSettings:"'tnum' 'onum'" } }, overdue ? "✓" : val),
+          React.createElement("div", { style:{ fontFamily:mono, fontSize:8.5, letterSpacing:"0.1em", color:C.mute, textTransform:"uppercase", fontWeight:500 } }, lab)
+        )
+      )
+    ),
+    React.createElement("div", { style:{ height:3, borderRadius:4, background:"rgba(255,255,255,0.07)", overflow:"hidden", marginBottom:14 } },
+      React.createElement("div", { style:{ height:"100%", borderRadius:4, background:"linear-gradient(90deg,"+C.rust+"dd,"+C.rust+")", width:Math.min(100, weeks.w/40*100)+"%", transition:"width 900ms cubic-bezier(0.2,0,0,1)" } })
+    ),
+    React.createElement("div", { style:{ display:"flex", alignItems:"center", justifyContent:"space-between" } },
+      React.createElement("div", null,
+        React.createElement("div", { style:{ fontFamily:display, fontWeight:500, fontSize:16, color:C.text } }, sizeFor(weeks.w).name),
+        React.createElement("div", { style:{ fontFamily:body, fontSize:12, color:C.mute } }, "~", sizeFor(weeks.w).inch, "\" · ", sizeFor(weeks.w).cm, " cm")
+      ),
+      overdue ? React.createElement("div", { style:{ fontFamily:body, fontWeight:500, fontSize:15, color:"#f9b4d0", letterSpacing:"0" } }, "Any day now 🌸") :
+      React.createElement("div", { style:{ textAlign:"right" } },
+        React.createElement("div", { style:{ fontFamily:mono, fontSize:10, letterSpacing:"0.1em", color:C.mute, textTransform:"uppercase" } }, "due"),
+        React.createElement("div", { style:{ fontFamily:body, fontSize:13, color:C.text } }, new Date(due+"T12:00:00").toLocaleDateString(undefined,{month:"short",day:"numeric"}))
+      )
+    )
+)))
+  ),
+  React.createElement("div", {
+    style: { position:"absolute", inset:0, overflowY:"auto", WebkitOverflowScrolling:"touch",
+             transform: pageTransform(1),
+             transition: isDragging ? "none" : "transform 0.34s cubic-bezier(0.2,0,0,1)",
+             willChange: "transform" }
+  },
+  React.createElement("div", {
+    className: "relative z-[1] mx-auto max-w-md",
+    style: { paddingTop: "max(3rem, env(safe-area-inset-top))",
+             paddingBottom: "calc(100px + env(safe-area-inset-bottom, 0px))",
+             paddingLeft: "max(20px, calc(env(safe-area-inset-left, 0px) + 16px))",
+             paddingRight: "max(20px, calc(env(safe-area-inset-right, 0px) + 16px))" }
+  },
+    React.createElement("div", {
+      style: { display:"flex", alignItems:"center", gap:14, marginBottom:28 }
+    },
+    React.createElement("div", {
+      style: { width:52, height:52, borderRadius:"50%", background:"linear-gradient(140deg,"+C.rust+","+C.rust+"aa)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, boxShadow:"0 0 0 2px rgba(0,0,0,0.8), 0 0 0 3.5px "+C.rust+", 0 6px 20px "+C.rust+"44" }
+    }, React.createElement("span", { style:{ fontFamily:display, fontWeight:700, fontSize:22, color:"#fff" } }, "M")),
+    React.createElement("div", null,
+      React.createElement("h1", {
+        style: { fontFamily: display, fontWeight: 700, fontSize: 17, letterSpacing: "-0.015em",
+                 color: C.text, lineHeight: 1.2, margin: 0 }
+      }, "Mabry"),
+      React.createElement("div", {
+        style: { fontFamily:body, fontSize:12, color:C.mute, marginTop:3, display:"flex", alignItems:"center", gap:5 }
+      }, React.createElement("span", { style:{ display:"inline-block", width:5, height:5, borderRadius:"50%", background: paired ? "#30D158" : "#FF453A", boxShadow: paired ? "0 0 6px #30D15888" : "0 0 6px #FF453A66", flexShrink:0 } }), "Partner · Your person")
+    )
+  ),
+    React.createElement("div", {
+    key: "messages",
+    className: "rise"
+  },
+  React.createElement("div", {
+    style: { minHeight: "50vh", paddingBottom: 8, paddingLeft: 4, paddingRight: 4, animation: "rise 0.3s ease both" }
+  },
+    threadMsgs.length === 0 && React.createElement("div", {
+      style: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "50vh", gap: 14 }
+    },
+      React.createElement("div", { style: { fontSize: 44, lineHeight: 1, opacity: 0.4, filter:"drop-shadow(0 4px 16px rgba(255,180,100,0.15))" } }, "💬"),
+      React.createElement("p", { style: { fontFamily: body, color: C.mute, fontSize: 14, margin: "6px 0 0", textAlign: "center", lineHeight: 1.6 } }, "Start the conversation ♥")
+    ),
+    (() => {
+      const GAP = 5 * 60 * 1000;
+      const lastMineIdx = threadMsgs.reduce((acc, msg, idx) => msg.side === "his" ? idx : acc, -1);
+      return threadMsgs.map((m, i) => {
+        const mine = m.side === "his";
+        const prev = threadMsgs[i - 1];
+        const next = threadMsgs[i + 1];
+        const isFirstInCluster = !prev || prev.side !== m.side || m.at - prev.at > GAP;
+        const isLastInCluster = !next || next.side !== m.side || next.at - m.at > GAP;
+        const showTime = !prev || m.at - prev.at > GAP;
+        const isLastMine = i === lastMineIdx;
+        const seenByHer = isLastMine && threadSeen && threadSeen.hers_seen_at > 0 && threadSeen.hers_seen_at >= m.at;
+        const tl = mine ? 20 : (isFirstInCluster ? 20 : 5);
+        const tr = mine ? (isFirstInCluster ? 20 : 5) : 20;
+        const bl = mine ? 20 : (isLastInCluster ? 5 : 5);
+        const br = mine ? (isLastInCluster ? 5 : 5) : 20;
+        const mb = isLastInCluster ? 6 : 2;
+        return React.createElement("div", { key: m.id || i },
+          showTime && React.createElement("div", {
+            style: { textAlign: "center", fontSize: 11, color: C.mute, fontFamily: mono, margin: "20px 0 8px", letterSpacing: "0.04em", opacity: 0.7, textTransform: "uppercase" }
+          }, new Date(m.at).toLocaleDateString() === new Date().toLocaleDateString() ? new Date(m.at).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"}) : new Date(m.at).toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})),
+          React.createElement("div", {
+            style: { display: "flex", alignItems: "flex-end", justifyContent: mine ? "flex-end" : "flex-start", marginBottom: mb, gap: 6, gap: 6 }
+          },
+            !mine && React.createElement("div", {
+              style: {
+                width: 24, height: 24, borderRadius: "50%", flexShrink: 0, marginBottom: 1,
+                background: isLastInCluster ? `${C.rust}22` : "transparent",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 11, fontWeight: 700, color: C.rust, fontFamily: body,
+                letterSpacing: "-0.01em"
+              }
+            }, isLastInCluster ? "M" : ""),
+            React.createElement("div", {
+              style: {
+                maxWidth: "78%", padding: "11px 16px", fontSize: 16, lineHeight: 1.46,
+                fontFamily: body,
+                background: mine ? `linear-gradient(145deg, ${C.rust}, ${C.rust}cc)` : C.cardHi,
+                color: mine ? contrastFor(C.rust) : C.text,
+                borderTopLeftRadius: tl, borderTopRightRadius: tr,
+                borderBottomLeftRadius: bl, borderBottomRightRadius: br,
+                whiteSpace: "pre-wrap",
+                boxShadow: mine ? "0 2px 8px rgba(0,0,0,0.35)" : "0 2px 6px rgba(0,0,0,0.28)", wordBreak: "break-word",
+                boxShadow: mine ? `0 2px 12px ${C.rust}44` : "0 1px 6px rgba(0,0,0,0.25)"
+              }
+            }, m.text)
+          ),
+          seenByHer && React.createElement("div", {
+            style: { textAlign: "right", fontSize: 10.5, color: C.mute, fontFamily: mono, marginBottom: 4, marginRight: 8, opacity: 0.65, letterSpacing: "0.02em" }
+          }, "✓ Seen")
+        );
+      });
+    })(),
+    React.createElement("div", {
+      ref: el => { if (el && tab === "messages" && el.scrollIntoView) el.scrollIntoView({ block: "end", behavior: "smooth" }); }
+    })
+  ),
+  React.createElement("div", {
+    className: "sticky glass",
+    style: {
+      bottom: "calc(80px + env(safe-area-inset-bottom, 0px))",
+      background: "rgba(18,18,20,0.82)",
+      borderTop: "1px solid rgba(255,255,255,0.1)",
+      padding: "10px 12px 10px",
+      display: "flex", alignItems: "center", gap: 10,
+      borderRadius: "20px 20px 0 0",
+      backdropFilter: "blur(28px) saturate(1.7)",
+      WebkitBackdropFilter: "blur(28px) saturate(1.7)",
+      zIndex: 10
+    }
+  },
+    React.createElement("input", {
+      value: threadInput,
+      onChange: e => setThreadInput(e.target.value),
+      onKeyDown: e => { if (e.key === "Enter") sendMessage(); },
+      maxLength: 280,
+      placeholder: "Message Mabry…",
+      style: {
+        flex: 1, minWidth: 0, fontSize: 15, fontFamily: body, color: C.text,
+        background: "rgba(255,255,255,0.08)",
+        border: "1px solid rgba(255,255,255,0.11)",
+        borderRadius: 24, padding: "9px 16px", outline: "none"
+      }
+    }),
+    React.createElement("button", {
+      onClick: sendMessage,
+      disabled: threadBusy || !threadInput.trim(),
+      "aria-label": "Send",
+      style: {
+        width: 34, height: 34, borderRadius: "50%", border: "none", cursor: "pointer",
+        background: (threadBusy || !threadInput.trim()) ? "rgba(255,255,255,0.06)" : C.rust,
+        color: (threadBusy || !threadInput.trim()) ? C.mute : contrastFor(C.rust), display: "grid", placeItems: "center", flexShrink: 0,
+        transition: "background 0.2s ease, transform 0.18s ease, opacity 0.18s ease",
+        transform: threadInput.trim() ? "scale(1)" : "scale(0.82)",
+        opacity: threadInput.trim() ? 1 : 0.35
+      }
+    },
+      React.createElement("span", { style: { fontSize: 17, marginTop: -1, display: "block" } }, "↑")
+    )
+  ))
+  )
+  ),
+  React.createElement("div", {
+    style: { position:"absolute", inset:0, overflowY:"auto", WebkitOverflowScrolling:"touch",
+             transform: pageTransform(2),
+             transition: isDragging ? "none" : "transform 0.32s cubic-bezier(0.2,0,0,1)",
+             willChange: "transform" }
+  },
+  React.createElement("div", {
+    className: "relative z-[1] mx-auto max-w-md",
+    style: { paddingTop: "max(2.5rem, env(safe-area-inset-top))",
+             paddingBottom: "calc(100px + env(safe-area-inset-bottom, 0px))",
+             paddingLeft: "max(20px, calc(env(safe-area-inset-left, 0px) + 16px))",
+             paddingRight: "max(20px, calc(env(safe-area-inset-right, 0px) + 16px))" }
+  },
+    React.createElement("div", {
+      style: { display:"flex", alignItems:"center", gap:14, marginBottom:28 }
+    },
+    React.createElement("div", {
+      style: { width:56, height:56, borderRadius:"50%", background:"linear-gradient(135deg,#636AFF,#D26BF0)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, boxShadow:"0 0 0 2px rgba(0,0,0,0.85), 0 0 0 4px #5E5CE6, 0 8px 28px #5E5CE688" }
+    }, React.createElement("span", { style:{ fontFamily:display, fontWeight:700, fontSize:22, color:"#fff" } }, "G")),
+    React.createElement("div", null,
+      React.createElement("h1", {
+        style: { fontFamily: display, fontWeight: 700, fontSize: 26, letterSpacing: "-0.02em",
+                 background: "linear-gradient(140deg,#ffffff 0%,rgba(255,255,255,0.7) 100%)",
+                 WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                 backgroundClip: "text", lineHeight: 1.1, margin: 0 }
+      }, "Gage"),
+      React.createElement("div", { style:{ fontFamily:body, fontSize:11, color:C.mute, marginTop:3 } }, React.createElement("span", { style:{ color:C.rust } }, "The Keeper"), " · ", React.createElement("span", { style:{ color:C.mute } }, DEPLOY_VER))
+    )
+  ),
+    React.createElement("div", {
+    key: "settings",
+    className: "rise space-y-3"
+  }, React.createElement(Card, null, React.createElement(Eyebrow, {color: C.rust}, "Accent color"), React.createElement("div", {
+    className: "grid grid-cols-6 gap-3"
+  }, Object.entries(ACCENTS).map(([k, a]) => React.createElement("button", {
+    key: k,
+    onClick: () => {
+      sfx.tick();
+      haptic(6);
+      setTheme(k, bgKey);
+    },
+    className: "press flex flex-col items-center gap-1.5"
+  }, React.createElement("span", {
+    className: "grid place-items-center rounded-full",
+    style: {
+      width: 44, height: 44,
+      background: a.v,
+      boxShadow: accentKey === k ? `0 0 0 2.5px rgba(0,0,0,0.85), 0 0 0 4.5px ${a.v}, 0 4px 14px ${a.v}55` : `0 2px 8px ${a.v}44`
+    }
+  }, accentKey === k && React.createElement("span", {
+    style: { color: contrastFor(a.v), fontSize: 14, fontWeight: 700 }
+  }, "✓")), React.createElement("span", {
+    style: {
+      fontFamily: body,
+      fontSize: 9,
+      letterSpacing: "0.02em",
+      color: accentKey === k ? C.text : "rgba(255,255,255,0.45)",
+      fontWeight: accentKey === k ? 600 : 400
+    }
+  }, a.name))))), React.createElement(Card, null, React.createElement(Eyebrow, {color:"#64D2FF"}, "Wallpaper"), React.createElement("div", {
+    className: "grid grid-cols-3 gap-3"
+  }, Object.entries(WALLPAPERS).map(([k, wp]) => React.createElement("button", {
+    key: k,
+    onClick: () => {
+      sfx.tick();
+      haptic(6);
+      setTheme(accentKey, k);
+    },
+    className: "press flex flex-col items-center gap-1.5"
+  }, React.createElement("span", {
+    className: "w-full rounded-2xl overflow-hidden",
+    style: {
+      background: wp.css,
+      border: bgKey === k ? `2.5px solid ${C.rust}` : `0.5px solid ${C.line}`,
+      boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)"
+    }
+  }), React.createElement("span", {
+    className: "text-[11px]",
+    style: {
+      fontFamily: body,
+      color: bgKey === k ? C.text : C.mute
+    }
+  }, wp.name))))), React.createElement(Card, null, React.createElement(Eyebrow, {color:"#34C759"}, "Scenes"), React.createElement("p", {
+      className: "mb-3 text-xs", style: { fontFamily:body, color:C.mute, lineHeight:1.6 }
+    }, "Tap a photo to set it as your wallpaper."), React.createElement("div", {
+      className: "grid grid-cols-3 gap-2"
+    }, Object.entries(PHOTO_SCENES).map(function(entry){
+      var k=entry[0], sc=entry[1];
+      return React.createElement("button", { key:k, onClick:function(){ sfx.tick(); haptic(6); setTheme(accentKey,k); }, className:"press flex flex-col items-center gap-1.5" },
+        React.createElement("span", { style:{ display:"block", height:60, width:"100%", borderRadius:12, overflow:"hidden", border:bgKey===k?"2.5px solid "+C.rust:"1px solid "+C.line } },
+          React.createElement("img", { src:sc.url.replace("w=1080","w=400"), alt:sc.name, loading:"lazy", style:{ width:"100%", height:"100%", objectFit:"cover", opacity:bgKey===k?1:0.72, display:"block" } })
+        ),
+        React.createElement("span", { className:"text-[10px]", style:{ fontFamily:body, color:bgKey===k?C.text:C.mute, textAlign:"center", lineHeight:1.3 } }, sc.name)
+      );
+    }))), React.createElement(Card, null, React.createElement("div", {
+    className: "mb-2 flex items-center justify-between"
+  }, React.createElement(Eyebrow, {color:"#BF5AF2"}, "Glass"), React.createElement("span", {
+    className: "text-xs",
+    style: {
+      fontFamily: mono,
+      color: C.mute
+    }
+  }, Math.round(glass * 100), "%")), React.createElement("input", {
+    type: "range",
+    min: "0",
+    max: "1",
+    step: "0.05",
+    value: glass,
+    onChange: e => setGlassLevel(parseFloat(e.target.value)),
+    className: "w-full",
+    style: {
+      accentColor: C.rust
+    }
+  }), React.createElement("div", {
+    className: "mt-1 flex justify-between text-xs",
+    style: {
+      fontFamily: body,
+      color: C.mute
+    }
+  }, React.createElement("span", null, "Solid"), React.createElement("span", null, "Clear"))), React.createElement("button", {
+    onClick: toggleLimits,
+    className: "glass press flex w-full items-center justify-between p-4 text-left",
+    style: {
+      background: C.card,
+      border: `1px solid ${pushLimits ? C.rust : C.line}`,
+      borderRadius: 18
+    }
+  }, React.createElement("div", {
+    className: "min-w-0 pr-3"
+  }, React.createElement("div", {
+    className: "text-sm",
+    style: {
+      fontFamily: body,
+      fontWeight: 500,
+      color: C.text
+    }
+  }, "Push the limits"), React.createElement("div", {
+    className: "text-xs",
+    style: {
+      fontFamily: body,
+      color: C.mute
+    }
+  }, "Maximum liquid glass — deeper blur, a living sheen, heavier drips")), React.createElement("span", {
+    className: "relative h-8 w-14 shrink-0 rounded-full",
+    style: {
+      background: pushLimits ? C.rust : C.cardHi,
+      border: `1px solid ${C.line}`,
+      transition: "background 200ms ease"
+    }
+  }, React.createElement("span", {
+    className: "absolute top-0.5 h-6 w-6 rounded-full",
+    style: {
+      background: "#fff",
+      left: pushLimits ? 26 : 2,
+      transition: "left 220ms cubic-bezier(0.34,1.56,0.64,1)"
+    }
+  }))), React.createElement(Card, null,
+      React.createElement(Eyebrow, {color:"#f9b4d0"}, "Baby & Tree"),
+      React.createElement("div", { style:{ marginBottom:16 } },
+        React.createElement("div", { className:"mb-1 text-xs uppercase", style:{ fontFamily:mono, letterSpacing:"0.1em", color:C.mute } }, "Tree name"),
+        React.createElement("div", { style:{ display:"flex", gap:8 } },
+          React.createElement("input", { value:treeNameDraft, onChange:function(e){ setTreeNameDraft(e.target.value); }, onKeyDown:function(e){ if(e.key==="Enter") saveTreeName(treeNameDraft); }, placeholder:"Your Tree", className:"flex-1 rounded-xl px-3 py-2 outline-none", style:{ fontFamily:"'Cormorant Garamond','Georgia',serif", fontStyle:"italic", fontSize:16, color:C.text, background:C.bg0, border:"1px solid "+C.line } }),
+          React.createElement("button", { onClick:function(){ saveTreeName(treeNameDraft); }, className:"rounded-full px-4 py-2 text-sm", style:{ fontFamily:body, background:C.rust, color:contrastFor(C.rust), border:"none", cursor:"pointer" } }, "Save")
+        )
+      ),
+      React.createElement("button", {
+        onClick:function(){ setWateringHistory({}); save("waterHistory",{}); sfx.pop(); setFlash("Watering streak reset"); },
+        style:{ fontFamily:body, fontSize:13, color:C.mute, background:"none", border:"none", cursor:"pointer", padding:0, display:"flex", alignItems:"center", gap:6 }
+      }, React.createElement("span", null, "↺"), "Reset watering streak")
+    ), React.createElement(Card, null, React.createElement(Eyebrow, {color:"#FFD60A"}, "Clock"), React.createElement("div", {
+    className: "flex items-center justify-between py-1"
+  }, React.createElement("span", {
+    className: "text-sm",
+    style: {
+      fontFamily: body,
+      color: C.text
+    }
+  }, "24-hour time"), React.createElement("button", {
+    onClick: () => {
+      const n = !clock24;
+      setClock24(n);
+      save("clock", {
+        h24: n,
+        sec: showSeconds
+      });
+      sfx.tick();
+    },
+    className: "press relative h-8 w-14 rounded-full",
+    style: {
+      background: clock24 ? C.rust : C.cardHi,
+      border: `1px solid ${C.line}`,
+      transition: "background 200ms ease"
+    }
+  }, React.createElement("span", {
+    className: "absolute top-0.5 h-6 w-6 rounded-full",
+    style: {
+      background: "#fff",
+      left: clock24 ? 26 : 2,
+      transition: "left 220ms cubic-bezier(0.34,1.56,0.64,1)"
+    }
+  }))), React.createElement("div", {
+    className: "flex items-center justify-between border-t py-1 pt-3",
+    style: {
+      borderColor: C.line
+    }
+  }, React.createElement("span", {
+    className: "text-sm",
+    style: {
+      fontFamily: body,
+      color: C.text
+    }
+  }, "Show seconds"), React.createElement("button", {
+    onClick: () => {
+      const n = !showSeconds;
+      setShowSeconds(n);
+      save("clock", {
+        h24: clock24,
+        sec: n
+      });
+      sfx.tick();
+    },
+    className: "press relative h-8 w-14 rounded-full",
+    style: {
+      background: showSeconds ? C.rust : C.cardHi,
+      border: `1px solid ${C.line}`,
+      transition: "background 200ms ease"
+    }
+  }, React.createElement("span", {
+    className: "absolute top-0.5 h-6 w-6 rounded-full",
+    style: {
+      background: "#fff",
+      left: showSeconds ? 26 : 2,
+      transition: "left 220ms cubic-bezier(0.34,1.56,0.64,1)"
+    }
+  })))), React.createElement(Card, null, React.createElement("div", {
+    className: "flex items-center justify-between"
+  }, React.createElement("div", null, React.createElement(Eyebrow, {color:"#FF9F0A"}, "Sound"), React.createElement("div", {
+    className: "text-sm",
+    style: {
+      fontFamily: body,
+      color: C.mute
+    }
+  }, "Soft taps and cues")), React.createElement("button", {
+    onClick: () => {
+      const n = !sound;
+      setSound(n);
+      save("sound", {
+        on: n
+      });
+      if (n) {
+        const c = ac();
+        if (c) tone(660, 0.12, "sine", 0.05, 880);
+      }
+    },
+    className: "press relative h-8 w-14 rounded-full",
+    style: {
+      background: sound ? C.rust : C.cardHi,
+      border: `1px solid ${C.line}`,
+      transition: "background 200ms ease"
+    }
+  }, React.createElement("span", {
+    className: "absolute top-0.5 h-6 w-6 rounded-full",
+    style: {
+      background: "#fff",
+      left: sound ? 26 : 2,
+      transition: "left 220ms cubic-bezier(0.34,1.56,0.64,1)"
+    }
+  })))))
+  )
+  )
+),
+  React.createElement("div", {
+    style: { position:"fixed", bottom:"calc(74px + env(safe-area-inset-bottom, 0px))",
+             left:0, right:0, display:"flex", justifyContent:"center", gap:0,
+             zIndex:59, pointerEvents:"none" }
+  },
+  React.createElement("div", {
+    style: { display:"flex", alignItems:"center", gap:6, padding:"5px 12px",
+             borderRadius:20, background:"rgba(0,0,0,0.35)", backdropFilter:"blur(12px)",
+             WebkitBackdropFilter:"blur(12px)" }
+  },
+    SWIPE_TABS.map((_, i) => React.createElement("div", {
+      key: i,
+      style: {
+        width: i === SWIPE_TABS.indexOf(tab) ? 20 : 6, height: 6, borderRadius: 3,
+        background: i === SWIPE_TABS.indexOf(tab) ? C.rust : "rgba(255,255,255,0.28)",
+        transition: "all 0.3s cubic-bezier(0.25,1,0.5,1)"
+      }
+    }))
+  )
+  ), flash && React.createElement("div", {
+    className: "pointer-events-none fixed inset-x-0 z-40 flex justify-center px-6",
+    style: {
+      bottom: "6.5rem"
+    }
+  }, React.createElement("div", {
+    className: "rounded-full px-5 py-3 text-sm",
+    style: {
+      fontFamily: body,
+      letterSpacing: "0.01em",
+      color: C.text,
+      background: "rgba(36,36,38,0.95)",
+      backdropFilter: "blur(40px) saturate(1.8)",
+      WebkitBackdropFilter: "blur(40px) saturate(1.8)",
+      border: "0.5px solid rgba(84,84,88,0.5)",
+      boxShadow: "0 10px 32px rgba(0,0,0,0.65), 0 2px 8px rgba(0,0,0,0.4)"
+    }
+  }, flash)),
+  React.createElement(BottomTabBar, {
+    tab,
+    openScreen,
+    closeScreen,
+    msgInput: threadInput, setMsgInput: setThreadInput,
+    onSend: sendMessage,
+    sending: threadBusy,
+    paired,
+    unread: threadMsgs.some(m => m.side === "hers" && m.at > (threadSeen.his_seen_at || 0))
+  }),
+);
+}
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(React.createElement(BaseCamp, null));
+
+</script>
+</body>
+</html>
