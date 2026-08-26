@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+<title>Night Watch — The Keeper</title>
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Night Watch" />
+<meta name="theme-color" content="#08060a" />
+<style>
+  :root{
+    --bg:#08060a;
+    --ember:#FF9F0A;
+    --core:#FFD60A;
+    --coal:#B34A3D;
+    --bone:#E8DCC8;
+    --mute:#8E8E93;
+    --line:rgba(232,220,200,0.16);
+    --panel:rgba(20,16,14,0.82);
+    --danger:#FF453A;
+    --display:-apple-system,'SF Pro Display',system-ui,sans-serif;
+    --body:-apple-system,'SF Pro Text',system-ui,sans-serif;
+    --mono:ui-monospace,'SF Mono','SFMono-Regular',menlo,monospace;
+    --safeT:env(safe-area-inset-top,0px);
+    --safeB:env(safe-area-inset-bottom,0px);
+    --safeL:env(safe-area-inset-left,0px);
+    --safeR:env(safe-area-inset-right,0px);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{
+    width:100%;height:100%;overflow:hidden;background:var(--bg);
+    color:var(--bone);font-family:var(--body);
+    overscroll-behavior:none;touch-action:none;user-select:none;-webkit-user-select:none;
+  }
+  #c{position:fixed;inset:0;display:block;z-index:0}
+
+  /* ---------- HUD ---------- */
+  #hud{
+    position:fixed;z-index:2;left:0;right:0;top:0;
+    padding:calc(var(--safeT) + 10px) calc(var(--safeR) + 14px) 0 calc(var(--safeL) + 14px);
+    display:flex;align-items:flex-start;gap:12px;pointer-events:none;
+    max-width:660px;margin:0 auto;
+    opacity:0;transition:opacity .35s ease;
+  }
+  #hud.on{opacity:1}
+  .meter{flex:1;min-width:0}
+  .meter .lbl{
+    display:flex;justify-content:space-between;align-items:baseline;
+    font:600 10px/1 var(--body);letter-spacing:.14em;text-transform:uppercase;
+    color:var(--mute);margin-bottom:6px;
+  }
+  .meter .lbl b{font:700 11px/1 var(--mono);letter-spacing:.06em;color:var(--bone)}
+  .bar{height:7px;border-radius:4px;background:rgba(232,220,200,0.10);overflow:hidden}
+  .bar i{
+    display:block;height:100%;width:60%;border-radius:4px;
+    background:linear-gradient(90deg,var(--coal),var(--ember) 55%,var(--core));
+    box-shadow:0 0 12px rgba(255,159,10,0.55);
+    transition:width .12s linear, background .3s ease;
+  }
+  .bar.low i{background:linear-gradient(90deg,#7a2520,var(--danger));box-shadow:0 0 14px rgba(255,69,58,0.6)}
+  #dawnWrap{width:88px;flex:none}
+  #dawnWrap .bar i{background:linear-gradient(90deg,#2a3550,#5E5CE6 60%,#9AD5FF);box-shadow:0 0 10px rgba(94,92,230,0.5)}
+  #stats{
+    flex:none;text-align:right;font:700 12px/1.5 var(--mono);letter-spacing:.04em;
+    color:var(--bone);text-shadow:0 1px 8px #000;
+  }
+  #stats small{display:block;font:600 9px/1 var(--body);letter-spacing:.14em;color:var(--mute);text-transform:uppercase;margin-bottom:4px}
+
+  /* ---------- Controls ---------- */
+  .btn{
+    position:fixed;z-index:3;display:grid;place-items:center;
+    border:1px solid var(--line);background:var(--panel);
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    color:var(--bone);cursor:pointer;opacity:0;pointer-events:none;
+    transition:opacity .35s ease, transform .1s ease, background .15s ease;
+  }
+  .btn.on{opacity:1;pointer-events:auto}
+  .btn:active{transform:scale(.94)}
+  #flare{
+    right:calc(var(--safeR) + 22px);bottom:calc(var(--safeB) + 30px);
+    width:88px;height:88px;border-radius:50%;
+    font:700 10px/1 var(--body);letter-spacing:.16em;text-transform:uppercase;
+    color:var(--core);border-color:rgba(255,214,10,0.34);
+    box-shadow:0 0 26px rgba(255,159,10,0.14), inset 0 0 22px rgba(255,159,10,0.10);
+    overflow:hidden;
+  }
+  #flare .fill{
+    position:absolute;left:0;right:0;bottom:0;height:0%;
+    background:rgba(255,159,10,0.14);transition:height .08s linear;
+  }
+  #flare span{position:relative;z-index:1}
+  #flare.cool{color:#7d7369;border-color:var(--line);box-shadow:none}
+  #flare.ready{animation:flarePulse 2.6s ease-in-out infinite}
+  @keyframes flarePulse{
+    0%,100%{box-shadow:0 0 22px rgba(255,159,10,0.12), inset 0 0 20px rgba(255,159,10,0.08)}
+    50%{box-shadow:0 0 34px rgba(255,159,10,0.26), inset 0 0 26px rgba(255,159,10,0.16)}
+  }
+  #pause{
+    top:calc(var(--safeT) + 58px);right:calc(var(--safeR) + 14px);
+    width:38px;height:38px;border-radius:12px;
+  }
+  #pause svg{opacity:.75}
+
+  /* ---------- Overlays ---------- */
+  #veil{
+    position:fixed;inset:0;z-index:4;display:grid;place-items:center;
+    padding:calc(var(--safeT) + 24px) 26px calc(var(--safeB) + 24px);
+    background:radial-gradient(120% 90% at 50% 45%, rgba(24,14,8,0.72), rgba(4,3,5,0.94) 70%);
+    backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);
+    transition:opacity .4s ease;
+  }
+  #veil.hide{opacity:0;pointer-events:none}
+  .card{width:100%;max-width:380px;text-align:center;animation:rise .5s cubic-bezier(.2,.9,.25,1) both}
+  @keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+  .eyebrow{font:700 10px/1 var(--body);letter-spacing:.28em;text-transform:uppercase;color:var(--ember);margin-bottom:14px}
+  h1{font:700 40px/1.02 var(--display);letter-spacing:-.02em;margin-bottom:14px}
+  h1 em{font-style:normal;display:block;color:var(--ember);text-shadow:0 0 34px rgba(255,159,10,0.45)}
+  .lede{font:400 15px/1.55 var(--body);color:#B8AEA0;margin-bottom:26px}
+  .rules{
+    text-align:left;border:1px solid var(--line);border-radius:16px;
+    background:rgba(20,16,14,0.5);padding:14px 16px;margin-bottom:24px;
+  }
+  .rules li{list-style:none;display:flex;gap:11px;align-items:flex-start;padding:7px 0;font:400 13.5px/1.45 var(--body);color:#C4BAAC}
+  .rules li+li{border-top:1px solid rgba(232,220,200,0.07)}
+  .rules b{color:var(--bone);font-weight:600}
+  .glyph{flex:none;width:22px;text-align:center;font-size:15px;line-height:1.45;filter:saturate(.9)}
+  .go{
+    display:block;width:100%;padding:17px;border:none;border-radius:16px;cursor:pointer;
+    background:linear-gradient(180deg,#FFB13A,#E07C0A);color:#20130a;
+    font:700 16px/1 var(--body);letter-spacing:.02em;
+    box-shadow:0 10px 34px rgba(255,159,10,0.28);
+    transition:transform .1s ease,filter .15s ease;
+  }
+  .go:active{transform:scale(.98);filter:brightness(1.06)}
+  .ghost{
+    display:block;width:100%;padding:15px;margin-top:10px;cursor:pointer;
+    background:transparent;border:1px solid var(--line);border-radius:16px;
+    color:var(--mute);font:600 14px/1 var(--body);
+  }
+  .ghost:active{background:rgba(232,220,200,0.05)}
+  .tally{display:flex;gap:10px;margin-bottom:24px}
+  .tally div{
+    flex:1;border:1px solid var(--line);border-radius:14px;padding:14px 8px;
+    background:rgba(20,16,14,0.5);
+  }
+  .tally span{display:block;font:600 9px/1 var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--mute);margin-bottom:8px}
+  .tally b{font:700 24px/1 var(--mono);letter-spacing:-.02em;color:var(--bone)}
+  .tally b.hi{color:var(--core)}
+  .foot{margin-top:20px;font:500 10px/1.6 var(--body);letter-spacing:.12em;text-transform:uppercase;color:#57514c}
+
+  /* ---------- Toast ---------- */
+  #toast{
+    position:fixed;z-index:3;left:50%;top:38%;transform:translate(-50%,-50%);
+    text-align:center;pointer-events:none;opacity:0;
+  }
+  #toast.show{animation:toast 1.7s cubic-bezier(.2,.9,.25,1) both}
+  #toast .t1{font:700 34px/1 var(--display);letter-spacing:-.01em;color:var(--core);text-shadow:0 0 40px rgba(255,214,10,0.5)}
+  #toast .t2{margin-top:8px;font:600 11px/1 var(--body);letter-spacing:.24em;text-transform:uppercase;color:#B8AEA0}
+  @keyframes toast{
+    0%{opacity:0;transform:translate(-50%,-50%) scale(.86)}
+    16%{opacity:1;transform:translate(-50%,-50%) scale(1)}
+    72%{opacity:1}
+    100%{opacity:0;transform:translate(-50%,-58%) scale(1.02)}
+  }
+  @media (max-height:620px){
+    h1{font-size:32px}
+    .rules li{font-size:12.5px;padding:6px 0}
+    .lede{margin-bottom:18px;font-size:14px}
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud">
+  <div class="meter" id="fuelWrap">
+    <div class="lbl"><span>Fire</span><b id="fuelNum">60</b></div>
+    <div class="bar" id="fuelBar"><i></i></div>
+  </div>
+  <div class="meter" id="dawnWrap">
+    <div class="lbl"><span>Dawn</span></div>
+    <div class="bar" id="dawnBar"><i></i></div>
+  </div>
+  <div id="stats"><small>Night <span id="nightNum">1</span></small><span id="scoreNum">0</span></div>
+</div>
+
+<button class="btn" id="pause" aria-label="Pause">
+  <svg width="14" height="16" viewBox="0 0 14 16" fill="none"><rect x="1" y="1" width="4" height="14" rx="1.4" fill="currentColor"/><rect x="9" y="1" width="4" height="14" rx="1.4" fill="currentColor"/></svg>
+</button>
+
+<button class="btn" id="flare" aria-label="Flare"><div class="fill"></div><span>Flare</span></button>
+
+<div id="toast"><div class="t1"></div><div class="t2"></div></div>
+
+<div id="veil"><div class="card" id="card"></div></div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ────────────────────────────────────────────────────────────── setup
+  var cvs = document.getElementById('c');
+  var ctx = cvs.getContext('2d');
+  var darkCvs = document.createElement('canvas');
+  var dctx = darkCvs.getContext('2d');
+  var groundCvs = document.createElement('canvas');
+  var gctx = groundCvs.getContext('2d');
+
+  var W = 0, H = 0, DPR = 1;
+  var BEST_KEY = 'keeper.nightwatch.best';
+  var MUTE_KEY = 'keeper.nightwatch.mute';
+
+  // ────────────────────────────────────────────────────────────── tuning
+  var K = {
+    keeperSpeed: 205,
+    keeperR: 13,
+    lampR: 84,
+    fireCoreR: 34,
+    depositR: 52,
+    pickupR: 26,
+    maxFuel: 100,
+    startFuel: 68,
+    logFuel: 24,
+    nightLen: 42,          // seconds of darkness per night
+    baseDrain: 1.35,       // fuel burned per second on night 1
+    drainPerNight: 0.38,
+    flareCost: 10,
+    flareCd: 1.5,
+    flareR: 148,
+    maxLogs: 6,
+    logEvery: 2.4
+  };
+
+  // ────────────────────────────────────────────────────────────── state
+  var S = {
+    mode: 'menu',          // menu | play | paused | over | dawn
+    time: 0,
+    night: 1,
+    nightT: 0,
+    score: 0,
+    fuel: K.startFuel,
+    fire: { x: 0, y: 0, flare: 0 },
+    keeper: { x: 0, y: 0, vx: 0, vy: 0, carry: 0, cd: 0, stun: 0, face: 0 },
+    logs: [], shades: [], parts: [],
+    logT: 0, spawnT: 0, shake: 0, dawnHold: 0,
+    kills: 0, logsBurned: 0, muted: false
+  };
+
+  // ────────────────────────────────────────────────────────────── helpers
+  function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function rand(a, b) { return a + Math.random() * (b - a); }
+  function dist2(ax, ay, bx, by) { var dx = ax - bx, dy = ay - by; return dx * dx + dy * dy; }
+  function dist(ax, ay, bx, by) { return Math.sqrt(dist2(ax, ay, bx, by)); }
+
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      var t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+
+  // ────────────────────────────────────────────────────────────── audio
+  var AC = null;
+  function ac() {
+    if (S.muted) return null;
+    if (!AC) {
+      var Ctor = window.AudioContext || window.webkitAudioContext;
+      if (!Ctor) return null;
+      AC = new Ctor();
+    }
+    if (AC.state === 'suspended') AC.resume();
+    return AC;
+  }
+  function tone(freq, dur, type, vol, slideTo) {
+    var a = ac(); if (!a) return;
+    var o = a.createOscillator(), g = a.createGain();
+    o.type = type || 'sine';
+    o.frequency.setValueAtTime(freq, a.currentTime);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(20, slideTo), a.currentTime + dur);
+    g.gain.setValueAtTime(0.0001, a.currentTime);
+    g.gain.exponentialRampToValueAtTime(vol || 0.08, a.currentTime + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + dur);
+    o.connect(g); g.connect(a.destination);
+    o.start(); o.stop(a.currentTime + dur + 0.02);
+  }
+  function noise(dur, vol, freq) {
+    var a = ac(); if (!a) return;
+    var len = Math.floor(a.sampleRate * dur);
+    var buf = a.createBuffer(1, len, a.sampleRate);
+    var d = buf.getChannelData(0);
+    for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    var src = a.createBufferSource(); src.buffer = buf;
+    var f = a.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq || 800;
+    var g = a.createGain(); g.gain.value = vol || 0.1;
+    src.connect(f); f.connect(g); g.connect(a.destination);
+    src.start();
+  }
+  function buzz(ms) { if (navigator.vibrate && !S.muted) { try { navigator.vibrate(ms); } catch (e) {} } }
+
+  var SFX = {
+    pick:  function () { tone(520, 0.09, 'triangle', 0.05, 760); },
+    feed:  function () { noise(0.26, 0.13, 420); tone(180, 0.34, 'sine', 0.09, 90); },
+    flare: function () { noise(0.32, 0.16, 1400); tone(300, 0.3, 'sawtooth', 0.06, 900); },
+    kill:  function () { noise(0.14, 0.09, 2200); tone(760, 0.1, 'square', 0.03, 300); },
+    hurt:  function () { tone(120, 0.22, 'square', 0.09, 60); noise(0.16, 0.1, 260); },
+    dawn:  function () { [523, 659, 784, 1047].forEach(function (f, i) { setTimeout(function () { tone(f, 0.5, 'sine', 0.06); }, i * 110); }); },
+    dead:  function () { [330, 262, 196, 131].forEach(function (f, i) { setTimeout(function () { tone(f, 0.7, 'sine', 0.08); }, i * 190); }); },
+    low:   function () { tone(90, 0.3, 'sine', 0.06, 62); }
+  };
+
+  // ────────────────────────────────────────────────────────────── canvas sizing
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth;
+    H = window.innerHeight;
+    [cvs, darkCvs, groundCvs].forEach(function (cv) {
+      cv.width = Math.max(1, Math.round(W * DPR));
+      cv.height = Math.max(1, Math.round(H * DPR));
+      cv.style.width = W + 'px';
+      cv.style.height = H + 'px';
+    });
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    dctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    gctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    S.fire.x = W / 2;
+    S.fire.y = H / 2;
+    S.keeper.x = clamp(S.keeper.x, 16, W - 16);
+    S.keeper.y = clamp(S.keeper.y, 60, H - 24);
+    paintGround();
+  }
+
+  function paintGround() {
+    var r = mulberry32(1337);
+    gctx.clearRect(0, 0, W, H);
+    var g = gctx.createRadialGradient(W / 2, H / 2, 20, W / 2, H / 2, Math.max(W, H) * 0.8);
+    g.addColorStop(0, '#241a14');
+    g.addColorStop(0.45, '#150f10');
+    g.addColorStop(1, '#08060a');
+    gctx.fillStyle = g;
+    gctx.fillRect(0, 0, W, H);
+
+    // scattered grit
+    for (var i = 0; i < Math.floor(W * H / 1400); i++) {
+      var x = r() * W, y = r() * H, s = r() * 1.7 + 0.3;
+      gctx.fillStyle = 'rgba(232,220,200,' + (0.02 + r() * 0.05).toFixed(3) + ')';
+      gctx.fillRect(x, y, s, s);
+    }
+    // a few grass tufts / stones
+    for (var j = 0; j < Math.floor((W * H) / 26000); j++) {
+      var px = r() * W, py = r() * H;
+      if (dist(px, py, W / 2, H / 2) < 90) continue;
+      gctx.strokeStyle = 'rgba(150,168,107,0.10)';
+      gctx.lineWidth = 1.1;
+      for (var b = 0; b < 3; b++) {
+        gctx.beginPath();
+        gctx.moveTo(px + b * 2.6 - 2.6, py);
+        gctx.quadraticCurveTo(px + b * 2.6 - 4, py - 7, px + b * 3.4 - 6, py - 12);
+        gctx.stroke();
+      }
+    }
+    // fire ring stones
+    for (var k = 0; k < 13; k++) {
+      var a = (k / 13) * Math.PI * 2 + 0.2;
+      var rr = 46 + r() * 5;
+      var sx = W / 2 + Math.cos(a) * rr, sy = H / 2 + Math.sin(a) * rr * 0.72;
+      gctx.fillStyle = 'rgba(120,112,104,0.32)';
+      gctx.beginPath();
+      gctx.ellipse(sx, sy, 8 + r() * 3, 6 + r() * 2, a, 0, Math.PI * 2);
+      gctx.fill();
+      gctx.fillStyle = 'rgba(0,0,0,0.35)';
+      gctx.beginPath();
+      gctx.ellipse(sx, sy + 2.5, 7 + r() * 2, 3, a, 0, Math.PI * 2);
+      gctx.fill();
+    }
+  }
+
+  // ────────────────────────────────────────────────────────────── lighting model
+  function lightRadius() {
+    return 74 + (S.fuel / K.maxFuel) * 196 + S.fire.flare * 90;
+  }
+  function lightAt(x, y) {
+    var lr = lightRadius();
+    var f = clamp(1 - dist(x, y, S.fire.x, S.fire.y) / lr, 0, 1);
+    var l = clamp(1 - dist(x, y, S.keeper.x, S.keeper.y) / K.lampR, 0, 1) * 0.85;
+    return clamp(Math.max(f * f * 1.15, l), 0, 1);
+  }
+
+  // ────────────────────────────────────────────────────────────── particles
+  function spark(x, y, n, hue, spd, life) {
+    for (var i = 0; i < n; i++) {
+      var a = rand(0, Math.PI * 2), s = rand(spd * 0.3, spd);
+      S.parts.push({
+        x: x, y: y, vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+        life: rand(life * 0.5, life), max: life, r: rand(1, 2.6), c: hue, g: 0
+      });
+    }
+  }
+  function ember(x, y) {
+    S.parts.push({
+      x: x + rand(-13, 13), y: y + rand(-6, 6),
+      vx: rand(-14, 14), vy: rand(-52, -24),
+      life: rand(0.7, 1.7), max: 1.7, r: rand(0.9, 2.1), c: 'ember', g: -8
+    });
+  }
+
+  // ────────────────────────────────────────────────────────────── spawning
+  // wood gets scarcer and lies farther out as the nights wear on
+  function logInterval() { return K.logEvery + Math.min(1.9, (S.night - 1) * 0.17); }
+  function logMinDist() { return Math.min(Math.min(W, H) * 0.42, 128 + (S.night - 1) * 13); }
+
+  function spawnLog() {
+    if (S.logs.length >= K.maxLogs) return;
+    var minD = logMinDist();
+    for (var tries = 0; tries < 30; tries++) {
+      var x = rand(46, W - 46), y = rand(88, H - 96);
+      if (dist(x, y, S.fire.x, S.fire.y) < minD) continue;
+      S.logs.push({ x: x, y: y, a: rand(0, Math.PI), pop: 0 });
+      return;
+    }
+    // arena too small to honour the min distance — drop it on the ring instead
+    var ang = rand(0, 6.283);
+    S.logs.push({
+      x: clamp(S.fire.x + Math.cos(ang) * minD, 46, W - 46),
+      y: clamp(S.fire.y + Math.sin(ang) * minD, 88, H - 96),
+      a: rand(0, Math.PI), pop: 0
+    });
+  }
+
+  function spawnShade() {
+    var edge = Math.floor(rand(0, 4)), x, y, m = 40;
+    if (edge === 0) { x = rand(-m, W + m); y = -m; }
+    else if (edge === 1) { x = W + m; y = rand(-m, H + m); }
+    else if (edge === 2) { x = rand(-m, W + m); y = H + m; }
+    else { x = -m; y = rand(-m, H + m); }
+
+    // husks only start walking on night 5, and never crowd out everything else
+    var huskChance = S.night >= 5 ? clamp((S.night - 4) * 0.07, 0, 0.34) : 0;
+    var wispChance = S.night >= 3 ? clamp(0.16 + S.night * 0.04, 0, 0.42) : 0;
+    var roll = Math.random();
+    var kind = roll < huskChance ? 'husk' : (roll < huskChance + wispChance ? 'wisp' : 'crawler');
+    var T = SHADE[kind];
+    var hp = T.hp + S.night * T.hpN;
+
+    S.shades.push({
+      kind: kind, t: T,
+      x: x, y: y,
+      hp: hp, maxHp: hp,
+      spd: rand(T.spd[0], T.spd[1]) + S.night * T.spdN,
+      r: T.r,
+      kx: 0, ky: 0,       // knockback velocity
+      wob: rand(0, 6.28),
+      latched: 0,
+      hit: 0
+    });
+  }
+
+  // Three kinds of dark. `burn` is how fast light eats them — a husk barely
+  // cares about firelight, so it has to be met out in the open with a flare.
+  var SHADE = {
+    crawler: { hp: 6.0, hpN: 1.4, spd: [30, 41], spdN: 1.1, r: 15, burn: 5.2, drain: 5.4, wob: 3.4, sway: 0.22, score: 12, tint: '34,18,44',  eye: 'rgba(255,107,107,0.80)', eyeGap: 4.4 },
+    wisp:    { hp: 3.4, hpN: 0.0, spd: [66, 80], spdN: 0.0, r: 10, burn: 6.5, drain: 3.6, wob: 7.0, sway: 0.50, score: 8,  tint: '78,48,142',  eye: 'rgba(200,180,255,0.85)', eyeGap: 3.2 },
+    husk:    { hp: 13,  hpN: 2.2, spd: [22, 30], spdN: 0.5, r: 19, burn: 2.0, drain: 7.6, wob: 2.0, sway: 0.14, score: 26, tint: '14,8,20',   eye: 'rgba(255,168,32,0.90)', eyeGap: 6.0 }
+  };
+
+  // ────────────────────────────────────────────────────────────── input
+  var keys = {};
+  var stick = { id: null, ox: 0, oy: 0, x: 0, y: 0, dx: 0, dy: 0, on: false };
+
+  window.addEventListener('keydown', function (e) {
+    var k = e.key.toLowerCase();
+    keys[k] = true;
+    if (k === ' ') { e.preventDefault(); doFlare(); }
+    if (k === 'escape' || k === 'p') togglePause();
+    if (k === 'enter' && (S.mode === 'menu' || S.mode === 'over')) startGame();
+  });
+  window.addEventListener('keyup', function (e) { keys[e.key.toLowerCase()] = false; });
+
+  function localPt(e) {
+    return { x: e.clientX, y: e.clientY };
+  }
+  cvs.addEventListener('pointerdown', function (e) {
+    if (S.mode !== 'play') return;
+    e.preventDefault();
+    var p = localPt(e);
+    if (stick.id === null) {
+      stick.id = e.pointerId; stick.ox = p.x; stick.oy = p.y;
+      stick.x = p.x; stick.y = p.y; stick.dx = 0; stick.dy = 0; stick.on = true;
+      try { cvs.setPointerCapture(e.pointerId); } catch (err) {}
+    } else {
+      doFlare(); // second finger anywhere = flare
+    }
+  }, { passive: false });
+
+  cvs.addEventListener('pointermove', function (e) {
+    if (e.pointerId !== stick.id) return;
+    var p = localPt(e);
+    stick.x = p.x; stick.y = p.y;
+    var dx = stick.x - stick.ox, dy = stick.y - stick.oy;
+    var d = Math.hypot(dx, dy);
+    var MAX = 54;
+    if (d > MAX) {                      // let the origin trail the finger
+      stick.ox += dx * (1 - MAX / d);
+      stick.oy += dy * (1 - MAX / d);
+      dx = stick.x - stick.ox; dy = stick.y - stick.oy; d = MAX;
+    }
+    var n = d < 7 ? 0 : clamp((d - 7) / (MAX - 7), 0, 1);
+    if (d > 0.001) { stick.dx = dx / d * n; stick.dy = dy / d * n; }
+    else { stick.dx = 0; stick.dy = 0; }
+  }, { passive: false });
+
+  function endStick(e) {
+    if (e.pointerId !== stick.id) return;
+    stick.id = null; stick.on = false; stick.dx = 0; stick.dy = 0;
+  }
+  cvs.addEventListener('pointerup', endStick);
+  cvs.addEventListener('pointercancel', endStick);
+
+  var flareBtn = document.getElementById('flare');
+  flareBtn.addEventListener('pointerdown', function (e) { e.preventDefault(); e.stopPropagation(); doFlare(); });
+  document.getElementById('pause').addEventListener('click', togglePause);
+
+  // ────────────────────────────────────────────────────────────── actions
+  function doFlare() {
+    if (S.mode !== 'play') return;
+    var k = S.keeper;
+    if (k.cd > 0 || S.fuel < K.flareCost + 2) { tone(140, 0.06, 'square', 0.03); return; }
+    k.cd = K.flareCd;
+    S.fuel -= K.flareCost;
+    S.fire.flare = Math.max(S.fire.flare, 1);
+    S.shake = Math.max(S.shake, 7);
+    SFX.flare(); buzz(22);
+    spark(k.x, k.y, 22, 'gold', 230, 0.5);
+
+    for (var i = S.shades.length - 1; i >= 0; i--) {
+      var s = S.shades[i];
+      var d = dist(s.x, s.y, k.x, k.y);
+      if (d > K.flareR) continue;
+      var force = (1 - d / K.flareR);
+      var ang = Math.atan2(s.y - k.y, s.x - k.x);
+      s.kx += Math.cos(ang) * 420 * force;
+      s.ky += Math.sin(ang) * 420 * force;
+      s.latched = 0;
+      s.hit = 0.25;
+      s.hp -= 3.2 * force + 1;
+      if (s.hp <= 0) killShade(i);
+    }
+  }
+
+  function killShade(i) {
+    var s = S.shades[i];
+    spark(s.x, s.y, Math.round(s.r * 0.9), 'shade', 150, 0.55);
+    spark(s.x, s.y, 5, 'gold', 90, 0.4);
+    S.shades.splice(i, 1);
+    S.kills++;
+    S.score += s.t.score;
+    SFX.kill();
+  }
+
+  // ────────────────────────────────────────────────────────────── update
+  function update(dt) {
+    S.time += dt;
+    S.shake = Math.max(0, S.shake - dt * 26);
+    S.fire.flare = Math.max(0, S.fire.flare - dt * 1.9);
+
+    // embers off the fire
+    if (Math.random() < dt * (12 + S.fuel * 0.5)) ember(S.fire.x, S.fire.y - 8);
+
+    // particles
+    for (var p = S.parts.length - 1; p >= 0; p--) {
+      var pt = S.parts[p];
+      pt.life -= dt;
+      if (pt.life <= 0) { S.parts.splice(p, 1); continue; }
+      pt.x += pt.vx * dt; pt.y += pt.vy * dt;
+      pt.vy += (pt.g || 0) * dt;
+      pt.vx *= (1 - dt * 1.6); pt.vy *= (1 - dt * 1.6);
+    }
+
+    if (S.mode === 'dawn') {
+      S.dawnHold -= dt;
+      if (S.dawnHold <= 0) { S.mode = 'play'; S.nightT = 0; }
+      return;
+    }
+    if (S.mode !== 'play') return;
+
+    // ── keeper movement
+    var k = S.keeper;
+    var ix = 0, iy = 0;
+    if (keys['arrowleft'] || keys['a']) ix -= 1;
+    if (keys['arrowright'] || keys['d']) ix += 1;
+    if (keys['arrowup'] || keys['w']) iy -= 1;
+    if (keys['arrowdown'] || keys['s']) iy += 1;
+    var kd = Math.hypot(ix, iy);
+    if (kd > 0) { ix /= kd; iy /= kd; }
+    if (stick.on) { ix = stick.dx; iy = stick.dy; }
+
+    var stunned = k.stun > 0;
+    k.stun = Math.max(0, k.stun - dt);
+    var speed = K.keeperSpeed * (k.carry ? 0.86 : 1) * (stunned ? 0.25 : 1);
+    k.vx = lerp(k.vx, ix * speed, 1 - Math.pow(0.0008, dt));
+    k.vy = lerp(k.vy, iy * speed, 1 - Math.pow(0.0008, dt));
+    k.x = clamp(k.x + k.vx * dt, 16, W - 16);
+    k.y = clamp(k.y + k.vy * dt, 60, H - 24);
+    if (Math.hypot(k.vx, k.vy) > 12) k.face = Math.atan2(k.vy, k.vx);
+    k.cd = Math.max(0, k.cd - dt);
+
+    // keep the keeper out of the coals
+    var fd = dist(k.x, k.y, S.fire.x, S.fire.y);
+    if (fd < K.fireCoreR) {
+      var a = Math.atan2(k.y - S.fire.y, k.x - S.fire.x);
+      k.x = S.fire.x + Math.cos(a) * K.fireCoreR;
+      k.y = S.fire.y + Math.sin(a) * K.fireCoreR;
+    }
+
+    // ── logs
+    S.logT -= dt;
+    if (S.logT <= 0) { spawnLog(); S.logT = logInterval() * rand(0.75, 1.3); }
+    for (var i = S.logs.length - 1; i >= 0; i--) {
+      var lg = S.logs[i];
+      lg.pop = Math.min(1, lg.pop + dt * 3.2);
+      if (!k.carry && dist2(lg.x, lg.y, k.x, k.y) < K.pickupR * K.pickupR) {
+        S.logs.splice(i, 1);
+        k.carry = 1;
+        SFX.pick(); buzz(8);
+        spark(lg.x, lg.y, 5, 'wood', 70, 0.35);
+      }
+    }
+    // deposit
+    if (k.carry && fd < K.depositR) {
+      k.carry = 0;
+      S.fuel = Math.min(K.maxFuel, S.fuel + K.logFuel);
+      S.logsBurned++;
+      S.score += 15;
+      S.fire.flare = Math.max(S.fire.flare, 0.75);
+      S.shake = Math.max(S.shake, 3.5);
+      SFX.feed(); buzz(14);
+      for (var e = 0; e < 16; e++) ember(S.fire.x, S.fire.y - 6);
+      spark(S.fire.x, S.fire.y - 6, 12, 'gold', 130, 0.7);
+    }
+
+    // ── shades
+    S.spawnT -= dt;
+    var interval = Math.max(0.5, 2.0 - S.night * 0.13);
+    if (S.spawnT <= 0 && S.shades.length < 28) {
+      spawnShade();
+      S.spawnT = interval * rand(0.7, 1.3);
+    }
+
+    var drain = K.baseDrain + (S.night - 1) * K.drainPerNight;
+    for (var j = S.shades.length - 1; j >= 0; j--) {
+      var s = S.shades[j];
+      s.wob += dt * s.t.wob;
+      s.hit = Math.max(0, s.hit - dt);
+
+      var li = lightAt(s.x, s.y);
+      s.hp -= li * s.t.burn * dt;
+      if (s.hp <= 0) { killShade(j); continue; }
+
+      var sd = dist(s.x, s.y, S.fire.x, S.fire.y);
+      if (sd < K.fireCoreR + 8) {
+        s.latched = 1;
+        drain += s.t.drain;
+      } else {
+        s.latched = 0;
+        var ang = Math.atan2(S.fire.y - s.y, S.fire.x - s.x);
+        var slow = 1 - 0.6 * li;
+        var wob = Math.sin(s.wob) * s.t.sway;
+        s.x += Math.cos(ang + wob) * s.spd * slow * dt;
+        s.y += Math.sin(ang + wob) * s.spd * slow * dt;
+      }
+
+      // knockback
+      s.x += s.kx * dt; s.y += s.ky * dt;
+      s.kx *= Math.pow(0.02, dt); s.ky *= Math.pow(0.02, dt);
+
+      // touching the keeper
+      if (k.stun <= 0 && dist2(s.x, s.y, k.x, k.y) < (s.r + K.keeperR) * (s.r + K.keeperR)) {
+        k.stun = 0.55;
+        var ka = Math.atan2(k.y - s.y, k.x - s.x);
+        k.vx = Math.cos(ka) * 340; k.vy = Math.sin(ka) * 340;
+        s.kx = -Math.cos(ka) * 180; s.ky = -Math.sin(ka) * 180;
+        S.shake = Math.max(S.shake, 9);
+        SFX.hurt(); buzz([12, 40, 12]);
+        if (k.carry) {
+          k.carry = 0;
+          S.logs.push({ x: clamp(k.x + rand(-30, 30), 30, W - 30), y: clamp(k.y + rand(-30, 30), 90, H - 40), a: rand(0, 3.14), pop: 0 });
+        }
+      }
+    }
+
+    // ── fuel + night clock
+    var wasLow = S.fuel <= 20;
+    S.fuel -= drain * dt;
+    S.score += dt * 6;
+
+    if (S.fuel <= 20 && !wasLow) SFX.low();
+    if (S.fuel <= 0) { S.fuel = 0; gameOver(); return; }
+
+    S.nightT += dt;
+    if (S.nightT >= K.nightLen) breakOfDawn();
+  }
+
+  function breakOfDawn() {
+    S.mode = 'dawn';
+    S.dawnHold = 2.2;
+    S.score += 120 * S.night;
+    S.fuel = Math.min(K.maxFuel, S.fuel + 26);
+    S.shake = 6;
+    for (var i = S.shades.length - 1; i >= 0; i--) {
+      spark(S.shades[i].x, S.shades[i].y, 8, 'shade', 190, 0.6);
+    }
+    S.shades.length = 0;
+    S.night++;
+    S.nightT = 0;
+    SFX.dawn(); buzz([18, 60, 18]);
+    var omen = S.night === 3 ? 'Something quicker is out there'
+             : S.night === 5 ? 'Husks walk tonight — light alone will not hold them'
+             : 'Night ' + S.night + ' begins';
+    toast('Dawn', omen);
+  }
+
+  // ────────────────────────────────────────────────────────────── render
+  function render() {
+    var ox = 0, oy = 0;
+    if (S.shake > 0.2) { ox = rand(-S.shake, S.shake) * 0.5; oy = rand(-S.shake, S.shake) * 0.5; }
+
+    ctx.setTransform(DPR, 0, 0, DPR, ox * DPR, oy * DPR);
+    ctx.clearRect(-20, -20, W + 40, H + 40);
+    ctx.drawImage(groundCvs, 0, 0, W, H);
+
+    drawLogs();
+    drawFire();
+    drawShades();
+    drawKeeper();
+
+    drawDarkness();
+    drawGlow();
+    drawParticles();
+    drawStick();
+
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+
+  function drawLogs() {
+    for (var i = 0; i < S.logs.length; i++) {
+      var l = S.logs[i];
+      var sc = 0.6 + 0.4 * l.pop;
+      var li = lightAt(l.x, l.y);
+      ctx.save();
+      ctx.translate(l.x, l.y);
+      ctx.rotate(l.a);
+      ctx.scale(sc, sc);
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.beginPath(); ctx.ellipse(0, 6, 16, 5, 0, 0, 6.29); ctx.fill();
+      ctx.fillStyle = 'rgb(' + Math.round(56 + li * 78) + ',' + Math.round(38 + li * 50) + ',' + Math.round(24 + li * 26) + ')';
+      roundRect(-16, -6, 32, 12, 6); ctx.fill();
+      ctx.strokeStyle = 'rgba(20,12,8,0.75)'; ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.moveTo(-6, -6); ctx.lineTo(-6, 6); ctx.moveTo(5, -6); ctx.lineTo(5, 6); ctx.stroke();
+      ctx.fillStyle = 'rgba(' + Math.round(120 + li * 90) + ',' + Math.round(92 + li * 60) + ',60,0.9)';
+      ctx.beginPath(); ctx.ellipse(-15, 0, 3, 5.5, 0, 0, 6.29); ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  function drawFire() {
+    var f = S.fire;
+    var lvl = S.fuel / K.maxFuel;
+    var t = S.time;
+    var pulse = 1 + Math.sin(t * 9) * 0.06 + Math.sin(t * 3.3) * 0.04 + S.fire.flare * 0.5;
+    var h = (16 + lvl * 40) * pulse;
+
+    // coals
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.beginPath(); ctx.ellipse(f.x, f.y + 12, 40, 13, 0, 0, 6.29); ctx.fill();
+    for (var i = 0; i < 7; i++) {
+      var a = i * 0.9 + 0.4;
+      var cg = 0.35 + 0.45 * lvl + Math.sin(t * 4 + i) * 0.12;
+      ctx.fillStyle = 'rgba(' + Math.round(150 + 100 * cg) + ',' + Math.round(50 + 40 * cg) + ',20,' + clamp(cg, 0.12, 0.9) + ')';
+      ctx.beginPath();
+      ctx.ellipse(f.x + Math.cos(a) * 17, f.y + 8 + Math.sin(a) * 6, 7, 4, a, 0, 6.29);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    if (lvl <= 0.001) return;
+
+    // flame body — additive, three tapering tongues
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    var tips = [
+      { w: 25, h: 1.00, sp: 4.4, sw: 5.5, top: 'rgba(255,120,20,0.00)', mid: 'rgba(226,96,26,0.50)', hot: 'rgba(255,150,40,0.34)' },
+      { w: 17, h: 0.74, sp: 6.7, sw: 4.0, top: 'rgba(255,190,60,0.00)', mid: 'rgba(255,168,32,0.62)', hot: 'rgba(255,206,90,0.48)' },
+      { w: 9.5, h: 0.48, sp: 9.1, sw: 2.6, top: 'rgba(255,244,190,0.00)', mid: 'rgba(255,240,180,0.85)', hot: 'rgba(255,252,232,0.92)' }
+    ];
+    for (var L = 0; L < tips.length; L++) {
+      var T = tips[L];
+      var w = T.w * pulse * (0.55 + lvl * 0.55);
+      var hh = h * T.h;
+      var sway = Math.sin(t * T.sp + L * 1.7) * T.sw;
+      var flick = 1 + Math.sin(t * (T.sp * 2.3) + L) * 0.07;
+      var base = f.y + 9;
+      var tipY = base - hh * flick;
+
+      var fg = ctx.createLinearGradient(f.x, base, f.x, tipY);
+      fg.addColorStop(0, T.hot);
+      fg.addColorStop(0.42, T.mid);
+      fg.addColorStop(1, T.top);
+
+      ctx.beginPath();
+      ctx.moveTo(f.x - w, base);
+      // left edge sweeps in toward the tip
+      ctx.bezierCurveTo(f.x - w * 0.98, base - hh * 0.36,
+                        f.x - w * 0.42 + sway * 0.7, base - hh * 0.68,
+                        f.x + sway, tipY);
+      // right edge back down
+      ctx.bezierCurveTo(f.x + w * 0.42 + sway * 0.7, base - hh * 0.68,
+                        f.x + w * 0.98, base - hh * 0.36,
+                        f.x + w, base);
+      ctx.quadraticCurveTo(f.x, base + 5, f.x - w, base);
+      ctx.closePath();
+      ctx.fillStyle = fg;
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawKeeper() {
+    var k = S.keeper;
+    var bob = Math.sin(S.time * 9) * (Math.hypot(k.vx, k.vy) > 30 ? 1.7 : 0.5);
+    ctx.save();
+    ctx.translate(k.x, k.y + bob);
+
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.beginPath(); ctx.ellipse(0, 12 - bob, 12, 4.5, 0, 0, 6.29); ctx.fill();
+
+    var flashing = k.stun > 0 && Math.floor(S.time * 22) % 2 === 0;
+
+    // cloak
+    ctx.fillStyle = flashing ? '#FF453A' : '#2E2A33';
+    ctx.beginPath();
+    ctx.moveTo(-10, 12); ctx.quadraticCurveTo(-9, -6, 0, -9);
+    ctx.quadraticCurveTo(9, -6, 10, 12);
+    ctx.quadraticCurveTo(0, 15, -10, 12);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(232,220,200,0.28)'; ctx.lineWidth = 1.1; ctx.stroke();
+
+    // head
+    ctx.fillStyle = flashing ? '#FFD9D6' : '#E8DCC8';
+    ctx.beginPath(); ctx.arc(0, -13, 5.6, 0, 6.29); ctx.fill();
+    // hood brim
+    ctx.fillStyle = '#3A343E';
+    ctx.beginPath(); ctx.arc(0, -14.5, 6.4, Math.PI, 0); ctx.fill();
+
+    // carried log
+    if (k.carry) {
+      ctx.save();
+      ctx.translate(0, -30);
+      ctx.rotate(Math.sin(S.time * 5) * 0.09);
+      ctx.fillStyle = '#6B4A2C';
+      roundRect(-11.5, -4, 23, 8, 4); ctx.fill();
+      ctx.strokeStyle = 'rgba(20,12,8,0.7)'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(-3.5, -4); ctx.lineTo(-3.5, 4); ctx.stroke();
+      ctx.fillStyle = 'rgba(190,150,90,0.85)';
+      ctx.beginPath(); ctx.ellipse(-11, 0, 2.4, 4, 0, 0, 6.29); ctx.fill();
+      ctx.restore();
+    }
+
+    // lantern arm
+    var lx = Math.cos(k.face) * 13, ly = Math.sin(k.face) * 8 + 1;
+    ctx.strokeStyle = 'rgba(232,220,200,0.5)'; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(lx, ly); ctx.stroke();
+    ctx.fillStyle = '#FFD60A';
+    ctx.beginPath(); ctx.arc(lx, ly, 3.4, 0, 6.29); ctx.fill();
+
+    ctx.restore();
+  }
+
+  function drawShades() {
+    for (var i = 0; i < S.shades.length; i++) {
+      var s = S.shades[i];
+      var li = lightAt(s.x, s.y);
+      var hpF = clamp(s.hp / s.maxHp, 0, 1);
+      var wob = Math.sin(s.wob) * (s.kind === 'wisp' ? 3 : 1.6);
+      ctx.save();
+      ctx.translate(s.x, s.y);
+
+      // body — a torn wisp of dark
+      ctx.globalAlpha = 0.55 + 0.45 * hpF;
+      var grd = ctx.createRadialGradient(0, 0, 1, 0, 0, s.r * 1.7);
+      var tint = s.hit > 0 ? '90,40,60' : s.t.tint;
+      grd.addColorStop(0, 'rgba(' + tint + ',0.98)');
+      grd.addColorStop(0.6, 'rgba(' + tint + ',0.55)');
+      grd.addColorStop(1, 'rgba(10,6,14,0)');
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.moveTo(-s.r + wob * 0.3, s.r * 0.5);
+      ctx.quadraticCurveTo(-s.r * 1.1, -s.r * 0.9, wob, -s.r * 1.25);
+      ctx.quadraticCurveTo(s.r * 1.1, -s.r * 0.9, s.r + wob * 0.3, s.r * 0.5);
+      ctx.quadraticCurveTo(s.r * 0.4, s.r * 1.3 + wob, 0, s.r * 0.9);
+      ctx.quadraticCurveTo(-s.r * 0.4, s.r * 1.3 - wob, -s.r + wob * 0.3, s.r * 0.5);
+      ctx.closePath();
+      ctx.fill();
+
+      // burning-away shimmer — a scorched rim, so the body stays dark.
+      // A husk shrugs most of it off, which is the visual tell that it will last.
+      if (li > 0.12) {
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = li * 0.62 * (s.t.burn / 5.2);
+        ctx.strokeStyle = 'rgba(255,150,40,0.75)';
+        ctx.lineWidth = 2.2 + Math.sin(S.time * 14 + s.wob) * 0.7;
+        ctx.beginPath(); ctx.arc(0, 0, s.r * 1.02, 0, 6.29); ctx.stroke();
+        ctx.globalAlpha = li * 0.16 * (s.t.burn / 5.2);
+        ctx.fillStyle = 'rgba(255,159,10,0.6)';
+        ctx.beginPath(); ctx.arc(0, 0, s.r * 1.02, 0, 6.29); ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
+      }
+
+      // husks carry a cracked ember core that dims as they take damage
+      if (s.kind === 'husk') {
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.35 + 0.4 * hpF;
+        ctx.strokeStyle = 'rgba(255,120,20,0.85)';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(-5, -7); ctx.lineTo(-1.5, -1); ctx.lineTo(-5.5, 3.5);
+        ctx.moveTo(4.5, -6); ctx.lineTo(1.5, 1.5); ctx.lineTo(5, 7);
+        ctx.stroke();
+        ctx.globalCompositeOperation = 'source-over';
+      }
+      ctx.restore();
+    }
+  }
+
+  // darkness mask: black sheet with the light punched out
+  function drawDarkness() {
+    var lr = lightRadius();
+    dctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    dctx.globalCompositeOperation = 'source-over';
+    dctx.fillStyle = 'rgba(3,2,6,0.93)';
+    dctx.clearRect(0, 0, W, H);
+    dctx.fillRect(0, 0, W, H);
+
+    dctx.globalCompositeOperation = 'destination-out';
+    // fire light
+    var g1 = dctx.createRadialGradient(S.fire.x, S.fire.y, 0, S.fire.x, S.fire.y, lr);
+    g1.addColorStop(0, 'rgba(0,0,0,1)');
+    g1.addColorStop(0.42, 'rgba(0,0,0,0.94)');
+    g1.addColorStop(0.78, 'rgba(0,0,0,0.42)');
+    g1.addColorStop(1, 'rgba(0,0,0,0)');
+    dctx.fillStyle = g1;
+    dctx.beginPath(); dctx.arc(S.fire.x, S.fire.y, lr, 0, 6.29); dctx.fill();
+    // lantern
+    var k = S.keeper;
+    var g2 = dctx.createRadialGradient(k.x, k.y, 0, k.x, k.y, K.lampR);
+    g2.addColorStop(0, 'rgba(0,0,0,0.86)');
+    g2.addColorStop(0.55, 'rgba(0,0,0,0.44)');
+    g2.addColorStop(1, 'rgba(0,0,0,0)');
+    dctx.fillStyle = g2;
+    dctx.beginPath(); dctx.arc(k.x, k.y, K.lampR, 0, 6.29); dctx.fill();
+
+    dctx.globalCompositeOperation = 'source-over';
+    ctx.drawImage(darkCvs, 0, 0, W, H);
+  }
+
+  // warm additive bloom, drawn on top of the darkness
+  function drawGlow() {
+    var lr = lightRadius();
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+
+    var g = ctx.createRadialGradient(S.fire.x, S.fire.y, 0, S.fire.x, S.fire.y, lr);
+    var warm = 0.10 + (S.fuel / K.maxFuel) * 0.16 + S.fire.flare * 0.2;
+    g.addColorStop(0, 'rgba(255,176,58,' + (warm * 1.5).toFixed(3) + ')');
+    g.addColorStop(0.35, 'rgba(255,120,30,' + (warm * 0.5).toFixed(3) + ')');
+    g.addColorStop(1, 'rgba(255,90,20,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(S.fire.x, S.fire.y, lr, 0, 6.29); ctx.fill();
+
+    var k = S.keeper;
+    var g2 = ctx.createRadialGradient(k.x, k.y, 0, k.x, k.y, K.lampR);
+    g2.addColorStop(0, 'rgba(255,214,10,0.15)');
+    g2.addColorStop(1, 'rgba(255,214,10,0)');
+    ctx.fillStyle = g2;
+    ctx.beginPath(); ctx.arc(k.x, k.y, K.lampR, 0, 6.29); ctx.fill();
+
+    // flare shockwave
+    if (S.keeper.cd > K.flareCd - 0.45) {
+      var t = 1 - (S.keeper.cd - (K.flareCd - 0.45)) / 0.45;
+      ctx.strokeStyle = 'rgba(255,214,10,' + (0.5 * (1 - t)).toFixed(3) + ')';
+      ctx.lineWidth = 6 * (1 - t) + 1;
+      ctx.beginPath(); ctx.arc(k.x, k.y, K.flareR * t, 0, 6.29); ctx.stroke();
+    }
+
+    // log glints — a wet-bark catchlight so wood is findable out in the dark
+    for (var g3 = 0; g3 < S.logs.length; g3++) {
+      var lgg = S.logs[g3];
+      var dark = 1 - lightAt(lgg.x, lgg.y);
+      var tw = 0.5 + 0.5 * Math.sin(S.time * 2.2 + g3 * 1.9);
+      ctx.fillStyle = 'rgba(255,176,80,' + (0.10 + dark * 0.20 * tw).toFixed(3) + ')';
+      ctx.beginPath();
+      ctx.ellipse(lgg.x, lgg.y, 13 * lgg.pop, 5.5 * lgg.pop, lgg.a, 0, 6.29);
+      ctx.fill();
+    }
+
+    // something is on the fire — bleed a warning ring off the coals
+    var latched = 0;
+    for (var q = 0; q < S.shades.length; q++) if (S.shades[q].latched) latched++;
+    if (latched) {
+      var lp = 0.5 + 0.5 * Math.sin(S.time * 11);
+      ctx.strokeStyle = 'rgba(255,69,58,' + (0.14 + 0.2 * lp + latched * 0.05).toFixed(3) + ')';
+      ctx.lineWidth = 2 + lp * 2;
+      ctx.beginPath();
+      ctx.arc(S.fire.x, S.fire.y, K.fireCoreR + 12 + lp * 5, 0, 6.29);
+      ctx.stroke();
+    }
+
+    // shade eyes — always faintly visible in the dark
+    for (var i = 0; i < S.shades.length; i++) {
+      var s = S.shades[i];
+      var eo = s.t.eyeGap;
+      ctx.fillStyle = s.t.eye;
+      ctx.beginPath(); ctx.arc(s.x - eo, s.y - 2, 1.7, 0, 6.29); ctx.fill();
+      ctx.beginPath(); ctx.arc(s.x + eo, s.y - 2, 1.7, 0, 6.29); ctx.fill();
+    }
+
+    // dawn wash
+    if (S.mode === 'dawn') {
+      var d = clamp(1 - Math.abs(S.dawnHold - 1.1) / 1.1, 0, 1);
+      ctx.fillStyle = 'rgba(255,190,110,' + (d * 0.3).toFixed(3) + ')';
+      ctx.fillRect(0, 0, W, H);
+    }
+    ctx.restore();
+
+    // low-fuel warning vignette
+    if (S.mode === 'play' && S.fuel < 22) {
+      var a = (1 - S.fuel / 22) * (0.16 + Math.sin(S.time * 6) * 0.08);
+      var vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.25, W / 2, H / 2, Math.max(W, H) * 0.62);
+      vg.addColorStop(0, 'rgba(255,69,58,0)');
+      vg.addColorStop(1, 'rgba(255,69,58,' + clamp(a, 0, 0.4).toFixed(3) + ')');
+      ctx.fillStyle = vg;
+      ctx.fillRect(0, 0, W, H);
+    }
+  }
+
+  function drawParticles() {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (var i = 0; i < S.parts.length; i++) {
+      var p = S.parts[i];
+      var t = clamp(p.life / p.max, 0, 1);
+      var col;
+      if (p.c === 'ember') col = 'rgba(255,' + Math.round(120 + 100 * t) + ',40,' + (t * 0.85).toFixed(3) + ')';
+      else if (p.c === 'gold') col = 'rgba(255,214,10,' + (t * 0.9).toFixed(3) + ')';
+      else if (p.c === 'wood') col = 'rgba(190,150,90,' + (t * 0.8).toFixed(3) + ')';
+      else col = 'rgba(150,110,220,' + (t * 0.75).toFixed(3) + ')';
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (0.4 + t * 0.8), 0, 6.29); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawStick() {
+    if (!stick.on || S.mode !== 'play') return;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(232,220,200,0.20)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(stick.ox, stick.oy, 46, 0, 6.29); ctx.stroke();
+    ctx.fillStyle = 'rgba(232,220,200,0.22)';
+    ctx.beginPath(); ctx.arc(stick.ox + stick.dx * 40, stick.oy + stick.dy * 40, 17, 0, 6.29); ctx.fill();
+    ctx.restore();
+  }
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  // ────────────────────────────────────────────────────────────── DOM / HUD
+  var elHud = document.getElementById('hud');
+  var elFuelBar = document.getElementById('fuelBar');
+  var elFuelFill = elFuelBar.firstElementChild;
+  var elFuelNum = document.getElementById('fuelNum');
+  var elDawnFill = document.querySelector('#dawnBar i');
+  var elNight = document.getElementById('nightNum');
+  var elScore = document.getElementById('scoreNum');
+  var elVeil = document.getElementById('veil');
+  var elCard = document.getElementById('card');
+  var elPause = document.getElementById('pause');
+  var elToast = document.getElementById('toast');
+  var elFlareFill = flareBtn.querySelector('.fill');
+
+  function syncHud() {
+    var pct = clamp(S.fuel / K.maxFuel, 0, 1);
+    elFuelFill.style.width = (pct * 100).toFixed(1) + '%';
+    elFuelBar.classList.toggle('low', pct < 0.22);
+    elFuelNum.textContent = Math.round(S.fuel);
+    elDawnFill.style.width = (clamp(S.nightT / K.nightLen, 0, 1) * 100).toFixed(1) + '%';
+    elNight.textContent = S.night;
+    elScore.textContent = Math.round(S.score).toLocaleString();
+    var charging = S.keeper.cd > 0;
+    var poor = S.fuel < K.flareCost + 2;
+    var cd = clamp(1 - S.keeper.cd / K.flareCd, 0, 1);
+    elFlareFill.style.height = charging ? (cd * 100).toFixed(0) + '%' : '0%';
+    flareBtn.classList.toggle('cool', charging || poor);
+    flareBtn.classList.toggle('ready', !charging && !poor);
+  }
+
+  var toastT = null;
+  function toast(a, b) {
+    elToast.querySelector('.t1').textContent = a;
+    elToast.querySelector('.t2').textContent = b || '';
+    elToast.classList.remove('show');
+    void elToast.offsetWidth;
+    elToast.classList.add('show');
+    clearTimeout(toastT);
+    toastT = setTimeout(function () { elToast.classList.remove('show'); }, 1800);
+  }
+
+  function showChrome(on) {
+    elHud.classList.toggle('on', on);
+    flareBtn.classList.toggle('on', on);
+    elPause.classList.toggle('on', on);
+  }
+
+  function best() { try { return parseInt(localStorage.getItem(BEST_KEY) || '0', 10) || 0; } catch (e) { return 0; } }
+  function setBest(v) { try { localStorage.setItem(BEST_KEY, String(v)); } catch (e) {} }
+
+  function veil(html) {
+    elCard.innerHTML = html;
+    elVeil.classList.remove('hide');
+  }
+  function hideVeil() { elVeil.classList.add('hide'); }
+
+  function menu() {
+    S.mode = 'menu';
+    showChrome(false);
+    var b = best();
+    veil(
+      '<div class="eyebrow">The Keeper</div>' +
+      '<h1>Night<em>Watch</em></h1>' +
+      '<p class="lede">The fire is the only thing between you and what waits past the light. Keep it burning until dawn.</p>' +
+      '<ul class="rules">' +
+        '<li><span class="glyph">🪵</span><span>Walk over <b>logs</b> to pick one up. Carry it into the fire to feed it.</span></li>' +
+        '<li><span class="glyph">🔥</span><span>The fire burns down on its own — and a bigger fire throws a <b>wider ring of light</b>.</span></li>' +
+        '<li><span class="glyph">👁</span><span><b>Shades</b> crawl in from the dark to drain it. Light burns them; your lantern helps.</span></li>' +
+        '<li><span class="glyph">✦</span><span><b>Flare</b> blasts them back — but it costs fuel. Later nights bring <b>husks</b> that shrug off firelight.</span></li>' +
+      '</ul>' +
+      '<button class="go" id="btnStart">Take the Watch</button>' +
+      (b ? '<div class="foot">Best · ' + b.toLocaleString() + '</div>' : '<div class="foot">Drag to move · Tap flare</div>')
+    );
+    document.getElementById('btnStart').addEventListener('click', startGame);
+  }
+
+  function startGame() {
+    S.mode = 'play';
+    S.time = 0; S.night = 1; S.nightT = 0; S.score = 0;
+    S.fuel = K.startFuel;
+    S.logs.length = 0; S.shades.length = 0; S.parts.length = 0;
+    S.logT = 0.6; S.spawnT = 3.2; S.shake = 0;
+    S.kills = 0; S.logsBurned = 0;
+    S.fire.flare = 0.8;
+    S.keeper.x = W / 2; S.keeper.y = H / 2 + 96;
+    S.keeper.vx = 0; S.keeper.vy = 0;
+    S.keeper.carry = 0; S.keeper.cd = 0; S.keeper.stun = 0; S.keeper.face = -Math.PI / 2;
+    stick.id = null; stick.on = false; stick.dx = 0; stick.dy = 0;
+    for (var i = 0; i < 3; i++) spawnLog();
+    hideVeil();
+    showChrome(true);
+    ac();
+    toast('Night 1', 'Hold the light');
+  }
+
+  function togglePause() {
+    if (S.mode === 'play' || S.mode === 'dawn') {
+      S._resume = S.mode;
+      S.mode = 'paused';
+      showChrome(false);
+      veil(
+        '<div class="eyebrow">Paused</div>' +
+        '<h1>Hold<em>Fast</em></h1>' +
+        '<div class="tally">' +
+          '<div><span>Night</span><b>' + S.night + '</b></div>' +
+          '<div><span>Score</span><b>' + Math.round(S.score).toLocaleString() + '</b></div>' +
+          '<div><span>Fire</span><b>' + Math.round(S.fuel) + '</b></div>' +
+        '</div>' +
+        '<button class="go" id="btnResume">Resume</button>' +
+        '<button class="ghost" id="btnSound">Sound · ' + (S.muted ? 'Off' : 'On') + '</button>' +
+        '<button class="ghost" id="btnQuit">Abandon the Watch</button>'
+      );
+      document.getElementById('btnResume').addEventListener('click', togglePause);
+      document.getElementById('btnQuit').addEventListener('click', menu);
+      document.getElementById('btnSound').addEventListener('click', function () {
+        S.muted = !S.muted;
+        try { localStorage.setItem(MUTE_KEY, S.muted ? '1' : '0'); } catch (e) {}
+        this.textContent = 'Sound · ' + (S.muted ? 'Off' : 'On');
+      });
+    } else if (S.mode === 'paused') {
+      S.mode = S._resume || 'play';
+      hideVeil();
+      showChrome(true);
+      last = performance.now();
+    }
+  }
+
+  function gameOver() {
+    S.mode = 'over';
+    S.shake = 14;
+    showChrome(false);
+    SFX.dead(); buzz([30, 80, 30, 80, 60]);
+    spark(S.fire.x, S.fire.y, 40, 'ember', 200, 1.2);
+
+    var sc = Math.round(S.score);
+    var b = best();
+    var isBest = sc > b;
+    if (isBest) setBest(sc);
+
+    setTimeout(function () {
+      veil(
+        '<div class="eyebrow">' + (isBest ? 'New Best' : 'The fire went out') + '</div>' +
+        '<h1>Cold<em>Ashes</em></h1>' +
+        '<p class="lede">' + epitaph() + '</p>' +
+        '<div class="tally">' +
+          '<div><span>Nights</span><b>' + (S.night - 1) + '</b></div>' +
+          '<div><span>Score</span><b class="' + (isBest ? 'hi' : '') + '">' + sc.toLocaleString() + '</b></div>' +
+          '<div><span>Best</span><b>' + Math.max(sc, b).toLocaleString() + '</b></div>' +
+        '</div>' +
+        '<button class="go" id="btnAgain">Take the Watch Again</button>' +
+        '<button class="ghost" id="btnMenu">Back to camp</button>' +
+        '<div class="foot">' + plural(S.logsBurned, 'log') + ' burned · ' + plural(S.kills, 'shade') + ' dispelled</div>'
+      );
+      document.getElementById('btnAgain').addEventListener('click', startGame);
+      document.getElementById('btnMenu').addEventListener('click', menu);
+    }, 900);
+  }
+
+  function plural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
+
+  function epitaph() {
+    var n = S.night - 1;
+    if (n <= 0) return 'You did not make it to the first dawn. The dark is patient — try again.';
+    if (n === 1) return 'One night held. The watch is longer than it looks.';
+    if (n < 4) return n + ' nights held. You were learning the rhythm of it.';
+    if (n < 7) return n + ' nights held. Steady hands — the fire remembers.';
+    return n + ' nights held. Whoever comes after will find warm ground.';
+  }
+
+  // ────────────────────────────────────────────────────────────── loop
+  var last = 0, acc = 0;
+  var STEP = 1 / 120;
+  function frame(now) {
+    requestAnimationFrame(frame);
+    if (!last) last = now;
+    var dt = Math.min(0.1, (now - last) / 1000);
+    last = now;
+
+    if (S.mode !== 'paused') {
+      acc += dt;
+      var guard = 0;
+      while (acc >= STEP && guard++ < 20) { update(STEP); acc -= STEP; }
+    }
+    render();
+    syncHud();
+  }
+
+  // ────────────────────────────────────────────────────────────── boot
+  window.addEventListener('resize', resize);
+  window.addEventListener('orientationchange', function () { setTimeout(resize, 120); });
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden && S.mode === 'play') togglePause();
+  });
+  document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
+
+  try { S.muted = localStorage.getItem(MUTE_KEY) === '1'; } catch (e) {}
+  // opt-in inspection hook for tuning/QA: open with #debug
+  if (/[?#]debug/.test(location.href)) window.__NW = { S: S, K: K, flare: doFlare, lightAt: lightAt };
+  resize();
+  S.keeper.x = W / 2; S.keeper.y = H / 2 + 96;
+  menu();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
