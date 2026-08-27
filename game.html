@@ -48,19 +48,24 @@
   .meter{flex:1;min-width:0}
   .meter .lbl{
     display:flex;justify-content:space-between;align-items:baseline;
-    font:600 10px/1 var(--body);letter-spacing:.14em;text-transform:uppercase;
-    color:var(--mute);margin-bottom:6px;
+    font:700 11px/1 var(--body);letter-spacing:.14em;text-transform:uppercase;
+    color:#A79C90;margin-bottom:7px;
   }
-  .meter .lbl b{font:700 11px/1 var(--mono);letter-spacing:.06em;color:var(--bone)}
-  .bar{height:7px;border-radius:4px;background:rgba(232,220,200,0.10);overflow:hidden}
+  .meter .lbl b{font:800 17px/1 var(--mono);letter-spacing:.02em;color:var(--bone);text-shadow:0 1px 6px #000}
+  .bar{
+    height:15px;border-radius:8px;background:rgba(232,220,200,0.13);
+    border:1px solid rgba(232,220,200,0.10);overflow:hidden;
+    box-shadow:inset 0 1px 3px rgba(0,0,0,0.5);
+  }
   .bar i{
-    display:block;height:100%;width:60%;border-radius:4px;
+    display:block;height:100%;width:60%;border-radius:7px;
     background:linear-gradient(90deg,var(--coal),var(--ember) 55%,var(--core));
-    box-shadow:0 0 12px rgba(255,159,10,0.55);
+    box-shadow:0 0 16px rgba(255,159,10,0.7);
     transition:width .12s linear, background .3s ease;
   }
-  .bar.low i{background:linear-gradient(90deg,#7a2520,var(--danger));box-shadow:0 0 14px rgba(255,69,58,0.6)}
-  #dawnWrap{width:88px;flex:none}
+  .bar.low i{background:linear-gradient(90deg,#7a2520,var(--danger));box-shadow:0 0 18px rgba(255,69,58,0.75)}
+  .bar.low{border-color:rgba(255,69,58,0.4)}
+  #dawnWrap{width:112px;flex:none}
   #dawnWrap .bar i{background:linear-gradient(90deg,#2a3550,#5E5CE6 60%,#9AD5FF);box-shadow:0 0 10px rgba(94,92,230,0.5)}
   #stats{
     flex:none;text-align:right;font:700 12px/1.5 var(--mono);letter-spacing:.04em;
@@ -78,10 +83,30 @@
   }
   .btn.on{opacity:1;pointer-events:auto}
   .btn:active{transform:scale(.94)}
+  /* primary action sits under the thumb; the flare moved up out of it */
+  #brand{
+    right:calc(var(--safeR) + 20px);bottom:calc(var(--safeB) + 28px);
+    width:104px;height:104px;border-radius:50%;
+    font:700 11px/1 var(--body);letter-spacing:.16em;text-transform:uppercase;
+    color:#FFC46B;border-color:rgba(255,150,40,0.42);
+    background:radial-gradient(120% 120% at 50% 20%, rgba(72,34,8,0.9), rgba(20,16,14,0.86));
+    box-shadow:0 0 30px rgba(255,120,20,0.20), inset 0 0 26px rgba(255,120,20,0.14);
+    overflow:hidden;
+  }
+  #brand .fill{
+    position:absolute;left:0;right:0;bottom:0;height:0%;
+    background:rgba(255,120,20,0.20);transition:height .06s linear;
+  }
+  #brand span{position:relative;z-index:1}
+  #brand.cool{color:#8a7b6a;border-color:var(--line);box-shadow:none}
+  #brand.ready{
+    color:#FFD9A0;border-color:rgba(255,168,60,0.75);
+    box-shadow:0 0 38px rgba(255,120,20,0.34), inset 0 0 30px rgba(255,120,20,0.20);
+  }
   #flare{
-    right:calc(var(--safeR) + 22px);bottom:calc(var(--safeB) + 30px);
-    width:88px;height:88px;border-radius:50%;
-    font:700 10px/1 var(--body);letter-spacing:.16em;text-transform:uppercase;
+    right:calc(var(--safeR) + 30px);bottom:calc(var(--safeB) + 150px);
+    width:78px;height:78px;border-radius:50%;
+    font:700 9px/1 var(--body);letter-spacing:.16em;text-transform:uppercase;
     color:var(--core);border-color:rgba(255,214,10,0.34);
     box-shadow:0 0 26px rgba(255,159,10,0.14), inset 0 0 22px rgba(255,159,10,0.10);
     overflow:hidden;
@@ -98,7 +123,7 @@
     50%{box-shadow:0 0 34px rgba(255,159,10,0.26), inset 0 0 26px rgba(255,159,10,0.16)}
   }
   #pause{
-    top:calc(var(--safeT) + 58px);right:calc(var(--safeR) + 14px);
+    top:calc(var(--safeT) + 72px);right:calc(var(--safeR) + 14px);
     width:38px;height:38px;border-radius:12px;
   }
   #pause svg{opacity:.75}
@@ -167,7 +192,7 @@
 
   /* ---------- HUD row 2: heat + held upgrades ---------- */
   #hud2{
-    position:fixed;z-index:2;left:0;right:0;top:calc(var(--safeT) + 52px);
+    position:fixed;z-index:2;left:0;right:0;top:calc(var(--safeT) + 66px);
     padding:0 calc(var(--safeR) + 62px) 0 calc(var(--safeL) + 14px);
     max-width:660px;margin:0 auto;
     display:flex;align-items:center;gap:8px;
@@ -312,6 +337,8 @@
     h1{font-size:32px}
     .rules li{font-size:12.5px;padding:6px 0}
     .lede{margin-bottom:18px;font-size:14px}
+    #brand{width:88px;height:88px}
+    #flare{width:66px;height:66px;bottom:calc(var(--safeB) + 126px)}
     .dcard{padding:11px 12px;gap:11px}
     .dg{width:34px;height:34px;font-size:18px}
     .db b{font-size:14px}
@@ -340,6 +367,7 @@
 </button>
 
 <button class="btn" id="flare" aria-label="Flare"><div class="fill"></div><span>Flare</span></button>
+<button class="btn" id="brand" aria-label="Swing the brand"><div class="fill"></div><span>Brand</span></button>
 
 <div id="toast"><div class="t1"></div><div class="t2"></div></div>
 
@@ -378,7 +406,13 @@
     flareCd: 1.5,
     flareR: 148,
     maxLogs: 6,
-    logEvery: 2.4
+    logEvery: 2.4,
+    carryBase: 3,          // armload before any upgrades
+    brandR: 78,            // how far the swing reaches
+    brandArc: 1.95,        // ~112 degrees of sweep
+    brandDmg: 4.6,
+    swingCd: 0.46,
+    swingDur: 0.24
   };
 
   // ══════════════════════════════════════════ what carries between runs ══
@@ -415,7 +449,7 @@
     { id: 'reach',      name: 'Long Reach',     glyph: '🤲', tier: 1, max: 2, lv: 1, desc: '+45% range on gathering and feeding.' },
     { id: 'hoard',      name: 'Woodpile',       glyph: '🪟', tier: 1, max: 2, lv: 1, desc: 'Two more logs can lie about at once.' },
     { id: 'firstlight', name: 'First Light',    glyph: '🌅', tier: 1, max: 3, lv: 1, desc: 'Dawn restores +16 more fire.' },
-    { id: 'secondarm',  name: 'Second Arm',     glyph: '💪', tier: 2, max: 1, lv: 2, desc: 'Carry two logs at once.' },
+    { id: 'broadback',  name: 'Broad Back',     glyph: '💪', tier: 2, max: 2, lv: 2, desc: 'Carry two more logs per trip.' },
 
     // ── the light itself
     { id: 'lantern',    name: 'Bright Lantern', glyph: '🏮', tier: 1, max: 3, lv: 1, desc: 'Your lantern reaches 28% farther.' },
@@ -429,6 +463,12 @@
     { id: 'wide',       name: 'Wide Flare',     glyph: '📡', tier: 1, max: 3, lv: 1, desc: 'Flare reaches 30% farther.' },
     { id: 'cinder',     name: 'Cinder Trail',   glyph: '✨', tier: 2, max: 2, lv: 3, desc: 'Flares leave burning ground behind them.' },
     { id: 'backdraft',  name: 'Backdraft',      glyph: '💨', tier: 2, max: 2, lv: 3, desc: 'Flare returns 2 fire for every shade it catches.' },
+
+    // ── the brand
+    { id: 'longbrand',  name: 'Long Brand',     glyph: '🔥', tier: 1, max: 3, lv: 1, desc: 'The swing reaches 35% farther.' },
+    { id: 'quickhands', name: 'Quick Hands',    glyph: '🤚', tier: 1, max: 3, lv: 1, desc: 'Swing the brand 28% faster.' },
+    { id: 'whitehot',   name: 'White-Hot Brand',glyph: '🌡', tier: 1, max: 3, lv: 1, desc: 'The brand hits far harder.' },
+    { id: 'sweep',      name: 'Sweeping Brand', glyph: '🌀', tier: 2, max: 1, lv: 3, desc: 'The swing comes all the way around you.' },
 
     // ── the keeper
     { id: 'feet',       name: 'Sure Feet',      glyph: '👣', tier: 1, max: 3, lv: 1, desc: 'Walk 13% faster.' },
@@ -457,6 +497,7 @@
     { id: 'clean4',  name: 'Steady Hand',      desc: 'Reach night 4 without ever flaring.', embers: 120, test: function (r) { return r.night >= 4 && r.flares === 0; } },
     { id: 'stack8',  name: 'Well Provisioned', desc: 'Hold 8 upgrades at once.',            embers: 100, test: function (r) { return r.upCount >= 8; } },
     { id: 'heat10',  name: 'White Heat',       desc: 'Reach heat ×10.',                     embers: 130, test: function (r) { return r.bestHeat >= 10; } },
+    { id: 'brand40', name: 'Brandbearer',      desc: 'Dispel 40 shades with the brand in one run.', embers: 110, test: function (r) { return r.brandKills >= 40; } },
     { id: 'score10k',name: 'Ten Thousand',     desc: 'Score 10,000 in one run.',            embers: 200, test: function (r) { return r.score >= 10000; } }
   ];
 
@@ -505,7 +546,14 @@
     D.logRate   = Math.pow(0.8, u('cache'));          // multiplies the interval
     D.pickupR   = K.pickupR * reachMul;
     D.depositR  = K.depositR * reachMul;
-    D.carry     = 1 + u('secondarm');
+    D.carry     = K.carryBase + u('broadback') * 2;
+
+    // the brand: free, fast, and aimed — the everyday answer to a shade
+    D.brandR    = K.brandR * (1 + u('longbrand') * 0.35);
+    D.brandArc  = u('sweep') ? Math.PI * 2 : K.brandArc;
+    D.brandDmg  = K.brandDmg + u('whitehot') * 2.1;
+    D.swingCd   = K.swingCd * Math.pow(0.72, u('quickhands'));
+    D.swingDur  = K.swingDur;
 
     D.lampR     = K.lampR * (1 + u('lantern') * 0.28) * (1 + pk('lamp') * 0.06);
     D.fireLight = 1 + u('ward') * 0.15;
@@ -516,7 +564,7 @@
     D.flareR    = K.flareR * (1 + u('wide') * 0.30);
 
     D.speed     = K.keeperSpeed * (1 + u('feet') * 0.13) * (1 + pk('boots') * 0.04);
-    D.carryMul  = u('unburdened') ? 1 : 0.86;
+    D.carryPer  = u('unburdened') ? 0 : 0.05;   // speed lost per log carried
     D.stunTime  = u('nerve') ? (u('nerve') > 1 ? 0.22 : 0.34) : 0.55;
     D.guard     = u('nerve') * 0.45;
     D.scoreMul  = 1 + u('veteran') * 0.25;
@@ -539,7 +587,7 @@
     // progression + feedback
     up: {}, motes: [], cinders: [], floats: [],
     heat: 0, heatT: 0, bestHeat: 0, husks: 0, flares: 0,
-    revived: false, pyreCount: 0, rerolls: 0, earned: null
+    revived: false, pyreCount: 0, rerolls: 0, earned: null, brandKills: 0
   };
 
   // ────────────────────────────────────────────────────────────── helpers
@@ -795,7 +843,8 @@
   window.addEventListener('keydown', function (e) {
     var k = e.key.toLowerCase();
     keys[k] = true;
-    if (k === ' ') { e.preventDefault(); doFlare(); }
+    if (k === ' ') { e.preventDefault(); doSwing(); }
+    if (k === 'f' || k === 'shift') { e.preventDefault(); doFlare(); }
     if (k === 'escape' || k === 'p') togglePause();
     if (k === 'enter' && (S.mode === 'menu' || S.mode === 'over')) startGame();
   });
@@ -813,7 +862,7 @@
       stick.x = p.x; stick.y = p.y; stick.dx = 0; stick.dy = 0; stick.on = true;
       try { cvs.setPointerCapture(e.pointerId); } catch (err) {}
     } else {
-      doFlare(); // second finger anywhere = flare
+      doSwing(); // second finger anywhere = swing the brand
     }
   }, { passive: false });
 
@@ -843,6 +892,8 @@
 
   var flareBtn = document.getElementById('flare');
   flareBtn.addEventListener('pointerdown', function (e) { e.preventDefault(); e.stopPropagation(); doFlare(); });
+  var brandBtn = document.getElementById('brand');
+  brandBtn.addEventListener('pointerdown', function (e) { e.preventDefault(); e.stopPropagation(); doSwing(); });
   document.getElementById('pause').addEventListener('click', togglePause);
 
   // ────────────────────────────────────────────────────────────── actions
@@ -868,6 +919,50 @@
                          r: 30 + u('cinder') * 8, life: 4, max: 4 });
       }
     }
+  }
+
+  function angDiff(a, b) {
+    var d = (a - b) % (Math.PI * 2);
+    if (d > Math.PI) d -= Math.PI * 2;
+    if (d < -Math.PI) d += Math.PI * 2;
+    return d;
+  }
+
+  // The brand — a burning stick off the fire. Costs nothing but has to be
+  // aimed and closes the distance, which is the trade against the flare.
+  function doSwing() {
+    if (S.mode !== 'play') return;
+    var k = S.keeper;
+    if (k.swingCd > 0) return;
+    k.swingCd = D.swingCd;
+    k.swing = D.swingDur;
+    k.swingDir = k.face;
+
+    // a hotter fire makes a hotter brand
+    var heat = 0.75 + 0.5 * clamp(S.fuel / D.maxFuel, 0, 1);
+    var dmg = D.brandDmg * heat;
+    var half = D.brandArc / 2;
+    var before = S.kills, hits = 0;
+
+    for (var i = S.shades.length - 1; i >= 0; i--) {
+      var sh = S.shades[i];
+      var d = dist(sh.x, sh.y, k.x, k.y);
+      if (d > D.brandR + sh.r) continue;
+      var ang = Math.atan2(sh.y - k.y, sh.x - k.x);
+      if (D.brandArc < Math.PI * 2 && Math.abs(angDiff(ang, k.swingDir)) > half) continue;
+      sh.kx += Math.cos(ang) * 300;
+      sh.ky += Math.sin(ang) * 300;
+      sh.hit = 0.28;
+      sh.latched = 0;
+      sh.hp -= dmg;
+      hits++;
+      spark(sh.x, sh.y, 4, 'gold', 90, 0.3);
+      if (sh.hp <= 0) killShade(i);
+    }
+    S.brandKills += S.kills - before;
+
+    noise(0.13, hits ? 0.13 : 0.07, hits ? 1500 : 900);
+    if (hits) { tone(260, 0.1, 'square', 0.045, 150); buzz(10); S.shake = Math.max(S.shake, 4); }
   }
 
   // Shared by the flare and by Pyre: knock everything back, burn it, and pay
@@ -961,7 +1056,10 @@
     var stunned = k.stun > 0;
     k.stun = Math.max(0, k.stun - dt);
     k.guard = Math.max(0, (k.guard || 0) - dt);
-    var speed = D.speed * (k.carry ? D.carryMul : 1) * (stunned ? 0.25 : 1);
+    k.swingCd = Math.max(0, (k.swingCd || 0) - dt);
+    k.swing = Math.max(0, (k.swing || 0) - dt);
+    var load = Math.max(0.78, 1 - k.carry * D.carryPer);
+    var speed = D.speed * load * (stunned ? 0.25 : 1);
     k.vx = lerp(k.vx, ix * speed, 1 - Math.pow(0.0008, dt));
     k.vy = lerp(k.vy, iy * speed, 1 - Math.pow(0.0008, dt));
     k.x = clamp(k.x + k.vx * dt, 16, W - 16);
@@ -983,6 +1081,7 @@
     for (var i = S.logs.length - 1; i >= 0; i--) {
       var lg = S.logs[i];
       lg.pop = Math.min(1, lg.pop + dt * 3.2);
+      if (lg.cool > 0) { lg.cool -= dt; continue; }
       if (k.carry < D.carry && dist2(lg.x, lg.y, k.x, k.y) < D.pickupR * D.pickupR) {
         S.logs.splice(i, 1);
         k.carry++;
@@ -1062,8 +1161,8 @@
 
     // ── shades
     S.spawnT -= dt;
-    var interval = Math.max(0.5, 2.0 - S.night * 0.13);
-    if (S.spawnT <= 0 && S.shades.length < 28) {
+    var interval = Math.max(0.46, 1.95 - S.night * 0.135);
+    if (S.spawnT <= 0 && S.shades.length < 32) {
       spawnShade();
       S.spawnT = interval * rand(0.7, 1.3);
     }
@@ -1104,11 +1203,17 @@
         s.kx = -Math.cos(ka) * 180; s.ky = -Math.sin(ka) * 180;
         S.shake = Math.max(S.shake, 9);
         SFX.hurt(); buzz([12, 40, 12]);
-        floatText(k.x, k.y - 34, 'HIT', 'rgba(255,69,58,0.95)', 15);
+        floatText(k.x, k.y - 34, k.carry ? 'DROPPED A LOG' : 'HIT', 'rgba(255,69,58,0.95)', 14);
         S.heat = 0; S.heatT = 0;
-        while (k.carry > 0) {
+        if (k.carry > 0) {                    // you fumble one, not the armful
           k.carry--;
-          S.logs.push({ x: clamp(k.x + rand(-34, 34), 30, W - 30), y: clamp(k.y + rand(-34, 34), 90, H - 40), a: rand(0, 3.14), pop: 0 });
+          var da = ka + rand(-1.1, 1.1);      // flung back past the shade
+          var dd = D.pickupR + rand(26, 52);
+          S.logs.push({
+            x: clamp(k.x - Math.cos(da) * dd, 30, W - 30),
+            y: clamp(k.y - Math.sin(da) * dd, 90, H - 40),
+            a: rand(0, 3.14), pop: 0, cool: 0.7
+          });
         }
       }
     }
@@ -1362,6 +1467,22 @@
       ctx.restore();
     }
 
+    // the brand, held out to the side or mid-swing
+    var bAng = k.swing > 0
+      ? k.swingDir - D.brandArc / 2 + D.brandArc * (1 - k.swing / D.swingDur)
+      : k.face + 1.1;
+    var bLen = k.swing > 0 ? 26 : 17;
+    ctx.save();
+    ctx.rotate(bAng);
+    ctx.strokeStyle = '#6B4A2C';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(4, 0); ctx.lineTo(bLen, 0); ctx.stroke();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = 'rgba(255,170,50,0.95)';
+    ctx.beginPath(); ctx.arc(bLen + 2, 0, k.swing > 0 ? 4.6 : 3.4, 0, 6.29); ctx.fill();
+    ctx.restore();
+
     // lantern arm
     var lx = Math.cos(k.face) * 13, ly = Math.sin(k.face) * 8 + 1;
     ctx.strokeStyle = 'rgba(232,220,200,0.5)'; ctx.lineWidth = 1.6;
@@ -1479,6 +1600,42 @@
     g2.addColorStop(1, 'rgba(255,214,10,0)');
     ctx.fillStyle = g2;
     ctx.beginPath(); ctx.arc(k.x, k.y, D.lampR, 0, 6.29); ctx.fill();
+
+    // the swing's burning trail
+    var kk = S.keeper;
+    if (kk.swing > 0) {
+      var p = 1 - kk.swing / D.swingDur;
+      var half2 = D.brandArc / 2;
+      var from = kk.swingDir - half2;
+      var to = from + D.brandArc * p;
+      // body of the sweep — fades out behind the leading edge
+      var grd = ctx.createRadialGradient(kk.x, kk.y, D.brandR * 0.3, kk.x, kk.y, D.brandR);
+      grd.addColorStop(0, 'rgba(255,90,10,0)');
+      grd.addColorStop(0.55, 'rgba(255,140,30,0.42)');
+      grd.addColorStop(0.85, 'rgba(255,180,60,0.80)');
+      grd.addColorStop(1, 'rgba(255,120,20,0)');
+      ctx.strokeStyle = grd;
+      ctx.lineWidth = D.brandR * 0.44;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.arc(kk.x, kk.y, D.brandR * 0.7, from, to);
+      ctx.stroke();
+
+      // hot core of the trail
+      ctx.strokeStyle = 'rgba(255,214,110,0.55)';
+      ctx.lineWidth = D.brandR * 0.16;
+      ctx.beginPath();
+      ctx.arc(kk.x, kk.y, D.brandR * 0.78, from, to);
+      ctx.stroke();
+
+      // white-hot leading edge, where the brand actually is
+      ctx.strokeStyle = 'rgba(255,248,225,' + (0.95 * (1 - p * 0.35)).toFixed(3) + ')';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.arc(kk.x, kk.y, D.brandR * 0.78, Math.max(from, to - 0.30), to);
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+    }
 
     // flare shockwave
     if (S.keeper.cd > D.flareCd - 0.45) {
@@ -1598,6 +1755,7 @@
   var elPause = document.getElementById('pause');
   var elToast = document.getElementById('toast');
   var elFlareFill = flareBtn.querySelector('.fill');
+  var elBrandFill = brandBtn.querySelector('.fill');
   var elHud2 = document.getElementById('hud2');
   var elHeat = document.getElementById('heat');
   var elChips = document.getElementById('chips');
@@ -1626,6 +1784,11 @@
     elFlareFill.style.height = charging ? (cd * 100).toFixed(0) + '%' : '0%';
     flareBtn.classList.toggle('cool', charging || poor);
     flareBtn.classList.toggle('ready', !charging && !poor);
+
+    var swinging = S.keeper.swingCd > 0;
+    elBrandFill.style.height = swinging ? ((1 - S.keeper.swingCd / D.swingCd) * 100).toFixed(0) + '%' : '0%';
+    brandBtn.classList.toggle('cool', swinging);
+    brandBtn.classList.toggle('ready', !swinging);
   }
 
   var toastT = null;
@@ -1643,6 +1806,7 @@
     elHud2.classList.toggle('on', on);
     elHud.classList.toggle('on', on);
     flareBtn.classList.toggle('on', on);
+    brandBtn.classList.toggle('on', on);
     elPause.classList.toggle('on', on);
   }
 
@@ -1715,7 +1879,8 @@
             '<li><span class="glyph">🪵</span><span>Walk over <b>logs</b> to pick one up. Carry it into the fire to feed it.</span></li>' +
             '<li><span class="glyph">🔥</span><span>The fire burns down on its own — and a bigger fire throws a <b>wider ring of light</b>.</span></li>' +
             '<li><span class="glyph">👁</span><span><b>Shades</b> crawl in from the dark to drain it. Light burns them; your lantern helps.</span></li>' +
-            '<li><span class="glyph">✦</span><span><b>Flare</b> blasts them back — but it costs fire. Later nights bring <b>husks</b> that shrug off firelight.</span></li>' +
+            '<li><span class="glyph">🔥</span><span>Swing the <b>brand</b> to drive them off — free and fast, but you must aim it and get close.</span></li>' +
+            '<li><span class="glyph">✦</span><span><b>Flare</b> clears all around you at once, but it costs fire. Later nights bring <b>husks</b> that shrug off firelight.</span></li>' +
             '<li><span class="glyph">🌅</span><span>Survive to <b>dawn</b> and you draft an upgrade. Embers you earn buy permanent gear.</span></li>' +
           '</ul>') +
       '<button class="go" id="btnStart">Take the Watch</button>' +
@@ -1723,6 +1888,7 @@
         '<button class="ghost" id="btnShop">Provisions</button>' +
         '<button class="ghost" id="btnFeats">Feats · ' + feats + '/' + ACHIEVEMENTS.length + '</button>' +
       '</div>' +
+      '<div class="foot">Drag to move · Brand to swing · Flare when surrounded</div>' +
       '<div class="foot">' + (locked ? locked + ' upgrades still locked · level up to draft them' : 'Every upgrade unlocked') + '</div>'
     );
     on('btnStart', startGame);
@@ -1894,7 +2060,8 @@
   function finishRun() {
     var r = {
       night: S.night, score: Math.round(S.score), logs: S.logsBurned, kills: S.kills,
-      husks: S.husks, flares: S.flares, upCount: upCount(), bestHeat: S.bestHeat
+      husks: S.husks, flares: S.flares, upCount: upCount(), bestHeat: S.bestHeat,
+      brandKills: S.brandKills
     };
     var base = Math.round(r.score / 22) + r.night * 12;
     var embers = Math.max(1, Math.round(base * (1 + pk('sifter') * 0.12)));
@@ -1929,7 +2096,7 @@
     S.logT = 0.6; S.spawnT = 3.2; S.shake = 0;
     S.kills = 0; S.logsBurned = 0; S.husks = 0; S.flares = 0;
     S.heat = 0; S.heatT = 0; S.bestHeat = 0;
-    S.revived = false; S.pyreCount = 0; S.earned = null;
+    S.revived = false; S.pyreCount = 0; S.earned = null; S.brandKills = 0;
     S.rerolls = D.rerolls;
     S.fire.flare = 0.8;
 
@@ -1944,6 +2111,7 @@
     S.keeper.x = W / 2; S.keeper.y = H / 2 + 96;
     S.keeper.vx = 0; S.keeper.vy = 0;
     S.keeper.carry = 0; S.keeper.cd = 0; S.keeper.stun = 0; S.keeper.guard = 0;
+    S.keeper.swing = 0; S.keeper.swingCd = 0; S.keeper.swingDir = 0;
     S.keeper.face = -Math.PI / 2;
     stick.id = null; stick.on = false; stick.dx = 0; stick.dy = 0;
     for (var j = 0; j < 3; j++) spawnLog();
@@ -2032,7 +2200,7 @@
           '<button class="ghost" id="btnShop2">Provisions</button>' +
           '<button class="ghost" id="btnMenu">Camp</button>' +
         '</div>' +
-        '<div class="foot">' + plural(r.logs, 'log') + ' burned · ' + plural(r.kills, 'shade') + ' dispelled · heat ×' + r.bestHeat + '</div>',
+        '<div class="foot">' + plural(r.logs, 'log') + ' burned · ' + plural(r.kills, 'shade') + ' dispelled (' + r.brandKills + ' by brand) · heat ×' + r.bestHeat + '</div>',
         'wide'
       );
       on('btnAgain', startGame);
@@ -2081,7 +2249,7 @@
   recalc();
   // opt-in inspection hook for tuning/QA: open with #debug
   if (/[?#]debug/.test(location.href)) window.__NW = { S: S, K: K, D: D, META: META, UPGRADES: UPGRADES, PERKS: PERKS,
-      flare: doFlare, lightAt: lightAt, recalc: recalc, saveMeta: saveMeta, rollDraft: rollDraft, take: takeUpgrade };
+      flare: doFlare, swing: doSwing, lightAt: lightAt, recalc: recalc, saveMeta: saveMeta, rollDraft: rollDraft, take: takeUpgrade };
   resize();
   S.keeper.x = W / 2; S.keeper.y = H / 2 + 96;
   menu();
