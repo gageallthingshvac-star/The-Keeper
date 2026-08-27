@@ -65,8 +65,29 @@
   }
   .bar.low i{background:linear-gradient(90deg,#7a2520,var(--danger));box-shadow:0 0 18px rgba(255,69,58,0.75)}
   .bar.low{border-color:rgba(255,69,58,0.4)}
-  #dawnWrap{width:112px;flex:none}
-  #dawnWrap .bar i{background:linear-gradient(90deg,#2a3550,#5E5CE6 60%,#9AD5FF);box-shadow:0 0 10px rgba(94,92,230,0.5)}
+  .meters{flex:1;min-width:0;display:flex;flex-direction:column;gap:9px}
+  .bar.thin{height:10px;border-radius:6px}
+  .bar.thin i{border-radius:5px}
+  #hpBar i{
+    background:linear-gradient(90deg,#2f8f5b,#63E6BE 60%,#9CF6D4);
+    box-shadow:0 0 14px rgba(99,230,190,0.55);
+  }
+  #hpBar.hurt i{background:linear-gradient(90deg,#8a6a1c,#FFD60A);box-shadow:0 0 14px rgba(255,214,10,0.6)}
+  #hpBar.crit i{background:linear-gradient(90deg,#7a2520,var(--danger));box-shadow:0 0 16px rgba(255,69,58,0.75)}
+  #hpBar.crit{border-color:rgba(255,69,58,0.4)}
+  /* dawn is a hairline along the very top edge — the bar became health */
+  #dawnLine{
+    position:fixed;z-index:3;left:0;top:0;width:100%;height:3px;
+    background:rgba(232,220,200,0.07);opacity:0;transition:opacity .35s ease;
+    pointer-events:none;
+  }
+  #dawnLine.on{opacity:1}
+  #dawnLine i{
+    display:block;height:100%;width:0%;
+    background:linear-gradient(90deg,#2a3550,#5E5CE6 60%,#9AD5FF);
+    box-shadow:0 0 8px rgba(94,92,230,0.7);
+    transition:width .12s linear;
+  }
   #stats{
     flex:none;text-align:right;font:700 12px/1.5 var(--mono);letter-spacing:.04em;
     color:var(--bone);text-shadow:0 1px 8px #000;
@@ -123,7 +144,7 @@
     50%{box-shadow:0 0 34px rgba(255,159,10,0.26), inset 0 0 26px rgba(255,159,10,0.16)}
   }
   #pause{
-    top:calc(var(--safeT) + 72px);right:calc(var(--safeR) + 14px);
+    top:calc(var(--safeT) + 116px);right:calc(var(--safeR) + 14px);
     width:38px;height:38px;border-radius:12px;
   }
   #pause svg{opacity:.75}
@@ -192,7 +213,7 @@
 
   /* ---------- HUD row 2: heat + held upgrades ---------- */
   #hud2{
-    position:fixed;z-index:2;left:0;right:0;top:calc(var(--safeT) + 66px);
+    position:fixed;z-index:2;left:0;right:0;top:calc(var(--safeT) + 110px);
     padding:0 calc(var(--safeR) + 62px) 0 calc(var(--safeL) + 14px);
     max-width:660px;margin:0 auto;
     display:flex;align-items:center;gap:8px;
@@ -317,6 +338,47 @@
   .feat:not(.got) .fe{color:var(--mute);opacity:.6}
 
   /* ---------- run summary extras ---------- */
+  .knight{
+    display:flex;align-items:center;gap:14px;text-align:left;
+    border:1px solid var(--line);border-radius:18px;padding:12px 15px;margin-bottom:18px;
+    background:linear-gradient(120deg,rgba(38,28,20,0.6),rgba(20,16,14,0.5));
+  }
+  .knight.small{margin:16px 0 4px;padding:10px 13px;gap:11px}
+  .portrait{
+    flex:none;width:76px;height:76px;display:block;
+    border-radius:14px;background:radial-gradient(70% 70% at 50% 35%,rgba(255,159,10,0.12),transparent 70%);
+  }
+  .knight.small .portrait{width:56px;height:56px}
+  .portrait.big{
+    width:150px;height:150px;margin:0 auto 16px;border-radius:24px;
+    background:radial-gradient(70% 70% at 50% 35%,rgba(255,159,10,0.16),transparent 72%);
+  }
+  .kinfo{flex:1;min-width:0}
+  .kinfo b{display:block;font:700 19px/1.15 var(--display);letter-spacing:-.01em;color:var(--bone)}
+  .kinfo span{display:block;font:600 10px/1.4 var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--ember);margin-top:3px}
+  .kinfo u{display:block;text-decoration:none;font:500 11.5px/1.4 var(--body);color:#8d8479;margin-top:6px}
+  .knight.small .kinfo b{font-size:16px}
+
+  .nameIn{
+    display:block;width:100%;margin-bottom:16px;padding:15px 16px;
+    border-radius:16px;border:1px solid var(--line);
+    background:rgba(20,16,14,0.7);color:var(--bone);
+    font:600 17px/1 var(--body);text-align:center;
+    -webkit-appearance:none;appearance:none;
+  }
+  .nameIn::placeholder{color:#5c554e;font-weight:500}
+  .nameIn:focus{outline:none;border-color:rgba(255,159,10,0.6);box-shadow:0 0 0 3px rgba(255,159,10,0.12)}
+
+  .plumes{display:flex;gap:10px;justify-content:center;margin-bottom:20px}
+  .sw{
+    width:38px;height:38px;border-radius:50%;cursor:pointer;padding:0;
+    border:2px solid transparent;
+    background:linear-gradient(135deg,var(--sw) 52%,var(--sw2) 52%);
+    transition:transform .1s ease,border-color .15s ease;
+  }
+  .sw:active{transform:scale(.92)}
+  .sw.on{border-color:var(--bone);box-shadow:0 0 0 3px rgba(232,220,200,0.14)}
+
   .nowplaying{
     display:flex;align-items:baseline;justify-content:center;gap:8px;
     margin:16px 0 4px;padding:11px 14px;border-radius:14px;
@@ -358,14 +420,17 @@
 <body>
 <canvas id="c"></canvas>
 
+<div id="dawnLine"><i></i></div>
 <div id="hud">
-  <div class="meter" id="fuelWrap">
-    <div class="lbl"><span>Fire</span><b id="fuelNum">60</b></div>
-    <div class="bar" id="fuelBar"><i></i></div>
-  </div>
-  <div class="meter" id="dawnWrap">
-    <div class="lbl"><span>Dawn</span></div>
-    <div class="bar" id="dawnBar"><i></i></div>
+  <div class="meters">
+    <div class="meter" id="fuelWrap">
+      <div class="lbl"><span>Fire</span><b id="fuelNum">60</b></div>
+      <div class="bar" id="fuelBar"><i></i></div>
+    </div>
+    <div class="meter" id="hpWrap">
+      <div class="lbl"><span>Health</span><b id="hpNum">100</b></div>
+      <div class="bar thin" id="hpBar"><i></i></div>
+    </div>
   </div>
   <div id="stats"><small>Night <span id="nightNum">1</span></small><span id="scoreNum">0</span></div>
 </div>
@@ -401,11 +466,11 @@
   // ────────────────────────────────────────────────────────────── tuning
   var K = {
     keeperSpeed: 205,
-    keeperR: 13,
+    keeperR: 14,
     lampR: 84,
     fireCoreR: 34,
     depositR: 52,
-    pickupR: 26,
+    pickupR: 56,
     maxFuel: 100,
     startFuel: 68,
     logFuel: 24,
@@ -418,6 +483,9 @@
     maxLogs: 6,
     logEvery: 2.4,
     carryBase: 3,          // armload before any upgrades
+    maxHealth: 100,
+    hitDamage: 10,         // what a shade costs you on contact
+    iframe: 1.05,          // invulnerable while you find your feet
     brandR: 78,            // how far the swing reaches
     brandArc: 1.95,        // ~112 degrees of sweep
     brandDmg: 4.6,
@@ -444,6 +512,8 @@
       desc: function (r) { return r + ' reroll' + (r === 1 ? '' : 's') + ' per dawn draft.'; } },
     { id: 'headstart',  name: 'Head Start',      glyph: '✨', ranks: 2, cost: [150, 320],
       desc: function (r) { return 'Begin each run holding ' + r + ' random upgrade' + (r === 1 ? '' : 's') + '.'; } },
+    { id: 'mail',       name: "Squire's Mail",   glyph: '⛓', ranks: 4, cost: [60, 110, 180, 270],
+      desc: function (r) { return '+' + (r * 8) + ' maximum health.'; } },
     { id: 'sifter',     name: 'Ash Sifter',      glyph: '⚱️', ranks: 4, cost: [80, 150, 240, 360],
       desc: function (r) { return 'Earn ' + (r * 12) + '% more embers.'; } }
   ];
@@ -482,7 +552,9 @@
 
     // ── the keeper
     { id: 'feet',       name: 'Sure Feet',      glyph: '👣', tier: 1, max: 3, lv: 1, desc: 'Walk 13% faster.' },
-    { id: 'nerve',      name: 'Iron Nerve',     glyph: '🛡', tier: 1, max: 2, lv: 1, desc: 'Shrug off hits faster, and guard briefly after.' },
+    { id: 'nerve',      name: 'Iron Nerve',     glyph: '🛡', tier: 1, max: 2, lv: 1, desc: 'Take 2 less damage, and guard for longer after a hit.' },
+    { id: 'hearty',     name: 'Padded Gambeson',glyph: '🧥', tier: 1, max: 3, lv: 1, desc: '+25 maximum health.' },
+    { id: 'mend',       name: 'Field Dressing', glyph: '💚', tier: 2, max: 1, lv: 2, desc: 'Dawn patches you up completely.' },
     { id: 'unburdened', name: 'Unburdened',     glyph: '🕊', tier: 2, max: 1, lv: 4, desc: 'Carrying wood no longer slows you.' },
 
     // ── the deep cuts
@@ -507,13 +579,15 @@
     { id: 'clean4',  name: 'Steady Hand',      desc: 'Reach night 4 without ever flaring.', embers: 120, test: function (r) { return r.night >= 4 && r.flares === 0; } },
     { id: 'stack8',  name: 'Well Provisioned', desc: 'Hold 8 upgrades at once.',            embers: 100, test: function (r) { return r.upCount >= 8; } },
     { id: 'heat10',  name: 'White Heat',       desc: 'Reach heat ×10.',                     embers: 130, test: function (r) { return r.bestHeat >= 10; } },
+    { id: 'untouched', name: 'Untouched',     desc: 'Reach night 4 without taking a single hit.', embers: 140, test: function (r) { return r.night >= 4 && r.damage === 0; } },
     { id: 'brand40', name: 'Brandbearer',      desc: 'Dispel 40 shades with the brand in one run.', embers: 110, test: function (r) { return r.brandKills >= 40; } },
     { id: 'score10k',name: 'Ten Thousand',     desc: 'Score 10,000 in one run.',            embers: 200, test: function (r) { return r.score >= 10000; } }
   ];
 
   function freshMeta() {
     return { v: 2, embers: 0, xp: 0, runs: 0, bestNight: 0, bestScore: 0,
-             perks: {}, ach: {}, lifeLogs: 0, lifeKills: 0 };
+             perks: {}, ach: {}, lifeLogs: 0, lifeKills: 0, lifeNights: 0,
+             knight: { name: '', plume: 'crimson' } };
   }
   var META = freshMeta();
   function loadMeta() {
@@ -524,6 +598,8 @@
       if (!m || typeof m !== 'object') return;
       var f = freshMeta();
       for (var key in f) if (m[key] !== undefined && m[key] !== null) f[key] = m[key];
+      if (!f.knight || typeof f.knight !== 'object') f.knight = { name: '', plume: 'crimson' };
+      if (typeof f.knight.name !== 'string') f.knight.name = '';
       META = f;
     } catch (e) { /* corrupt or unavailable storage — play on a fresh slate */ }
   }
@@ -575,8 +651,10 @@
 
     D.speed     = K.keeperSpeed * (1 + u('feet') * 0.13) * (1 + pk('boots') * 0.04);
     D.carryPer  = u('unburdened') ? 0 : 0.05;   // speed lost per log carried
-    D.stunTime  = u('nerve') ? (u('nerve') > 1 ? 0.22 : 0.34) : 0.55;
-    D.guard     = u('nerve') * 0.45;
+    D.maxHealth = K.maxHealth + u('hearty') * 25 + pk('mail') * 8;
+    D.hitDamage = Math.max(4, K.hitDamage - u('nerve') * 2);
+    D.iframe    = K.iframe + u('nerve') * 0.35;
+    D.dawnHeal  = u('mend') ? 9999 : 40;
     D.scoreMul  = 1 + u('veteran') * 0.25;
     D.rerolls   = pk('reroll');
   }
@@ -597,7 +675,8 @@
     // progression + feedback
     up: {}, motes: [], cinders: [], floats: [],
     heat: 0, heatT: 0, bestHeat: 0, husks: 0, flares: 0,
-    revived: false, pyreCount: 0, rerolls: 0, earned: null, brandKills: 0
+    revived: false, pyreCount: 0, rerolls: 0, earned: null, brandKills: 0,
+    health: 100, damageTaken: 0, cause: 'dark'
   };
 
   // ────────────────────────────────────────────────────────────── helpers
@@ -1136,6 +1215,8 @@
   var stick = { id: null, ox: 0, oy: 0, x: 0, y: 0, dx: 0, dy: 0, on: false };
 
   window.addEventListener('keydown', function (e) {
+    var tg = e.target;
+    if (tg && (tg.tagName === 'INPUT' || tg.tagName === 'TEXTAREA')) return;
     var k = e.key.toLowerCase();
     keys[k] = true;
     if (k === ' ') { e.preventDefault(); if (!e.repeat) doSwing(); }
@@ -1348,13 +1429,11 @@
     if (kd > 0) { ix /= kd; iy /= kd; }
     if (stick.on) { ix = stick.dx; iy = stick.dy; }
 
-    var stunned = k.stun > 0;
-    k.stun = Math.max(0, k.stun - dt);
     k.guard = Math.max(0, (k.guard || 0) - dt);
     k.swingCd = Math.max(0, (k.swingCd || 0) - dt);
     k.swing = Math.max(0, (k.swing || 0) - dt);
     var load = Math.max(0.78, 1 - k.carry * D.carryPer);
-    var speed = D.speed * load * (stunned ? 0.25 : 1);
+    var speed = D.speed * load;
     k.vx = lerp(k.vx, ix * speed, 1 - Math.pow(0.0008, dt));
     k.vy = lerp(k.vy, iy * speed, 1 - Math.pow(0.0008, dt));
     k.x = clamp(k.x + k.vx * dt, 16, W - 16);
@@ -1373,15 +1452,41 @@
     // ── logs
     S.logT -= dt;
     if (S.logT <= 0) { spawnLog(); S.logT = logInterval() * D.logRate * rand(0.75, 1.3); }
+    var inFlight = 0;
+    for (var fi = 0; fi < S.logs.length; fi++) if (S.logs[fi].fly) inFlight++;
+
     for (var i = S.logs.length - 1; i >= 0; i--) {
       var lg = S.logs[i];
       lg.pop = Math.min(1, lg.pop + dt * 3.2);
-      if (lg.cool > 0) { lg.cool -= dt; continue; }
-      if (k.carry < D.carry && dist2(lg.x, lg.y, k.x, k.y) < D.pickupR * D.pickupR) {
-        S.logs.splice(i, 1);
-        k.carry++;
-        SFX.pick(); buzz(8);
-        spark(lg.x, lg.y, 5, 'wood', 70, 0.35);
+      if (lg.cool > 0) { lg.cool -= dt; lg.fly = 0; continue; }
+
+      var room = k.carry + inFlight < D.carry;
+      var ld = dist(lg.x, lg.y, k.x, k.y);
+
+      if (!lg.fly && room && ld < D.pickupR) {
+        lg.fly = 1;                       // it has noticed you
+        lg.vx = lg.vx || 0; lg.vy = lg.vy || 0;
+        inFlight++;
+      } else if (lg.fly && k.carry + (inFlight - 1) >= D.carry && ld > 24) {
+        lg.fly = 0; inFlight--;           // arms filled up — it settles again
+      }
+
+      if (lg.fly) {
+        var la = Math.atan2(k.y - lg.y, k.x - lg.x);
+        var pull = 620 + (1 - clamp(ld / Math.max(D.pickupR, 1), 0, 1)) * 900;
+        lg.vx += Math.cos(la) * pull * dt;
+        lg.vy += Math.sin(la) * pull * dt;
+        lg.vx *= Math.pow(0.02, dt); lg.vy *= Math.pow(0.02, dt);
+        lg.x += lg.vx * dt; lg.y += lg.vy * dt;
+        lg.a += dt * 7;                   // tumbling as it comes
+        if (ld < 15) {                    // landed in your hands
+          S.logs.splice(i, 1);
+          inFlight--;
+          k.carry++;
+          SFX.pick(); buzz(8);
+          spark(k.x, k.y - 20, 6, 'wood', 80, 0.35);
+          floatText(k.x, k.y - 46, '+1 log', 'rgba(190,150,90,0.95)', 13);
+        }
       }
     }
 
@@ -1489,16 +1594,16 @@
       s.x += s.kx * dt; s.y += s.ky * dt;
       s.kx *= Math.pow(0.02, dt); s.ky *= Math.pow(0.02, dt);
 
-      // touching the keeper
-      if (k.stun <= 0 && k.guard <= 0 && dist2(s.x, s.y, k.x, k.y) < (s.r + K.keeperR) * (s.r + K.keeperR)) {
-        k.stun = D.stunTime;
-        k.guard = D.stunTime + D.guard;
+      // touching a shade costs you health — but never your footing
+      if (k.guard <= 0 && dist2(s.x, s.y, k.x, k.y) < (s.r + K.keeperR) * (s.r + K.keeperR)) {
+        k.guard = D.iframe;
         var ka = Math.atan2(k.y - s.y, k.x - s.x);
-        k.vx = Math.cos(ka) * 340; k.vy = Math.sin(ka) * 340;
-        s.kx = -Math.cos(ka) * 180; s.ky = -Math.sin(ka) * 180;
+        s.kx = -Math.cos(ka) * 210; s.ky = -Math.sin(ka) * 210;   // it recoils, you stand firm
+        S.health -= D.hitDamage;
+        S.damageTaken += D.hitDamage;
         S.shake = Math.max(S.shake, 9);
         SFX.hurt(); buzz([12, 40, 12]);
-        floatText(k.x, k.y - 34, k.carry ? 'DROPPED A LOG' : 'HIT', 'rgba(255,69,58,0.95)', 14);
+        floatText(k.x, k.y - 42, '-' + D.hitDamage, 'rgba(255,69,58,0.98)', 19);
         S.heat = 0; S.heatT = 0;
         if (k.carry > 0) {                    // you fumble one, not the armful
           k.carry--;
@@ -1507,9 +1612,10 @@
           S.logs.push({
             x: clamp(k.x - Math.cos(da) * dd, 30, W - 30),
             y: clamp(k.y - Math.sin(da) * dd, 90, H - 40),
-            a: rand(0, 3.14), pop: 0, cool: 0.7
+            a: rand(0, 3.14), pop: 0, cool: 0.7, fly: 0, vx: 0, vy: 0
           });
         }
+        if (S.health <= 0) { S.health = 0; gameOver('fell'); return; }
       }
     }
 
@@ -1531,7 +1637,7 @@
         toast('Ember Heart', 'The fire takes again');
         SFX.dawn(); buzz([40, 60, 40]);
       } else {
-        S.fuel = 0; gameOver(); return;
+        S.fuel = 0; gameOver('dark'); return;
       }
     }
 
@@ -1544,6 +1650,7 @@
     S.dawnHold = 2.2;
     S.score += 120 * S.night * D.scoreMul;
     S.fuel = Math.min(D.maxFuel, S.fuel + D.dawnFuel);
+    S.health = Math.min(D.maxHealth, S.health + D.dawnHeal);
     S.shake = 6;
     for (var i = S.shades.length - 1; i >= 0; i--) {
       spark(S.shades[i].x, S.shades[i].y, 8, 'shade', 190, 0.6);
@@ -1722,46 +1829,122 @@
     ctx.restore();
   }
 
+  // ── the knight ─────────────────────────────────────────────────────────
+  // Drawn from scratch so the same routine paints both the sprite in play
+  // and the portrait on the camp screen.
+  var PLUMES = [
+    { id: 'crimson', name: 'Crimson', plume: '#FF6B6B', tabard: '#B34A3D', trim: '#FFD9A0' },
+    { id: 'ember',   name: 'Ember',   plume: '#FF9F0A', tabard: '#C0894A', trim: '#FFE9C0' },
+    { id: 'moss',    name: 'Moss',    plume: '#95A86B', tabard: '#5E7346', trim: '#DDE8C4' },
+    { id: 'dusk',    name: 'Dusk',    plume: '#8E86FF', tabard: '#4A4478', trim: '#DDD9FF' },
+    { id: 'tide',    name: 'Tide',    plume: '#5AC8FA', tabard: '#2F6D86', trim: '#D6F1FF' },
+    { id: 'rose',    name: 'Rose',    plume: '#FF9FC4', tabard: '#8E4468', trim: '#FFE0EE' }
+  ];
+  function plumeOf() {
+    var want = META.knight && META.knight.plume;
+    for (var i = 0; i < PLUMES.length; i++) if (PLUMES[i].id === want) return PLUMES[i];
+    return PLUMES[0];
+  }
+  var TITLES = [
+    [1, 'Squire'], [2, 'Ember Squire'], [3, 'Knight of the Watch'], [5, 'Knight of the Ember'],
+    [7, 'Warden of the Flame'], [10, 'Keeper of the Long Night'], [14, 'Dawnbringer']
+  ];
+  function knightTitle() {
+    var lv = keeperLevel(), out = TITLES[0][1];
+    for (var i = 0; i < TITLES.length; i++) if (lv >= TITLES[i][0]) out = TITLES[i][1];
+    return out;
+  }
+  function knightName() {
+    return (META.knight && META.knight.name) ? META.knight.name : 'the Keeper';
+  }
+
+  // opts: { bob, flash, carry, face, swing, swingDir, brandArc, lantern, scale }
+  function drawKnight(g, o) {
+    var P = plumeOf();
+    var sc = o.scale || 1;
+    var steel = o.flash ? '#FFD9D6' : '#C9CFD8';
+    var steelDark = o.flash ? '#E0A9A6' : '#8E97A4';
+
+    g.save();
+    g.scale(sc, sc);
+
+    // shadow
+    g.fillStyle = 'rgba(0,0,0,0.45)';
+    g.beginPath(); g.ellipse(0, 13, 11, 4, 0, 0, 6.29); g.fill();
+
+    // little round shield on the off hand
+    g.save();
+    g.translate(-11, 1);
+    g.rotate(-0.25);
+    g.fillStyle = steelDark;
+    g.beginPath(); g.ellipse(0, 0, 6.2, 7.4, 0, 0, 6.29); g.fill();
+    g.fillStyle = P.tabard;
+    g.beginPath(); g.ellipse(0, 0, 4.2, 5.2, 0, 0, 6.29); g.fill();
+    g.fillStyle = P.trim;
+    g.beginPath(); g.arc(0, 0, 1.7, 0, 6.29); g.fill();
+    g.restore();
+
+    // body — a stubby tabard over mail
+    g.fillStyle = steelDark;
+    roundRectOn(g, -8, -4, 16, 15, 6); g.fill();
+    g.fillStyle = P.tabard;
+    g.beginPath();
+    g.moveTo(-5.5, -3); g.lineTo(5.5, -3); g.lineTo(4.4, 10.5);
+    g.lineTo(0, 12.4); g.lineTo(-4.4, 10.5);
+    g.closePath(); g.fill();
+    g.strokeStyle = P.trim; g.lineWidth = 1; g.globalAlpha = 0.75;
+    g.beginPath(); g.moveTo(-5.2, 1.4); g.lineTo(5.2, 1.4); g.stroke();
+    g.globalAlpha = 1;
+
+    // oversized helmet — the whole point of a cute knight
+    g.fillStyle = steel;
+    g.beginPath(); g.arc(0, -11, 9.4, Math.PI, 0); g.fill();
+    roundRectOn(g, -9.4, -11, 18.8, 11, 4.5); g.fill();
+    // visor slit
+    g.fillStyle = '#1A1A22';
+    roundRectOn(g, -6.4, -10.4, 12.8, 4.2, 2); g.fill();
+    // two friendly pinpricks of light inside
+    g.fillStyle = o.flash ? '#FFC9C4' : '#FFE9A8';
+    g.beginPath(); g.arc(-2.6, -8.3, 1.25, 0, 6.29); g.fill();
+    g.beginPath(); g.arc(2.6, -8.3, 1.25, 0, 6.29); g.fill();
+    // cheek plates + rivet
+    g.fillStyle = steelDark;
+    roundRectOn(g, -9.4, -5.4, 18.8, 2.6, 1.3); g.fill();
+    g.fillStyle = P.trim;
+    g.beginPath(); g.arc(0, -4.1, 0.9, 0, 6.29); g.fill();
+
+    // plume
+    g.fillStyle = P.plume;
+    var sway = Math.sin((o.t || 0) * 4) * 0.12;
+    g.save();
+    g.translate(0, -19.4);
+    g.rotate(sway);
+    g.beginPath();
+    g.moveTo(0, 2);
+    g.quadraticCurveTo(-5.5, -2.5, -2.4, -9.5);
+    g.quadraticCurveTo(0.6, -4.5, 3.4, -8.2);
+    g.quadraticCurveTo(4.2, -1.6, 0, 2);
+    g.closePath(); g.fill();
+    g.restore();
+
+    g.restore();
+  }
+  function roundRectOn(g, x, y, w, h, r) {
+    g.beginPath();
+    g.moveTo(x + r, y);
+    g.arcTo(x + w, y, x + w, y + h, r);
+    g.arcTo(x + w, y + h, x, y + h, r);
+    g.arcTo(x, y + h, x, y, r);
+    g.arcTo(x, y, x + w, y, r);
+    g.closePath();
+  }
+
   function drawKeeper() {
     var k = S.keeper;
-    var bob = Math.sin(S.time * 9) * (Math.hypot(k.vx, k.vy) > 30 ? 1.7 : 0.5);
+    var moving = Math.hypot(k.vx, k.vy) > 30;
+    var bob = Math.sin(S.time * 9) * (moving ? 1.7 : 0.5);
     ctx.save();
     ctx.translate(k.x, k.y + bob);
-
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.beginPath(); ctx.ellipse(0, 12 - bob, 12, 4.5, 0, 0, 6.29); ctx.fill();
-
-    var flashing = k.stun > 0 && Math.floor(S.time * 22) % 2 === 0;
-
-    // cloak
-    ctx.fillStyle = flashing ? '#FF453A' : '#2E2A33';
-    ctx.beginPath();
-    ctx.moveTo(-10, 12); ctx.quadraticCurveTo(-9, -6, 0, -9);
-    ctx.quadraticCurveTo(9, -6, 10, 12);
-    ctx.quadraticCurveTo(0, 15, -10, 12);
-    ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = 'rgba(232,220,200,0.28)'; ctx.lineWidth = 1.1; ctx.stroke();
-
-    // head
-    ctx.fillStyle = flashing ? '#FFD9D6' : '#E8DCC8';
-    ctx.beginPath(); ctx.arc(0, -13, 5.6, 0, 6.29); ctx.fill();
-    // hood brim
-    ctx.fillStyle = '#3A343E';
-    ctx.beginPath(); ctx.arc(0, -14.5, 6.4, Math.PI, 0); ctx.fill();
-
-    // carried logs, stacked
-    for (var ci = 0; ci < k.carry; ci++) {
-      ctx.save();
-      ctx.translate(0, -30 - ci * 9);
-      ctx.rotate(Math.sin(S.time * 5 + ci * 0.8) * 0.09);
-      ctx.fillStyle = ci % 2 ? '#7A5433' : '#6B4A2C';
-      roundRect(-11.5, -4, 23, 8, 4); ctx.fill();
-      ctx.strokeStyle = 'rgba(20,12,8,0.7)'; ctx.lineWidth = 1.2;
-      ctx.beginPath(); ctx.moveTo(-3.5, -4); ctx.lineTo(-3.5, 4); ctx.stroke();
-      ctx.fillStyle = 'rgba(190,150,90,0.85)';
-      ctx.beginPath(); ctx.ellipse(-11, 0, 2.4, 4, 0, 0, 6.29); ctx.fill();
-      ctx.restore();
-    }
 
     // the brand, held out to the side or mid-swing
     var bAng = k.swing > 0
@@ -1778,6 +1961,26 @@
     ctx.fillStyle = 'rgba(255,170,50,0.95)';
     ctx.beginPath(); ctx.arc(bLen + 2, 0, k.swing > 0 ? 4.6 : 3.4, 0, 6.29); ctx.fill();
     ctx.restore();
+
+    drawKnight(ctx, {
+      t: S.time,
+      scale: 1.32,
+      flash: k.guard > 0 && Math.floor(S.time * 18) % 2 === 0
+    });
+
+    // carried logs, stacked over the helmet
+    for (var ci = 0; ci < k.carry; ci++) {
+      ctx.save();
+      ctx.translate(0, -38 - ci * 9);
+      ctx.rotate(Math.sin(S.time * 5 + ci * 0.8) * 0.09);
+      ctx.fillStyle = ci % 2 ? '#7A5433' : '#6B4A2C';
+      roundRect(-11.5, -4, 23, 8, 4); ctx.fill();
+      ctx.strokeStyle = 'rgba(20,12,8,0.7)'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(-3.5, -4); ctx.lineTo(-3.5, 4); ctx.stroke();
+      ctx.fillStyle = 'rgba(190,150,90,0.85)';
+      ctx.beginPath(); ctx.ellipse(-11, 0, 2.4, 4, 0, 0, 6.29); ctx.fill();
+      ctx.restore();
+    }
 
     // lantern arm
     var lx = Math.cos(k.face) * 13, ly = Math.sin(k.face) * 8 + 1;
@@ -1941,12 +2144,29 @@
       ctx.beginPath(); ctx.arc(k.x, k.y, D.flareR * t, 0, 6.29); ctx.stroke();
     }
 
+    // your reach — a faint ring so the pickup range is never a guess
+    var kp = S.keeper;
+    if (S.mode === 'play' || S.mode === 'paused') {
+      var full = kp.carry >= D.carry;
+      var ringPulse = 0.5 + 0.5 * Math.sin(S.time * 2.4);
+      ctx.strokeStyle = full
+        ? 'rgba(232,220,200,' + (0.05 + 0.03 * ringPulse).toFixed(3) + ')'
+        : 'rgba(255,196,110,' + (0.13 + 0.07 * ringPulse).toFixed(3) + ')';
+      ctx.lineWidth = 1.4;
+      ctx.setLineDash([5, 7]);
+      ctx.beginPath();
+      ctx.arc(kp.x, kp.y, D.pickupR, 0, 6.29);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
     // log glints — a wet-bark catchlight so wood is findable out in the dark
     for (var g3 = 0; g3 < S.logs.length; g3++) {
       var lgg = S.logs[g3];
       var dark = 1 - lightAt(lgg.x, lgg.y);
       var tw = 0.5 + 0.5 * Math.sin(S.time * 2.2 + g3 * 1.9);
       var seen = u('nightsight') ? 0.34 : 0;
+      if (lgg.fly) seen += 0.42;
       ctx.fillStyle = 'rgba(255,176,80,' + (0.10 + seen + dark * 0.20 * tw).toFixed(3) + ')';
       ctx.beginPath();
       ctx.ellipse(lgg.x, lgg.y, 13 * lgg.pop, 5.5 * lgg.pop, lgg.a, 0, 6.29);
@@ -1989,12 +2209,14 @@
     }
     ctx.restore();
 
-    // low-fuel warning vignette
-    if (S.mode === 'play' && S.fuel < 22) {
-      var a = (1 - S.fuel / 22) * (0.16 + Math.sin(S.time * 6) * 0.08);
+    // low-fuel / low-health warning vignette
+    var hpFrac = S.health / D.maxHealth;
+    if (S.mode === 'play' && (S.fuel < 22 || hpFrac < 0.3)) {
+      var danger = Math.max(S.fuel < 22 ? 1 - S.fuel / 22 : 0, hpFrac < 0.3 ? 1 - hpFrac / 0.3 : 0);
+      var a = danger * (0.16 + Math.sin(S.time * 6) * 0.08);
       var vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.25, W / 2, H / 2, Math.max(W, H) * 0.62);
       vg.addColorStop(0, 'rgba(255,69,58,0)');
-      vg.addColorStop(1, 'rgba(255,69,58,' + clamp(a, 0, 0.4).toFixed(3) + ')');
+      vg.addColorStop(1, 'rgba(255,69,58,' + clamp(a, 0, 0.42).toFixed(3) + ')');
       ctx.fillStyle = vg;
       ctx.fillRect(0, 0, W, H);
     }
@@ -2043,7 +2265,11 @@
   var elFuelBar = document.getElementById('fuelBar');
   var elFuelFill = elFuelBar.firstElementChild;
   var elFuelNum = document.getElementById('fuelNum');
-  var elDawnFill = document.querySelector('#dawnBar i');
+  var elDawnFill = document.querySelector('#dawnLine i');
+  var elDawnLine = document.getElementById('dawnLine');
+  var elHpBar = document.getElementById('hpBar');
+  var elHpFill = elHpBar.firstElementChild;
+  var elHpNum = document.getElementById('hpNum');
   var elNight = document.getElementById('nightNum');
   var elScore = document.getElementById('scoreNum');
   var elVeil = document.getElementById('veil');
@@ -2063,6 +2289,12 @@
     elFuelBar.classList.toggle('low', pct < 0.22);
     elFuelNum.textContent = Math.round(S.fuel);
     elDawnFill.style.width = (clamp(S.nightT / K.nightLen, 0, 1) * 100).toFixed(1) + '%';
+
+    var hp = clamp(S.health / D.maxHealth, 0, 1);
+    elHpFill.style.width = (hp * 100).toFixed(1) + '%';
+    elHpBar.classList.toggle('hurt', hp < 0.6 && hp >= 0.3);
+    elHpBar.classList.toggle('crit', hp < 0.3);
+    elHpNum.textContent = Math.max(0, Math.round(S.health));
     elNight.textContent = S.night;
     elScore.textContent = Math.round(S.score).toLocaleString();
     // heat pill + held-upgrade chips
@@ -2100,13 +2332,39 @@
 
   function showChrome(on) {
     elHud2.classList.toggle('on', on);
+    elDawnLine.classList.toggle('on', on);
     elHud.classList.toggle('on', on);
     flareBtn.classList.toggle('on', on);
     brandBtn.classList.toggle('on', on);
     elPause.classList.toggle('on', on);
   }
 
+  var portraitCv = null;
+  function paintPortrait() {
+    var cv = portraitCv;
+    if (!cv || !cv.isConnected) { portraitCv = null; return; }
+    var w = cv.clientWidth || 128, h = cv.clientHeight || 128;
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    // check BOTH axes: a canvas defaults to 300x150, and a 150px-wide box at
+    // dpr 2 gives exactly 300, so a width-only guard silently skips the height
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) {
+      cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    }
+    var g = cv.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, w, h);
+    // the knight occupies roughly y -29..+13 around his own origin; fit that
+    // box with a margin rather than guessing, so nothing clips at any size
+    var TOP = -29, BOT = 13, MID = (TOP + BOT) / 2;
+    var sc = Math.min(w, h) / ((BOT - TOP) * 1.28);
+    g.save();
+    g.translate(w / 2, h / 2 - MID * sc);
+    drawKnight(g, { t: S.time, scale: sc });
+    g.restore();
+  }
+
   function veil(html, cls) {
+    portraitCv = null;
     elCard.className = 'card' + (cls ? ' ' + cls : '');
     elCard.innerHTML = html;
     elVeil.classList.remove('hide');
@@ -2114,6 +2372,65 @@
   }
   function hideVeil() { elVeil.classList.add('hide'); }
   function on(id, fn) { var el = document.getElementById(id); if (el) el.addEventListener('click', fn); }
+  function hookPortrait() { portraitCv = document.getElementById('portrait'); paintPortrait(); }
+  function plumeSwatches() {
+    var cur = plumeOf().id, out = '';
+    for (var i = 0; i < PLUMES.length; i++) {
+      var P = PLUMES[i];
+      out += '<button class="sw' + (P.id === cur ? ' on' : '') + '" data-plume="' + P.id + '" ' +
+             'aria-label="' + esc(P.name) + '" title="' + esc(P.name) + '" ' +
+             'style="--sw:' + P.plume + ';--sw2:' + P.tabard + '"></button>';
+    }
+    return out;
+  }
+  function bindPlumes() {
+    var sw = elCard.querySelectorAll('[data-plume]');
+    for (var i = 0; i < sw.length; i++) {
+      sw[i].addEventListener('click', function () {
+        META.knight.plume = this.getAttribute('data-plume');
+        saveMeta();
+        var all = elCard.querySelectorAll('[data-plume]');
+        for (var j = 0; j < all.length; j++) all[j].classList.toggle('on', all[j] === this);
+        paintPortrait();
+        tone(700, 0.09, 'triangle', 0.05, 940);
+      });
+    }
+  }
+
+  // ── naming your knight ─────────────────────────────────────────────────
+  function cleanName(v) {
+    return String(v || '').replace(/[\u0000-\u001f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 14);
+  }
+  function nameKnight(after) {
+    S.mode = 'menu';
+    showChrome(false);
+    var first = !META.knight.name;
+    veil(
+      '<div class="eyebrow">' + (first ? 'Before you begin' : 'Your knight') + '</div>' +
+      '<h1>Who <em>Holds?</em></h1>' +
+      '<canvas id="portrait" class="portrait big"></canvas>' +
+      '<input id="nameIn" class="nameIn" maxlength="14" autocomplete="off" spellcheck="false" ' +
+        'placeholder="Name your knight" value="' + esc(META.knight.name) + '">' +
+      '<div class="plumes">' + plumeSwatches() + '</div>' +
+      '<button class="go" id="btnName">' + (first ? 'Take the Watch' : 'Save') + '</button>' +
+      (first ? '' : '<button class="ghost" id="btnNameBack">Back to camp</button>') +
+      '<div class="foot">They will be remembered by this name</div>',
+      'wide'
+    );
+    hookPortrait();
+    bindPlumes();
+    var input = document.getElementById('nameIn');
+    var commit = function () {
+      var n = cleanName(input.value);
+      META.knight.name = n || 'Pip';
+      saveMeta();
+      (after || menu)();
+    };
+    on('btnName', commit);
+    on('btnNameBack', menu);
+    input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); commit(); } });
+    if (first) setTimeout(function () { try { input.focus(); } catch (e) {} }, 320);
+  }
   function plural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
   function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
@@ -2163,6 +2480,17 @@
     veil(
       '<div class="eyebrow">The Keeper</div>' +
       '<h1>Night<em>Watch</em></h1>' +
+      (META.knight.name
+        ? '<div class="knight">' +
+            '<canvas id="portrait" class="portrait"></canvas>' +
+            '<div class="kinfo">' +
+              '<b>' + esc(META.knight.name) + '</b>' +
+              '<span>' + esc(knightTitle()) + '</span>' +
+              '<u>' + plural(META.lifeNights, 'night') + ' held · ' +
+                      plural(META.lifeKills, 'shade') + ' dispelled</u>' +
+            '</div>' +
+          '</div>'
+        : '') +
       (META.runs
         ? levelStrip() +
           '<div class="tally sm">' +
@@ -2184,13 +2512,18 @@
         '<button class="ghost" id="btnShop">Provisions</button>' +
         '<button class="ghost" id="btnFeats">Feats · ' + feats + '/' + ACHIEVEMENTS.length + '</button>' +
       '</div>' +
+      '<button class="ghost" id="btnKnight">' + (META.knight.name ? 'Your knight' : 'Name your knight') + '</button>' +
       '<div class="foot">Drag to move · Brand to swing · Flare when surrounded</div>' +
       '<div class="foot">♪ ' + esc(tuneName()) + (MUS.on ? '' : ' · music off') + '</div>' +
       '<div class="foot">' + (locked ? locked + ' upgrades still locked · level up to draft them' : 'Every upgrade unlocked') + '</div>'
     );
-    on('btnStart', startGame);
+    on('btnStart', function () {
+      if (!META.knight.name) nameKnight(startGame); else startGame();
+    });
     on('btnShop', shop);
     on('btnFeats', feats2);
+    on('btnKnight', function () { nameKnight(menu); });
+    hookPortrait();
   }
 
   // ── provisions: spend embers on things that persist ───────────────────────
@@ -2360,7 +2693,7 @@
     var r = {
       night: S.night, score: Math.round(S.score), logs: S.logsBurned, kills: S.kills,
       husks: S.husks, flares: S.flares, upCount: upCount(), bestHeat: S.bestHeat,
-      brandKills: S.brandKills
+      brandKills: S.brandKills, damage: S.damageTaken
     };
     var base = Math.round(r.score / 22) + r.night * 12;
     var embers = Math.max(1, Math.round(base * (1 + pk('sifter') * 0.12)));
@@ -2378,6 +2711,7 @@
     META.runs++;
     META.lifeLogs += r.logs;
     META.lifeKills += r.kills;
+    META.lifeNights += Math.max(0, r.night - 1);
     if (r.night > META.bestNight) META.bestNight = r.night;
     if (r.score > META.bestScore) META.bestScore = r.score;
     var after = keeperLevel();
@@ -2396,6 +2730,7 @@
     S.kills = 0; S.logsBurned = 0; S.husks = 0; S.flares = 0;
     S.heat = 0; S.heatT = 0; S.bestHeat = 0;
     S.revived = false; S.pyreCount = 0; S.earned = null; S.brandKills = 0;
+    S.health = D.maxHealth; S.damageTaken = 0; S.cause = 'dark';
     S.rerolls = D.rerolls;
     S.fire.flare = 0.8;
 
@@ -2420,7 +2755,7 @@
     startMusic();
     duckMusic(1, 0.8);
     last = performance.now();
-    toast('Night 1', given.length ? given[0].glyph + ' ' + given[0].name : 'Hold the light');
+    toast('Night 1', knightName() + ' takes the watch');
   }
 
   function togglePause() {
@@ -2434,8 +2769,13 @@
         '<h1>Hold<em>Fast</em></h1>' +
         '<div class="tally sm">' +
           '<div><span>Night</span><b>' + S.night + '</b></div>' +
-          '<div><span>Score</span><b>' + Math.round(S.score).toLocaleString() + '</b></div>' +
+          '<div><span>Health</span><b>' + Math.max(0, Math.round(S.health)) + '</b></div>' +
           '<div><span>Fire</span><b>' + Math.round(S.fuel) + '</b></div>' +
+        '</div>' +
+        '<div class="knight small">' +
+          '<canvas id="portrait" class="portrait"></canvas>' +
+          '<div class="kinfo"><b>' + esc(knightName()) + '</b><span>' + esc(knightTitle()) + '</span>' +
+          '<u>score ' + Math.round(S.score).toLocaleString() + '</u></div>' +
         '</div>' +
         '<div class="held big">' + upChips(S.up, true) + '</div>' +
         '<div class="nowplaying">♪ <b>' + esc(tuneName()) + '</b><span>' + (MUS.on ? 'now playing' : 'music off') + '</span></div>' +
@@ -2447,6 +2787,7 @@
         '<button class="ghost" id="btnQuit">Abandon the Watch</button>',
         'wide'
       );
+      hookPortrait();
       on('btnResume', togglePause);
       on('btnQuit', function () { finishRun(); menu(); });
       on('btnSound', function () {
@@ -2470,7 +2811,8 @@
     }
   }
 
-  function gameOver() {
+  function gameOver(cause) {
+    S.cause = cause || 'dark';
     S.mode = 'over';
     S.shake = 14;
     showChrome(false);
@@ -2494,8 +2836,9 @@
 
     setTimeout(function () {
       veil(
-        '<div class="eyebrow">' + (r.score > 0 && r.score >= META.bestScore ? 'New Best' : 'The fire went out') + '</div>' +
-        '<h1>Cold<em>Ashes</em></h1>' +
+        '<div class="eyebrow">' + (r.score > 0 && r.score >= META.bestScore ? 'New Best'
+            : S.cause === 'fell' ? 'Your knight fell' : 'The fire went out') + '</div>' +
+        (S.cause === 'fell' ? '<h1>Carried<em>Home</em></h1>' : '<h1>Cold<em>Ashes</em></h1>') +
         '<p class="lede">' + epitaph() + '</p>' +
         '<div class="tally">' +
           '<div><span>Night</span><b>' + r.night + '</b></div>' +
@@ -2514,7 +2857,8 @@
           '<button class="ghost" id="btnShop2">Provisions</button>' +
           '<button class="ghost" id="btnMenu">Camp</button>' +
         '</div>' +
-        '<div class="foot">' + plural(r.logs, 'log') + ' burned · ' + plural(r.kills, 'shade') + ' dispelled (' + r.brandKills + ' by brand) · heat ×' + r.bestHeat + '</div>',
+        '<div class="foot">' + plural(r.logs, 'log') + ' burned · ' + plural(r.kills, 'shade') + ' dispelled (' + r.brandKills + ' by brand) · heat ×' + r.bestHeat + '</div>' +
+        '<div class="foot">' + (r.damage ? r.damage + ' damage taken' : 'not a scratch') + '</div>',
         'wide'
       );
       on('btnAgain', startGame);
@@ -2524,12 +2868,13 @@
   }
 
   function epitaph() {
-    var n = S.night - 1;
-    if (n <= 0) return 'You did not make it to the first dawn. The dark is patient — try again.';
-    if (n === 1) return 'One night held. The watch is longer than it looks.';
-    if (n < 4) return n + ' nights held. You were learning the rhythm of it.';
-    if (n < 7) return n + ' nights held. Steady hands — the fire remembers.';
-    return n + ' nights held. Whoever comes after will find warm ground.';
+    var n = S.night - 1, who = knightName();
+    var fell = S.cause === 'fell';
+    if (n <= 0) return who + ' did not see the first dawn. The dark is patient — try again.';
+    if (n === 1) return who + ' held one night. The watch is longer than it looks.';
+    if (n < 4) return who + ' held ' + n + ' nights, and was learning the rhythm of it.';
+    if (n < 7) return who + ' held ' + n + ' nights. ' + (fell ? 'Carried home by morning.' : 'Steady hands — the fire remembers.');
+    return who + ' held ' + n + ' nights. Whoever comes after will find warm ground.';
   }
 
   // ────────────────────────────────────────────────────────────── loop
@@ -2548,6 +2893,7 @@
     }
     render();
     syncHud();
+    if (portraitCv) paintPortrait();
   }
 
   // ────────────────────────────────────────────────────────────── boot
