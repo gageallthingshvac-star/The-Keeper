@@ -373,7 +373,7 @@
     transition:background .3s ease;
   }
   .stage:active{background:radial-gradient(80% 90% at 50% 80%, rgba(255,159,10,0.24), rgba(30,26,64,0.55) 62%, rgba(14,13,38,0.66))}
-  .portrait.stage-knight{width:100%;height:158px;margin:0;display:block;background:none;pointer-events:none}
+  .portrait.stage-knight{width:100%;height:190px;margin:0;display:block;background:none;pointer-events:none}
   .stagename{text-align:center;margin-top:2px;pointer-events:none}
   .stagename b{display:block;font:700 22px/1.15 var(--display);letter-spacing:-.01em;color:var(--bone)}
   .stagename span{display:block;margin-top:4px;font:600 10px/1 var(--body);letter-spacing:.18em;
@@ -594,15 +594,21 @@
   var gctx = groundCvs.getContext('2d');
 
   var W = 0, H = 0, DPR = 1;
-  var BUILD = 'v1.8.0';        // bump on every deploy — shown in-game for support
+  // The field is drawn smaller than life so more of it fits on the glass. All
+  // the game's numbers stay in field units; only the transform knows about it.
+  var ZOOM = 0.8;
+  var VS = 1;                     // device pixels per field unit
+  function px(n) { return n / ZOOM; }   // n screen pixels, in field units
+  var BUILD = 'v1.9.0';        // bump on every deploy — shown in-game for support
   var MUTE_KEY = 'keeper.nightwatch.mute';
   var MUSIC_KEY = 'keeper.nightwatch.music';
 
   // ────────────────────────────────────────────────────────────── tuning
+  var FIELD = 1.25;              // = 1 / ZOOM, spelled out so the tuning reads
   var K = {
-    keeperSpeed: 205,
+    keeperSpeed: 205 * FIELD,
     keeperR: 14,
-    lampR: 84,
+    lampR: 84 * FIELD,
     fireCoreR: 34,
     depositR: 52,
     pickupR: 56,
@@ -1821,21 +1827,23 @@
   // ────────────────────────────────────────────────────────────── canvas sizing
   function resize() {
     DPR = Math.min(window.devicePixelRatio || 1, 2);
-    W = window.innerWidth;
-    H = window.innerHeight;
+    var cw = window.innerWidth, ch = window.innerHeight;
+    W = cw / ZOOM;
+    H = ch / ZOOM;
+    VS = DPR * ZOOM;
     [cvs, darkCvs, groundCvs].forEach(function (cv) {
-      cv.width = Math.max(1, Math.round(W * DPR));
-      cv.height = Math.max(1, Math.round(H * DPR));
-      cv.style.width = W + 'px';
-      cv.style.height = H + 'px';
+      cv.width = Math.max(1, Math.round(cw * DPR));
+      cv.height = Math.max(1, Math.round(ch * DPR));
+      cv.style.width = cw + 'px';
+      cv.style.height = ch + 'px';
     });
-    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    dctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    gctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.setTransform(VS, 0, 0, VS, 0, 0);
+    dctx.setTransform(VS, 0, 0, VS, 0, 0);
+    gctx.setTransform(VS, 0, 0, VS, 0, 0);
     S.fire.x = W / 2;
     S.fire.y = H / 2;
-    S.keeper.x = clamp(S.keeper.x, 16, W - 16);
-    S.keeper.y = clamp(S.keeper.y, 60, H - 24);
+    S.keeper.x = clamp(S.keeper.x, px(16), W - px(16));
+    S.keeper.y = clamp(S.keeper.y, px(60), H - px(24));
     _sheet = null;
     paintGround();
   }
@@ -1888,7 +1896,7 @@
 
   // ────────────────────────────────────────────────────────────── lighting model
   function lightRadius() {
-    return (74 + (S.fuel / D.maxFuel) * 196 + S.fire.flare * 90) * D.fireLight;
+    return (74 + (S.fuel / D.maxFuel) * 196 + S.fire.flare * 90) * D.fireLight * FIELD;
   }
   function lightAt(x, y) {
     var lr = lightRadius();
@@ -1945,13 +1953,13 @@
   // ────────────────────────────────────────────────────────────── spawning
   // wood gets scarcer and lies farther out as the nights wear on
   function logInterval() { return K.logEvery + Math.min(1.9, (S.night - 1) * 0.17); }
-  function logMinDist() { return Math.min(Math.min(W, H) * 0.42, 128 + (S.night - 1) * 13); }
+  function logMinDist() { return Math.min(Math.min(W, H) * 0.42, (128 + (S.night - 1) * 13) * FIELD); }
 
   function spawnLog() {
     if (S.logs.length >= D.maxLogs) return;
     var minD = logMinDist();
     for (var tries = 0; tries < 30; tries++) {
-      var x = rand(46, W - 46), y = rand(88, H - 96);
+      var x = rand(px(46), W - px(46)), y = rand(px(88), H - px(96));
       if (dist(x, y, S.fire.x, S.fire.y) < minD) continue;
       S.logs.push({ x: x, y: y, a: rand(0, Math.PI), pop: 0 });
       return;
@@ -1959,8 +1967,8 @@
     // arena too small to honour the min distance — drop it on the ring instead
     var ang = rand(0, 6.283);
     S.logs.push({
-      x: clamp(S.fire.x + Math.cos(ang) * minD, 46, W - 46),
-      y: clamp(S.fire.y + Math.sin(ang) * minD, 88, H - 96),
+      x: clamp(S.fire.x + Math.cos(ang) * minD, px(46), W - px(46)),
+      y: clamp(S.fire.y + Math.sin(ang) * minD, px(88), H - px(96)),
       a: rand(0, Math.PI), pop: 0
     });
   }
@@ -1984,7 +1992,7 @@
       kind: kind, t: T,
       x: x, y: y,
       hp: hp, maxHp: hp,
-      spd: rand(T.spd[0], T.spd[1]) + S.night * T.spdN,
+      spd: (rand(T.spd[0], T.spd[1]) + S.night * T.spdN) * FIELD,
       r: T.r,
       kx: 0, ky: 0,       // knockback velocity
       wob: rand(0, 6.28),
@@ -2018,7 +2026,7 @@
   window.addEventListener('keyup', function (e) { keys[e.key.toLowerCase()] = false; });
 
   function localPt(e) {
-    return { x: e.clientX, y: e.clientY };
+    return { x: e.clientX / ZOOM, y: e.clientY / ZOOM };
   }
   cvs.addEventListener('pointerdown', function (e) {
     if (S.mode !== 'play') return;
@@ -2039,7 +2047,7 @@
     stick.x = p.x; stick.y = p.y;
     var dx = stick.x - stick.ox, dy = stick.y - stick.oy;
     var d = Math.hypot(dx, dy);
-    var MAX = 54;
+    var MAX = px(54);
     if (d > MAX) {
       if (META.opts.stick === 'drift') {   // the origin follows your thumb
         stick.ox += dx * (1 - MAX / d);
@@ -2048,7 +2056,8 @@
       }
       d = MAX;                             // fixed: the origin stays put
     }
-    var n = d < 7 ? 0 : clamp((d - 7) / (MAX - 7), 0, 1);
+    var dead = px(7);
+    var n = d < dead ? 0 : clamp((d - dead) / (MAX - dead), 0, 1);
     n = n * (0.4 + 0.6 * n);            // fine control near the middle, full tilt at the rim
     if (d > 0.001) { stick.dx = dx / d * n; stick.dy = dy / d * n; }
     else { stick.dx = 0; stick.dy = 0; }
@@ -2261,8 +2270,8 @@
       k.y += Math.sin(k.face) * k.lunge * dt;
       k.lunge = Math.max(0, k.lunge - dt * 460);
     }
-    k.x = clamp(k.x + k.vx * dt, 16, W - 16);
-    k.y = clamp(k.y + k.vy * dt, 60, H - 24);
+    k.x = clamp(k.x + k.vx * dt, px(16), W - px(16));
+    k.y = clamp(k.y + k.vy * dt, px(60), H - px(24));
 
     var sp = Math.hypot(k.vx, k.vy);
     // the body turns rather than snapping, but fast enough to aim with
@@ -2531,7 +2540,7 @@
     var ox = 0, oy = 0;
     if (S.shake > 0.2) { ox = rand(-S.shake, S.shake) * 0.5; oy = rand(-S.shake, S.shake) * 0.5; }
 
-    ctx.setTransform(DPR, 0, 0, DPR, ox * DPR, oy * DPR);
+    ctx.setTransform(VS, 0, 0, VS, ox * VS, oy * VS);
     ctx.clearRect(-20, -20, W + 40, H + 40);
     ctx.drawImage(groundCvs, 0, 0, W, H);
 
@@ -2548,7 +2557,7 @@
     drawFloats();
     drawStick();
 
-    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.setTransform(VS, 0, 0, VS, 0, 0);
   }
 
   function drawLogs() {
@@ -2617,7 +2626,7 @@
       var t = clamp(f.life / f.max, 0, 1);
       var rise = (1 - t) * 8;
       ctx.globalAlpha = t < 0.35 ? t / 0.35 : 1;
-      ctx.font = '700 ' + f.size + 'px ' + "-apple-system, 'SF Pro Text', system-ui, sans-serif";
+      ctx.font = '700 ' + (f.size / ZOOM).toFixed(1) + 'px ' + "-apple-system, 'SF Pro Text', system-ui, sans-serif";
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
       ctx.fillText(f.txt, f.x, f.y - rise + 1.5);
       ctx.fillStyle = f.col;
@@ -3201,7 +3210,7 @@
 
     drawKnight(ctx, {
       t: S.time,
-      scale: 1.32,
+      scale: 1.5,
       expr: k.guard > 0 ? 'surprised' : (k.carry >= D.carry ? 'happy' : 'normal'),
       flash: k.guard > 0 && Math.floor(S.time * 18) % 2 === 0,
       flip: k.flip, walk: k.walk, step: k.step, tilt: k.lean
@@ -3307,7 +3316,7 @@
   // darkness mask: the night sheet with the light punched out of it
   function drawDarkness() {
     var lr = lightRadius();
-    dctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    dctx.setTransform(VS, 0, 0, VS, 0, 0);
     dctx.globalCompositeOperation = 'source-over';
     dctx.fillStyle = nightSheet();
     dctx.clearRect(0, 0, W, H);
@@ -3529,9 +3538,10 @@
     ctx.save();
     ctx.strokeStyle = 'rgba(232,220,200,0.20)';
     ctx.lineWidth = 1.4;
-    ctx.beginPath(); ctx.arc(stick.ox, stick.oy, 46, 0, 6.29); ctx.stroke();
+    ctx.lineWidth = px(1.4);
+    ctx.beginPath(); ctx.arc(stick.ox, stick.oy, px(46), 0, 6.29); ctx.stroke();
     ctx.fillStyle = 'rgba(232,220,200,0.22)';
-    ctx.beginPath(); ctx.arc(stick.ox + stick.dx * 40, stick.oy + stick.dy * 40, 17, 0, 6.29); ctx.fill();
+    ctx.beginPath(); ctx.arc(stick.ox + stick.dx * px(40), stick.oy + stick.dy * px(40), px(17), 0, 6.29); ctx.fill();
     ctx.restore();
   }
 
@@ -3921,45 +3931,52 @@
 
   // things he wonders about, and things he wonders about you
   var KN_SAYS = {
-    world: ['I wonder how far the dark goes.', 'The fire likes this wood better.',
-            'I still do not know who lit this fire. I have stopped asking.',
-            'Whoever kept it before me left in a hurry. Or did not leave.',
-            'One night I will follow the dark out and see where it keeps itself.',
-            'Something moved out there. Probably nothing.', 'It gets colder around the third hour.',
-            'I should fix that lean-to properly one day.', 'The stew is nearly right.',
-            'Do the stars burn like this fire does?', 'I found a good stick today.',
-            'The panel only works when the sun does. Rude.', 'Everything out here is quieter than it looks.'],
+    world: ['I wonder how far the dark goes.',
+            'This wood burns better than the last lot. I am pleased with it.',
+            'Somebody lit this fire long before me. I would like to thank them.',
+            'Something moved out there. Probably a rabbit.',
+            'It gets cold around the third hour. It always does.',
+            'I should fix that lean-to properly one day.',
+            'The stew is nearly right. Nearly.',
+            'Do you think the stars are fires too, with somebody keeping them?',
+            'I found a really good stick today. It is by the woodpile.',
+            'My solar panel only works when the sun is out, which out here is never.',
+            'One day I will walk over that hill and see what is on the other side.',
+            'It is quiet out here. I mind it less when you visit.'],
     you:   ['Are you still there?', 'What is it like, where you are?',
-            'Do you have a fire too?', 'You watch me a lot. I do not mind.',
-            'Is it warm where you sit?', 'Do you sleep, out there?',
-            'You could say something back, you know.', 'I like it when you visit.',
-            'Do you have a camp of your own?', 'What do you do when I am not looking?'],
-    named: ['Evening, {p}.', 'You came back, {p}.', '{p}. Good. I was getting bored.',
+            'Do you have a fire of your own?', 'You watch me a lot. I do not mind at all.',
+            'Is it warm where you are sitting?', 'Do you sleep, out there?',
+            'You can talk back, you know. I would not mind.',
+            'I like it when you visit.',
+            'Have you got a camp too, or just the one chair?',
+            'What do you get up to when I am not looking?'],
+    named: ['Evening, {p}.', 'You came back, {p}. Good.',
+            '{p}! I was hoping you would turn up.',
             'Do you ever get cold out there, {p}?', 'Stay a while, {p}.'],
-    // only ever said once he has been told — see the filter in knightSay
-    // said only to a lad — easy company, a bit of ribbing
-    lad:   ['You would like it out here. Nothing to do and all night to do it.',
-            'If you had a fire, would you keep it as well as I keep mine?',
-            'I nearly had that moth. You saw. You saw nothing.',
+    // only ever said to a lad — easy company, a bit of ribbing
+    lad:   ['You would like it out here. Nothing to do, and all night to do it.',
+            'If you had a fire, would you keep it as well as I keep mine? Be honest.',
+            'I almost caught a moth earlier. We will not talk about it.',
             'Between us, {p} — I have no idea what I am doing. It is going well.',
-            'Come on then. Say something clever.',
+            'Go on then. Say something clever.',
             'I built that lean-to myself. Do not look too closely at it.',
-            'One day I will beat my own high score. Then what.'],
-    // said only to a lass — softer, a shade more careful
+            'One day I will beat my own best night. Then I will need a new hobby.'],
+    // only ever said to a lass — softer, a shade more careful
     lass:  ['I saved you the warm side of the fire, {p}.',
             'You do not have to say anything. It is nice that you are here.',
-            'I found a good flat stone today. I thought you might like it.',
-            'Is it cold where you are? I would send some of this if I could.',
-            'I tidied a bit. Before you came. Not because you came.',
+            'I found a good flat stone today. I put it by your side of the fire.',
+            'Is it cold where you are? I would send some of this over if I could.',
+            'I tidied up a bit. Before you came. Not because you were coming.',
             'The stew is better tonight. I was hoping you would turn up for it.',
-            'You always show up on the long nights. I have noticed.'],
-    knew:  ['I painted the sign {c}. Because you like it. Do you see?',
-            'A {g} keeping watch with me. That suits us both.',
-            'If it gets cold out there, {p}, sit closer.',
+            'You always show up on the long nights. I have noticed that.'],
+    // only ever said once he has been told — see the filter in knightSay
+    knew:  ['I painted the sign {c}, because you like {c}. Do you see it?',
+            'A {g} keeping watch with me. That suits the pair of us.',
+            'If it gets cold out there, {p}, come and sit closer.',
             'You never did say what you do when you are not here, {p}.',
-            'I thought about what you said. You said nothing. I thought about that too.',
-            'Everything is a bit {c} now. I have got used to it.',
-            'Is every {g} out there as quiet as you?']
+            'I told the fire your name, {p}. It did not answer, but it listened.',
+            'The whole place is a bit {c} now. Good pick, {p}.',
+            'Is every {g} out there as quiet as you are?']
   };
 
   function genderWord() { return META.player.gender === 'lass' ? 'lass' : 'lad'; }
@@ -4026,7 +4043,7 @@
     var i;
     // the camera drifts after him rather than snapping, and stops at the
     // edges of the camp so you never see past the last thing he owns
-    var camWant = clamp(KN.x, -36, 47);
+    var camWant = 6;                    // the camp all fits; the shot does not need to move
     KN.cam += (camWant - KN.cam) * Math.min(1, dt * 1.8);
     // the fire answers whatever he is doing to it
     var fWant = KN.act === 'rub' ? 0.5 : (KN.act === 'poke' || KN.act === 'haul') ? 1.14 : 1;
@@ -4287,11 +4304,13 @@
   }
 
   // The lobby: his whole camp, with him living in it.
-  var CAMP_VIEW = 180;      // scene units across, whatever the canvas measures
+  // Wide enough to hold his whole camp at once, so the lobby is a fixed shot
+  // of the place rather than a camera chasing him around it.
+  var CAMP_VIEW = 272;
   var CAMP_GND = 8;         // the y everything in camp stands on
   function paintCamp(g, w, h) {
     var sc = w / CAMP_VIEW;
-    var base = h * 0.86;
+    var base = h * 0.84;
     var cam = KN.cam;
     g.save();
     g.translate(w / 2 - cam * sc, base);
@@ -4317,7 +4336,7 @@
 
     if (KN.say && KN.sayT > 0) {
       sayBubble(g, w, h, KN.say,
-        w / 2 + (KN.x - cam) * sc, base - 37 * sc,
+        w / 2 + (KN.x - cam) * sc, base - 40 * sc,
         Math.min(1, KN.sayT / 0.4));
     }
   }
@@ -4520,28 +4539,22 @@
   // He asks. You answer. Nothing here is required — every step can be walked
   // past, and everything it learns can be changed later in Settings.
   var INTRO = [
-    { say: 'Oh — hello. I did not think anyone came this far out.',
+    { say: 'Oh — hello! Nobody comes out this far. Come in, the fire is warm.',
       btn: 'Hello', expr: 'surprised', act: 'idle' },
-    { say: 'Do not mind the mess. I was not expecting company. I have not had company.',
-      btn: 'It is alright', expr: 'shy', act: 'tidy' },
-    { say: 'What should I call you?', ask: 'name', expr: 'think', act: 'idle' },
-    { say: '{p}. That suits you. And are you a lad or a lass?',
+    { say: 'What should I call you?', ask: 'name', expr: 'happy', act: 'idle' },
+    { say: '{p}. I like that one. Are you a lad or a lass?',
       ask: 'gender', expr: 'happy', act: 'idle' },
-    { say: 'Well then, {p}. If you are staying you ought to know what you are staying for.',
-      btn: 'Go on', expr: 'normal', act: 'warm' },
-    { say: 'This fire was burning when I got here. I never found out who lit it. It was already old.',
-      btn: 'And you kept it?', expr: 'think', act: 'poke' },
-    { say: 'Somebody had to. While it burns the dark keeps its distance. I watched it go out once. I would rather not watch that twice.',
-      btn: 'What happens?', expr: 'sleepy', act: 'warm' },
-    { say: 'Shades come in off the edge of the light and lean on it until there is nothing left of it. So I feed it. All night. Every night.',
-      btn: 'Every night?', expr: 'grumble', act: 'poke' },
-    { say: 'Until dawn. Then I sleep badly and do it again. It is not much of a life. It is warm, though, and it is mine.',
-      btn: 'I will help', expr: 'content', act: 'warm' },
-    { say: 'You will? Then it is ours. Paint the place — what is your favourite colour?',
+    { say: 'Right then, {p}. Here is the whole of it. This fire is the only light for miles, and anyone lost out there walks towards it.',
+      btn: 'Towards us?', expr: 'content', act: 'warm' },
+    { say: 'Towards us. So we keep it lit until morning, and by morning somebody has always found their way in. That is the good bit.',
+      btn: 'I like that', expr: 'happy', act: 'poke' },
+    { say: 'The shades do not like it lit, so they come and lean on it. We just keep feeding it. Wood is easy out here, and I am quick.',
+      btn: 'We can do that', expr: 'happy', act: 'haul' },
+    { say: 'Good. Then paint the place — what colour do you like?',
       ask: 'hue', expr: 'happy', act: 'idle' },
-    { say: 'There. Feels more like ours already.', btn: 'It does', expr: 'happy', act: 'idle' },
-    { say: 'One more thing and then I will stop talking. I have never had a name of my own. Would you give me one?',
-      btn: 'Of course', expr: 'shy', act: 'idle' }
+    { say: 'There. Much more like it. Thank you.', btn: 'Any time', expr: 'content', act: 'idle' },
+    { say: 'One last thing. I have never had a name of my own. Would you pick me one?',
+      btn: 'Gladly', expr: 'shy', act: 'idle' }
   ];
 
   function fillP(line) {
@@ -4831,7 +4844,7 @@
             '<div><span>Best night</span><b>' + META.bestNight + '</b></div>' +
             '<div><span>Shades</span><b>' + META.lifeKills + '</b></div>' +
           '</div>' + levelStrip()
-        : '<p class="lede">Keep his fire burning until dawn.</p>') +
+        : '<p class="lede">Keep his fire lit until dawn. Somebody out there is walking towards it.</p>') +
       '<button class="go" id="btnStart">Take the Watch</button>' +
       '<div class="row2">' +
         '<button class="ghost" id="btnShop">Provisions</button>' +
@@ -4929,7 +4942,7 @@
         '<li><span class="glyph">👁</span><span><b>Shades</b> come in from the dark to drain it. Light burns them, and dispelling one mends you a little.</span></li>' +
         '<li><span class="glyph">🗡</span><span>Swing the <b>brand</b> to drive them off — free and fast, but you have to aim it.</span></li>' +
         '<li><span class="glyph">✦</span><span><b>Flare</b> clears all around you at once, but it costs fire.</span></li>' +
-        '<li><span class="glyph">🌅</span><span>Live to <b>dawn</b> and you draft an upgrade. Embers you earn buy permanent gear.</span></li>' +
+        '<li><span class="glyph">🌅</span><span>Reach <b>dawn</b> and somebody found their way in — you draft an upgrade, and the embers you earn buy permanent gear.</span></li>' +
       '</ul>' +
       '<button class="ghost" id="btnBack">Back</button>' +
       buildFoot(),
@@ -5475,7 +5488,7 @@
   document.addEventListener('keydown', wakeAudio);
   // opt-in inspection hook for tuning/QA: open with #debug
   if (/[?#]debug/.test(location.href)) window.__NW = { S: S, K: K, D: D, META: META, UPGRADES: UPGRADES, PERKS: PERKS,
-      flare: doFlare, swing: doSwing, lightAt: lightAt, stick: stick, KN: KN, CAMP: CAMP, KN_ACTS: KN_ACTS, knightSay: knightSay, knightAct: knightAct, updateKnight: updateKnight, knightPoke: knightPoke, knightPet: knightPet, beatNow: beatNow, drawKnight: drawKnight, A: A, MUS: MUS, TUNES: TUNES,
+      flare: doFlare, swing: doSwing, lightAt: lightAt, stick: stick, KN: KN, CAMP: CAMP, ZOOM: ZOOM, field: function () { return { w: W, h: H }; }, KN_ACTS: KN_ACTS, knightSay: knightSay, knightAct: knightAct, updateKnight: updateKnight, knightPoke: knightPoke, knightPet: knightPet, beatNow: beatNow, drawKnight: drawKnight, A: A, MUS: MUS, TUNES: TUNES,
       startMusic: startMusic, nextTune: nextTune, setMusic: setMusic, SFX: SFX, UI: UI, ac: ac, switchTo: switchTo, applyTone: applyTone, GENRE: GENRE,
       music: { parseChord: parseChord, voicing: voicing, bassNote: bassNote,
                leadNote: leadNote, chordAt: chordAt, QUAL: QUAL, mtof: mtof }, recalc: recalc, saveMeta: saveMeta, rollDraft: rollDraft, take: takeUpgrade };
