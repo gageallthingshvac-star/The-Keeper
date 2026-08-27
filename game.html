@@ -85,7 +85,7 @@
   .btn:active{transform:scale(.94)}
   /* primary action sits under the thumb; the flare moved up out of it */
   #brand{
-    right:calc(var(--safeR) + 20px);bottom:calc(var(--safeB) + 28px);
+    left:calc(var(--safeL) + 20px);bottom:calc(var(--safeB) + 28px);
     width:104px;height:104px;border-radius:50%;
     font:700 11px/1 var(--body);letter-spacing:.16em;text-transform:uppercase;
     color:#FFC46B;border-color:rgba(255,150,40,0.42);
@@ -104,7 +104,7 @@
     box-shadow:0 0 38px rgba(255,120,20,0.34), inset 0 0 30px rgba(255,120,20,0.20);
   }
   #flare{
-    right:calc(var(--safeR) + 30px);bottom:calc(var(--safeB) + 150px);
+    left:calc(var(--safeL) + 30px);bottom:calc(var(--safeB) + 150px);
     width:78px;height:78px;border-radius:50%;
     font:700 9px/1 var(--body);letter-spacing:.16em;text-transform:uppercase;
     color:var(--core);border-color:rgba(255,214,10,0.34);
@@ -421,7 +421,7 @@
     brandR: 78,            // how far the swing reaches
     brandArc: 1.95,        // ~112 degrees of sweep
     brandDmg: 4.6,
-    swingCd: 0.46,
+    swingCd: 0,            // no cooldown — the swing is limited only by your thumb
     swingDur: 0.24
   };
 
@@ -476,7 +476,7 @@
 
     // ── the brand
     { id: 'longbrand',  name: 'Long Brand',     glyph: '🔥', tier: 1, max: 3, lv: 1, desc: 'The swing reaches 35% farther.' },
-    { id: 'quickhands', name: 'Quick Hands',    glyph: '🤚', tier: 1, max: 3, lv: 1, desc: 'Swing the brand 28% faster.' },
+    { id: 'deft',       name: 'Deft Hands',     glyph: '🤚', tier: 1, max: 3, lv: 1, desc: 'The swing covers 26% more ground.' },
     { id: 'whitehot',   name: 'White-Hot Brand',glyph: '🌡', tier: 1, max: 3, lv: 1, desc: 'The brand hits far harder.' },
     { id: 'sweep',      name: 'Sweeping Brand', glyph: '🌀', tier: 2, max: 1, lv: 3, desc: 'The swing comes all the way around you.' },
 
@@ -560,9 +560,9 @@
 
     // the brand: free, fast, and aimed — the everyday answer to a shade
     D.brandR    = K.brandR * (1 + u('longbrand') * 0.35);
-    D.brandArc  = u('sweep') ? Math.PI * 2 : K.brandArc;
+    D.brandArc  = u('sweep') ? Math.PI * 2 : Math.min(Math.PI * 1.75, K.brandArc * (1 + u('deft') * 0.26));
     D.brandDmg  = K.brandDmg + u('whitehot') * 2.1;
-    D.swingCd   = K.swingCd * Math.pow(0.72, u('quickhands'));
+    D.swingCd   = K.swingCd;
     D.swingDur  = K.swingDur;
 
     D.lampR     = K.lampR * (1 + u('lantern') * 0.28) * (1 + pk('lamp') * 0.06);
@@ -1138,7 +1138,7 @@
   window.addEventListener('keydown', function (e) {
     var k = e.key.toLowerCase();
     keys[k] = true;
-    if (k === ' ') { e.preventDefault(); doSwing(); }
+    if (k === ' ') { e.preventDefault(); if (!e.repeat) doSwing(); }
     if (k === 'f' || k === 'shift') { e.preventDefault(); doFlare(); }
     if (k === 'escape' || k === 'p') togglePause();
     if (k === 'enter' && (S.mode === 'menu' || S.mode === 'over')) startGame();
@@ -2081,7 +2081,7 @@
     flareBtn.classList.toggle('cool', charging || poor);
     flareBtn.classList.toggle('ready', !charging && !poor);
 
-    var swinging = S.keeper.swingCd > 0;
+    var swinging = D.swingCd > 0 && S.keeper.swingCd > 0;
     elBrandFill.style.height = swinging ? ((1 - S.keeper.swingCd / D.swingCd) * 100).toFixed(0) + '%' : '0%';
     brandBtn.classList.toggle('cool', swinging);
     brandBtn.classList.toggle('ready', !swinging);
