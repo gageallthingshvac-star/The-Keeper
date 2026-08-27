@@ -716,7 +716,7 @@
   var ZOOM = 0.7;
   var VS = 1;                     // device pixels per field unit
   function px(n) { return n / ZOOM; }   // n screen pixels, in field units
-  var BUILD = 'v1.15.0';        // bump on every deploy — shown in-game for support
+  var BUILD = 'v1.16.0';        // bump on every deploy — shown in-game for support
   var MUTE_KEY = 'keeper.nightwatch.mute';
   var MUSIC_KEY = 'keeper.nightwatch.music';
 
@@ -3114,10 +3114,10 @@
   // for a lad. Same fellow either way — it is how he comes across, not who
   // he is.
   var BUILD_BASE = { id: 'lad', name: 'Lad', waist: 1.06, head: 9.3, brow: 1, lash: 0,
-                     jaw: 1.1, eye: 2.3, plume: 0.9, blush: 0, scruff: 0 };
+                     eye: 2.3, plume: 0.9, scruff: 0 };
   var BUILD_FOR = {
-    lass: { head: 9.7, waist: 0.99, brow: 0.6, jaw: 0.94, eye: 2.62, plume: 1.1, blush: 1, scruff: 0 },
-    lad:  { head: 9.3, waist: 1.06, brow: 1,   jaw: 1.1,  eye: 2.3,  plume: 0.9, blush: 0, scruff: 1 }
+    lass: { head: 9.7, waist: 0.99, brow: 0.62, eye: 2.62, plume: 1.1, scruff: 0 },
+    lad:  { head: 9.3, waist: 1.06, brow: 1,    eye: 2.3,  plume: 0.9, scruff: 1 }
   };
   var _buildCache = {};
   function buildKey(k) {
@@ -3356,8 +3356,6 @@
     var hr = B.head;
     g.fillStyle = skin;
     g.beginPath(); g.arc(0, -9.6, hr, 0, 6.29); g.fill();
-    g.fillStyle = skinS;
-    g.beginPath(); g.ellipse(0, -3.4, 5.6 * B.jaw, 2, 0, 0, Math.PI); g.fill();
 
     if (back) {
       // the back of his head: hair over almost all of it, one ear, no face
@@ -3383,20 +3381,32 @@
       drawHead(g, H, hr, accent, cloth, trim, HR, o);
       g.restore();
     } else {
+      g.fillStyle = skin;                          // ears, so the head has corners
+      for (var er = -1; er <= 1; er += 2) {
+        g.beginPath(); g.ellipse(er * (hr - 0.5), -8.6, 1.4, 2, 0, 0, 6.29); g.fill();
+      }
+      g.fillStyle = skinS;
+      for (er = -1; er <= 1; er += 2) {
+        g.beginPath(); g.ellipse(er * (hr - 0.3), -8.6, 0.55, 1, 0, 0, 6.29); g.fill();
+      }
       if (H.hair !== false) {
+        // The cap comes over the crown and down past the temples, and the
+        // fringe sweeps up clear of his eyes rather than sitting on them.
         g.fillStyle = HR.v;
         g.beginPath();
-        g.arc(0, -10, hr + 0.5, Math.PI * 1.02, Math.PI * 1.98);
-        g.lineTo(hr * 0.9, -10.4);
-        g.lineTo(hr * 0.55, -12.6);
-        g.lineTo(-hr * 0.2, -11.2);
-        g.lineTo(-hr * 0.85, -12.4);
+        g.arc(0, -10.2, hr + 0.5, Math.PI * 1.04, Math.PI * 1.96);
+        g.bezierCurveTo(hr * 0.7, -15.2, hr * 0.16, -16.4, -hr * 0.3, -15.8);
+        g.bezierCurveTo(-hr * 0.68, -15.3, -hr * 0.9, -13.8, -hr * 0.999, -12.05);
         g.closePath(); g.fill();
-        if (B.scruff) {                        // a tuft that never lies flat
+        g.fillStyle = 'rgba(255,255,255,0.07)';      // a little light off the top
+        g.beginPath();
+        g.ellipse(-hr * 0.34, -16.2, hr * 0.42, 1.5, -0.34, 0, 6.29); g.fill();
+        if (B.scruff) {                              // a bit of it never lies flat
+          g.fillStyle = HR.v;
           g.beginPath();
-          g.moveTo(-hr * 0.1, -hr - 8.6);
-          g.quadraticCurveTo(hr * 0.5, -hr - 13.4, hr * 0.86, -hr - 9.2);
-          g.quadraticCurveTo(hr * 0.4, -hr - 9.8, -hr * 0.1, -hr - 8.6);
+          g.moveTo(-hr * 0.26, -hr - 8.9);
+          g.bezierCurveTo(hr * 0.06, -hr - 12.6, hr * 0.6, -hr - 12.2, hr * 0.82, -hr - 9.6);
+          g.bezierCurveTo(hr * 0.38, -hr - 10.9, hr * 0.02, -hr - 10.0, -hr * 0.26, -hr - 8.9);
           g.fill();
         }
       }
@@ -3508,30 +3518,47 @@
 
 
   function drawFace(g, o, B, amt, skin) {
-    var ex = 3.5, ey = -9.8, s, e = o.expr || 'normal';
-    var lookX = (o.look || 0) * 1.5;
-    var ink = '#3A2E30';
-    g.strokeStyle = ink; g.fillStyle = ink; g.lineCap = 'round';
+    // Eyes a shade above the middle of the head, brows up on the forehead the
+    // hair no longer covers, mouth high enough to leave him a chin.
+    var ex = 3.7, ey = -10.3, s, e = o.expr || 'normal';
+    var browY = -13.2, my = -5.2;
+    var lookX = (o.look || 0) * 1.5, lookY = clamp(o.lookD || 0, -1, 1) * 1.15;
+    var ink = '#3B2F31';
+    g.strokeStyle = ink; g.fillStyle = ink; g.lineCap = 'round'; g.lineJoin = 'round';
 
-    function eyeArc(cx, up) {
-      g.lineWidth = 1.6;
-      var r = 2.2 * (0.6 + 0.4 * amt);
+    function eyeArc(cx, up) {                  // a closed, happy eye
+      g.strokeStyle = ink; g.lineWidth = 1.7;
+      var r = 2.3 * (0.6 + 0.4 * amt);
       g.beginPath();
-      if (up) g.arc(cx, ey + 1, r, Math.PI * 1.12, Math.PI * 1.88);
-      else    g.arc(cx, ey - 1, r, Math.PI * 0.12, Math.PI * 0.88);
+      if (up) g.arc(cx, ey + 1.1, r, Math.PI * 1.1, Math.PI * 1.9);
+      else    g.arc(cx, ey - 1.1, r, Math.PI * 0.1, Math.PI * 0.9);
       g.stroke();
     }
     function eyeBall(cx, r, ry) {
+      ry = ry || r;
+      var py = ey + lookY;
       g.fillStyle = ink;
-      g.beginPath(); g.ellipse(cx + lookX, ey, r, ry || r, 0, 0, 6.29); g.fill();
-      g.fillStyle = 'rgba(255,255,255,0.92)';
-      g.beginPath(); g.arc(cx + lookX - r * 0.34, ey - r * 0.42, r * 0.36, 0, 6.29); g.fill();
-      g.fillStyle = ink;
+      g.beginPath(); g.ellipse(cx + lookX, py, r, ry, 0, 0, 6.29); g.fill();
+      // one clean catchlight and a small one opposite it, which is what makes
+      // a flat dot read as an eye rather than a hole
+      g.fillStyle = 'rgba(255,255,255,0.95)';
+      g.beginPath(); g.arc(cx + lookX - r * 0.36, py - ry * 0.4, r * 0.38, 0, 6.29); g.fill();
+      g.fillStyle = 'rgba(255,255,255,0.4)';
+      g.beginPath(); g.arc(cx + lookX + r * 0.42, py + ry * 0.42, r * 0.17, 0, 6.29); g.fill();
       if (B.lash) {
         g.strokeStyle = ink; g.lineWidth = 0.9;
         g.beginPath();
-        g.moveTo(cx + (cx < 0 ? -1 : 1) * r * 0.9, ey - r * 0.9);
-        g.lineTo(cx + (cx < 0 ? -1 : 1) * (r * 1.7), ey - r * 1.5);
+        g.moveTo(cx + (cx < 0 ? -1 : 1) * r * 0.9, py - ry * 0.9);
+        g.lineTo(cx + (cx < 0 ? -1 : 1) * (r * 1.7), py - ry * 1.5);
+        g.stroke();
+      }
+    }
+    function brows(tilt, lift) {               // both at once, and level with each other
+      g.strokeStyle = ink; g.lineWidth = 1.2 * B.brow; g.lineCap = 'round';
+      for (var b = -1; b <= 1; b += 2) {
+        g.beginPath();
+        g.moveTo(b * (ex + 2.1), browY + lift - tilt);
+        g.quadraticCurveTo(b * ex, browY + lift - tilt - 0.7, b * (ex - 1.9), browY + lift + tilt);
         g.stroke();
       }
     }
@@ -3540,117 +3567,126 @@
     if (e === 'happy' || e === 'content') {
       if (amt < 0.45) { eyeBall(-ex, eyeR * 0.95, eyeR * 1.05); eyeBall(ex, eyeR * 0.95, eyeR * 1.05); }
       else { eyeArc(-ex, true); eyeArc(ex, true); }
+      brows(-0.35, -0.5);
     } else if (e === 'blink') {
-      g.lineWidth = 1.6;
-      for (s = -1; s <= 1; s += 2) { g.beginPath(); g.moveTo(s * ex - 1.6, ey); g.lineTo(s * ex + 1.6, ey); g.stroke(); }
+      g.strokeStyle = ink; g.lineWidth = 1.7;
+      for (s = -1; s <= 1; s += 2) { g.beginPath(); g.moveTo(s * ex - 1.7, ey); g.lineTo(s * ex + 1.7, ey); g.stroke(); }
+      brows(0, 0);
     } else if (e === 'sleepy') {
       eyeArc(-ex, false); eyeArc(ex, false);
+      brows(0.22, 0.45);
     } else if (e === 'surprised') {
       eyeBall(-ex, eyeR * (1 + 0.25 * amt), eyeR * (1.1 + 0.3 * amt));
       eyeBall(ex, eyeR * (1 + 0.25 * amt), eyeR * (1.1 + 0.3 * amt));
+      brows(-0.2, -1.3 - amt * 0.5);
     } else if (e === 'shy') {
       eyeArc(-ex, true); eyeArc(ex, true);
+      brows(-0.5, -0.2);
     } else if (e === 'think') {
       eyeBall(-ex, eyeR * 0.9, eyeR * 0.75); eyeBall(ex, eyeR * 0.9, eyeR * 0.75);
-      g.strokeStyle = ink; g.lineWidth = 1.1; g.globalAlpha = 0.6;
-      g.beginPath(); g.moveTo(ex - 1.6, ey - 4.2); g.lineTo(ex + 2, ey - 5); g.stroke();
-      g.globalAlpha = 1;
+      g.strokeStyle = ink; g.lineWidth = 1.2 * B.brow;
+      g.beginPath();                                        // one up, one level
+      g.moveTo(-ex - 2.1, browY); g.quadraticCurveTo(-ex, browY - 0.7, -ex + 1.9, browY);
+      g.stroke();
+      g.beginPath();
+      g.moveTo(ex + 2.1, browY - 1.5); g.quadraticCurveTo(ex, browY - 2.4, ex - 1.9, browY - 1.2);
+      g.stroke();
     } else if (e === 'grumble') {
-      eyeBall(-ex, eyeR * 0.8, eyeR * (0.75 - 0.2 * amt));
-      eyeBall(ex, eyeR * 0.8, eyeR * (0.75 - 0.2 * amt));
-      g.strokeStyle = ink; g.lineWidth = 1.4 * B.brow;
-      g.beginPath(); g.moveTo(-ex - 2.2, ey - 4.6); g.lineTo(-ex + 1.5, ey - 3.2 - amt * 0.8); g.stroke();
-      g.beginPath(); g.moveTo(ex + 2.2, ey - 4.6); g.lineTo(ex - 1.5, ey - 3.2 - amt * 0.8); g.stroke();
+      eyeBall(-ex, eyeR * 0.82, eyeR * (0.78 - 0.18 * amt));
+      eyeBall(ex, eyeR * 0.82, eyeR * (0.78 - 0.18 * amt));
+      g.strokeStyle = ink; g.lineWidth = 1.35 * B.brow;     // knitted, pointing in and down
+      for (s = -1; s <= 1; s += 2) {
+        g.beginPath();
+        g.moveTo(s * (ex + 2.2), browY - 0.9);
+        g.lineTo(s * (ex - 1.5), browY + 1.5 + amt * 0.7);
+        g.stroke();
+      }
     } else {
       eyeBall(-ex, eyeR, eyeR * 1.12); eyeBall(ex, eyeR, eyeR * 1.12);
+      brows(0, 0);
     }
 
-    g.strokeStyle = ink; g.fillStyle = ink; g.lineWidth = 1.4;
-    var my = -4.4;
+    g.strokeStyle = ink; g.fillStyle = ink; g.lineWidth = 1.5;
     if (e === 'happy' && amt > 0.55) {
-      g.beginPath(); g.arc(0, my - 0.6, 1.5 + amt, 0.15, Math.PI - 0.15); g.fill();
+      g.beginPath(); g.arc(0, my - 0.7, 1.7 + amt, 0.14, Math.PI - 0.14); g.fill();
       g.fillStyle = '#C97C86';
-      g.beginPath(); g.arc(0, my + 0.4, 0.7 + amt * 0.6, 0.1, Math.PI - 0.1); g.fill();
+      g.beginPath(); g.arc(0, my + 0.4, 0.8 + amt * 0.6, 0.1, Math.PI - 0.1); g.fill();
     } else if (e === 'surprised') {
       g.fillStyle = ink;
-      g.beginPath(); g.ellipse(0, my, 0.8 + amt * 0.6, 1 + amt * 0.8, 0, 0, 6.29); g.fill();
+      g.beginPath(); g.ellipse(0, my, 0.85 + amt * 0.6, 1.1 + amt * 0.8, 0, 0, 6.29); g.fill();
     } else if (e === 'grumble') {
-      g.beginPath(); g.arc(0, my + 2.2, 1.4 + amt * 0.8, Math.PI * 1.25, Math.PI * 1.75); g.stroke();
+      g.beginPath(); g.arc(0, my + 2.4, 1.6 + amt * 0.8, Math.PI * 1.22, Math.PI * 1.78); g.stroke();
     } else if (e === 'sleepy') {
-      g.beginPath(); g.ellipse(0, my, 0.7 + amt * 0.35, 0.9 + amt * 0.45, 0, 0, 6.29); g.fill();
+      g.beginPath(); g.ellipse(0, my, 0.75 + amt * 0.35, 0.95 + amt * 0.45, 0, 0, 6.29); g.fill();
     } else if (e === 'think') {
-      g.beginPath(); g.moveTo(-1.4, my); g.lineTo(1.4, my - 0.5); g.stroke();
+      g.beginPath(); g.moveTo(-1.5, my + 0.2); g.lineTo(1.5, my - 0.4); g.stroke();
     } else {
-      g.beginPath(); g.arc(0, my - 1, 1.4 + amt * 0.7, 0.35, Math.PI - 0.35); g.stroke();
-    }
-
-    var warm = (e === 'happy' || e === 'content' || e === 'shy' || e === 'surprised');
-    if (warm || B.blush) {
-      var ba = warm ? (e === 'shy' ? 0.55 : 0.4) * (0.35 + 0.65 * amt) : 0.26;
-      g.fillStyle = 'rgba(255,' + (e === 'shy' ? 120 : 140) + ',150,' + ba.toFixed(3) + ')';
-      g.beginPath(); g.ellipse(-6.2, -6.2, 2.2, 1.4, 0, 0, 6.29); g.fill();
-      g.beginPath(); g.ellipse(6.2, -6.2, 2.2, 1.4, 0, 0, 6.29); g.fill();
-    }
-    if (B.scruff) {                          // a day he did not bother shaving
-      g.globalAlpha = 0.16; g.fillStyle = ink;
-      g.beginPath(); g.ellipse(0, -2.6, 4.6, 1.9, 0, 0, Math.PI); g.fill();
-      g.globalAlpha = 1;
+      g.beginPath(); g.arc(0, my - 1.1, 1.8 + amt * 0.7, 0.32, Math.PI - 0.32); g.stroke();
     }
   }
 
   function drawHead(g, H, hr, accent, cloth, trim, HR, o) {
     var s;
     if (H.id === 'none') return;
+    // Every hat sits on the same line, high enough to leave his eyes alone —
+    // a brim across the pupils was making him look half asleep in all of them.
+    // The crown is a slice of his own head, so nothing floats or bites in.
+    var hy = -13.5;
+    var a1 = Math.PI * 1.127, a2 = Math.PI * 1.873;
+    var hw = Math.sqrt(Math.max(0, (hr + 0.5) * (hr + 0.5) - (hy + 9.6) * (hy + 9.6)));
+    function crown(pad) {
+      var r = hr + 0.5 + (pad || 0);
+      g.beginPath(); g.arc(0, -9.6, r, a1, a2); g.closePath(); g.fill();
+    }
     if (H.id === 'cap') {
       g.fillStyle = accent;
-      g.beginPath(); g.arc(0, -10.6, hr + 0.4, Math.PI * 1.03, Math.PI * 1.97); g.fill();
-      roundRectOn(g, -hr - 0.4, -12.4, (hr + 0.4) * 2, 2.6, 1.2); g.fill();
-      g.beginPath(); g.ellipse(hr - 1, -11.4, 6.4, 1.7, -0.06, 0, 6.29); g.fill();   // brim
+      crown(0);
+      roundRectOn(g, -hw - 0.6, hy - 2.4, (hw + 0.6) * 2, 2.6, 1.1); g.fill();
+      g.beginPath(); g.ellipse(hw - 1.4, hy - 1, 6.6, 1.8, -0.06, 0, 6.29); g.fill();   // brim
       g.fillStyle = trim;
-      g.beginPath(); g.arc(0, -16.6, 1.1, 0, 6.29); g.fill();
+      g.beginPath(); g.arc(0, -18.4, 1.1, 0, 6.29); g.fill();                           // button
     } else if (H.id === 'beanie') {
       g.fillStyle = accent;
-      g.beginPath(); g.arc(0, -11.2, hr + 0.8, Math.PI * 1.02, Math.PI * 1.98); g.fill();
-      roundRectOn(g, -hr - 0.8, -12.6, (hr + 0.8) * 2, 3.2, 1.5); g.fill();
-      g.fillStyle = trim; g.globalAlpha = 0.8;
-      roundRectOn(g, -hr - 1, -11.4, (hr + 1) * 2, 2.4, 1.2); g.fill();
+      crown(1.7);
+      roundRectOn(g, -hw - 1.3, hy - 2.8, (hw + 1.3) * 2, 3, 1.4); g.fill();
+      g.fillStyle = trim; g.globalAlpha = 0.85;                                          // turned-up brim
+      roundRectOn(g, -hw - 1.3, hy - 2.5, (hw + 1.3) * 2, 2.5, 1.2); g.fill();
       g.globalAlpha = 1;
       g.fillStyle = accent;
-      g.beginPath(); g.arc(0, -18.6, 2.1, 0, 6.29); g.fill();                        // bobble
+      g.beginPath(); g.arc(0, -21.6, 2.2, 0, 6.29); g.fill();                            // bobble
     } else if (H.id === 'bandana') {
       g.fillStyle = accent;
-      g.beginPath(); g.arc(0, -11.4, hr + 0.5, Math.PI * 1.05, Math.PI * 1.95); g.fill();
-      roundRectOn(g, -hr - 0.5, -13, (hr + 0.5) * 2, 2.8, 1.2); g.fill();
-      g.beginPath();                                                                  // knot tail
-      g.moveTo(-hr, -12.4); g.lineTo(-hr - 4.4, -9.6); g.lineTo(-hr - 1.2, -9); g.closePath(); g.fill();
+      crown(0);
+      roundRectOn(g, -hw - 0.5, hy - 2.6, (hw + 0.5) * 2, 2.8, 1.2); g.fill();
+      g.beginPath();                                                                     // knot tail
+      g.moveTo(-hw - 0.2, hy - 2.4); g.lineTo(-hw - 5, hy + 0.6); g.lineTo(-hw - 1.4, hy + 1.4);
+      g.closePath(); g.fill();
     } else if (H.id === 'hood') {
       g.fillStyle = accent;
-      g.beginPath(); g.arc(0, -10, hr + 1.8, Math.PI * 0.98, Math.PI * 2.02); g.fill();
+      crown(2.4);
+      // the sides fall past his cheeks, framing the face rather than covering it
       for (s = -1; s <= 1; s += 2) {
         g.beginPath();
-        g.moveTo(s * (hr + 1.8), -10);
-        g.quadraticCurveTo(s * (hr + 2.8), -2.6, s * (hr - 1.4), -1.6);
-        g.lineTo(s * (hr - 1.4), -5.6);
+        g.moveTo(s * (hw + 2.4), hy + 0.6);
+        g.quadraticCurveTo(s * (hr + 3.6), -6.4, s * (hr - 0.2), -1.2);
+        g.quadraticCurveTo(s * (hr - 1.2), -5.4, s * (hr - 2.6), -7.4);
         g.closePath(); g.fill();
       }
     } else if (H.id === 'bucket') {
       g.fillStyle = accent;
-      g.beginPath(); g.arc(0, -11.6, hr - 0.4, Math.PI, 0); g.fill();
-      roundRectOn(g, -hr + 0.4, -12.6, (hr - 0.4) * 2, 2.6, 1); g.fill();
-      g.beginPath(); g.ellipse(0, -10.4, hr + 3.4, 2, 0, 0, 6.29); g.fill();
+      crown(-0.6);
+      roundRectOn(g, -hw + 0.4, hy - 2.4, (hw - 0.4) * 2, 2.6, 1); g.fill();
+      g.beginPath(); g.ellipse(0, hy - 0.2, hw + 4.2, 2, 0, 0, 6.29); g.fill();          // floppy brim
     } else if (H.id === 'helm') {
       g.fillStyle = '#CBD2DB';
-      g.beginPath();
-      g.arc(0, -10.8, hr + 0.7, Math.PI, 0);
-      g.lineTo(hr + 0.7, -12.8); g.lineTo(-hr - 0.7, -12.8);
-      g.closePath(); g.fill();
+      crown(1.1);
       g.fillStyle = '#94A1AF';
-      roundRectOn(g, -hr - 1.1, -14, (hr + 1.1) * 2, 2.7, 1.3); g.fill();
-      g.fillStyle = '#CBD2DB';
-      roundRectOn(g, -hr - 1.4, -12.8, 3, 7.6, 1.4); g.fill();
-      roundRectOn(g, hr - 1.6, -12.8, 3, 7.6, 1.4); g.fill();
-      g.fillStyle = accent;                                                            // plume
-      g.save(); g.translate(0, -20.4); g.rotate(Math.sin((o.t || 0) * 4) * 0.13);
+      roundRectOn(g, -hw - 1.1, hy - 2.5, (hw + 1.1) * 2, 2.7, 1.3); g.fill();           // browband
+      g.fillStyle = '#CBD2DB';                                                            // cheek guards
+      roundRectOn(g, -hr - 1.2, hy + 0.2, 3, 7, 1.4); g.fill();
+      roundRectOn(g, hr - 1.8, hy + 0.2, 3, 7, 1.4); g.fill();
+      g.fillStyle = accent;                                                               // plume
+      g.save(); g.translate(0, -20.8); g.rotate(Math.sin((o.t || 0) * 4) * 0.13);
       g.beginPath();
       g.moveTo(0, 2.4); g.quadraticCurveTo(-5.4, -2.2, -2.4, -9);
       g.quadraticCurveTo(0.6, -4.4, 3.4, -7.8); g.quadraticCurveTo(4.2, -1.4, 0, 2.4);
@@ -4169,7 +4205,7 @@
     fire:  { x: 0,    stand: -16, face: 1 },
     pot:   { x: 0,    stand: 18,  face: -1 },   // the tripod hangs over the fire
     wood:  { x: -32,  stand: -28, face: -1 },
-    bed:   { x: -112, stand: -108, face: 1 },
+    bed:   { x: -112, stand: -102, face: 1 },   // the tent — he sleeps inside it
     kennel:{ x: -60,  stand: -70, face: 1 },
     chair: { x: 60,   stand: 61,  face: -1 },   // his reading chair, turned to the fire
     desk:  { x: 104,  stand: 104, face: 1 },   // square in front of it, back to you
@@ -4245,6 +4281,18 @@
     var i;
     if (!baked) { drawCampStars(g, t); drawCampSky(g); }
 
+    // ── a rug in front of the fire, because bare ground is not a home
+    g.save(); g.translate(-6, 0);
+    g.fillStyle = '#6B4436';
+    g.beginPath(); g.ellipse(0, 6.6, 27, 6.2, 0, 0, 6.29); g.fill();
+    g.fillStyle = '#8A5A44';
+    g.beginPath(); g.ellipse(0, 6.6, 23, 5, 0, 0, 6.29); g.fill();
+    g.fillStyle = 'rgba(226,196,150,0.34)';
+    g.beginPath(); g.ellipse(0, 6.6, 15, 3.1, 0, 0, 6.29); g.fill();
+    g.fillStyle = '#8A5A44';
+    g.beginPath(); g.ellipse(0, 6.6, 8, 1.6, 0, 0, 6.29); g.fill();
+    g.restore();
+
     // ── a proper tent, pegged out, with a bedroll just inside the door
     g.save(); g.translate(CAMP.bed.x, 0);
     g.strokeStyle = 'rgba(90,80,70,0.6)'; g.lineWidth = 0.7; g.lineCap = 'round';
@@ -4261,9 +4309,6 @@
     g.closePath(); g.fill();
     g.fillStyle = '#2A2E28';                                             // the doorway
     g.beginPath(); g.moveTo(-12, 8); g.lineTo(-2, -20); g.lineTo(10, 8); g.closePath(); g.fill();
-    g.fillStyle = '#6B7A64';                                             // the flap, tied back
-    g.beginPath(); g.moveTo(-2, -20); g.lineTo(-11, 8); g.lineTo(-6, 8); g.quadraticCurveTo(-3, -6, -2, -20);
-    g.closePath(); g.fill();
     g.strokeStyle = '#3A4238'; g.lineWidth = 1.1;                        // ridge pole
     g.beginPath(); g.moveTo(-2.6, -24.4); g.lineTo(9.6, -24.4); g.stroke();
     g.fillStyle = '#7C6A58';                                             // bedroll in the door
@@ -4331,6 +4376,17 @@
     g.beginPath();                                                         // and its back, up past his shoulders
     g.moveTo(3.9, -3.3); g.lineTo(8.4, -3.7); g.lineTo(11.1, -25.4); g.lineTo(6.2, -25.0);
     g.closePath(); g.fill();
+    g.fillStyle = '#8A5A44';                                               // a blanket over the back
+    g.beginPath();
+    g.moveTo(2.6, -18.6); g.lineTo(11.6, -19.2);
+    g.quadraticCurveTo(13.4, -12.4, 11.2, -6.6);
+    g.lineTo(3.4, -7.2);
+    g.quadraticCurveTo(4.6, -12.8, 2.6, -18.6);
+    g.closePath(); g.fill();
+    g.fillStyle = 'rgba(226,196,150,0.3)';
+    g.beginPath();
+    g.moveTo(3.1, -14.4); g.lineTo(12.3, -15.0); g.lineTo(12.5, -13.4); g.lineTo(3.3, -12.8);
+    g.closePath(); g.fill();
     g.strokeStyle = 'rgba(238,230,214,0.18)'; g.lineWidth = 0.55;          // seams, so it reads as cloth
     g.beginPath(); g.moveTo(-8.6, 1.6); g.lineTo(5.2, 0.2); g.stroke();
     g.beginPath(); g.moveTo(4.8, -11.4); g.lineTo(9.3, -11.7); g.stroke();
@@ -4395,31 +4451,54 @@
     // ── the setup. You are stood behind him and a bit above, so you see the
     // back of his head and, over it, the screen he is looking at.
     g.save(); g.translate(CAMP.desk.x, 0);
-    g.fillStyle = '#5A4E42';                                    // stool, behind him
-    roundRectOn(g, -7, 1, 14, 8, 2.2); g.fill();
-    g.fillStyle = '#6B5C4C';
-    g.beginPath(); g.ellipse(0, 1, 7, 2, 0, 0, 6.29); g.fill();
+    var rigL = pk('rig');
+    // a proper desk chair, seat and back, so he is sitting in something
+    g.fillStyle = '#3A3238';
+    roundRectOn(g, -1.4, -2, 2.8, 10, 1.2); g.fill();           // gas post
+    g.beginPath(); g.ellipse(0, 8.4, 8.6, 2.2, 0, 0, 6.29); g.fill();   // star base
+    g.fillStyle = '#2C262C';
+    for (var cw = -1; cw <= 1; cw += 2) { g.beginPath(); g.arc(cw * 7.4, 8.8, 1.3, 0, 6.29); g.fill(); }
+    g.fillStyle = '#4A4048';                                    // seat
+    roundRectOn(g, -8.6, -3.4, 17.2, 3.4, 1.5); g.fill();
+    g.fillStyle = '#564B54';                                    // backrest, wide enough to see round him
+    roundRectOn(g, -10.4, -23.6, 20.8, 21, 3.6); g.fill();
+    g.fillStyle = '#3F3742';                                    // headrest
+    roundRectOn(g, -6.6, -28.4, 13.2, 5.6, 2.6); g.fill();
+    g.fillStyle = 'rgba(255,255,255,0.05)';
+    roundRectOn(g, -8.4, -21.4, 16.8, 7, 2.6); g.fill();
+    g.fillStyle = hexA(hueOf().accent, 0.5);                    // a stripe up each wing
+    roundRectOn(g, -10.4, -22.8, 2, 19.4, 1); g.fill();
+    roundRectOn(g, 8.4, -22.8, 2, 19.4, 1); g.fill();
 
-    // the low table he has it all on
+    // the desk he has it all on
     g.fillStyle = 'rgba(12,9,20,0.26)';
-    g.beginPath(); g.ellipse(0, 8, 26, 4, 0, 0, 6.29); g.fill();
+    g.beginPath(); g.ellipse(0, 8, 28, 4, 0, 0, 6.29); g.fill();
     g.fillStyle = '#453B31';                                    // legs
-    roundRectOn(g, -21, -1, 6, 10, 1.2); g.fill();
-    roundRectOn(g, 15, -1, 6, 10, 1.2); g.fill();
+    roundRectOn(g, -22, -1, 5, 10, 1.2); g.fill();
+    roundRectOn(g, 17, -1, 5, 10, 1.2); g.fill();
+    g.strokeStyle = '#3A3128'; g.lineWidth = 1.4;               // cross brace
+    g.beginPath(); g.moveTo(-19, 5.4); g.lineTo(19, 5.4); g.stroke();
     g.fillStyle = '#514639';                                    // the top
-    roundRectOn(g, -23, -3, 46, 2.6, 1.1); g.fill();
+    roundRectOn(g, -24, -3, 48, 2.6, 1.1); g.fill();
     g.fillStyle = 'rgba(255,236,200,0.08)';
-    roundRectOn(g, -23, -3, 46, 0.9, 0.45); g.fill();
+    roundRectOn(g, -24, -3, 48, 0.9, 0.45); g.fill();
 
-    // a crate to stand the monitor on, so it clears his head
-    g.fillStyle = '#4C4137';
-    roundRectOn(g, -11, -17 - pk('rig') * 1.6, 22, 14 + pk('rig') * 1.6, 1.6); g.fill();
-    g.strokeStyle = 'rgba(0,0,0,0.22)'; g.lineWidth = 0.7;
-    g.beginPath(); g.moveTo(-11, -10); g.lineTo(11, -10); g.stroke();
+    // a riser shelf to stand the monitor on, so it clears his head
+    g.fillStyle = '#3E362E';
+    roundRectOn(g, -13, -6.4 - rigL * 1.6, 3, 4 + rigL * 1.6, 0.8); g.fill();
+    roundRectOn(g, 10, -6.4 - rigL * 1.6, 3, 4 + rigL * 1.6, 0.8); g.fill();
+    g.fillStyle = '#5A4E40';
+    roundRectOn(g, -15, -8.6 - rigL * 1.6, 30, 2.4, 1); g.fill();
+    g.fillStyle = 'rgba(255,236,200,0.07)';
+    roundRectOn(g, -15, -8.6 - rigL * 1.6, 30, 0.8, 0.4); g.fill();
+    g.fillStyle = '#6B5C4C';                                    // a couple of books under it
+    roundRectOn(g, -10.6, -5.2 - rigL * 1.6, 8.4, 1.5, 0.4); g.fill();
+    g.fillStyle = '#7A4A3C';
+    roundRectOn(g, -10, -3.6 - rigL * 1.6, 7.6, 1.4, 0.4); g.fill();
 
     // monitor, straight in front of him and above his head — and it gets
     // better every time he saves up for it
-    var rig = pk('rig');
+    var rig = rigL;
     var MX = 0, MY = -38 - rig * 1.6, MW = 28 + rig * 3, MH = 20 + rig * 1.4;
     if (rig >= 2) {                                             // a second screen, angled in
       g.save(); g.translate(-MW / 2 - 9, MY + 5); g.rotate(0.16);
@@ -4446,8 +4525,14 @@
       g.fillStyle = ug;
       g.beginPath(); g.arc(MX, MY + MH + 2, 16 + rig * 4, 0, 6.29); g.fill();
     }
-    g.fillStyle = '#33333B';                                    // stand down onto the crate
-    roundRectOn(g, MX - 2.2, MY + MH, 4.4, 2.6, 1); g.fill();
+    g.fillStyle = '#33333B';                                    // neck and foot, on the shelf
+    roundRectOn(g, MX - 2.2, MY + MH, 4.4, 3.4 + rig * 1.6, 1); g.fill();
+    roundRectOn(g, MX - 6.4, MY + MH + 2.6 + rig * 1.6, 12.8, 1.6, 0.8); g.fill();
+    g.strokeStyle = 'rgba(24,22,28,0.8)'; g.lineWidth = 0.9;    // the cable, down behind the riser
+    g.beginPath();
+    g.moveTo(MX + 2.6, MY + MH + 1.4);
+    g.bezierCurveTo(MX + 9, MY + MH + 4, MX + 11.6, -9, MX + 13.4, -6.4);
+    g.stroke();
     // the screen throws its light back over him
     var sg = g.createRadialGradient(MX, MY + MH / 2, 1, MX, MY + MH / 2, 40);
     sg.addColorStop(0, 'rgba(120,170,240,0.2)');
@@ -4455,20 +4540,53 @@
     g.fillStyle = sg;
     g.beginPath(); g.arc(MX, MY + MH / 2, 40, 0, 6.29); g.fill();
 
-    // keyboard on the table in front of him, where his hands land
-    g.fillStyle = '#3A3A42';
-    roundRectOn(g, -16, -5.4, 32, 2.6, 1); g.fill();
-    g.fillStyle = 'rgba(200,206,216,0.35)';
-    for (i = 0; i < 11; i++) { roundRectOn(g, -14.6 + i * 2.7, -4.9, 1.7, 0.9, 0.35); g.fill(); }
+    // desk mat, keyboard, mouse — the surface his hands land on
+    g.fillStyle = '#2A2630';
+    roundRectOn(g, -18.5, -5.9, 38, 3.4, 0.8); g.fill();
+    g.strokeStyle = hexA(hueOf().accent, 0.35); g.lineWidth = 0.4;
+    roundRectOn(g, -18.5, -5.9, 38, 3.4, 0.8); g.stroke();
+    g.fillStyle = '#3A3A42';                                    // keyboard
+    roundRectOn(g, -16, -5.4, 27, 2.6, 0.9); g.fill();
+    for (i = 0; i < 10; i++) {
+      var kl = 0.28 + 0.5 * Math.abs(Math.sin(t * 2.2 + i * 1.7));
+      g.fillStyle = KN.act === 'game' ? hexA(hueOf().accent, kl * 0.8) : 'rgba(200,206,216,0.35)';
+      roundRectOn(g, -14.8 + i * 2.6, -4.9, 1.7, 0.9, 0.35); g.fill();
+    }
     g.fillStyle = '#3A3A42';                                    // mouse
-    g.beginPath(); g.ellipse(19, -4.2, 1.8, 2.4, 0, 0, 6.29); g.fill();
-    // tower, on the ground beside the table
+    g.beginPath(); g.ellipse(15.4, -4.2, 2, 2.6, 0, 0, 6.29); g.fill();
+    g.fillStyle = hexA(hueOf().accent, 0.5);
+    g.beginPath(); g.ellipse(15.4, -4.8, 0.8, 1, 0, 0, 6.29); g.fill();
+
+    // the tower, on the ground beside the desk, with a window in the side
     g.fillStyle = '#2F2F36';
-    roundRectOn(g, 24, -13, 7, 17, 1.6); g.fill();
-    g.fillStyle = 'rgba(99,230,190,0.95)';
-    g.beginPath(); g.arc(27.5, -10.4, 1, 0, 6.29); g.fill();
-    g.fillStyle = 'rgba(99,230,190,' + (0.3 + 0.5 * Math.abs(Math.sin(t * 3.1))).toFixed(2) + ')';
-    g.beginPath(); g.arc(27.5, -8, 0.7, 0, 6.29); g.fill();
+    roundRectOn(g, 25, -15, 8, 19, 1.6); g.fill();
+    g.fillStyle = 'rgba(10,10,14,0.85)';
+    roundRectOn(g, 26.2, -13.4, 5.6, 13, 0.9); g.fill();
+    for (i = 0; i < 3; i++) {                                   // fans behind the glass
+      var fy = -11.6 + i * 4;
+      g.strokeStyle = hexA(hueOf().accent, 0.55); g.lineWidth = 0.5;
+      g.beginPath(); g.arc(29, fy, 1.7, 0, 6.29); g.stroke();
+      g.save(); g.translate(29, fy); g.rotate(t * (KN.act === 'game' ? 5 : 1.4) + i);
+      g.strokeStyle = hexA(hueOf().accent, 0.4); g.lineWidth = 0.45;
+      for (var fb = 0; fb < 3; fb++) {
+        g.beginPath(); g.moveTo(0, 0);
+        g.lineTo(Math.cos(fb * 2.1) * 1.5, Math.sin(fb * 2.1) * 1.5); g.stroke();
+      }
+      g.restore();
+    }
+    g.fillStyle = 'rgba(99,230,190,0.95)';                      // power light
+    g.beginPath(); g.arc(29, -16.2, 0.8, 0, 6.29); g.fill();
+
+    // a mug and a headset live on the desk with everything else
+    g.fillStyle = '#C9BBA4';
+    roundRectOn(g, -22.4, -6.6, 3.6, 3.8, 1); g.fill();
+    g.strokeStyle = '#C9BBA4'; g.lineWidth = 0.7;
+    g.beginPath(); g.arc(-18.4, -4.9, 1.2, -1.2, 1.2); g.stroke();
+    g.fillStyle = '#2E2E36';                                    // headset, hung off the riser leg
+    g.strokeStyle = '#2E2E36'; g.lineWidth = 1.5;
+    g.beginPath(); g.arc(-13.4, -4.4, 3.2, Math.PI * 1.05, Math.PI * 1.95); g.stroke();
+    g.beginPath(); g.ellipse(-16.5, -4.2, 1.3, 1.8, 0, 0, 6.29); g.fill();
+    g.beginPath(); g.ellipse(-10.3, -4.2, 1.3, 1.8, 0, 0, 6.29); g.fill();
     g.restore();
 
     // ── the small stuff: a sign, a washing line, a plant, a duck
@@ -4514,6 +4632,44 @@
     g.strokeStyle = '#C9BBA4'; g.lineWidth = 0.8;
     g.beginPath(); g.arc(2.6, 6.4, 1.5, -1.2, 1.2); g.stroke();
     g.restore();
+
+    // ── a string of lights right across the camp, hung off the washing-line
+    // pole and the far post. Warm, low, and the reason the place feels lived in.
+    var lx0 = -88, lx1 = 140, ly0 = -47, ly1 = -41, lcy = -25;
+    g.strokeStyle = '#4A4038'; g.lineWidth = 1.3;               // a post at either end
+    g.beginPath(); g.moveTo(lx0, 8); g.lineTo(lx0, ly0); g.stroke();
+    g.beginPath(); g.moveTo(lx1, 8); g.lineTo(lx1, ly1); g.stroke();
+    g.strokeStyle = 'rgba(58,50,44,0.75)'; g.lineWidth = 0.5;
+    g.beginPath();
+    g.moveTo(lx0, ly0);
+    g.quadraticCurveTo((lx0 + lx1) / 2, lcy, lx1, ly1);
+    g.stroke();
+    for (i = 0; i <= 12; i++) {
+      var u = i / 12, iu = 1 - u;
+      var bx = iu * iu * lx0 + 2 * iu * u * ((lx0 + lx1) / 2) + u * u * lx1;
+      var by = iu * iu * ly0 + 2 * iu * u * lcy + u * u * ly1;
+      var flick = 0.82 + 0.18 * Math.sin(t * 1.6 + i * 1.9);
+      g.strokeStyle = 'rgba(58,50,44,0.75)'; g.lineWidth = 0.45;
+      g.beginPath(); g.moveTo(bx, by); g.lineTo(bx, by + 1.7); g.stroke();
+      g.fillStyle = 'rgba(255,186,92,' + (0.09 * flick).toFixed(3) + ')';
+      g.beginPath(); g.arc(bx, by + 2.4, 4.6, 0, 6.29); g.fill();
+      g.fillStyle = 'rgba(255,206,128,' + (0.24 * flick).toFixed(3) + ')';
+      g.beginPath(); g.arc(bx, by + 2.4, 2.2, 0, 6.29); g.fill();
+      g.fillStyle = 'rgba(255,238,198,' + (0.95 * flick).toFixed(3) + ')';
+      g.beginPath(); g.arc(bx, by + 2.4, 1.05, 0, 6.29); g.fill();
+    }
+
+    // ── a few fireflies, drifting nowhere in particular
+    for (i = 0; i < 7; i++) {
+      var fp = t * 0.24 + i * 0.9;
+      var fx = -74 + i * 30 + Math.sin(fp * 0.8 + i) * 15;
+      var fy = -22 - 16 * (0.5 + 0.5 * Math.sin(fp * 0.55 + i * 2.1));
+      var fa = 0.2 + 0.35 * Math.max(0, Math.sin(t * 1.5 + i * 2.4));
+      g.fillStyle = 'rgba(255,214,120,' + (fa * 0.22).toFixed(3) + ')';
+      g.beginPath(); g.arc(fx, fy, 2.4, 0, 6.29); g.fill();
+      g.fillStyle = 'rgba(255,240,190,' + fa.toFixed(3) + ')';
+      g.beginPath(); g.arc(fx, fy, 0.7, 0, 6.29); g.fill();
+    }
 
     // solar panel and inverter, further out
     g.save(); g.translate(CAMP.line.x, 0);
@@ -4808,6 +4964,21 @@
   // The near edge of the desk, with the keyboard on it. Drawn after him, so
   // when he sits down his hands go behind it the way hands do.
   function drawCampFront(g, t) {
+    // The tent's doorway shade and its tied-back flap are drawn after him, so
+    // when he turns in for a nap he is inside the tent rather than beside it.
+    g.save(); g.translate(CAMP.bed.x, 0);
+    g.fillStyle = 'rgba(14,16,20,0.5)';
+    g.beginPath(); g.moveTo(-11.4, 8); g.lineTo(-2, -19); g.lineTo(9.4, 8); g.closePath(); g.fill();
+    g.fillStyle = '#6B7A64';
+    g.beginPath();
+    g.moveTo(-2, -20); g.lineTo(-11, 8); g.lineTo(-6, 8); g.quadraticCurveTo(-3, -6, -2, -20);
+    g.closePath(); g.fill();
+    g.fillStyle = 'rgba(0,0,0,0.16)';
+    g.beginPath();
+    g.moveTo(-2, -20); g.lineTo(-8.4, 8); g.lineTo(-6, 8); g.quadraticCurveTo(-3, -6, -2, -20);
+    g.closePath(); g.fill();
+    g.restore();
+
     g.save(); g.translate(CAMP.chair.x, 0);
     g.strokeStyle = '#6B5039'; g.lineWidth = 1.6; g.lineCap = 'round';     // near armrest
     g.beginPath(); g.moveTo(-11.4, -5.4); g.lineTo(3.6, -6.4); g.stroke();
@@ -4844,7 +5015,7 @@
     armL: undefined, armR: undefined, item: null, itemL: null,
     blink: 1.8, hop: 0, tilt: 0, lean: 0, zzz: 0, sit: 0,
     crouch: 0, lie: 0, back: 0, headTilt: 0, lift: 0, treatT: 0, faceYou: 0, factT: 0,
-    spin: 0, squash: 0, look: 0, lookT: 0,
+    spin: 0, squash: 0, look: 0, lookD: 0, lookT: 0,
     hearts: [], props: [], taps: 0, tapT: 0, petting: 0, pet: 0,
     onStage: false, lastReact: '', bounce: 0, danceT: 0,
     amt: 0.5, amtTarget: 0.5,
@@ -5217,7 +5388,7 @@
     // edges of the camp so you never see past the last thing he owns
     // he is the subject, so the shot stays on him, stopping at the ends of the
     // camp so you never pan off past the last thing he owns
-    var camWant = clamp(KN.x, -50, 72);
+    var camWant = clamp(KN.x, -102, 72);
     KN.cam += (camWant - KN.cam) * Math.min(1, dt * 1.8);
     // the fire answers whatever he is doing to it
     var fWant = KN.act === 'rub' ? 0.5 : (KN.act === 'poke' || KN.act === 'haul') ? 1.14 : 1;
@@ -5309,7 +5480,7 @@
     }
 
     var A2 = KN.act, wobble = Math.sin(S.time * 2) * 0.03;
-    var armL, armR, item = null, itemL = null, expr = 'normal';
+    var armL, armR, item = null, itemL = null, expr = 'normal', lookD = 0;
     var tilt = wobble, lean = 0, sit = 0, zzz = 0;
     var crouch = 0, lie = 0, back = 0, headTilt = 0, lift = 0;
 
@@ -5442,14 +5613,18 @@
       KN.look = 0;
       expr = peek ? 'happy' : (Math.sin(S.time * 0.7) > 0.6 ? 'surprised' : 'think');
     } else if (A2 === 'read') {
-      // back in the chair with the book up, turning a page every so often
-      sit = 1; lift = 2.4;
+      // Settled back in the chair with the book held in both hands. The far
+      // hand holds the spine, the near one turns the page; when he reads a bit
+      // out to you he looks up from it, which is what makes it read as reading.
+      sit = 1; lift = 2.4; lean = -0.05;
       var page = Math.sin(S.time * 0.62) > 0.94;
-      armR = -0.66 + (page ? 0.44 : 0) + Math.sin(S.time * 0.7) * 0.025;
-      armL = 0.70 - (page ? 0.26 : 0);
+      var upAt = KN.sayT > 0;
+      armR = -0.86 + (page ? 0.5 : 0) + Math.sin(S.time * 0.7) * 0.03;   // near hand, on the page
+      armL = 0.84 - (page ? 0.1 : 0);                                     // far hand, under the spine
       item = 'book';
-      headTilt = 0.15;
-      expr = page ? 'surprised' : 'think';
+      headTilt = upAt ? -0.04 : 0.19;                                     // down at it, up at you
+      lookD = upAt ? 0 : 1;                                               // and his eyes go with it
+      expr = upAt ? 'happy' : (page ? 'surprised' : 'normal');
       KN.look = 0;
     } else if (A2 === 'sit') {
       // in the chair, hands on his knees
@@ -5503,6 +5678,7 @@
     }
 
     KN.armL = armL; KN.armR = armR; KN.item = item; KN.itemL = itemL;
+    KN.lookD += (lookD - KN.lookD) * Math.min(1, dt * 7);
     KN.tilt = tilt;
     KN.lean += (lean - KN.lean) * Math.min(1, dt * 6);
     KN.sit += (sit - KN.sit) * Math.min(1, dt * 4);
@@ -5620,7 +5796,7 @@
   // The moon, the hills and the ground never move and never change, and they
   // are the largest fills on the screen. Bake them once per canvas size and
   // slide the strip under the camera instead of re-pathing it every frame.
-  var CAM_LO = -50, CAM_HI = 72;
+  var CAM_LO = -102, CAM_HI = 72;
   var campBack = null;
   function campBackdrop(w, h, dpr, base, sc) {
     if (campBack && campBack.w === w && campBack.h === h &&
@@ -5696,7 +5872,7 @@
     g.save();
     g.translate(KN.x, CAMP_GND - 14);
     drawKnight(g, {
-      t: S.time, scale: 1, expr: KN.expr, amt: KN.amt, look: KN.look,
+      t: S.time, scale: 1, expr: KN.expr, amt: KN.amt, look: KN.look, lookD: KN.lookD,
       tilt: KN.tilt, hop: KN.hop, squash: KN.squash, spin: KN.spin,
       lean: KN.lean, zzz: KN.zzz, sit: KN.sit, flip: KN.face,
       crouch: KN.crouch, lie: KN.lie, back: KN.back, headTilt: KN.headTilt, lift: KN.lift,
@@ -5724,7 +5900,7 @@
     g.translate(w / 2, h / 2 - MID * sc);
     g.scale(sc, sc);
     drawKnight(g, {
-      t: S.time, scale: 1, expr: KN.expr, amt: KN.amt, look: KN.look,
+      t: S.time, scale: 1, expr: KN.expr, amt: KN.amt, look: KN.look, lookD: KN.lookD,
       tilt: KN.tilt, hop: KN.hop, squash: KN.squash, spin: KN.spin,
       zzz: KN.zzz, sit: KN.sit * 0.5, flip: 1, crouch: KN.crouch * 0.4,
       armL: KN.armL, armR: KN.armR, item: KN.item, itemL: KN.itemL
