@@ -596,28 +596,28 @@
   var W = 0, H = 0, DPR = 1;
   // The field is drawn smaller than life so more of it fits on the glass. All
   // the game's numbers stay in field units; only the transform knows about it.
-  var ZOOM = 0.8;
+  var ZOOM = 0.7;
   var VS = 1;                     // device pixels per field unit
   function px(n) { return n / ZOOM; }   // n screen pixels, in field units
-  var BUILD = 'v1.10.0';        // bump on every deploy — shown in-game for support
+  var BUILD = 'v1.11.0';        // bump on every deploy — shown in-game for support
   var MUTE_KEY = 'keeper.nightwatch.mute';
   var MUSIC_KEY = 'keeper.nightwatch.music';
 
   // ────────────────────────────────────────────────────────────── tuning
-  var FIELD = 1.25;              // = 1 / ZOOM, spelled out so the tuning reads
+  var FIELD = 1.4286;            // = 1 / ZOOM, spelled out so the tuning reads
   var K = {
-    keeperSpeed: 205 * FIELD,
+    keeperSpeed: 152 * FIELD,   // unhurried on purpose: this is a calm game
     keeperR: 14,
     lampR: 84 * FIELD,
     fireCoreR: 34,
-    depositR: 52,
-    pickupR: 56,
+    depositR: 60,
+    pickupR: 68,
     maxFuel: 100,
     startFuel: 68,
     logFuel: 24,
     nightLen: 42,          // seconds of darkness per night
-    baseDrain: 1.35,       // fuel burned per second on night 1
-    drainPerNight: 0.38,
+    baseDrain: 1.2,        // fuel burned per second on night 1
+    drainPerNight: 0.34,
     flareCost: 10,
     flareCd: 1.5,
     flareR: 148,
@@ -628,7 +628,7 @@
     hitDamage: 10,         // what a shade costs you on contact
     iframe: 1.05,          // invulnerable while you find your feet
     brandR: 78,            // how far the swing reaches
-    brandArc: 1.95,        // ~112 degrees of sweep
+    brandArc: 2.62,        // ~150 degrees of sweep, so aiming is forgiving
     brandDmg: 4.6,
     swingCd: 0,            // no cooldown — the swing is limited only by your thumb
     swingDur: 0.24
@@ -896,7 +896,7 @@
     D.flareCd   = K.flareCd * Math.pow(0.70, u('quick'));
     D.flareR    = K.flareR * (1 + u('wide') * 0.30);
 
-    D.speed     = K.keeperSpeed * (1 + u('feet') * 0.13) * (1 + pk('boots') * 0.04);
+    D.speed     = K.keeperSpeed * (1 + u('feet') * 0.17) * (1 + pk('boots') * 0.05);
     D.carryPer  = u('unburdened') ? 0 : 0.05;   // speed lost per log carried
     D.maxHealth = K.maxHealth + u('hearty') * 25 + pk('mail') * 8;
     D.hitDamage = Math.max(4, K.hitDamage - u('nerve') * 2);
@@ -1878,6 +1878,10 @@
         gctx.stroke();
       }
     }
+    // his camp, arranged round the fire — it is not just a fire you are
+    // keeping, it is the place he lives
+    campProps(gctx, W / 2, H / 2);
+
     // fire ring stones
     for (var k = 0; k < 13; k++) {
       var a = (k / 13) * Math.PI * 2 + 0.2;
@@ -1892,6 +1896,87 @@
       gctx.ellipse(sx, sy + 2.5, 7 + r() * 2, 3, a, 0, Math.PI * 2);
       gctx.fill();
     }
+  }
+
+  // The camp, laid out around the fire and baked into the ground layer once —
+  // it costs nothing per frame and the darkness falls over it like everything
+  // else. Same furniture as his lobby, just further apart.
+  var CAMP_PROPS = [
+    ['bed',   -0.86, 0.10], ['wood',  -0.34, 0.30], ['stump',  0.40, 0.26],
+    ['desk',   0.78, -0.06], ['line', -0.80, -0.20], ['crates', 0.16, -0.34],
+    ['pot',   -0.46, 0.44],  ['duck', -0.62, 0.16]
+  ];
+  function campProps(g, fx, fy) {
+    var rx = Math.min(W, H) * 0.42, ry = Math.min(W, H) * 0.40;
+    for (var i = 0; i < CAMP_PROPS.length; i++) {
+      var P = CAMP_PROPS[i];
+      campProp(g, P[0], fx + P[1] * rx, fy + P[2] * ry);
+    }
+  }
+  function campProp(g, kind, x, y) {
+    var i;
+    g.save();
+    g.translate(x, y);
+    g.scale(1.45, 1.45);
+    g.fillStyle = 'rgba(0,0,0,0.3)';
+    g.beginPath(); g.ellipse(0, 1, 14, 4, 0, 0, 6.29); g.fill();
+    if (kind === 'bed') {
+      g.fillStyle = '#4A4038';
+      g.beginPath(); g.moveTo(-20, 0); g.lineTo(4, -24); g.lineTo(18, 0); g.closePath(); g.fill();
+      g.fillStyle = '#3A322C';
+      g.beginPath(); g.moveTo(4, -24); g.lineTo(18, 0); g.lineTo(10, 0); g.closePath(); g.fill();
+      g.fillStyle = '#7C6A58'; roundRectOn(g, -13, -6, 24, 6, 3); g.fill();
+      g.fillStyle = '#C9BBA4'; roundRectOn(g, -13, -8, 8, 4.5, 2.2); g.fill();
+    } else if (kind === 'wood') {
+      for (i = 0; i < 5; i++) {
+        var wy = -1 - (i % 3) * 4.4, wx = -10 + ((i / 3) | 0) * 11 + (i % 3) * 1.5;
+        g.fillStyle = i % 2 ? '#6B4A2C' : '#7A5433';
+        roundRectOn(g, wx, wy, 13, 4, 2); g.fill();
+        g.fillStyle = 'rgba(190,150,90,0.7)';
+        g.beginPath(); g.ellipse(wx + 0.8, wy + 2, 1.2, 1.6, 0, 0, 6.29); g.fill();
+      }
+    } else if (kind === 'stump') {
+      g.fillStyle = '#5E4530'; roundRectOn(g, -8, -7, 16, 8, 3); g.fill();
+      g.fillStyle = '#7A5F44'; g.beginPath(); g.ellipse(0, -7, 8, 2.5, 0, 0, 6.29); g.fill();
+    } else if (kind === 'desk') {
+      g.fillStyle = '#453B31';
+      roundRectOn(g, -22, -3, 6, 4, 1); g.fill();
+      roundRectOn(g, 16, -3, 6, 4, 1); g.fill();
+      g.fillStyle = '#514639'; roundRectOn(g, -24, -5, 48, 2.4, 1); g.fill();
+      g.fillStyle = '#4C4137'; roundRectOn(g, -9, -17, 18, 12, 1.4); g.fill();
+      g.fillStyle = '#26262C'; roundRectOn(g, -13, -33, 26, 17, 2); g.fill();
+      g.fillStyle = 'rgba(70,110,190,0.5)'; roundRectOn(g, -11, -31, 22, 13, 1); g.fill();
+      g.fillStyle = '#3A3A42'; roundRectOn(g, -12, -4.6, 22, 2, 0.8); g.fill();
+    } else if (kind === 'line') {
+      g.strokeStyle = '#4A4038'; g.lineWidth = 1.4; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(0, 0); g.lineTo(0, -30); g.stroke();
+      g.beginPath(); g.moveTo(-34, -6); g.lineTo(-34, -26); g.stroke();
+      g.strokeStyle = 'rgba(180,164,142,0.4)'; g.lineWidth = 0.8;
+      g.beginPath(); g.moveTo(0, -29); g.quadraticCurveTo(-17, -22, -34, -25); g.stroke();
+      var socks = ['#D9695E', '#7FA8C9', '#E2C46A'];
+      for (i = 0; i < 3; i++) {
+        g.fillStyle = socks[i];
+        roundRectOn(g, -9 - i * 9, -26 + Math.sin(i) * 1.2, 4.6, 6.6, 1.8); g.fill();
+      }
+    } else if (kind === 'crates') {
+      g.fillStyle = '#4C4137'; roundRectOn(g, -14, -10, 14, 11, 1.4); g.fill();
+      g.fillStyle = '#43392F'; roundRectOn(g, 1, -8, 12, 9, 1.4); g.fill();
+      g.strokeStyle = 'rgba(0,0,0,0.24)'; g.lineWidth = 0.8;
+      g.beginPath(); g.moveTo(-14, -4.6); g.lineTo(0, -4.6); g.stroke();
+      g.fillStyle = '#C9BBA4'; roundRectOn(g, 3, -12, 5, 4.4, 1.2); g.fill();
+    } else if (kind === 'pot') {
+      g.strokeStyle = '#4A4038'; g.lineWidth = 1.4; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(-11, 0); g.lineTo(0, -22); g.lineTo(11, 0); g.stroke();
+      g.fillStyle = '#57514C'; roundRectOn(g, -6, -15, 12, 9, 3); g.fill();
+      g.fillStyle = '#6E6660'; g.beginPath(); g.ellipse(0, -15, 6.4, 2, 0, 0, 6.29); g.fill();
+    } else if (kind === 'duck') {
+      g.fillStyle = '#E9C558';
+      g.beginPath(); g.ellipse(0, -2, 4, 3, 0, 0, 6.29); g.fill();
+      g.beginPath(); g.arc(2.4, -5.6, 2.4, 0, 6.29); g.fill();
+      g.fillStyle = '#E08A3C';
+      g.beginPath(); g.moveTo(4.4, -5.6); g.lineTo(7.2, -4.9); g.lineTo(4.4, -4.2); g.closePath(); g.fill();
+    }
+    g.restore();
   }
 
   // ────────────────────────────────────────────────────────────── lighting model
@@ -1992,7 +2077,7 @@
       kind: kind, t: T,
       x: x, y: y,
       hp: hp, maxHp: hp,
-      spd: (rand(T.spd[0], T.spd[1]) + S.night * T.spdN) * FIELD,
+      spd: (rand(T.spd[0], T.spd[1]) + S.night * T.spdN) * 0.78 * FIELD,
       r: T.r,
       kx: 0, ky: 0,       // knockback velocity
       wob: rand(0, 6.28),
@@ -2130,7 +2215,10 @@
       var d = dist(sh.x, sh.y, k.x, k.y);
       if (d > D.brandR + sh.r) continue;
       var ang = Math.atan2(sh.y - k.y, sh.x - k.x);
-      if (D.brandArc < Math.PI * 2 && Math.abs(angDiff(ang, k.swingDir)) > half) continue;
+      // anything you are practically stood on counts as in front of you —
+      // at that range the angle is noise, and missing it feels broken
+      var hugging = d < K.keeperR + sh.r + 6;
+      if (!hugging && D.brandArc < Math.PI * 2 && Math.abs(angDiff(ang, k.swingDir)) > half) continue;
       sh.kx += Math.cos(ang) * 300;
       sh.ky += Math.sin(ang) * 300;
       sh.hit = 0.28;
@@ -3273,7 +3361,7 @@
 
     drawKnight(ctx, {
       t: S.time,
-      scale: 1.5,
+      scale: 1.7,
       expr: k.guard > 0 ? 'surprised' : (k.carry >= D.carry ? 'happy' : 'normal'),
       flash: k.guard > 0 && Math.floor(S.time * 18) % 2 === 0,
       flip: k.flip, walk: k.walk, step: k.step, tilt: k.lean
@@ -3506,9 +3594,9 @@
       var full = kp.carry >= D.carry;
       var ringPulse = 0.5 + 0.5 * Math.sin(S.time * 2.4);
       ctx.strokeStyle = full
-        ? 'rgba(232,220,200,' + (0.05 + 0.03 * ringPulse).toFixed(3) + ')'
-        : 'rgba(255,196,110,' + (0.13 + 0.07 * ringPulse).toFixed(3) + ')';
-      ctx.lineWidth = 1.4;
+        ? 'rgba(232,220,200,' + (0.09 + 0.05 * ringPulse).toFixed(3) + ')'
+        : 'rgba(255,210,140,' + (0.26 + 0.12 * ringPulse).toFixed(3) + ')';
+      ctx.lineWidth = 1.8;
       ctx.setLineDash([5, 7]);
       ctx.beginPath();
       ctx.arc(kp.x, kp.y, D.pickupR, 0, 6.29);
@@ -3723,7 +3811,7 @@
     wood:  { x: -46,  stand: -64, face: 1 },
     bed:   { x: -92,  stand: -88, face: 1 },
     stump: { x: 42,   stand: 42,  face: -1 },
-    desk:  { x: 96,   stand: 84,  face: 1 },   // he sits at the near end, back to you
+    desk:  { x: 96,   stand: 96,  face: 1 },   // square in front of it, back to you
     line:  { x: 144,  stand: 126, face: 1 }
   };
 
@@ -3839,37 +3927,59 @@
     }
     g.restore();
 
-    // ── the setup: a crate desk his size, a real screen, a stool at the near end
+    // ── the setup. You are stood behind him and a bit above, so you see the
+    // back of his head and, over it, the screen he is looking at.
     g.save(); g.translate(CAMP.desk.x, 0);
     g.fillStyle = '#5A4E42';                                    // stool, behind him
-    roundRectOn(g, -22, 1, 14, 8, 2.2); g.fill();
+    roundRectOn(g, -7, 1, 14, 8, 2.2); g.fill();
     g.fillStyle = '#6B5C4C';
-    g.beginPath(); g.ellipse(-15, 1, 7, 2, 0, 0, 6.29); g.fill();
-    g.fillStyle = 'rgba(12,9,20,0.26)';                         // the dark under the desk
-    g.beginPath(); g.ellipse(2, 8, 28, 4, 0, 0, 6.29); g.fill();
+    g.beginPath(); g.ellipse(0, 1, 7, 2, 0, 0, 6.29); g.fill();
 
-    // monitor, up at the far end where nothing gets in front of it
-    var MX = 12, MY = -25, MW = 28, MH = 21;
-    g.fillStyle = '#33333B';                                    // stand
-    roundRectOn(g, MX - 2.2, MY + MH - 1, 4.4, 4, 1); g.fill();
-    roundRectOn(g, MX - 6, MY + MH + 1.6, 12, 1.8, 0.9); g.fill();
-    g.fillStyle = '#26262C';                                    // frame
+    // the low table he has it all on
+    g.fillStyle = 'rgba(12,9,20,0.26)';
+    g.beginPath(); g.ellipse(0, 8, 26, 4, 0, 0, 6.29); g.fill();
+    g.fillStyle = '#453B31';                                    // legs
+    roundRectOn(g, -25, -1, 7, 10, 1.2); g.fill();
+    roundRectOn(g, 18, -1, 7, 10, 1.2); g.fill();
+    g.fillStyle = '#514639';                                    // the top
+    roundRectOn(g, -27, -3, 54, 2.6, 1.1); g.fill();
+    g.fillStyle = 'rgba(255,236,200,0.08)';
+    roundRectOn(g, -27, -3, 54, 0.9, 0.45); g.fill();
+
+    // a crate to stand the monitor on, so it clears his head
+    g.fillStyle = '#4C4137';
+    roundRectOn(g, -11, -17, 22, 14, 1.6); g.fill();
+    g.strokeStyle = 'rgba(0,0,0,0.22)'; g.lineWidth = 0.7;
+    g.beginPath(); g.moveTo(-11, -10); g.lineTo(11, -10); g.stroke();
+
+    // monitor, straight in front of him and above his head
+    var MX = 0, MY = -39, MW = 32, MH = 22;
+    g.fillStyle = '#26262C';
     roundRectOn(g, MX - MW / 2, MY, MW, MH, 2.2); g.fill();
     drawScreen(g, MX - MW / 2 + 1.6, MY + 1.6, MW - 3.2, MH - 3.2, t, fireLevel);
-    // the screen throws a little light back into the camp
-    var sg = g.createRadialGradient(MX, MY + MH / 2, 1, MX, MY + MH / 2, 36);
-    sg.addColorStop(0, 'rgba(120,170,240,0.17)');
+    g.fillStyle = '#33333B';                                    // stand down onto the crate
+    roundRectOn(g, MX - 2.2, MY + MH, 4.4, 2.6, 1); g.fill();
+    // the screen throws its light back over him
+    var sg = g.createRadialGradient(MX, MY + MH / 2, 1, MX, MY + MH / 2, 40);
+    sg.addColorStop(0, 'rgba(120,170,240,0.2)');
     sg.addColorStop(1, 'rgba(120,170,240,0)');
     g.fillStyle = sg;
-    g.beginPath(); g.arc(MX, MY + MH / 2, 36, 0, 6.29); g.fill();
+    g.beginPath(); g.arc(MX, MY + MH / 2, 40, 0, 6.29); g.fill();
 
-    // tower, tucked at the far end
+    // keyboard on the table in front of him, where his hands land
+    g.fillStyle = '#3A3A42';
+    roundRectOn(g, -18, -5.4, 36, 2.6, 1); g.fill();
+    g.fillStyle = 'rgba(200,206,216,0.35)';
+    for (i = 0; i < 12; i++) { roundRectOn(g, -16.6 + i * 2.8, -4.9, 1.8, 0.9, 0.35); g.fill(); }
+    g.fillStyle = '#3A3A42';                                    // mouse
+    g.beginPath(); g.ellipse(22, -4.2, 1.8, 2.4, 0, 0, 6.29); g.fill();
+    // tower, on the ground beside the table
     g.fillStyle = '#2F2F36';
-    roundRectOn(g, 30, -19, 7, 18, 1.6); g.fill();
+    roundRectOn(g, 28, -13, 7, 17, 1.6); g.fill();
     g.fillStyle = 'rgba(99,230,190,0.95)';
-    g.beginPath(); g.arc(33.5, -16, 1, 0, 6.29); g.fill();
+    g.beginPath(); g.arc(31.5, -10.4, 1, 0, 6.29); g.fill();
     g.fillStyle = 'rgba(99,230,190,' + (0.3 + 0.5 * Math.abs(Math.sin(t * 3.1))).toFixed(2) + ')';
-    g.beginPath(); g.arc(33.5, -13.6, 0.7, 0, 6.29); g.fill();
+    g.beginPath(); g.arc(31.5, -8, 0.7, 0, 6.29); g.fill();
     g.restore();
 
     // ── the small stuff: a sign, a washing line, a plant, a duck
@@ -3951,7 +4061,7 @@
   function drawScreen(g, x, y, w, h, t, fireLevel) {
     g.save();
     g.beginPath(); roundRectOn(g, x, y, w, h, 1.2); g.clip();
-    var cx = x + w * 0.5, cy = y + h * 0.58;
+    var cx = x + w * 0.5, cy = y + h * 0.42;
     g.fillStyle = '#0B0A22';
     g.fillRect(x, y, w, h);
     // its own firelight
@@ -4013,22 +4123,10 @@
   // when he sits down his hands go behind it the way hands do.
   function drawCampFront(g, t) {
     g.save(); g.translate(CAMP.desk.x, 0);
-    g.fillStyle = '#3A3A42';                                    // keyboard
-    roundRectOn(g, -20, -6.5, 19, 3.4, 1.2); g.fill();
-    g.fillStyle = 'rgba(200,206,216,0.35)';
-    for (var i = 0; i < 7; i++) { roundRectOn(g, -18.7 + i * 2.5, -5.8, 1.6, 1, 0.4); g.fill(); }
-    g.fillStyle = '#3A3A42';                                    // mouse
-    g.beginPath(); g.ellipse(4, -4.9, 1.8, 2.4, 0, 0, 6.29); g.fill();
-    g.fillStyle = '#453B31';                                    // two crate legs
-    roundRectOn(g, -28, -1.2, 8, 10.2, 1.2); g.fill();
-    roundRectOn(g, 24, -1.2, 8, 10.2, 1.2); g.fill();
-    g.strokeStyle = 'rgba(0,0,0,0.22)'; g.lineWidth = 0.7;
-    g.beginPath(); g.moveTo(-28, 4); g.lineTo(-20, 4); g.stroke();
-    g.beginPath(); g.moveTo(24, 4); g.lineTo(32, 4); g.stroke();
-    g.fillStyle = '#514639';                                    // the desktop itself
-    roundRectOn(g, -30, -3.5, 64, 2.8, 1.2); g.fill();
-    g.fillStyle = 'rgba(255,236,200,0.08)';
-    roundRectOn(g, -30, -3.5, 64, 1, 0.5); g.fill();
+    g.fillStyle = '#40372E';                                    // the near edge of the table
+    roundRectOn(g, -27, -0.4, 54, 3.4, 1.2); g.fill();
+    g.fillStyle = 'rgba(0,0,0,0.18)';
+    roundRectOn(g, -27, -0.4, 54, 1, 0.5); g.fill();
     g.restore();
   }
 
@@ -4074,18 +4172,19 @@
 
   // things he wonders about, and things he wonders about you
   var KN_SAYS = {
-    world: ['I wonder how far the dark goes.',
-            'This wood burns better than the last lot. I am pleased with it.',
+    world: ['This wood burns better than the last lot. I am pleased with it.',
             'Somebody lit this fire long before me. I would like to thank them.',
             'Something moved out there. Probably a rabbit.',
             'It gets cold around the third hour. It always does.',
-            'I should fix that lean-to properly one day.',
+            'I should fix that lean-to properly one day. No hurry.',
             'The stew is nearly right. Nearly.',
             'Do you think the stars are fires too, with somebody keeping them?',
             'I found a really good stick today. It is by the woodpile.',
             'My solar panel only works when the sun is out, which out here is never.',
-            'One day I will walk over that hill and see what is on the other side.',
-            'It is quiet out here. I mind it less when you visit.'],
+            'People ask if I get bored out here. I never have.',
+            'This is my favourite part of the night, I think. Right about now.',
+            'I have kept this fire longer than I can count. I would not swap it for anything.',
+            'It is quiet out here. That is rather the point of it.'],
     you:   ['Are you still there?', 'What is it like, where you are?',
             'Do you have a fire of your own?', 'You watch me a lot. I do not mind at all.',
             'Is it warm where you are sitting?', 'Do you sleep, out there?',
@@ -4361,10 +4460,11 @@
       armR = -1.62 + Math.sin(S.time * 5) * 0.42; armL = 0.7;
       lean = 0.2; headTilt = 0.22; expr = 'normal';
     } else if (A2 === 'game') {
-      // on the stool, back to you, both hands on the keys
-      sit = 1; lift = 2.4; back = 1; lean = 0.1; headTilt = 0.07;
-      armR = -1.18 + Math.sin(S.time * 15) * 0.07;
-      armL = -0.72 + Math.sin(S.time * 13 + 1.1) * 0.07;
+      // on the stool, back to you, looking up at the screen, both hands
+      // bouncing along the keys
+      sit = 1; lift = 2.4; back = 1; lean = 0.04; headTilt = -0.07;
+      armR = -1.24 + Math.abs(Math.sin(S.time * 7.5)) * 0.13;
+      armL = 1.24 - Math.abs(Math.sin(S.time * 7.5 + 2.1)) * 0.13;
       KN.look = 0;
       expr = Math.sin(S.time * 0.7) > 0.6 ? 'surprised' : 'think';
     } else if (A2 === 'sit') {
@@ -4746,12 +4846,12 @@
     { say: 'What should I call you?', ask: 'name', expr: 'happy', act: 'idle' },
     { say: '{p}. I like that one. Are you a lad or a lass?',
       ask: 'gender', expr: 'happy', act: 'idle' },
-    { say: 'Right then, {p}. Here is the whole of it. This fire is the only light for miles, and anyone lost out there walks towards it.',
-      btn: 'Towards us?', expr: 'content', act: 'warm' },
-    { say: 'Towards us. So we keep it lit until morning, and by morning somebody has always found their way in. That is the good bit.',
-      btn: 'I like that', expr: 'happy', act: 'poke' },
-    { say: 'The shades do not like it lit, so they come and lean on it. We just keep feeding it. Wood is easy out here, and I am quick.',
-      btn: 'We can do that', expr: 'happy', act: 'haul' },
+    { say: 'Right then, {p}. This is my fire. I have kept it as long as I can remember, and there is nothing else I would rather be doing.',
+      btn: 'You like it out here?', expr: 'content', act: 'warm' },
+    { say: 'I love it out here. It is the only light for miles, so anyone lost in the dark walks towards it — and I am the one who makes sure it is still burning when they arrive.',
+      btn: 'That is a good job', expr: 'happy', act: 'poke' },
+    { say: 'It is the best job there is. The shades come and lean on the fire to put it out, so we feed it and we see the night through. Wood is easy out here, and I am quick.',
+      btn: 'Let us keep it lit', expr: 'happy', act: 'haul' },
     { say: 'Good. Then paint the place — what colour do you like?',
       ask: 'hue', expr: 'happy', act: 'idle' },
     { say: 'There. Much more like it. Thank you.', btn: 'Any time', expr: 'content', act: 'idle' },
@@ -5690,7 +5790,7 @@
   document.addEventListener('keydown', wakeAudio);
   // opt-in inspection hook for tuning/QA: open with #debug
   if (/[?#]debug/.test(location.href)) window.__NW = { S: S, K: K, D: D, META: META, UPGRADES: UPGRADES, PERKS: PERKS,
-      flare: doFlare, swing: doSwing, lightAt: lightAt, stick: stick, KN: KN, CAMP: CAMP, drawCamp: drawCamp, drawCampFront: drawCampFront, ZOOM: ZOOM, field: function () { return { w: W, h: H }; }, KN_ACTS: KN_ACTS, knightSay: knightSay, knightAct: knightAct, updateKnight: updateKnight, knightPoke: knightPoke, knightPet: knightPet, beatNow: beatNow, drawKnight: drawKnight, A: A, MUS: MUS, TUNES: TUNES,
+      flare: doFlare, swing: doSwing, spawnShade: spawnShade, lightAt: lightAt, stick: stick, KN: KN, CAMP: CAMP, drawCamp: drawCamp, drawCampFront: drawCampFront, ZOOM: ZOOM, field: function () { return { w: W, h: H }; }, KN_ACTS: KN_ACTS, knightSay: knightSay, knightAct: knightAct, updateKnight: updateKnight, knightPoke: knightPoke, knightPet: knightPet, beatNow: beatNow, drawKnight: drawKnight, A: A, MUS: MUS, TUNES: TUNES,
       startMusic: startMusic, nextTune: nextTune, setMusic: setMusic, SFX: SFX, UI: UI, ac: ac, switchTo: switchTo, applyTone: applyTone, GENRE: GENRE,
       music: { parseChord: parseChord, voicing: voicing, bassNote: bassNote,
                leadNote: leadNote, chordAt: chordAt, QUAL: QUAL, mtof: mtof }, recalc: recalc, saveMeta: saveMeta, rollDraft: rollDraft, take: takeUpgrade };
