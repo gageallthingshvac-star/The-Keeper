@@ -368,11 +368,11 @@
     position:relative;display:block;width:100%;margin-bottom:18px;padding:10px 0 14px;
     border-radius:22px;cursor:pointer;
     border:1px solid var(--line);
-    background:radial-gradient(80% 90% at 50% 78%, rgba(255,159,10,0.13), rgba(20,16,14,0.35) 68%, transparent);
+    background:radial-gradient(80% 90% at 50% 80%, rgba(255,159,10,0.16), rgba(26,22,58,0.5) 62%, rgba(14,13,38,0.62));
     touch-action:none;-webkit-user-select:none;user-select:none;
     transition:background .3s ease;
   }
-  .stage:active{background:radial-gradient(80% 90% at 50% 78%, rgba(255,159,10,0.2), rgba(20,16,14,0.4) 68%, transparent)}
+  .stage:active{background:radial-gradient(80% 90% at 50% 80%, rgba(255,159,10,0.24), rgba(30,26,64,0.55) 62%, rgba(14,13,38,0.66))}
   .portrait.stage-knight{width:100%;height:158px;margin:0;display:block;background:none;pointer-events:none}
   .stagename{text-align:center;margin-top:2px;pointer-events:none}
   .stagename b{display:block;font:700 22px/1.15 var(--display);letter-spacing:-.01em;color:var(--bone)}
@@ -594,7 +594,7 @@
   var gctx = groundCvs.getContext('2d');
 
   var W = 0, H = 0, DPR = 1;
-  var BUILD = 'v1.7.0';        // bump on every deploy — shown in-game for support
+  var BUILD = 'v1.8.0';        // bump on every deploy — shown in-game for support
   var MUTE_KEY = 'keeper.nightwatch.mute';
   var MUSIC_KEY = 'keeper.nightwatch.music';
 
@@ -785,14 +785,14 @@
     var k = (m.knight && typeof m.knight === 'object') ? m.knight : {};
     f.knight.name = cleanName(k.name);
     for (i = 0; i < PLUMES.length; i++)  if (PLUMES[i].id === k.plume)   f.knight.plume = k.plume;
-    for (i = 0; i < BUILDS.length; i++)  if (BUILDS[i].id === k.build)   f.knight.build = k.build;
+    f.knight.build = 'lad';                 // he is a lad; older records said so too
     for (i = 0; i < HEADS.length; i++)   if (HEADS[i].id === k.helm)     f.knight.helm = k.helm;
     for (i = 0; i < OUTFITS.length; i++) if (OUTFITS[i].id === k.cape)    f.knight.cape = k.cape;
     for (i = 0; i < HAIRS.length; i++)   if (HAIRS[i].id === k.armour)    f.knight.armour = k.armour;
 
     var pl = (m.player && typeof m.player === 'object') ? m.player : {};
     f.player.name = cleanName(pl.name);
-    f.player.gender = (pl.gender === 'lad' || pl.gender === 'lass' || pl.gender === 'neither') ? pl.gender : '';
+    f.player.gender = (pl.gender === 'lad' || pl.gender === 'lass') ? pl.gender : '';
     for (i = 0; i < HUES.length; i++) if (HUES[i].id === pl.hue) f.player.hue = pl.hue;
     f.player.met = pl.met ? 1 : 0;
     f.player.theme = pl.theme !== false;
@@ -910,9 +910,10 @@
     score: 0,
     fuel: K.startFuel,
     fire: { x: 0, y: 0, flare: 0 },
-    keeper: { x: 0, y: 0, vx: 0, vy: 0, carry: 0, cd: 0, stun: 0, face: 0 },
+    keeper: { x: 0, y: 0, vx: 0, vy: 0, carry: 0, cd: 0, stun: 0, face: 0,
+              flip: 1, step: 0, walk: 0, lean: 0, stepT: 0, lunge: 0 },
     logs: [], shades: [], parts: [],
-    logT: 0, spawnT: 0, shake: 0, dawnHold: 0,
+    logT: 0, spawnT: 0, shake: 0, dawnHold: 0, hitstop: 0,
     kills: 0, logsBurned: 0, muted: false,
     // progression + feedback
     up: {}, motes: [], cinders: [], floats: [],
@@ -1835,6 +1836,7 @@
     S.fire.y = H / 2;
     S.keeper.x = clamp(S.keeper.x, 16, W - 16);
     S.keeper.y = clamp(S.keeper.y, 60, H - 24);
+    _sheet = null;
     paintGround();
   }
 
@@ -1842,23 +1844,24 @@
     var r = mulberry32(1337);
     gctx.clearRect(0, 0, W, H);
     var g = gctx.createRadialGradient(W / 2, H / 2, 20, W / 2, H / 2, Math.max(W, H) * 0.8);
-    g.addColorStop(0, '#241a14');
-    g.addColorStop(0.45, '#150f10');
-    g.addColorStop(1, '#08060a');
+    g.addColorStop(0, '#523016');
+    g.addColorStop(0.28, '#33202A');
+    g.addColorStop(0.62, '#181435');
+    g.addColorStop(1, '#0A0820');
     gctx.fillStyle = g;
     gctx.fillRect(0, 0, W, H);
 
     // scattered grit
     for (var i = 0; i < Math.floor(W * H / 1400); i++) {
       var x = r() * W, y = r() * H, s = r() * 1.7 + 0.3;
-      gctx.fillStyle = 'rgba(232,220,200,' + (0.02 + r() * 0.05).toFixed(3) + ')';
+      gctx.fillStyle = 'rgba(255,226,180,' + (0.03 + r() * 0.08).toFixed(3) + ')';
       gctx.fillRect(x, y, s, s);
     }
     // a few grass tufts / stones
     for (var j = 0; j < Math.floor((W * H) / 26000); j++) {
       var px = r() * W, py = r() * H;
       if (dist(px, py, W / 2, H / 2) < 90) continue;
-      gctx.strokeStyle = 'rgba(150,168,107,0.10)';
+      gctx.strokeStyle = 'rgba(120,170,92,0.13)';
       gctx.lineWidth = 1.1;
       for (var b = 0; b < 3; b++) {
         gctx.beginPath();
@@ -1993,9 +1996,9 @@
   // Three kinds of dark. `burn` is how fast light eats them — a husk barely
   // cares about firelight, so it has to be met out in the open with a flare.
   var SHADE = {
-    crawler: { hp: 6.0, hpN: 1.4, spd: [30, 41], spdN: 1.1, r: 15, burn: 5.2, drain: 5.4, wob: 3.4, sway: 0.22, score: 12, heal: 1.1, tint: '34,18,44',  eye: 'rgba(255,107,107,0.80)', eyeGap: 4.4 },
-    wisp:    { hp: 3.4, hpN: 0.0, spd: [66, 80], spdN: 0.0, r: 10, burn: 6.5, drain: 3.6, wob: 7.0, sway: 0.50, score: 8,  heal: 0.7, tint: '78,48,142',  eye: 'rgba(200,180,255,0.85)', eyeGap: 3.2 },
-    husk:    { hp: 13,  hpN: 2.2, spd: [22, 30], spdN: 0.5, r: 19, burn: 2.0, drain: 7.6, wob: 2.0, sway: 0.14, score: 26, heal: 2.6, tint: '14,8,20',   eye: 'rgba(255,168,32,0.90)', eyeGap: 6.0 }
+    crawler: { hp: 6.0, hpN: 1.4, spd: [30, 41], spdN: 1.1, r: 15, burn: 5.2, drain: 5.4, wob: 3.4, sway: 0.22, score: 12, heal: 1.1, tint: '66,28,92',  rim: '188,110,255', eye: 'rgba(255,107,107,0.80)', eyeGap: 4.4 },
+    wisp:    { hp: 3.4, hpN: 0.0, spd: [66, 80], spdN: 0.0, r: 10, burn: 6.5, drain: 3.6, wob: 7.0, sway: 0.50, score: 8,  heal: 0.7, tint: '104,72,214', rim: '168,196,255', eye: 'rgba(200,180,255,0.85)', eyeGap: 3.2 },
+    husk:    { hp: 13,  hpN: 2.2, spd: [22, 30], spdN: 0.5, r: 19, burn: 2.0, drain: 7.6, wob: 2.0, sway: 0.14, score: 26, heal: 2.6, tint: '38,18,56',  rim: '128,88,190', eye: 'rgba(255,168,32,0.90)', eyeGap: 6.0 }
   };
 
   // ────────────────────────────────────────────────────────────── input
@@ -2046,6 +2049,7 @@
       d = MAX;                             // fixed: the origin stays put
     }
     var n = d < 7 ? 0 : clamp((d - 7) / (MAX - 7), 0, 1);
+    n = n * (0.4 + 0.6 * n);            // fine control near the middle, full tilt at the rim
     if (d > 0.001) { stick.dx = dx / d * n; stick.dy = dy / d * n; }
     else { stick.dx = 0; stick.dy = 0; }
   }, { passive: false });
@@ -2104,6 +2108,7 @@
     k.swingCd = D.swingCd;
     k.swing = D.swingDur;
     k.swingDir = k.face;
+    k.lunge = 132;                    // he steps into it rather than swinging flat-footed
 
     // a hotter fire makes a hotter brand
     var heat = 0.75 + 0.5 * clamp(S.fuel / D.maxFuel, 0, 1);
@@ -2177,6 +2182,7 @@
         S.mended = 0;
       }
     }
+    S.hitstop = Math.min(0.055, (S.hitstop || 0) + (s.kind === 'husk' ? 0.05 : 0.028));
     bumpHeat();
     addScore(s.t.score, s.x, s.y - 12);
     if (u('tinder') && Math.random() < 0.28 * u('tinder')) spawnMote(s.x, s.y);
@@ -2237,11 +2243,47 @@
     k.swing = Math.max(0, (k.swing || 0) - dt);
     var load = Math.max(0.78, 1 - k.carry * D.carryPer);
     var speed = D.speed * load;
-    k.vx = lerp(k.vx, ix * speed, 1 - Math.pow(0.0008, dt));
-    k.vy = lerp(k.vy, iy * speed, 1 - Math.pow(0.0008, dt));
+    var tvx = ix * speed, tvy = iy * speed;
+
+    // He has weight. He leans into a start, coasts half a step when you let
+    // go, and digs in harder when you ask him to turn against his own
+    // momentum — an armful of wood makes all three slower.
+    var pushing = Math.hypot(ix, iy) > 0.02;
+    var against = pushing && (k.vx * tvx + k.vy * tvy) < 0;
+    var tau = (!pushing ? 0.19 : against ? 0.085 : 0.115) * (1 + k.carry * 0.085);
+    var m = 1 - Math.exp(-dt / tau);
+    k.vx += (tvx - k.vx) * m;
+    k.vy += (tvy - k.vy) * m;
+
+    // a short shove forward on the swing, so the brand carries him into it
+    if (k.lunge > 0) {
+      k.x += Math.cos(k.face) * k.lunge * dt;
+      k.y += Math.sin(k.face) * k.lunge * dt;
+      k.lunge = Math.max(0, k.lunge - dt * 460);
+    }
     k.x = clamp(k.x + k.vx * dt, 16, W - 16);
     k.y = clamp(k.y + k.vy * dt, 60, H - 24);
-    if (Math.hypot(k.vx, k.vy) > 12) k.face = Math.atan2(k.vy, k.vx);
+
+    var sp = Math.hypot(k.vx, k.vy);
+    // the body turns rather than snapping, but fast enough to aim with
+    if (sp > 12) {
+      var wa = Math.atan2(k.vy, k.vx), dA = wa - k.face;
+      while (dA > Math.PI) dA -= 6.283185307;
+      while (dA < -Math.PI) dA += 6.283185307;
+      k.face += dA * Math.min(1, dt * 17);
+    }
+    // stride length, not a metronome: he takes longer paces when he is quick
+    k.step += sp * dt * 0.105;
+    k.walk += ((sp > 26 ? 1 : 0) - k.walk) * Math.min(1, dt * 9);
+    k.lean += ((sp > 26 ? 0.1 : 0) - k.lean) * Math.min(1, dt * 6);
+    if (k.vx < -8) k.flip = -1; else if (k.vx > 8) k.flip = 1;
+    // a scuff of dust under each footfall
+    k.stepT -= sp * dt * 0.021;
+    if (k.stepT <= 0 && sp > 40) {
+      k.stepT = 1;
+      S.parts.push({ x: k.x + rand(-5, 5), y: k.y + 13, vx: -k.vx * 0.06, vy: rand(-6, -14),
+                     g: 26, r: rand(1.4, 2.6), life: 0.38, max: 0.38, c: 'dust' });
+    }
     k.cd = Math.max(0, k.cd - dt);
 
     // keep the keeper out of the coals
@@ -2393,6 +2435,21 @@
         s.y += Math.sin(ang + wob) * s.spd * slow * dt;
       }
 
+      // they give each other room, so a crowd reads as a crowd rather than
+      // one very dark blob, and a brand sweep catches a spread of them
+      for (var sj = j - 1; sj >= 0; sj--) {
+        var o2 = S.shades[sj];
+        if (s.latched || o2.latched) continue;   // at the fire they press in, and should
+        var ddx = o2.x - s.x, ddy = o2.y - s.y;
+        var want = (s.r + o2.r) * 0.82;
+        var d2 = ddx * ddx + ddy * ddy;
+        if (d2 > want * want || d2 < 0.01) continue;
+        var dd = Math.sqrt(d2), push = (want - dd) * 2.4 * dt;
+        var nx = ddx / dd, ny = ddy / dd;
+        s.x -= nx * push; s.y -= ny * push;
+        o2.x += nx * push; o2.y += ny * push;
+      }
+
       // knockback
       s.x += s.kx * dt; s.y += s.ky * dt;
       s.kx *= Math.pow(0.02, dt); s.ky *= Math.pow(0.02, dt);
@@ -2505,11 +2562,11 @@
       ctx.scale(sc, sc);
       ctx.fillStyle = 'rgba(0,0,0,0.4)';
       ctx.beginPath(); ctx.ellipse(0, 6, 16, 5, 0, 0, 6.29); ctx.fill();
-      ctx.fillStyle = 'rgb(' + Math.round(56 + li * 78) + ',' + Math.round(38 + li * 50) + ',' + Math.round(24 + li * 26) + ')';
+      ctx.fillStyle = 'rgb(' + Math.round(74 + li * 116) + ',' + Math.round(46 + li * 72) + ',' + Math.round(26 + li * 26) + ')';
       roundRect(-16, -6, 32, 12, 6); ctx.fill();
       ctx.strokeStyle = 'rgba(20,12,8,0.75)'; ctx.lineWidth = 1.4;
       ctx.beginPath(); ctx.moveTo(-6, -6); ctx.lineTo(-6, 6); ctx.moveTo(5, -6); ctx.lineTo(5, 6); ctx.stroke();
-      ctx.fillStyle = 'rgba(' + Math.round(120 + li * 90) + ',' + Math.round(92 + li * 60) + ',60,0.9)';
+      ctx.fillStyle = 'rgba(' + Math.round(150 + li * 90) + ',' + Math.round(112 + li * 66) + ',66,0.95)';
       ctx.beginPath(); ctx.ellipse(-15, 0, 3, 5.5, 0, 0, 6.29); ctx.fill();
       ctx.restore();
     }
@@ -2578,12 +2635,12 @@
 
     // coals
     ctx.save();
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillStyle = 'rgba(28,14,6,0.42)';
     ctx.beginPath(); ctx.ellipse(f.x, f.y + 12, 40, 13, 0, 0, 6.29); ctx.fill();
     for (var i = 0; i < 7; i++) {
       var a = i * 0.9 + 0.4;
       var cg = 0.35 + 0.45 * lvl + Math.sin(t * 4 + i) * 0.12;
-      ctx.fillStyle = 'rgba(' + Math.round(150 + 100 * cg) + ',' + Math.round(50 + 40 * cg) + ',20,' + clamp(cg, 0.12, 0.9) + ')';
+      ctx.fillStyle = 'rgba(' + Math.round(176 + 79 * cg) + ',' + Math.round(54 + 58 * cg) + ',18,' + clamp(cg, 0.18, 0.95) + ')';
       ctx.beginPath();
       ctx.ellipse(f.x + Math.cos(a) * 17, f.y + 8 + Math.sin(a) * 6, 7, 4, a, 0, 6.29);
       ctx.fill();
@@ -2637,19 +2694,23 @@
   // and the portrait on the camp screen.
   var PLUMES = [
     { id: 'crimson', name: 'Crimson', plume: '#FF6B6B', tabard: '#B34A3D', trim: '#FFD9A0' },
-    { id: 'ember',   name: 'Ember',   plume: '#FF9F0A', tabard: '#C0894A', trim: '#FFE9C0' },
+    { id: 'ember',   name: 'Ember',   plume: '#FF9F0A', tabard: '#A96828', trim: '#FFE9C0' },
     { id: 'moss',    name: 'Moss',    plume: '#95A86B', tabard: '#5E7346', trim: '#DDE8C4' },
     { id: 'dusk',    name: 'Dusk',    plume: '#8E86FF', tabard: '#4A4478', trim: '#DDD9FF' },
     { id: 'tide',    name: 'Tide',    plume: '#5AC8FA', tabard: '#2F6D86', trim: '#D6F1FF' },
     { id: 'rose',    name: 'Rose',    plume: '#FF9FC4', tabard: '#8E4468', trim: '#FFE0EE' }
   ];
-  // Two builds. Both are meant to be likeable — the lass is rounder and
-  // softer-featured, the lad squarer and scruffier, neither is the "serious"
-  // one.
-  var BUILDS = [
-    { id: 'lad',  name: 'Lad',  waist: 1.06, head: 9.3, brow: 1,   lash: 0, jaw: 1.1, eye: 2.3, plume: 0.9 },
-    { id: 'lass', name: 'Lass', waist: 0.9,  head: 9.7, brow: 0.5, lash: 1, jaw: 0.85, eye: 2.6, plume: 1.15, longHair: 1 }
-  ];
+  // He is a lad. He is drawn a little differently depending on who is
+  // watching, though: rounder and warmer for a lass, scruffier and goofier
+  // for a lad. Same fellow either way — it is how he comes across, not who
+  // he is.
+  var BUILD_BASE = { id: 'lad', name: 'Lad', waist: 1.06, head: 9.3, brow: 1, lash: 0,
+                     jaw: 1.1, eye: 2.3, plume: 0.9, blush: 0, scruff: 0 };
+  var BUILD_FOR = {
+    lass: { head: 9.7, waist: 0.99, brow: 0.6, jaw: 0.94, eye: 2.62, plume: 1.1, blush: 1, scruff: 0 },
+    lad:  { head: 9.3, waist: 1.06, brow: 1,   jaw: 1.1,  eye: 2.3,  plume: 0.9, blush: 0, scruff: 1 }
+  };
+  var _buildCache = null, _buildFor = null;
   var HEADS = [
     { id: 'none',    name: 'Hair' },
     { id: 'cap',     name: 'Cap' },
@@ -2659,10 +2720,13 @@
     { id: 'bucket',  name: 'Bucket' },
     { id: 'helm',    name: 'Helm',   hair: false }
   ];
+  // `under` is the shirt showing through, so it has to sit clearly darker
+  // than his skin or the whole torso reads as one bare shape. `sleeveCol`
+  // lets a sleeveless layer still show the shirt on the upper arm.
   var OUTFITS = [
     { id: 'hoodie',   name: 'Hoodie',   sleeve: 5.6, pants: '#3E4655' },
-    { id: 'jacket',   name: 'Jacket',   sleeve: 5.6, pants: '#4A5568', under: '#E7DCC8' },
-    { id: 'vest',     name: 'Vest',     sleeve: 0,   pants: '#4A5568', under: '#E7DCC8' },
+    { id: 'jacket',   name: 'Jacket',   sleeve: 5.6, pants: '#404B5E', under: '#6E839B' },
+    { id: 'vest',     name: 'Vest',     sleeve: 3.4, pants: '#404B5E', under: '#4A5A72', sleeveCol: '#4A5A72' },
     { id: 'tee',      name: 'Tee',      sleeve: 2.6, pants: '#3E4655' },
     { id: 'poncho',   name: 'Poncho',   sleeve: 1.6, pants: '#4A4038' },
     { id: 'overalls', name: 'Overalls', sleeve: 2.6, pants: '#3D5A73' }
@@ -2710,7 +2774,17 @@
     for (var i = 0; i < list.length; i++) if (list[i].id === want) return list[i];
     return dflt || list[0];
   }
-  function buildOf()  { return pickFrom(BUILDS,  META.knight && META.knight.build); }
+  // Rebuilt only when the answer would change — this runs every frame.
+  function buildOf() {
+    var g = (META.player && META.player.gender === 'lass') ? 'lass' : 'lad';
+    if (_buildFor === g && _buildCache) return _buildCache;
+    var o = {}, k;
+    for (k in BUILD_BASE) o[k] = BUILD_BASE[k];
+    var v = BUILD_FOR[g];
+    for (k in v) o[k] = v[k];
+    _buildFor = g; _buildCache = o;
+    return o;
+  }
   function headOf()   { return pickFrom(HEADS,   META.knight && META.knight.helm); }
   function outfitOf() { return pickFrom(OUTFITS, META.knight && META.knight.cape); }
   function hairOf()   { return pickFrom(HAIRS,   META.knight && META.knight.armour); }
@@ -2836,18 +2910,17 @@
       g.beginPath();
       g.arc(0, -10, hr + 0.5, Math.PI * 1.02, Math.PI * 1.98);
       g.lineTo(hr * 0.9, -10.4);
-      if (B.longHair) {
-        g.lineTo(hr + 1.4, -1.5);
-        g.quadraticCurveTo(hr * 0.6, -0.6, hr * 0.5, -6);
-      }
       g.lineTo(hr * 0.55, -12.6);
       g.lineTo(-hr * 0.2, -11.2);
       g.lineTo(-hr * 0.85, -12.4);
-      if (B.longHair) {
-        g.lineTo(-hr * 0.5, -6);
-        g.quadraticCurveTo(-hr * 0.6, -0.6, -hr - 1.4, -1.5);
-      }
       g.closePath(); g.fill();
+      if (B.scruff) {                        // a tuft that never lies flat
+        g.beginPath();
+        g.moveTo(-hr * 0.1, -hr - 8.6);
+        g.quadraticCurveTo(hr * 0.5, -hr - 13.4, hr * 0.86, -hr - 9.2);
+        g.quadraticCurveTo(hr * 0.4, -hr - 9.8, -hr * 0.1, -hr - 8.6);
+        g.fill();
+      }
     }
 
     drawFace(g, o, B, amt, skin);
@@ -2877,8 +2950,12 @@
     g.translate(x, y);
     g.rotate(ang || 0);
     var sleeve = F.sleeve === 0 ? 0 : (F.sleeve || 5.2);
-    g.strokeStyle = cloth; g.lineWidth = 3.4; g.lineCap = 'round';
-    if (sleeve > 0) { g.beginPath(); g.moveTo(0, 0); g.lineTo(0, sleeve); g.stroke(); }
+    g.strokeStyle = F.sleeveCol || cloth; g.lineWidth = 3.4; g.lineCap = 'round';
+    if (sleeve > 0) {
+      g.beginPath(); g.moveTo(0, 0); g.lineTo(0, sleeve); g.stroke();
+      g.strokeStyle = 'rgba(0,0,0,0.28)'; g.lineWidth = 3.6;
+      g.beginPath(); g.moveTo(0, sleeve - 0.5); g.lineTo(0, sleeve); g.stroke();
+    }
     g.strokeStyle = skin; g.lineWidth = 2.8;
     g.beginPath(); g.moveTo(0, sleeve); g.lineTo(0, 8.4); g.stroke();
     g.fillStyle = skin;
@@ -3011,11 +3088,17 @@
       g.beginPath(); g.arc(0, my - 1, 1.4 + amt * 0.7, 0.35, Math.PI - 0.35); g.stroke();
     }
 
-    if (e === 'happy' || e === 'content' || e === 'shy' || e === 'surprised') {
-      var ba = (e === 'shy' ? 0.55 : 0.4) * (0.35 + 0.65 * amt);
+    var warm = (e === 'happy' || e === 'content' || e === 'shy' || e === 'surprised');
+    if (warm || B.blush) {
+      var ba = warm ? (e === 'shy' ? 0.55 : 0.4) * (0.35 + 0.65 * amt) : 0.26;
       g.fillStyle = 'rgba(255,' + (e === 'shy' ? 120 : 140) + ',150,' + ba.toFixed(3) + ')';
       g.beginPath(); g.ellipse(-6.2, -6.2, 2.2, 1.4, 0, 0, 6.29); g.fill();
       g.beginPath(); g.ellipse(6.2, -6.2, 2.2, 1.4, 0, 0, 6.29); g.fill();
+    }
+    if (B.scruff) {                          // a day he did not bother shaving
+      g.globalAlpha = 0.16; g.fillStyle = ink;
+      g.beginPath(); g.ellipse(0, -2.6, 4.6, 1.9, 0, 0, Math.PI); g.fill();
+      g.globalAlpha = 1;
     }
   }
 
@@ -3091,8 +3174,9 @@
 
   function drawKeeper() {
     var k = S.keeper;
-    var moving = Math.hypot(k.vx, k.vy) > 30;
-    var bob = Math.sin(S.time * 9) * (moving ? 1.7 : 0.5);
+    // the bob rides the stride rather than a metronome, so his head dips on
+    // the footfalls and settles when he stops
+    var bob = Math.sin(k.step * 2) * (0.5 + k.walk * 1.4);
     ctx.save();
     ctx.translate(k.x, k.y + bob);
 
@@ -3101,6 +3185,9 @@
       ? k.swingDir - D.brandArc / 2 + D.brandArc * (1 - k.swing / D.swingDur)
       : k.face + 1.1;
     var bLen = k.swing > 0 ? 26 : 17;
+    // the tip banks back up as the swing comes off cooldown, so you can see
+    // when it is ready without looking away from the fight
+    var ready = k.swingCd > 0 ? clamp(1 - k.swingCd / D.swingCd, 0, 1) : 1;
     ctx.save();
     ctx.rotate(bAng);
     ctx.strokeStyle = '#6B4A2C';
@@ -3108,21 +3195,22 @@
     ctx.lineCap = 'round';
     ctx.beginPath(); ctx.moveTo(4, 0); ctx.lineTo(bLen, 0); ctx.stroke();
     ctx.globalCompositeOperation = 'lighter';
-    ctx.fillStyle = 'rgba(255,170,50,0.95)';
-    ctx.beginPath(); ctx.arc(bLen + 2, 0, k.swing > 0 ? 4.6 : 3.4, 0, 6.29); ctx.fill();
+    ctx.fillStyle = 'rgba(255,170,50,' + (0.28 + 0.67 * ready).toFixed(3) + ')';
+    ctx.beginPath(); ctx.arc(bLen + 2, 0, (k.swing > 0 ? 4.6 : 2.2 + 1.2 * ready), 0, 6.29); ctx.fill();
     ctx.restore();
 
     drawKnight(ctx, {
       t: S.time,
       scale: 1.32,
       expr: k.guard > 0 ? 'surprised' : (k.carry >= D.carry ? 'happy' : 'normal'),
-      flash: k.guard > 0 && Math.floor(S.time * 18) % 2 === 0
+      flash: k.guard > 0 && Math.floor(S.time * 18) % 2 === 0,
+      flip: k.flip, walk: k.walk, step: k.step, tilt: k.lean
     });
 
     // carried logs, stacked over the helmet
     for (var ci = 0; ci < k.carry; ci++) {
       ctx.save();
-      ctx.translate(0, -38 - ci * 9);
+      ctx.translate(0, -30 - ci * 8);
       ctx.rotate(Math.sin(S.time * 5 + ci * 0.8) * 0.09);
       ctx.fillStyle = ci % 2 ? '#7A5433' : '#6B4A2C';
       roundRect(-11.5, -4, 23, 8, 4); ctx.fill();
@@ -3156,10 +3244,13 @@
       ctx.globalAlpha = 0.55 + 0.45 * hpF;
       var grd = ctx.createRadialGradient(0, 0, 1, 0, 0, s.r * 1.7);
       var tint = s.hit > 0 ? '90,40,60' : s.t.tint;
-      grd.addColorStop(0, 'rgba(' + tint + ',0.98)');
-      grd.addColorStop(0.6, 'rgba(' + tint + ',0.55)');
-      grd.addColorStop(1, 'rgba(10,6,14,0)');
+      grd.addColorStop(0, 'rgba(' + tint + ',0.99)');
+      grd.addColorStop(0.55, 'rgba(' + tint + ',0.72)');
+      grd.addColorStop(1, 'rgba(12,7,28,0)');
       ctx.fillStyle = grd;
+      ctx.strokeStyle = 'rgba(' + (s.t.rim || '150,120,220') + ',' +
+        ((0.12 + 0.3 * li) * (0.5 + 0.5 * hpF)).toFixed(3) + ')';
+      ctx.lineWidth = 1.4;
       ctx.beginPath();
       ctx.moveTo(-s.r + wob * 0.3, s.r * 0.5);
       ctx.quadraticCurveTo(-s.r * 1.1, -s.r * 0.9, wob, -s.r * 1.25);
@@ -3168,6 +3259,7 @@
       ctx.quadraticCurveTo(-s.r * 0.4, s.r * 1.3 - wob, -s.r + wob * 0.3, s.r * 0.5);
       ctx.closePath();
       ctx.fill();
+      ctx.stroke();
 
       // burning-away shimmer — a scorched rim, so the body stays dark.
       // A husk shrugs most of it off, which is the visual tell that it will last.
@@ -3199,12 +3291,25 @@
     }
   }
 
-  // darkness mask: black sheet with the light punched out
+  // The night itself: not black, but a cold sky that is a shade lighter
+  // overhead than it is underfoot. Cached — it only changes on a resize.
+  var _sheet = null, _sheetH = 0;
+  function nightSheet() {
+    if (_sheet && _sheetH === H) return _sheet;
+    var g = dctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, 'rgba(26,30,84,0.885)');
+    g.addColorStop(0.5, 'rgba(17,15,54,0.9)');
+    g.addColorStop(1, 'rgba(10,8,32,0.915)');
+    _sheet = g; _sheetH = H;
+    return g;
+  }
+
+  // darkness mask: the night sheet with the light punched out of it
   function drawDarkness() {
     var lr = lightRadius();
     dctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     dctx.globalCompositeOperation = 'source-over';
-    dctx.fillStyle = 'rgba(3,2,6,0.93)';
+    dctx.fillStyle = nightSheet();
     dctx.clearRect(0, 0, W, H);
     dctx.fillRect(0, 0, W, H);
 
@@ -3212,16 +3317,16 @@
     // fire light
     var g1 = dctx.createRadialGradient(S.fire.x, S.fire.y, 0, S.fire.x, S.fire.y, lr);
     g1.addColorStop(0, 'rgba(0,0,0,1)');
-    g1.addColorStop(0.42, 'rgba(0,0,0,0.94)');
-    g1.addColorStop(0.78, 'rgba(0,0,0,0.42)');
+    g1.addColorStop(0.46, 'rgba(0,0,0,0.97)');
+    g1.addColorStop(0.8, 'rgba(0,0,0,0.5)');
     g1.addColorStop(1, 'rgba(0,0,0,0)');
     dctx.fillStyle = g1;
     dctx.beginPath(); dctx.arc(S.fire.x, S.fire.y, lr, 0, 6.29); dctx.fill();
     // lantern
     var k = S.keeper;
     var g2 = dctx.createRadialGradient(k.x, k.y, 0, k.x, k.y, D.lampR);
-    g2.addColorStop(0, 'rgba(0,0,0,0.86)');
-    g2.addColorStop(0.55, 'rgba(0,0,0,0.44)');
+    g2.addColorStop(0, 'rgba(0,0,0,0.9)');
+    g2.addColorStop(0.55, 'rgba(0,0,0,0.5)');
     g2.addColorStop(1, 'rgba(0,0,0,0)');
     dctx.fillStyle = g2;
     dctx.beginPath(); dctx.arc(k.x, k.y, D.lampR, 0, 6.29); dctx.fill();
@@ -3237,16 +3342,18 @@
     ctx.globalCompositeOperation = 'lighter';
 
     var g = ctx.createRadialGradient(S.fire.x, S.fire.y, 0, S.fire.x, S.fire.y, lr);
-    var warm = 0.10 + (S.fuel / D.maxFuel) * 0.16 + S.fire.flare * 0.2;
-    g.addColorStop(0, 'rgba(255,176,58,' + (warm * 1.5).toFixed(3) + ')');
-    g.addColorStop(0.35, 'rgba(255,120,30,' + (warm * 0.5).toFixed(3) + ')');
+    var warm = 0.14 + (S.fuel / D.maxFuel) * 0.2 + S.fire.flare * 0.24;
+    g.addColorStop(0, 'rgba(255,186,76,' + (warm * 1.7).toFixed(3) + ')');
+    g.addColorStop(0.22, 'rgba(255,132,36,' + (warm * 0.6).toFixed(3) + ')');
+    g.addColorStop(0.6, 'rgba(214,62,22,' + (warm * 0.15).toFixed(3) + ')');
     g.addColorStop(1, 'rgba(255,90,20,0)');
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.arc(S.fire.x, S.fire.y, lr, 0, 6.29); ctx.fill();
 
     var k = S.keeper;
     var g2 = ctx.createRadialGradient(k.x, k.y, 0, k.x, k.y, D.lampR);
-    g2.addColorStop(0, 'rgba(255,214,10,0.15)');
+    g2.addColorStop(0, 'rgba(255,206,60,0.22)');
+    g2.addColorStop(0.6, 'rgba(255,150,30,0.07)');
     g2.addColorStop(1, 'rgba(255,214,10,0)');
     ctx.fillStyle = g2;
     ctx.beginPath(); ctx.arc(k.x, k.y, D.lampR, 0, 6.29); ctx.fill();
@@ -3409,6 +3516,7 @@
       if (p.c === 'ember') col = 'rgba(255,' + Math.round(120 + 100 * t) + ',40,' + (t * 0.85).toFixed(3) + ')';
       else if (p.c === 'gold') col = 'rgba(255,214,10,' + (t * 0.9).toFixed(3) + ')';
       else if (p.c === 'wood') col = 'rgba(190,150,90,' + (t * 0.8).toFixed(3) + ')';
+      else if (p.c === 'dust') col = 'rgba(126,104,80,' + (t * 0.42).toFixed(3) + ')';
       else col = 'rgba(150,110,220,' + (t * 0.75).toFixed(3) + ')';
       ctx.fillStyle = col;
       ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (0.4 + t * 0.8), 0, 6.29); ctx.fill();
@@ -3546,12 +3654,29 @@
     line:  { x: 124,  stand: 106, face: 1 }
   };
 
+  // A fixed sky — same stars every visit, because it is the same sky.
+  var CAMP_STARS = (function () {
+    var r = mulberry32(90210), out = [];
+    for (var i = 0; i < 46; i++) {
+      out.push({ x: -170 + r() * 340, y: -63 + r() * 42, r: 0.35 + r() * 0.75, ph: r() * 6.28 });
+    }
+    return out;
+  })();
+
   function drawCamp(g, t, fireLevel) {
     var i;
+    // the sky he keeps looking up at
+    for (i = 0; i < CAMP_STARS.length; i++) {
+      var st2 = CAMP_STARS[i];
+      var tw = 0.35 + 0.35 * Math.sin(t * 0.8 + st2.ph);
+      g.fillStyle = 'rgba(206,216,255,' + tw.toFixed(3) + ')';
+      g.beginPath(); g.arc(st2.x, st2.y, st2.r, 0, 6.29); g.fill();
+    }
     // ground
     var gg = g.createLinearGradient(0, -6, 0, 34);
-    gg.addColorStop(0, 'rgba(58,44,34,0.55)');
-    gg.addColorStop(1, 'rgba(24,18,16,0)');
+    gg.addColorStop(0, 'rgba(84,56,34,0.62)');
+    gg.addColorStop(0.55, 'rgba(48,34,38,0.42)');
+    gg.addColorStop(1, 'rgba(26,22,48,0)');
     g.fillStyle = gg;
     g.beginPath(); g.ellipse(0, 12, 250, 34, 0, 0, 6.29); g.fill();
 
@@ -3619,7 +3744,8 @@
     var lvl = fireLevel === undefined ? 1 : fireLevel;
     if (lvl > 0.02) {
       var glow = g.createRadialGradient(0, -2, 0, 0, -2, 44 * lvl);
-      glow.addColorStop(0, 'rgba(255,170,60,' + (0.5 * lvl).toFixed(3) + ')');
+      glow.addColorStop(0, 'rgba(255,184,80,' + (0.62 * lvl).toFixed(3) + ')');
+      glow.addColorStop(0.42, 'rgba(255,132,36,' + (0.26 * lvl).toFixed(3) + ')');
       glow.addColorStop(1, 'rgba(255,120,20,0)');
       g.fillStyle = glow;
       g.beginPath(); g.arc(0, -2, 44 * lvl, 0, 6.29); g.fill();
@@ -3767,7 +3893,7 @@
     hearts: [], props: [], taps: 0, tapT: 0, petting: 0, pet: 0,
     onStage: false, lastReact: '', bounce: 0, danceT: 0,
     amt: 0.5, amtTarget: 0.5,
-    say: '', sayT: 0, sayNext: 6, lastSay: -1, fire: 1, scripted: false
+    say: '', sayT: 0, sayNext: 6, lastSay: -1, fire: 1, scripted: false, hold: ''
   };
 
   // where he goes, what he does there, and roughly how long for
@@ -3796,6 +3922,9 @@
   // things he wonders about, and things he wonders about you
   var KN_SAYS = {
     world: ['I wonder how far the dark goes.', 'The fire likes this wood better.',
+            'I still do not know who lit this fire. I have stopped asking.',
+            'Whoever kept it before me left in a hurry. Or did not leave.',
+            'One night I will follow the dark out and see where it keeps itself.',
             'Something moved out there. Probably nothing.', 'It gets colder around the third hour.',
             'I should fix that lean-to properly one day.', 'The stew is nearly right.',
             'Do the stars burn like this fire does?', 'I found a good stick today.',
@@ -3808,6 +3937,22 @@
     named: ['Evening, {p}.', 'You came back, {p}.', '{p}. Good. I was getting bored.',
             'Do you ever get cold out there, {p}?', 'Stay a while, {p}.'],
     // only ever said once he has been told — see the filter in knightSay
+    // said only to a lad — easy company, a bit of ribbing
+    lad:   ['You would like it out here. Nothing to do and all night to do it.',
+            'If you had a fire, would you keep it as well as I keep mine?',
+            'I nearly had that moth. You saw. You saw nothing.',
+            'Between us, {p} — I have no idea what I am doing. It is going well.',
+            'Come on then. Say something clever.',
+            'I built that lean-to myself. Do not look too closely at it.',
+            'One day I will beat my own high score. Then what.'],
+    // said only to a lass — softer, a shade more careful
+    lass:  ['I saved you the warm side of the fire, {p}.',
+            'You do not have to say anything. It is nice that you are here.',
+            'I found a good flat stone today. I thought you might like it.',
+            'Is it cold where you are? I would send some of this if I could.',
+            'I tidied a bit. Before you came. Not because you came.',
+            'The stew is better tonight. I was hoping you would turn up for it.',
+            'You always show up on the long nights. I have noticed.'],
     knew:  ['I painted the sign {c}. Because you like it. Do you see?',
             'A {g} keeping watch with me. That suits us both.',
             'If it gets cold out there, {p}, sit closer.',
@@ -3817,10 +3962,7 @@
             'Is every {g} out there as quiet as you?']
   };
 
-  function genderWord() {
-    var g = META.player.gender;
-    return g === 'lad' ? 'lad' : g === 'lass' ? 'lass' : 'one';
-  }
+  function genderWord() { return META.player.gender === 'lass' ? 'lass' : 'lad'; }
 
   // He only says what he actually knows: a line asking for something he was
   // never told is dropped rather than filled with a guess.
@@ -3912,8 +4054,9 @@
     if (KN.sayNext <= 0 && KN.petting <= 0 && !KN.scripted) {
       KN.sayNext = rand(11, 26);
       if (Math.random() < 0.62) {
-        var r = Math.random();
-        knightSay(r < 0.36 ? 'world' : r < 0.58 ? 'you' : r < 0.8 ? 'knew' : 'named');
+        var r = Math.random(), gp = META.player.gender;
+        knightSay(r < 0.3 ? 'world' : r < 0.48 ? 'you'
+                : r < 0.66 ? (gp || 'you') : r < 0.84 ? 'knew' : 'named');
       }
     }
 
@@ -4049,6 +4192,8 @@
         expr = 'look';
       }
     }
+
+    if (KN.scripted && KN.hold) expr = KN.hold;
 
     if (A2 !== 'ember' && A2 !== 'moth' && A2 !== 'stars') {
       KN.lookT -= dt;
@@ -4375,12 +4520,28 @@
   // He asks. You answer. Nothing here is required — every step can be walked
   // past, and everything it learns can be changed later in Settings.
   var INTRO = [
-    { say: 'Oh — hello. I did not think anyone came this far out.', btn: 'Hello' },
-    { say: 'I keep this fire. That is mostly the whole of it.', btn: 'Go on' },
-    { say: 'What should I call you?', ask: 'name' },
-    { say: '{p}. That suits you. And are you a lad, a lass, or neither?', ask: 'gender' },
-    { say: 'Last thing, I promise. What is your favourite colour? I will paint the place.', ask: 'hue' },
-    { say: 'There. Feels more like ours now. Stay a while, {p} — the dark is long tonight.', btn: 'Stay' }
+    { say: 'Oh — hello. I did not think anyone came this far out.',
+      btn: 'Hello', expr: 'surprised', act: 'idle' },
+    { say: 'Do not mind the mess. I was not expecting company. I have not had company.',
+      btn: 'It is alright', expr: 'shy', act: 'tidy' },
+    { say: 'What should I call you?', ask: 'name', expr: 'think', act: 'idle' },
+    { say: '{p}. That suits you. And are you a lad or a lass?',
+      ask: 'gender', expr: 'happy', act: 'idle' },
+    { say: 'Well then, {p}. If you are staying you ought to know what you are staying for.',
+      btn: 'Go on', expr: 'normal', act: 'warm' },
+    { say: 'This fire was burning when I got here. I never found out who lit it. It was already old.',
+      btn: 'And you kept it?', expr: 'think', act: 'poke' },
+    { say: 'Somebody had to. While it burns the dark keeps its distance. I watched it go out once. I would rather not watch that twice.',
+      btn: 'What happens?', expr: 'sleepy', act: 'warm' },
+    { say: 'Shades come in off the edge of the light and lean on it until there is nothing left of it. So I feed it. All night. Every night.',
+      btn: 'Every night?', expr: 'grumble', act: 'poke' },
+    { say: 'Until dawn. Then I sleep badly and do it again. It is not much of a life. It is warm, though, and it is mine.',
+      btn: 'I will help', expr: 'content', act: 'warm' },
+    { say: 'You will? Then it is ours. Paint the place — what is your favourite colour?',
+      ask: 'hue', expr: 'happy', act: 'idle' },
+    { say: 'There. Feels more like ours already.', btn: 'It does', expr: 'happy', act: 'idle' },
+    { say: 'One more thing and then I will stop talking. I have never had a name of my own. Would you give me one?',
+      btn: 'Of course', expr: 'shy', act: 'idle' }
   ];
 
   function fillP(line) {
@@ -4415,7 +4576,6 @@
       body = '<div class="askrow">' +
              '<button class="ghost" data-gen="lad">A lad</button>' +
              '<button class="ghost" data-gen="lass">A lass</button>' +
-             '<button class="ghost" data-gen="neither">Neither</button>' +
              '</div>';
     } else if (sc.ask === 'hue') {
       body = '<div class="plumes wrap">' + hueSwatches() + '</div>' +
@@ -4437,12 +4597,14 @@
     );
 
     // he is at his fire, saying it out loud, for as long as the step lasts
-    KN.act = 'idle'; KN.actT = 999; KN.props.length = 0;
+    KN.props.length = 0;
     KN.x = -16; KN.tx = -16; KN.cam = -16; KN.face = 1; KN.spotFace = 1;
     KN.sit = 0; KN.zzz = 0; KN.item = null; KN.itemL = null;
     KN.scripted = true;
+    KN.hold = sc.expr || 'normal';
+    KN.act = sc.act || 'idle'; KN.actT = 999;
     KN.say = fillP(sc.say); KN.sayT = 999;
-    knFeel(step === 0 ? 'surprised' : 'happy', 1.6, 0.8);
+    knFeel(KN.hold, 1.6, rand(0.55, 0.9));
     hookPortrait();
     bindStage();
 
@@ -4486,7 +4648,7 @@
   function introDone() {
     META.player.met = 1;
     saveMeta();
-    KN.scripted = false;
+    KN.scripted = false; KN.hold = '';
     KN.say = ''; KN.sayT = 0; KN.actT = 0;
     if (!META.knight.name) nameKnight(menu); else menu();
   }
@@ -4500,14 +4662,13 @@
     showChrome(false);
     var first = !META.knight.name;
     veil(
-      '<div class="eyebrow">' + (first ? 'Before you begin' : 'Your knight') + '</div>' +
+      '<div class="eyebrow">' + (first ? 'He asked you for one' : 'Your keeper') + '</div>' +
       '<h1>Who <em>Holds?</em></h1>' +
       '<canvas id="portrait" class="portrait big"></canvas>' +
       '<input id="nameIn" class="nameIn" maxlength="14" autocomplete="off" spellcheck="false" ' +
-        'placeholder="Name your knight" value="' + esc(META.knight.name) + '">' +
+        'placeholder="' + (first ? 'Give him a name' : 'His name') + '" value="' + esc(META.knight.name) + '">' +
       '<div class="plumes">' + plumeSwatches() + '</div>' +
       '<div class="wearlist">' +
-        wardrobeRow('Build',  'build',  BUILDS,  buildOf().id) +
         wardrobeRow('Wearing','cape',   OUTFITS, outfitOf().id) +
         wardrobeRow('Head',   'helm',   HEADS,   headOf().id) +
         wardrobeRow('Hair',   'armour', HAIRS,   hairOf().id) +
@@ -4515,7 +4676,7 @@
       '<button class="go" id="btnName">' + (first ? 'Take the Watch' : 'Save') + '</button>' +
       (first ? '' : '<button class="ghost" id="btnNameBack">Back to camp</button>') +
       (first ? '' : '<button class="ghost danger" id="btnWipe">Start over from nothing</button>') +
-      '<div class="foot">They will be remembered by this name</div>' +
+      '<div class="foot">' + (first ? 'He will keep it. He has waited a while for one.' : 'He will be remembered by this name') + '</div>' +
       buildFoot(),
       'wide'
     );
@@ -4677,7 +4838,7 @@
         '<button class="ghost" id="btnFeats">Feats · ' + feats + '/' + ACHIEVEMENTS.length + '</button>' +
       '</div>' +
       '<div class="row2">' +
-        '<button class="ghost" id="btnKnight">' + (META.knight.name ? 'Your knight' : 'Name your knight') + '</button>' +
+        '<button class="ghost" id="btnKnight">' + (META.knight.name ? 'Your keeper' : 'Name your keeper') + '</button>' +
         '<button class="ghost" id="btnSettings">Settings</button>' +
       '</div>' +
       transportHtml(true) +
@@ -4814,7 +4975,7 @@
       rows += '<div class="setrow"><div class="sinfo"><b>' + esc(R.name) + '</b>' +
               '<span>' + esc(R.help) + '</span></div><div class="segs">' + segs + '</div></div>';
     }
-    var gsegs = '', GEN = [['lad', 'A lad'], ['lass', 'A lass'], ['neither', 'Neither']];
+    var gsegs = '', GEN = [['lad', 'A lad'], ['lass', 'A lass']];
     for (var q2 = 0; q2 < GEN.length; q2++) {
       gsegs += '<button class="seg' + (GEN[q2][0] === META.player.gender ? ' on' : '') +
                '" data-gen="' + GEN[q2][0] + '">' + esc(GEN[q2][1]) + '</button>';
@@ -4828,7 +4989,7 @@
     rows +=
       '<div class="ghead">You</div>' +
       '<div class="setrow"><div class="sinfo"><b>You are</b>' +
-        '<span>He picks his words a little differently. Leave it if you would rather not say.</span></div>' +
+        '<span>He picks his words — and carries himself — a little differently for each.</span></div>' +
         '<div class="segs">' + gsegs + '</div></div>' +
       '<div class="setrow"><div class="sinfo"><b>Tint the interface</b>' +
         '<span>Turn this off if your colour is hard to read against the dark.</span></div>' +
@@ -5112,6 +5273,9 @@
     S.fuel = D.startFuel;
     S.keeper.x = W / 2; S.keeper.y = H / 2 + 96;
     S.keeper.vx = 0; S.keeper.vy = 0;
+    S.keeper.step = 0; S.keeper.walk = 0; S.keeper.lean = 0;
+    S.keeper.flip = 1; S.keeper.lunge = 0; S.keeper.stepT = 0;
+    S.hitstop = 0;
     S.keeper.carry = 0; S.keeper.cd = 0; S.keeper.stun = 0; S.keeper.guard = 0;
     S.keeper.swing = 0; S.keeper.swingCd = 0; S.keeper.swingDir = 0;
     S.keeper.face = -Math.PI / 2;
@@ -5255,9 +5419,14 @@
     last = now;
 
     if (S.mode !== 'paused') {
-      acc += dt;
-      var guard = 0;
-      while (acc >= STEP && guard++ < 20) { update(STEP); acc -= STEP; }
+      // a sliver of held time on a kill: long enough to feel the hit land,
+      // short enough that it never reads as a stutter
+      if (S.hitstop > 0) { S.hitstop -= dt; if (acc > STEP) acc = STEP; }
+      else {
+        acc += dt;
+        var guard = 0;
+        while (acc >= STEP && guard++ < 20) { update(STEP); acc -= STEP; }
+      }
     }
     render();
     syncHud();
