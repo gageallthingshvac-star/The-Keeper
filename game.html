@@ -378,6 +378,23 @@
   .stagename b{display:block;font:700 22px/1.15 var(--display);letter-spacing:-.01em;color:var(--bone)}
   .stagename span{display:block;margin-top:4px;font:600 10px/1 var(--body);letter-spacing:.18em;
     text-transform:uppercase;color:var(--ember)}
+  .stagename u{display:block;margin-top:5px;font:500 12px/1.3 var(--body);color:var(--mute);text-decoration:none}
+  .stage.still{cursor:default}
+  .lede.sm{font-size:14px;margin:2px 0 14px;color:var(--mute)}
+  .road{
+    border:1px solid var(--line);border-radius:16px;padding:13px 15px;margin:0 0 16px;
+    background:linear-gradient(120deg,rgba(38,28,20,0.5),rgba(20,16,14,0.4));
+  }
+  .road-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+  .road-top span{font:600 9px/1 var(--body);letter-spacing:.2em;text-transform:uppercase;color:var(--mute)}
+  .road-top b{font:700 15px/1.2 var(--display);color:var(--bone);text-align:right}
+  .road-bar{height:6px;border-radius:3px;background:rgba(232,220,200,0.1);overflow:hidden;margin:9px 0 7px}
+  .road-bar i{display:block;height:100%;border-radius:3px;
+    background:linear-gradient(90deg,var(--go2),var(--go1));box-shadow:0 0 10px var(--glow)}
+  .road-sub{font:500 11px/1.4 var(--body);color:var(--mute)}
+  .road.done{text-align:center}
+  .road.done b{display:block;font:700 16px/1.2 var(--display);color:var(--bone)}
+  .road.done span{display:block;margin-top:5px;font:500 12px/1.4 var(--body);color:var(--mute)}
 
   .knight{
     display:flex;align-items:center;gap:14px;text-align:left;
@@ -599,7 +616,7 @@
   var ZOOM = 0.7;
   var VS = 1;                     // device pixels per field unit
   function px(n) { return n / ZOOM; }   // n screen pixels, in field units
-  var BUILD = 'v1.11.0';        // bump on every deploy — shown in-game for support
+  var BUILD = 'v1.12.0';        // bump on every deploy — shown in-game for support
   var MUTE_KEY = 'keeper.nightwatch.mute';
   var MUSIC_KEY = 'keeper.nightwatch.music';
 
@@ -743,12 +760,53 @@
     { id: 'score10k',name: 'Ten Thousand',     desc: 'Score 10,000 in one run.',            embers: 200, test: function (r) { return r.score >= 10000; } }
   ];
 
+  // The long road. Every couple of keeper levels puts another one behind you,
+  // and somebody new joins the camp when it does.
+  var LANDMARKS = [
+    { st: 'Missouri',      name: 'the Gateway Arch' },
+    { st: 'Arizona',       name: 'the Grand Canyon' },
+    { st: 'South Dakota',  name: 'Mount Rushmore' },
+    { st: 'Wyoming',       name: 'Old Faithful' },
+    { st: 'Nevada',        name: 'the Hoover Dam' },
+    { st: 'California',    name: 'the Golden Gate Bridge' },
+    { st: 'Washington',    name: 'Mount Rainier' },
+    { st: 'Colorado',      name: 'Pikes Peak' },
+    { st: 'Illinois',      name: 'the Willis Tower' },
+    { st: 'Louisiana',     name: 'the French Quarter' },
+    { st: 'Florida',       name: 'the Everglades' },
+    { st: 'Massachusetts', name: 'Fenway Park' },
+    { st: 'New York',      name: 'the Statue of Liberty' },
+    { st: 'Alaska',        name: 'Denali' },
+    { st: 'Hawaii',        name: 'Kilauea' }
+  ];
+  var LM_LEVEL = 2;               // keeper levels between one landmark and the next
+  function journeyIndex() { return Math.min(LANDMARKS.length, Math.floor(keeperLevel() / LM_LEVEL)); }
+  function nextLandmark() { var i = journeyIndex(); return i < LANDMARKS.length ? LANDMARKS[i] : null; }
+  function levelsToNext() { return (journeyIndex() + 1) * LM_LEVEL - keeperLevel(); }
+
+  // Rolled once, on the machine it is rolled on — send this to ten people and
+  // ten different dogs turn up.
+  var DOG_NAMES = ['Biscuit', 'Marbles', 'Pepper', 'Nugget', 'Waffle', 'Domino', 'Pickle',
+    'Comet', 'Boots', 'Scout', 'Bramble', 'Otto', 'Maple', 'Rooster', 'Tumble', 'Ziggy',
+    'Barnaby', 'Cinder', 'Toast', 'Juniper', 'Sprocket', 'Hazel', 'Gus', 'Bandit', 'Fennel',
+    'Bodger', 'Tuppence', 'Noodle', 'Rusty', 'Pumpkin', 'Sausage', 'Clover', 'Mudge', 'Tilly'];
+  var FOLK_NAMES = ['Wren', 'Marlow', 'Odette', 'Bram', 'Halloway', 'Juno', 'Fitch', 'Perrin',
+    'Sable', 'Ivor', 'Tallis', 'Rook', 'Meadow', 'Quill', 'Bo', 'Ash', 'Nettle', 'Corvin',
+    'Peg', 'Silas', 'Marnie', 'Dorrit', 'Ely', 'Tam', 'Vesper', 'Lark'];
+  function rollFrom(list, taken) {
+    var pool = [];
+    for (var i = 0; i < list.length; i++) if (!taken || taken.indexOf(list[i]) < 0) pool.push(list[i]);
+    if (!pool.length) pool = list;
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
   function freshMeta() {
     return { v: 3, embers: 0, xp: 0, runs: 0, bestNight: 0, bestScore: 0,
              perks: {}, ach: {}, lifeLogs: 0, lifeKills: 0, lifeNights: 0,
              knight: { name: '', plume: 'crimson', build: 'lad', helm: 'none',
                        cape: 'hoodie', armour: 'chestnut' },
              player: { name: '', gender: '', hue: 'ember', met: 0, theme: true },
+             dog: { name: '' }, camp: [], reached: 0,
              opts: { sound: true, music: true, stick: 'drift', hand: 'left',
                      aim: true, haptics: true, loop: false } };
   }
@@ -802,6 +860,16 @@
     for (i = 0; i < HUES.length; i++) if (HUES[i].id === pl.hue) f.player.hue = pl.hue;
     f.player.met = pl.met ? 1 : 0;
     f.player.theme = pl.theme !== false;
+
+    var dg = (m.dog && typeof m.dog === 'object') ? m.dog : {};
+    f.dog.name = cleanName(dg.name);
+    if (Object.prototype.toString.call(m.camp) === '[object Array]') {
+      for (i = 0; i < m.camp.length && f.camp.length < LANDMARKS.length; i++) {
+        var cn = cleanName(m.camp[i]);
+        if (cn) f.camp.push(cn);
+      }
+    }
+    f.reached = num(m.reached, 0, 0, LANDMARKS.length);
 
     var o = (m.opts && typeof m.opts === 'object') ? m.opts : {};
     f.opts.sound   = o.sound !== false;
@@ -919,7 +987,7 @@
     keeper: { x: 0, y: 0, vx: 0, vy: 0, carry: 0, cd: 0, stun: 0, face: 0,
               flip: 1, step: 0, walk: 0, lean: 0, stepT: 0, lunge: 0 },
     logs: [], shades: [], parts: [],
-    logT: 0, spawnT: 0, shake: 0, dawnHold: 0, hitstop: 0,
+    logT: 0, spawnT: 0, shake: 0, dawnHold: 0, hitstop: 0, partyNote: '',
     kills: 0, logsBurned: 0, muted: false,
     // progression + feedback
     up: {}, motes: [], cinders: [], floats: [],
@@ -1111,7 +1179,14 @@
     choose:  function () { [523, 659, 784].forEach(function (f, i) { bell(f, 0.6, 0.032, 2.2, i * 0.045); }); },
     buy:     function () { [392, 523, 659, 880].forEach(function (f, i) { bell(f, 0.7, 0.034, 2.0, i * 0.05); }); },
     denied:  function () { bell(180, 0.24, 0.03, 1.4); },
-    level:   function () { [523, 659, 784, 1047, 1319].forEach(function (f, i) { bell(f, 1.0, 0.036, 2.2, i * 0.08); }); }
+    level:   function () { [523, 659, 784, 1047, 1319].forEach(function (f, i) { bell(f, 1.0, 0.036, 2.2, i * 0.08); }); },
+    // arriving somewhere gets a proper fanfare
+    win:     function () {
+      [392, 523, 659, 784, 659, 784, 1047, 1319].forEach(function (f, i) {
+        bell(f, 1.1, 0.038, 2.0, i * 0.11);
+      });
+      [784, 1047].forEach(function (f, i) { bell(f, 1.6, 0.03, 1.8, 0.95 + i * 0.05); });
+    }
   };
 
   // ══════════════════════════════════════════════════════ the house band ══
@@ -2910,7 +2985,12 @@
   // opts: { t, scale, flash, expr, amt, look, flip, tilt, hop, squash, sit,
   //         lean, armL, armR, item, itemL, walk, step, zzz }
   function drawKnight(g, o) {
-    var P = plumeOf(), B = buildOf(), H = headOf(), F = outfitOf(), HR = hairOf();
+    var wr = o.wear;                       // somebody who is not him
+    var P = wr ? pickFrom(PLUMES, wr.plume) : plumeOf();
+    var H = wr ? pickFrom(HEADS, wr.helm) : headOf();
+    var F = wr ? pickFrom(OUTFITS, wr.cape) : outfitOf();
+    var HR = wr ? pickFrom(HAIRS, wr.hair) : hairOf();
+    var B = buildOf();
     var sc = o.scale || 1;
     var skin  = o.flash ? '#FFD3CF' : '#F7E0C4';
     var skinS = o.flash ? '#E9B4B0' : '#E2C29F';
@@ -3808,11 +3888,12 @@
   var CAMP = {
     fire:  { x: 0,    stand: -16, face: 1 },
     pot:   { x: 0,    stand: 18,  face: -1 },   // the tripod hangs over the fire
-    wood:  { x: -46,  stand: -64, face: 1 },
-    bed:   { x: -92,  stand: -88, face: 1 },
-    stump: { x: 42,   stand: 42,  face: -1 },
-    desk:  { x: 96,   stand: 96,  face: 1 },   // square in front of it, back to you
-    line:  { x: 144,  stand: 126, face: 1 }
+    wood:  { x: -32,  stand: -28, face: -1 },
+    bed:   { x: -112, stand: -108, face: 1 },
+    kennel:{ x: -60,  stand: -70, face: 1 },
+    stump: { x: 60,   stand: 60,  face: -1 },
+    desk:  { x: 104,  stand: 104, face: 1 },   // square in front of it, back to you
+    line:  { x: 146,  stand: 130, face: 1 }
   };
 
   // A fixed sky — same stars every visit, because it is the same sky.
@@ -3841,16 +3922,49 @@
     g.fillStyle = gg;
     g.beginPath(); g.ellipse(0, 26, 300, 80, 0, 0, 6.29); g.fill();
 
-    // ── bedroll, off to the left under a lean-to
+    // ── a proper tent, pegged out, with a bedroll just inside the door
     g.save(); g.translate(CAMP.bed.x, 0);
-    g.fillStyle = '#4A4038';
-    g.beginPath(); g.moveTo(-22, 8); g.lineTo(4, -20); g.lineTo(20, 8); g.closePath(); g.fill();
-    g.fillStyle = '#3A322C';
-    g.beginPath(); g.moveTo(4, -20); g.lineTo(20, 8); g.lineTo(11, 8); g.closePath(); g.fill();
-    g.fillStyle = '#7C6A58';
-    roundRectOn(g, -14, 1, 26, 7, 3.4); g.fill();
+    g.strokeStyle = 'rgba(90,80,70,0.6)'; g.lineWidth = 0.7; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(-2, -26); g.lineTo(-27, 8); g.stroke();      // guy lines
+    g.beginPath(); g.moveTo(-2, -26); g.lineTo(25, 8); g.stroke();
+    g.fillStyle = '#4A4038';                                             // pegs
+    roundRectOn(g, -28.6, 6.6, 3, 2.4, 1); g.fill();
+    roundRectOn(g, 24.4, 6.6, 3, 2.4, 1); g.fill();
+    g.fillStyle = '#5C6B57';                                             // near panel
+    g.beginPath(); g.moveTo(-23, 8); g.lineTo(-2, -24); g.lineTo(9, -24); g.lineTo(-12, 8);
+    g.closePath(); g.fill();
+    g.fillStyle = '#485741';                                             // far panel
+    g.beginPath(); g.moveTo(21, 8); g.lineTo(9, -24); g.lineTo(-2, -24); g.lineTo(10, 8);
+    g.closePath(); g.fill();
+    g.fillStyle = '#2A2E28';                                             // the doorway
+    g.beginPath(); g.moveTo(-12, 8); g.lineTo(-2, -20); g.lineTo(10, 8); g.closePath(); g.fill();
+    g.fillStyle = '#6B7A64';                                             // the flap, tied back
+    g.beginPath(); g.moveTo(-2, -20); g.lineTo(-11, 8); g.lineTo(-6, 8); g.quadraticCurveTo(-3, -6, -2, -20);
+    g.closePath(); g.fill();
+    g.strokeStyle = '#3A4238'; g.lineWidth = 1.1;                        // ridge pole
+    g.beginPath(); g.moveTo(-2.6, -24.4); g.lineTo(9.6, -24.4); g.stroke();
+    g.fillStyle = '#7C6A58';                                             // bedroll in the door
+    roundRectOn(g, -9, 2, 18, 6, 3); g.fill();
     g.fillStyle = '#C9BBA4';
-    roundRectOn(g, -14, -1.4, 9, 5, 2.4); g.fill();
+    roundRectOn(g, -9, 0.2, 7, 4.4, 2.2); g.fill();
+    g.restore();
+
+    // ── the dog's house
+    g.save(); g.translate(CAMP.kennel.x, 0);
+    g.fillStyle = '#6B4A2C';
+    roundRectOn(g, -11, -12, 22, 20, 1.6); g.fill();
+    g.fillStyle = '#7A5433';                                             // pitched roof
+    g.beginPath(); g.moveTo(-13.5, -11.4); g.lineTo(0, -21); g.lineTo(13.5, -11.4); g.closePath(); g.fill();
+    g.fillStyle = 'rgba(0,0,0,0.18)';
+    g.beginPath(); g.moveTo(0, -21); g.lineTo(13.5, -11.4); g.lineTo(6, -11.4); g.closePath(); g.fill();
+    g.fillStyle = '#2A1F16';                                             // arched door
+    g.beginPath();
+    g.moveTo(-6, 8); g.lineTo(-6, -4); g.quadraticCurveTo(0, -10.4, 6, -4); g.lineTo(6, 8);
+    g.closePath(); g.fill();
+    g.fillStyle = '#8A6A45';                                             // a bowl by the door
+    g.beginPath(); g.ellipse(15, 6, 4, 1.8, 0, 0, 6.29); g.fill();
+    g.fillStyle = '#5E4530';
+    g.beginPath(); g.ellipse(15, 5.4, 2.6, 1.1, 0, 0, 6.29); g.fill();
     g.restore();
 
     // ── woodpile
@@ -3875,7 +3989,7 @@
     g.restore();
 
     // ── cooking tripod over the fire
-    g.save(); g.translate(CAMP.pot.x + 20, 0);
+    g.save(); g.translate(CAMP.pot.x, 0);
     g.strokeStyle = '#4A4038'; g.lineWidth = 1.4; g.lineCap = 'round';
     g.beginPath(); g.moveTo(-14, 8); g.lineTo(0, -26); g.lineTo(14, 8); g.stroke();
     g.beginPath(); g.moveTo(-7, 8); g.lineTo(3, -26); g.stroke();
@@ -3939,12 +4053,12 @@
     g.fillStyle = 'rgba(12,9,20,0.26)';
     g.beginPath(); g.ellipse(0, 8, 26, 4, 0, 0, 6.29); g.fill();
     g.fillStyle = '#453B31';                                    // legs
-    roundRectOn(g, -25, -1, 7, 10, 1.2); g.fill();
-    roundRectOn(g, 18, -1, 7, 10, 1.2); g.fill();
+    roundRectOn(g, -21, -1, 6, 10, 1.2); g.fill();
+    roundRectOn(g, 15, -1, 6, 10, 1.2); g.fill();
     g.fillStyle = '#514639';                                    // the top
-    roundRectOn(g, -27, -3, 54, 2.6, 1.1); g.fill();
+    roundRectOn(g, -23, -3, 46, 2.6, 1.1); g.fill();
     g.fillStyle = 'rgba(255,236,200,0.08)';
-    roundRectOn(g, -27, -3, 54, 0.9, 0.45); g.fill();
+    roundRectOn(g, -23, -3, 46, 0.9, 0.45); g.fill();
 
     // a crate to stand the monitor on, so it clears his head
     g.fillStyle = '#4C4137';
@@ -3953,7 +4067,7 @@
     g.beginPath(); g.moveTo(-11, -10); g.lineTo(11, -10); g.stroke();
 
     // monitor, straight in front of him and above his head
-    var MX = 0, MY = -39, MW = 32, MH = 22;
+    var MX = 0, MY = -38, MW = 28, MH = 20;
     g.fillStyle = '#26262C';
     roundRectOn(g, MX - MW / 2, MY, MW, MH, 2.2); g.fill();
     drawScreen(g, MX - MW / 2 + 1.6, MY + 1.6, MW - 3.2, MH - 3.2, t, fireLevel);
@@ -3968,33 +4082,22 @@
 
     // keyboard on the table in front of him, where his hands land
     g.fillStyle = '#3A3A42';
-    roundRectOn(g, -18, -5.4, 36, 2.6, 1); g.fill();
+    roundRectOn(g, -16, -5.4, 32, 2.6, 1); g.fill();
     g.fillStyle = 'rgba(200,206,216,0.35)';
-    for (i = 0; i < 12; i++) { roundRectOn(g, -16.6 + i * 2.8, -4.9, 1.8, 0.9, 0.35); g.fill(); }
+    for (i = 0; i < 11; i++) { roundRectOn(g, -14.6 + i * 2.7, -4.9, 1.7, 0.9, 0.35); g.fill(); }
     g.fillStyle = '#3A3A42';                                    // mouse
-    g.beginPath(); g.ellipse(22, -4.2, 1.8, 2.4, 0, 0, 6.29); g.fill();
+    g.beginPath(); g.ellipse(19, -4.2, 1.8, 2.4, 0, 0, 6.29); g.fill();
     // tower, on the ground beside the table
     g.fillStyle = '#2F2F36';
-    roundRectOn(g, 28, -13, 7, 17, 1.6); g.fill();
+    roundRectOn(g, 24, -13, 7, 17, 1.6); g.fill();
     g.fillStyle = 'rgba(99,230,190,0.95)';
-    g.beginPath(); g.arc(31.5, -10.4, 1, 0, 6.29); g.fill();
+    g.beginPath(); g.arc(27.5, -10.4, 1, 0, 6.29); g.fill();
     g.fillStyle = 'rgba(99,230,190,' + (0.3 + 0.5 * Math.abs(Math.sin(t * 3.1))).toFixed(2) + ')';
-    g.beginPath(); g.arc(31.5, -8, 0.7, 0, 6.29); g.fill();
+    g.beginPath(); g.arc(27.5, -8, 0.7, 0, 6.29); g.fill();
     g.restore();
 
     // ── the small stuff: a sign, a washing line, a plant, a duck
-    g.save(); g.translate(-28, 0);                              // hand-painted sign
-    g.strokeStyle = '#4A4038'; g.lineWidth = 1.2; g.lineCap = 'round';
-    g.beginPath(); g.moveTo(0, 8); g.lineTo(0, -8); g.stroke();
-    g.save(); g.rotate(-0.06);
-    g.fillStyle = '#6B5136';
-    roundRectOn(g, -9, -13, 18, 7, 1.4); g.fill();
-    g.fillStyle = 'rgba(240,226,200,0.75)';
-    roundRectOn(g, -6, -10.8, 12, 1.1, 0.5); g.fill();
-    roundRectOn(g, -4.5, -8.8, 9, 1.1, 0.5); g.fill();
-    g.restore(); g.restore();
-
-    g.save(); g.translate(-66, 0);                              // washing line
+    g.save(); g.translate(-80, 0);                              // washing line
     g.strokeStyle = '#4A4038'; g.lineWidth = 1.1;
     g.beginPath(); g.moveTo(0, 8); g.lineTo(0, -30); g.stroke();
     g.strokeStyle = 'rgba(180,164,142,0.5)'; g.lineWidth = 0.7;
@@ -4009,7 +4112,7 @@
     }
     g.restore();
 
-    g.save(); g.translate(28, 0);                               // a plant he waters
+    g.save(); g.translate(46, 0);                               // a plant he waters
     g.fillStyle = '#7A5433';
     roundRectOn(g, -3.4, 3, 6.8, 6, 1.2); g.fill();
     g.strokeStyle = '#5E8A55'; g.lineWidth = 1; g.lineCap = 'round';
@@ -4020,7 +4123,7 @@
     }
     g.restore();
 
-    g.save(); g.translate(-80, 0);                              // a duck, for reasons
+    g.save(); g.translate(-96, 0);                              // a duck, for reasons
     g.fillStyle = '#E9C558';
     g.beginPath(); g.ellipse(0, 6, 3.4, 2.6, 0, 0, 6.29); g.fill();
     g.beginPath(); g.arc(2, 3.2, 2, 0, 6.29); g.fill();
@@ -4030,7 +4133,7 @@
     g.beginPath(); g.arc(2.7, 2.7, 0.45, 0, 6.29); g.fill();
     g.restore();
 
-    g.save(); g.translate(16, 0);                               // a mug left on the ground
+    g.save(); g.translate(12, 0);                               // a mug left on the ground
     g.fillStyle = '#C9BBA4';
     roundRectOn(g, -2.2, 4, 4.4, 5, 1.2); g.fill();
     g.strokeStyle = '#C9BBA4'; g.lineWidth = 0.8;
@@ -4055,6 +4158,127 @@
     g.beginPath(); g.moveTo(-3, 6); g.quadraticCurveTo(-16, 11, -30, 6.5); g.stroke();
     g.restore();
   }
+
+  // The dog. Coat comes off his name, so he is the same dog every time you
+  // open the app and a different dog on somebody else's phone.
+  var DOG_COATS = [
+    { c: '#B98A5A', d: '#94693F', b: '#F0E2CC' },   // sandy
+    { c: '#6E5A4A', d: '#52422F', b: '#E3D4BC' },   // brown
+    { c: '#3E3A38', d: '#2A2725', b: '#D9CDBA' },   // black and tan
+    { c: '#D8CBB4', d: '#B4A489', b: '#F6EEDF' },   // cream
+    { c: '#8C4E33', d: '#6B3722', b: '#EBD9C2' },   // red
+    { c: '#8A8480', d: '#6B6663', b: '#E6DCCC' }    // grey
+  ];
+  function dogCoat() {
+    var n = META.dog.name || 'Dog', h = 0;
+    for (var i = 0; i < n.length; i++) h = (h * 31 + n.charCodeAt(i)) & 0xffff;
+    return DOG_COATS[h % DOG_COATS.length];
+  }
+
+  // o: { t, scale, flip, walk, step, sit, sleep, wag, hop, head, bark }
+  function drawDog(g, o) {
+    var C = dogCoat();
+    var sc = o.scale || 1, flip = o.flip === -1 ? -1 : 1;
+    var sit = clamp(o.sit || 0, 0, 1), sleep = clamp(o.sleep || 0, 0, 1);
+    var walk = o.walk || 0, step = o.step || 0, hop = o.hop || 0;
+    var t = o.t || 0;
+    g.save();
+    g.scale(sc, sc);
+    g.fillStyle = 'rgba(0,0,0,0.32)';
+    g.beginPath(); g.ellipse(0, 0, 7.5 + sleep * 3.5, 1.9, 0, 0, 6.29); g.fill();
+    g.translate(0, -hop);
+    g.scale(flip, 1);
+
+    var back = -9.4 + sit * 1.4 + sleep * 5.6;      // the line of his back
+    var bh = 5.2 - sleep * 1.2;                      // how deep the body is
+    var hipY = back + bh - 0.8;                      // where the legs hang from
+    var sw = Math.sin(step) * walk * 2.2;
+    var sw2 = Math.sin(step + 2.1) * walk * 2.2;
+
+    g.lineCap = 'round';
+    // ── far legs, behind the body
+    g.strokeStyle = C.d; g.lineWidth = 2;
+    if (sleep < 0.5) {
+      g.beginPath(); g.moveTo(-3.2, hipY); g.lineTo(-3.2 - sw, sit > 0.5 ? -0.2 : -0.1); g.stroke();
+      g.beginPath(); g.moveTo(3.6, hipY); g.lineTo(3.6 + sw2, -0.1); g.stroke();
+    }
+
+    // ── tail
+    var wag = Math.sin(t * 13) * (o.wag || 0);
+    g.strokeStyle = C.c; g.lineWidth = 2;
+    g.beginPath();
+    g.moveTo(-5.4, back + 1);
+    g.quadraticCurveTo(-8.6, back - 1.4 + wag * 2.4, -9.4, back - 5 + wag * 3.4);
+    g.stroke();
+
+    // ── body
+    g.fillStyle = C.c;
+    roundRectOn(g, -5.8, back, 11.8, bh, 2.5); g.fill();
+    if (sit > 0.5) {                                  // haunch, sat down
+      g.beginPath(); g.ellipse(-3.4, hipY - 1, 3.4, 3.2, 0, 0, 6.29); g.fill();
+    }
+    g.fillStyle = C.b; g.globalAlpha = 0.55;          // pale chest and belly
+    roundRectOn(g, -1.2, back + bh - 2, 5.4, 2, 1); g.fill();
+    g.globalAlpha = 1;
+
+    // ── near legs, in front
+    g.strokeStyle = C.d; g.lineWidth = 2.2;
+    if (sleep < 0.5) {
+      if (sit > 0.5) {
+        g.beginPath(); g.moveTo(4.6, hipY - 0.6); g.lineTo(5, -0.1); g.stroke();
+        g.beginPath(); g.moveTo(-2.4, hipY + 0.4); g.lineTo(0.6, -0.1); g.stroke();
+      } else {
+        g.beginPath(); g.moveTo(-2.6, hipY); g.lineTo(-2.6 + sw2 * 0.7, -0.1); g.stroke();
+        g.beginPath(); g.moveTo(4.4, hipY); g.lineTo(4.4 - sw * 0.7, -0.1); g.stroke();
+      }
+    } else {                                          // curled up, paws out front
+      g.beginPath(); g.moveTo(4, back + bh - 0.6); g.lineTo(8.6, back + bh - 0.2); g.stroke();
+      g.beginPath(); g.moveTo(3, back + bh - 0.6); g.lineTo(7.2, back + bh + 0.4); g.stroke();
+    }
+
+    // ── collar
+    g.strokeStyle = P_COLLAR(); g.lineWidth = 1.2;
+    g.beginPath(); g.moveTo(4.9, back + 0.3); g.lineTo(4.9, back + bh - 1.6); g.stroke();
+
+    // ── head
+    g.save();
+    var hx = 5.4, hy = back - 2.4;
+    if (sleep > 0.5) { hx = 8.6; hy = back + bh - 1.6; }
+    g.translate(hx, hy);
+    if (o.head) g.rotate(o.head);
+    g.fillStyle = C.c;
+    g.beginPath(); g.arc(0, 0, 3.6, 0, 6.29); g.fill();
+    roundRectOn(g, 1.6, -0.4, 4.4, 3.2, 1.5); g.fill();          // muzzle
+    g.fillStyle = C.b;
+    roundRectOn(g, 2.4, 1.2, 3.4, 1.6, 0.8); g.fill();           // pale chin
+    g.fillStyle = C.d;
+    g.beginPath();                                                // floppy ear
+    g.moveTo(-1, -3);
+    g.quadraticCurveTo(-4.8, -2.6, -3.6, 2.4);
+    g.quadraticCurveTo(-1.4, 1.4, -1, -3);
+    g.fill();
+    g.fillStyle = '#2A2320';
+    g.beginPath(); g.ellipse(5.8, 0.2, 1.1, 0.95, 0, 0, 6.29); g.fill();   // nose
+    if (sleep > 0.5) {
+      g.strokeStyle = '#2A2320'; g.lineWidth = 0.7;
+      g.beginPath(); g.arc(1.6, -0.6, 1.2, Math.PI * 1.12, Math.PI * 1.88); g.stroke();
+    } else {
+      g.fillStyle = '#2A2320';
+      g.beginPath(); g.arc(1.8, -0.8, 0.9, 0, 6.29); g.fill();
+      g.fillStyle = 'rgba(255,255,255,0.92)';
+      g.beginPath(); g.arc(1.5, -1.1, 0.34, 0, 6.29); g.fill();
+    }
+    if (o.bark) {                                                 // open mouth
+      g.fillStyle = '#7A3A3A';
+      g.beginPath(); g.ellipse(4.4, 2.4, 1.6, 1.2 * o.bark, 0, 0, 6.29); g.fill();
+      g.fillStyle = '#D98A8A';
+      g.beginPath(); g.ellipse(4.6, 3, 0.9, 0.6 * o.bark, 0, 0, 6.29); g.fill();
+    }
+    g.restore();
+    g.restore();
+  }
+  // his collar takes the camp colour, so he matches the place
+  function P_COLLAR() { return hueOf().accent; }
 
   // What is on his monitor: Night Watch, obviously. A fire in the middle, a
   // little keeper of his own running about, and shades wandering in for it.
@@ -4124,9 +4348,9 @@
   function drawCampFront(g, t) {
     g.save(); g.translate(CAMP.desk.x, 0);
     g.fillStyle = '#40372E';                                    // the near edge of the table
-    roundRectOn(g, -27, -0.4, 54, 3.4, 1.2); g.fill();
+    roundRectOn(g, -23, -0.4, 46, 3.4, 1.2); g.fill();
     g.fillStyle = 'rgba(0,0,0,0.18)';
-    roundRectOn(g, -27, -0.4, 54, 1, 0.5); g.fill();
+    roundRectOn(g, -23, -0.4, 46, 1, 0.5); g.fill();
     g.restore();
   }
 
@@ -4144,7 +4368,8 @@
     hearts: [], props: [], taps: 0, tapT: 0, petting: 0, pet: 0,
     onStage: false, lastReact: '', bounce: 0, danceT: 0,
     amt: 0.5, amtTarget: 0.5,
-    say: '', sayT: 0, sayNext: 6, lastSay: -1, fire: 1, scripted: false, hold: ''
+    say: '', sayT: 0, sayNext: 6, lastSay: -1, fire: 1, scripted: false, hold: '',
+    party: '', partyT: 0
   };
 
   // where he goes, what he does there, and roughly how long for
@@ -4265,11 +4490,174 @@
     KN.actT = rand(picked.dur[0], picked.dur[1]);
     KN.props.length = 0;
     var spot = picked.at ? CAMP[picked.at] : null;
-    KN.tx = spot ? spot.stand + rand(-4, 4) : rand(-88, 118);
+    KN.tx = spot ? spot.stand + rand(-4, 4) : rand(-104, 124);
     if (!spot && Math.abs(KN.tx) < 20) KN.tx += KN.tx < 0 ? -22 : 22;
     KN.spotFace = spot ? spot.face : 0;
     if (KN.act === 'ember') KN.props.push({ kind: 'ember', x: 0, y: 4, vx: rand(-5, 5), vy: -9, ph: rand(0, 6.28), life: KN.actT });
     if (KN.act === 'moth')  KN.props.push({ kind: 'moth', x: 0, y: -14, ph: rand(0, 6.28), life: KN.actT });
+  }
+
+  // ── the dog ────────────────────────────────────────────────────────────
+  // He mostly wants to be near his person, and the rest of the time he is
+  // asleep in his house or busy with something in the grass.
+  var DOG = { x: -50, tx: -50, face: 1, step: 0, walking: 0, sit: 0, sleep: 0,
+              wag: 0, hop: 0, bark: 0, head: 0, act: 'follow', actT: 3, party: 0 };
+  var DOG_ACTS = ['follow', 'follow', 'follow', 'kennel', 'sniff', 'sit', 'chase', 'watch'];
+
+  function dogAct() {
+    var pick = DOG_ACTS[Math.floor(Math.random() * DOG_ACTS.length)];
+    DOG.act = pick;
+    DOG.actT = rand(4, 10);
+    if (pick === 'kennel') { DOG.tx = CAMP.kennel.x + rand(-3, 3); DOG.actT = rand(8, 18); }
+    else if (pick === 'sniff') DOG.tx = rand(-104, 124);
+    else if (pick === 'sit')   DOG.tx = CAMP.fire.stand + rand(10, 26);
+    else if (pick === 'watch') DOG.tx = KN.x + rand(-30, 30);
+  }
+
+  function updateDog(dt) {
+    DOG.actT -= dt;
+    if (DOG.actT <= 0) dogAct();
+    if (DOG.act === 'follow' || DOG.act === 'chase') {
+      var want = KN.x + (KN.x > DOG.x ? -16 : 16);
+      DOG.tx += (want - DOG.tx) * Math.min(1, dt * (DOG.act === 'chase' ? 3 : 1.2));
+    }
+    var run = DOG.act === 'chase' ? 74 : 44;
+    var dx = DOG.tx - DOG.x;
+    if (Math.abs(dx) > 3) {
+      var dir = dx > 0 ? 1 : -1;
+      DOG.x += dir * run * dt;
+      DOG.face = dir;
+      DOG.walking = Math.min(1, DOG.walking + dt * 7);
+      DOG.step += dt * (DOG.act === 'chase' ? 20 : 13);
+    } else {
+      DOG.walking = Math.max(0, DOG.walking - dt * 7);
+    }
+    DOG.x = clamp(DOG.x, -120, 134);
+
+    var sit = 0, sleep = 0, wag = 0, head = 0;
+    if (DOG.party > 0) {
+      DOG.party -= dt;
+      DOG.hop = Math.max(DOG.hop, Math.abs(Math.sin(S.time * 9)) * 5);
+      wag = 1; head = -0.25;
+      DOG.bark = Math.sin(S.time * 11) > 0.4 ? 1 : 0;
+    } else if (DOG.walking > 0.3) {
+      wag = 0.7;
+      DOG.bark = 0;
+    } else if (DOG.act === 'kennel') {
+      sleep = 1; wag = 0.1;
+    } else if (DOG.act === 'sit' || DOG.act === 'watch') {
+      sit = 1; wag = 0.45; head = Math.sin(S.time * 0.7) * 0.12;
+      DOG.face = DOG.act === 'watch' ? (KN.x > DOG.x ? 1 : -1) : -1;
+    } else if (DOG.act === 'sniff') {
+      head = 0.5; wag = 0.5;
+    } else {
+      wag = 0.6;
+      DOG.face = KN.x > DOG.x ? 1 : -1;
+    }
+    // near the kennel he can actually be asleep in it
+    if (DOG.act === 'kennel' && Math.abs(DOG.x - CAMP.kennel.x) > 8) { sleep = 0; wag = 0.5; }
+
+    DOG.sit += (sit - DOG.sit) * Math.min(1, dt * 5);
+    DOG.sleep += (sleep - DOG.sleep) * Math.min(1, dt * 3);
+    DOG.wag += (wag - DOG.wag) * Math.min(1, dt * 6);
+    DOG.head += (head - DOG.head) * Math.min(1, dt * 5);
+    DOG.hop = Math.max(0, DOG.hop - dt * 26);
+  }
+
+  // ── everyone who has joined him ────────────────────────────────────────
+  // One per landmark reached. They stand about the camp doing very little,
+  // which is the point of them.
+  var FOLK_SPOTS = [-84, 34, -50, 74, 20, -102, 90, 48, -26, 118, 4, -66, 62, 130, -112];
+  var FOLK = [];
+  function syncFolk() {
+    while (FOLK.length > META.camp.length) FOLK.pop();
+    for (var i = FOLK.length; i < META.camp.length; i++) {
+      var n = META.camp[i], h = 0;
+      for (var c = 0; c < n.length; c++) h = (h * 33 + n.charCodeAt(c)) & 0xffff;
+      FOLK.push({
+        name: n,
+        x: FOLK_SPOTS[i % FOLK_SPOTS.length],
+        flip: (h & 1) ? 1 : -1,
+        plume: PLUMES[h % PLUMES.length].id,
+        cape: OUTFITS[(h >> 3) % OUTFITS.length].id,
+        helm: HEADS[(h >> 5) % HEADS.length].id,
+        hair: HAIRS[(h >> 7) % HAIRS.length].id,
+        ph: (h % 100) / 16,
+        expr: 'content'
+      });
+    }
+  }
+
+  // ── celebrating ────────────────────────────────────────────────────────
+  // A night held is worth marking. Which way they mark it is a different
+  // roll every dawn.
+  var PARTIES = [
+    { id: 'cheer',  note: 'Another one held. {d} did three laps of the fire.' },
+    { id: 'dance',  note: 'They danced. {f} started it and could not stop.' },
+    { id: 'toast',  note: 'Mugs up all round. The stew was nearly right, too.' },
+    { id: 'wave',   note: 'He waved at you for a solid minute. You are welcome here.' },
+    { id: 'spin',   note: 'He span until he had to sit down and think about it.' },
+    { id: 'howl',   note: '{d} howled at the dawn. Everyone joined in, badly.' },
+    { id: 'sparks', note: 'Somebody put far too much on the fire. Worth it.' },
+    { id: 'hug',    note: 'A great deal of hugging. Nobody seemed to mind.' }
+  ];
+  function partyNote(P) {
+    var d = META.dog.name || 'the dog';
+    var f = META.camp.length ? META.camp[Math.floor(Math.random() * META.camp.length)]
+                             : (META.knight.name || 'somebody');
+    return P.note.replace(/\{d\}/g, d).replace(/\{f\}/g, f);
+  }
+  var CHEERS = ['That is another one!', 'Dawn already. Look at that.', 'We held it, {p}!',
+    'Not a single one got through. Well, one did.', 'Every night is a good night eventually.',
+    'Somebody put the kettle on.', 'I told you it was the best job.'];
+  function startParty(kind) {
+    KN.say = CHEERS[Math.floor(Math.random() * CHEERS.length)]
+      .replace(/\{p\}/g, META.player.name || 'you');
+    KN.sayT = 6.5;
+    var P = kind ? PARTIES[0] : PARTIES[Math.floor(Math.random() * PARTIES.length)];
+    for (var i = 0; kind && i < PARTIES.length; i++) if (PARTIES[i].id === kind) P = PARTIES[i];
+    KN.party = P.id; KN.partyT = 900;
+    KN.hearts.length = 0;
+    DOG.party = 900;
+    for (var j = 0; j < FOLK.length; j++) FOLK[j].ph = rand(0, 6.28);
+    return P;
+  }
+  function endParty() { KN.party = ''; KN.partyT = 0; DOG.party = 0; }
+
+  // What everybody who is not him does while it is going on.
+  function folkPose(f, t) {
+    var ph = f.ph, kind = KN.partyT > 0 ? KN.party : '';
+    var o = { t: t, scale: 1, wear: f, flip: f.flip, amt: 0.7, expr: 'content' };
+    var b = Math.sin(t * 3 + ph);
+    if (!kind) {
+      o.expr = Math.sin(t * 0.4 + ph) > 0.5 ? 'happy' : 'content';
+      o.tilt = Math.sin(t * 0.9 + ph) * 0.035;
+      o.look = Math.sin(t * 0.3 + ph) > 0.4 ? 0.6 : 0;
+      return o;
+    }
+    o.expr = 'happy'; o.amt = 0.95;
+    if (kind === 'cheer' || kind === 'howl') {
+      o.armR = -2.75 - b * 0.15; o.armL = 2.75 + b * 0.15;
+      o.hop = Math.abs(Math.sin(t * 5 + ph)) * 4.5;
+      if (kind === 'howl') o.headTilt = -0.34;
+    } else if (kind === 'dance') {
+      o.tilt = Math.sin(t * 4 + ph) * 0.16;
+      o.armR = -1.5 - b * 0.6; o.armL = 1.4 + b * 0.5;
+      o.hop = Math.abs(Math.sin(t * 4 + ph)) * 4;
+    } else if (kind === 'toast') {
+      o.armR = -2.35 + b * 0.08; o.item = 'mug'; o.headTilt = -0.1;
+    } else if (kind === 'wave') {
+      o.armR = -2.5 + Math.sin(t * 6 + ph) * 0.35;
+    } else if (kind === 'spin') {
+      o.spin = (t * 4 + ph) % 6.283;
+      o.armR = -1.9; o.armL = 1.9;
+    } else if (kind === 'sparks') {
+      o.crouch = 0.3; o.armR = -1.4; o.armL = 1.3; o.expr = 'surprised';
+    } else if (kind === 'hug') {
+      o.armR = -1.55; o.armL = 1.55;
+      o.tilt = Math.sin(t * 1.6 + ph) * 0.07;
+    }
+    return o;
   }
 
   function knHeart(kind) {
@@ -4285,7 +4673,7 @@
     var i;
     // the camera drifts after him rather than snapping, and stops at the
     // edges of the camp so you never see past the last thing he owns
-    var camWant = 21;                   // the camp all fits; the shot does not need to move
+    var camWant = 10;                   // the camp all fits; the shot does not need to move
     KN.cam += (camWant - KN.cam) * Math.min(1, dt * 1.8);
     // the fire answers whatever he is doing to it
     var fWant = KN.act === 'rub' ? 0.5 : (KN.act === 'poke' || KN.act === 'haul') ? 1.14 : 1;
@@ -4304,13 +4692,14 @@
     KN.tapT = Math.max(0, KN.tapT - dt);
     if (KN.tapT <= 0) KN.taps = 0;
     if (KN.exprT > 0) KN.exprT -= dt;
+    if (KN.partyT > 0 && KN.sayT <= 0) { KN.say = ''; }
     if (KN.scripted) { /* he is being asked something; leave it up */ }
     else if (KN.sayT > 0) KN.sayT -= dt;
     else KN.say = '';
 
     // he says something now and then, unprompted
     KN.sayNext -= dt;
-    if (KN.sayNext <= 0 && KN.petting <= 0 && !KN.scripted) {
+    if (KN.sayNext <= 0 && KN.petting <= 0 && !KN.scripted && KN.partyT <= 0) {
       KN.sayNext = rand(11, 26);
       if (Math.random() < 0.62) {
         var r = Math.random(), gp = META.player.gender;
@@ -4358,7 +4747,7 @@
       KN.walking = Math.max(0, KN.walking - dt * 6);
       if (KN.spotFace) KN.face = KN.spotFace;
     }
-    KN.x = clamp(KN.x, -100, 128);
+    KN.x = clamp(KN.x, -120, 134);
 
     for (i = KN.props.length - 1; i >= 0; i--) {
       var pr = KN.props[i];
@@ -4380,7 +4769,43 @@
     var tilt = wobble, lean = 0, sit = 0, zzz = 0;
     var crouch = 0, lie = 0, back = 0, headTilt = 0, lift = 0;
 
-    if (KN.walking > 0.4) {
+    if (KN.partyT > 0) {
+      // a night held: he is not doing chores, he is celebrating
+      KN.partyT -= dt;
+      KN.tx = KN.x;
+      var pk = KN.party, T = S.time, bb = Math.sin(T * 5);
+      expr = 'happy';
+      if (pk === 'cheer') {
+        armR = -2.85 - bb * 0.12; armL = 2.85 + bb * 0.12;
+        KN.hop = Math.max(KN.hop, Math.abs(Math.sin(T * 5)) * 6);
+        if (Math.random() < dt * 1.6) knHeart('heart');
+      } else if (pk === 'dance') {
+        tilt = Math.sin(T * 4) * 0.18;
+        armR = -1.5 - bb * 0.6; armL = 1.4 + bb * 0.5;
+        KN.hop = Math.max(KN.hop, Math.abs(Math.sin(T * 4)) * 5);
+        if (Math.random() < dt * 1.2) knHeart('note');
+      } else if (pk === 'toast') {
+        item = 'mug'; armR = -2.4 + bb * 0.06; headTilt = -0.12;
+        if (Math.random() < dt * 0.5) knHeart('heart');
+      } else if (pk === 'wave') {
+        armR = -2.55 + Math.sin(T * 6.5) * 0.4; armL = 0.4;
+        if (Math.random() < dt * 0.8) knHeart('heart');
+      } else if (pk === 'spin') {
+        KN.spin = (T * 4.5) % 6.283;
+        armR = -1.9; armL = 1.9;
+        if (Math.random() < dt * 1.2) knHeart('note');
+      } else if (pk === 'howl') {
+        headTilt = -0.42; armR = -0.6; armL = 0.6;
+        if (Math.random() < dt * 0.9) knHeart('note');
+      } else if (pk === 'sparks') {
+        crouch = 0.34; armR = -2.6 + bb * 0.3; armL = 1.1; expr = 'surprised';
+        if (Math.random() < dt * 9) spark2(KN.x + rand(-10, 10), -8);
+      } else {
+        armR = -1.55; armL = 1.55;
+        tilt = Math.sin(T * 1.7) * 0.08;
+        if (Math.random() < dt * 1.4) knHeart('heart');
+      }
+    } else if (KN.walking > 0.4) {
       expr = 'normal';
     } else if (A2 === 'dance') {
       var B2 = beatNow();
@@ -4606,7 +5031,7 @@
   // The lobby: his whole camp, with him living in it.
   // Wide enough to hold his whole camp at once, so the lobby is a fixed shot
   // of the place rather than a camera chasing him around it.
-  var CAMP_VIEW = 280;
+  var CAMP_VIEW = 306;
   var CAMP_GND = 8;         // the y everything in camp stands on
   function paintCamp(g, w, h) {
     var sc = w / CAMP_VIEW;
@@ -4619,6 +5044,24 @@
 
     drawCamp(g, S.time, clamp(KN.fire, 0, 1.2));
     drawKnProps(g);
+
+    // everyone who has joined him along the way
+    for (var fi = 0; fi < FOLK.length; fi++) {
+      var F2 = FOLK[fi];
+      g.save();
+      g.translate(F2.x, CAMP_GND - 14);
+      g.scale(0.87, 0.87);
+      drawKnight(g, folkPose(F2, S.time));
+      g.restore();
+    }
+
+    // the dog
+    g.save();
+    g.translate(DOG.x, CAMP_GND);
+    drawDog(g, { t: S.time, scale: 1.45, flip: DOG.face, walk: DOG.walking, step: DOG.step,
+                 sit: DOG.sit, sleep: DOG.sleep, wag: DOG.wag, hop: DOG.hop,
+                 head: DOG.head, bark: DOG.bark });
+    g.restore();
 
     g.save();
     g.translate(KN.x, CAMP_GND - 14);
@@ -5084,6 +5527,26 @@
   }
 
   // ── shared fragments ──────────────────────────────────────────────────────
+  // How far along the road he is, and what is at the end of the next stretch.
+  function journeyStrip(compact) {
+    var done = journeyIndex(), L = nextLandmark();
+    var lvl = keeperLevel();
+    if (!L) {
+      return '<div class="road done"><b>The whole road, walked.</b>' +
+        '<span>All ' + LANDMARKS.length + ' of them, and everyone still here.</span></div>';
+    }
+    var from = done * LM_LEVEL, span = LM_LEVEL;
+    var pct = clamp((lvl - from) / span, 0, 1) * 100;
+    var away = levelsToNext();
+    return '<div class="road">' +
+      '<div class="road-top"><span>Next stop</span><b>' + esc(L.name) + '</b></div>' +
+      '<div class="road-bar"><i style="width:' + pct.toFixed(1) + '%"></i></div>' +
+      '<div class="road-sub">' + esc(L.st) + ' · ' +
+        (away <= 1 ? 'one more level' : away + ' more levels') +
+        (compact ? '' : ' · ' + done + ' of ' + LANDMARKS.length + ' behind you') + '</div>' +
+    '</div>';
+  }
+
   function levelStrip() {
     var L = levelInfo(META.xp);
     var pct = clamp(L.into / L.need, 0, 1) * 100;
@@ -5137,8 +5600,10 @@
         '<canvas id="portrait" class="portrait stage-knight"></canvas>' +
         (META.knight.name
           ? '<div class="stagename"><b>' + esc(META.knight.name) + '</b>' +
-            '<span>' + esc(knightTitle()) + '</span></div>'
-          : '<div class="stagename"><b>A knight with no name</b><span>waiting by the fire</span></div>') +
+            '<span>' + esc(knightTitle()) + '</span>' +
+            '<u>with ' + esc(META.dog.name || 'a dog') +
+              (META.camp.length ? ' and ' + plural(META.camp.length, 'other') : '') + '</u></div>'
+          : '<div class="stagename"><b>A keeper with no name</b><span>waiting by the fire</span></div>') +
       '</div>' +
       (META.runs
         ? '<div class="tally sm">' +
@@ -5147,6 +5612,7 @@
             '<div><span>Shades</span><b>' + META.lifeKills + '</b></div>' +
           '</div>' + levelStrip()
         : '<p class="lede">Keep his fire lit until dawn. Somebody out there is walking towards it.</p>') +
+      journeyStrip(false) +
       '<button class="go" id="btnStart">Take the Watch</button>' +
       '<div class="row2">' +
         '<button class="ghost" id="btnShop">Provisions</button>' +
@@ -5477,6 +5943,7 @@
     if (!offer.length) { S.mode = 'play'; hideVeil(); showChrome(true); return; }  // everything maxed
     S.mode = 'draft';
     showChrome(false);
+    S.partyNote = partyNote(startParty());
     renderDraft(offer);
   }
 
@@ -5496,13 +5963,19 @@
         '</button>';
     }
     veil(
-      '<div class="eyebrow">Dawn · Night ' + S.night + '</div>' +
-      '<h1>Take <em>One</em></h1>' +
+      '<div class="eyebrow">Dawn · Night ' + S.night + ' held</div>' +
+      '<h1>Back at <em>Camp</em></h1>' +
+      '<div class="stage still">' +
+        '<canvas id="portrait" class="portrait stage-knight"></canvas>' +
+      '</div>' +
+      '<p class="lede sm">' + esc(S.partyNote || '') + '</p>' +
+      journeyStrip(true) +
       (upCount() ? '<div class="held">' + upChips(S.up) + '</div>' : '') +
       '<div class="draft">' + cards + '</div>' +
       (S.rerolls > 0 ? '<button class="ghost" id="btnRe">Reroll · ' + S.rerolls + ' left</button>' : ''),
       'wide'
     );
+    hookPortrait();
     var btns = elCard.querySelectorAll('button[data-up]');
     for (var b = 0; b < btns.length; b++) {
       btns[b].addEventListener('click', function () { takeUpgrade(this.getAttribute('data-up')); });
@@ -5516,6 +5989,7 @@
   }
 
   function takeUpgrade(id) {
+    endParty();
     var def = UP_BY_ID[id];
     if (!def) return;
     S.up[id] = (S.up[id] || 0) + 1;
@@ -5708,10 +6182,52 @@
         buildFoot(),
         'wide'
       );
-      on('btnAgain', startGame);
-      on('btnMenu', menu);
+      on('btnAgain', function () { if (!arrivals(startGame)) startGame(); });
+      on('btnMenu', function () { if (!arrivals(menu)) menu(); });
       on('btnShop2', shop);
     }, 900);
+  }
+
+  // If the run pushed you past a landmark, that comes first — and somebody
+  // new is waiting at the camp when you get there.
+  function arrivals(after) {
+    if (journeyIndex() <= META.reached) return false;
+    var L = LANDMARKS[META.reached];
+    var who = rollFrom(FOLK_NAMES, META.camp);
+    META.reached++;
+    META.camp.push(who);
+    saveMeta();
+    syncFolk();
+    arrivalCard(L, who, after);
+    return true;
+  }
+
+  function arrivalCard(L, who, after) {
+    S.mode = 'menu';
+    showChrome(false);
+    var n = META.camp.length;
+    S.partyNote = partyNote(startParty('cheer'));
+    veil(
+      '<div class="eyebrow">You made it</div>' +
+      '<h1>' + esc(L.st) + '<em>' + esc(L.name) + '</em></h1>' +
+      '<div class="stage still">' +
+        '<canvas id="portrait" class="portrait stage-knight"></canvas>' +
+      '</div>' +
+      '<p class="lede">' + esc(who) + ' saw the fire from the road and came over. ' +
+        'They are staying.</p>' +
+      '<div class="tally sm">' +
+        '<div><span>Landmarks</span><b>' + META.reached + ' / ' + LANDMARKS.length + '</b></div>' +
+        '<div><span>At the fire</span><b>' + (n + 1) + '</b></div>' +
+        '<div><span>Dog</span><b>' + esc(META.dog.name || '—') + '</b></div>' +
+      '</div>' +
+      journeyStrip(false) +
+      '<button class="go" id="btnOn">On we go</button>' +
+      buildFoot(),
+      'wide'
+    );
+    hookPortrait();
+    UI.win();
+    on('btnOn', function () { endParty(); if (!arrivals(after)) (after || menu)(); });
   }
 
   function epitaph() {
@@ -5745,7 +6261,7 @@
     }
     render();
     syncHud();
-    if (portraitCv) { updateKnight(dt); paintPortrait(); }
+    if (portraitCv) { syncFolk(); updateKnight(dt); updateDog(dt); paintPortrait(); }
   }
 
   // ────────────────────────────────────────────────────────────── boot
@@ -5790,12 +6306,14 @@
   document.addEventListener('keydown', wakeAudio);
   // opt-in inspection hook for tuning/QA: open with #debug
   if (/[?#]debug/.test(location.href)) window.__NW = { S: S, K: K, D: D, META: META, UPGRADES: UPGRADES, PERKS: PERKS,
-      flare: doFlare, swing: doSwing, spawnShade: spawnShade, lightAt: lightAt, stick: stick, KN: KN, CAMP: CAMP, drawCamp: drawCamp, drawCampFront: drawCampFront, ZOOM: ZOOM, field: function () { return { w: W, h: H }; }, KN_ACTS: KN_ACTS, knightSay: knightSay, knightAct: knightAct, updateKnight: updateKnight, knightPoke: knightPoke, knightPet: knightPet, beatNow: beatNow, drawKnight: drawKnight, A: A, MUS: MUS, TUNES: TUNES,
+      flare: doFlare, swing: doSwing, spawnShade: spawnShade, lightAt: lightAt, stick: stick, KN: KN, CAMP: CAMP, drawCamp: drawCamp, drawCampFront: drawCampFront, DOG: DOG, FOLK: FOLK, drawDog: drawDog, folkPose: folkPose, updateDog: updateDog, syncFolk: syncFolk, startParty: startParty, endParty: endParty, LANDMARKS: LANDMARKS, journeyIndex: journeyIndex, ZOOM: ZOOM, field: function () { return { w: W, h: H }; }, KN_ACTS: KN_ACTS, knightSay: knightSay, knightAct: knightAct, updateKnight: updateKnight, knightPoke: knightPoke, knightPet: knightPet, beatNow: beatNow, drawKnight: drawKnight, A: A, MUS: MUS, TUNES: TUNES,
       startMusic: startMusic, nextTune: nextTune, setMusic: setMusic, SFX: SFX, UI: UI, ac: ac, switchTo: switchTo, applyTone: applyTone, GENRE: GENRE,
       music: { parseChord: parseChord, voicing: voicing, bassNote: bassNote,
                leadNote: leadNote, chordAt: chordAt, QUAL: QUAL, mtof: mtof }, recalc: recalc, saveMeta: saveMeta, rollDraft: rollDraft, take: takeUpgrade };
   resize();
   S.keeper.x = W / 2; S.keeper.y = H / 2 + 96;
+  if (!META.dog.name) { META.dog.name = rollFrom(DOG_NAMES, []); saveMeta(); }
+  syncFolk();
   applyHue();
   // He does not wait politely at the fire for you to arrive; whatever he was
   // doing, he was already doing it, somewhere in the camp.
