@@ -570,7 +570,7 @@
   var gctx = groundCvs.getContext('2d');
 
   var W = 0, H = 0, DPR = 1;
-  var BUILD = 'v1.4.0';        // bump on every deploy — shown in-game for support
+  var BUILD = 'v1.5.0';        // bump on every deploy — shown in-game for support
   var MUTE_KEY = 'keeper.nightwatch.mute';
   var MUSIC_KEY = 'keeper.nightwatch.music';
 
@@ -1172,7 +1172,7 @@
     for (var i = 0; i < TUNES.length; i++) if (late[TUNES[i].name]) TUNES[i].bars = late[TUNES[i].name];
   })();
 
-  var MUS = { on: true, tune: 0, bar: 0, beat: 0, next: 0, timer: null, lead: 74, phrase: 0, swap: null };
+  var MUS = { on: true, tune: 0, bar: 0, beat: 0, next: 0, timer: null, lead: 74, phrase: 0, swap: null, sched: [] };
   function mtof(m) { return 440 * Math.pow(2, (m - 69) / 12); }
   function anyOf(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
   function tuneName() { return TUNES[MUS.tune].name; }
@@ -1363,6 +1363,9 @@
 
   function playBeat(t, spb) {
     var T = TUNES[MUS.tune];
+    // leave a breadcrumb so anything watching can find the pulse later
+    MUS.sched.push({ t: t, beat: MUS.beat, bar: MUS.bar, spb: spb });
+    if (MUS.sched.length > 24) MUS.sched.shift();
     var beat = MUS.beat, bar = MUS.bar, meter = T.meter || 4;
     var last = meter - 1;
     var ch = chordAt(bar);
@@ -1495,6 +1498,18 @@
       MUS.next += spb;
       if (++MUS.beat >= meter) { MUS.beat = 0; MUS.bar++; }
     }
+  }
+
+  // Where we are inside the current beat, for anything that wants to move to it.
+  function beatNow() {
+    var a = A.ctx;
+    if (!a || !MUS.timer || !MUS.sched.length) return null;
+    var now = a.currentTime, cur = null;
+    for (var i = MUS.sched.length - 1; i >= 0; i--) {
+      if (MUS.sched[i].t <= now) { cur = MUS.sched[i]; break; }
+    }
+    if (!cur || now - cur.t > cur.spb * 2) return null;
+    return { phase: clamp((now - cur.t) / cur.spb, 0, 1), beat: cur.beat, bar: cur.bar, spb: cur.spb };
   }
 
   function startMusic() {
@@ -2400,133 +2415,186 @@
     return (META.knight && META.knight.name) ? META.knight.name : 'the Keeper';
   }
 
-  // opts: { t, scale, flash, expr, tilt, hop, wave, zzz, carry }
+  // opts: { t, scale, flash, expr, tilt, hop, squash, wave, reach, zzz, sit, spin, look }
   function drawKnight(g, o) {
     var P = plumeOf();
     var sc = o.scale || 1;
-    var steel = o.flash ? '#FFD9D6' : '#C9CFD8';
-    var steelDark = o.flash ? '#E0A9A6' : '#8E97A4';
-    var hop = o.hop || 0;
+    var skin  = o.flash ? '#FFD3CF' : '#F7E0C4';
+    var skinS = o.flash ? '#E9B4B0' : '#E2C29F';
+    var steel = o.flash ? '#FFD9D6' : '#CBD2DB';
+    var dark  = o.flash ? '#E0A9A6' : '#94A1AF';
+    var hop = o.hop || 0, sit = o.sit || 0;
+    var lookX = (o.look || 0) * 1.5;
 
     g.save();
     g.scale(sc, sc);
 
-    // shadow stays on the ground and shrinks as he leaves it
-    g.fillStyle = 'rgba(0,0,0,' + (0.45 - hop * 0.03).toFixed(3) + ')';
-    g.beginPath(); g.ellipse(0, 13, 11 - hop * 0.55, 4 - hop * 0.18, 0, 0, 6.29); g.fill();
+    // shadow — stays on the ground, shrinks as he leaves it
+    g.fillStyle = 'rgba(0,0,0,' + Math.max(0.12, 0.42 - hop * 0.03).toFixed(3) + ')';
+    g.beginPath(); g.ellipse(0, 14, 10.5 - hop * 0.42, 3.5 - hop * 0.12, 0, 0, 6.29); g.fill();
 
-    g.translate(0, -hop);
+    g.translate(0, -hop + sit * 4);
     if (o.tilt) g.rotate(o.tilt);
+    // a twirl reads as turning on the spot, not cartwheeling over his feet
+    if (o.spin) g.scale(Math.cos(o.spin), 1);
+    var sq = o.squash || 0;
+    g.scale(1 + sq, 1 - sq);
 
-    // little round shield on the off hand
-    g.save();
-    g.translate(-11, 1);
-    g.rotate(-0.25 + (o.wave || 0) * -0.5);
-    g.fillStyle = steelDark;
-    g.beginPath(); g.ellipse(0, 0, 6.2, 7.4, 0, 0, 6.29); g.fill();
-    g.fillStyle = P.tabard;
-    g.beginPath(); g.ellipse(0, 0, 4.2, 5.2, 0, 0, 6.29); g.fill();
-    g.fillStyle = P.trim;
-    g.beginPath(); g.arc(0, 0, 1.7, 0, 6.29); g.fill();
-    g.restore();
+    // ── little boots
+    g.fillStyle = '#5E4C3E';
+    roundRectOn(g, -6.4, 9.6 - sit * 2, 5.2, 4.6, 2.2); g.fill();
+    roundRectOn(g, 1.2, 9.6 - sit * 2, 5.2, 4.6, 2.2); g.fill();
 
-    // a small waving hand on the other side
-    if (o.wave) {
-      g.save();
-      g.translate(10, 0);
-      g.rotate(-0.9 - Math.sin((o.t || 0) * 12) * 0.4 * o.wave);
-      g.strokeStyle = steelDark; g.lineWidth = 2.6; g.lineCap = 'round';
-      g.beginPath(); g.moveTo(0, 0); g.lineTo(0, -8); g.stroke();
-      g.fillStyle = steel;
-      g.beginPath(); g.arc(0, -9.5, 2.4, 0, 6.29); g.fill();
-      g.restore();
-    }
-
-    // body — a stubby tabard over mail
-    g.fillStyle = steelDark;
-    roundRectOn(g, -8, -4, 16, 15, 6); g.fill();
+    // ── a round little body
+    g.fillStyle = dark;
+    roundRectOn(g, -7.8, -2.6, 15.6, 13.4, 6.8); g.fill();
     g.fillStyle = P.tabard;
     g.beginPath();
-    g.moveTo(-5.5, -3); g.lineTo(5.5, -3); g.lineTo(4.4, 10.5);
-    g.lineTo(0, 12.4); g.lineTo(-4.4, 10.5);
+    g.moveTo(-5.4, -2.2); g.lineTo(5.4, -2.2); g.lineTo(4.5, 8.6);
+    g.quadraticCurveTo(0, 11.2, -4.5, 8.6);
     g.closePath(); g.fill();
-    g.strokeStyle = P.trim; g.lineWidth = 1; g.globalAlpha = 0.75;
-    g.beginPath(); g.moveTo(-5.2, 1.4); g.lineTo(5.2, 1.4); g.stroke();
+    g.fillStyle = P.trim; g.globalAlpha = 0.85;
+    roundRectOn(g, -5.4, 0.6, 10.8, 1.1, 0.5); g.fill();
     g.globalAlpha = 1;
 
-    // oversized helmet — the whole point of a cute knight
+    // ── stubby arms
+    var reach = o.reach || 0, wave = o.wave || 0;
     g.fillStyle = steel;
-    g.beginPath(); g.arc(0, -11, 9.4, Math.PI, 0); g.fill();
-    roundRectOn(g, -9.4, -11, 18.8, 11, 4.5); g.fill();
-    g.fillStyle = '#1A1A22';
-    roundRectOn(g, -6.4, -10.4, 12.8, 4.2, 2); g.fill();
-
-    // ── the face, such as it is: two lights behind the visor
-    var eye = o.flash ? '#FFC9C4' : '#FFE9A8';
-    var ex = 2.6, ey = -8.3, s2;
-    g.fillStyle = eye; g.strokeStyle = eye; g.lineCap = 'round';
-    if (o.expr === 'happy' || o.expr === 'content') {
-      var lift = o.expr === 'happy' ? 1.75 : 1.5;
-      g.lineWidth = 1.5;
-      for (s2 = -1; s2 <= 1; s2 += 2) {
-        g.beginPath(); g.arc(s2 * ex, ey + 0.9, lift, Math.PI * 1.15, Math.PI * 1.85); g.stroke();
-      }
-    } else if (o.expr === 'blink') {
-      g.lineWidth = 1.5;
-      for (s2 = -1; s2 <= 1; s2 += 2) {
-        g.beginPath(); g.moveTo(s2 * ex - 1.7, ey); g.lineTo(s2 * ex + 1.7, ey); g.stroke();
-      }
-    } else if (o.expr === 'sleepy') {
-      g.lineWidth = 1.4;
-      for (s2 = -1; s2 <= 1; s2 += 2) {
-        g.beginPath(); g.arc(s2 * ex, ey - 0.7, 1.7, Math.PI * 0.12, Math.PI * 0.88); g.stroke();
-      }
-    } else if (o.expr === 'surprised') {
-      g.beginPath(); g.arc(-ex, ey, 1.85, 0, 6.29); g.fill();
-      g.beginPath(); g.arc(ex, ey, 1.85, 0, 6.29); g.fill();
-    } else if (o.expr === 'look') {
-      var lx = Math.cos((o.t || 0) * 1.1) * 0.9;
-      g.beginPath(); g.arc(-ex + lx, ey, 1.25, 0, 6.29); g.fill();
-      g.beginPath(); g.arc(ex + lx, ey, 1.25, 0, 6.29); g.fill();
-    } else {
-      g.beginPath(); g.arc(-ex, ey, 1.25, 0, 6.29); g.fill();
-      g.beginPath(); g.arc(ex, ey, 1.25, 0, 6.29); g.fill();
+    g.save();                                   // left arm holds the shield
+    g.translate(-8.2, 2.2); g.rotate(-0.2 - reach * 0.5);
+    g.beginPath(); g.ellipse(0, 0, 2.6, 3.6, 0, 0, 6.29); g.fill();
+    g.restore();
+    g.save();                                   // right arm waves or reaches
+    g.translate(7.8, 2);
+    var lift = Math.max(wave, reach);
+    g.rotate(0.2 - wave * (1.3 + Math.sin((o.t || 0) * 13) * 0.35) - reach * 1.55);
+    g.beginPath(); g.ellipse(0, 0, 2.6, 3.4, 0, 0, 6.29); g.fill();       // shoulder
+    if (lift > 0.05) {                          // forearm, still attached to it
+      g.beginPath(); g.ellipse(0, -3.6 * lift, 2.3, 3.4, 0, 0, 6.29); g.fill();
+      g.fillStyle = skin;
+      g.beginPath(); g.arc(0, -6.6 * lift, 1.9, 0, 6.29); g.fill();       // little hand
+      g.fillStyle = steel;
     }
+    g.restore();
 
-    // cheek plates + rivet
-    g.fillStyle = steelDark;
-    roundRectOn(g, -9.4, -5.4, 18.8, 2.6, 1.3); g.fill();
-    g.fillStyle = P.trim;
-    g.beginPath(); g.arc(0, -4.1, 0.9, 0, 6.29); g.fill();
-    // a pleased little flush on the cheek plates
-    if (o.expr === 'happy' || o.expr === 'content') {
-      g.fillStyle = 'rgba(255,140,150,0.5)';
-      g.beginPath(); g.ellipse(-6.6, -4.2, 2, 1.1, 0, 0, 6.29); g.fill();
-      g.beginPath(); g.ellipse(6.6, -4.2, 2, 1.1, 0, 0, 6.29); g.fill();
-    }
-
-    // plume
-    g.fillStyle = P.plume;
-    var sway = Math.sin((o.t || 0) * 4) * 0.12 + (o.tilt || 0) * -0.6;
+    // shield on the off hand
     g.save();
-    g.translate(0, -19.4);
+    g.translate(-10.4, 3.4); g.rotate(-0.3 - reach * 0.4);
+    g.fillStyle = dark;
+    g.beginPath(); g.ellipse(0, 0, 5.6, 6.6, 0, 0, 6.29); g.fill();
+    g.fillStyle = P.tabard;
+    g.beginPath(); g.ellipse(0, 0, 3.8, 4.6, 0, 0, 6.29); g.fill();
+    g.fillStyle = P.trim;
+    g.beginPath(); g.arc(0, 0, 1.5, 0, 6.29); g.fill();
+    g.restore();
+
+    // ── a big round face
+    g.fillStyle = skin;
+    g.beginPath(); g.arc(0, -10.2, 9.5, 0, 6.29); g.fill();
+    g.fillStyle = skinS;                        // soft chin shading
+    g.beginPath(); g.ellipse(0, -3.6, 6.4, 2.2, 0, 0, Math.PI); g.fill();
+
+    // ── the face
+    var ex = 3.7, ey = -10.4, s, e = o.expr || 'normal';
+    var ink = '#3A2E30';
+    g.strokeStyle = ink; g.fillStyle = ink; g.lineCap = 'round';
+
+    function eyeArc(cx, up) {                    // a curved, closed eye
+      g.lineWidth = 1.7;
+      g.beginPath();
+      if (up) g.arc(cx, ey + 1.1, 2.3, Math.PI * 1.12, Math.PI * 1.88);
+      else    g.arc(cx, ey - 1.1, 2.3, Math.PI * 0.12, Math.PI * 0.88);
+      g.stroke();
+    }
+    function eyeBall(cx, r, ry) {
+      g.fillStyle = ink;
+      g.beginPath(); g.ellipse(cx + lookX, ey, r, ry || r, 0, 0, 6.29); g.fill();
+      g.fillStyle = 'rgba(255,255,255,0.92)';    // the highlight is the whole trick
+      g.beginPath(); g.arc(cx + lookX - r * 0.34, ey - r * 0.42, r * 0.36, 0, 6.29); g.fill();
+      g.fillStyle = ink;
+    }
+
+    if (e === 'happy' || e === 'content') {
+      eyeArc(-ex, true); eyeArc(ex, true);
+    } else if (e === 'blink') {
+      g.lineWidth = 1.7;
+      for (s = -1; s <= 1; s += 2) { g.beginPath(); g.moveTo(s * ex - 1.7, ey); g.lineTo(s * ex + 1.7, ey); g.stroke(); }
+    } else if (e === 'sleepy') {
+      eyeArc(-ex, false); eyeArc(ex, false);
+    } else if (e === 'surprised') {
+      eyeBall(-ex, 2.9, 3.2); eyeBall(ex, 2.9, 3.2);
+    } else if (e === 'shy') {
+      eyeArc(-ex, true); eyeArc(ex, true);
+    } else if (e === 'grumble') {
+      eyeBall(-ex, 1.9, 1.5); eyeBall(ex, 1.9, 1.5);   // narrowed, not closed
+      g.strokeStyle = ink; g.lineWidth = 1.5;          // brows well clear above
+      g.beginPath(); g.moveTo(-ex - 2.4, ey - 5); g.lineTo(-ex + 1.6, ey - 3.4); g.stroke();
+      g.beginPath(); g.moveTo(ex + 2.4, ey - 5); g.lineTo(ex - 1.6, ey - 3.4); g.stroke();
+    } else {
+      eyeBall(-ex, 2.4, 2.7); eyeBall(ex, 2.4, 2.7);
+    }
+
+    // mouth
+    g.strokeStyle = ink; g.fillStyle = ink; g.lineWidth = 1.5;
+    var my = -4.6;
+    if (e === 'happy') {
+      g.beginPath(); g.arc(0, my - 0.6, 2.5, 0.15, Math.PI - 0.15); g.fill();
+      g.fillStyle = '#C97C86';
+      g.beginPath(); g.arc(0, my + 0.5, 1.4, 0.1, Math.PI - 0.1); g.fill();
+    } else if (e === 'surprised') {
+      g.fillStyle = ink;
+      g.beginPath(); g.ellipse(0, my, 1.5, 1.9, 0, 0, 6.29); g.fill();
+    } else if (e === 'grumble') {
+      g.beginPath(); g.arc(0, my + 2.4, 2.2, Math.PI * 1.25, Math.PI * 1.75); g.stroke();
+    } else if (e === 'sleepy') {
+      g.beginPath(); g.ellipse(0, my, 1, 1.3, 0, 0, 6.29); g.fill();
+    } else {
+      g.beginPath(); g.arc(0, my - 1, 2.1, 0.35, Math.PI - 0.35); g.stroke();
+    }
+
+    // blush
+    if (e === 'happy' || e === 'content' || e === 'shy' || e === 'surprised') {
+      g.fillStyle = e === 'shy' ? 'rgba(255,120,140,0.55)' : 'rgba(255,140,150,0.42)';
+      g.beginPath(); g.ellipse(-6.6, -6.6, 2.4, 1.5, 0, 0, 6.29); g.fill();
+      g.beginPath(); g.ellipse(6.6, -6.6, 2.4, 1.5, 0, 0, 6.29); g.fill();
+    }
+
+    // ── helmet: a dome and cheek guards, leaving the face open
+    g.fillStyle = steel;
+    g.beginPath();
+    g.arc(0, -11.4, 10.2, Math.PI, 0);
+    g.lineTo(10.2, -13.4); g.lineTo(-10.2, -13.4);
+    g.closePath(); g.fill();
+    g.fillStyle = dark;
+    roundRectOn(g, -10.6, -14.6, 21.2, 2.9, 1.4); g.fill();     // brim
+    g.fillStyle = steel;
+    roundRectOn(g, -10.9, -13.4, 3.1, 8.2, 1.5); g.fill();      // cheek guards
+    roundRectOn(g, 7.8, -13.4, 3.1, 8.2, 1.5); g.fill();
+    g.fillStyle = P.trim;
+    g.beginPath(); g.arc(0, -13.2, 1, 0, 6.29); g.fill();
+
+    // ── plume
+    g.fillStyle = P.plume;
+    var sway = Math.sin((o.t || 0) * 4) * 0.13 + (o.tilt || 0) * -0.7;
+    g.save();
+    g.translate(0, -21.2);
     g.rotate(sway);
     g.beginPath();
-    g.moveTo(0, 2);
-    g.quadraticCurveTo(-5.5, -2.5, -2.4, -9.5);
-    g.quadraticCurveTo(0.6, -4.5, 3.4, -8.2);
-    g.quadraticCurveTo(4.2, -1.6, 0, 2);
+    g.moveTo(0, 2.4);
+    g.quadraticCurveTo(-6, -2.4, -2.6, -10);
+    g.quadraticCurveTo(0.7, -4.8, 3.7, -8.6);
+    g.quadraticCurveTo(4.6, -1.6, 0, 2.4);
     g.closePath(); g.fill();
     g.restore();
 
     // dozing
     if (o.zzz) {
-      g.fillStyle = 'rgba(232,220,200,' + (0.5 * o.zzz).toFixed(3) + ')';
       g.font = '700 7px -apple-system, system-ui, sans-serif';
       for (var z = 0; z < 3; z++) {
-        var zt = ((o.t || 0) * 0.5 + z * 0.33) % 1;
+        var zt = ((o.t || 0) * 0.45 + z * 0.33) % 1;
         g.globalAlpha = (1 - zt) * o.zzz;
-        g.fillText('z', 9 + zt * 7, -18 - zt * 13);
+        g.fillStyle = 'rgba(232,220,200,0.75)';
+        g.fillText('z', 9 + zt * 7, -20 - zt * 13);
       }
       g.globalAlpha = 1;
     }
@@ -2570,6 +2638,7 @@
     drawKnight(ctx, {
       t: S.time,
       scale: 1.32,
+      expr: k.guard > 0 ? 'surprised' : (k.carry >= D.carry ? 'happy' : 'normal'),
       flash: k.guard > 0 && Math.floor(S.time * 18) % 2 === 0
     });
 
@@ -2984,37 +3053,62 @@
   }
 
   // ── his little life ────────────────────────────────────────────────────
-  // On the camp screen he is not a portrait, he is a small person with
-  // nothing to do. He potters, and you can bother him.
+  // Nothing here is on a schedule. He picks something, does it for a while
+  // he chose, and picks again — and when you bother him he answers with
+  // whichever reaction he feels like, not the same one every time.
   var KN = {
     act: 'idle', actT: 2, expr: 'normal', exprT: 0,
-    blink: 1.8, hop: 0, tilt: 0, wave: 0, zzz: 0,
-    hearts: [], taps: 0, tapT: 0, petting: 0, pet: 0, bounce: 0
+    blink: 1.8, hop: 0, tilt: 0, wave: 0, reach: 0, zzz: 0, sit: 0,
+    spin: 0, squash: 0, look: 0, lookT: 0,
+    hearts: [], props: [], taps: 0, tapT: 0, petting: 0, pet: 0,
+    onStage: false, lastReact: '', bounce: 0, danceT: 0
   };
+
+  // weight, and how long he might keep at it
   var KN_ACTS = [
-    { id: 'idle',    w: 5, dur: [2.5, 5] },
-    { id: 'look',    w: 3, dur: [2.5, 4] },
-    { id: 'wave',    w: 1.6, dur: [1.8, 2.6] },
-    { id: 'stretch', w: 1.6, dur: [1.6, 2.2] },
-    { id: 'doze',    w: 1.4, dur: [4, 7] }
+    { id: 'idle',    w: 4,   dur: [1.6, 4.5] },
+    { id: 'look',    w: 2.6, dur: [2, 4] },
+    { id: 'wave',    w: 1.2, dur: [1.6, 2.6] },
+    { id: 'stretch', w: 1.2, dur: [1.4, 2.4] },
+    { id: 'doze',    w: 1.3, dur: [3.5, 8] },
+    { id: 'hum',     w: 1.6, dur: [3, 6] },
+    { id: 'poke',    w: 1.4, dur: [2, 3.5] },
+    { id: 'ember',   w: 1.7, dur: [3, 4.5] },
+    { id: 'moth',    w: 1.5, dur: [4, 7] },
+    { id: 'spin',    w: 0.7, dur: [1, 1.4] },
+    { id: 'sit',     w: 1.1, dur: [3, 6] }
   ];
-  function knightAct() {
-    var total = 0, i;
-    for (i = 0; i < KN_ACTS.length; i++) total += KN_ACTS[i].w;
-    var roll = Math.random() * total, acc = 0, pickd = KN_ACTS[0];
-    for (i = 0; i < KN_ACTS.length; i++) { acc += KN_ACTS[i].w; if (roll <= acc) { pickd = KN_ACTS[i]; break; } }
-    KN.act = pickd.id;
-    KN.actT = rand(pickd.dur[0], pickd.dur[1]);
+
+  function knightAct(force) {
+    var pool = [], i;
+    // dancing only exists on the camp screen, and only when the band is playing
+    if (KN.onStage && MUS.timer && Math.random() < 0.42) {
+      KN.act = 'dance'; KN.actT = rand(6, 14); KN.props.length = 0; return;
+    }
+    for (i = 0; i < KN_ACTS.length; i++) {
+      if (KN_ACTS[i].id === KN.act) continue;          // never twice in a row
+      pool.push(KN_ACTS[i]);
+    }
+    var total = 0;
+    for (i = 0; i < pool.length; i++) total += pool[i].w;
+    var roll = Math.random() * total, acc = 0, picked = pool[0];
+    for (i = 0; i < pool.length; i++) { acc += pool[i].w; if (roll <= acc) { picked = pool[i]; break; } }
+    KN.act = force || picked.id;
+    KN.actT = rand(picked.dur[0], picked.dur[1]);
+    KN.props.length = 0;
+    if (KN.act === 'ember') KN.props.push({ kind: 'ember', x: rand(-6, 6), y: 6, vx: rand(-5, 5), vy: -9, life: KN.actT });
+    if (KN.act === 'moth')  KN.props.push({ kind: 'moth', x: rand(-14, 14), y: -14, ph: rand(0, 6.28), life: KN.actT });
   }
+
   function knHeart(kind) {
-    KN.hearts.push({ x: rand(-7, 7), y: -16, vy: rand(-16, -24), vx: rand(-6, 6),
+    KN.hearts.push({ x: rand(-7, 7), y: -18, vy: rand(-16, -24), vx: rand(-6, 6),
                      life: 1.5, max: 1.5, kind: kind || 'heart', r: rand(0.8, 1.2) });
   }
   function knFeel(expr, secs) { KN.expr = expr; KN.exprT = secs; }
 
   function updateKnight(dt) {
-    // hearts drift up whatever he is doing
-    for (var i = KN.hearts.length - 1; i >= 0; i--) {
+    var i;
+    for (i = KN.hearts.length - 1; i >= 0; i--) {
       var h = KN.hearts[i];
       h.life -= dt;
       if (h.life <= 0) { KN.hearts.splice(i, 1); continue; }
@@ -3022,71 +3116,148 @@
     }
 
     KN.hop = Math.max(0, KN.hop - dt * 26);
+    KN.squash = KN.squash > 0 ? Math.max(0, KN.squash - dt * 3) : Math.min(0, KN.squash + dt * 3);
+    KN.spin = KN.spin > 0.001 ? Math.max(0, KN.spin - dt * 7) : 0;
     if (KN.bounce > 0) { KN.bounce -= dt; KN.hop = Math.max(KN.hop, Math.abs(Math.sin(KN.bounce * 15)) * 5 * KN.bounce); }
     KN.tapT = Math.max(0, KN.tapT - dt);
     if (KN.tapT <= 0) KN.taps = 0;
+    if (KN.exprT > 0) KN.exprT -= dt;
 
-    // being petted overrides everything, because of course it does
+    // being stroked beats anything he had planned
     if (KN.petting > 0) {
       KN.petting -= dt;
       KN.pet = Math.min(1, KN.pet + dt * 4);
       KN.tilt = Math.sin(S.time * 5) * 0.07 * KN.pet;
-      KN.wave = 0; KN.zzz = 0;
-      knFeel('content', 0.3);
+      KN.wave = 0; KN.reach = 0; KN.zzz = 0; KN.sit = Math.min(0.4, KN.sit + dt);
+      if (KN.exprT <= 0) knFeel('content', 0.25);
       if (Math.random() < dt * 2.2) knHeart('heart');
       return;
     }
     KN.pet = Math.max(0, KN.pet - dt * 2);
 
-    if (KN.exprT > 0) { KN.exprT -= dt; }
-
     KN.actT -= dt;
     if (KN.actT <= 0) knightAct();
 
-    // gestures belonging to the current pottering
-    KN.wave = KN.act === 'wave' ? Math.min(1, KN.wave + dt * 5) : Math.max(0, KN.wave - dt * 5);
-    KN.zzz  = KN.act === 'doze' ? Math.min(1, KN.zzz + dt * 1.2) : Math.max(0, KN.zzz - dt * 3);
-    if (KN.act === 'stretch') {
-      KN.tilt = Math.sin(S.time * 2.2) * 0.11;
-      KN.hop = Math.max(KN.hop, 1.4 + Math.sin(S.time * 2.2) * 1.4);
-    } else if (KN.act !== 'doze') {
-      KN.tilt = Math.sin(S.time * 1.1) * 0.02;
-    } else {
-      KN.tilt = 0.1;
+    // props live their own little lives
+    for (i = KN.props.length - 1; i >= 0; i--) {
+      var pr = KN.props[i];
+      pr.life -= dt;
+      if (pr.life <= 0) { KN.props.splice(i, 1); continue; }
+      if (pr.kind === 'ember') {
+        pr.x += pr.vx * dt; pr.y += pr.vy * dt;
+        pr.vx += Math.sin(S.time * 3 + pr.ph) * 6 * dt;
+        pr.vy = Math.max(-16, pr.vy - dt * 2);
+      } else {
+        pr.ph += dt * 2.2;
+        pr.x = Math.cos(pr.ph) * 15;
+        pr.y = -14 + Math.sin(pr.ph * 2) * 7;
+      }
     }
 
-    // blinking, unless his eyes are already doing something
+    // ease every gesture toward what this behaviour wants
+    var wantWave = 0, wantReach = 0, wantZzz = 0, wantSit = 0, tilt = Math.sin(S.time * 1.1) * 0.02, expr = 'normal';
+
+    if (KN.act === 'dance') {
+      var B = beatNow();
+      if (!B) { knightAct('idle'); }
+      else {
+        var e = 1 - B.phase;
+        var pop = e * e;
+        KN.hop = Math.max(KN.hop, pop * (B.beat === 0 ? 7.5 : 4.6));
+        KN.squash = B.phase < 0.1 ? 0.1 : -pop * 0.08;
+        tilt = ((B.beat % 2) ? 1 : -1) * 0.15 * (0.35 + e * 0.65);
+        wantWave = B.beat % 2 ? 0.55 : 0;
+        expr = 'happy';
+        KN.danceT += dt;
+        if (Math.random() < dt * 0.5) knHeart('note');
+      }
+    } else if (KN.act === 'wave')    { wantWave = 1; expr = 'happy'; }
+    else if (KN.act === 'stretch')   { tilt = Math.sin(S.time * 2.2) * 0.11; KN.hop = Math.max(KN.hop, 1.4 + Math.sin(S.time * 2.2) * 1.4); expr = 'sleepy'; }
+    else if (KN.act === 'doze')      { wantZzz = 1; wantSit = 0.5; tilt = 0.1; expr = 'sleepy'; }
+    else if (KN.act === 'sit')       { wantSit = 1; expr = Math.sin(S.time) > 0 ? 'content' : 'normal'; }
+    else if (KN.act === 'hum')       { tilt = Math.sin(S.time * 2.6) * 0.1; expr = 'content'; }
+    else if (KN.act === 'poke')      { wantReach = 0.5 + Math.sin(S.time * 5) * 0.5; tilt = 0.09; expr = 'normal'; }
+    else if (KN.act === 'spin')      { if (KN.spin < 0.01) KN.spin = 6.28; expr = 'happy'; }
+    else if (KN.act === 'look')      { expr = 'normal'; }
+    else if (KN.act === 'ember') {
+      var em = KN.props[0];
+      wantReach = em ? 1 : 0;
+      if (em) {
+        KN.look = clamp(em.x / 12, -1, 1);
+        tilt = clamp(em.x / 60, -0.12, 0.12);
+        if (Math.random() < dt * 2.5) KN.hop = Math.max(KN.hop, 4);
+        expr = 'surprised';
+      } else { expr = 'grumble'; }        // it got away
+    } else if (KN.act === 'moth') {
+      var mo = KN.props[0];
+      if (mo) {
+        KN.look = clamp(mo.x / 14, -1, 1);
+        tilt = clamp(mo.x / 90, -0.1, 0.1);
+        if (Math.abs(mo.x) < 6 && Math.random() < dt * 3) { wantWave = 1; }
+        expr = 'look';
+      }
+    }
+
+    if (KN.act !== 'ember' && KN.act !== 'moth') {
+      KN.lookT -= dt;
+      if (KN.lookT <= 0) { KN.lookT = rand(0.7, 2.2); KN.look = KN.act === 'look' ? rand(-1, 1) : 0; }
+    }
+
+    KN.wave  += (wantWave - KN.wave) * Math.min(1, dt * 7);
+    KN.reach += (wantReach - KN.reach) * Math.min(1, dt * 7);
+    KN.zzz   += (wantZzz - KN.zzz) * Math.min(1, dt * 3);
+    KN.sit   += (wantSit - KN.sit) * Math.min(1, dt * 4);
+    KN.tilt = tilt;
+
     KN.blink -= dt;
-    if (KN.blink <= 0) { KN.blink = rand(2.4, 5.5); knFeel('blink', 0.13); }
-
-    if (KN.exprT <= 0) {
-      KN.expr = KN.act === 'doze' ? 'sleepy'
-              : KN.act === 'look' ? 'look'
-              : KN.act === 'wave' ? 'happy'
-              : 'normal';
-    }
+    if (KN.blink <= 0) { KN.blink = rand(1.8, 6); knFeel('blink', rand(0.1, 0.16)); }
+    if (KN.exprT <= 0) KN.expr = expr;
   }
 
-  // tap him
-  function knightPoke(x, y) {
-    KN.taps++; KN.tapT = 1.6;
-    if (KN.taps >= 4) {                       // enough, thank you
-      knFeel('surprised', 1.1);
-      KN.bounce = 0.5;
+  // ── bothering him ──────────────────────────────────────────────────────
+  // A bag of reactions rather than one response, so he never answers the
+  // same way twice running.
+  var KN_REACTS = [
+    { id: 'hop',    w: 3,   go: function () { knFeel('happy', rand(1, 1.8)); KN.hop = rand(5.5, 8); KN.squash = -0.1; knHeart('heart'); bell(rand(820, 960), 0.28, 0.032, 3.2); } },
+    { id: 'giggle', w: 2.4, go: function () { knFeel('happy', 1.6); KN.bounce = 0.55; knHeart('heart'); knHeart('heart');
+                                              bell(700, 0.22, 0.028, 3.4); bell(880, 0.24, 0.026, 3.4, 0.09); } },
+    { id: 'shy',    w: 1.6, go: function () { knFeel('shy', rand(1.4, 2.2)); KN.look = rand(0, 1) > 0.5 ? 1 : -1; KN.lookT = 2; knHeart('heart'); bell(590, 0.4, 0.026, 2.6); } },
+    { id: 'spin',   w: 1.2, go: function () { knFeel('happy', 1.4); KN.spin = 6.28; knHeart('note'); bell(660, 0.3, 0.03, 2.8); bell(990, 0.3, 0.024, 2.8, 0.1); } },
+    { id: 'wave',   w: 1.4, go: function () { knFeel('happy', 1.6); KN.act = 'wave'; KN.actT = 2; bell(760, 0.26, 0.03, 3); } },
+    { id: 'jump',   w: 1.1, go: function () { knFeel('surprised', 1.1); KN.hop = 9; KN.squash = -0.14; bell(1050, 0.2, 0.03, 3.6); } },
+    { id: 'ignore', w: 0.9, go: function () { knFeel('blink', 0.5); bell(430, 0.2, 0.018, 2.4); } },
+    { id: 'grump',  w: 0.7, go: function () { knFeel('grumble', 1.6); KN.tilt = 0.12; bell(300, 0.34, 0.03, 1.6); } }
+  ];
+
+  function knightPoke() {
+    KN.taps++; KN.tapT = 2;
+    KN.act = 'idle'; KN.actT = rand(1.2, 2.4); KN.props.length = 0;
+
+    // pester him and he stops being charmed by it
+    if (KN.taps >= 5 && Math.random() < 0.7) {
+      knFeel('grumble', 1.8);
+      KN.bounce = 0.4;
       knHeart('note');
-      bell(720, 0.3, 0.035, 3.4);
+      bell(260, 0.4, 0.032, 1.5);
       KN.taps = 0;
-    } else {
-      knFeel('happy', 1.4);
-      KN.hop = 6.5;
-      KN.act = 'idle'; KN.actT = 1.6;
-      knHeart('heart');
-      bell(880 + KN.taps * 90, 0.28, 0.032, 3.2);
+      buzz(12);
+      return;
     }
+    var pool = [], i, total = 0;
+    for (i = 0; i < KN_REACTS.length; i++) if (KN_REACTS[i].id !== KN.lastReact) pool.push(KN_REACTS[i]);
+    for (i = 0; i < pool.length; i++) total += pool[i].w;
+    var roll = Math.random() * total, acc = 0, picked = pool[0];
+    for (i = 0; i < pool.length; i++) { acc += pool[i].w; if (roll <= acc) { picked = pool[i]; break; } }
+    KN.lastReact = picked.id;
+    picked.go();
     buzz(8);
   }
+
   function knightPet() {
-    if (KN.petting <= 0) bell(660, 0.4, 0.028, 2.6);
+    if (KN.petting <= 0) {
+      bell(rand(600, 700), 0.4, 0.026, 2.6);
+      if (Math.random() < 0.25) { knFeel('surprised', 0.5); KN.hop = 4; }   // caught him off guard
+    }
     KN.petting = 0.35;
   }
 
@@ -3110,9 +3281,33 @@
     var sc = Math.min(w, h) / ((BOT - TOP) * 1.28);
     g.save();
     g.translate(w / 2, h / 2 - MID * sc);
+    // the ember he is chasing, or the moth bothering him
+    g.save();
+    g.scale(sc, sc);
+    for (var pi = 0; pi < KN.props.length; pi++) {
+      var pr = KN.props[pi];
+      if (pr.kind === 'ember') {
+        var eg = g.createRadialGradient(pr.x, pr.y, 0, pr.x, pr.y, 4);
+        eg.addColorStop(0, 'rgba(255,236,170,0.95)');
+        eg.addColorStop(0.4, 'rgba(255,168,50,0.7)');
+        eg.addColorStop(1, 'rgba(255,120,20,0)');
+        g.fillStyle = eg;
+        g.beginPath(); g.arc(pr.x, pr.y, 4, 0, 6.29); g.fill();
+      } else {
+        var fl = Math.sin(S.time * 26 + pr.ph) * 0.5 + 0.5;
+        g.fillStyle = 'rgba(226,214,190,0.85)';
+        g.beginPath(); g.ellipse(pr.x - 1.4, pr.y, 1.7, 0.6 + fl * 1.5, -0.5, 0, 6.29); g.fill();
+        g.beginPath(); g.ellipse(pr.x + 1.4, pr.y, 1.7, 0.6 + fl * 1.5, 0.5, 0, 6.29); g.fill();
+        g.fillStyle = 'rgba(120,104,88,0.9)';
+        g.beginPath(); g.ellipse(pr.x, pr.y, 0.7, 1.5, 0, 0, 6.29); g.fill();
+      }
+    }
+    g.restore();
+
     drawKnight(g, {
-      t: S.time, scale: sc, expr: KN.expr,
-      tilt: KN.tilt, hop: KN.hop, wave: KN.wave, zzz: KN.zzz
+      t: S.time, scale: sc, expr: KN.expr, look: KN.look,
+      tilt: KN.tilt, hop: KN.hop, squash: KN.squash, spin: KN.spin,
+      wave: KN.wave, reach: KN.reach, zzz: KN.zzz, sit: KN.sit
     });
     // whatever he is feeling about it
     for (var i = 0; i < KN.hearts.length; i++) {
@@ -3140,6 +3335,7 @@
 
   function veil(html, cls) {
     portraitCv = null;
+    KN.onStage = false;
     elCard.className = 'card' + (cls ? ' ' + cls : '');
     elCard.innerHTML = html;
     elVeil.classList.remove('hide');
@@ -3153,6 +3349,7 @@
   function bindStage() {
     var st = document.getElementById('stage');
     if (!st) return;
+    KN.onStage = true;
     var down = false, moved = 0, sx = 0, sy = 0;
     st.addEventListener('pointerdown', function (e) {
       down = true; moved = 0; sx = e.clientX; sy = e.clientY;
@@ -3929,7 +4126,7 @@
   document.addEventListener('keydown', wakeAudio);
   // opt-in inspection hook for tuning/QA: open with #debug
   if (/[?#]debug/.test(location.href)) window.__NW = { S: S, K: K, D: D, META: META, UPGRADES: UPGRADES, PERKS: PERKS,
-      flare: doFlare, swing: doSwing, lightAt: lightAt, stick: stick, KN: KN, updateKnight: updateKnight, A: A, MUS: MUS, TUNES: TUNES,
+      flare: doFlare, swing: doSwing, lightAt: lightAt, stick: stick, KN: KN, updateKnight: updateKnight, knightPoke: knightPoke, knightPet: knightPet, beatNow: beatNow, drawKnight: drawKnight, A: A, MUS: MUS, TUNES: TUNES,
       startMusic: startMusic, nextTune: nextTune, setMusic: setMusic, SFX: SFX, UI: UI, ac: ac,
       music: { parseChord: parseChord, voicing: voicing, bassNote: bassNote,
                leadNote: leadNote, chordAt: chordAt, QUAL: QUAL, mtof: mtof }, recalc: recalc, saveMeta: saveMeta, rollDraft: rollDraft, take: takeUpgrade };
