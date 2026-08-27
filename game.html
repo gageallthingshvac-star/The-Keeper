@@ -430,8 +430,8 @@
   }
   .homestage .portrait.stage-knight{width:100%;height:100%;border-radius:0}
   .hometop{
-    position:absolute;z-index:2;left:calc(var(--safeL) + 14px);top:calc(var(--safeT) + 15px);
-    right:calc(var(--safeR) + 106px);display:flex;flex-wrap:wrap;gap:7px;pointer-events:none;
+    position:absolute;z-index:2;left:calc(var(--safeL) + 14px);top:calc(var(--safeT) + 78px);
+    right:calc(var(--safeR) + 14px);display:flex;flex-wrap:wrap;gap:7px;pointer-events:none;
   }
   .hchip{
     display:inline-flex;align-items:baseline;gap:6px;padding:7px 12px;border-radius:999px;
@@ -441,19 +441,27 @@
   }
   .hchip b{font:700 13px/1 var(--display);letter-spacing:0;color:var(--bone);text-transform:none}
   .hchip.warn{border-color:rgba(255,69,58,0.5);color:#FFB4AE;letter-spacing:.04em;text-transform:none}
-  #veilnote{
-    position:fixed;z-index:6;display:none;
-    top:calc(var(--safeT) + 12px);right:calc(var(--safeR) + 62px);
-    width:42px;height:42px;border-radius:50%;cursor:pointer;
-    border:1px solid var(--line);background:rgba(20,16,14,0.86);
-    color:var(--mute);font:400 17px/1 var(--body);padding:0;
-    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-    transition:transform .18s ease,color .2s ease,border-color .2s ease;
+  .homemus{
+    position:absolute;z-index:3;right:calc(var(--safeR) + 62px);top:calc(var(--safeT) + 12px);
+    display:flex;align-items:center;gap:4px;padding:5px 7px;border-radius:999px;
+    border:1px solid var(--line);background:rgba(14,11,10,0.66);
+    backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);
   }
-  #veilnote.on{display:block}
-  #veilnote.lit{color:var(--ember);border-color:rgba(255,159,10,0.45)}
-  #veilnote:active{transform:scale(.92)}
-  #veil.hide #veilnote{display:none}
+  .homemus .tb{
+    width:30px;height:30px;border-radius:50%;border:0;background:none;padding:0;
+    color:var(--mute);display:grid;place-items:center;cursor:pointer;
+  }
+  .homemus .tb.big{width:34px;height:34px;background:rgba(255,159,10,0.13);color:var(--ember)}
+  .homemus .tb.lit{color:var(--ember)}
+  .homemus .tb:active{transform:scale(.9)}
+  .homemus .tb svg{width:13px;height:12px}
+  .homemus .tb.big svg{width:12px;height:14px}
+  .hometune{
+    position:absolute;z-index:3;right:calc(var(--safeR) + 12px);top:calc(var(--safeT) + 56px);
+    max-width:62%;text-align:right;pointer-events:none;
+    font:600 10px/1.3 var(--body);letter-spacing:.1em;text-transform:uppercase;color:#6E6560;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
   .homebar{
     position:absolute;z-index:2;left:0;right:0;bottom:0;text-align:center;
     padding:64px calc(var(--safeR) + 20px) calc(var(--safeB) + 14px) calc(var(--safeL) + 20px);
@@ -696,7 +704,7 @@
 <div id="build"></div>
 <div id="toast"><div class="t1"></div><div class="t2"></div></div>
 
-<div id="veil"><button id="veilback" aria-label="Back" title="Back">‹</button><button id="veilnote" aria-label="Music" title="Music">♪</button><button id="veilgear" aria-label="Settings" title="Settings">⚙</button><div class="card" id="card"></div></div>
+<div id="veil"><button id="veilback" aria-label="Back" title="Back">‹</button><button id="veilgear" aria-label="Settings" title="Settings">⚙</button><div class="card" id="card"></div></div>
 
 <script>
 (function () {
@@ -716,7 +724,7 @@
   var ZOOM = 0.7;
   var VS = 1;                     // device pixels per field unit
   function px(n) { return n / ZOOM; }   // n screen pixels, in field units
-  var BUILD = 'v1.16.1';        // bump on every deploy — shown in-game for support
+  var BUILD = 'v1.17.0';        // bump on every deploy — shown in-game for support
   var MUTE_KEY = 'keeper.nightwatch.mute';
   var MUSIC_KEY = 'keeper.nightwatch.music';
 
@@ -988,7 +996,7 @@
     return { v: 3, embers: 0, xp: 0, runs: 0, bestNight: 0, bestScore: 0,
              perks: {}, ach: {}, lifeLogs: 0, lifeKills: 0, lifeNights: 0,
              knight: { name: '', plume: 'crimson', build: 'lad', helm: 'none',
-                       cape: 'hoodie', armour: 'chestnut' },
+                       cape: 'hoodie', armour: 'chestnut', cut: 'swept' },
              player: { name: '', gender: '', hue: 'ember', met: 0, theme: true },
              night: 1, up: {}, pets: [], partner: '', treats: 0,
              dog: { name: '' }, camp: [], reached: 0,
@@ -1038,6 +1046,7 @@
     for (i = 0; i < HEADS.length; i++)   if (HEADS[i].id === k.helm)     f.knight.helm = k.helm;
     for (i = 0; i < OUTFITS.length; i++) if (OUTFITS[i].id === k.cape)    f.knight.cape = k.cape;
     for (i = 0; i < HAIRS.length; i++)   if (HAIRS[i].id === k.armour)    f.knight.armour = k.armour;
+    for (i = 0; i < CUTS.length; i++)    if (CUTS[i].id === k.cut)        f.knight.cut = k.cut;
 
     var pl = (m.player && typeof m.player === 'object') ? m.player : {};
     f.player.name = cleanName(pl.name);
@@ -1792,12 +1801,13 @@
   // melodica — dub lead
   function melodica(t, freq, dur, vol) {
     var a = A.ctx, g = a.createGain(), f = a.createBiquadFilter();
-    f.type = 'bandpass'; f.frequency.value = freq * 2.4; f.Q.value = 1.6;
+    f.type = 'lowpass';                                    // reedy, not vowel-y
+    f.frequency.value = Math.min(5000, freq * 5); f.Q.value = 0.8;
     var o = osc('sawtooth', freq, t, dur);
-    var vib = osc('sine', 5.4, t, dur), vg = a.createGain();
-    vg.gain.setValueAtTime(0, t); vg.gain.linearRampToValueAtTime(freq * 0.009, t + dur * 0.5);
+    var vib = osc('sine', 4.6, t, dur), vg = a.createGain();
+    vg.gain.setValueAtTime(0, t); vg.gain.linearRampToValueAtTime(freq * 0.003, t + dur * 0.6);
     vib.connect(vg); vg.connect(o.frequency);
-    env(g, t, dur, vol, 0.06);
+    env(g, t, dur, vol, 0.026);                            // reeds speak quickly
     o.connect(f); f.connect(g); g.connect(A.music);
   }
   // upright piano — nocturne, waltz
@@ -1829,15 +1839,15 @@
   function flute(t, freq, dur, vol) {
     var a = A.ctx, g = a.createGain();
     var o = osc('sine', freq, t, dur);
-    var vib = osc('sine', 5, t, dur), vg = a.createGain();
-    vg.gain.setValueAtTime(0, t); vg.gain.linearRampToValueAtTime(freq * 0.007, t + dur * 0.6);
+    var vib = osc('sine', 4.8, t, dur), vg = a.createGain();
+    vg.gain.setValueAtTime(0, t); vg.gain.linearRampToValueAtTime(freq * 0.0032, t + dur * 0.6);
     vib.connect(vg); vg.connect(o.frequency);
     var br = a.createBufferSource(); br.buffer = noiseBuffer(a); br.loop = true;
-    var bf = a.createBiquadFilter(); bf.type = 'bandpass'; bf.frequency.value = freq * 2; bf.Q.value = 2;
-    var bg = a.createGain(); bg.gain.value = vol * 0.1;
+    var bf = a.createBiquadFilter(); bf.type = 'highpass'; bf.frequency.value = freq * 2.4; bf.Q.value = 0.7;
+    var bg = a.createGain(); bg.gain.value = vol * 0.055;
     br.connect(bf); bf.connect(bg); bg.connect(g);
     br.start(t); br.stop(t + dur + 0.05);
-    env(g, t, dur, vol, 0.08);
+    env(g, t, dur, vol, 0.05);
     o.connect(g); g.connect(A.music);
   }
   // tuned hand drum — latin
@@ -3188,6 +3198,16 @@
     { id: 'ginger',   name: 'Ginger',   v: '#C2643A' },
     { id: 'ink',      name: 'Ink',      v: '#241C1A' }
   ];
+  // How the hair is cut. Each one is the same cap over the crown with a
+  // different edge to it, plus whatever it does at the sides.
+  var CUTS = [
+    { id: 'swept',  name: 'Swept' },
+    { id: 'mop',    name: 'Mop' },
+    { id: 'tuft',   name: 'Tuft' },
+    { id: 'curls',  name: 'Curls' },
+    { id: 'crop',   name: 'Crop' },
+    { id: 'long',   name: 'Long' }
+  ];
   function pickFrom(list, want, dflt) {
     for (var i = 0; i < list.length; i++) if (list[i].id === want) return list[i];
     return dflt || list[0];
@@ -3199,6 +3219,7 @@
   function headOf()   { return pickFrom(HEADS,   META.knight && META.knight.helm); }
   function outfitOf() { return pickFrom(OUTFITS, META.knight && META.knight.cape); }
   function hairOf()   { return pickFrom(HAIRS,   META.knight && META.knight.armour); }
+  function cutOf()    { return pickFrom(CUTS,    META.knight && META.knight.cut); }
 
   function plumeOf() {
     var want = META.knight && META.knight.plume;
@@ -3229,6 +3250,7 @@
     var H = wr ? pickFrom(HEADS, wr.helm) : headOf();
     var F = wr ? pickFrom(OUTFITS, wr.cape) : outfitOf();
     var HR = wr ? pickFrom(HAIRS, wr.hair) : hairOf();
+    var CU = wr ? pickFrom(CUTS, wr.cut) : cutOf();
     var B = o.build ? buildKey(o.build) : buildOf();
     var sc = o.scale || 1;
     var skin  = o.flash ? '#FFD3CF' : '#F7E0C4';
@@ -3361,6 +3383,10 @@
       // the back of his head: hair over almost all of it, one ear, no face
       if (H.hair !== false) {
         g.fillStyle = HR.v;
+        if (CU.id === 'long') {
+          g.beginPath();
+          g.ellipse(-hr * 0.1, -6.6, hr + 1.6, hr - 0.4, 0, 0, 6.29); g.fill();
+        }
         g.beginPath(); g.arc(0, -10, hr + 0.3, 0, 6.29); g.fill();
         g.fillStyle = 'rgba(0,0,0,0.14)';
         g.beginPath(); g.arc(hr * 0.22, -11.4, hr * 0.42, 0, 6.29); g.fill();   // crown whorl
@@ -3381,27 +3407,7 @@
       drawHead(g, H, hr, accent, cloth, trim, HR, o);
       g.restore();
     } else {
-      if (H.hair !== false) {
-        // The cap comes over the crown and down past the temples, and the
-        // fringe sweeps up clear of his eyes rather than sitting on them.
-        g.fillStyle = HR.v;
-        g.beginPath();
-        g.arc(0, -9.9, hr + 0.6, Math.PI * 1.02, Math.PI * 1.98);
-        g.bezierCurveTo(hr * 0.8, -13.9, hr * 0.2, -15.2, -hr * 0.28, -14.7);
-        g.bezierCurveTo(-hr * 0.66, -14.3, -hr * 0.92, -13.4, -hr * 0.999, -12.2);
-        g.closePath(); g.fill();
-        g.fillStyle = 'rgba(255,255,255,0.06)';      // a little light off the top
-        g.beginPath();
-        g.ellipse(-hr * 0.3, -15.6, hr * 0.44, 1.4, -0.3, 0, 6.29); g.fill();
-        if (B.scruff) {                              // a bit of it never lies flat
-          g.fillStyle = HR.v;
-          g.beginPath();
-          g.moveTo(-hr * 0.26, -hr - 8.9);
-          g.bezierCurveTo(hr * 0.06, -hr - 12.6, hr * 0.6, -hr - 12.2, hr * 0.82, -hr - 9.6);
-          g.bezierCurveTo(hr * 0.38, -hr - 10.9, hr * 0.02, -hr - 10.0, -hr * 0.26, -hr - 8.9);
-          g.fill();
-        }
-      }
+      if (H.hair !== false) drawHair(g, CU.id, hr, HR, B);
       drawFace(g, o, B, amt, skin);
       drawHead(g, H, hr, accent, cloth, trim, HR, o);
     }
@@ -3442,11 +3448,11 @@
     g.beginPath(); g.moveTo(0, sleeve); g.lineTo(0, 8.4); g.stroke();
     g.fillStyle = skin;
     g.beginPath(); g.arc(0, 9, 1.8, 0, 6.29); g.fill();
-    if (item) drawItem(g, item, t);
+    if (item) drawItem(g, item, t, ang || 0);
     g.restore();
   }
 
-  function drawItem(g, item, t) {
+  function drawItem(g, item, t, ang) {
     g.save();
     g.translate(0, 9.6);
     if (item === 'stick' || item === 'sticks') {
@@ -3484,21 +3490,23 @@
       g.moveTo(-0.4, -8.4); g.lineTo(3.6, -9.6); g.lineTo(3.6, -6.2); g.lineTo(-0.4, -6.6);
       g.closePath(); g.fill();
     } else if (item === 'book') {
-      // an open book, held up where the firelight gets at the pages
-      g.rotate(-0.2);
+      // An open book, held up where the firelight gets at the pages. The arm
+      // it hangs off can be at any angle, so undo that and keep the book level.
+      g.rotate(-(ang || 0) - 0.14);
+      g.translate(0, 1.4);
       g.fillStyle = '#7A4A3C';
-      roundRectOn(g, -6.4, -8.6, 12.8, 8.8, 1); g.fill();
+      roundRectOn(g, -5.6, -7.4, 11.2, 7.8, 0.9); g.fill();
       g.fillStyle = '#EFE6D2';
-      roundRectOn(g, -5.6, -8.0, 5.2, 7.6, 0.7); g.fill();
-      roundRectOn(g, 0.4, -8.0, 5.2, 7.6, 0.7); g.fill();
-      g.strokeStyle = 'rgba(128,110,88,0.5)'; g.lineWidth = 0.36;
+      roundRectOn(g, -4.9, -6.9, 4.5, 6.7, 0.6); g.fill();
+      roundRectOn(g, 0.4, -6.9, 4.5, 6.7, 0.6); g.fill();
+      g.strokeStyle = 'rgba(128,110,88,0.5)'; g.lineWidth = 0.32;
       for (var bl = 0; bl < 4; bl++) {
-        var by = -7.0 + bl * 1.6;
-        g.beginPath(); g.moveTo(-4.9, by); g.lineTo(-1.2, by); g.stroke();
-        g.beginPath(); g.moveTo(1.1, by); g.lineTo(4.8, by); g.stroke();
+        var by = -6.0 + bl * 1.4;
+        g.beginPath(); g.moveTo(-4.3, by); g.lineTo(-1.1, by); g.stroke();
+        g.beginPath(); g.moveTo(1.0, by); g.lineTo(4.2, by); g.stroke();
       }
-      g.strokeStyle = '#5F392E'; g.lineWidth = 0.6;
-      g.beginPath(); g.moveTo(0, -8.2); g.lineTo(0, -0.6); g.stroke();
+      g.strokeStyle = '#5F392E'; g.lineWidth = 0.55;
+      g.beginPath(); g.moveTo(0, -7.1); g.lineTo(0, -0.4); g.stroke();
     } else if (item === 'marsh') {
       g.strokeStyle = '#7A5433'; g.lineWidth = 1.2;
       g.beginPath(); g.moveTo(0, 0); g.lineTo(7, -2.4); g.stroke();
@@ -3604,6 +3612,66 @@
       g.beginPath(); g.moveTo(-1.5, my + 0.2); g.lineTo(1.5, my - 0.4); g.stroke();
     } else {
       g.beginPath(); g.arc(0, my - 1.1, 1.8 + amt * 0.7, 0.32, Math.PI - 0.32); g.stroke();
+    }
+  }
+
+  // Every cut is the same cap over the crown — it has to be, or a hat would
+  // stop fitting — with its own edge across the forehead and its own business
+  // at the sides. All of them stay clear of his eyes.
+  function drawHair(g, cut, hr, HR, B) {
+    var i;
+    g.fillStyle = HR.v;
+    if (cut === 'long') {                            // down past the jaw on both sides
+      g.beginPath();
+      g.moveTo(-hr - 1.4, -9);
+      g.bezierCurveTo(-hr - 2.4, -1.4, -hr - 1, 1.6, -hr + 1.2, 1.2);
+      g.lineTo(-hr + 2.4, -8);
+      g.closePath(); g.fill();
+      g.beginPath();
+      g.moveTo(hr + 1.4, -9);
+      g.bezierCurveTo(hr + 2.4, -1.4, hr + 1, 1.6, hr - 1.2, 1.2);
+      g.lineTo(hr - 2.4, -8);
+      g.closePath(); g.fill();
+    }
+    g.beginPath();
+    g.arc(0, -9.9, hr + (cut === 'crop' ? 0.15 : 0.6),
+          Math.PI * (cut === 'crop' ? 1.09 : 1.02), Math.PI * (cut === 'crop' ? 1.91 : 1.98));
+    if (cut === 'mop') {                             // a full fringe, straight across
+      g.bezierCurveTo(hr * 0.72, -12.9, hr * 0.3, -13.35, 0, -13.3);
+      g.bezierCurveTo(-hr * 0.3, -13.25, -hr * 0.72, -12.8, -hr * 0.999, -11.9);
+    } else if (cut === 'curls') {                    // four soft lobes hanging over
+      var xr = hr * 0.999;
+      for (i = 0; i < 4; i++) {
+        var xa = xr - 2 * xr * (i / 4), xb = xr - 2 * xr * ((i + 1) / 4);
+        g.quadraticCurveTo((xa + xb) / 2, -12.6, xb, -15.0);
+      }
+    } else if (cut === 'crop') {                     // short, right down on the skull
+      g.bezierCurveTo(hr * 0.62, -15.6, hr * 0.26, -16.0, 0, -15.95);
+      g.bezierCurveTo(-hr * 0.26, -15.9, -hr * 0.62, -15.4, -hr * 0.92, -13.9);
+    } else {                                         // swept, tuft and long share an edge
+      g.bezierCurveTo(hr * 0.8, -13.9, hr * 0.2, -15.2, -hr * 0.28, -14.7);
+      g.bezierCurveTo(-hr * 0.66, -14.3, -hr * 0.92, -13.4, -hr * 0.999, -12.2);
+    }
+    g.closePath(); g.fill();
+    if (cut !== 'crop') {                            // a little light off the top
+      g.fillStyle = 'rgba(255,255,255,0.06)';
+      g.beginPath();
+      g.ellipse(-hr * 0.3, -15.6, hr * 0.44, 1.4, -0.3, 0, 6.29); g.fill();
+    }
+    if (cut === 'tuft' || (cut === 'swept' && B.scruff)) {   // a bit that never lies flat
+      g.fillStyle = HR.v;
+      g.beginPath();
+      g.moveTo(-hr * 0.26, -hr - 8.9);
+      g.bezierCurveTo(hr * 0.06, -hr - 12.6, hr * 0.6, -hr - 12.2, hr * 0.82, -hr - 9.6);
+      g.bezierCurveTo(hr * 0.38, -hr - 10.9, hr * 0.02, -hr - 10.0, -hr * 0.26, -hr - 8.9);
+      g.fill();
+    }
+    if (cut === 'tuft') {                            // and a second, smaller one
+      g.beginPath();
+      g.moveTo(-hr * 0.62, -hr - 8.2);
+      g.bezierCurveTo(-hr * 0.72, -hr - 11.2, -hr * 0.24, -hr - 11.4, -hr * 0.12, -hr - 9.2);
+      g.bezierCurveTo(-hr * 0.34, -hr - 9.8, -hr * 0.5, -hr - 9.2, -hr * 0.62, -hr - 8.2);
+      g.fill();
     }
   }
 
@@ -4187,9 +4255,9 @@
     fire:  { x: 0,    stand: -16, face: 1 },
     pot:   { x: 0,    stand: 18,  face: -1 },   // the tripod hangs over the fire
     wood:  { x: -32,  stand: -28, face: -1 },
-    bed:   { x: -112, stand: -102, face: 1 },   // the tent — he sleeps inside it
+    bed:   { x: -112, stand: -107, face: 1 },   // the tent — he sleeps inside it
     kennel:{ x: -60,  stand: -70, face: 1 },
-    chair: { x: 60,   stand: 61,  face: -1 },   // his reading chair, turned to the fire
+    chair: { x: 60,   stand: 60,  face: -1 },   // his reading chair, turned to the fire
     desk:  { x: 104,  stand: 104, face: 1 },   // square in front of it, back to you
     line:  { x: 146,  stand: 130, face: 1 }
   };
@@ -4277,26 +4345,26 @@
 
     // ── a proper tent, pegged out, with a bedroll just inside the door
     g.save(); g.translate(CAMP.bed.x, 0);
-    g.strokeStyle = 'rgba(90,80,70,0.6)'; g.lineWidth = 0.7; g.lineCap = 'round';
-    g.beginPath(); g.moveTo(-2, -26); g.lineTo(-27, 8); g.stroke();      // guy lines
-    g.beginPath(); g.moveTo(-2, -26); g.lineTo(25, 8); g.stroke();
+    g.strokeStyle = 'rgba(90,80,70,0.6)'; g.lineWidth = 0.8; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(-3, -42); g.lineTo(-42, 8); g.stroke();      // guy lines
+    g.beginPath(); g.moveTo(-3, -42); g.lineTo(38, 8); g.stroke();
     g.fillStyle = '#4A4038';                                             // pegs
-    roundRectOn(g, -28.6, 6.6, 3, 2.4, 1); g.fill();
-    roundRectOn(g, 24.4, 6.6, 3, 2.4, 1); g.fill();
+    roundRectOn(g, -44, 6.4, 3.4, 2.6, 1); g.fill();
+    roundRectOn(g, 37, 6.4, 3.4, 2.6, 1); g.fill();
     g.fillStyle = '#5C6B57';                                             // near panel
-    g.beginPath(); g.moveTo(-23, 8); g.lineTo(-2, -24); g.lineTo(9, -24); g.lineTo(-12, 8);
+    g.beginPath(); g.moveTo(-36, 8); g.lineTo(-3, -40); g.lineTo(14, -40); g.lineTo(-19, 8);
     g.closePath(); g.fill();
     g.fillStyle = '#485741';                                             // far panel
-    g.beginPath(); g.moveTo(21, 8); g.lineTo(9, -24); g.lineTo(-2, -24); g.lineTo(10, 8);
+    g.beginPath(); g.moveTo(33, 8); g.lineTo(14, -40); g.lineTo(-3, -40); g.lineTo(16, 8);
     g.closePath(); g.fill();
-    g.fillStyle = '#2A2E28';                                             // the doorway
-    g.beginPath(); g.moveTo(-12, 8); g.lineTo(-2, -20); g.lineTo(10, 8); g.closePath(); g.fill();
-    g.strokeStyle = '#3A4238'; g.lineWidth = 1.1;                        // ridge pole
-    g.beginPath(); g.moveTo(-2.6, -24.4); g.lineTo(9.6, -24.4); g.stroke();
-    g.fillStyle = '#7C6A58';                                             // bedroll in the door
-    roundRectOn(g, -9, 2, 18, 6, 3); g.fill();
+    g.fillStyle = '#2A2E28';                                             // the doorway, big enough to lie in
+    g.beginPath(); g.moveTo(-19, 8); g.lineTo(-3, -34); g.lineTo(16, 8); g.closePath(); g.fill();
+    g.strokeStyle = '#3A4238'; g.lineWidth = 1.3;                        // ridge pole
+    g.beginPath(); g.moveTo(-3.8, -40.6); g.lineTo(14.8, -40.6); g.stroke();
+    g.fillStyle = '#7C6A58';                                             // bedroll, laid out inside
+    roundRectOn(g, -15, 1.4, 30, 6.6, 3.2); g.fill();
     g.fillStyle = '#C9BBA4';
-    roundRectOn(g, -9, 0.2, 7, 4.4, 2.2); g.fill();
+    roundRectOn(g, -15, -0.8, 11, 5, 2.4); g.fill();
     g.restore();
 
     // ── the dog's house
@@ -4345,36 +4413,36 @@
     // ── his chair: a folding camp chair, sling seat, turned to face the fire,
     // with a book on the arm and a mug in the holder for when he sits down
     g.save(); g.translate(CAMP.chair.x, 0);
-    g.strokeStyle = '#3F3833'; g.lineWidth = 1.7; g.lineCap = 'round';
-    g.beginPath(); g.moveTo(-8.5, 9); g.lineTo(7.0, 0.4); g.stroke();      // crossed legs
-    g.beginPath(); g.moveTo(9.2, 9); g.lineTo(-6.5, 0.4); g.stroke();
-    g.strokeStyle = '#5E4530'; g.lineWidth = 1.4;                          // back uprights
-    g.beginPath(); g.moveTo(8.2, 0.6); g.lineTo(11.4, -26.5); g.stroke();
-    g.beginPath(); g.moveTo(3.6, 0.9); g.lineTo(6.8, -26.1); g.stroke();
-    g.fillStyle = '#4E6B5A';                                               // the canvas sling
+    g.strokeStyle = '#3F3833'; g.lineWidth = 1.9; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(-11.4, 9); g.lineTo(9.6, -0.4); g.stroke();    // crossed legs
+    g.beginPath(); g.moveTo(12.4, 9); g.lineTo(-8.6, -0.4); g.stroke();
+    g.strokeStyle = '#5E4530'; g.lineWidth = 1.6;                          // back uprights
+    g.beginPath(); g.moveTo(11.2, 0.2); g.lineTo(15.4, -30.4); g.stroke();
+    g.beginPath(); g.moveTo(4.8, 0.6); g.lineTo(9.0, -30.0); g.stroke();
+    g.fillStyle = '#5E8069';                                               // the canvas sling
     g.beginPath();
-    g.moveTo(-9.2, 2.6); g.lineTo(7.6, 0.9); g.lineTo(7.6, -0.9); g.lineTo(-9.2, 0.7);
+    g.moveTo(-12.2, 2.8); g.lineTo(10.2, 0.4); g.lineTo(10.2, -2); g.lineTo(-12.2, 0.4);
     g.closePath(); g.fill();
     g.beginPath();                                                         // and its back, up past his shoulders
-    g.moveTo(3.9, -3.3); g.lineTo(8.4, -3.7); g.lineTo(11.1, -25.4); g.lineTo(6.2, -25.0);
+    g.moveTo(5.2, -4.2); g.lineTo(11.4, -4.8); g.lineTo(15.0, -29.2); g.lineTo(8.4, -28.7);
     g.closePath(); g.fill();
     g.fillStyle = '#8A5A44';                                               // a blanket over the back
     g.beginPath();
-    g.moveTo(2.6, -18.6); g.lineTo(11.6, -19.2);
-    g.quadraticCurveTo(13.4, -12.4, 11.2, -6.6);
-    g.lineTo(3.4, -7.2);
-    g.quadraticCurveTo(4.6, -12.8, 2.6, -18.6);
+    g.moveTo(4.0, -21.2); g.lineTo(14.2, -22.0);
+    g.quadraticCurveTo(16.4, -14.2, 13.8, -7.6);
+    g.lineTo(4.9, -8.4);
+    g.quadraticCurveTo(6.2, -14.6, 4.0, -21.2);
     g.closePath(); g.fill();
     g.fillStyle = 'rgba(226,196,150,0.3)';
     g.beginPath();
-    g.moveTo(3.1, -14.4); g.lineTo(12.3, -15.0); g.lineTo(12.5, -13.4); g.lineTo(3.3, -12.8);
+    g.moveTo(4.6, -16.4); g.lineTo(15.1, -17.2); g.lineTo(15.4, -15.3); g.lineTo(4.8, -14.6);
     g.closePath(); g.fill();
-    g.strokeStyle = 'rgba(238,230,214,0.18)'; g.lineWidth = 0.55;          // seams, so it reads as cloth
-    g.beginPath(); g.moveTo(-8.6, 1.6); g.lineTo(5.2, 0.2); g.stroke();
-    g.beginPath(); g.moveTo(4.8, -11.4); g.lineTo(9.3, -11.7); g.stroke();
-    g.beginPath(); g.moveTo(5.6, -19.0); g.lineTo(10.1, -19.3); g.stroke();
-    g.strokeStyle = '#5E4530'; g.lineWidth = 1.4;                          // far armrest, behind him
-    g.beginPath(); g.moveTo(-6.4, -7.4); g.lineTo(6.8, -8.4); g.stroke();
+    g.strokeStyle = 'rgba(238,230,214,0.2)'; g.lineWidth = 0.6;            // seams, so it reads as cloth
+    g.beginPath(); g.moveTo(-11.4, 1.7); g.lineTo(7.0, -0.3); g.stroke();
+    g.beginPath(); g.moveTo(6.3, -13.0); g.lineTo(12.0, -13.5); g.stroke();
+    g.beginPath(); g.moveTo(7.2, -22.0); g.lineTo(13.2, -22.5); g.stroke();
+    g.strokeStyle = '#5E4530'; g.lineWidth = 1.5;                          // far armrest, behind him
+    g.beginPath(); g.moveTo(-8.4, -9.0); g.lineTo(9.2, -10.2); g.stroke();
     g.restore();
 
     // ── cooking tripod over the fire
@@ -4572,7 +4640,7 @@
     g.restore();
 
     // ── the small stuff: a sign, a washing line, a plant, a duck
-    g.save(); g.translate(-80, 0);                              // washing line
+    g.save(); g.translate(-166, 0);                             // washing line
     g.strokeStyle = '#4A4038'; g.lineWidth = 1.1;
     g.beginPath(); g.moveTo(0, 8); g.lineTo(0, -30); g.stroke();
     g.strokeStyle = 'rgba(180,164,142,0.5)'; g.lineWidth = 0.7;
@@ -4598,7 +4666,7 @@
     }
     g.restore();
 
-    g.save(); g.translate(-96, 0);                              // a duck, for reasons
+    g.save(); g.translate(-158, 0);                             // a duck, for reasons
     g.fillStyle = '#E9C558';
     g.beginPath(); g.ellipse(0, 6, 3.4, 2.6, 0, 0, 6.29); g.fill();
     g.beginPath(); g.arc(2, 3.2, 2, 0, 6.29); g.fill();
@@ -4617,9 +4685,8 @@
 
     // ── a string of lights right across the camp, hung off the washing-line
     // pole and the far post. Warm, low, and the reason the place feels lived in.
-    var lx0 = -88, lx1 = 140, ly0 = -47, ly1 = -41, lcy = -25;
-    g.strokeStyle = '#4A4038'; g.lineWidth = 1.3;               // a post at either end
-    g.beginPath(); g.moveTo(lx0, 8); g.lineTo(lx0, ly0); g.stroke();
+    var lx0 = CAMP.bed.x + 6, lx1 = 140, ly0 = -42, ly1 = -41, lcy = -22;
+    g.strokeStyle = '#4A4038'; g.lineWidth = 1.3;               // one end on the tent, one on a post
     g.beginPath(); g.moveTo(lx1, 8); g.lineTo(lx1, ly1); g.stroke();
     g.strokeStyle = 'rgba(58,50,44,0.75)'; g.lineWidth = 0.5;
     g.beginPath();
@@ -4949,33 +5016,35 @@
     // The tent's doorway shade and its tied-back flap are drawn after him, so
     // when he turns in for a nap he is inside the tent rather than beside it.
     g.save(); g.translate(CAMP.bed.x, 0);
-    g.fillStyle = 'rgba(14,16,20,0.5)';
-    g.beginPath(); g.moveTo(-11.4, 8); g.lineTo(-2, -19); g.lineTo(9.4, 8); g.closePath(); g.fill();
-    g.fillStyle = '#6B7A64';
+    g.fillStyle = 'rgba(14,16,20,0.46)';
+    g.beginPath(); g.moveTo(-18.2, 8); g.lineTo(-3, -32.6); g.lineTo(15.2, 8); g.closePath(); g.fill();
+    g.fillStyle = '#6B7A64';                                             // the flap, tied back on the frame
     g.beginPath();
-    g.moveTo(-2, -20); g.lineTo(-11, 8); g.lineTo(-6, 8); g.quadraticCurveTo(-3, -6, -2, -20);
+    g.moveTo(-3, -34); g.lineTo(-19.4, 8); g.lineTo(-13.4, 8); g.quadraticCurveTo(-7.4, -12, -3, -34);
     g.closePath(); g.fill();
     g.fillStyle = 'rgba(0,0,0,0.16)';
     g.beginPath();
-    g.moveTo(-2, -20); g.lineTo(-8.4, 8); g.lineTo(-6, 8); g.quadraticCurveTo(-3, -6, -2, -20);
+    g.moveTo(-3, -34); g.lineTo(-16.2, 8); g.lineTo(-13.4, 8); g.quadraticCurveTo(-7.4, -12, -3, -34);
     g.closePath(); g.fill();
     g.restore();
 
     g.save(); g.translate(CAMP.chair.x, 0);
-    g.strokeStyle = '#6B5039'; g.lineWidth = 1.6; g.lineCap = 'round';     // near armrest
-    g.beginPath(); g.moveTo(-11.4, -5.4); g.lineTo(3.6, -6.4); g.stroke();
-    g.strokeStyle = '#3F3833'; g.lineWidth = 1.2;                          // and its post
-    g.beginPath(); g.moveTo(-10.6, -5.5); g.lineTo(-9.2, 1.4); g.stroke();
+    g.strokeStyle = '#3F3833'; g.lineWidth = 1.9; g.lineCap = 'round';     // the near front leg
+    g.beginPath(); g.moveTo(-11.4, 9); g.lineTo(-2.6, 4.6); g.stroke();
+    g.strokeStyle = '#6B5039'; g.lineWidth = 1.7;                          // near armrest, across his lap
+    g.beginPath(); g.moveTo(-14.6, -6.6); g.lineTo(5.4, -8.0); g.stroke();
+    g.strokeStyle = '#3F3833'; g.lineWidth = 1.3;                          // and its post
+    g.beginPath(); g.moveTo(-13.6, -6.7); g.lineTo(-11.8, 1.6); g.stroke();
     g.fillStyle = '#3F5A4A';                                               // cup holder off the arm
-    roundRectOn(g, -18.4, -6.2, 5.6, 5.2, 1.3); g.fill();
+    roundRectOn(g, -22.4, -7.6, 6.2, 5.8, 1.4); g.fill();
     g.fillStyle = '#C9BBA4';
-    roundRectOn(g, -17.6, -8.4, 3.9, 4, 1); g.fill();
+    roundRectOn(g, -21.5, -10.0, 4.3, 4.4, 1.1); g.fill();
     if (KN.act !== 'read') {                                               // the book waits on the arm
-      g.save(); g.translate(-5.6, -7.2); g.rotate(-0.07);
+      g.save(); g.translate(-6.6, -8.8); g.rotate(-0.07);
       g.fillStyle = '#7A4A3C';
-      roundRectOn(g, -4.4, -1.7, 8.8, 2.7, 0.7); g.fill();
+      roundRectOn(g, -4.8, -1.8, 9.6, 2.9, 0.7); g.fill();
       g.fillStyle = '#E6DBC4';
-      roundRectOn(g, -3.9, -1.3, 7.8, 1.7, 0.4); g.fill();
+      roundRectOn(g, -4.2, -1.4, 8.4, 1.8, 0.4); g.fill();
       g.restore();
     }
     g.restore();
@@ -5006,27 +5075,30 @@
   };
 
   // where he goes, what he does there, and roughly how long for
+  // He is not a screensaver. Once he has walked somewhere he stays there and
+  // does the thing properly, so the lobby is a place he lives in rather than a
+  // man jogging between props.
   var KN_ACTS = [
-    { id: 'idle',    at: 'fire',  w: 2.4, dur: [1.6, 4] },
-    { id: 'warm',    at: 'fire',  w: 2.2, dur: [3, 6] },
-    { id: 'poke',    at: 'fire',  w: 1.8, dur: [2.5, 4.5] },
-    { id: 'rub',     at: 'fire',  w: 1.7, dur: [4, 7] },
-    { id: 'stir',    at: 'pot',   w: 2,   dur: [3.5, 6] },
-    { id: 'sip',     at: 'pot',   w: 1.6, dur: [3, 5] },
-    { id: 'marsh',   at: 'fire',  w: 1.4, dur: [4, 6] },
-    { id: 'chop',    at: 'wood',  w: 1.8, dur: [3.5, 6] },
-    { id: 'haul',    at: 'wood',  w: 1.5, dur: [3, 5] },
-    { id: 'nap',     at: 'bed',   w: 1.6, dur: [5, 9] },
-    { id: 'tidy',    at: 'bed',   w: 1.1, dur: [2.5, 4] },
-    { id: 'game',    at: 'desk',  w: 1.4, dur: [4, 7] },
-    { id: 'read',    at: 'chair', w: 2.1, dur: [7, 13] },
-    { id: 'sit',     at: 'chair', w: 1.4, dur: [3.5, 7] },
-    { id: 'stars',   at: 'chair', w: 1.3, dur: [4, 7] },
-    { id: 'panel',   at: 'line',  w: 0.7, dur: [2.2, 3.4] },
-    { id: 'wander',  at: null,    w: 1.6, dur: [2.5, 5] },
-    { id: 'moth',    at: null,    w: 1.2, dur: [4, 7] },
-    { id: 'ember',   at: 'fire',  w: 1.3, dur: [3, 4.5] },
-    { id: 'stretch', at: null,    w: 1,   dur: [1.4, 2.4] }
+    { id: 'idle',    at: 'fire',  w: 1.6, dur: [4, 9] },
+    { id: 'warm',    at: 'fire',  w: 2.2, dur: [9, 17] },
+    { id: 'poke',    at: 'fire',  w: 1.8, dur: [6, 11] },
+    { id: 'rub',     at: 'fire',  w: 1.7, dur: [8, 14] },
+    { id: 'stir',    at: 'pot',   w: 2,   dur: [9, 17] },
+    { id: 'sip',     at: 'pot',   w: 1.6, dur: [7, 12] },
+    { id: 'marsh',   at: 'fire',  w: 1.4, dur: [9, 15] },
+    { id: 'chop',    at: 'wood',  w: 1.8, dur: [8, 15] },
+    { id: 'haul',    at: 'wood',  w: 1.3, dur: [5, 9] },
+    { id: 'nap',     at: 'bed',   w: 1.8, dur: [16, 30] },
+    { id: 'tidy',    at: 'bed',   w: 1.1, dur: [6, 11] },
+    { id: 'game',    at: 'desk',  w: 1.6, dur: [12, 24] },
+    { id: 'read',    at: 'chair', w: 2.3, dur: [16, 30] },
+    { id: 'sit',     at: 'chair', w: 1.4, dur: [9, 17] },
+    { id: 'stars',   at: 'chair', w: 1.4, dur: [10, 18] },
+    { id: 'panel',   at: 'line',  w: 0.7, dur: [5, 9] },
+    { id: 'wander',  at: null,    w: 0.8, dur: [3, 6] },
+    { id: 'moth',    at: null,    w: 1,   dur: [7, 12] },
+    { id: 'ember',   at: 'fire',  w: 1.2, dur: [6, 10] },
+    { id: 'stretch', at: null,    w: 0.7, dur: [2, 3.4] }
   ];
 
   // things he wonders about, and things he wonders about you
@@ -5104,7 +5176,7 @@
     KN.say = line.replace(/\{p\}/g, META.player.name || 'you')
                  .replace(/\{g\}/g, genderWord())
                  .replace(/\{c\}/g, hueOf().name.toLowerCase());
-    KN.sayT = 3.4 + KN.say.length * 0.03;
+    KN.sayT = 4.4 + KN.say.length * 0.055;
   }
 
   // What he is reading about is wherever the flame is going next, so the book
@@ -5116,7 +5188,7 @@
     if (f === KN.lastSay && L.facts.length > 1) f = L.facts[(L.facts.indexOf(f) + 1) % L.facts.length];
     KN.lastSay = f;
     KN.say = f;
-    KN.sayT = 4.6 + f.length * 0.038;
+    KN.sayT = 9 + f.length * 0.085;      // long enough to actually read it
   }
 
   function knightAct(force) {
@@ -5360,7 +5432,11 @@
     var i;
     if (KN.factT > 0) {
       KN.factT -= dt;
-      if (KN.factT <= 0 && KN.act === 'read') knightFact();
+      if (KN.factT <= 0 && KN.act === 'read') {
+        knightFact();
+        // he will look up with another one before he puts the book down
+        if (KN.actT > KN.sayT + 8) KN.factT = KN.sayT + rand(4, 8);
+      }
     }
     if (KN.treatT > 0) {
       KN.treatT -= dt;
@@ -5598,11 +5674,13 @@
       // Settled back in the chair with the book held in both hands. The far
       // hand holds the spine, the near one turns the page; when he reads a bit
       // out to you he looks up from it, which is what makes it read as reading.
-      sit = 1; lift = 2.4; lean = -0.05;
+      sit = 1; lift = 2.4; lean = -0.04;
       var page = Math.sin(S.time * 0.62) > 0.94;
       var upAt = KN.sayT > 0;
-      armR = -0.86 + (page ? 0.5 : 0) + Math.sin(S.time * 0.7) * 0.03;   // near hand, on the page
-      armL = 0.84 - (page ? 0.1 : 0);                                     // far hand, under the spine
+      // Straight arms, so the only way a hand reaches the middle of his chest
+      // is to come up and across. Both do, and they meet on the book.
+      armR = 1.1 - (page ? 0.38 : 0) + Math.sin(S.time * 0.55) * 0.035;    // near hand, turns the page
+      armL = -1.04 + Math.sin(S.time * 0.55 + 1) * 0.02;                   // far hand, under the spine
       item = 'book';
       headTilt = upAt ? -0.04 : 0.19;                                     // down at it, up at you
       lookD = upAt ? 0 : 0.72;                                            // and his eyes go with it
@@ -5996,9 +6074,7 @@
     f();
   });
   var elVeilGear = document.getElementById('veilgear');
-  var elVeilNote = document.getElementById('veilnote');
   elVeilGear.addEventListener('click', function () { UI.tap(); settingsScreen(menu); });
-  elVeilNote.addEventListener('click', function () { UI.tap(); musicScreen(menu); });
   function veil(html, cls, back, gear) {
     portraitCv = null;
     KN.onStage = false;
@@ -6009,8 +6085,6 @@
     veilBackFn = back || null;
     elVeilBack.classList.toggle('on', !!back);
     elVeilGear.classList.toggle('on', !!gear);
-    elVeilNote.classList.toggle('on', !!gear);
-    elVeilNote.classList.toggle('lit', !!MUS.timer);
     elVeil.classList.toggle('full', cls === 'home');
   }
   function hideVeil() {
@@ -6019,7 +6093,7 @@
     portraitCv = null; KN.onStage = false;
     elVeil.classList.add('hide'); veilBackFn = null;
     elVeilBack.classList.remove('on'); elVeilGear.classList.remove('on');
-    elVeilNote.classList.remove('on'); elVeil.classList.remove('full');
+    elVeil.classList.remove('full');
   }
   function on(id, fn) { var el = document.getElementById(id); if (el) el.addEventListener('click', fn); }
   function hookPortrait() {
@@ -6252,6 +6326,7 @@
         wardrobeRow('Wearing','cape',   OUTFITS, outfitOf().id) +
         wardrobeRow('Head',   'helm',   HEADS,   headOf().id) +
         wardrobeRow('Hair',   'armour', HAIRS,   hairOf().id) +
+        wardrobeRow('Cut',    'cut',    CUTS,    cutOf().id) +
       '</div>' +
       '<button class="go" id="btnName">' + (first ? 'Take the Watch' : 'Save') + '</button>' +
       (first ? '' : '<button class="ghost" id="btnNameBack">Back to camp</button>') +
@@ -6315,6 +6390,12 @@
       : '<svg width="14" height="16" viewBox="0 0 14 16"><path d="M2 1.4v13.2L13 8 2 1.4z" fill="currentColor"/></svg>';
   }
   function refreshTransport() {
+    var lob = document.getElementById('homeTune');
+    if (lob) {
+      lob.textContent = tuneName() + (MUS.on ? '' : ' · paused');
+      var lp2 = document.querySelector('.homemus #mPlay');
+      if (lp2) lp2.innerHTML = playGlyph();
+    }
     var box = document.querySelector('.transport');
     if (!box) return;
     var T = TUNES[MUS.tune];
@@ -6425,6 +6506,20 @@
       '<div class="stage homestage" id="stage">' +
         '<canvas id="portrait" class="portrait stage-knight"></canvas>' +
       '</div>' +
+      '<div class="homemus">' +
+        '<button class="tb" id="mPrev" aria-label="Previous tune">' +
+          '<svg viewBox="0 0 16 14"><path d="M15 1.5v11L7 7l8-5.5zM6 1.5v11L1 7l5-5.5z" fill="currentColor"/></svg>' +
+        '</button>' +
+        '<button class="tb big" id="mPlay" aria-label="Play or pause music">' + playGlyph() + '</button>' +
+        '<button class="tb" id="mNext" aria-label="Next tune">' +
+          '<svg viewBox="0 0 16 14"><path d="M1 1.5v11L9 7 1 1.5zM10 1.5v11L15 7l-5-5.5z" fill="currentColor"/></svg>' +
+        '</button>' +
+        '<button class="tb" id="mList" aria-label="Browse music">' +
+          '<svg viewBox="0 0 16 14"><path d="M1 2h14M1 7h14M1 12h9" stroke="currentColor" stroke-width="1.8" ' +
+            'stroke-linecap="round" fill="none"/></svg>' +
+        '</button>' +
+      '</div>' +
+      '<div class="hometune" id="homeTune">' + esc(tuneName()) + '</div>' +
       '<div class="hometop">' +
         '<span class="hchip">Night <b>' + META.night + '</b></span>' +
         (L ? '<span class="hchip">' + esc(L.st) + ' <b>' +
@@ -6462,6 +6557,7 @@
     on('btnShop', shop);
     on('btnFeats', feats2);
     on('btnKnight', function () { nameKnight(menu); });
+    bindTransport(function () { musicScreen(menu); });
     hookPortrait();
     bindStage();
   }
