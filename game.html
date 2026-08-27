@@ -186,6 +186,8 @@
     color:var(--mute);font:600 14px/1 var(--body);
   }
   .ghost:active{background:rgba(232,220,200,0.05)}
+  .ghost.danger{color:#c98b84;border-color:rgba(255,69,58,0.3)}
+  .ghost.danger.armed{color:#fff;background:rgba(255,69,58,0.22);border-color:rgba(255,69,58,0.65)}
   .tally{display:flex;gap:10px;margin-bottom:24px}
   .tally div{
     flex:1;border:1px solid var(--line);border-radius:14px;padding:14px 8px;
@@ -197,6 +199,22 @@
   .foot{margin-top:20px;font:500 10px/1.6 var(--body);letter-spacing:.12em;text-transform:uppercase;color:#57514c}
 
   /* ---------- Toast ---------- */
+  #build{
+    position:fixed;z-index:1;right:calc(var(--safeR) + 12px);bottom:calc(var(--safeB) + 10px);
+    font:600 9px/1 var(--mono);letter-spacing:.1em;color:rgba(232,220,200,0.22);
+    pointer-events:none;user-select:none;
+  }
+  .buildfoot{
+    margin-top:14px;font:600 9px/1.6 var(--mono);letter-spacing:.12em;
+    text-transform:uppercase;color:#4a453f;
+  }
+  .warnbox{
+    border:1px solid rgba(255,159,10,0.4);border-radius:14px;
+    background:rgba(60,34,8,0.5);padding:12px 14px;margin-bottom:16px;text-align:left;
+    font:500 12px/1.5 var(--body);color:#E4C79A;
+  }
+  .warnbox b{color:var(--core);font-weight:700}
+
   #toast{
     position:fixed;z-index:3;left:50%;top:38%;transform:translate(-50%,-50%);
     text-align:center;pointer-events:none;opacity:0;
@@ -388,6 +406,27 @@
   .nowplaying b{color:var(--bone);font-weight:600}
   .nowplaying span{font:600 9px/1 var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--mute)}
 
+  .explain{
+    text-align:left;border:1px solid var(--line);border-radius:16px;
+    background:rgba(20,16,14,0.5);padding:6px 14px;margin-bottom:18px;
+  }
+  .explain>div{display:flex;gap:11px;align-items:flex-start;padding:9px 0}
+  .explain>div+div{border-top:1px solid rgba(232,220,200,0.07)}
+  .explain i{flex:none;width:20px;text-align:center;font-style:normal;font-size:14px;line-height:1.5}
+  .explain span{font:400 12.5px/1.5 var(--body);color:#B0A69A}
+  .explain b{color:var(--bone);font-weight:600}
+
+  .payout{
+    border:1px solid var(--line);border-radius:14px;
+    background:rgba(20,16,14,0.5);padding:8px 14px;margin-bottom:14px;text-align:left;
+  }
+  .payout div{display:flex;justify-content:space-between;align-items:baseline;padding:5px 0}
+  .payout div+div{border-top:1px solid rgba(232,220,200,0.07)}
+  .payout span{font:400 12px/1.4 var(--body);color:#9d938a}
+  .payout u{text-decoration:none;font:700 12.5px/1 var(--mono);color:var(--core)}
+  .payout .tot span{color:var(--bone);font-weight:600}
+  .payout .tot u{color:var(--bone)}
+
   .newfeats{
     border:1px solid rgba(255,159,10,0.32);border-radius:14px;
     background:rgba(48,28,10,0.45);padding:11px 14px;margin-bottom:14px;text-align:left;
@@ -443,6 +482,7 @@
 <button class="btn" id="flare" aria-label="Flare"><div class="fill"></div><span>Flare</span></button>
 <button class="btn" id="brand" aria-label="Swing the brand"><div class="fill"></div><span>Brand</span></button>
 
+<div id="build"></div>
 <div id="toast"><div class="t1"></div><div class="t2"></div></div>
 
 <div id="veil"><div class="card" id="card"></div></div>
@@ -460,6 +500,7 @@
   var gctx = groundCvs.getContext('2d');
 
   var W = 0, H = 0, DPR = 1;
+  var BUILD = 'v1.0.0';        // bump on every deploy — shown in-game for support
   var MUTE_KEY = 'keeper.nightwatch.mute';
   var MUSIC_KEY = 'keeper.nightwatch.music';
 
@@ -495,6 +536,21 @@
 
   // ══════════════════════════════════════════ what carries between runs ══
   var META_KEY = 'keeper.nightwatch.meta.v2';
+
+  // Progress lives in this browser's own storage, so everyone you send the
+  // game to keeps their own knight. Private windows and blocked site data
+  // make that storage throw or silently drop writes, which would let someone
+  // grind for an hour and lose it on refresh — so probe it for real.
+  var STORE_OK = (function () {
+    try {
+      var t = '__nw_probe__';
+      localStorage.setItem(t, '1');
+      var ok = localStorage.getItem(t) === '1';
+      localStorage.removeItem(t);
+      return ok;
+    } catch (e) { return false; }
+  })();
+  var SAVE_FAILED = false;
 
   // Bought once with embers, kept forever. Ranks are cumulative.
   var PERKS = [
@@ -585,25 +641,94 @@
   ];
 
   function freshMeta() {
-    return { v: 2, embers: 0, xp: 0, runs: 0, bestNight: 0, bestScore: 0,
+    return { v: 3, embers: 0, xp: 0, runs: 0, bestNight: 0, bestScore: 0,
              perks: {}, ach: {}, lifeLogs: 0, lifeKills: 0, lifeNights: 0,
-             knight: { name: '', plume: 'crimson' } };
+             knight: { name: '', plume: 'crimson' },
+             opts: { sound: true, music: true } };
   }
   var META = freshMeta();
-  function loadMeta() {
-    try {
-      var raw = localStorage.getItem(META_KEY);
-      if (!raw) return;
-      var m = JSON.parse(raw);
-      if (!m || typeof m !== 'object') return;
-      var f = freshMeta();
-      for (var key in f) if (m[key] !== undefined && m[key] !== null) f[key] = m[key];
-      if (!f.knight || typeof f.knight !== 'object') f.knight = { name: '', plume: 'crimson' };
-      if (typeof f.knight.name !== 'string') f.knight.name = '';
-      META = f;
-    } catch (e) { /* corrupt or unavailable storage — play on a fresh slate */ }
+
+  function num(v, def, min, max) {
+    var n = typeof v === 'number' ? v : parseFloat(v);
+    if (!isFinite(n)) n = def;
+    if (min !== undefined && n < min) n = min;
+    if (max !== undefined && n > max) n = max;
+    return Math.floor(n);
   }
-  function saveMeta() { try { localStorage.setItem(META_KEY, JSON.stringify(META)); } catch (e) {} }
+
+  // Never trust what comes back out of storage. A single bad value — an old
+  // schema, a hand-edited number, an interrupted write — would otherwise turn
+  // embers into NaN and quietly break the shop forever.
+  function sanitizeMeta(m) {
+    var f = freshMeta(), i;
+    if (!m || typeof m !== 'object') return f;
+    f.embers     = num(m.embers, 0, 0, 1e12);
+    f.xp         = num(m.xp, 0, 0, 1e12);
+    f.runs       = num(m.runs, 0, 0, 1e9);
+    f.bestNight  = num(m.bestNight, 0, 0, 1e6);
+    f.bestScore  = num(m.bestScore, 0, 0, 1e12);
+    f.lifeLogs   = num(m.lifeLogs, 0, 0, 1e12);
+    f.lifeKills  = num(m.lifeKills, 0, 0, 1e12);
+    f.lifeNights = num(m.lifeNights, 0, 0, 1e12);
+
+    if (m.perks && typeof m.perks === 'object') {
+      for (i = 0; i < PERKS.length; i++) {
+        var r = num(m.perks[PERKS[i].id], 0, 0, PERKS[i].ranks);
+        if (r > 0) f.perks[PERKS[i].id] = r;
+      }
+    }
+    if (m.ach && typeof m.ach === 'object') {
+      for (i = 0; i < ACHIEVEMENTS.length; i++) {
+        if (m.ach[ACHIEVEMENTS[i].id]) f.ach[ACHIEVEMENTS[i].id] = 1;
+      }
+    }
+    var k = (m.knight && typeof m.knight === 'object') ? m.knight : {};
+    f.knight.name = cleanName(k.name);
+    for (i = 0; i < PLUMES.length; i++) if (PLUMES[i].id === k.plume) f.knight.plume = k.plume;
+
+    var o = (m.opts && typeof m.opts === 'object') ? m.opts : {};
+    f.opts.sound = o.sound !== false;
+    f.opts.music = o.music !== false;
+    return f;
+  }
+
+  function loadMeta() {
+    var raw = null;
+    try { raw = localStorage.getItem(META_KEY); } catch (e) { return; }
+    if (!raw) { migrateLegacy(); return; }
+    var parsed = null;
+    try { parsed = JSON.parse(raw); } catch (e) { parsed = null; }
+    META = sanitizeMeta(parsed);
+    if (!parsed) saveMeta();          // repair an unreadable record in place
+  }
+
+  // sound/music used to live in their own keys; fold them in once
+  function migrateLegacy() {
+    try {
+      var mu = localStorage.getItem(MUTE_KEY);
+      var mus = localStorage.getItem(MUSIC_KEY);
+      if (mu !== null) { META.opts.sound = mu !== '1'; localStorage.removeItem(MUTE_KEY); }
+      if (mus !== null) { META.opts.music = mus !== '0'; localStorage.removeItem(MUSIC_KEY); }
+      if (mu !== null || mus !== null) saveMeta();
+    } catch (e) {}
+  }
+
+  function saveMeta() {
+    try {
+      localStorage.setItem(META_KEY, JSON.stringify(META));
+      SAVE_FAILED = false;
+      return true;
+    } catch (e) {
+      SAVE_FAILED = true;           // quota, private mode, blocked site data
+      return false;
+    }
+  }
+  function wipeMeta() {
+    META = freshMeta();
+    try { localStorage.removeItem(META_KEY); } catch (e) {}
+    saveMeta();
+    recalc();
+  }
 
   // Levels come from embers *earned*, so spending never costs you progress.
   function xpFor(l) { return Math.round(95 * Math.pow(l, 1.18)); }
@@ -1025,7 +1150,8 @@
   }
   function setMusic(on) {
     MUS.on = on;
-    try { localStorage.setItem(MUSIC_KEY, on ? '1' : '0'); } catch (e) {}
+    META.opts.music = on;
+    saveMeta();
     if (on) startMusic(); else stopMusic(0.5);
   }
 
@@ -2276,6 +2402,17 @@
   var elCard = document.getElementById('card');
   var elPause = document.getElementById('pause');
   var elToast = document.getElementById('toast');
+  document.getElementById('build').textContent = BUILD;
+  function buildFoot() {
+    return '<div class="buildfoot">Night Watch ' + BUILD +
+      (STORE_OK ? '' : ' · progress not saving') + '</div>';
+  }
+  function storageWarning() {
+    if (STORE_OK && !SAVE_FAILED) return '';
+    return '<div class="warnbox"><b>Progress won\'t save here.</b> This browser is ' +
+      'blocking site data — often a private window. Your knight and embers will ' +
+      'reset when you close the tab. Open the game in a normal window to keep them.</div>';
+  }
   var elFlareFill = flareBtn.querySelector('.fill');
   var elBrandFill = brandBtn.querySelector('.fill');
   var elHud2 = document.getElementById('hud2');
@@ -2414,7 +2551,9 @@
       '<div class="plumes">' + plumeSwatches() + '</div>' +
       '<button class="go" id="btnName">' + (first ? 'Take the Watch' : 'Save') + '</button>' +
       (first ? '' : '<button class="ghost" id="btnNameBack">Back to camp</button>') +
-      '<div class="foot">They will be remembered by this name</div>',
+      (first ? '' : '<button class="ghost danger" id="btnWipe">Start over from nothing</button>') +
+      '<div class="foot">They will be remembered by this name</div>' +
+      buildFoot(),
       'wide'
     );
     hookPortrait();
@@ -2428,6 +2567,12 @@
     };
     on('btnName', commit);
     on('btnNameBack', menu);
+    on('btnWipe', function () {
+      if (this.getAttribute('data-sure')) { wipeMeta(); nameKnight(menu); return; }
+      this.setAttribute('data-sure', '1');
+      this.classList.add('armed');
+      this.textContent = 'Tap again — this erases everything';
+    });
     input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); commit(); } });
     if (first) setTimeout(function () { try { input.focus(); } catch (e) {} }, 320);
   }
@@ -2480,6 +2625,7 @@
     veil(
       '<div class="eyebrow">The Keeper</div>' +
       '<h1>Night<em>Watch</em></h1>' +
+      storageWarning() +
       (META.knight.name
         ? '<div class="knight">' +
             '<canvas id="portrait" class="portrait"></canvas>' +
@@ -2513,6 +2659,7 @@
         '<button class="ghost" id="btnFeats">Feats · ' + feats + '/' + ACHIEVEMENTS.length + '</button>' +
       '</div>' +
       '<button class="ghost" id="btnKnight">' + (META.knight.name ? 'Your knight' : 'Name your knight') + '</button>' +
+      buildFoot() +
       '<div class="foot">Drag to move · Brand to swing · Flare when surrounded</div>' +
       '<div class="foot">♪ ' + esc(tuneName()) + (MUS.on ? '' : ' · music off') + '</div>' +
       '<div class="foot">' + (locked ? locked + ' upgrades still locked · level up to draft them' : 'Every upgrade unlocked') + '</div>'
@@ -2551,10 +2698,18 @@
     }
     veil(
       '<div class="eyebrow">Provisions</div>' +
-      '<h1>The <em>Store</em></h1>' +
+      '<h1>Spend <em>Embers</em></h1>' +
       levelStrip() +
+      '<div class="explain">' +
+        '<div><i>🔥</i><span><b>What they buy.</b> Gear on this page, kept forever — ' +
+          'every rank you buy applies to every run from now on.</span></div>' +
+        '<div><i>🌙</i><span><b>How you earn them.</b> Every watch pays out when it ends: ' +
+          'further nights and higher scores pay more.</span></div>' +
+        '<div><i>🎖</i><span><b>Bonus.</b> Each Feat pays a one-time bounty the first time you manage it.</span></div>' +
+      '</div>' +
       '<div class="shoplist">' + rows + '</div>' +
-      '<button class="ghost" id="btnBack">Back to camp</button>',
+      '<button class="ghost" id="btnBack">Back to camp</button>' +
+      buildFoot(),
       'wide'
     );
     var btns = elCard.querySelectorAll('button[data-perk]');
@@ -2595,7 +2750,8 @@
       '<div class="eyebrow">Feats</div>' +
       '<h1>The <em>Ledger</em></h1>' +
       '<div class="shoplist">' + rows + '</div>' +
-      '<button class="ghost" id="btnBack">Back to camp</button>',
+      '<button class="ghost" id="btnBack">Back to camp</button>' +
+      buildFoot(),
       'wide'
     );
     on('btnBack', menu);
@@ -2784,7 +2940,8 @@
           '<button class="ghost" id="btnMusic">Music · ' + (MUS.on ? 'On' : 'Off') + '</button>' +
           '<button class="ghost" id="btnSound">Sound · ' + (S.muted ? 'Off' : 'On') + '</button>' +
         '</div>' +
-        '<button class="ghost" id="btnQuit">Abandon the Watch</button>',
+        '<button class="ghost" id="btnQuit">Abandon the Watch</button>' +
+        buildFoot(),
         'wide'
       );
       hookPortrait();
@@ -2792,7 +2949,8 @@
       on('btnQuit', function () { finishRun(); menu(); });
       on('btnSound', function () {
         S.muted = !S.muted;
-        try { localStorage.setItem(MUTE_KEY, S.muted ? '1' : '0'); } catch (e) {}
+        META.opts.sound = !S.muted;
+        saveMeta();
         this.textContent = 'Sound · ' + (S.muted ? 'Off' : 'On');
       });
       on('btnMusic', function () {
@@ -2845,6 +3003,13 @@
           '<div><span>Score</span><b class="' + (r.score >= META.bestScore ? 'hi' : '') + '">' + r.score.toLocaleString() + '</b></div>' +
           '<div><span>Embers</span><b class="hi">+' + out.embers + '</b></div>' +
         '</div>' +
+        '<div class="payout">' +
+          '<div><span>Night ' + r.night + ' · score ' + r.score.toLocaleString() + '</span><u>+' + out.runEmbers + '</u></div>' +
+          (out.embers > out.runEmbers
+            ? '<div><span>' + plural(out.newAch.length, 'feat') + ' earned</span><u>+' + (out.embers - out.runEmbers) + '</u></div>'
+            : '') +
+          '<div class="tot"><span>Embers banked</span><u>' + META.embers.toLocaleString() + '</u></div>' +
+        '</div>' +
         achHtml +
         (levelled ? '<div class="levelup">Keeper level ' + out.after + nextUnlockNote(out.after - 1) + '</div>' : '') +
         '<div class="lvl tight">' +
@@ -2858,7 +3023,8 @@
           '<button class="ghost" id="btnMenu">Camp</button>' +
         '</div>' +
         '<div class="foot">' + plural(r.logs, 'log') + ' burned · ' + plural(r.kills, 'shade') + ' dispelled (' + r.brandKills + ' by brand) · heat ×' + r.bestHeat + '</div>' +
-        '<div class="foot">' + (r.damage ? r.damage + ' damage taken' : 'not a scratch') + '</div>',
+        '<div class="foot">' + (r.damage ? r.damage + ' damage taken' : 'not a scratch') + '</div>' +
+        buildFoot(),
         'wide'
       );
       on('btnAgain', startGame);
@@ -2907,10 +3073,10 @@
   });
   document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
 
-  try { S.muted = localStorage.getItem(MUTE_KEY) === '1'; } catch (e) {}
-  try { MUS.on = localStorage.getItem(MUSIC_KEY) !== '0'; } catch (e) {}
-  MUS.tune = Math.floor(Math.random() * TUNES.length);
   loadMeta();
+  S.muted = !META.opts.sound;
+  MUS.on = META.opts.music;
+  MUS.tune = Math.floor(Math.random() * TUNES.length);
   recalc();
 
   // browsers hold audio until the first gesture, so the band starts then
