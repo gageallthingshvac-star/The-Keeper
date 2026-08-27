@@ -416,18 +416,66 @@
     font:600 10px/1 var(--body);letter-spacing:.2em;text-transform:uppercase;
     color:var(--mute);text-decoration:none;
   }
-  .brand{font:700 11px/1 var(--body);letter-spacing:.34em;text-transform:uppercase;
-    color:var(--mute);margin:0 0 14px}
-  .stage.hero{padding:0 0 16px;margin-bottom:14px}
-  .stage.hero .portrait.stage-knight{height:264px;border-radius:22px 22px 0 0}
-  .stage.hero .stagename b{font-size:26px}
-  .metaline{
-    display:flex;flex-wrap:wrap;justify-content:center;gap:6px 16px;margin:0 0 20px;
-    font:500 11px/1 var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--mute);
+  /* ---------- the lobby: one fixed room, no scrolling ---------- */
+  #veil.full{overflow:hidden;padding:0;display:block;background:none;backdrop-filter:none;
+    -webkit-backdrop-filter:none}
+  .card.home{max-width:none;width:100%;height:100%;position:absolute;inset:0;text-align:left}
+  .homestage{
+    position:absolute;inset:0;z-index:0;margin:0;padding:0;border:0;border-radius:0;
+    background-color:#07060f;
+    background-image:radial-gradient(78% 62% at 50% 66%, rgba(255,159,10,0.15), rgba(24,20,52,0.55) 58%, rgba(9,8,24,0.72));
   }
-  .metaline b{color:var(--bone);font-weight:700;letter-spacing:.04em}
-  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-top:10px}
-  .row3 .ghost{margin-top:0;padding:14px 4px;font-size:12.5px}
+  .homestage:active{
+    background-image:radial-gradient(78% 62% at 50% 66%, rgba(255,159,10,0.21), rgba(28,23,58,0.58) 58%, rgba(9,8,24,0.75));
+  }
+  .homestage .portrait.stage-knight{width:100%;height:100%;border-radius:0}
+  .hometop{
+    position:absolute;z-index:2;left:calc(var(--safeL) + 14px);top:calc(var(--safeT) + 15px);
+    right:calc(var(--safeR) + 106px);display:flex;flex-wrap:wrap;gap:7px;pointer-events:none;
+  }
+  .hchip{
+    display:inline-flex;align-items:baseline;gap:6px;padding:7px 12px;border-radius:999px;
+    border:1px solid var(--line);background:rgba(14,11,10,0.62);
+    backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);
+    font:600 10px/1 var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--mute);
+  }
+  .hchip b{font:700 13px/1 var(--display);letter-spacing:0;color:var(--bone);text-transform:none}
+  .hchip.warn{border-color:rgba(255,69,58,0.5);color:#FFB4AE;letter-spacing:.04em;text-transform:none}
+  #veilnote{
+    position:fixed;z-index:6;display:none;
+    top:calc(var(--safeT) + 12px);right:calc(var(--safeR) + 62px);
+    width:42px;height:42px;border-radius:50%;cursor:pointer;
+    border:1px solid var(--line);background:rgba(20,16,14,0.86);
+    color:var(--mute);font:400 17px/1 var(--body);padding:0;
+    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+    transition:transform .18s ease,color .2s ease,border-color .2s ease;
+  }
+  #veilnote.on{display:block}
+  #veilnote.lit{color:var(--ember);border-color:rgba(255,159,10,0.45)}
+  #veilnote:active{transform:scale(.92)}
+  #veil.hide #veilnote{display:none}
+  .homebar{
+    position:absolute;z-index:2;left:0;right:0;bottom:0;text-align:center;
+    padding:64px calc(var(--safeR) + 20px) calc(var(--safeB) + 14px) calc(var(--safeL) + 20px);
+    background:linear-gradient(to top,rgba(6,4,7,0.96) 42%,rgba(6,4,7,0.82) 68%,rgba(6,4,7,0));
+  }
+  .homename{margin:0 0 14px}
+  .homename b{display:block;font:700 27px/1.1 var(--display);letter-spacing:-.015em;color:var(--bone)}
+  .homename u{display:block;margin-top:5px;font:500 12.5px/1.3 var(--body);color:var(--mute);
+    text-decoration:none}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-top:9px}
+  .row3 .ghost{margin-top:0;padding:13px 4px;font-size:12.5px}
+  .homebar .go{margin-top:0}
+  .homebar .purse{margin:0 0 12px}
+  .homebar .ghost.treat{margin-top:9px}
+  .homefoot{margin-top:11px;font:500 10px/1 var(--body);letter-spacing:.2em;
+    text-transform:uppercase;color:#4E4843}
+  @media (max-height:700px){
+    .homebar{padding-top:44px}
+    .homename b{font-size:22px}
+    .homename{margin-bottom:10px}
+    .homebar .purse{margin-bottom:9px}
+  }
   .stagename u{display:block;margin-top:5px;font:500 12px/1.3 var(--body);color:var(--mute);text-decoration:none}
   .stage.still{cursor:default}
   .ghost.treat{margin-top:10px}
@@ -648,7 +696,7 @@
 <div id="build"></div>
 <div id="toast"><div class="t1"></div><div class="t2"></div></div>
 
-<div id="veil"><button id="veilback" aria-label="Back" title="Back">‹</button><button id="veilgear" aria-label="Settings" title="Settings">⚙</button><div class="card" id="card"></div></div>
+<div id="veil"><button id="veilback" aria-label="Back" title="Back">‹</button><button id="veilnote" aria-label="Music" title="Music">♪</button><button id="veilgear" aria-label="Settings" title="Settings">⚙</button><div class="card" id="card"></div></div>
 
 <script>
 (function () {
@@ -668,7 +716,7 @@
   var ZOOM = 0.7;
   var VS = 1;                     // device pixels per field unit
   function px(n) { return n / ZOOM; }   // n screen pixels, in field units
-  var BUILD = 'v1.14.0';        // bump on every deploy — shown in-game for support
+  var BUILD = 'v1.15.0';        // bump on every deploy — shown in-game for support
   var MUTE_KEY = 'keeper.nightwatch.mute';
   var MUSIC_KEY = 'keeper.nightwatch.music';
 
@@ -832,22 +880,69 @@
 
   // The long road. Every couple of keeper levels puts another one behind you,
   // and somebody new joins the camp when it does.
+  // Every stop has a lamp waiting to be lit, and a book on his chair about the
+  // place. The facts are real ones — he reads them out on the way there.
   var LANDMARKS = [
-    { st: 'Missouri',      name: 'the Gateway Arch' },
-    { st: 'Arizona',       name: 'the Grand Canyon' },
-    { st: 'South Dakota',  name: 'Mount Rushmore' },
-    { st: 'Wyoming',       name: 'Old Faithful' },
-    { st: 'Nevada',        name: 'the Hoover Dam' },
-    { st: 'California',    name: 'the Golden Gate Bridge' },
-    { st: 'Washington',    name: 'Mount Rainier' },
-    { st: 'Colorado',      name: 'Pikes Peak' },
-    { st: 'Illinois',      name: 'the Willis Tower' },
-    { st: 'Louisiana',     name: 'the French Quarter' },
-    { st: 'Florida',       name: 'the Everglades' },
-    { st: 'Massachusetts', name: 'Fenway Park' },
-    { st: 'New York',      name: 'the Statue of Liberty' },
-    { st: 'Alaska',        name: 'Denali' },
-    { st: 'Hawaii',        name: 'Kilauea' }
+    { st: 'Missouri',      name: 'the Gateway Arch', facts: [
+      'Listen to this. The Gateway Arch is 630 feet tall and exactly 630 feet wide at the base. Square, if you drew a box round it.',
+      'They built the Arch from both ends at once and met in the middle. It fit. I would not have slept for a year.',
+      'There is a little tram inside the Arch that carries people up through the curve. Imagine riding up the inside of a bend.'] },
+    { st: 'Arizona',       name: 'the Grand Canyon', facts: [
+      'The Grand Canyon is a mile deep in places, and the rock at the bottom is about 1.8 billion years old.',
+      'The Colorado River cut the Grand Canyon, and it is still cutting. Slowly. Very slowly.',
+      'The Grand Canyon runs 277 river miles. That is a fair walk, even for me.'] },
+    { st: 'South Dakota',  name: 'Mount Rushmore', facts: [
+      'The four heads on Mount Rushmore are sixty feet tall. The noses alone are twenty.',
+      'Mount Rushmore took fourteen years, and most of the rock came off with dynamite. Careful work, that.',
+      'Fourteen years of carving Mount Rushmore, hanging off a cliff, and nobody died doing it. I think that is lovely.'] },
+    { st: 'Wyoming',       name: 'Old Faithful', facts: [
+      'Old Faithful goes off about every ninety minutes and throws water over a hundred feet up.',
+      'Old Faithful sits in Yellowstone, which was the first national park anywhere in the world. Eighteen seventy-two.',
+      'They can tell you when Old Faithful will go next by timing the last one. A longer spout means a longer wait.'] },
+    { st: 'Nevada',        name: 'the Hoover Dam', facts: [
+      'The Hoover Dam came in two years early. Two years! I cannot get a lean-to up in a fortnight.',
+      'They poured the Hoover Dam in blocks with cooling pipes through them. In one solid pour the concrete would still be cooling now.',
+      'The Hoover Dam sits right on the state line, so one end of it is an hour ahead of the other.'] },
+    { st: 'California',    name: 'the Golden Gate Bridge', facts: [
+      'The Golden Gate is painted a colour called International Orange, chosen because you can still see it through fog.',
+      'The Golden Gate opened in 1937, and its towers stand seven hundred and forty-six feet up.',
+      'They never finish painting the Golden Gate. Touch-up work, all year, forever. I respect that.'] },
+    { st: 'Washington',    name: 'Mount Rainier', facts: [
+      'Mount Rainier is a volcano, and it carries more glacier ice than any other mountain in the lower forty-eight.',
+      'Mount Rainier stands 14,411 feet up. On a clear day you can see it from a hundred miles off.',
+      'Mount Rainier makes its own weather. The mountain is so big the clouds pile up on it.'] },
+    { st: 'Colorado',      name: 'Pikes Peak', facts: [
+      'A woman rode to the top of Pikes Peak in 1893, looked at the view, and wrote America the Beautiful about it.',
+      'Pikes Peak is 14,115 feet, and a cog railway climbs the whole way up.',
+      'You can drive to the top of Pikes Peak. Once a year they race up it, which sounds like a poor idea.'] },
+    { st: 'Illinois',      name: 'the Willis Tower', facts: [
+      'The Willis Tower was the tallest building in the world for nearly twenty-five years. It was the Sears Tower then.',
+      'The Willis Tower is nine square tubes bundled together, stopping at different heights. That is why it has that shape.',
+      'There are glass boxes on the side of the Willis Tower you can stand in, 1,353 feet up. No thank you.'] },
+    { st: 'Louisiana',     name: 'the French Quarter', facts: [
+      'The French Quarter is the oldest part of New Orleans, laid out in 1718 — but most of what stands there now is Spanish, built after two great fires.',
+      'Those iron lace balconies in the French Quarter are not original at all. They went up in the 1800s, long after.',
+      'The whole French Quarter is only about thirteen blocks by six. You could walk it in an afternoon.'] },
+    { st: 'Florida',       name: 'the Everglades', facts: [
+      'The Everglades is a river. Sixty miles wide, a few inches deep, moving south so slowly you cannot see it go.',
+      'The Everglades is the only place on earth where alligators and crocodiles live side by side.',
+      'They call the Everglades the river of grass. It is sawgrass, mostly, and it will cut you.'] },
+    { st: 'Massachusetts', name: 'Fenway Park', facts: [
+      'Fenway Park opened in 1912 and is the oldest ballpark still in use. The wall out in left field is thirty-seven feet tall.',
+      'There is one red seat at Fenway among all the green, marking where the longest home run there came down.',
+      'Fenway is an odd shape because they built it to fit the streets that were already there.'] },
+    { st: 'New York',      name: 'the Statue of Liberty', facts: [
+      'The Statue of Liberty was a gift from France, and her copper skin is only about as thick as two pennies.',
+      'The Statue of Liberty arrived a shiny copper brown. The green took some thirty years to come on.',
+      'It is 354 steps up inside the Statue of Liberty to the crown, and twenty-five windows when you get there.'] },
+    { st: 'Alaska',        name: 'Denali', facts: [
+      'Denali is 20,310 feet, the highest in North America. The name means the tall one.',
+      'Denali rises further from the ground around it than Everest does. Everest starts up on a high plateau; Denali starts near the sea.',
+      'Only about half the people who set out up Denali reach the top. The weather decides, not them.'] },
+    { st: 'Hawaii',        name: 'Kilauea', facts: [
+      'Kilauea is one of the most active volcanoes on earth, and it has been building the island underneath it for hundreds of thousands of years.',
+      'When Kilauea runs to the sea it makes new land. The island is bigger than it was.',
+      'Kilauea is not a cone. It is a shield — wide and low, built up by lava running out flat.'] }
   ];
   var LM_NIGHTS = 20;             // nights of walking between one landmark and the next
   function journeyIndex() { return Math.min(LANDMARKS.length, Math.floor((META.night - 1) / LM_NIGHTS)); }
@@ -2090,7 +2185,7 @@
   // it costs nothing per frame and the darkness falls over it like everything
   // else. Same furniture as his lobby, just further apart.
   var CAMP_PROPS = [
-    ['bed',   -0.86, 0.10], ['wood',  -0.34, 0.30], ['stump',  0.40, 0.26],
+    ['bed',   -0.86, 0.10], ['wood',  -0.34, 0.30], ['chair',  0.40, 0.26],
     ['desk',   0.78, -0.06], ['line', -0.80, -0.20], ['crates', 0.16, -0.34],
     ['pot',   -0.46, 0.44],  ['duck', -0.62, 0.16]
   ];
@@ -2123,9 +2218,19 @@
         g.fillStyle = 'rgba(190,150,90,0.7)';
         g.beginPath(); g.ellipse(wx + 0.8, wy + 2, 1.2, 1.6, 0, 0, 6.29); g.fill();
       }
-    } else if (kind === 'stump') {
-      g.fillStyle = '#5E4530'; roundRectOn(g, -8, -7, 16, 8, 3); g.fill();
-      g.fillStyle = '#7A5F44'; g.beginPath(); g.ellipse(0, -7, 8, 2.5, 0, 0, 6.29); g.fill();
+    } else if (kind === 'chair') {
+      g.strokeStyle = '#3F3833'; g.lineWidth = 1.7; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(-8.5, 1); g.lineTo(5.5, -7.6); g.stroke();
+      g.beginPath(); g.moveTo(7.5, 1); g.lineTo(-6.5, -7.6); g.stroke();
+      g.fillStyle = '#4E6B5A';
+      g.beginPath();
+      g.moveTo(-9.2, -5.4); g.lineTo(5.8, -7); g.lineTo(5.8, -8.8); g.lineTo(-9.2, -7.3);
+      g.closePath(); g.fill();
+      g.beginPath();
+      g.moveTo(3.2, -7.1); g.lineTo(6, -7.3); g.lineTo(8.2, -20.8); g.lineTo(4.4, -20.6);
+      g.closePath(); g.fill();
+      g.strokeStyle = '#5E4530'; g.lineWidth = 1.5;
+      g.beginPath(); g.moveTo(-7, -13.6); g.lineTo(5, -14.6); g.stroke();
     } else if (kind === 'desk') {
       g.fillStyle = '#453B31';
       roundRectOn(g, -22, -3, 6, 4, 1); g.fill();
@@ -3376,6 +3481,22 @@
       g.beginPath();
       g.moveTo(-0.4, -8.4); g.lineTo(3.6, -9.6); g.lineTo(3.6, -6.2); g.lineTo(-0.4, -6.6);
       g.closePath(); g.fill();
+    } else if (item === 'book') {
+      // an open book, held up where the firelight gets at the pages
+      g.rotate(-0.2);
+      g.fillStyle = '#7A4A3C';
+      roundRectOn(g, -6.4, -8.6, 12.8, 8.8, 1); g.fill();
+      g.fillStyle = '#EFE6D2';
+      roundRectOn(g, -5.6, -8.0, 5.2, 7.6, 0.7); g.fill();
+      roundRectOn(g, 0.4, -8.0, 5.2, 7.6, 0.7); g.fill();
+      g.strokeStyle = 'rgba(128,110,88,0.5)'; g.lineWidth = 0.36;
+      for (var bl = 0; bl < 4; bl++) {
+        var by = -7.0 + bl * 1.6;
+        g.beginPath(); g.moveTo(-4.9, by); g.lineTo(-1.2, by); g.stroke();
+        g.beginPath(); g.moveTo(1.1, by); g.lineTo(4.8, by); g.stroke();
+      }
+      g.strokeStyle = '#5F392E'; g.lineWidth = 0.6;
+      g.beginPath(); g.moveTo(0, -8.2); g.lineTo(0, -0.6); g.stroke();
     } else if (item === 'marsh') {
       g.strokeStyle = '#7A5433'; g.lineWidth = 1.2;
       g.beginPath(); g.moveTo(0, 0); g.lineTo(7, -2.4); g.stroke();
@@ -4050,7 +4171,7 @@
     wood:  { x: -32,  stand: -28, face: -1 },
     bed:   { x: -112, stand: -108, face: 1 },
     kennel:{ x: -60,  stand: -70, face: 1 },
-    stump: { x: 60,   stand: 60,  face: -1 },
+    chair: { x: 60,   stand: 61,  face: -1 },   // his reading chair, turned to the fire
     desk:  { x: 104,  stand: 104, face: 1 },   // square in front of it, back to you
     line:  { x: 146,  stand: 130, face: 1 }
   };
@@ -4058,25 +4179,34 @@
   // A fixed sky — same stars every visit, because it is the same sky.
   var CAMP_STARS = (function () {
     var r = mulberry32(90210), out = [];
-    for (var i = 0; i < 72; i++) {
-      out.push({ x: -200 + r() * 400, y: -114 + r() * 94, r: 0.3 + r() * 0.8, ph: r() * 6.28 });
+    for (var i = 0; i < 118; i++) {
+      out.push({ x: -230 + r() * 470, y: -198 + r() * 180, r: 0.3 + r() * 0.8, ph: r() * 6.28 });
     }
     return out;
   })();
   var CAMP_MOON = { x: -44, y: -88, r: 7.4 };
 
-  function drawCamp(g, t, fireLevel) {
-    var i;
-    // the sky he keeps looking up at
-    for (i = 0; i < CAMP_STARS.length; i++) {
-      var st2 = CAMP_STARS[i];
-      var tw = 0.3 + 0.32 * Math.sin(t * 0.8 + st2.ph);
-      g.fillStyle = 'rgba(206,216,255,' + tw.toFixed(3) + ')';
-      g.beginPath(); g.arc(st2.x, st2.y, st2.r, 0, 6.29); g.fill();
+  // One ridge of hills: a soft silhouette summed from a couple of sines, filled
+  // down past the horizon so the ground gradient lands on top of it.
+  function campRidge(g, y0, amp, freq, phase, fill) {
+    g.fillStyle = fill;
+    g.beginPath();
+    g.moveTo(-330, 40);
+    for (var hx = -330; hx <= 330; hx += 10) {
+      var hy = y0 - amp * (0.55 + 0.45 * Math.sin(hx * freq + phase))
+                  * (0.7 + 0.3 * Math.sin(hx * freq * 2.7 + phase * 1.9));
+      g.lineTo(hx, hy);
     }
-    // and the moon that keeps him company on the far side of it. The crescent
-    // is one path: the lit disc, then a second disc wound the other way, which
-    // punches the shadow out of it without touching the halo underneath.
+    g.lineTo(330, 40);
+    g.closePath(); g.fill();
+  }
+
+  // The half of the shot that never changes: moon, hills, ground. It is the
+  // biggest fill in the scene and it is the same every frame, so it gets baked
+  // once and blitted (see campBackdrop) rather than re-pathed at 60Hz.
+  function drawCampSky(g) {
+    // The crescent is one path: the lit disc, then a second disc wound the
+    // other way, which punches the shadow out without touching the halo.
     var mx = CAMP_MOON.x, my = CAMP_MOON.y;
     var halo = g.createRadialGradient(mx, my, 1, mx, my, 30);
     halo.addColorStop(0, 'rgba(198,212,255,0.17)');
@@ -4089,13 +4219,31 @@
     g.arc(mx + 3.6, my - 1.7, CAMP_MOON.r - 0.5, 0, 6.29, true);
     g.fillStyle = 'rgba(228,234,255,0.82)';
     g.fill();
-    // ground
+    // the country he is crossing, two ridges deep — the same country each time
+    campRidge(g, -78, 34, 0.016, 2.1, 'rgba(52,47,98,0.50)');
+    campRidge(g, -58, 20, 0.029, 5.4, 'rgba(28,24,56,0.82)');
     var gg = g.createLinearGradient(0, -6, 0, 34);
     gg.addColorStop(0, 'rgba(84,56,34,0.62)');
     gg.addColorStop(0.55, 'rgba(48,34,38,0.42)');
     gg.addColorStop(1, 'rgba(26,22,48,0)');
     g.fillStyle = gg;
     g.beginPath(); g.ellipse(0, 26, 300, 80, 0, 0, 6.29); g.fill();
+  }
+
+  // The stars twinkle, so they stay live — but they go down before the baked
+  // layer, which is how the hills end up in front of them.
+  function drawCampStars(g, t) {
+    for (var i = 0; i < CAMP_STARS.length; i++) {
+      var st2 = CAMP_STARS[i];
+      var tw = 0.3 + 0.32 * Math.sin(t * 0.8 + st2.ph);
+      g.fillStyle = 'rgba(206,216,255,' + tw.toFixed(3) + ')';
+      g.beginPath(); g.arc(st2.x, st2.y, st2.r, 0, 6.29); g.fill();
+    }
+  }
+
+  function drawCamp(g, t, fireLevel, baked) {
+    var i;
+    if (!baked) { drawCampStars(g, t); drawCampSky(g); }
 
     // ── a proper tent, pegged out, with a bedroll just inside the door
     g.save(); g.translate(CAMP.bed.x, 0);
@@ -4167,14 +4315,28 @@
     }
     g.restore();
 
-    // ── stump seat
-    g.save(); g.translate(CAMP.stump.x, 0);
-    g.fillStyle = '#5E4530';
-    roundRectOn(g, -8.5, 1, 17, 8, 3); g.fill();
-    g.fillStyle = '#7A5F44';
-    g.beginPath(); g.ellipse(0, 1, 8.5, 2.6, 0, 0, 6.29); g.fill();
-    g.fillStyle = 'rgba(120,92,62,0.5)';
-    g.beginPath(); g.ellipse(0, 1, 5, 1.5, 0, 0, 6.29); g.fill();
+    // ── his chair: a folding camp chair, sling seat, turned to face the fire,
+    // with a book on the arm and a mug in the holder for when he sits down
+    g.save(); g.translate(CAMP.chair.x, 0);
+    g.strokeStyle = '#3F3833'; g.lineWidth = 1.7; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(-8.5, 9); g.lineTo(7.0, 0.4); g.stroke();      // crossed legs
+    g.beginPath(); g.moveTo(9.2, 9); g.lineTo(-6.5, 0.4); g.stroke();
+    g.strokeStyle = '#5E4530'; g.lineWidth = 1.4;                          // back uprights
+    g.beginPath(); g.moveTo(8.2, 0.6); g.lineTo(11.4, -26.5); g.stroke();
+    g.beginPath(); g.moveTo(3.6, 0.9); g.lineTo(6.8, -26.1); g.stroke();
+    g.fillStyle = '#4E6B5A';                                               // the canvas sling
+    g.beginPath();
+    g.moveTo(-9.2, 2.6); g.lineTo(7.6, 0.9); g.lineTo(7.6, -0.9); g.lineTo(-9.2, 0.7);
+    g.closePath(); g.fill();
+    g.beginPath();                                                         // and its back, up past his shoulders
+    g.moveTo(3.9, -3.3); g.lineTo(8.4, -3.7); g.lineTo(11.1, -25.4); g.lineTo(6.2, -25.0);
+    g.closePath(); g.fill();
+    g.strokeStyle = 'rgba(238,230,214,0.18)'; g.lineWidth = 0.55;          // seams, so it reads as cloth
+    g.beginPath(); g.moveTo(-8.6, 1.6); g.lineTo(5.2, 0.2); g.stroke();
+    g.beginPath(); g.moveTo(4.8, -11.4); g.lineTo(9.3, -11.7); g.stroke();
+    g.beginPath(); g.moveTo(5.6, -19.0); g.lineTo(10.1, -19.3); g.stroke();
+    g.strokeStyle = '#5E4530'; g.lineWidth = 1.4;                          // far armrest, behind him
+    g.beginPath(); g.moveTo(-6.4, -7.4); g.lineTo(6.8, -8.4); g.stroke();
     g.restore();
 
     // ── cooking tripod over the fire
@@ -4646,6 +4808,24 @@
   // The near edge of the desk, with the keyboard on it. Drawn after him, so
   // when he sits down his hands go behind it the way hands do.
   function drawCampFront(g, t) {
+    g.save(); g.translate(CAMP.chair.x, 0);
+    g.strokeStyle = '#6B5039'; g.lineWidth = 1.6; g.lineCap = 'round';     // near armrest
+    g.beginPath(); g.moveTo(-11.4, -5.4); g.lineTo(3.6, -6.4); g.stroke();
+    g.strokeStyle = '#3F3833'; g.lineWidth = 1.2;                          // and its post
+    g.beginPath(); g.moveTo(-10.6, -5.5); g.lineTo(-9.2, 1.4); g.stroke();
+    g.fillStyle = '#3F5A4A';                                               // cup holder off the arm
+    roundRectOn(g, -18.4, -6.2, 5.6, 5.2, 1.3); g.fill();
+    g.fillStyle = '#C9BBA4';
+    roundRectOn(g, -17.6, -8.4, 3.9, 4, 1); g.fill();
+    if (KN.act !== 'read') {                                               // the book waits on the arm
+      g.save(); g.translate(-5.6, -7.2); g.rotate(-0.07);
+      g.fillStyle = '#7A4A3C';
+      roundRectOn(g, -4.4, -1.7, 8.8, 2.7, 0.7); g.fill();
+      g.fillStyle = '#E6DBC4';
+      roundRectOn(g, -3.9, -1.3, 7.8, 1.7, 0.4); g.fill();
+      g.restore();
+    }
+    g.restore();
     g.save(); g.translate(CAMP.desk.x, 0);
     g.fillStyle = '#40372E';                                    // the near edge of the table
     roundRectOn(g, -23, -0.4, 46, 3.4, 1.2); g.fill();
@@ -4663,7 +4843,7 @@
     x: 0, tx: 0, cam: 0, face: 1, walking: 0, step: 0,
     armL: undefined, armR: undefined, item: null, itemL: null,
     blink: 1.8, hop: 0, tilt: 0, lean: 0, zzz: 0, sit: 0,
-    crouch: 0, lie: 0, back: 0, headTilt: 0, lift: 0, treatT: 0, faceYou: 0,
+    crouch: 0, lie: 0, back: 0, headTilt: 0, lift: 0, treatT: 0, faceYou: 0, factT: 0,
     spin: 0, squash: 0, look: 0, lookT: 0,
     hearts: [], props: [], taps: 0, tapT: 0, petting: 0, pet: 0,
     onStage: false, lastReact: '', bounce: 0, danceT: 0,
@@ -4686,8 +4866,9 @@
     { id: 'nap',     at: 'bed',   w: 1.6, dur: [5, 9] },
     { id: 'tidy',    at: 'bed',   w: 1.1, dur: [2.5, 4] },
     { id: 'game',    at: 'desk',  w: 1.4, dur: [4, 7] },
-    { id: 'sit',     at: 'stump', w: 1.6, dur: [3.5, 7] },
-    { id: 'stars',   at: 'stump', w: 1.3, dur: [4, 7] },
+    { id: 'read',    at: 'chair', w: 2.1, dur: [7, 13] },
+    { id: 'sit',     at: 'chair', w: 1.4, dur: [3.5, 7] },
+    { id: 'stars',   at: 'chair', w: 1.3, dur: [4, 7] },
     { id: 'panel',   at: 'line',  w: 0.7, dur: [2.2, 3.4] },
     { id: 'wander',  at: null,    w: 1.6, dur: [2.5, 5] },
     { id: 'moth',    at: null,    w: 1.2, dur: [4, 7] },
@@ -4709,7 +4890,11 @@
             'People ask if I get bored out here. I never have.',
             'This is my favourite part of the night, I think. Right about now.',
             'I have kept this fire longer than I can count. I would not swap it for anything.',
-            'It is quiet out here. That is rather the point of it.'],
+            'It is quiet out here. That is rather the point of it.',
+            'The flame in there is older than any town it has lit. I only carry it.',
+            'When I get there they will light their lamp off mine and I will still have mine. That is the good part.',
+            'A match would be quicker. It would also be the wrong fire. It has to be this one.',
+            'Some towns leave the lamp out on a post for me. Some hand it over in a jar. I like the jar ones.'],
     you:   ['Are you still there?', 'What is it like, where you are?',
             'Do you have a fire of your own?', 'You watch me a lot. I do not mind at all.',
             'Is it warm where you are sitting?', 'Do you sleep, out there?',
@@ -4769,6 +4954,18 @@
     KN.sayT = 3.4 + KN.say.length * 0.03;
   }
 
+  // What he is reading about is wherever the flame is going next, so the book
+  // is always the right book for the road he is on.
+  function knightFact() {
+    var L = nextLandmark();
+    if (!L || !L.facts || !L.facts.length) { knightSay('world'); return; }
+    var f = L.facts[Math.floor(Math.random() * L.facts.length)];
+    if (f === KN.lastSay && L.facts.length > 1) f = L.facts[(L.facts.indexOf(f) + 1) % L.facts.length];
+    KN.lastSay = f;
+    KN.say = f;
+    KN.sayT = 4.6 + f.length * 0.038;
+  }
+
   function knightAct(force) {
     var pool = [], i;
     if (KN.onStage && MUS.timer && Math.random() < 0.3) {
@@ -4789,6 +4986,7 @@
     KN.act = picked.id;
     KN.actT = rand(picked.dur[0], picked.dur[1]);
     KN.props.length = 0;
+    KN.factT = picked.id === 'read' ? rand(1.8, 3.4) : 0;   // let him settle, then read it out
     var spot = picked.at ? CAMP[picked.at] : null;
     KN.tx = spot ? spot.stand + rand(-4, 4) : rand(-104, 124);
     if (!spot && Math.abs(KN.tx) < 20) KN.tx += KN.tx < 0 ? -22 : 22;
@@ -5007,6 +5205,10 @@
 
   function updateKnight(dt) {
     var i;
+    if (KN.factT > 0) {
+      KN.factT -= dt;
+      if (KN.factT <= 0 && KN.act === 'read') knightFact();
+    }
     if (KN.treatT > 0) {
       KN.treatT -= dt;
       if (KN.treatT <= 0) { var tb = document.getElementById('btnTreat'); if (tb) tb.textContent = treatLabel(); }
@@ -5239,12 +5441,22 @@
       armL = 1.24 - Math.abs(Math.sin(S.time * 7.5 + 2.1)) * 0.13;
       KN.look = 0;
       expr = peek ? 'happy' : (Math.sin(S.time * 0.7) > 0.6 ? 'surprised' : 'think');
+    } else if (A2 === 'read') {
+      // back in the chair with the book up, turning a page every so often
+      sit = 1; lift = 2.4;
+      var page = Math.sin(S.time * 0.62) > 0.94;
+      armR = -0.66 + (page ? 0.44 : 0) + Math.sin(S.time * 0.7) * 0.025;
+      armL = 0.70 - (page ? 0.26 : 0);
+      item = 'book';
+      headTilt = 0.15;
+      expr = page ? 'surprised' : 'think';
+      KN.look = 0;
     } else if (A2 === 'sit') {
-      // on the stump, hands on his knees
+      // in the chair, hands on his knees
       sit = 1; lift = 2.4; expr = Math.sin(S.time) > 0 ? 'content' : 'normal';
       armL = 1.15; armR = -1.15;
     } else if (A2 === 'stars') {
-      // on the stump, head right back
+      // in the chair, head right back
       sit = 1; lift = 2.4; headTilt = -0.34; expr = 'content';
       armL = 0.85; armR = -0.85;
       KN.look = 0;
@@ -5366,38 +5578,92 @@
   }
 
   var portraitCv = null;
+  // Where his feet land in a full-screen lobby: just clear of the name, so he
+  // never stands behind his own controls whatever the phone's shape.
+  var homeFrac = 0.555;
+  function measureHomeFrac(h) {
+    var nm = document.querySelector('.homename');
+    if (!nm || !h) return 0.555;
+    var top = nm.getBoundingClientRect().top;
+    if (!(top > 0)) return 0.555;
+    return clamp((top - h * 0.085) / h, 0.34, 0.8);
+  }
   function paintPortrait() {
     var cv = portraitCv;
     if (!cv || !cv.isConnected) { portraitCv = null; return; }
     var w = cv.clientWidth || 128, h = cv.clientHeight || 128;
     var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    // A full-screen stage is four times the pixels of a card-sized one, and
+    // this is flat vector art: past a budget the extra resolution costs frames
+    // without showing. Card-sized stages are well under it and keep full dpr.
+    var cap = Math.sqrt(1500000 / Math.max(1, w * h));
+    if (cap < dpr) dpr = Math.max(1.4, cap);
     // check BOTH axes: a canvas defaults to 300x150, and a 150px-wide box at
     // dpr 2 gives exactly 300, so a width-only guard silently skips the height
     if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) {
       cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+      homeFrac = measureHomeFrac(h);
     }
     var g = cv.getContext('2d');
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, w, h);
-    if (cv.classList.contains('stage-knight')) paintCamp(g, w, h);
+    if (cv.classList.contains('stage-knight')) {
+      // full-screen lobby: he sits above the controls, not behind them
+      paintCamp(g, w, h,
+        cv.parentNode && cv.parentNode.classList.contains('homestage') ? homeFrac : 0.88, dpr);
+    }
     else paintBust(g, w, h);
   }
 
-  // The lobby: his whole camp, with him living in it.
-  // Wide enough to hold his whole camp at once, so the lobby is a fixed shot
-  // of the place rather than a camera chasing him around it.
-  var CAMP_VIEW = 178;
+  // The lobby: his whole camp, with him living in it, and the camera on him.
   var CAMP_GND = 8;         // the y everything in camp stands on
-  function paintCamp(g, w, h) {
-    var sc = w / CAMP_VIEW;
-    var base = h * 0.88;
+  // The moon, the hills and the ground never move and never change, and they
+  // are the largest fills on the screen. Bake them once per canvas size and
+  // slide the strip under the camera instead of re-pathing it every frame.
+  var CAM_LO = -50, CAM_HI = 72;
+  var campBack = null;
+  function campBackdrop(w, h, dpr, base, sc) {
+    if (campBack && campBack.w === w && campBack.h === h &&
+        campBack.dpr === dpr && campBack.base === base) return campBack;
+    var half = w / sc / 2;
+    var x0 = CAM_LO - half - 6;
+    var cw = Math.ceil((CAM_HI - CAM_LO + w / sc + 12) * sc);
+    var cv = (campBack && campBack.cv) || document.createElement('canvas');
+    cv.width = Math.ceil(cw * dpr); cv.height = Math.ceil(h * dpr);
+    var bg = cv.getContext('2d');
+    bg.setTransform(dpr, 0, 0, dpr, 0, 0);
+    bg.clearRect(0, 0, cw, h);
+    bg.translate(-x0 * sc, base);
+    bg.scale(sc, sc);
+    bg.translate(0, -CAMP_GND);
+    drawCampSky(bg);
+    campBack = { w: w, h: h, dpr: dpr, base: base, sc: sc, cv: cv, x0: x0, cw: cw };
+    return campBack;
+  }
+
+  function paintCamp(g, w, h, baseFrac, dpr) {
+    // Frame him rather than the frame: aim for him at about a fifth of the
+    // height, but never so close you lose the camp or so far he is a speck.
+    var sc = clamp(h / 140, w / 320, w / 162);
+    var base = h * (baseFrac || 0.88);
     var cam = KN.cam;
+
+    g.save();
+    g.translate(w / 2 - cam * sc, base);
+    g.scale(sc, sc);
+    g.translate(0, -CAMP_GND);
+    drawCampStars(g, S.time);
+    g.restore();
+
+    var bk = campBackdrop(w, h, dpr || 1, base, sc);
+    g.drawImage(bk.cv, w / 2 + (bk.x0 - cam) * sc, 0, bk.cw, h);
+
     g.save();
     g.translate(w / 2 - cam * sc, base);
     g.scale(sc, sc);
     g.translate(0, -CAMP_GND);
 
-    drawCamp(g, S.time, clamp(KN.fire, 0, 1.2));
+    drawCamp(g, S.time, clamp(KN.fire, 0, 1.2), true);
     drawKnProps(g);
 
     // everyone who has joined him along the way
@@ -5572,7 +5838,9 @@
     f();
   });
   var elVeilGear = document.getElementById('veilgear');
+  var elVeilNote = document.getElementById('veilnote');
   elVeilGear.addEventListener('click', function () { UI.tap(); settingsScreen(menu); });
+  elVeilNote.addEventListener('click', function () { UI.tap(); musicScreen(menu); });
   function veil(html, cls, back, gear) {
     portraitCv = null;
     KN.onStage = false;
@@ -5583,13 +5851,24 @@
     veilBackFn = back || null;
     elVeilBack.classList.toggle('on', !!back);
     elVeilGear.classList.toggle('on', !!gear);
+    elVeilNote.classList.toggle('on', !!gear);
+    elVeilNote.classList.toggle('lit', !!MUS.timer);
+    elVeil.classList.toggle('full', cls === 'home');
   }
   function hideVeil() {
+    // The card stays in the DOM behind the fade, so without this the lobby
+    // canvas keeps painting a full screen of camp underneath the actual game.
+    portraitCv = null; KN.onStage = false;
     elVeil.classList.add('hide'); veilBackFn = null;
     elVeilBack.classList.remove('on'); elVeilGear.classList.remove('on');
+    elVeilNote.classList.remove('on'); elVeil.classList.remove('full');
   }
   function on(id, fn) { var el = document.getElementById(id); if (el) el.addEventListener('click', fn); }
-  function hookPortrait() { portraitCv = document.getElementById('portrait'); paintPortrait(); }
+  function hookPortrait() {
+    portraitCv = document.getElementById('portrait');
+    homeFrac = measureHomeFrac(portraitCv ? portraitCv.clientHeight : 0);
+    paintPortrait();
+  }
 
   // Poke him and he perks up; drag across him and he leans into it.
   function bindStage() {
@@ -5667,17 +5946,19 @@
   // He asks. You answer. Nothing here is required — every step can be walked
   // past, and everything it learns can be changed later in Settings.
   var INTRO = [
-    { say: 'Oh — hello! Nobody comes out this far. Come in, the fire is warm.',
+    { say: 'Oh — hello! Come in, come in. The fire is warm and I have the whole night.',
       btn: 'Hello', expr: 'surprised', act: 'idle' },
     { say: 'What should I call you?', ask: 'name', expr: 'happy', act: 'idle' },
     { say: '{p}. I like that one. Are you a lad or a lass?',
       ask: 'gender', expr: 'happy', act: 'idle' },
-    { say: 'Right then, {p}. This is my fire. I have kept it as long as I can remember, and there is nothing else I would rather be doing.',
-      btn: 'You like it out here?', expr: 'content', act: 'warm' },
-    { say: 'I love it out here. It is the only light for miles, so anyone lost in the dark walks towards it — and I am the one who makes sure it is still burning when they arrive.',
-      btn: 'That is a good job', expr: 'happy', act: 'poke' },
-    { say: 'It is the best job there is. The shades come and lean on the fire to put it out, so we feed it and we see the night through. Wood is easy out here, and I am quick.',
-      btn: 'Let us keep it lit', expr: 'happy', act: 'haul' },
+    { say: 'Good to meet you, {p}. Now — this fire is not really mine. I am only carrying it.',
+      btn: 'Carrying it where?', expr: 'content', act: 'warm' },
+    { say: 'Every town out there keeps one lamp lit at its landmark, and every one of those lamps was lit from this same flame. When a town lets theirs go out, somebody has to walk the flame back to them. That somebody is me.',
+      btn: 'You walk it there?', expr: 'happy', act: 'poke' },
+    { say: 'All the way there. And it cannot go out on the road — a match will not do, it has to be this fire — so wherever I stop for the night, I sit up and keep it.',
+      btn: 'And the nights?', expr: 'happy', act: 'haul' },
+    { say: 'At night the shades come and lean on it to smother it. So we feed it wood and we see the morning in. Wood is easy out here, and I am quick. Best job there is.',
+      btn: 'Let us keep it lit', expr: 'happy', act: 'chop' },
     { say: 'Good. Then paint the place — what colour do you like?',
       ask: 'hue', expr: 'happy', act: 'idle' },
     { say: 'There. Much more like it. Thank you.', btn: 'Any time', expr: 'content', act: 'idle' },
@@ -5980,38 +6261,41 @@
     for (var j = 0; j < ACHIEVEMENTS.length; j++) if (META.ach[ACHIEVEMENTS[j].id]) feats++;
 
     var L = nextLandmark(), away = nightsToNext();
+    // One fixed room. He gets the whole screen; the numbers sit round the edge
+    // of it in chips, near enough to read and far enough to ignore.
     veil(
-      '<div class="brand">Night Watch</div>' +
-      storageWarning() +
-      '<div class="stage hero" id="stage">' +
+      '<div class="stage homestage" id="stage">' +
         '<canvas id="portrait" class="portrait stage-knight"></canvas>' +
+      '</div>' +
+      '<div class="hometop">' +
+        '<span class="hchip">Night <b>' + META.night + '</b></span>' +
+        (L ? '<span class="hchip">' + esc(L.st) + ' <b>' +
+               (away <= 1 ? 'tonight' : 'in ' + away + ' nights') + '</b></span>'
+           : '<span class="hchip">The whole road <b>walked</b></span>') +
+        (STORE_OK && !SAVE_FAILED ? ''
+          : '<span class="hchip warn">Progress won\u2019t save in this window \u2014 see Settings</span>') +
+      '</div>' +
+      '<div class="homebar">' +
         (META.knight.name
-          ? '<div class="stagename"><b>' + esc(META.knight.name) + '</b>' +
+          ? '<div class="homename"><b>' + esc(META.knight.name) + '</b>' +
             '<u>' + esc(campRoll()) + '</u></div>'
-          : '<div class="stagename"><b>A keeper with no name</b><u>waiting by the fire</u></div>') +
-      '</div>' +
-      '<div class="metaline">' +
-        '<span>Night <b>' + META.night + '</b></span>' +
-        (L ? '<span>' + esc(L.st) + ' in <b>' + (away <= 1 ? 'one night' : away + ' nights') + '</b></span>'
-           : '<span>The whole road <b>walked</b></span>') +
-      '</div>' +
-      emberChip() +
-      '<button class="go" id="btnStart">' +
+          : '<div class="homename"><b>A keeper with no name</b><u>waiting by the fire</u></div>') +
+        emberChip() +
+        '<button class="go" id="btnStart">' +
+          (isLandmarkNight(META.night)
+            ? 'Night ' + META.night + ' · ' + esc((L || {}).name || 'the last stretch')
+            : 'Take the Watch · Night ' + META.night) + '</button>' +
         (isLandmarkNight(META.night)
-          ? 'Night ' + META.night + ' · ' + esc((L || {}).name || 'the last stretch')
-          : 'Take the Watch · Night ' + META.night) + '</button>' +
-      (isLandmarkNight(META.night)
-        ? '<div class="foot hi">You reach it tonight. You will not be out there alone.</div>' : '') +
-      '<button class="ghost treat" id="btnTreat">' + esc(treatLabel()) + '</button>' +
-      '<div class="row3">' +
-        '<button class="ghost" id="btnShop">Stores</button>' +
-        '<button class="ghost" id="btnFeats">Feats · ' + feats + '/' + ACHIEVEMENTS.length + '</button>' +
-        '<button class="ghost" id="btnKnight">' + (META.knight.name ? 'Keeper' : 'Name him') + '</button>' +
-      '</div>' +
-      transportHtml(true) +
-      '<div class="foot">Tap him. He likes that.</div>' +
-      buildFoot(),
-      '', null, true
+          ? '<div class="foot hi">You reach it tonight. You will not be out there alone.</div>' : '') +
+        '<button class="ghost treat" id="btnTreat">' + esc(treatLabel()) + '</button>' +
+        '<div class="row3">' +
+          '<button class="ghost" id="btnShop">Stores</button>' +
+          '<button class="ghost" id="btnFeats">Feats · ' + feats + '/' + ACHIEVEMENTS.length + '</button>' +
+          '<button class="ghost" id="btnKnight">' + (META.knight.name ? 'Keeper' : 'Name him') + '</button>' +
+        '</div>' +
+        '<div class="homefoot">Tap him \u00b7 Night Watch ' + BUILD + '</div>' +
+      '</div>',
+      'home', null, true
     );
     on('btnStart', function () {
       if (!META.knight.name) nameKnight(startGame); else startGame();
@@ -6020,7 +6304,6 @@
     on('btnShop', shop);
     on('btnFeats', feats2);
     on('btnKnight', function () { nameKnight(menu); });
-    bindTransport(function () { musicScreen(menu); });
     hookPortrait();
     bindStage();
   }
@@ -6099,7 +6382,7 @@
         '<li><span class="glyph">👁</span><span><b>Shades</b> come in from the dark to drain it. Light burns them, and dispelling one mends you a little.</span></li>' +
         '<li><span class="glyph">🗡</span><span>Swing the <b>brand</b> to drive them off — free and fast, but you have to aim it.</span></li>' +
         '<li><span class="glyph">✦</span><span><b>Flare</b> clears all around you at once, but it costs fire.</span></li>' +
-        '<li><span class="glyph">🌅</span><span>Reach <b>dawn</b> and somebody found their way in — you draft an upgrade, and the embers you earn buy permanent gear.</span></li>' +
+        '<li><span class="glyph">🌅</span><span>Reach <b>dawn</b> with the flame still lit and it goes another day up the road — you draft an upgrade, and the embers you earn buy permanent gear.</span></li>' +
       '</ul>' +
       '<button class="ghost" id="btnBack">Back</button>' +
       buildFoot(),
@@ -6168,6 +6451,7 @@
     veil(
       '<div class="eyebrow">Settings</div>' +
       '<h1>How It <em>Plays</em></h1>' +
+      storageWarning() +
       '<div class="setlist">' + rows + '</div>' +
       '<div class="ghead">Your name</div>' +
       '<input id="setName" class="nameIn" maxlength="14" autocomplete="off" spellcheck="false" ' +
@@ -6654,7 +6938,7 @@
       ? [who + ' woke up by the fire with a headache and no memory of the end of it.',
          'They dragged him in before it got him. He is fine. Mostly.',
          who + ' went down swinging, and somebody put the kettle on.']
-      : ['The fire went out about an hour before dawn. It happens.',
+      : ['The flame went out about an hour before dawn. It happens. He will walk back and borrow a light.',
          who + ' ran out of wood at the worst possible moment.',
          'Nearly. Genuinely nearly. Have another go.'];
     var tail = ' Everything he has bought is still his — try the night again, or spend what you earned first.';
@@ -6680,7 +6964,9 @@
         while (acc >= STEP && guard++ < 20) { update(STEP); acc -= STEP; }
       }
     }
-    render();
+    // The lobby is opaque wall to wall, so the field behind it is drawn for
+    // nobody. Skipping it there is most of a frame back on a phone.
+    if (!elVeil.classList.contains('full')) { render(); }
     syncHud();
     if (portraitCv) { syncFolk(); syncPets(); updateKnight(dt); updateDog(dt); updatePets(dt); paintPortrait(); }
   }
@@ -6727,7 +7013,7 @@
   document.addEventListener('keydown', wakeAudio);
   // opt-in inspection hook for tuning/QA: open with #debug
   if (/[?#]debug/.test(location.href)) window.__NW = { S: S, K: K, D: D, META: META, UPGRADES: UPGRADES, PERKS: PERKS,
-      flare: doFlare, swing: doSwing, spawnShade: spawnShade, lightAt: lightAt, stick: stick, KN: KN, CAMP: CAMP, drawCamp: drawCamp, drawCampFront: drawCampFront, DOG: DOG, FOLK: FOLK, PETS: PETS, drawDog: drawDog, drawPet: drawPet, PET_KINDS: PET_KINDS, folkPose: folkPose, updateDog: updateDog, syncFolk: syncFolk, startParty: startParty, endParty: endParty, LANDMARKS: LANDMARKS, journeyIndex: journeyIndex, ZOOM: ZOOM, field: function () { return { w: W, h: H }; }, KN_ACTS: KN_ACTS, knightSay: knightSay, knightAct: knightAct, updateKnight: updateKnight, knightPoke: knightPoke, knightPet: knightPet, beatNow: beatNow, drawKnight: drawKnight, A: A, MUS: MUS, TUNES: TUNES,
+      flare: doFlare, swing: doSwing, spawnShade: spawnShade, lightAt: lightAt, stick: stick, KN: KN, CAMP: CAMP, drawCamp: drawCamp, drawCampFront: drawCampFront, DOG: DOG, FOLK: FOLK, PETS: PETS, drawDog: drawDog, drawPet: drawPet, PET_KINDS: PET_KINDS, folkPose: folkPose, updateDog: updateDog, syncFolk: syncFolk, startParty: startParty, endParty: endParty, LANDMARKS: LANDMARKS, journeyIndex: journeyIndex, ZOOM: ZOOM, field: function () { return { w: W, h: H }; }, KN_ACTS: KN_ACTS, knightSay: knightSay, knightFact: knightFact, nextLandmark: nextLandmark, knightAct: knightAct, updateKnight: updateKnight, knightPoke: knightPoke, knightPet: knightPet, beatNow: beatNow, drawKnight: drawKnight, A: A, MUS: MUS, TUNES: TUNES,
       startMusic: startMusic, nextTune: nextTune, setMusic: setMusic, SFX: SFX, UI: UI, ac: ac, switchTo: switchTo, applyTone: applyTone, GENRE: GENRE,
       music: { parseChord: parseChord, voicing: voicing, bassNote: bassNote,
                leadNote: leadNote, chordAt: chordAt, QUAL: QUAL, mtof: mtof }, recalc: recalc, saveMeta: saveMeta, rollDraft: rollDraft, take: takeUpgrade };
