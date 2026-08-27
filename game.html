@@ -317,6 +317,15 @@
   .feat:not(.got) .fe{color:var(--mute);opacity:.6}
 
   /* ---------- run summary extras ---------- */
+  .nowplaying{
+    display:flex;align-items:baseline;justify-content:center;gap:8px;
+    margin:16px 0 4px;padding:11px 14px;border-radius:14px;
+    border:1px solid var(--line);background:rgba(20,16,14,0.5);
+    color:var(--ember);font:600 13px/1 var(--body);
+  }
+  .nowplaying b{color:var(--bone);font-weight:600}
+  .nowplaying span{font:600 9px/1 var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--mute)}
+
   .newfeats{
     border:1px solid rgba(255,159,10,0.32);border-radius:14px;
     background:rgba(48,28,10,0.45);padding:11px 14px;margin-bottom:14px;text-align:left;
@@ -387,6 +396,7 @@
 
   var W = 0, H = 0, DPR = 1;
   var MUTE_KEY = 'keeper.nightwatch.mute';
+  var MUSIC_KEY = 'keeper.nightwatch.music';
 
   // ────────────────────────────────────────────────────────────── tuning
   var K = {
@@ -606,54 +616,339 @@
     };
   }
 
-  // ────────────────────────────────────────────────────────────── audio
-  var AC = null;
+  // ══════════════════════════════════════════════════════════════ audio ══
+  // Every sound here is synthesised at runtime — no samples, no external
+  // files — so the game stays one portable HTML file.
+  var A = { ctx: null, master: null, comp: null, sfx: null, music: null, verb: null, noise: null };
+  var SFX_TRIM = 0.42;        // everything got a lot softer
+  var MUSIC_LEVEL = 0.5;
+
   function ac() {
-    if (S.muted) return null;
-    if (!AC) {
-      var Ctor = window.AudioContext || window.webkitAudioContext;
-      if (!Ctor) return null;
-      AC = new Ctor();
-    }
-    if (AC.state === 'suspended') AC.resume();
-    return AC;
+    if (A.ctx) { if (A.ctx.state === 'suspended') A.ctx.resume(); return A.ctx; }
+    var Ctor = window.AudioContext || window.webkitAudioContext;
+    if (!Ctor) return null;
+    var a;
+    try { a = new Ctor(); } catch (e) { return null; }
+    A.ctx = a;
+
+    var comp = a.createDynamicsCompressor();
+    comp.threshold.value = -20; comp.knee.value = 26; comp.ratio.value = 3.2;
+    comp.attack.value = 0.006; comp.release.value = 0.25;
+    var master = a.createGain(); master.gain.value = 0.85;
+    comp.connect(master); master.connect(a.destination);
+
+    // a small warm room, so nothing lands bone dry
+    var verb = a.createConvolver();
+    verb.buffer = impulse(a, 2.4, 2.6);
+    var verbG = a.createGain(); verbG.gain.value = 0.75;
+    verb.connect(verbG); verbG.connect(comp);
+
+    // sfx bus — rolled off up top so nothing is sharp any more
+    var sfx = a.createGain(); sfx.gain.value = 1;
+    var sfxLP = a.createBiquadFilter();
+    sfxLP.type = 'lowpass'; sfxLP.frequency.value = 2300; sfxLP.Q.value = 0.4;
+    sfx.connect(sfxLP); sfxLP.connect(comp);
+    var sfxSend = a.createGain(); sfxSend.gain.value = 0.2;
+    sfxLP.connect(sfxSend); sfxSend.connect(verb);
+
+    // music bus — starts silent and fades up
+    var music = a.createGain(); music.gain.value = 0.0001;
+    var musLP = a.createBiquadFilter();
+    musLP.type = 'lowpass'; musLP.frequency.value = 5400; musLP.Q.value = 0.3;
+    music.connect(musLP); musLP.connect(comp);
+    var musSend = a.createGain(); musSend.gain.value = 0.34;
+    musLP.connect(musSend); musSend.connect(verb);
+
+    A.master = master; A.comp = comp; A.verb = verb; A.sfx = sfx; A.music = music;
+    return a;
   }
+
+  function impulse(a, dur, decay) {
+    var len = Math.floor(a.sampleRate * dur), buf = a.createBuffer(2, len, a.sampleRate);
+    for (var c = 0; c < 2; c++) {
+      var d = buf.getChannelData(c);
+      for (var i = 0; i < len; i++) {
+        var t = i / len;
+        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, decay);
+      }
+    }
+    return buf;
+  }
+  function noiseBuffer(a) {
+    if (A.noise) return A.noise;
+    var len = Math.floor(a.sampleRate * 2), b = a.createBuffer(1, len, a.sampleRate), d = b.getChannelData(0);
+    for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    A.noise = b; return b;
+  }
+
+  // ── effects ────────────────────────────────────────────────────────────
   function tone(freq, dur, type, vol, slideTo) {
+    if (S.muted) return;
     var a = ac(); if (!a) return;
+    var t = a.currentTime;
     var o = a.createOscillator(), g = a.createGain();
     o.type = type || 'sine';
-    o.frequency.setValueAtTime(freq, a.currentTime);
-    if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(20, slideTo), a.currentTime + dur);
-    g.gain.setValueAtTime(0.0001, a.currentTime);
-    g.gain.exponentialRampToValueAtTime(vol || 0.08, a.currentTime + 0.012);
-    g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + dur);
-    o.connect(g); g.connect(a.destination);
-    o.start(); o.stop(a.currentTime + dur + 0.02);
+    o.frequency.setValueAtTime(freq, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(20, slideTo), t + dur);
+    var peak = Math.max(0.0002, (vol || 0.08) * SFX_TRIM);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + 0.03);      // gentler attack
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(A.sfx);
+    o.start(t); o.stop(t + dur + 0.03);
   }
   function noise(dur, vol, freq) {
+    if (S.muted) return;
     var a = ac(); if (!a) return;
-    var len = Math.floor(a.sampleRate * dur);
-    var buf = a.createBuffer(1, len, a.sampleRate);
-    var d = buf.getChannelData(0);
-    for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
-    var src = a.createBufferSource(); src.buffer = buf;
-    var f = a.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq || 800;
-    var g = a.createGain(); g.gain.value = vol || 0.1;
-    src.connect(f); f.connect(g); g.connect(a.destination);
-    src.start();
+    var t = a.currentTime;
+    var src = a.createBufferSource();
+    src.buffer = noiseBuffer(a);
+    src.loop = true;
+    var f = a.createBiquadFilter();
+    f.type = 'bandpass'; f.frequency.value = freq || 800; f.Q.value = 0.8;
+    var g = a.createGain();
+    var peak = Math.max(0.0002, (vol || 0.1) * SFX_TRIM);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f); f.connect(g); g.connect(A.sfx);
+    src.start(t); src.stop(t + dur + 0.03);
   }
   function buzz(ms) { if (navigator.vibrate && !S.muted) { try { navigator.vibrate(ms); } catch (e) {} } }
 
   var SFX = {
-    pick:  function () { tone(520, 0.09, 'triangle', 0.05, 760); },
-    feed:  function () { noise(0.26, 0.13, 420); tone(180, 0.34, 'sine', 0.09, 90); },
-    flare: function () { noise(0.32, 0.16, 1400); tone(300, 0.3, 'sawtooth', 0.06, 900); },
-    kill:  function () { noise(0.14, 0.09, 2200); tone(760, 0.1, 'square', 0.03, 300); },
-    hurt:  function () { tone(120, 0.22, 'square', 0.09, 60); noise(0.16, 0.1, 260); },
-    dawn:  function () { [523, 659, 784, 1047].forEach(function (f, i) { setTimeout(function () { tone(f, 0.5, 'sine', 0.06); }, i * 110); }); },
-    dead:  function () { [330, 262, 196, 131].forEach(function (f, i) { setTimeout(function () { tone(f, 0.7, 'sine', 0.08); }, i * 190); }); },
-    low:   function () { tone(90, 0.3, 'sine', 0.06, 62); }
+    pick:  function () { tone(480, 0.10, 'sine', 0.045, 660); },
+    feed:  function () { noise(0.30, 0.10, 340); tone(170, 0.38, 'sine', 0.085, 92); },
+    flare: function () { noise(0.34, 0.11, 900);  tone(300, 0.32, 'triangle', 0.055, 880); },
+    kill:  function () { noise(0.15, 0.06, 1500); tone(680, 0.12, 'triangle', 0.028, 320); },
+    hurt:  function () { tone(118, 0.24, 'triangle', 0.08, 62); noise(0.18, 0.07, 230); },
+    dawn:  function () { [523, 659, 784, 1047].forEach(function (f, i) { setTimeout(function () { tone(f, 0.6, 'sine', 0.05); }, i * 120); }); },
+    dead:  function () { [330, 262, 196, 131].forEach(function (f, i) { setTimeout(function () { tone(f, 0.8, 'sine', 0.07); }, i * 200); }); },
+    low:   function () { tone(88, 0.34, 'sine', 0.05, 62); }
   };
+
+  // ══════════════════════════════════════════════════════ the house band ══
+  // A small combo improvising over original changes: walking upright bass,
+  // brushed kit, a Rhodes comping rootless voicings, and a horn noodling
+  // through the chord scale. Nothing is a recording — it plays live.
+  var NOTE = { C:0, 'C#':1, Db:1, D:2, 'D#':3, Eb:3, E:4, F:5, 'F#':6, Gb:6, G:7, 'G#':8, Ab:8, A:9, 'A#':10, Bb:10, B:11 };
+  var QUAL = {
+    'maj7': { tones:[0,4,7,11], ext:[14,18], scale:[0,2,4,5,7,9,11] },
+    'm7b5': { tones:[0,3,6,10], ext:[14],    scale:[0,2,3,5,6,8,10] },
+    'm7':   { tones:[0,3,7,10], ext:[14,17], scale:[0,2,3,5,7,9,10] },
+    'm':    { tones:[0,3,7,10], ext:[14],    scale:[0,2,3,5,7,9,10] },
+    'm6':   { tones:[0,3,7,9],  ext:[14],    scale:[0,2,3,5,7,9,11] },
+    '6':    { tones:[0,4,7,9],  ext:[14],    scale:[0,2,4,5,7,9,11] },
+    '7':    { tones:[0,4,7,10], ext:[14,21], scale:[0,2,4,5,7,9,10] }
+  };
+  function parseChord(str) {
+    var m = /^([A-G][b#]?)(.*)$/.exec(str);
+    var q = (m && QUAL[m[2]]) ? m[2] : '7';
+    return { root: m ? NOTE[m[1]] : 0, q: q, d: QUAL[q] };
+  }
+
+  // Original changes, built from ordinary jazz harmony.
+  var TUNES = [
+    { name: 'Ember Blues',   bpm: 86,  bars: ['F7','Bb7','F7','F7','Bb7','Bb7','F7','F7','Gm7','C7','F7','C7'] },
+    { name: 'Low Lamplight', bpm: 72,  bars: ['Cm7','F7','Bbmaj7','Gm7','Cm7','F7','Bbmaj7','Bbmaj7'] },
+    { name: 'Smoke & Rye',   bpm: 96,  bars: ['Dm7','Dm7','Gm7','Gm7','Dm7','Dm7','Em7b5','A7'] },
+    { name: 'Last Coals',    bpm: 104, bars: ['Am7','D7','Gmaj7','Cmaj7','F#m7b5','B7','Em7','Em7'] }
+  ];
+
+  var MUS = { on: true, tune: 0, bar: 0, beat: 0, next: 0, timer: null, lead: 74, phrase: 0 };
+  function mtof(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+  function anyOf(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  function tuneName() { return TUNES[MUS.tune].name; }
+  function chordAt(bar) {
+    var t = TUNES[MUS.tune];
+    return parseChord(t.bars[((bar % t.bars.length) + t.bars.length) % t.bars.length]);
+  }
+
+  // ── voices ─────────────────────────────────────────────────────────────
+  function upright(t, freq, dur, vol) {
+    var a = A.ctx;
+    var o = a.createOscillator(); o.type = 'triangle'; o.frequency.value = freq;
+    var sub = a.createOscillator(); sub.type = 'sine'; sub.frequency.value = freq;
+    var f = a.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 1.1;
+    f.frequency.setValueAtTime(1500, t);
+    f.frequency.exponentialRampToValueAtTime(320, t + 0.3);
+    var g = a.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(f); sub.connect(f); f.connect(g); g.connect(A.music);
+    o.start(t); sub.start(t); o.stop(t + dur + 0.05); sub.stop(t + dur + 0.05);
+  }
+  function rhodes(t, freq, dur, vol) {
+    var a = A.ctx;
+    var car = a.createOscillator(); car.type = 'sine'; car.frequency.value = freq;
+    var mod = a.createOscillator(); mod.type = 'sine'; mod.frequency.value = freq * 2.005;
+    var modG = a.createGain();
+    modG.gain.setValueAtTime(freq * 2.2, t);                 // bell-like attack
+    modG.gain.exponentialRampToValueAtTime(freq * 0.05, t + 0.4);
+    mod.connect(modG); modG.connect(car.frequency);
+    var g = a.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    car.connect(g); g.connect(A.music);
+    car.start(t); mod.start(t); car.stop(t + dur + 0.05); mod.stop(t + dur + 0.05);
+  }
+  function horn(t, freq, dur, vol) {
+    var a = A.ctx;
+    var o = a.createOscillator(); o.type = 'triangle'; o.frequency.setValueAtTime(freq, t);
+    var o2 = a.createOscillator(); o2.type = 'sine'; o2.frequency.setValueAtTime(freq * 1.004, t);
+    var vib = a.createOscillator(); vib.type = 'sine'; vib.frequency.value = 5.2;
+    var vibG = a.createGain(); vibG.gain.setValueAtTime(0, t);
+    vibG.gain.linearRampToValueAtTime(freq * 0.006, t + dur * 0.6);
+    vib.connect(vibG); vibG.connect(o.frequency); vibG.connect(o2.frequency);
+    var f = a.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 1900; f.Q.value = 0.7;
+    var g = a.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.07);      // breathy, not plucked
+    g.gain.setValueAtTime(vol, t + dur * 0.55);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(f); o2.connect(f); f.connect(g); g.connect(A.music);
+    o.start(t); o2.start(t); vib.start(t);
+    o.stop(t + dur + 0.05); o2.stop(t + dur + 0.05); vib.stop(t + dur + 0.05);
+  }
+  function perc(t, dur, vol, type, freq, q) {
+    var a = A.ctx;
+    var src = a.createBufferSource(); src.buffer = noiseBuffer(a); src.loop = true;
+    var f = a.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q || 0.8;
+    var g = a.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f); f.connect(g); g.connect(A.music);
+    src.start(t); src.stop(t + dur + 0.03);
+  }
+  function ride(t, vol)  { perc(t, 0.42, vol, 'bandpass', 7200, 1.4); }
+  function hat(t, vol)   { perc(t, 0.09, vol, 'highpass', 8200, 0.7); }
+  function brush(t, d, v){ perc(t, d, v, 'bandpass', 1700, 0.6); }
+
+  // ── the parts ──────────────────────────────────────────────────────────
+  function bassNote(ch, beat, next) {
+    var base = 28 + ch.root, t = ch.d.tones, n;
+    if (beat === 0) n = base;
+    else if (beat === 1) n = base + anyOf([t[2], t[1], t[3]]);
+    else if (beat === 2) n = base + anyOf([t[2], t[3], t[1], 5]);
+    else {
+      var target = 28 + next.root;                 // chromatic approach into the next bar
+      while (target < base - 6) target += 12;
+      while (target > base + 8) target -= 12;
+      n = target + anyOf([-1, 1, -2, 2]);
+    }
+    while (n < 28) n += 12;
+    while (n > 50) n -= 12;
+    return n;
+  }
+  function voicing(ch) {
+    var d = ch.d, base = 48 + ch.root;             // rootless, left-hand register
+    var v = [base + d.tones[1], base + d.tones[3], base + d.tones[2] + 12];
+    if (d.ext.length && Math.random() < 0.65) v.push(base + d.ext[0]);
+    return v.map(function (m) { while (m < 52) m += 12; while (m > 80) m -= 12; return m; });
+  }
+  function leadNote(ch) {
+    var sc = ch.d.scale, cands = [];
+    for (var oct = 4; oct <= 6; oct++) {
+      for (var i = 0; i < sc.length; i++) {
+        var m = 12 * oct + ch.root + sc[i];
+        if (m >= 68 && m <= 88) cands.push(m);
+      }
+    }
+    if (!cands.length) return MUS.lead;
+    cands.sort(function (x, y) { return Math.abs(x - MUS.lead) - Math.abs(y - MUS.lead); });
+    var n = cands[Math.floor(Math.random() * Math.min(4, cands.length))];   // mostly stepwise
+    MUS.lead = n;
+    return n;
+  }
+
+  function playBeat(t, spb) {
+    var beat = MUS.beat, bar = MUS.bar;
+    var ch = chordAt(bar);
+    var next = chordAt(bar + (beat === 3 ? 1 : 0));
+    var swung = spb * 0.64;                        // where the '&' lands
+
+    upright(t, mtof(bassNote(ch, beat, next)), spb * 0.9, 0.24);
+
+    ride(t, 0.075);
+    if (beat === 1 || beat === 3) {
+      ride(t + swung, 0.05);
+      hat(t, 0.035);
+      brush(t, spb * 0.7, 0.028);
+    }
+
+    if (Math.random() < (beat === 1 || beat === 3 ? 0.5 : 0.26)) {
+      var when = Math.random() < 0.6 ? t + swung : t;
+      var v = voicing(ch);
+      for (var i = 0; i < v.length; i++) rhodes(when + i * 0.01, mtof(v[i]), spb * 1.6, 0.055);
+    }
+
+    // the horn sits out for whole bars at a time, then answers
+    if (beat === 0) MUS.phrase = Math.random() < 0.5 ? 1 : 0;
+    if (MUS.phrase && Math.random() < 0.5) {
+      if (Math.random() < 0.45) {
+        horn(t, mtof(leadNote(ch)), swung * 0.9, 0.05);
+        horn(t + swung, mtof(leadNote(ch)), (spb - swung) * 0.9, 0.045);
+      } else {
+        horn(t, mtof(leadNote(ch)), spb * 0.85, 0.052);
+      }
+    }
+  }
+
+  function musicTick() {
+    var a = A.ctx;
+    if (!a || !MUS.timer) return;
+    var spb = 60 / TUNES[MUS.tune].bpm;
+    var guard = 0;
+    while (MUS.next < a.currentTime + 0.3 && guard++ < 32) {
+      playBeat(MUS.next, spb);
+      MUS.next += spb;
+      if (++MUS.beat >= 4) { MUS.beat = 0; MUS.bar++; }
+    }
+  }
+
+  function startMusic() {
+    if (!MUS.on || MUS.timer) return;
+    var a = ac(); if (!a) return;
+    MUS.next = a.currentTime + 0.2;
+    A.music.gain.cancelScheduledValues(a.currentTime);
+    A.music.gain.setValueAtTime(0.0001, a.currentTime);
+    A.music.gain.exponentialRampToValueAtTime(MUSIC_LEVEL, a.currentTime + 3);
+    MUS.timer = setInterval(musicTick, 30);
+  }
+  function stopMusic(fade) {
+    if (MUS.timer) { clearInterval(MUS.timer); MUS.timer = null; }
+    var a = A.ctx; if (!a || !A.music) return;
+    var now = a.currentTime;
+    A.music.gain.cancelScheduledValues(now);
+    A.music.gain.setValueAtTime(Math.max(0.0001, A.music.gain.value), now);
+    A.music.gain.exponentialRampToValueAtTime(0.0001, now + (fade || 0.7));
+  }
+  function duckMusic(level, secs) {
+    var a = A.ctx; if (!a || !A.music || !MUS.timer) return;
+    var now = a.currentTime;
+    A.music.gain.cancelScheduledValues(now);
+    A.music.gain.setValueAtTime(Math.max(0.0001, A.music.gain.value), now);
+    A.music.gain.exponentialRampToValueAtTime(Math.max(0.0001, MUSIC_LEVEL * level), now + (secs || 0.5));
+  }
+  // Each night brings up the next tune, dipped across the change.
+  function nextTune() {
+    if (!MUS.timer) { MUS.tune = (MUS.tune + 1) % TUNES.length; return; }
+    duckMusic(0.12, 0.5);
+    setTimeout(function () {
+      MUS.tune = (MUS.tune + 1) % TUNES.length;
+      MUS.bar = 0; MUS.beat = 0;
+      if (A.ctx) MUS.next = Math.max(MUS.next, A.ctx.currentTime + 0.1);
+      duckMusic(1, 1.6);
+    }, 900);
+  }
+  function setMusic(on) {
+    MUS.on = on;
+    try { localStorage.setItem(MUSIC_KEY, on ? '1' : '0'); } catch (e) {}
+    if (on) startMusic(); else stopMusic(0.5);
+  }
 
   // ────────────────────────────────────────────────────────────── canvas sizing
   function resize() {
@@ -1257,6 +1552,7 @@
     S.night++;
     S.nightT = 0;
     SFX.dawn(); buzz([18, 60, 18]);
+    nextTune();
     var omen = S.night === 3 ? 'Something quicker is out there'
              : S.night === 5 ? 'Husks walk tonight — light alone will not hold them'
              : 'Night ' + S.night + ' begins';
@@ -1889,6 +2185,7 @@
         '<button class="ghost" id="btnFeats">Feats · ' + feats + '/' + ACHIEVEMENTS.length + '</button>' +
       '</div>' +
       '<div class="foot">Drag to move · Brand to swing · Flare when surrounded</div>' +
+      '<div class="foot">♪ ' + esc(tuneName()) + (MUS.on ? '' : ' · music off') + '</div>' +
       '<div class="foot">' + (locked ? locked + ' upgrades still locked · level up to draft them' : 'Every upgrade unlocked') + '</div>'
     );
     on('btnStart', startGame);
@@ -1998,6 +2295,7 @@
   }
 
   function openDraft() {
+    duckMusic(0.55, 0.4);
     var offer = rollDraft(3);
     if (!offer.length) { S.mode = 'play'; hideVeil(); showChrome(true); return; }  // everything maxed
     S.mode = 'draft';
@@ -2052,6 +2350,7 @@
     S.nightT = 0;
     hideVeil();
     showChrome(true);
+    duckMusic(1, 0.8);
     toast(def.glyph + ' ' + def.name, def.desc);
     last = performance.now();
   }
@@ -2118,6 +2417,8 @@
     hideVeil();
     showChrome(true);
     ac();
+    startMusic();
+    duckMusic(1, 0.8);
     last = performance.now();
     toast('Night 1', given.length ? given[0].glyph + ' ' + given[0].name : 'Hold the light');
   }
@@ -2127,6 +2428,7 @@
       S._resume = S.mode;
       S.mode = 'paused';
       showChrome(false);
+      duckMusic(0.45, 0.4);
       veil(
         '<div class="eyebrow">Paused</div>' +
         '<h1>Hold<em>Fast</em></h1>' +
@@ -2136,8 +2438,12 @@
           '<div><span>Fire</span><b>' + Math.round(S.fuel) + '</b></div>' +
         '</div>' +
         '<div class="held big">' + upChips(S.up, true) + '</div>' +
+        '<div class="nowplaying">♪ <b>' + esc(tuneName()) + '</b><span>' + (MUS.on ? 'now playing' : 'music off') + '</span></div>' +
         '<button class="go" id="btnResume">Resume</button>' +
-        '<button class="ghost" id="btnSound">Sound · ' + (S.muted ? 'Off' : 'On') + '</button>' +
+        '<div class="row2">' +
+          '<button class="ghost" id="btnMusic">Music · ' + (MUS.on ? 'On' : 'Off') + '</button>' +
+          '<button class="ghost" id="btnSound">Sound · ' + (S.muted ? 'Off' : 'On') + '</button>' +
+        '</div>' +
         '<button class="ghost" id="btnQuit">Abandon the Watch</button>',
         'wide'
       );
@@ -2148,10 +2454,18 @@
         try { localStorage.setItem(MUTE_KEY, S.muted ? '1' : '0'); } catch (e) {}
         this.textContent = 'Sound · ' + (S.muted ? 'Off' : 'On');
       });
+      on('btnMusic', function () {
+        setMusic(!MUS.on);
+        this.textContent = 'Music · ' + (MUS.on ? 'On' : 'Off');
+        var np = elCard.querySelector('.nowplaying span');
+        if (np) np.textContent = MUS.on ? 'now playing' : 'music off';
+        if (MUS.on) duckMusic(0.45, 0.3);
+      });
     } else if (S.mode === 'paused') {
       S.mode = S._resume || 'play';
       hideVeil();
       showChrome(true);
+      duckMusic(1, 0.6);
       last = performance.now();
     }
   }
@@ -2241,15 +2555,33 @@
   window.addEventListener('orientationchange', function () { setTimeout(resize, 120); });
   document.addEventListener('visibilitychange', function () {
     if (document.hidden && S.mode === 'play') togglePause();
+    if (!A.ctx) return;
+    if (document.hidden) { A.ctx.suspend(); }
+    else if (MUS.on || !S.muted) { A.ctx.resume(); }
   });
   document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
 
   try { S.muted = localStorage.getItem(MUTE_KEY) === '1'; } catch (e) {}
+  try { MUS.on = localStorage.getItem(MUSIC_KEY) !== '0'; } catch (e) {}
+  MUS.tune = Math.floor(Math.random() * TUNES.length);
   loadMeta();
   recalc();
+
+  // browsers hold audio until the first gesture, so the band starts then
+  function wakeAudio() {
+    document.removeEventListener('pointerdown', wakeAudio);
+    document.removeEventListener('keydown', wakeAudio);
+    ac();
+    startMusic();
+  }
+  document.addEventListener('pointerdown', wakeAudio);
+  document.addEventListener('keydown', wakeAudio);
   // opt-in inspection hook for tuning/QA: open with #debug
   if (/[?#]debug/.test(location.href)) window.__NW = { S: S, K: K, D: D, META: META, UPGRADES: UPGRADES, PERKS: PERKS,
-      flare: doFlare, swing: doSwing, lightAt: lightAt, recalc: recalc, saveMeta: saveMeta, rollDraft: rollDraft, take: takeUpgrade };
+      flare: doFlare, swing: doSwing, lightAt: lightAt, A: A, MUS: MUS, TUNES: TUNES,
+      startMusic: startMusic, nextTune: nextTune, setMusic: setMusic,
+      music: { parseChord: parseChord, voicing: voicing, bassNote: bassNote,
+               leadNote: leadNote, chordAt: chordAt, QUAL: QUAL, mtof: mtof }, recalc: recalc, saveMeta: saveMeta, rollDraft: rollDraft, take: takeUpgrade };
   resize();
   S.keeper.x = W / 2; S.keeper.y = H / 2 + 96;
   menu();
