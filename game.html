@@ -397,14 +397,46 @@
   .sw:active{transform:scale(.92)}
   .sw.on{border-color:var(--bone);box-shadow:0 0 0 3px rgba(232,220,200,0.14)}
 
-  .nowplaying{
-    display:flex;align-items:baseline;justify-content:center;gap:8px;
-    margin:16px 0 4px;padding:11px 14px;border-radius:14px;
-    border:1px solid var(--line);background:rgba(20,16,14,0.5);
-    color:var(--ember);font:600 13px/1 var(--body);
+  .transport{
+    display:flex;align-items:center;gap:12px;
+    margin:16px 0 4px;padding:11px 13px;border-radius:16px;
+    border:1px solid var(--line);background:rgba(20,16,14,0.55);text-align:left;
   }
-  .nowplaying b{color:var(--bone);font-weight:600}
-  .nowplaying span{font:600 9px/1 var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--mute)}
+  .tbtns{display:flex;align-items:center;gap:6px;flex:none}
+  .tb{
+    width:34px;height:34px;flex:none;display:grid;place-items:center;cursor:pointer;
+    border-radius:10px;border:1px solid var(--line);background:transparent;color:#B8AEA0;
+    transition:transform .1s ease,color .15s ease,background .15s ease;
+  }
+  .tb:active{transform:scale(.9)}
+  .tb:hover{color:var(--bone);background:rgba(232,220,200,0.06)}
+  .tb.big{width:40px;height:40px;color:var(--ember);border-color:rgba(255,159,10,0.4)}
+  .tb.browse{margin-left:auto}
+  .tinfo{flex:1;min-width:0}
+  .tinfo b{display:block;font:600 14px/1.2 var(--body);color:var(--bone);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tinfo span{display:block;font:600 9px/1.4 var(--body);letter-spacing:.13em;
+    text-transform:uppercase;color:var(--mute);margin-top:3px}
+
+  .shelf{display:flex;flex-direction:column;gap:5px;margin-bottom:18px}
+  .ghead{
+    font:700 9px/1 var(--body);letter-spacing:.2em;text-transform:uppercase;
+    color:var(--ember);margin:14px 0 5px;padding-left:2px;
+  }
+  .ghead:first-child{margin-top:2px}
+  .trow{
+    display:flex;align-items:center;gap:10px;width:100%;text-align:left;cursor:pointer;
+    padding:11px 13px;border-radius:12px;
+    border:1px solid var(--line);background:rgba(20,16,14,0.5);color:var(--bone);
+    transition:border-color .15s ease,background .15s ease;
+  }
+  .trow:hover{background:rgba(38,28,18,0.6)}
+  .trow.on{border-color:rgba(255,159,10,0.55);background:rgba(52,32,12,0.6)}
+  .tdot{flex:none;width:7px;height:7px;border-radius:50%;background:rgba(232,220,200,0.18)}
+  .trow.on .tdot{background:var(--ember);box-shadow:0 0 9px rgba(255,159,10,0.85)}
+  .tname{flex:1;min-width:0;font:600 13.5px/1.2 var(--body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .trow.on .tname{color:var(--core)}
+  .tmeta{flex:none;font:600 10px/1 var(--mono);color:var(--mute);letter-spacing:.02em}
 
   .explain{
     text-align:left;border:1px solid var(--line);border-radius:16px;
@@ -500,7 +532,7 @@
   var gctx = groundCvs.getContext('2d');
 
   var W = 0, H = 0, DPR = 1;
-  var BUILD = 'v1.1.0';        // bump on every deploy — shown in-game for support
+  var BUILD = 'v1.2.0';        // bump on every deploy — shown in-game for support
   var MUTE_KEY = 'keeper.nightwatch.mute';
   var MUSIC_KEY = 'keeper.nightwatch.music';
 
@@ -992,38 +1024,84 @@
     return { root: m ? NOTE[m[1]] : 0, q: q, d: QUAL[q] };
   }
 
-  // Original changes, built from ordinary jazz harmony. `feel` decides whether
-  // the eighths swing, `meter` gives waltzes their three, and `kit` picks how
-  // the drummer sits behind it.
+  // Original changes across a few different rooms. `feel` decides whether the
+  // eighths swing, `meter` gives the waltzes their three, `kit` picks how the
+  // drummer sits behind it, and `comp` chooses block chords or arpeggios.
   var TUNES = [
-    { name: 'Ember Blues',    bpm: 86,  feel: 'swing',    meter: 4, kit: 'brushes', pad: 0,    horn: 0.42,
+    // ── jazz
+    { name: 'Ember Blues', gain: 0.79,    genre: 'Jazz',     bpm: 86,  feel: 'swing',    meter: 4, kit: 'brushes', pad: 0,    horn: 0.42,
       bars: ['F7','Bb7','F7','F7','Bb7','Bb7','F7','F7','Gm7','C7','F7','C7'] },
-    { name: 'Low Lamplight',  bpm: 72,  feel: 'swing',    meter: 4, kit: 'brushes', pad: 0.5,  horn: 0.34,
+    { name: 'Low Lamplight', gain: 0.99,  genre: 'Jazz',     bpm: 72,  feel: 'swing',    meter: 4, kit: 'brushes', pad: 0.5,  horn: 0.34,
       bars: ['Cm7','F7','Bbmaj7','Gm7','Cm7','F7','Bbmaj7','Bbmaj7'] },
-    { name: 'Smoke & Rye',    bpm: 96,  feel: 'swing',    meter: 4, kit: 'brushes', pad: 0,    horn: 0.4,
+    { name: 'Smoke & Rye', gain: 0.9,    genre: 'Jazz',     bpm: 96,  feel: 'swing',    meter: 4, kit: 'brushes', pad: 0,    horn: 0.4,
       bars: ['Dm7','Dm7','Gm7','Gm7','Dm7','Dm7','Em7b5','A7'] },
-    { name: 'Last Coals',     bpm: 104, feel: 'swing',    meter: 4, kit: 'brushes', pad: 0,    horn: 0.36,
+    { name: 'Last Coals', gain: 0.88,     genre: 'Jazz',     bpm: 104, feel: 'swing',    meter: 4, kit: 'brushes', pad: 0,    horn: 0.36,
       bars: ['Am7','D7','Gmaj7','Cmaj7','F#m7b5','B7','Em7','Em7'] },
 
-    { name: 'Rain on Canvas', bpm: 112, feel: 'straight', meter: 4, kit: 'bossa',   pad: 0.35, horn: 0.34,
+    // ── bossa
+    { name: 'Rain on Canvas', gain: 1.14, genre: 'Bossa',    bpm: 112, feel: 'straight', meter: 4, kit: 'bossa',   pad: 0.35, horn: 0.34,
       bars: ['Am7','D7','Gmaj7','Cmaj7','F#m7b5','B7','Em7','A7'] },
-    { name: 'Moth Hour',      bpm: 68,  feel: 'straight', meter: 4, kit: 'soft',    pad: 0.8,  horn: 0.26,
-      bars: ['Fmaj7','Em7','Dm7','Cmaj7','Fmaj7','Em7','Am7','Am7'] },
-    { name: 'Quiet Snow',     bpm: 104, feel: 'straight', meter: 3, kit: 'soft',    pad: 0.6,  horn: 0.3,
-      bars: ['Cmaj7','Am7','Dm7','G7','Em7','Am7','Dm7','G7'] },
-    { name: 'Blue Hour',      bpm: 74,  feel: 'straight', meter: 4, kit: 'soft',    pad: 0.9,  horn: 0.24,
-      bars: ['Ebmaj7','Ebmaj7','Dbmaj7','Dbmaj7','Cm7','Cm7','Bbm7','Bbm7'] },
-    { name: 'Cinder Bossa',   bpm: 122, feel: 'straight', meter: 4, kit: 'bossa',   pad: 0.3,  horn: 0.36,
+    { name: 'Cinder Bossa', gain: 0.98,   genre: 'Bossa',    bpm: 122, feel: 'straight', meter: 4, kit: 'bossa',   pad: 0.3,  horn: 0.36,
       bars: ['Dm7','G7','Cmaj7','Fmaj7','Bm7b5','E7','Am7','A7'] },
-    { name: 'The Long Watch', bpm: 62,  feel: 'straight', meter: 4, kit: 'soft',    pad: 1,    horn: 0.22,
-      bars: ['Gmaj7','Bm7','Em7','Cmaj7','Am7','D7','Gmaj7','Gmaj7'] },
-    { name: 'Woodsmoke',      bpm: 92,  feel: 'swing',    meter: 3, kit: 'brushes', pad: 0.4,  horn: 0.32,
-      bars: ['Dm7','Gm7','Cmaj7','Fmaj7','Bm7b5','E7','Am7','Am7'] },
-    { name: 'Ash & Honey',    bpm: 84,  feel: 'straight', meter: 4, kit: 'bossa',   pad: 0.55, horn: 0.3,
-      bars: ['Fmaj7','Bbmaj7','Am7','Dm7','Gm7','C7','Fmaj7','C7'] }
-  ];
+    { name: 'Ash & Honey', gain: 1.09,    genre: 'Bossa',    bpm: 84,  feel: 'straight', meter: 4, kit: 'bossa',   pad: 0.55, horn: 0.3,
+      bars: ['Fmaj7','Bbmaj7','Am7','Dm7','Gm7','C7','Fmaj7','C7'] },
 
-  var MUS = { on: true, tune: 0, bar: 0, beat: 0, next: 0, timer: null, lead: 74, phrase: 0 };
+    // ── lo-fi
+    { name: 'Moth Hour', gain: 0.92,      genre: 'Lo-fi',    bpm: 68,  feel: 'straight', meter: 4, kit: 'lofi',    pad: 0.8,  horn: 0.26,
+      bars: ['Fmaj7','Em7','Dm7','Cmaj7','Fmaj7','Em7','Am7','Am7'] },
+    { name: 'Paper Lanterns', gain: 1.01, genre: 'Lo-fi',    bpm: 76,  feel: 'straight', meter: 4, kit: 'lofi',    pad: 0.7,  horn: 0.24,
+      bars: ['Dm7','Bbmaj7','Fmaj7','C7','Dm7','Bbmaj7','Gm7','C7'] },
+    { name: 'Slow Tide', gain: 1.03,      genre: 'Lo-fi',    bpm: 82,  feel: 'straight', meter: 4, kit: 'lofi',    pad: 0.65, horn: 0.26,
+      bars: ['Am7','Fmaj7','Cmaj7','G7','Am7','Fmaj7','Dm7','G7'] },
+
+    // ── soul
+    { name: 'Velvet Hour', gain: 1.02,    genre: 'Soul',     bpm: 74,  feel: 'straight', meter: 4, kit: 'lofi',    pad: 0.6,  horn: 0.3,
+      bars: ['Ebmaj7','Cm7','Fm7','Bb7','Ebmaj7','Cm7','Fm7','Bb7'] },
+    { name: 'Late Rain', gain: 1.02,      genre: 'Soul',     bpm: 68,  feel: 'straight', meter: 4, kit: 'lofi',    pad: 0.7,  horn: 0.28,
+      bars: ['Fmaj7','Dm7','Gm7','C7','Fmaj7','Dm7','Bbmaj7','C7'] },
+
+    // ── dub
+    { name: 'Driftwood Dub', gain: 1.06,  genre: 'Dub',      bpm: 72,  feel: 'straight', meter: 4, kit: 'dub',     pad: 0.5,  horn: 0.24,
+      bars: ['Am7','Am7','Dm7','Dm7','Am7','Am7','Em7','Em7'] },
+    { name: 'Tin Roof', gain: 0.83,       genre: 'Dub',      bpm: 78,  feel: 'straight', meter: 4, kit: 'dub',     pad: 0.45, horn: 0.26,
+      bars: ['Em7','Em7','Am7','Am7','Cmaj7','Cmaj7','B7','B7'] },
+
+    // ── folk
+    { name: 'Hollow Pines', gain: 0.75,   genre: 'Folk',     bpm: 88,  feel: 'straight', meter: 4, kit: 'none',    pad: 0.4,  horn: 0.22, comp: 'arp' },
+    { name: 'Riverstone', gain: 1.33,     genre: 'Folk',     bpm: 78,  feel: 'straight', meter: 4, kit: 'none',    pad: 0.5,  horn: 0.2,  comp: 'arp' },
+
+    // ── nocturne
+    { name: 'Night Glass', gain: 1.11,    genre: 'Nocturne', bpm: 60,  feel: 'straight', meter: 4, kit: 'none',    pad: 0.9,  horn: 0.18, comp: 'arp' },
+    { name: 'Snowlight', gain: 1.03,      genre: 'Nocturne', bpm: 66,  feel: 'straight', meter: 4, kit: 'none',    pad: 0.85, horn: 0.2,  comp: 'arp' },
+
+    // ── ambient
+    { name: 'Blue Hour', gain: 1.34,      genre: 'Ambient',  bpm: 74,  feel: 'straight', meter: 4, kit: 'soft',    pad: 0.9,  horn: 0.24,
+      bars: ['Ebmaj7','Ebmaj7','Dbmaj7','Dbmaj7','Cm7','Cm7','Bbm7','Bbm7'] },
+    { name: 'The Long Watch', gain: 1.37, genre: 'Ambient',  bpm: 62,  feel: 'straight', meter: 4, kit: 'soft',    pad: 1,    horn: 0.22,
+      bars: ['Gmaj7','Bm7','Em7','Cmaj7','Am7','D7','Gmaj7','Gmaj7'] },
+    { name: 'Ash Drift', gain: 0.97,      genre: 'Ambient',  bpm: 56,  feel: 'straight', meter: 4, kit: 'none',    pad: 1,    horn: 0.16,
+      bars: ['Cmaj7','Cmaj7','Am7','Am7','Fmaj7','Fmaj7','Gmaj7','Gmaj7'] },
+
+    // ── waltz
+    { name: 'Quiet Snow', gain: 0.98,     genre: 'Waltz',    bpm: 104, feel: 'straight', meter: 3, kit: 'soft',    pad: 0.6,  horn: 0.3,
+      bars: ['Cmaj7','Am7','Dm7','G7','Em7','Am7','Dm7','G7'] },
+    { name: 'Woodsmoke', gain: 1.07,      genre: 'Waltz',    bpm: 92,  feel: 'swing',    meter: 3, kit: 'brushes', pad: 0.4,  horn: 0.32,
+      bars: ['Dm7','Gm7','Cmaj7','Fmaj7','Bm7b5','E7','Am7','Am7'] },
+    { name: 'Ember Waltz', gain: 0.93,    genre: 'Waltz',    bpm: 96,  feel: 'swing',    meter: 3, kit: 'brushes', pad: 0.5,  horn: 0.28,
+      bars: ['Fmaj7','Dm7','Gm7','C7','Fmaj7','Dm7','Bbmaj7','C7'] }
+  ];
+  // the folk and nocturne sets share a shape, filled in here to keep the table readable
+  (function () {
+    var late = {
+      'Hollow Pines': ['Gmaj7','Em7','Cmaj7','D7','Gmaj7','Em7','Am7','D7'],
+      'Riverstone':   ['Am7','Fmaj7','Cmaj7','G7','Am7','Fmaj7','Dm7','Em7'],
+      'Night Glass':  ['Bbmaj7','Gm7','Cm7','F7','Bbmaj7','Gm7','Ebmaj7','F7'],
+      'Snowlight':    ['Dmaj7','Bm7','Em7','A7','Dmaj7','Bm7','Gmaj7','A7']
+    };
+    for (var i = 0; i < TUNES.length; i++) if (late[TUNES[i].name]) TUNES[i].bars = late[TUNES[i].name];
+  })();
+
+  var MUS = { on: true, tune: 0, bar: 0, beat: 0, next: 0, timer: null, lead: 74, phrase: 0, swap: null };
   function mtof(m) { return 440 * Math.pow(2, (m - 69) / 12); }
   function anyOf(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
   function tuneName() { return TUNES[MUS.tune].name; }
@@ -1140,6 +1218,23 @@
     }
   }
 
+  // Nylon-ish pluck for the arpeggiated sets.
+  function pluck(t, freq, dur, vol) {
+    var a = A.ctx;
+    var o = a.createOscillator(); o.type = 'triangle'; o.frequency.value = freq;
+    var o2 = a.createOscillator(); o2.type = 'sine'; o2.frequency.value = freq * 2;
+    var o2g = a.createGain(); o2g.gain.value = vol * 0.22;
+    var f = a.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 0.8;
+    f.frequency.setValueAtTime(2600, t);
+    f.frequency.exponentialRampToValueAtTime(700, t + dur * 0.7);
+    var g = a.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(f); o2.connect(o2g); o2g.connect(f); f.connect(g); g.connect(A.music);
+    o.start(t); o2.start(t); o.stop(t + dur + 0.05); o2.stop(t + dur + 0.05);
+  }
+
   // Vibraphone — the bell voice that makes the slow tunes shimmer.
   function vibes(t, freq, dur, vol) {
     var a = A.ctx;
@@ -1203,50 +1298,87 @@
     var next = chordAt(bar + (beat === last ? 1 : 0));
     var swung = spb * (T.feel === 'swing' ? 0.64 : 0.5);
     var backbeat = meter === 4 ? (beat === 1 || beat === 3) : (beat === 1);
+    // measured per-tune trim, so switching tunes never jumps in volume
+    var vg = T.gain || 1;
 
     // ── the pad breathes once a bar, under everything
     if (T.pad && beat === 0) {
       var pv = voicing(ch).slice(0, 3).map(function (m) { return m - 12; });
-      pad(t, pv, spb * meter * 0.98, 0.028 * T.pad);
+      pad(t, pv, spb * meter * 0.98, (0.028 * T.pad) * vg);
     }
 
     // ── bass
     var bn = bassNote(ch, meter === 3 ? beat : beat, next);
     if (T.kit === 'bossa') {
       // two-feel: root on one, fifth pushed before the next bar
-      if (beat === 0) upright(t, mtof(28 + ch.root), spb * 1.4, 0.24);
-      else if (beat === 2) upright(t, mtof(bn), spb * 1.2, 0.2);
-      else if (beat === last) upright(t + swung, mtof(bn), spb * 0.6, 0.16);
-    } else if (T.kit === 'soft') {
-      if (beat === 0 || beat === Math.floor(meter / 2)) upright(t, mtof(bn), spb * 1.5, 0.2);
+      if (beat === 0) upright(t, mtof(28 + ch.root), spb * 1.4, (0.24) * vg);
+      else if (beat === 2) upright(t, mtof(bn), spb * 1.2, (0.2) * vg);
+      else if (beat === last) upright(t + swung, mtof(bn), spb * 0.6, (0.16) * vg);
+    } else if (T.kit === 'soft' || T.kit === 'none') {
+      if (beat === 0 || beat === Math.floor(meter / 2)) upright(t, mtof(bn), spb * 1.5, (0.2) * vg);
+    } else if (T.kit === 'lofi') {
+      if (beat === 0) upright(t, mtof(28 + ch.root), spb * 1.8, (0.26) * vg);
+      else if (beat === 2) upright(t + swung * 0.5, mtof(bn), spb * 1.1, (0.19) * vg);
+    } else if (T.kit === 'dub') {
+      if (beat === 0) upright(t, mtof(28 + ch.root), spb * 2.2, (0.3) * vg);
+      else if (beat === 2) upright(t + swung, mtof(bn), spb * 0.9, (0.22) * vg);
     } else {
-      upright(t, mtof(bn), spb * 0.9, 0.24);         // walking
+      upright(t, mtof(bn), spb * 0.9, (0.24) * vg);         // walking
     }
 
     // ── drums
     if (T.kit === 'brushes') {
-      ride(t, 0.075);
-      if (backbeat) { ride(t + swung, 0.05); hat(t, 0.035); brush(t, spb * 0.7, 0.028); }
+      ride(t, (0.075) * vg);
+      if (backbeat) { ride(t + swung, (0.05) * vg); hat(t, (0.035) * vg); brush(t, spb * 0.7, (0.028) * vg); }
     } else if (T.kit === 'bossa') {
-      shaker(t, 0.03); shaker(t + swung, 0.022);
-      if (beat === 0) kick(t, 0.06);
-      if (beat === 2) kick(t + swung, 0.045);
-      if (backbeat) rim(t, 0.035);
+      shaker(t, (0.03) * vg); shaker(t + swung, (0.022) * vg);
+      if (beat === 0) kick(t, (0.06) * vg);
+      if (beat === 2) kick(t + swung, (0.045) * vg);
+      if (backbeat) rim(t, (0.035) * vg);
+    } else if (T.kit === 'lofi') {
+      // dusty and behind the beat: soft kick, brushed backbeat, eighth shaker
+      if (beat === 0) kick(t, (0.058) * vg);
+      if (beat === 2) kick(t + swung * 0.5, (0.04) * vg);
+      if (backbeat) { brush(t + 0.012, spb * 0.5, (0.03) * vg); rim(t + 0.012, (0.026) * vg); }
+      shaker(t, (0.018) * vg); shaker(t + swung, (0.013) * vg);
+    } else if (T.kit === 'dub') {
+      // everything leans off the beat, with lots of space
+      if (beat === 0) kick(t, (0.052) * vg);
+      if (beat === last) kick(t + swung, (0.036) * vg);
+      if (backbeat) rim(t, (0.04) * vg);
+      shaker(t + swung, (0.012) * vg);
+    } else if (T.kit === 'none') {
+      // no kit at all — the pad and the arpeggio carry it
     } else {                                          // 'soft' — barely there
-      if (beat === 0) kick(t, 0.045);
-      if (backbeat) brush(t, spb * 0.9, 0.022);
-      shaker(t, 0.014);
+      if (beat === 0) kick(t, (0.045) * vg);
+      if (backbeat) brush(t, spb * 0.9, (0.022) * vg);
+      shaker(t, (0.014) * vg);
     }
 
-    // ── comping: Rhodes normally, vibes on the slow tunes
-    var compChance = T.kit === 'soft' ? 0.34 : (backbeat ? 0.5 : 0.26);
-    if (Math.random() < compChance) {
-      var when = (T.feel === 'swing' && Math.random() < 0.6) ? t + swung : t;
-      var v = voicing(ch);
-      var useVibes = T.pad >= 0.55 && Math.random() < 0.5;
-      for (var i = 0; i < v.length; i++) {
-        if (useVibes) vibes(when + i * 0.03, mtof(v[i]), spb * 2.4, 0.035);
-        else rhodes(when + i * 0.01, mtof(v[i]), spb * 1.6, 0.055);
+    // ── comping
+    var v = voicing(ch);
+    if (T.comp === 'arp') {
+      // one note of the chord per beat, climbing and falling through the bar
+      var seq = v.concat(v.slice(0, -1).reverse());
+      var n1 = seq[(bar * meter + beat) % seq.length];
+      pluck(t, mtof(n1), spb * 1.9, (0.05) * vg);
+      if (Math.random() < 0.45) pluck(t + swung, mtof(seq[(bar * meter + beat + 2) % seq.length]), spb * 1.2, (0.032) * vg);
+      if (beat === 0 && Math.random() < 0.5) vibes(t, mtof(v[v.length - 1] + 12), spb * 3, (0.022) * vg);
+    } else if (T.kit === 'dub') {
+      // the skank: chords on the off-beats, with the odd one left out
+      if (Math.random() < 0.82) {
+        for (var d = 0; d < v.length; d++) rhodes(t + swung + d * 0.012, mtof(v[d]), spb * 0.7, (0.038) * vg);
+      }
+    } else {
+      var compChance = (T.kit === 'soft' || T.kit === 'lofi') ? 0.36 : (backbeat ? 0.5 : 0.26);
+      if (Math.random() < compChance) {
+        var when = (T.feel === 'swing' && Math.random() < 0.6) ? t + swung
+                 : (T.kit === 'lofi' ? t + 0.02 : t);          // lo-fi drags a hair
+        var useVibes = T.pad >= 0.55 && Math.random() < 0.5;
+        for (var i = 0; i < v.length; i++) {
+          if (useVibes) vibes(when + i * 0.03, mtof(v[i]), spb * 2.4, (0.035) * vg);
+          else rhodes(when + i * 0.01, mtof(v[i]), spb * 1.6, (0.055) * vg);
+        }
       }
     }
 
@@ -1254,10 +1386,10 @@
     if (beat === 0) MUS.phrase = Math.random() < (T.horn + 0.12) ? 1 : 0;
     if (MUS.phrase && Math.random() < T.horn + 0.14) {
       if (T.feel === 'swing' && Math.random() < 0.45) {
-        horn(t, mtof(leadNote(ch)), swung * 0.9, 0.05);
-        horn(t + swung, mtof(leadNote(ch)), (spb - swung) * 0.9, 0.045);
+        horn(t, mtof(leadNote(ch)), swung * 0.9, (0.05) * vg);
+        horn(t + swung, mtof(leadNote(ch)), (spb - swung) * 0.9, (0.045) * vg);
       } else {
-        horn(t, mtof(leadNote(ch)), spb * (T.kit === 'soft' ? 1.6 : 0.85), 0.05);
+        horn(t, mtof(leadNote(ch)), spb * (T.kit === 'soft' ? 1.6 : 0.85), (0.05) * vg);
       }
     }
   }
@@ -1299,18 +1431,33 @@
     A.music.gain.setValueAtTime(Math.max(0.0001, A.music.gain.value), now);
     A.music.gain.exponentialRampToValueAtTime(Math.max(0.0001, MUSIC_LEVEL * level), now + (secs || 0.5));
   }
-  // Each night brings up the next tune, dipped across the change.
-  function nextTune() {
-    if (!MUS.timer) { MUS.tune = (MUS.tune + 1) % TUNES.length; return; }
-    duckMusic(0.12, 0.5);
-    setTimeout(function () {
-      var nt = MUS.tune;
-      if (TUNES.length > 1) { while (nt === MUS.tune) nt = Math.floor(Math.random() * TUNES.length); }
-      MUS.tune = nt;
+  // Move to a tune, dipping the band across the change so nothing cuts.
+  function switchTo(i, fade) {
+    var target = ((i % TUNES.length) + TUNES.length) % TUNES.length;
+    if (!MUS.on || !MUS.timer) {
+      MUS.tune = target; MUS.bar = 0; MUS.beat = 0;
+      refreshTransport();
+      return;
+    }
+    duckMusic(0.08, fade ? fade * 0.35 : 0.18);
+    clearTimeout(MUS.swap);
+    MUS.swap = setTimeout(function () {
+      MUS.tune = target;
       MUS.bar = 0; MUS.beat = 0;
-      if (A.ctx) MUS.next = Math.max(MUS.next, A.ctx.currentTime + 0.1);
-      duckMusic(1, 1.6);
-    }, 900);
+      if (A.ctx) MUS.next = Math.max(MUS.next, A.ctx.currentTime + 0.06);
+      duckMusic(1, fade || 0.9);
+      refreshTransport();
+    }, fade ? 700 : 230);
+  }
+  function stepTune(dir) {
+    if (!MUS.on) { setMusic(true); }
+    switchTo(MUS.tune + dir);
+  }
+  // Each dawn draws a different tune, unhurried.
+  function nextTune() {
+    var nt = MUS.tune;
+    if (TUNES.length > 1) { while (nt === MUS.tune) nt = Math.floor(Math.random() * TUNES.length); }
+    switchTo(nt, 1.6);
   }
   function setMusic(on) {
     MUS.on = on;
@@ -2743,6 +2890,56 @@
   function plural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
   function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
+  // ── the music transport ───────────────────────────────────────────────────
+  function transportHtml(withBrowse) {
+    var T = TUNES[MUS.tune];
+    return '<div class="transport">' +
+      '<div class="tbtns">' +
+        '<button class="tb" id="mPrev" aria-label="Previous tune">' +
+          '<svg width="16" height="14" viewBox="0 0 16 14"><path d="M15 1.5v11L7 7l8-5.5zM6 1.5v11L1 7l5-5.5z" fill="currentColor"/></svg>' +
+        '</button>' +
+        '<button class="tb big" id="mPlay" aria-label="Play or pause music">' + playGlyph() + '</button>' +
+        '<button class="tb" id="mNext" aria-label="Next tune">' +
+          '<svg width="16" height="14" viewBox="0 0 16 14"><path d="M1 1.5v11L9 7 1 1.5zM10 1.5v11L15 7l-5-5.5z" fill="currentColor"/></svg>' +
+        '</button>' +
+      '</div>' +
+      '<div class="tinfo"><b>' + esc(T.name) + '</b>' +
+        '<span>' + esc(T.genre) + ' · ' + T.bpm + ' bpm' + (MUS.on ? '' : ' · paused') + '</span></div>' +
+      (withBrowse ? '<button class="tb browse" id="mList" aria-label="Browse music">' +
+        '<svg width="16" height="14" viewBox="0 0 16 14"><path d="M1 2h14M1 7h14M1 12h9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg>' +
+      '</button>' : '') +
+    '</div>';
+  }
+  function playGlyph() {
+    return MUS.on
+      ? '<svg width="14" height="16" viewBox="0 0 14 16"><rect x="1.5" y="1" width="4" height="14" rx="1.3" fill="currentColor"/><rect x="8.5" y="1" width="4" height="14" rx="1.3" fill="currentColor"/></svg>'
+      : '<svg width="14" height="16" viewBox="0 0 14 16"><path d="M2 1.4v13.2L13 8 2 1.4z" fill="currentColor"/></svg>';
+  }
+  function refreshTransport() {
+    var box = document.querySelector('.transport');
+    if (!box) return;
+    var T = TUNES[MUS.tune];
+    var b = box.querySelector('.tinfo b'), sp = box.querySelector('.tinfo span');
+    if (b) b.textContent = T.name;
+    if (sp) sp.textContent = T.genre + ' · ' + T.bpm + ' bpm' + (MUS.on ? '' : ' · paused');
+    var pl = box.querySelector('#mPlay');
+    if (pl) pl.innerHTML = playGlyph();
+    var rows = document.querySelectorAll('[data-tune]');
+    for (var i = 0; i < rows.length; i++) {
+      rows[i].classList.toggle('on', +rows[i].getAttribute('data-tune') === MUS.tune);
+    }
+  }
+  function bindTransport(browseFn) {
+    on('mPrev', function () { UI.back(); stepTune(-1); });
+    on('mNext', function () { UI.tap(); stepTune(1); });
+    on('mPlay', function () {
+      setMusic(!MUS.on);
+      if (MUS.on) { UI.open(); duckMusic(1, 0.5); } else UI.toggle();
+      refreshTransport();
+    });
+    if (browseFn) on('mList', browseFn);
+  }
+
   // ── shared fragments ──────────────────────────────────────────────────────
   function levelStrip() {
     var L = levelInfo(META.xp);
@@ -2823,9 +3020,10 @@
         '<button class="ghost" id="btnFeats">Feats · ' + feats + '/' + ACHIEVEMENTS.length + '</button>' +
       '</div>' +
       '<button class="ghost" id="btnKnight">' + (META.knight.name ? 'Your knight' : 'Name your knight') + '</button>' +
+      transportHtml(true) +
       buildFoot() +
       '<div class="foot">Drag to move · Brand to swing · Flare when surrounded</div>' +
-      '<div class="foot">♪ ' + esc(tuneName()) + (MUS.on ? '' : ' · music off') + '</div>' +
+
       '<div class="foot">' + (locked ? locked + ' upgrades still locked · level up to draft them' : 'Every upgrade unlocked') + '</div>'
     );
     on('btnStart', function () {
@@ -2834,6 +3032,7 @@
     on('btnShop', shop);
     on('btnFeats', feats2);
     on('btnKnight', function () { nameKnight(menu); });
+    bindTransport(function () { musicScreen(menu); });
     hookPortrait();
   }
 
@@ -2896,6 +3095,47 @@
       });
     }
     on('btnBack', menu);
+  }
+
+  // ── the record shelf ──────────────────────────────────────────────────────
+  function musicScreen(back) {
+    S.mode = 'menu';
+    var order = [], seen = {}, i;
+    for (i = 0; i < TUNES.length; i++) if (!seen[TUNES[i].genre]) { seen[TUNES[i].genre] = 1; order.push(TUNES[i].genre); }
+    var rows = '';
+    for (var g = 0; g < order.length; g++) {
+      rows += '<div class="ghead">' + esc(order[g]) + '</div>';
+      for (i = 0; i < TUNES.length; i++) {
+        if (TUNES[i].genre !== order[g]) continue;
+        var T = TUNES[i];
+        rows += '<button class="trow' + (i === MUS.tune ? ' on' : '') + '" data-tune="' + i + '">' +
+            '<span class="tdot"></span>' +
+            '<span class="tname">' + esc(T.name) + '</span>' +
+            '<span class="tmeta">' + T.bpm + ' bpm' + (T.meter === 3 ? ' · 3/4' : '') +
+              (T.feel === 'swing' ? ' · swing' : '') + '</span>' +
+          '</button>';
+      }
+    }
+    veil(
+      '<div class="eyebrow">Music</div>' +
+      '<h1>The <em>Shelf</em></h1>' +
+      transportHtml(false) +
+      '<div class="shelf">' + rows + '</div>' +
+      '<button class="ghost" id="btnBack">Back</button>' +
+      buildFoot(),
+      'wide'
+    );
+    bindTransport(null);
+    var btns = elCard.querySelectorAll('[data-tune]');
+    for (i = 0; i < btns.length; i++) {
+      btns[i].addEventListener('click', function () {
+        var idx = +this.getAttribute('data-tune');
+        UI.tap();
+        if (!MUS.on) setMusic(true);
+        switchTo(idx);
+      });
+    }
+    on('btnBack', back || menu);
   }
 
   // ── feats ─────────────────────────────────────────────────────────────────
@@ -3081,10 +3321,21 @@
   function togglePause() {
     if (S.mode === 'play' || S.mode === 'dawn') {
       S._resume = S.mode;
-      S.mode = 'paused';
-      showChrome(false);
       duckMusic(0.45, 0.4);
-      veil(
+      pauseCard();
+    } else if (S.mode === 'paused') {
+      S.mode = S._resume || 'play';
+      hideVeil();
+      showChrome(true);
+      duckMusic(1, 0.6);
+      last = performance.now();
+    }
+  }
+
+  function pauseCard() {
+    S.mode = 'paused';
+    showChrome(false);
+    veil(
         '<div class="eyebrow">Paused</div>' +
         '<h1>Hold<em>Fast</em></h1>' +
         '<div class="tally sm">' +
@@ -3098,39 +3349,23 @@
           '<u>score ' + Math.round(S.score).toLocaleString() + '</u></div>' +
         '</div>' +
         '<div class="held big">' + upChips(S.up, true) + '</div>' +
-        '<div class="nowplaying">♪ <b>' + esc(tuneName()) + '</b><span>' + (MUS.on ? 'now playing' : 'music off') + '</span></div>' +
+        transportHtml(true) +
         '<button class="go" id="btnResume">Resume</button>' +
-        '<div class="row2">' +
-          '<button class="ghost" id="btnMusic">Music · ' + (MUS.on ? 'On' : 'Off') + '</button>' +
-          '<button class="ghost" id="btnSound">Sound · ' + (S.muted ? 'Off' : 'On') + '</button>' +
-        '</div>' +
+        '<button class="ghost" id="btnSound">Sound · ' + (S.muted ? 'Off' : 'On') + '</button>' +
         '<button class="ghost" id="btnQuit">Abandon the Watch</button>' +
         buildFoot(),
         'wide'
       );
-      hookPortrait();
-      on('btnResume', togglePause);
-      on('btnQuit', function () { finishRun(); menu(); });
-      on('btnSound', function () {
-        S.muted = !S.muted;
-        META.opts.sound = !S.muted;
-        saveMeta();
-        this.textContent = 'Sound · ' + (S.muted ? 'Off' : 'On');
-      });
-      on('btnMusic', function () {
-        setMusic(!MUS.on);
-        this.textContent = 'Music · ' + (MUS.on ? 'On' : 'Off');
-        var np = elCard.querySelector('.nowplaying span');
-        if (np) np.textContent = MUS.on ? 'now playing' : 'music off';
-        if (MUS.on) duckMusic(0.45, 0.3);
-      });
-    } else if (S.mode === 'paused') {
-      S.mode = S._resume || 'play';
-      hideVeil();
-      showChrome(true);
-      duckMusic(1, 0.6);
-      last = performance.now();
-    }
+    hookPortrait();
+    bindTransport(function () { musicScreen(pauseCard); });
+    on('btnResume', togglePause);
+    on('btnQuit', function () { finishRun(); menu(); });
+    on('btnSound', function () {
+      S.muted = !S.muted;
+      META.opts.sound = !S.muted;
+      saveMeta();
+      this.textContent = 'Sound · ' + (S.muted ? 'Off' : 'On');
+    });
   }
 
   function gameOver(cause) {
