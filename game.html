@@ -105,6 +105,10 @@
   .btn.on{opacity:1;pointer-events:auto}
   .btn:active{transform:scale(.94)}
   /* primary action sits under the thumb; the flare moved up out of it */
+  html[data-hand="right"] #brand{left:auto;right:calc(var(--safeR) + 20px)}
+  html[data-hand="right"] #flare{left:auto;right:calc(var(--safeR) + 30px)}
+  html[data-hand="right"] #pause{right:auto;left:calc(var(--safeL) + 14px)}
+  html[data-hand="right"] #build{right:auto;left:calc(var(--safeL) + 12px)}
   #brand{
     left:calc(var(--safeL) + 20px);bottom:calc(var(--safeB) + 28px);
     width:104px;height:104px;border-radius:50%;
@@ -418,6 +422,25 @@
   .tinfo span{display:block;font:600 9px/1.4 var(--body);letter-spacing:.13em;
     text-transform:uppercase;color:var(--mute);margin-top:3px}
 
+  .setlist{display:flex;flex-direction:column;gap:6px;margin-bottom:18px}
+  .setrow{
+    display:flex;align-items:center;gap:12px;text-align:left;
+    padding:12px 13px;border-radius:14px;
+    border:1px solid var(--line);background:rgba(20,16,14,0.5);
+  }
+  .sinfo{flex:1;min-width:0}
+  .sinfo b{display:block;font:700 13.5px/1.2 var(--body);color:var(--bone);margin-bottom:3px}
+  .sinfo span{display:block;font:400 11.5px/1.4 var(--body);color:#8f867d}
+  .segs{flex:none;display:flex;gap:0;border:1px solid var(--line);border-radius:11px;overflow:hidden}
+  .seg{
+    padding:9px 11px;cursor:pointer;border:none;background:transparent;
+    font:700 11px/1 var(--body);color:var(--mute);
+    transition:background .15s ease,color .15s ease;
+  }
+  .seg+.seg{border-left:1px solid var(--line)}
+  .seg.on{background:linear-gradient(180deg,#FFB13A,#E07C0A);color:#20130a}
+  .seg:active{transform:scale(.96)}
+
   .shelf{display:flex;flex-direction:column;gap:5px;margin-bottom:18px}
   .ghead{
     font:700 9px/1 var(--body);letter-spacing:.2em;text-transform:uppercase;
@@ -532,7 +555,7 @@
   var gctx = groundCvs.getContext('2d');
 
   var W = 0, H = 0, DPR = 1;
-  var BUILD = 'v1.2.0';        // bump on every deploy — shown in-game for support
+  var BUILD = 'v1.3.0';        // bump on every deploy — shown in-game for support
   var MUTE_KEY = 'keeper.nightwatch.mute';
   var MUSIC_KEY = 'keeper.nightwatch.music';
 
@@ -602,6 +625,8 @@
       desc: function (r) { return 'Begin each run holding ' + r + ' random upgrade' + (r === 1 ? '' : 's') + '.'; } },
     { id: 'mail',       name: "Squire's Mail",   glyph: '⛓', ranks: 4, cost: [60, 110, 180, 270],
       desc: function (r) { return '+' + (r * 8) + ' maximum health.'; } },
+    { id: 'draught',    name: 'Warm Blood',      glyph: '🩸', ranks: 4, cost: [65, 120, 200, 300],
+      desc: function (r) { return 'Mend ' + (r * 25) + '% more from each shade.'; } },
     { id: 'sifter',     name: 'Ash Sifter',      glyph: '⚱️', ranks: 4, cost: [80, 150, 240, 360],
       desc: function (r) { return 'Earn ' + (r * 12) + '% more embers.'; } }
   ];
@@ -643,6 +668,7 @@
     { id: 'nerve',      name: 'Iron Nerve',     glyph: '🛡', tier: 1, max: 2, lv: 1, desc: 'Take 2 less damage, and guard for longer after a hit.' },
     { id: 'hearty',     name: 'Padded Gambeson',glyph: '🧥', tier: 1, max: 3, lv: 1, desc: '+25 maximum health.' },
     { id: 'mend',       name: 'Field Dressing', glyph: '💚', tier: 2, max: 1, lv: 2, desc: 'Dawn patches you up completely.' },
+    { id: 'draught',    name: 'Ember Draught',  glyph: '🍯', tier: 2, max: 2, lv: 2, desc: 'Dispelled shades mend you far more.' },
     { id: 'unburdened', name: 'Unburdened',     glyph: '🕊', tier: 2, max: 1, lv: 4, desc: 'Carrying wood no longer slows you.' },
 
     // ── the deep cuts
@@ -676,7 +702,8 @@
     return { v: 3, embers: 0, xp: 0, runs: 0, bestNight: 0, bestScore: 0,
              perks: {}, ach: {}, lifeLogs: 0, lifeKills: 0, lifeNights: 0,
              knight: { name: '', plume: 'crimson' },
-             opts: { sound: true, music: true } };
+             opts: { sound: true, music: true, stick: 'drift', hand: 'left',
+                     aim: true, haptics: true } };
   }
   var META = freshMeta();
 
@@ -719,8 +746,12 @@
     for (i = 0; i < PLUMES.length; i++) if (PLUMES[i].id === k.plume) f.knight.plume = k.plume;
 
     var o = (m.opts && typeof m.opts === 'object') ? m.opts : {};
-    f.opts.sound = o.sound !== false;
-    f.opts.music = o.music !== false;
+    f.opts.sound   = o.sound !== false;
+    f.opts.music   = o.music !== false;
+    f.opts.aim     = o.aim !== false;
+    f.opts.haptics = o.haptics !== false;
+    f.opts.stick   = o.stick === 'fixed' ? 'fixed' : 'drift';
+    f.opts.hand    = o.hand === 'right' ? 'right' : 'left';
     return f;
   }
 
@@ -812,6 +843,7 @@
     D.hitDamage = Math.max(4, K.hitDamage - u('nerve') * 2);
     D.iframe    = K.iframe + u('nerve') * 0.35;
     D.dawnHeal  = u('mend') ? 9999 : 40;
+    D.mend      = 1 + u('draught') * 1.1 + pk('draught') * 0.25;
     D.scoreMul  = 1 + u('veteran') * 0.25;
     D.rerolls   = pk('reroll');
   }
@@ -833,7 +865,7 @@
     up: {}, motes: [], cinders: [], floats: [],
     heat: 0, heatT: 0, bestHeat: 0, husks: 0, flares: 0,
     revived: false, pyreCount: 0, rerolls: 0, earned: null, brandKills: 0,
-    health: 100, damageTaken: 0, cause: 'dark'
+    health: 100, damageTaken: 0, cause: 'dark', mended: 0
   };
 
   // ────────────────────────────────────────────────────────────── helpers
@@ -936,7 +968,10 @@
   }
 
   // ── effects ────────────────────────────────────────────────────────────
-  function buzz(ms) { if (navigator.vibrate && !S.muted) { try { navigator.vibrate(ms); } catch (e) {} } }
+  function buzz(ms) {
+    if (!META.opts.haptics) return;
+    if (navigator.vibrate) { try { navigator.vibrate(ms); } catch (e) {} }
+  }
 
   // A soft struck-bell voice. Almost every sound in the game is built from
   // this — rounded attack, long gentle tail, nothing sharp anywhere.
@@ -1088,7 +1123,28 @@
     { name: 'Woodsmoke', gain: 1.07,      genre: 'Waltz',    bpm: 92,  feel: 'swing',    meter: 3, kit: 'brushes', pad: 0.4,  horn: 0.32,
       bars: ['Dm7','Gm7','Cmaj7','Fmaj7','Bm7b5','E7','Am7','Am7'] },
     { name: 'Ember Waltz', gain: 0.93,    genre: 'Waltz',    bpm: 96,  feel: 'swing',    meter: 3, kit: 'brushes', pad: 0.5,  horn: 0.28,
-      bars: ['Fmaj7','Dm7','Gm7','C7','Fmaj7','Dm7','Bbmaj7','C7'] }
+      bars: ['Fmaj7','Dm7','Gm7','C7','Fmaj7','Dm7','Bbmaj7','C7'] },
+    // ── groove
+    { name: 'Copper Pocket', gain: 1.31, genre: 'Groove',   bpm: 96,  feel: 'straight', meter: 4, kit: 'funk', pad: 0.3,  horn: 0.34,
+      bars: ['Dm7','Dm7','Gm7','Gm7','Dm7','Dm7','Am7','Gm7'] },
+    { name: 'Hearth Strut',  gain: 1.31, genre: 'Groove',   bpm: 102, feel: 'swing',    meter: 4, kit: 'funk', pad: 0.25, horn: 0.36,
+      bars: ['Fmaj7','Bbmaj7','Fmaj7','C7','Fmaj7','Bbmaj7','Gm7','C7'] },
+    { name: 'Brass Kettle',  gain: 1.21, genre: 'Groove',   bpm: 108, feel: 'straight', meter: 4, kit: 'funk', pad: 0.2,  horn: 0.38,
+      bars: ['Cm7','Cm7','Fm7','Fm7','Ebmaj7','Ebmaj7','Bb7','Bb7'] },
+    { name: 'Sunday Coals',  gain: 1.28, genre: 'Groove',   bpm: 88,  feel: 'swing',    meter: 4, kit: 'funk', pad: 0.35, horn: 0.32,
+      bars: ['Gm7','C7','Fmaj7','Dm7','Gm7','C7','Ebmaj7','C7'] },
+
+    // ── trip-hop
+    { name: 'Slow Machine',  gain: 1.06, genre: 'Trip-hop', bpm: 76,  feel: 'swing',    meter: 4, kit: 'lofi', pad: 0.75, horn: 0.24,
+      bars: ['Am7','Am7','Fmaj7','Fmaj7','Dm7','Dm7','Em7','Em7'] },
+    { name: 'Underlamp',     gain: 0.94, genre: 'Trip-hop', bpm: 72,  feel: 'swing',    meter: 4, kit: 'lofi', pad: 0.8,  horn: 0.22,
+      bars: ['Cm7','Cm7','Abmaj7','Abmaj7','Fm7','Fm7','Bb7','Bb7'] },
+
+    // ── latin
+    { name: 'Fire Samba',    gain: 1.07, genre: 'Latin',    bpm: 130, feel: 'straight', meter: 4, kit: 'bossa', pad: 0.25, horn: 0.4,
+      bars: ['Am7','D7','Gmaj7','Gmaj7','Cmaj7','F#m7b5','B7','Em7'] },
+    { name: 'Cocoa Hour',    gain: 1.03, genre: 'Latin',    bpm: 118, feel: 'straight', meter: 4, kit: 'bossa', pad: 0.4,  horn: 0.36,
+      bars: ['Fmaj7','Gm7','Am7','Bbmaj7','Gm7','C7','Fmaj7','C7'] }
   ];
   // the folk and nocturne sets share a shape, filled in here to keep the table readable
   (function () {
@@ -1322,6 +1378,11 @@
     } else if (T.kit === 'dub') {
       if (beat === 0) upright(t, mtof(28 + ch.root), spb * 2.2, (0.3) * vg);
       else if (beat === 2) upright(t + swung, mtof(bn), spb * 0.9, (0.22) * vg);
+    } else if (T.kit === 'funk') {
+      if (beat === 0) { upright(t, mtof(28 + ch.root), spb * 0.6, (0.28) * vg);
+                        upright(t + swung, mtof(28 + ch.root + 12), spb * 0.4, (0.14) * vg); }
+      else if (beat === 1) upright(t + swung, mtof(bn), spb * 0.5, (0.2) * vg);
+      else if (beat === last) upright(t, mtof(bn), spb * 0.7, (0.22) * vg);
     } else {
       upright(t, mtof(bn), spb * 0.9, (0.24) * vg);         // walking
     }
@@ -1347,6 +1408,14 @@
       if (beat === last) kick(t + swung, (0.036) * vg);
       if (backbeat) rim(t, (0.04) * vg);
       shaker(t + swung, (0.012) * vg);
+    } else if (T.kit === 'funk') {
+      // in the pocket: kick on the one and the and-of-two, hats on the eighths
+      if (beat === 0) kick(t, (0.062) * vg);
+      if (beat === 1) kick(t + swung, (0.05) * vg);
+      if (beat === 2 && Math.random() < 0.5) kick(t + swung, (0.036) * vg);
+      if (backbeat) { rim(t, (0.045) * vg); brush(t, spb * 0.35, (0.026) * vg); }
+      hat(t, (0.026) * vg);
+      hat(t + swung, (0.019) * vg);
     } else if (T.kit === 'none') {
       // no kit at all — the pad and the arpeggio carry it
     } else {                                          // 'soft' — barely there
@@ -1364,6 +1433,12 @@
       pluck(t, mtof(n1), spb * 1.9, (0.05) * vg);
       if (Math.random() < 0.45) pluck(t + swung, mtof(seq[(bar * meter + beat + 2) % seq.length]), spb * 1.2, (0.032) * vg);
       if (beat === 0 && Math.random() < 0.5) vibes(t, mtof(v[v.length - 1] + 12), spb * 3, (0.022) * vg);
+    } else if (T.kit === 'funk') {
+      // short stabs, mostly off the beat
+      if (Math.random() < 0.7) {
+        var when2 = Math.random() < 0.65 ? t + swung : t;
+        for (var q = 0; q < v.length; q++) rhodes(when2 + q * 0.008, mtof(v[q]), spb * 0.45, (0.05) * vg);
+      }
     } else if (T.kit === 'dub') {
       // the skank: chords on the off-beats, with the odd one left out
       if (Math.random() < 0.82) {
@@ -1642,9 +1717,9 @@
   // Three kinds of dark. `burn` is how fast light eats them — a husk barely
   // cares about firelight, so it has to be met out in the open with a flare.
   var SHADE = {
-    crawler: { hp: 6.0, hpN: 1.4, spd: [30, 41], spdN: 1.1, r: 15, burn: 5.2, drain: 5.4, wob: 3.4, sway: 0.22, score: 12, tint: '34,18,44',  eye: 'rgba(255,107,107,0.80)', eyeGap: 4.4 },
-    wisp:    { hp: 3.4, hpN: 0.0, spd: [66, 80], spdN: 0.0, r: 10, burn: 6.5, drain: 3.6, wob: 7.0, sway: 0.50, score: 8,  tint: '78,48,142',  eye: 'rgba(200,180,255,0.85)', eyeGap: 3.2 },
-    husk:    { hp: 13,  hpN: 2.2, spd: [22, 30], spdN: 0.5, r: 19, burn: 2.0, drain: 7.6, wob: 2.0, sway: 0.14, score: 26, tint: '14,8,20',   eye: 'rgba(255,168,32,0.90)', eyeGap: 6.0 }
+    crawler: { hp: 6.0, hpN: 1.4, spd: [30, 41], spdN: 1.1, r: 15, burn: 5.2, drain: 5.4, wob: 3.4, sway: 0.22, score: 12, heal: 1.1, tint: '34,18,44',  eye: 'rgba(255,107,107,0.80)', eyeGap: 4.4 },
+    wisp:    { hp: 3.4, hpN: 0.0, spd: [66, 80], spdN: 0.0, r: 10, burn: 6.5, drain: 3.6, wob: 7.0, sway: 0.50, score: 8,  heal: 0.7, tint: '78,48,142',  eye: 'rgba(200,180,255,0.85)', eyeGap: 3.2 },
+    husk:    { hp: 13,  hpN: 2.2, spd: [22, 30], spdN: 0.5, r: 19, burn: 2.0, drain: 7.6, wob: 2.0, sway: 0.14, score: 26, heal: 2.6, tint: '14,8,20',   eye: 'rgba(255,168,32,0.90)', eyeGap: 6.0 }
   };
 
   // ────────────────────────────────────────────────────────────── input
@@ -1686,10 +1761,13 @@
     var dx = stick.x - stick.ox, dy = stick.y - stick.oy;
     var d = Math.hypot(dx, dy);
     var MAX = 54;
-    if (d > MAX) {                      // let the origin trail the finger
-      stick.ox += dx * (1 - MAX / d);
-      stick.oy += dy * (1 - MAX / d);
-      dx = stick.x - stick.ox; dy = stick.y - stick.oy; d = MAX;
+    if (d > MAX) {
+      if (META.opts.stick === 'drift') {   // the origin follows your thumb
+        stick.ox += dx * (1 - MAX / d);
+        stick.oy += dy * (1 - MAX / d);
+        dx = stick.x - stick.ox; dy = stick.y - stick.oy;
+      }
+      d = MAX;                             // fixed: the origin stays put
     }
     var n = d < 7 ? 0 : clamp((d - 7) / (MAX - 7), 0, 1);
     if (d > 0.001) { stick.dx = dx / d * n; stick.dy = dy / d * n; }
@@ -1811,6 +1889,18 @@
     S.shades.splice(i, 1);
     S.kills++;
     if (s.kind === 'husk') S.husks++;
+
+    // dispelling a shade gives a little life back — the way home from a bad
+    // night is killing your way out of it
+    if (S.health < D.maxHealth) {
+      var mend = s.t.heal * D.mend;
+      S.health = Math.min(D.maxHealth, S.health + mend);
+      S.mended += mend;
+      if (S.mended >= 5) {                       // pooled, so it isn't a wall of +1s
+        floatText(S.keeper.x, S.keeper.y - 52, '+' + Math.round(S.mended) + ' hp', 'rgba(99,230,190,0.95)', 14);
+        S.mended = 0;
+      }
+    }
     bumpHeat();
     addScore(s.t.score, s.x, s.y - 12);
     if (u('tinder') && Math.random() < 0.28 * u('tinder')) spawnMote(s.x, s.y);
@@ -2581,6 +2671,32 @@
       ctx.beginPath(); ctx.arc(k.x, k.y, D.flareR * t, 0, 6.29); ctx.stroke();
     }
 
+    // where you are pointed — the arc the brand will actually sweep
+    if (META.opts.aim && (S.mode === 'play' || S.mode === 'paused')) {
+      var ak = S.keeper;
+      var ar = D.brandR * 0.82;
+      var half = Math.min(D.brandArc, Math.PI * 1.9) / 2;
+      var pulse = 0.5 + 0.5 * Math.sin(S.time * 3);
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = 'rgba(255,196,110,' + (0.16 + 0.08 * pulse).toFixed(3) + ')';
+      ctx.lineWidth = 2.4;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.arc(ak.x, ak.y, ar, ak.face - half, ak.face + half);
+      ctx.stroke();
+      // a small nose on the arc so the facing reads at a glance
+      var nx = ak.x + Math.cos(ak.face) * (ar + 7);
+      var ny = ak.y + Math.sin(ak.face) * (ar + 7);
+      ctx.fillStyle = 'rgba(255,214,110,' + (0.5 + 0.25 * pulse).toFixed(3) + ')';
+      ctx.beginPath();
+      ctx.moveTo(nx + Math.cos(ak.face) * 5, ny + Math.sin(ak.face) * 5);
+      ctx.lineTo(nx + Math.cos(ak.face + 2.4) * 5.5, ny + Math.sin(ak.face + 2.4) * 5.5);
+      ctx.lineTo(nx + Math.cos(ak.face - 2.4) * 5.5, ny + Math.sin(ak.face - 2.4) * 5.5);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+
     // your reach — a faint ring so the pickup range is never a guess
     var kp = S.keeper;
     if (S.mode === 'play' || S.mode === 'paused') {
@@ -2777,6 +2893,8 @@
     clearTimeout(toastT);
     toastT = setTimeout(function () { elToast.classList.remove('show'); }, 1800);
   }
+
+  function applyHand() { document.documentElement.setAttribute('data-hand', META.opts.hand); }
 
   function showChrome(on) {
     elHud2.classList.toggle('on', on);
@@ -3019,7 +3137,10 @@
         '<button class="ghost" id="btnShop">Provisions</button>' +
         '<button class="ghost" id="btnFeats">Feats · ' + feats + '/' + ACHIEVEMENTS.length + '</button>' +
       '</div>' +
-      '<button class="ghost" id="btnKnight">' + (META.knight.name ? 'Your knight' : 'Name your knight') + '</button>' +
+      '<div class="row2">' +
+        '<button class="ghost" id="btnKnight">' + (META.knight.name ? 'Your knight' : 'Name your knight') + '</button>' +
+        '<button class="ghost" id="btnSettings">Settings</button>' +
+      '</div>' +
       transportHtml(true) +
       buildFoot() +
       '<div class="foot">Drag to move · Brand to swing · Flare when surrounded</div>' +
@@ -3032,6 +3153,7 @@
     on('btnShop', shop);
     on('btnFeats', feats2);
     on('btnKnight', function () { nameKnight(menu); });
+    on('btnSettings', function () { settingsScreen(menu); });
     bindTransport(function () { musicScreen(menu); });
     hookPortrait();
   }
@@ -3095,6 +3217,69 @@
       });
     }
     on('btnBack', menu);
+  }
+
+  // ── settings ──────────────────────────────────────────────────────────────
+  // Every row is the same shape: a label, a line of help, and two or more
+  // choices. Picking one writes it straight through to the saved record.
+  var SETTINGS = [
+    { group: 'Controls' },
+    { id: 'stick', name: 'Joystick', help: 'Drifting follows your thumb as you slide. Fixed keeps the centre where you first touched.',
+      opts: [['drift', 'Drifting'], ['fixed', 'Fixed']] },
+    { id: 'hand',  name: 'Button side', help: 'Which side the brand and flare sit on. The other thumb steers.',
+      opts: [['left', 'Left'], ['right', 'Right']], after: function () { applyHand(); } },
+    { id: 'aim',   name: 'Aim guide', help: 'Shows the arc your brand will sweep, so you can see where you are pointed.',
+      opts: [[true, 'On'], [false, 'Off']] },
+    { group: 'Feel' },
+    { id: 'sound',   name: 'Sound', help: 'Fire, footsteps, shades and the interface.',
+      opts: [[true, 'On'], [false, 'Off']], after: function () { S.muted = !META.opts.sound; } },
+    { id: 'music',   name: 'Music', help: 'The band. Skip and browse from the player on the camp screen.',
+      opts: [[true, 'On'], [false, 'Off']], after: function () { setMusic(META.opts.music); } },
+    { id: 'haptics', name: 'Vibration', help: 'Small buzzes on hits, pickups and flares. Phones only.',
+      opts: [[true, 'On'], [false, 'Off']] }
+  ];
+
+  function settingsScreen(back) {
+    S.mode = 'menu';
+    showChrome(false);
+    var rows = '';
+    for (var i = 0; i < SETTINGS.length; i++) {
+      var R = SETTINGS[i];
+      if (R.group) { rows += '<div class="ghead">' + esc(R.group) + '</div>'; continue; }
+      var cur = META.opts[R.id];
+      var segs = '';
+      for (var j = 0; j < R.opts.length; j++) {
+        var val = R.opts[j][0];
+        segs += '<button class="seg' + (val === cur ? ' on' : '') + '" data-opt="' + R.id +
+                '" data-val="' + String(val) + '">' + esc(R.opts[j][1]) + '</button>';
+      }
+      rows += '<div class="setrow"><div class="sinfo"><b>' + esc(R.name) + '</b>' +
+              '<span>' + esc(R.help) + '</span></div><div class="segs">' + segs + '</div></div>';
+    }
+    veil(
+      '<div class="eyebrow">Settings</div>' +
+      '<h1>How It <em>Plays</em></h1>' +
+      '<div class="setlist">' + rows + '</div>' +
+      '<button class="ghost" id="btnMusicFromSet">Browse the music</button>' +
+      '<button class="ghost" id="btnBack">Back</button>' +
+      buildFoot(),
+      'wide'
+    );
+    var btns = elCard.querySelectorAll('[data-opt]');
+    for (var b = 0; b < btns.length; b++) {
+      btns[b].addEventListener('click', function () {
+        var id = this.getAttribute('data-opt'), raw = this.getAttribute('data-val');
+        var val = raw === 'true' ? true : raw === 'false' ? false : raw;
+        META.opts[id] = val;
+        saveMeta();
+        var row = this.parentNode.querySelectorAll('.seg');
+        for (var k = 0; k < row.length; k++) row[k].classList.toggle('on', row[k] === this);
+        for (var q = 0; q < SETTINGS.length; q++) if (SETTINGS[q].id === id && SETTINGS[q].after) SETTINGS[q].after();
+        UI.toggle();
+      });
+    }
+    on('btnMusicFromSet', function () { musicScreen(function () { settingsScreen(back); }); });
+    on('btnBack', back || menu);
   }
 
   // ── the record shelf ──────────────────────────────────────────────────────
@@ -3290,7 +3475,7 @@
     S.kills = 0; S.logsBurned = 0; S.husks = 0; S.flares = 0;
     S.heat = 0; S.heatT = 0; S.bestHeat = 0;
     S.revived = false; S.pyreCount = 0; S.earned = null; S.brandKills = 0;
-    S.health = D.maxHealth; S.damageTaken = 0; S.cause = 'dark';
+    S.health = D.maxHealth; S.damageTaken = 0; S.cause = 'dark'; S.mended = 0;
     S.rerolls = D.rerolls;
     S.fire.flare = 0.8;
 
@@ -3351,7 +3536,7 @@
         '<div class="held big">' + upChips(S.up, true) + '</div>' +
         transportHtml(true) +
         '<button class="go" id="btnResume">Resume</button>' +
-        '<button class="ghost" id="btnSound">Sound · ' + (S.muted ? 'Off' : 'On') + '</button>' +
+        '<button class="ghost" id="btnSettingsP">Settings</button>' +
         '<button class="ghost" id="btnQuit">Abandon the Watch</button>' +
         buildFoot(),
         'wide'
@@ -3359,13 +3544,8 @@
     hookPortrait();
     bindTransport(function () { musicScreen(pauseCard); });
     on('btnResume', togglePause);
+    on('btnSettingsP', function () { settingsScreen(pauseCard); });
     on('btnQuit', function () { finishRun(); menu(); });
-    on('btnSound', function () {
-      S.muted = !S.muted;
-      META.opts.sound = !S.muted;
-      saveMeta();
-      this.textContent = 'Sound · ' + (S.muted ? 'Off' : 'On');
-    });
   }
 
   function gameOver(cause) {
@@ -3485,6 +3665,7 @@
   }, true);
 
   loadMeta();
+  applyHand();
   S.muted = !META.opts.sound;
   MUS.on = META.opts.music;
   MUS.tune = Math.floor(Math.random() * TUNES.length);
@@ -3501,7 +3682,7 @@
   document.addEventListener('keydown', wakeAudio);
   // opt-in inspection hook for tuning/QA: open with #debug
   if (/[?#]debug/.test(location.href)) window.__NW = { S: S, K: K, D: D, META: META, UPGRADES: UPGRADES, PERKS: PERKS,
-      flare: doFlare, swing: doSwing, lightAt: lightAt, A: A, MUS: MUS, TUNES: TUNES,
+      flare: doFlare, swing: doSwing, lightAt: lightAt, stick: stick, A: A, MUS: MUS, TUNES: TUNES,
       startMusic: startMusic, nextTune: nextTune, setMusic: setMusic, SFX: SFX, UI: UI, ac: ac,
       music: { parseChord: parseChord, voicing: voicing, bassNote: bassNote,
                leadNote: leadNote, chordAt: chordAt, QUAL: QUAL, mtof: mtof }, recalc: recalc, saveMeta: saveMeta, rollDraft: rollDraft, take: takeUpgrade };
