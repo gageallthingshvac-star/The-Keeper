@@ -166,6 +166,18 @@
     transition:opacity .4s ease;
   }
   #veil.hide{opacity:0;pointer-events:none}
+  #veilback{
+    position:fixed;z-index:6;display:none;
+    top:calc(var(--safeT) + 12px);left:calc(var(--safeL) + 12px);
+    width:42px;height:42px;border-radius:50%;cursor:pointer;
+    border:1px solid var(--line);background:rgba(20,16,14,0.86);
+    color:var(--bone);font:400 27px/1 var(--display);padding:0 4px 4px 0;
+    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+    transition:transform .12s ease,border-color .2s ease;
+  }
+  #veilback.on{display:block}
+  #veilback:active{transform:scale(.92);border-color:var(--ember)}
+  #veil.hide #veilback{display:none}
   .card{width:100%;max-width:380px;text-align:center;animation:rise .5s cubic-bezier(.2,.9,.25,1) both}
   @keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
   .eyebrow{font:700 10px/1 var(--body);letter-spacing:.28em;text-transform:uppercase;color:var(--ember);margin-bottom:14px}
@@ -598,7 +610,7 @@
 <div id="build"></div>
 <div id="toast"><div class="t1"></div><div class="t2"></div></div>
 
-<div id="veil"><div class="card" id="card"></div></div>
+<div id="veil"><button id="veilback" aria-label="Back" title="Back">‹</button><div class="card" id="card"></div></div>
 
 <script>
 (function () {
@@ -618,7 +630,7 @@
   var ZOOM = 0.7;
   var VS = 1;                     // device pixels per field unit
   function px(n) { return n / ZOOM; }   // n screen pixels, in field units
-  var BUILD = 'v1.13.0';        // bump on every deploy — shown in-game for support
+  var BUILD = 'v1.13.1';        // bump on every deploy — shown in-game for support
   var MUTE_KEY = 'keeper.nightwatch.mute';
   var MUSIC_KEY = 'keeper.nightwatch.music';
 
@@ -5472,15 +5484,28 @@
     g.restore();
   }
 
-  function veil(html, cls) {
+  // Every screen that is not the camp gets a way back to it, pinned to the
+  // corner so it is reachable without scrolling to the bottom of a long list.
+  var elVeilBack = document.getElementById('veilback');
+  var veilBackFn = null;
+  elVeilBack.addEventListener('click', function () {
+    if (!veilBackFn) return;
+    UI.back();
+    var f = veilBackFn;
+    veilBackFn = null;
+    f();
+  });
+  function veil(html, cls, back) {
     portraitCv = null;
     KN.onStage = false;
     elCard.className = 'card' + (cls ? ' ' + cls : '');
     elCard.innerHTML = html;
     elVeil.classList.remove('hide');
     elVeil.scrollTop = 0;
+    veilBackFn = back || null;
+    elVeilBack.classList.toggle('on', !!back);
   }
-  function hideVeil() { elVeil.classList.add('hide'); }
+  function hideVeil() { elVeil.classList.add('hide'); veilBackFn = null; elVeilBack.classList.remove('on'); }
   function on(id, fn) { var el = document.getElementById(id); if (el) el.addEventListener('click', fn); }
   function hookPortrait() { portraitCv = document.getElementById('portrait'); paintPortrait(); }
 
@@ -5712,7 +5737,7 @@
       (first ? '' : '<button class="ghost danger" id="btnWipe">Start over from nothing</button>') +
       '<div class="foot">' + (first ? 'He will keep it. He has waited a while for one.' : 'He will be remembered by this name') + '</div>' +
       buildFoot(),
-      'wide'
+      'wide', first ? null : (after || menu)
     );
     hookPortrait();
     bindPlumes();
@@ -5956,7 +5981,7 @@
       '<div class="shoplist">' + rows + '</div>' +
       '<button class="ghost" id="btnBack">Back to camp</button>' +
       buildFoot(),
-      'wide'
+      'wide', menu
     );
     var btns = elCard.querySelectorAll('button[data-perk]');
     for (var b = 0; b < btns.length; b++) {
@@ -5995,7 +6020,7 @@
       '</ul>' +
       '<button class="ghost" id="btnBack">Back</button>' +
       buildFoot(),
-      'wide'
+      'wide', back || menu
     );
     on('btnBack', back || menu);
   }
@@ -6072,7 +6097,7 @@
       '</div>' +
       '<button class="ghost" id="btnBack">Back</button>' +
       buildFoot(),
-      'wide'
+      'wide', back || menu
     );
     var btns = elCard.querySelectorAll('[data-opt]');
     for (var b = 0; b < btns.length; b++) {
@@ -6154,7 +6179,7 @@
       '<div class="shelf">' + rows + '</div>' +
       '<button class="ghost" id="btnBack">Back</button>' +
       buildFoot(),
-      'wide'
+      'wide', back || menu
     );
     bindTransport(null);
     var btns = elCard.querySelectorAll('[data-tune]');
@@ -6187,7 +6212,7 @@
       '<div class="shoplist">' + rows + '</div>' +
       '<button class="ghost" id="btnBack">Back to camp</button>' +
       buildFoot(),
-      'wide'
+      'wide', menu
     );
     on('btnBack', menu);
   }
@@ -6265,7 +6290,7 @@
              : '<p class="lede sm">Nothing left to draft — the rest is bought at the camp.</p>') +
       '<button class="' + (cards ? 'ghost' : 'go') + '" id="btnHome">Back to camp</button>' +
       buildFoot(),
-      'wide'
+      'wide', function () { endParty(); if (!arrivals(menu)) menu(); }
     );
     hookPortrait();
     var btns = elCard.querySelectorAll('button[data-up]');
@@ -6405,7 +6430,7 @@
         '<button class="ghost" id="btnSettingsP">Settings</button>' +
         '<button class="ghost" id="btnQuit">Abandon the Watch</button>' +
         buildFoot(),
-        'wide'
+        'wide', togglePause
       );
     hookPortrait();
     bindTransport(function () { musicScreen(pauseCard); });
@@ -6470,7 +6495,7 @@
         '<div class="foot">' + plural(r.logs, 'log') + ' burned · ' + plural(r.kills, 'shade') + ' dispelled (' + r.brandKills + ' by brand) · heat ×' + r.bestHeat + '</div>' +
         '<div class="foot">' + (r.damage ? r.damage + ' damage taken' : 'not a scratch') + '</div>' +
         buildFoot(),
-        'wide'
+        'wide', menu
       );
       on('btnAgain', startGame);
       on('btnMenu', menu);
@@ -6531,7 +6556,7 @@
       journeyStrip(false) +
       '<button class="go" id="btnOn">On we go</button>' +
       buildFoot(),
-      'wide'
+      'wide', function () { endParty(); if (!arrivals(after)) (after || menu)(); }
     );
     hookPortrait();
     UI.win();
