@@ -630,7 +630,7 @@
   var ZOOM = 0.7;
   var VS = 1;                     // device pixels per field unit
   function px(n) { return n / ZOOM; }   // n screen pixels, in field units
-  var BUILD = 'v1.13.1';        // bump on every deploy — shown in-game for support
+  var BUILD = 'v1.13.2';        // bump on every deploy — shown in-game for support
   var MUTE_KEY = 'keeper.nightwatch.mute';
   var MUSIC_KEY = 'keeper.nightwatch.music';
 
@@ -3096,7 +3096,8 @@
     var sit    = clamp(o.sit || 0, 0, 1);      // knees forward, weight on a seat
     var crouch = clamp(o.crouch || 0, 0, 1);   // hunkered down over something
     var lie    = clamp(o.lie || 0, 0, 1);      // flat out
-    var back   = clamp(o.back || 0, 0, 1);     // turned away from you
+    var backA  = clamp(o.back || 0, 0, 1);     // how far through the turn he is
+    var back   = backA >= 0.5 ? 1 : 0;         // and whether that means you see his back
     var bodyY  = sit * 2.2 + crouch * 2.9;     // how far the whole trunk drops
 
     g.save();
@@ -3145,7 +3146,7 @@
     g.save();
     g.translate(0, bodyY);
 
-    var shoulder = 5.6 * W + back * 1.3;       // arms sit wider from behind
+    var shoulder = 5.6 * W + backA * 1.3;      // arms sit wider from behind
 
     // ── back arm, behind the body
     drawArm(g, -shoulder, -0.6, (o.armL === undefined ? -swing * 0.5 : o.armL), skin, F, cloth, o.itemL, o.t, back);
@@ -4603,7 +4604,7 @@
     x: 0, tx: 0, cam: 0, face: 1, walking: 0, step: 0,
     armL: undefined, armR: undefined, item: null, itemL: null,
     blink: 1.8, hop: 0, tilt: 0, lean: 0, zzz: 0, sit: 0,
-    crouch: 0, lie: 0, back: 0, headTilt: 0, lift: 0, treatT: 0,
+    crouch: 0, lie: 0, back: 0, headTilt: 0, lift: 0, treatT: 0, faceYou: 0,
     spin: 0, squash: 0, look: 0, lookT: 0,
     hearts: [], props: [], taps: 0, tapT: 0, petting: 0, pet: 0,
     onStage: false, lastReact: '', bounce: 0, danceT: 0,
@@ -4625,10 +4626,10 @@
     { id: 'haul',    at: 'wood',  w: 1.5, dur: [3, 5] },
     { id: 'nap',     at: 'bed',   w: 1.6, dur: [5, 9] },
     { id: 'tidy',    at: 'bed',   w: 1.1, dur: [2.5, 4] },
-    { id: 'game',    at: 'desk',  w: 2.2, dur: [5, 10] },
+    { id: 'game',    at: 'desk',  w: 1.4, dur: [4, 7] },
     { id: 'sit',     at: 'stump', w: 1.6, dur: [3.5, 7] },
     { id: 'stars',   at: 'stump', w: 1.3, dur: [4, 7] },
-    { id: 'panel',   at: 'line',  w: 0.9, dur: [2.5, 4] },
+    { id: 'panel',   at: 'line',  w: 0.7, dur: [2.2, 3.4] },
     { id: 'wander',  at: null,    w: 1.6, dur: [2.5, 5] },
     { id: 'moth',    at: null,    w: 1.2, dur: [4, 7] },
     { id: 'ember',   at: 'fire',  w: 1.3, dur: [3, 4.5] },
@@ -4926,6 +4927,7 @@
   function giveTreat() {
     if (KN.treatT > 0) return;
     KN.treatT = 7;
+    KN.faceYou = 4;
     META.treats++;
     saveMeta();
     DOG.act = 'treat'; DOG.actT = 7; DOG.tx = CAMP.kennel.x + 16;
@@ -5096,6 +5098,7 @@
         tilt = ((B2.beat % 2) ? 1 : -1) * 0.15 * (0.35 + e2 * 0.65);
         armR = -1.05 - e2 * 0.5; armL = 0.95 + e2 * 0.42;
         expr = 'happy';
+        KN.look = 0;                       // dancing, and dancing at you
         if (Math.random() < dt * 0.5) knHeart('note');
       }
     } else if (A2 === 'warm') {
@@ -5166,11 +5169,15 @@
     } else if (A2 === 'game') {
       // on the stool, back to you, looking up at the screen, both hands
       // bouncing along the keys
-      sit = 1; lift = 2.4; back = 1; lean = 0.04; headTilt = -0.07;
+      sit = 1; lift = 2.4; lean = 0.04;
+      // he turns round every few seconds to check you are still watching
+      var peek = Math.sin(S.time * 0.44 + 1.1) > 0.72;
+      back = peek ? 0 : 1;
+      headTilt = peek ? -0.12 : -0.07;
       armR = -1.24 + Math.abs(Math.sin(S.time * 7.5)) * 0.13;
       armL = 1.24 - Math.abs(Math.sin(S.time * 7.5 + 2.1)) * 0.13;
       KN.look = 0;
-      expr = Math.sin(S.time * 0.7) > 0.6 ? 'surprised' : 'think';
+      expr = peek ? 'happy' : (Math.sin(S.time * 0.7) > 0.6 ? 'surprised' : 'think');
     } else if (A2 === 'sit') {
       // on the stump, hands on his knees
       sit = 1; lift = 2.4; expr = Math.sin(S.time) > 0 ? 'content' : 'normal';
@@ -5182,10 +5189,13 @@
       KN.look = 0;
     } else if (A2 === 'panel') {
       // turned away, both hands up wiping the panel down
-      back = 1;
+      var peek2 = Math.sin(S.time * 0.6) > 0.66;
+      back = peek2 ? 0 : 1;
       armR = -2.5 + Math.sin(S.time * 2.6) * 0.2;
       armL = 2.3 - Math.sin(S.time * 2.6 + 0.6) * 0.2;
-      headTilt = -0.16; lean = 0.05; expr = 'think';
+      headTilt = -0.16; lean = 0.05;
+      expr = peek2 ? 'happy' : 'think';
+      if (peek2) KN.look = 0;
     } else if (A2 === 'stretch') {
       armR = -2.85; armL = 2.85; tilt = Math.sin(S.time * 2.2) * 0.09;
       lean = -0.1; headTilt = -0.2;
@@ -5209,9 +5219,12 @@
       }
     }
 
+    // anything you just did to him turns him round for a moment
+    if (KN.faceYou > 0) { KN.faceYou -= dt; back = 0; KN.look = 0; }
     if (KN.scripted && KN.hold) expr = KN.hold;
 
-    if (A2 !== 'ember' && A2 !== 'moth' && A2 !== 'stars') {
+    if (A2 === 'idle' || A2 === 'wander' || A2 === 'dance') KN.look = 0;
+    else if (A2 !== 'ember' && A2 !== 'moth' && A2 !== 'stars') {
       KN.lookT -= dt;
       if (KN.lookT <= 0) { KN.lookT = rand(0.7, 2.2); KN.look = Math.random() < 0.4 ? rand(-1, 1) : 0; }
     }
@@ -5260,6 +5273,7 @@
   function knightPoke() {
     KN.taps++; KN.tapT = 2;
     KN.act = 'idle'; KN.actT = rand(1.2, 2.4); KN.props.length = 0;
+    KN.faceYou = 3;
 
     // pester him and he stops being charmed by it
     if (KN.taps >= 5 && Math.random() < 0.7) {
@@ -5282,6 +5296,7 @@
   }
 
   function knightPet() {
+    KN.faceYou = 2;
     if (KN.petting <= 0) {
       bell(rand(600, 700), 0.4, 0.026, 2.6);
       if (Math.random() < 0.25) { knFeel('surprised', 0.5, rand(0.7, 1)); KN.hop = 4; }   // caught him off guard
