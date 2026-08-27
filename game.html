@@ -380,6 +380,8 @@
     text-transform:uppercase;color:var(--ember)}
   .stagename u{display:block;margin-top:5px;font:500 12px/1.3 var(--body);color:var(--mute);text-decoration:none}
   .stage.still{cursor:default}
+  .ghost.treat{margin-top:10px}
+  .foot.hi{color:var(--ember);font-weight:600}
   .lede.sm{font-size:14px;margin:2px 0 14px;color:var(--mute)}
   .road{
     border:1px solid var(--line);border-radius:16px;padding:13px 15px;margin:0 0 16px;
@@ -616,7 +618,7 @@
   var ZOOM = 0.7;
   var VS = 1;                     // device pixels per field unit
   function px(n) { return n / ZOOM; }   // n screen pixels, in field units
-  var BUILD = 'v1.12.0';        // bump on every deploy — shown in-game for support
+  var BUILD = 'v1.13.0';        // bump on every deploy — shown in-game for support
   var MUTE_KEY = 'keeper.nightwatch.mute';
   var MUSIC_KEY = 'keeper.nightwatch.music';
 
@@ -670,6 +672,15 @@
   var SAVE_FAILED = false;
 
   // Bought once with embers, kept forever. Ranks are cumulative.
+  // Each rank buys him a better screen, and a better screen is a happier
+  // keeper — the dopamine has to go somewhere, and it goes into his legs.
+  var RIG_DESC = [
+    'A better screen for him. Happier keeper, quicker feet.',
+    'A proper panel and a light strip. +6% speed, +15% mending.',
+    'Second monitor. He has opinions about it. +12% speed, +30% mending.',
+    'Curved ultrawide, lit underneath. +18% speed, +45% mending.',
+    'The full battlestation. He is beside himself. +24% speed, +60% mending.'
+  ];
   var PERKS = [
     { id: 'provisions', name: 'Provisions',      glyph: '🎒', ranks: 5, cost: [40, 75, 120, 180, 260],
       desc: function (r) { return 'Start each run with +' + (r * 7) + ' fire.'; } },
@@ -683,14 +694,18 @@
       desc: function (r) { return 'Flare costs ' + r + ' less fire.'; } },
     { id: 'reroll',     name: 'Second Thoughts', glyph: '🔄', ranks: 2, cost: [120, 260],
       desc: function (r) { return r + ' reroll' + (r === 1 ? '' : 's') + ' per dawn draft.'; } },
-    { id: 'headstart',  name: 'Head Start',      glyph: '✨', ranks: 2, cost: [150, 320],
-      desc: function (r) { return 'Begin each run holding ' + r + ' random upgrade' + (r === 1 ? '' : 's') + '.'; } },
+    { id: 'headstart',  name: 'Well Stacked',    glyph: '🪵', ranks: 3, cost: [90, 170, 280],
+      desc: function (r) { return 'Start each night with ' + r + ' more log' + (r === 1 ? '' : 's') + ' on the ground.'; } },
     { id: 'mail',       name: "Squire's Mail",   glyph: '⛓', ranks: 4, cost: [60, 110, 180, 270],
       desc: function (r) { return '+' + (r * 8) + ' maximum health.'; } },
     { id: 'draught',    name: 'Warm Blood',      glyph: '🩸', ranks: 4, cost: [65, 120, 200, 300],
       desc: function (r) { return 'Mend ' + (r * 25) + '% more from each shade.'; } },
     { id: 'sifter',     name: 'Ash Sifter',      glyph: '⚱️', ranks: 4, cost: [80, 150, 240, 360],
-      desc: function (r) { return 'Earn ' + (r * 12) + '% more embers.'; } }
+      desc: function (r) { return 'Earn ' + (r * 12) + '% more embers.'; } },
+    { id: 'rig',        name: 'The Rig',         glyph: '🖥', ranks: 4, cost: [90, 170, 290, 450],
+      desc: function (r) { return RIG_DESC[r] || RIG_DESC[4]; } },
+    { id: 'kettle',     name: 'Hot Kettle',      glyph: '🫖', ranks: 3, cost: [70, 130, 220],
+      desc: function (r) { return 'Start each night with +' + (r * 9) + ' health.'; } }
   ];
 
   // Drafted during a run, one per dawn. `lv` gates it behind a keeper level,
@@ -779,10 +794,29 @@
     { st: 'Alaska',        name: 'Denali' },
     { st: 'Hawaii',        name: 'Kilauea' }
   ];
-  var LM_LEVEL = 2;               // keeper levels between one landmark and the next
-  function journeyIndex() { return Math.min(LANDMARKS.length, Math.floor(keeperLevel() / LM_LEVEL)); }
+  var LM_NIGHTS = 20;             // nights of walking between one landmark and the next
+  function journeyIndex() { return Math.min(LANDMARKS.length, Math.floor((META.night - 1) / LM_NIGHTS)); }
   function nextLandmark() { var i = journeyIndex(); return i < LANDMARKS.length ? LANDMARKS[i] : null; }
-  function levelsToNext() { return (journeyIndex() + 1) * LM_LEVEL - keeperLevel(); }
+  function nightsToNext() { return (journeyIndex() + 1) * LM_NIGHTS - (META.night - 1); }
+  function isLandmarkNight(n) { return n % LM_NIGHTS === 0 && n / LM_NIGHTS <= LANDMARKS.length; }
+  // A pet turns up at the start and one more every five landmarks.
+  function extraPetsDue() { return Math.min(PET_KINDS.length, Math.floor(journeyIndex() / 5)); }
+
+  // Difficulty rides a curve, not a straight line — night 20 is about where
+  // night 8 used to be, and it keeps climbing without ever going vertical.
+  function nightP(n) { return Math.pow(n || 1, 0.7); }
+
+  // The dog is his from the start. One more animal turns up every five
+  // landmarks, and that is quite enough animals.
+  var PET_KINDS = ['cat', 'goat', 'hen'];
+  var PET_LABEL = { dog: 'dog', cat: 'cat', goat: 'goat', hen: 'hen' };
+  var PARTNER_NAMES = ['Nell', 'Iris', 'Bea', 'Sunny', 'Marguerite', 'Poppy', 'Wren',
+    'Juniper', 'Cleo', 'Vesper', 'Rosa', 'Tam', 'Elsie', 'Marlow'];
+  var PET_NAMES = {
+    cat: ['Mittens', 'Sooty', 'Bean', 'Olive', 'Widget', 'Pumpernickel', 'Nib', 'Saffron', 'Moss', 'Custard'],
+    goat: ['General', 'Bramble', 'Wilbur', 'Doris', 'Chomp', 'Bartholomew', 'Nanny', 'Fig', 'Rambler'],
+    hen: ['Mrs Featherstone', 'Cluck', 'Poppy', 'Sergeant', 'Doreen', 'Nugget', 'Beaky', 'Ethel']
+  };
 
   // Rolled once, on the machine it is rolled on — send this to ten people and
   // ten different dogs turn up.
@@ -806,6 +840,7 @@
              knight: { name: '', plume: 'crimson', build: 'lad', helm: 'none',
                        cape: 'hoodie', armour: 'chestnut' },
              player: { name: '', gender: '', hue: 'ember', met: 0, theme: true },
+             night: 1, up: {}, pets: [], partner: '', treats: 0,
              dog: { name: '' }, camp: [], reached: 0,
              opts: { sound: true, music: true, stick: 'drift', hand: 'left',
                      aim: true, haptics: true, loop: false } };
@@ -861,8 +896,29 @@
     f.player.met = pl.met ? 1 : 0;
     f.player.theme = pl.theme !== false;
 
+    f.night = num(m.night, 1, 1, 9999);
+    if (m.up && typeof m.up === 'object') {
+      for (i = 0; i < UPGRADES.length; i++) {
+        var uv = num(m.up[UPGRADES[i].id], 0, 0, UPGRADES[i].max);
+        if (uv > 0) f.up[UPGRADES[i].id] = uv;
+      }
+    }
+    if (Object.prototype.toString.call(m.pets) === '[object Array]') {
+      for (i = 0; i < m.pets.length && f.pets.length < PET_KINDS.length; i++) {
+        var pt = m.pets[i] || {};
+        var kind = PET_KINDS.indexOf(pt.kind) >= 0 ? pt.kind : PET_KINDS[f.pets.length];
+        var pn = cleanName(pt.name);
+        if (pn) f.pets.push({ kind: kind, name: pn });
+      }
+    }
+    f.partner = cleanName(m.partner);
+    f.treats = num(m.treats, 0, 0, 1e9);
     var dg = (m.dog && typeof m.dog === 'object') ? m.dog : {};
     f.dog.name = cleanName(dg.name);
+    // older saves kept the first camp arrival as the partner
+    if (!f.partner && Object.prototype.toString.call(m.camp) === '[object Array]' && m.camp.length) {
+      f.partner = cleanName(m.camp[0]);
+    }
     if (Object.prototype.toString.call(m.camp) === '[object Array]') {
       for (i = 0; i < m.camp.length && f.camp.length < LANDMARKS.length; i++) {
         var cn = cleanName(m.camp[i]);
@@ -964,13 +1020,14 @@
     D.flareCd   = K.flareCd * Math.pow(0.70, u('quick'));
     D.flareR    = K.flareR * (1 + u('wide') * 0.30);
 
-    D.speed     = K.keeperSpeed * (1 + u('feet') * 0.17) * (1 + pk('boots') * 0.05);
+    D.speed     = K.keeperSpeed * (1 + u('feet') * 0.17) * (1 + pk('boots') * 0.05) * (1 + pk('rig') * 0.06);
     D.carryPer  = u('unburdened') ? 0 : 0.05;   // speed lost per log carried
     D.maxHealth = K.maxHealth + u('hearty') * 25 + pk('mail') * 8;
+    D.startHealth = Math.min(D.maxHealth, D.maxHealth * 0 + K.maxHealth + u('hearty') * 25 + pk('mail') * 8);
     D.hitDamage = Math.max(4, K.hitDamage - u('nerve') * 2);
     D.iframe    = K.iframe + u('nerve') * 0.35;
     D.dawnHeal  = u('mend') ? 9999 : 40;
-    D.mend      = 1 + u('draught') * 1.1 + pk('draught') * 0.25;
+    D.mend      = 1 + u('draught') * 1.1 + pk('draught') * 0.25 + pk('rig') * 0.15;
     D.scoreMul  = 1 + u('veteran') * 0.25;
     D.rerolls   = pk('reroll');
   }
@@ -987,7 +1044,8 @@
     keeper: { x: 0, y: 0, vx: 0, vy: 0, carry: 0, cd: 0, stun: 0, face: 0,
               flip: 1, step: 0, walk: 0, lean: 0, stepT: 0, lunge: 0 },
     logs: [], shades: [], parts: [],
-    logT: 0, spawnT: 0, shake: 0, dawnHold: 0, hitstop: 0, partyNote: '',
+    logT: 0, spawnT: 0, shake: 0, dawnHold: 0, hitstop: 0, partyNote: '', draftOut: null,
+    ally: null, allyHits: 0,
     kills: 0, logsBurned: 0, muted: false,
     // progression + feedback
     up: {}, motes: [], cinders: [], floats: [],
@@ -2112,8 +2170,8 @@
 
   // ────────────────────────────────────────────────────────────── spawning
   // wood gets scarcer and lies farther out as the nights wear on
-  function logInterval() { return K.logEvery + Math.min(1.9, (S.night - 1) * 0.17); }
-  function logMinDist() { return Math.min(Math.min(W, H) * 0.42, (128 + (S.night - 1) * 13) * FIELD); }
+  function logInterval() { return K.logEvery + Math.min(1.9, (nightP(S.night) - 1) * 0.2); }
+  function logMinDist() { return Math.min(Math.min(W, H) * 0.42, (128 + (nightP(S.night) - 1) * 15) * FIELD); }
 
   function spawnLog() {
     if (S.logs.length >= D.maxLogs) return;
@@ -2141,18 +2199,19 @@
     else { x = -m; y = rand(-m, H + m); }
 
     // husks only start walking on night 5, and never crowd out everything else
-    var huskChance = S.night >= 5 ? clamp((S.night - 4) * 0.07, 0, 0.34) : 0;
-    var wispChance = S.night >= 3 ? clamp(0.16 + S.night * 0.04, 0, 0.42) : 0;
+    var NP = nightP(S.night);
+    var huskChance = S.night >= 8 ? clamp((NP - 4) * 0.09, 0, 0.34) : 0;
+    var wispChance = S.night >= 4 ? clamp(0.1 + NP * 0.05, 0, 0.42) : 0;
     var roll = Math.random();
     var kind = roll < huskChance ? 'husk' : (roll < huskChance + wispChance ? 'wisp' : 'crawler');
     var T = SHADE[kind];
-    var hp = T.hp + S.night * T.hpN;
+    var hp = T.hp + nightP(S.night) * T.hpN * 1.35;
 
     S.shades.push({
       kind: kind, t: T,
       x: x, y: y,
       hp: hp, maxHp: hp,
-      spd: (rand(T.spd[0], T.spd[1]) + S.night * T.spdN) * 0.78 * FIELD,
+      spd: (rand(T.spd[0], T.spd[1]) + NP * T.spdN * 1.3) * 0.78 * FIELD,
       r: T.r,
       kx: 0, ky: 0,       // knockback velocity
       wob: rand(0, 6.28),
@@ -2394,7 +2453,7 @@
 
     if (S.mode === 'dawn') {
       S.dawnHold -= dt;
-      if (S.dawnHold <= 0) { S.nightT = 0; openDraft(); }
+      if (S.dawnHold <= 0) { S.nightT = 0; nightHeld(); }
       return;
     }
     if (S.mode !== 'play') return;
@@ -2464,6 +2523,31 @@
       var a = Math.atan2(k.y - S.fire.y, k.x - S.fire.x);
       k.x = S.fire.x + Math.cos(a) * K.fireCoreR;
       k.y = S.fire.y + Math.sin(a) * K.fireCoreR;
+    }
+
+    // ── on a landmark night, somebody is out here holding the other side
+    if (S.ally) {
+      var AL = S.ally;
+      AL.t += dt;
+      AL.x = S.fire.x + Math.cos(AL.t * 0.5) * K.fireCoreR * 2.1;
+      AL.y = S.fire.y + Math.sin(AL.t * 0.5) * K.fireCoreR * 1.5;
+      AL.pulse = Math.max(0, AL.pulse - dt * 2.2);
+      AL.cd -= dt;
+      if (AL.cd <= 0) {
+        AL.cd = 3.1;
+        var hit = 0;
+        for (var ai = S.shades.length - 1; ai >= 0; ai--) {
+          var as = S.shades[ai];
+          if (dist(as.x, as.y, AL.x, AL.y) > px(96)) continue;
+          var aa = Math.atan2(as.y - AL.y, as.x - AL.x);
+          as.kx += Math.cos(aa) * 260; as.ky += Math.sin(aa) * 260;
+          as.hit = 0.28; as.latched = 0;
+          as.hp -= 3.4 + nightP(S.night) * 0.5;
+          hit++;
+          if (as.hp <= 0) killShade(ai);
+        }
+        if (hit) { AL.pulse = 1; S.allyHits += hit; spark(AL.x, AL.y, 8, 'gold', 130, 0.5); }
+      }
     }
 
     // ── logs
@@ -2578,13 +2662,13 @@
 
     // ── shades
     S.spawnT -= dt;
-    var interval = Math.max(0.46, 1.95 - S.night * 0.135);
+    var interval = Math.max(0.5, 1.95 - (nightP(S.night) - 1) * 0.152);
     if (S.spawnT <= 0 && S.shades.length < 32) {
       spawnShade();
       S.spawnT = interval * rand(0.7, 1.3);
     }
 
-    var drain = (K.baseDrain + (S.night - 1) * K.drainPerNight) * D.drainMul;
+    var drain = (K.baseDrain + (nightP(S.night) - 1) * K.drainPerNight) * D.drainMul;
     for (var j = S.shades.length - 1; j >= 0; j--) {
       var s = S.shades[j];
       s.wob += dt * s.t.wob;
@@ -2681,21 +2765,13 @@
     S.mode = 'dawn';
     S.dawnHold = 2.2;
     S.score += 120 * S.night * D.scoreMul;
-    S.fuel = Math.min(D.maxFuel, S.fuel + D.dawnFuel);
-    S.health = Math.min(D.maxHealth, S.health + D.dawnHeal);
     S.shake = 6;
     for (var i = S.shades.length - 1; i >= 0; i--) {
       spark(S.shades[i].x, S.shades[i].y, 8, 'shade', 190, 0.6);
     }
     S.shades.length = 0;
-    S.night++;
-    S.nightT = 0;
     SFX.dawn(); buzz([18, 60, 18]);
-    nextTune();
-    var omen = S.night === 3 ? 'Something quicker is out there'
-             : S.night === 5 ? 'Husks walk tonight — light alone will not hold them'
-             : 'Night ' + S.night + ' begins';
-    toast('Dawn', omen);
+    toast('Dawn', 'Night ' + S.night + ' held');
   }
 
   // ────────────────────────────────────────────────────────────── render
@@ -2711,6 +2787,7 @@
     drawLogs();
     drawFire();
     drawShades();
+    drawAlly();
     drawKeeper();
 
     drawDarkness();
@@ -2882,7 +2959,16 @@
     lass: { head: 9.7, waist: 0.99, brow: 0.6, jaw: 0.94, eye: 2.62, plume: 1.1, blush: 1, scruff: 0 },
     lad:  { head: 9.3, waist: 1.06, brow: 1,   jaw: 1.1,  eye: 2.3,  plume: 0.9, blush: 0, scruff: 1 }
   };
-  var _buildCache = null, _buildFor = null;
+  var _buildCache = {};
+  function buildKey(k) {
+    if (_buildCache[k]) return _buildCache[k];
+    var o = {}, key;
+    for (key in BUILD_BASE) o[key] = BUILD_BASE[key];
+    var v = BUILD_FOR[k] || BUILD_FOR.lad;
+    for (key in v) o[key] = v[key];
+    _buildCache[k] = o;
+    return o;
+  }
   var HEADS = [
     { id: 'none',    name: 'Hair' },
     { id: 'cap',     name: 'Cap' },
@@ -2948,14 +3034,7 @@
   }
   // Rebuilt only when the answer would change — this runs every frame.
   function buildOf() {
-    var g = (META.player && META.player.gender === 'lass') ? 'lass' : 'lad';
-    if (_buildFor === g && _buildCache) return _buildCache;
-    var o = {}, k;
-    for (k in BUILD_BASE) o[k] = BUILD_BASE[k];
-    var v = BUILD_FOR[g];
-    for (k in v) o[k] = v[k];
-    _buildFor = g; _buildCache = o;
-    return o;
+    return buildKey((META.player && META.player.gender === 'lass') ? 'lass' : 'lad');
   }
   function headOf()   { return pickFrom(HEADS,   META.knight && META.knight.helm); }
   function outfitOf() { return pickFrom(OUTFITS, META.knight && META.knight.cape); }
@@ -2990,7 +3069,7 @@
     var H = wr ? pickFrom(HEADS, wr.helm) : headOf();
     var F = wr ? pickFrom(OUTFITS, wr.cape) : outfitOf();
     var HR = wr ? pickFrom(HAIRS, wr.hair) : hairOf();
-    var B = buildOf();
+    var B = o.build ? buildKey(o.build) : buildOf();
     var sc = o.scale || 1;
     var skin  = o.flash ? '#FFD3CF' : '#F7E0C4';
     var skinS = o.flash ? '#E9B4B0' : '#E2C29F';
@@ -3468,6 +3547,30 @@
     ctx.fillStyle = '#FFD60A';
     ctx.beginPath(); ctx.arc(lx, ly, 3.4, 0, 6.29); ctx.fill();
 
+    ctx.restore();
+  }
+
+  // She works the far side of the fire on the nights it matters.
+  function drawAlly() {
+    if (!S.ally) return;
+    var A2 = S.ally;
+    if (A2.pulse > 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = 'rgba(255,180,220,' + (0.5 * A2.pulse).toFixed(3) + ')';
+      ctx.lineWidth = 3 * A2.pulse + 1;
+      ctx.beginPath(); ctx.arc(A2.x, A2.y, px(96) * (1 - A2.pulse), 0, 6.29); ctx.stroke();
+      ctx.restore();
+    }
+    ctx.save();
+    ctx.translate(A2.x, A2.y);
+    drawKnight(ctx, {
+      t: S.time, scale: 1.5, amt: 0.7, expr: 'content',
+      wear: { plume: 'rose', cape: 'poncho', helm: 'bandana', hair: 'ink' }, build: 'lass',
+      flip: Math.cos(A2.t * 0.5) < 0 ? -1 : 1,
+      walk: 1, step: A2.t * 5,
+      armR: -2.1 + Math.sin(A2.t * 3) * 0.2, armL: 1.2
+    });
     ctx.restore();
   }
 
@@ -3961,10 +4064,24 @@
     g.beginPath();
     g.moveTo(-6, 8); g.lineTo(-6, -4); g.quadraticCurveTo(0, -10.4, 6, -4); g.lineTo(6, 8);
     g.closePath(); g.fill();
-    g.fillStyle = '#8A6A45';                                             // a bowl by the door
-    g.beginPath(); g.ellipse(15, 6, 4, 1.8, 0, 0, 6.29); g.fill();
+    g.fillStyle = '#8A6A45';                                             // food bowl
+    g.beginPath(); g.ellipse(16, 6, 4.2, 1.9, 0, 0, 6.29); g.fill();
     g.fillStyle = '#5E4530';
-    g.beginPath(); g.ellipse(15, 5.4, 2.6, 1.1, 0, 0, 6.29); g.fill();
+    g.beginPath(); g.ellipse(16, 5.4, 2.8, 1.2, 0, 0, 6.29); g.fill();
+    if (KN.treatT > 0) {                                                 // with something in it
+      g.fillStyle = '#7A4A22';
+      for (i = 0; i < 5; i++) {
+        g.beginPath();
+        g.arc(14.4 + (i % 3) * 1.5, 5 - ((i / 3) | 0) * 1.1, 0.8, 0, 6.29);
+        g.fill();
+      }
+    }
+    g.fillStyle = '#7E90A0';                                             // water bowl
+    g.beginPath(); g.ellipse(25, 6.4, 4, 1.8, 0, 0, 6.29); g.fill();
+    g.fillStyle = 'rgba(120,180,220,0.85)';
+    g.beginPath(); g.ellipse(25, 5.9, 2.7, 1.15, 0, 0, 6.29); g.fill();
+    g.fillStyle = 'rgba(255,255,255,0.28)';
+    g.beginPath(); g.ellipse(24.2, 5.6, 1, 0.4, 0, 0, 6.29); g.fill();
     g.restore();
 
     // ── woodpile
@@ -4062,15 +4179,39 @@
 
     // a crate to stand the monitor on, so it clears his head
     g.fillStyle = '#4C4137';
-    roundRectOn(g, -11, -17, 22, 14, 1.6); g.fill();
+    roundRectOn(g, -11, -17 - pk('rig') * 1.6, 22, 14 + pk('rig') * 1.6, 1.6); g.fill();
     g.strokeStyle = 'rgba(0,0,0,0.22)'; g.lineWidth = 0.7;
     g.beginPath(); g.moveTo(-11, -10); g.lineTo(11, -10); g.stroke();
 
-    // monitor, straight in front of him and above his head
-    var MX = 0, MY = -38, MW = 28, MH = 20;
+    // monitor, straight in front of him and above his head — and it gets
+    // better every time he saves up for it
+    var rig = pk('rig');
+    var MX = 0, MY = -38 - rig * 1.6, MW = 28 + rig * 3, MH = 20 + rig * 1.4;
+    if (rig >= 2) {                                             // a second screen, angled in
+      g.save(); g.translate(-MW / 2 - 9, MY + 5); g.rotate(0.16);
+      g.fillStyle = '#26262C'; roundRectOn(g, -8, 0, 16, MH - 5, 1.8); g.fill();
+      drawScreen(g, -6.6, 1.4, 13.2, MH - 7.8, t + 3, fireLevel);
+      g.restore();
+    }
+    if (rig >= 4) {
+      g.save(); g.translate(MW / 2 + 9, MY + 5); g.rotate(-0.16);
+      g.fillStyle = '#26262C'; roundRectOn(g, -8, 0, 16, MH - 5, 1.8); g.fill();
+      drawScreen(g, -6.6, 1.4, 13.2, MH - 7.8, t + 6, fireLevel);
+      g.restore();
+    }
     g.fillStyle = '#26262C';
-    roundRectOn(g, MX - MW / 2, MY, MW, MH, 2.2); g.fill();
+    roundRectOn(g, MX - MW / 2, MY, MW, MH, rig >= 3 ? 4 : 2.2); g.fill();
     drawScreen(g, MX - MW / 2 + 1.6, MY + 1.6, MW - 3.2, MH - 3.2, t, fireLevel);
+    if (rig >= 1) {                                             // a light strip under it
+      var lit = hueOf().accent;
+      g.fillStyle = hexA(lit, 0.85);
+      roundRectOn(g, MX - MW / 2 + 3, MY + MH - 0.6, MW - 6, 1.2, 0.6); g.fill();
+      var ug = g.createRadialGradient(MX, MY + MH + 2, 1, MX, MY + MH + 2, 16 + rig * 4);
+      ug.addColorStop(0, hexA(lit, 0.2));
+      ug.addColorStop(1, hexA(lit, 0));
+      g.fillStyle = ug;
+      g.beginPath(); g.arc(MX, MY + MH + 2, 16 + rig * 4, 0, 6.29); g.fill();
+    }
     g.fillStyle = '#33333B';                                    // stand down onto the crate
     roundRectOn(g, MX - 2.2, MY + MH, 4.4, 2.6, 1); g.fill();
     // the screen throws its light back over him
@@ -4280,6 +4421,93 @@
   // his collar takes the camp colour, so he matches the place
   function P_COLLAR() { return hueOf().accent; }
 
+  // The rest of the menagerie. Same idea, fewer moving parts — they mill
+  // about their own patch of camp and mind their own business.
+  var PETS = [];
+  var PET_SPOTS = { cat: 46, goat: -66, hen: 22 };
+  function syncPets() {
+    while (PETS.length > META.pets.length) PETS.pop();
+    for (var i = PETS.length; i < META.pets.length; i++) {
+      var P = META.pets[i];
+      PETS.push({ kind: P.kind, name: P.name, x: PET_SPOTS[P.kind] || 30,
+                  home: PET_SPOTS[P.kind] || 30, face: 1, ph: rand(0, 6.28), t: rand(2, 7) });
+    }
+  }
+  function updatePets(dt) {
+    for (var i = 0; i < PETS.length; i++) {
+      var P = PETS[i];
+      P.t -= dt;
+      if (P.t <= 0) { P.t = rand(3, 9); P.tx = P.home + rand(-16, 16); }
+      var dx = (P.tx === undefined ? P.home : P.tx) - P.x;
+      if (Math.abs(dx) > 2) { var d = dx > 0 ? 1 : -1; P.x += d * 15 * dt; P.face = d; P.walk = 1; }
+      else P.walk = 0;
+      P.ph += dt;
+    }
+  }
+  function drawPet(g, P, t) {
+    var k = P.kind, wob = Math.sin(P.ph * 2.2) * 0.6;
+    g.save();
+    g.scale(P.face === -1 ? -1 : 1, 1);
+    g.fillStyle = 'rgba(0,0,0,0.3)';
+    g.beginPath(); g.ellipse(0, 0, 6, 1.7, 0, 0, 6.29); g.fill();
+    if (k === 'cat') {
+      g.strokeStyle = '#4A4038'; g.lineWidth = 1.5; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(-2.4, -3); g.lineTo(-2.4, -0.2); g.stroke();
+      g.beginPath(); g.moveTo(2.6, -3); g.lineTo(2.6, -0.2); g.stroke();
+      g.strokeStyle = '#5A5048'; g.lineWidth = 1.6;
+      g.beginPath(); g.moveTo(-4.2, -4);                                 // tall tail
+      g.quadraticCurveTo(-6.6, -7, -5.2, -10.4 + wob); g.stroke();
+      g.fillStyle = '#5A5048';
+      roundRectOn(g, -4.6, -7.4, 9.6, 4.6, 2.2); g.fill();               // body
+      g.beginPath(); g.arc(5, -9, 2.9, 0, 6.29); g.fill();               // head
+      g.beginPath();                                                      // ears
+      g.moveTo(3, -11.2); g.lineTo(3.4, -13.6); g.lineTo(5, -11.6); g.closePath(); g.fill();
+      g.moveTo(6.2, -11.6); g.lineTo(7.4, -13.4); g.lineTo(7.6, -11); g.closePath(); g.fill();
+      g.fillStyle = '#2A2320';
+      g.beginPath(); g.arc(6.2, -9.4, 0.6, 0, 6.29); g.fill();
+      g.fillStyle = '#D9CDBA';
+      roundRectOn(g, -2, -4.2, 5, 1.5, 0.7); g.fill();
+    } else if (k === 'goat') {
+      g.strokeStyle = '#6B6259'; g.lineWidth = 1.9; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(-2.6, -4.4); g.lineTo(-2.6, -0.2); g.stroke();
+      g.beginPath(); g.moveTo(3, -4.4); g.lineTo(3, -0.2); g.stroke();
+      g.fillStyle = '#CFC6B8';
+      roundRectOn(g, -5, -9.6, 10.6, 5.6, 2.4); g.fill();                // body
+      g.beginPath(); g.arc(6, -11, 3.1, 0, 6.29); g.fill();              // head
+      roundRectOn(g, 7.4, -11.4, 3.4, 2.6, 1.2); g.fill();               // muzzle
+      g.strokeStyle = '#8A8072'; g.lineWidth = 1.2;
+      g.beginPath(); g.moveTo(4.4, -13.4); g.quadraticCurveTo(3.4, -16, 5.2, -16.4); g.stroke();
+      g.beginPath(); g.moveTo(6.6, -13.6); g.quadraticCurveTo(6.4, -16.2, 8, -16.2); g.stroke();
+      g.fillStyle = '#CFC6B8';
+      g.beginPath(); g.moveTo(6.6, -9.6); g.lineTo(6.2, -6.4 + wob * 0.4); g.lineTo(7.8, -9.4);
+      g.closePath(); g.fill();                                            // beard
+      g.fillStyle = '#2A2320';
+      g.beginPath(); g.arc(7.2, -11.6, 0.55, 0, 6.29); g.fill();
+      g.strokeStyle = '#CFC6B8'; g.lineWidth = 1.4;
+      g.beginPath(); g.moveTo(-5, -8.6); g.lineTo(-6.6, -10 + wob); g.stroke();
+    } else {
+      g.strokeStyle = '#D9A03C'; g.lineWidth = 1.2; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(-0.6, -3.6); g.lineTo(-0.6, -0.2); g.stroke();
+      g.beginPath(); g.moveTo(1.8, -3.6); g.lineTo(1.8, -0.2); g.stroke();
+      g.fillStyle = '#E6DCCC';
+      g.beginPath(); g.ellipse(0, -6.4, 5, 4, 0, 0, 6.29); g.fill();     // body
+      g.beginPath();                                                      // tail feathers
+      g.moveTo(-4, -7.4); g.quadraticCurveTo(-8, -8.4 + wob, -6.4, -12); 
+      g.quadraticCurveTo(-4.4, -10, -4, -7.4); g.fill();
+      g.beginPath(); g.arc(4, -10, 2.5, 0, 6.29); g.fill();               // head
+      g.fillStyle = '#D2453C';
+      g.beginPath();                                                      // comb
+      g.moveTo(2.8, -12.2); g.quadraticCurveTo(3.6, -14, 4.4, -12.2);
+      g.quadraticCurveTo(5.2, -13.6, 5.8, -12); g.fill();
+      g.beginPath(); g.ellipse(4.4, -7.9, 0.9, 1.2, 0, 0, 6.29); g.fill();         // wattle
+      g.fillStyle = '#E8A72E';
+      g.beginPath(); g.moveTo(6.2, -10.2); g.lineTo(8.6, -9.6); g.lineTo(6.2, -9); g.closePath(); g.fill();
+      g.fillStyle = '#2A2320';
+      g.beginPath(); g.arc(5, -10.6, 0.55, 0, 6.29); g.fill();
+    }
+    g.restore();
+  }
+
   // What is on his monitor: Night Watch, obviously. A fire in the middle, a
   // little keeper of his own running about, and shades wandering in for it.
   function drawScreen(g, x, y, w, h, t, fireLevel) {
@@ -4363,7 +4591,7 @@
     x: 0, tx: 0, cam: 0, face: 1, walking: 0, step: 0,
     armL: undefined, armR: undefined, item: null, itemL: null,
     blink: 1.8, hop: 0, tilt: 0, lean: 0, zzz: 0, sit: 0,
-    crouch: 0, lie: 0, back: 0, headTilt: 0, lift: 0,
+    crouch: 0, lie: 0, back: 0, headTilt: 0, lift: 0, treatT: 0,
     spin: 0, squash: 0, look: 0, lookT: 0,
     hearts: [], props: [], taps: 0, tapT: 0, petting: 0, pet: 0,
     onStage: false, lastReact: '', bounce: 0, danceT: 0,
@@ -4517,7 +4745,13 @@
   function updateDog(dt) {
     DOG.actT -= dt;
     if (DOG.actT <= 0) dogAct();
-    if (DOG.act === 'follow' || DOG.act === 'chase') {
+    if (DOG.act === 'treat') {
+      DOG.tx = CAMP.kennel.x + 16;                 // straight to the bowl
+      if (Math.abs(DOG.x - DOG.tx) < 4 && Math.random() < dt * 3) {
+        KN.hearts.push({ x: DOG.x + rand(-4, 4), y: -12, vy: rand(-14, -20), vx: rand(-5, 5),
+                         life: 1.3, max: 1.3, kind: 'heart', r: rand(0.6, 1) });
+      }
+    } else if (DOG.act === 'follow' || DOG.act === 'chase') {
       var want = KN.x + (KN.x > DOG.x ? -16 : 16);
       DOG.tx += (want - DOG.tx) * Math.min(1, dt * (DOG.act === 'chase' ? 3 : 1.2));
     }
@@ -4548,6 +4782,9 @@
     } else if (DOG.act === 'sit' || DOG.act === 'watch') {
       sit = 1; wag = 0.45; head = Math.sin(S.time * 0.7) * 0.12;
       DOG.face = DOG.act === 'watch' ? (KN.x > DOG.x ? 1 : -1) : -1;
+    } else if (DOG.act === 'treat') {
+      head = 0.62; wag = 1;
+      if (Math.abs(DOG.x - DOG.tx) < 4) DOG.face = -1;
     } else if (DOG.act === 'sniff') {
       head = 0.5; wag = 0.5;
     } else {
@@ -4556,6 +4793,7 @@
     }
     // near the kennel he can actually be asleep in it
     if (DOG.act === 'kennel' && Math.abs(DOG.x - CAMP.kennel.x) > 8) { sleep = 0; wag = 0.5; }
+    if (KN.treatT <= 0 && DOG.act === 'treat') dogAct();
 
     DOG.sit += (sit - DOG.sit) * Math.min(1, dt * 5);
     DOG.sleep += (sleep - DOG.sleep) * Math.min(1, dt * 3);
@@ -4567,16 +4805,18 @@
   // ── everyone who has joined him ────────────────────────────────────────
   // One per landmark reached. They stand about the camp doing very little,
   // which is the point of them.
-  var FOLK_SPOTS = [-84, 34, -50, 74, 20, -102, 90, 48, -26, 118, 4, -66, 62, 130, -112];
+  var FOLK_SPOTS = [34, -52, 74, -86, 18];
   var FOLK = [];
   function syncFolk() {
-    while (FOLK.length > META.camp.length) FOLK.pop();
-    for (var i = FOLK.length; i < META.camp.length; i++) {
-      var n = META.camp[i], h = 0;
+    var roll = META.partner ? [META.partner] : [];
+    while (FOLK.length > roll.length) FOLK.pop();
+    for (var i = FOLK.length; i < roll.length; i++) {
+      var n = roll[i], h = 0;
       for (var c = 0; c < n.length; c++) h = (h * 33 + n.charCodeAt(c)) & 0xffff;
       FOLK.push({
         name: n,
         x: FOLK_SPOTS[i % FOLK_SPOTS.length],
+        lass: true,
         flip: (h & 1) ? 1 : -1,
         plume: PLUMES[h % PLUMES.length].id,
         cape: OUTFITS[(h >> 3) % OUTFITS.length].id,
@@ -4603,8 +4843,7 @@
   ];
   function partyNote(P) {
     var d = META.dog.name || 'the dog';
-    var f = META.camp.length ? META.camp[Math.floor(Math.random() * META.camp.length)]
-                             : (META.knight.name || 'somebody');
+    var f = META.partner || META.knight.name || 'somebody';
     return P.note.replace(/\{d\}/g, d).replace(/\{f\}/g, f);
   }
   var CHEERS = ['That is another one!', 'Dawn already. Look at that.', 'We held it, {p}!',
@@ -4627,7 +4866,7 @@
   // What everybody who is not him does while it is going on.
   function folkPose(f, t) {
     var ph = f.ph, kind = KN.partyT > 0 ? KN.party : '';
-    var o = { t: t, scale: 1, wear: f, flip: f.flip, amt: 0.7, expr: 'content' };
+    var o = { t: t, scale: 1, wear: f, build: f.lass ? 'lass' : 'lad', flip: f.flip, amt: 0.7, expr: 'content' };
     var b = Math.sin(t * 3 + ph);
     if (!kind) {
       o.expr = Math.sin(t * 0.4 + ph) > 0.5 ? 'happy' : 'content';
@@ -4660,6 +4899,30 @@
     return o;
   }
 
+  // Who is at this fire, in one line.
+  function campRoll() {
+    var bits = [META.dog.name || 'a dog'];
+    for (var i = 0; i < META.pets.length; i++) bits.push(META.pets[i].name);
+    if (META.partner) bits.push(META.partner);
+    if (bits.length === 1) return 'with ' + bits[0];
+    return 'with ' + bits.slice(0, -1).join(', ') + ' and ' + bits[bits.length - 1];
+  }
+  function treatLabel() {
+    var d = META.dog.name || 'the dog';
+    return KN.treatT > 0 ? d + ' is busy with it' : 'Give ' + d + ' a treat';
+  }
+  function giveTreat() {
+    if (KN.treatT > 0) return;
+    KN.treatT = 7;
+    META.treats++;
+    saveMeta();
+    DOG.act = 'treat'; DOG.actT = 7; DOG.tx = CAMP.kennel.x + 16;
+    knHeart('heart'); knHeart('heart');
+    UI.buy();
+    var b = document.getElementById('btnTreat');
+    if (b) b.textContent = treatLabel();
+  }
+
   function knHeart(kind) {
     KN.hearts.push({ x: KN.x + rand(-7, 7), y: -22, vy: rand(-16, -24), vx: rand(-6, 6),
                      life: 1.5, max: 1.5, kind: kind || 'heart', r: rand(0.8, 1.2) });
@@ -4671,6 +4934,10 @@
 
   function updateKnight(dt) {
     var i;
+    if (KN.treatT > 0) {
+      KN.treatT -= dt;
+      if (KN.treatT <= 0) { var tb = document.getElementById('btnTreat'); if (tb) tb.textContent = treatLabel(); }
+    }
     // the camera drifts after him rather than snapping, and stops at the
     // edges of the camp so you never see past the last thing he owns
     var camWant = 10;                   // the camp all fits; the shot does not need to move
@@ -5052,6 +5319,15 @@
       g.translate(F2.x, CAMP_GND - 14);
       g.scale(0.87, 0.87);
       drawKnight(g, folkPose(F2, S.time));
+      g.restore();
+    }
+
+    // the rest of the animals
+    for (var pi2 = 0; pi2 < PETS.length; pi2++) {
+      g.save();
+      g.translate(PETS[pi2].x, CAMP_GND);
+      g.scale(1.25, 1.25);
+      drawPet(g, PETS[pi2], S.time);
       g.restore();
     }
 
@@ -5530,19 +5806,18 @@
   // How far along the road he is, and what is at the end of the next stretch.
   function journeyStrip(compact) {
     var done = journeyIndex(), L = nextLandmark();
-    var lvl = keeperLevel();
     if (!L) {
       return '<div class="road done"><b>The whole road, walked.</b>' +
-        '<span>All ' + LANDMARKS.length + ' of them, and everyone still here.</span></div>';
+        '<span>All ' + LANDMARKS.length + ' of them, and the fire never went out for good.</span></div>';
     }
-    var from = done * LM_LEVEL, span = LM_LEVEL;
-    var pct = clamp((lvl - from) / span, 0, 1) * 100;
-    var away = levelsToNext();
+    var walked = (META.night - 1) - done * LM_NIGHTS;
+    var pct = clamp(walked / LM_NIGHTS, 0, 1) * 100;
+    var away = nightsToNext();
     return '<div class="road">' +
       '<div class="road-top"><span>Next stop</span><b>' + esc(L.name) + '</b></div>' +
       '<div class="road-bar"><i style="width:' + pct.toFixed(1) + '%"></i></div>' +
       '<div class="road-sub">' + esc(L.st) + ' · ' +
-        (away <= 1 ? 'one more level' : away + ' more levels') +
+        (away <= 1 ? 'one more night' : away + ' more nights') +
         (compact ? '' : ' · ' + done + ' of ' + LANDMARKS.length + ' behind you') + '</div>' +
     '</div>';
   }
@@ -5601,19 +5876,24 @@
         (META.knight.name
           ? '<div class="stagename"><b>' + esc(META.knight.name) + '</b>' +
             '<span>' + esc(knightTitle()) + '</span>' +
-            '<u>with ' + esc(META.dog.name || 'a dog') +
-              (META.camp.length ? ' and ' + plural(META.camp.length, 'other') : '') + '</u></div>'
+            '<u>' + esc(campRoll()) + '</u></div>'
           : '<div class="stagename"><b>A keeper with no name</b><span>waiting by the fire</span></div>') +
       '</div>' +
       (META.runs
         ? '<div class="tally sm">' +
+            '<div><span>Tonight</span><b>' + META.night + '</b></div>' +
             '<div><span>Nights held</span><b>' + META.lifeNights + '</b></div>' +
-            '<div><span>Best night</span><b>' + META.bestNight + '</b></div>' +
             '<div><span>Shades</span><b>' + META.lifeKills + '</b></div>' +
           '</div>' + levelStrip()
         : '<p class="lede">Keep his fire lit until dawn. Somebody out there is walking towards it.</p>') +
       journeyStrip(false) +
-      '<button class="go" id="btnStart">Take the Watch</button>' +
+      '<button class="go" id="btnStart">' +
+        (isLandmarkNight(META.night)
+          ? 'Night ' + META.night + ' · ' + esc((nextLandmark() || {}).name || 'the last stretch')
+          : 'Take the Watch · Night ' + META.night) + '</button>' +
+      (isLandmarkNight(META.night)
+        ? '<div class="foot hi">You reach it tonight. You will not be out there alone.</div>' : '') +
+      '<button class="ghost treat" id="btnTreat">' + esc(treatLabel()) + '</button>' +
       '<div class="row2">' +
         '<button class="ghost" id="btnShop">Provisions</button>' +
         '<button class="ghost" id="btnFeats">Feats · ' + feats + '/' + ACHIEVEMENTS.length + '</button>' +
@@ -5629,6 +5909,7 @@
     on('btnStart', function () {
       if (!META.knight.name) nameKnight(startGame); else startGame();
     });
+    on('btnTreat', giveTreat);
     on('btnShop', shop);
     on('btnFeats', feats2);
     on('btnKnight', function () { nameKnight(menu); });
@@ -5937,17 +6218,19 @@
     return out;
   }
 
-  function openDraft() {
+  function nightHeld() {
     duckMusic(0.55, 0.4);
-    var offer = rollDraft(3);
-    if (!offer.length) { S.mode = 'play'; hideVeil(); showChrome(true); return; }  // everything maxed
     S.mode = 'draft';
     showChrome(false);
+    var out = finishNight(true);
     S.partyNote = partyNote(startParty());
-    renderDraft(offer);
+    var offer = rollDraft(3);
+    renderDraft(offer, out);
   }
 
-  function renderDraft(offer) {
+  function openDraft() { nightHeld(); }
+
+  function renderDraft(offer, out) {
     var cards = '';
     for (var i = 0; i < offer.length; i++) {
       var U = offer[i], have = u(U.id);
@@ -5962,17 +6245,26 @@
             (have ? '<u>' + have + '/' + U.max + '</u>' : '') + '</div>' +
         '</button>';
     }
+    S.draftOut = out || S.draftOut;
+    var o = S.draftOut;
     veil(
-      '<div class="eyebrow">Dawn · Night ' + S.night + ' held</div>' +
+      '<div class="eyebrow">Night ' + S.night + ' held</div>' +
       '<h1>Back at <em>Camp</em></h1>' +
       '<div class="stage still">' +
         '<canvas id="portrait" class="portrait stage-knight"></canvas>' +
       '</div>' +
       '<p class="lede sm">' + esc(S.partyNote || '') + '</p>' +
+      (o ? '<div class="tally sm">' +
+        '<div><span>Score</span><b>' + o.r.score.toLocaleString() + '</b></div>' +
+        '<div><span>Embers</span><b class="hi">+' + o.embers + '</b></div>' +
+        '<div><span>Banked</span><b>' + META.embers.toLocaleString() + '</b></div>' +
+      '</div>' : '') +
       journeyStrip(true) +
-      (upCount() ? '<div class="held">' + upChips(S.up) + '</div>' : '') +
-      '<div class="draft">' + cards + '</div>' +
-      (S.rerolls > 0 ? '<button class="ghost" id="btnRe">Reroll · ' + S.rerolls + ' left</button>' : ''),
+      (cards ? '<div class="ghead">Take one, and keep it</div><div class="draft">' + cards + '</div>' +
+               (S.rerolls > 0 ? '<button class="ghost" id="btnRe">Reroll · ' + S.rerolls + ' left</button>' : '')
+             : '<p class="lede sm">Nothing left to draft — the rest is bought at the camp.</p>') +
+      '<button class="' + (cards ? 'ghost' : 'go') + '" id="btnHome">Back to camp</button>' +
+      buildFoot(),
       'wide'
     );
     hookPortrait();
@@ -5986,34 +6278,35 @@
       UI.open();
       renderDraft(rollDraft(3));
     });
+    on('btnHome', function () { endParty(); if (!arrivals(menu)) menu(); });
   }
 
   function takeUpgrade(id) {
-    endParty();
     var def = UP_BY_ID[id];
     if (!def) return;
-    S.up[id] = (S.up[id] || 0) + 1;
+    META.up[id] = (META.up[id] || 0) + 1;
+    S.up = META.up;
+    saveMeta();
     recalc();
-    S.fuel = Math.min(S.fuel, D.maxFuel);
     UI.choose();
     buzz(18);
-    S.mode = 'play';
-    S.nightT = 0;
-    hideVeil();
-    showChrome(true);
+    endParty();
     duckMusic(1, 0.8);
     toast(def.glyph + ' ' + def.name, def.desc);
-    last = performance.now();
+    if (!arrivals(menu)) menu();
   }
 
   // ── run bookkeeping ───────────────────────────────────────────────────────
-  function finishRun() {
+  // One night's worth of accounting. Held or lost, the embers are yours and
+  // the camp keeps everything you have bought — only the night number moves.
+  function finishNight(held) {
     var r = {
       night: S.night, score: Math.round(S.score), logs: S.logsBurned, kills: S.kills,
       husks: S.husks, flares: S.flares, upCount: upCount(), bestHeat: S.bestHeat,
-      brandKills: S.brandKills, damage: S.damageTaken
+      brandKills: S.brandKills, damage: S.damageTaken, held: !!held
     };
-    var base = Math.round(r.score / 22) + r.night * 12;
+    var base = Math.round(r.score / 22) + Math.round(nightP(r.night) * 14);
+    if (!held) base = Math.round(base * 0.55);              // a lost night still pays
     var embers = Math.max(1, Math.round(base * (1 + pk('sifter') * 0.12)));
     var runEmbers = embers;
 
@@ -6029,19 +6322,21 @@
     META.runs++;
     META.lifeLogs += r.logs;
     META.lifeKills += r.kills;
-    META.lifeNights += Math.max(0, r.night - 1);
+    META.lifeNights += held ? 1 : 0;
+    if (held) META.night = r.night + 1;
     if (r.night > META.bestNight) META.bestNight = r.night;
     if (r.score > META.bestScore) META.bestScore = r.score;
     var after = keeperLevel();
     saveMeta();
     return { r: r, embers: embers, runEmbers: runEmbers, newAch: newAch, before: before, after: after };
   }
+  function finishRun() { return finishNight(false); }
 
   function startGame() {
-    S.up = {};          // clear the last run's draft *before* deriving stats
+    S.up = META.up;     // the drafts he has taken are his, and they stay his
     recalc();
     S.mode = 'play';
-    S.time = 0; S.night = 1; S.nightT = 0; S.score = 0;
+    S.time = 0; S.night = META.night; S.nightT = 0; S.score = 0;
     S.logs.length = 0; S.shades.length = 0; S.parts.length = 0;
     S.motes.length = 0; S.cinders.length = 0; S.floats.length = 0;
     S.logT = 0.6; S.spawnT = 3.2; S.shake = 0;
@@ -6049,17 +6344,12 @@
     S.heat = 0; S.heatT = 0; S.bestHeat = 0;
     S.revived = false; S.pyreCount = 0; S.earned = null; S.brandKills = 0;
     S.health = D.maxHealth; S.damageTaken = 0; S.cause = 'dark'; S.mended = 0;
+    S.allyHits = 0;
     S.rerolls = D.rerolls;
     S.fire.flare = 0.8;
 
-    // Head Start hands you upgrades before the first night
-    var hs = pk('headstart'), given = [];
-    for (var i = 0; i < hs; i++) {
-      var pick = rollDraft(1)[0];
-      if (pick) { S.up[pick.id] = (S.up[pick.id] || 0) + 1; given.push(pick); recalc(); }
-    }
-
     S.fuel = D.startFuel;
+    S.ally = isLandmarkNight(S.night) ? { x: 0, y: 0, t: 0, cd: 2.4, pulse: 0 } : null;
     S.keeper.x = W / 2; S.keeper.y = H / 2 + 96;
     S.keeper.vx = 0; S.keeper.vy = 0;
     S.keeper.step = 0; S.keeper.walk = 0; S.keeper.lean = 0;
@@ -6069,7 +6359,7 @@
     S.keeper.swing = 0; S.keeper.swingCd = 0; S.keeper.swingDir = 0;
     S.keeper.face = -Math.PI / 2;
     stick.id = null; stick.on = false; stick.dx = 0; stick.dy = 0;
-    for (var j = 0; j < 3; j++) spawnLog();
+    for (var j = 0; j < 3 + pk('headstart'); j++) spawnLog();
     hideVeil();
     showChrome(true);
     ac();
@@ -6149,9 +6439,9 @@
 
     setTimeout(function () {
       veil(
-        '<div class="eyebrow">' + (r.score > 0 && r.score >= META.bestScore ? 'New Best'
-            : S.cause === 'fell' ? 'Your knight fell' : 'The fire went out') + '</div>' +
-        (S.cause === 'fell' ? '<h1>Carried<em>Home</em></h1>' : '<h1>Cold<em>Ashes</em></h1>') +
+        '<div class="eyebrow">Night ' + r.night + ' · ' +
+          (S.cause === 'fell' ? 'he was carried home' : 'the fire went out') + '</div>' +
+        '<h1>Try It <em>Again</em></h1>' +
         '<p class="lede">' + epitaph() + '</p>' +
         '<div class="tally">' +
           '<div><span>Night</span><b>' + r.night + '</b></div>' +
@@ -6172,18 +6462,18 @@
           '<div class="xp"><i style="width:' + pct.toFixed(1) + '%"></i></div>' +
         '</div>' +
         '<div class="held big">' + upChips(S.up, true) + '</div>' +
-        '<button class="go" id="btnAgain">Take the Watch Again</button>' +
+        '<button class="go" id="btnAgain">Take Night ' + META.night + ' Again</button>' +
         '<div class="row2">' +
-          '<button class="ghost" id="btnShop2">Provisions</button>' +
-          '<button class="ghost" id="btnMenu">Camp</button>' +
+          '<button class="ghost" id="btnShop2">Camp Stores</button>' +
+          '<button class="ghost" id="btnMenu">Back to camp</button>' +
         '</div>' +
         '<div class="foot">' + plural(r.logs, 'log') + ' burned · ' + plural(r.kills, 'shade') + ' dispelled (' + r.brandKills + ' by brand) · heat ×' + r.bestHeat + '</div>' +
         '<div class="foot">' + (r.damage ? r.damage + ' damage taken' : 'not a scratch') + '</div>' +
         buildFoot(),
         'wide'
       );
-      on('btnAgain', function () { if (!arrivals(startGame)) startGame(); });
-      on('btnMenu', function () { if (!arrivals(menu)) menu(); });
+      on('btnAgain', startGame);
+      on('btnMenu', menu);
       on('btnShop2', shop);
     }, 900);
   }
@@ -6193,32 +6483,50 @@
   function arrivals(after) {
     if (journeyIndex() <= META.reached) return false;
     var L = LANDMARKS[META.reached];
-    var who = rollFrom(FOLK_NAMES, META.camp);
     META.reached++;
-    META.camp.push(who);
+    var joined = null;
+    if (META.reached === 1 && !META.partner) {
+      META.partner = rollFrom(PARTNER_NAMES, []);
+      joined = { kind: 'partner', name: META.partner };
+    } else if (META.pets.length < extraPetsDue()) {
+      var kind = PET_KINDS[META.pets.length];
+      var taken = [];
+      for (var i = 0; i < META.pets.length; i++) taken.push(META.pets[i].name);
+      var nm = rollFrom(PET_NAMES[kind] || DOG_NAMES, taken);
+      META.pets.push({ kind: kind, name: nm });
+      joined = { kind: kind, name: nm };
+    }
     saveMeta();
     syncFolk();
-    arrivalCard(L, who, after);
+    arrivalCard(L, joined, after);
     return true;
   }
 
-  function arrivalCard(L, who, after) {
+  function arrivalCard(L, joined, after) {
     S.mode = 'menu';
     showChrome(false);
-    var n = META.camp.length;
     S.partyNote = partyNote(startParty('cheer'));
+    var lede;
+    if (!joined) {
+      lede = 'You walked the whole stretch and the fire never once went out.';
+    } else if (joined.kind === 'partner') {
+      lede = 'The one who kept the shades off you all night is called ' + esc(joined.name) +
+        '. She has been walking this road too. She is staying.';
+    } else {
+      lede = 'A ' + PET_LABEL[joined.kind] + ' followed you in from the road. ' +
+        esc(joined.name) + ', apparently. Nobody argued.';
+    }
     veil(
       '<div class="eyebrow">You made it</div>' +
       '<h1>' + esc(L.st) + '<em>' + esc(L.name) + '</em></h1>' +
       '<div class="stage still">' +
         '<canvas id="portrait" class="portrait stage-knight"></canvas>' +
       '</div>' +
-      '<p class="lede">' + esc(who) + ' saw the fire from the road and came over. ' +
-        'They are staying.</p>' +
+      '<p class="lede">' + lede + '</p>' +
       '<div class="tally sm">' +
         '<div><span>Landmarks</span><b>' + META.reached + ' / ' + LANDMARKS.length + '</b></div>' +
-        '<div><span>At the fire</span><b>' + (n + 1) + '</b></div>' +
-        '<div><span>Dog</span><b>' + esc(META.dog.name || '—') + '</b></div>' +
+        '<div><span>Nights held</span><b>' + META.lifeNights + '</b></div>' +
+        '<div><span>Animals</span><b>' + (1 + META.pets.length) + '</b></div>' +
       '</div>' +
       journeyStrip(false) +
       '<button class="go" id="btnOn">On we go</button>' +
@@ -6230,14 +6538,18 @@
     on('btnOn', function () { endParty(); if (!arrivals(after)) (after || menu)(); });
   }
 
+  // Nothing is lost when a night goes badly — the camp keeps everything.
   function epitaph() {
-    var n = S.night - 1, who = knightName();
-    var fell = S.cause === 'fell';
-    if (n <= 0) return who + ' did not see the first dawn. The dark is patient — try again.';
-    if (n === 1) return who + ' held one night. The watch is longer than it looks.';
-    if (n < 4) return who + ' held ' + n + ' nights, and was learning the rhythm of it.';
-    if (n < 7) return who + ' held ' + n + ' nights. ' + (fell ? 'Carried home by morning.' : 'Steady hands — the fire remembers.');
-    return who + ' held ' + n + ' nights. Whoever comes after will find warm ground.';
+    var who = knightName(), fell = S.cause === 'fell';
+    var lines = fell
+      ? [who + ' woke up by the fire with a headache and no memory of the end of it.',
+         'They dragged him in before it got him. He is fine. Mostly.',
+         who + ' went down swinging, and somebody put the kettle on.']
+      : ['The fire went out about an hour before dawn. It happens.',
+         who + ' ran out of wood at the worst possible moment.',
+         'Nearly. Genuinely nearly. Have another go.'];
+    var tail = ' Everything he has bought is still his — try the night again, or spend what you earned first.';
+    return lines[Math.floor(Math.random() * lines.length)] + tail;
   }
 
   // ────────────────────────────────────────────────────────────── loop
@@ -6261,7 +6573,7 @@
     }
     render();
     syncHud();
-    if (portraitCv) { syncFolk(); updateKnight(dt); updateDog(dt); paintPortrait(); }
+    if (portraitCv) { syncFolk(); syncPets(); updateKnight(dt); updateDog(dt); updatePets(dt); paintPortrait(); }
   }
 
   // ────────────────────────────────────────────────────────────── boot
@@ -6306,7 +6618,7 @@
   document.addEventListener('keydown', wakeAudio);
   // opt-in inspection hook for tuning/QA: open with #debug
   if (/[?#]debug/.test(location.href)) window.__NW = { S: S, K: K, D: D, META: META, UPGRADES: UPGRADES, PERKS: PERKS,
-      flare: doFlare, swing: doSwing, spawnShade: spawnShade, lightAt: lightAt, stick: stick, KN: KN, CAMP: CAMP, drawCamp: drawCamp, drawCampFront: drawCampFront, DOG: DOG, FOLK: FOLK, drawDog: drawDog, folkPose: folkPose, updateDog: updateDog, syncFolk: syncFolk, startParty: startParty, endParty: endParty, LANDMARKS: LANDMARKS, journeyIndex: journeyIndex, ZOOM: ZOOM, field: function () { return { w: W, h: H }; }, KN_ACTS: KN_ACTS, knightSay: knightSay, knightAct: knightAct, updateKnight: updateKnight, knightPoke: knightPoke, knightPet: knightPet, beatNow: beatNow, drawKnight: drawKnight, A: A, MUS: MUS, TUNES: TUNES,
+      flare: doFlare, swing: doSwing, spawnShade: spawnShade, lightAt: lightAt, stick: stick, KN: KN, CAMP: CAMP, drawCamp: drawCamp, drawCampFront: drawCampFront, DOG: DOG, FOLK: FOLK, PETS: PETS, drawDog: drawDog, drawPet: drawPet, PET_KINDS: PET_KINDS, folkPose: folkPose, updateDog: updateDog, syncFolk: syncFolk, startParty: startParty, endParty: endParty, LANDMARKS: LANDMARKS, journeyIndex: journeyIndex, ZOOM: ZOOM, field: function () { return { w: W, h: H }; }, KN_ACTS: KN_ACTS, knightSay: knightSay, knightAct: knightAct, updateKnight: updateKnight, knightPoke: knightPoke, knightPet: knightPet, beatNow: beatNow, drawKnight: drawKnight, A: A, MUS: MUS, TUNES: TUNES,
       startMusic: startMusic, nextTune: nextTune, setMusic: setMusic, SFX: SFX, UI: UI, ac: ac, switchTo: switchTo, applyTone: applyTone, GENRE: GENRE,
       music: { parseChord: parseChord, voicing: voicing, bassNote: bassNote,
                leadNote: leadNote, chordAt: chordAt, QUAL: QUAL, mtof: mtof }, recalc: recalc, saveMeta: saveMeta, rollDraft: rollDraft, take: takeUpgrade };
@@ -6314,6 +6626,7 @@
   S.keeper.x = W / 2; S.keeper.y = H / 2 + 96;
   if (!META.dog.name) { META.dog.name = rollFrom(DOG_NAMES, []); saveMeta(); }
   syncFolk();
+  syncPets();
   applyHue();
   // He does not wait politely at the fire for you to arrive; whatever he was
   // doing, he was already doing it, somewhere in the camp.
