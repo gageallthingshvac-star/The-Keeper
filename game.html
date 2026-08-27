@@ -406,6 +406,22 @@
   .nameIn::placeholder{color:#5c554e;font-weight:500}
   .nameIn:focus{outline:none;border-color:rgba(255,159,10,0.6);box-shadow:0 0 0 3px rgba(255,159,10,0.12)}
 
+  .wearlist{display:flex;flex-direction:column;gap:7px;margin-bottom:20px}
+  .wearrow{
+    display:flex;align-items:center;gap:12px;text-align:left;
+    padding:10px 12px;border-radius:13px;
+    border:1px solid var(--line);background:rgba(20,16,14,0.5);
+  }
+  .wearrow>span{
+    flex:none;width:58px;font:700 10px/1 var(--body);letter-spacing:.13em;
+    text-transform:uppercase;color:var(--mute);
+  }
+  .segs.wrap{flex:1;flex-wrap:wrap;border:none;border-radius:0;gap:5px;justify-content:flex-end}
+  .segs.wrap .seg{
+    border:1px solid var(--line);border-radius:9px;padding:7px 9px;font-size:10.5px;
+  }
+  .segs.wrap .seg+.seg{border-left:1px solid var(--line)}
+
   .plumes{display:flex;gap:10px;justify-content:center;margin-bottom:20px}
   .sw{
     width:38px;height:38px;border-radius:50%;cursor:pointer;padding:0;
@@ -570,7 +586,7 @@
   var gctx = groundCvs.getContext('2d');
 
   var W = 0, H = 0, DPR = 1;
-  var BUILD = 'v1.5.0';        // bump on every deploy — shown in-game for support
+  var BUILD = 'v1.6.0';        // bump on every deploy — shown in-game for support
   var MUTE_KEY = 'keeper.nightwatch.mute';
   var MUSIC_KEY = 'keeper.nightwatch.music';
 
@@ -716,7 +732,8 @@
   function freshMeta() {
     return { v: 3, embers: 0, xp: 0, runs: 0, bestNight: 0, bestScore: 0,
              perks: {}, ach: {}, lifeLogs: 0, lifeKills: 0, lifeNights: 0,
-             knight: { name: '', plume: 'crimson' },
+             knight: { name: '', plume: 'crimson', build: 'lad', helm: 'dome',
+                       cape: 'none', armour: 'steel' },
              opts: { sound: true, music: true, stick: 'drift', hand: 'left',
                      aim: true, haptics: true } };
   }
@@ -758,7 +775,11 @@
     }
     var k = (m.knight && typeof m.knight === 'object') ? m.knight : {};
     f.knight.name = cleanName(k.name);
-    for (i = 0; i < PLUMES.length; i++) if (PLUMES[i].id === k.plume) f.knight.plume = k.plume;
+    for (i = 0; i < PLUMES.length; i++)  if (PLUMES[i].id === k.plume)   f.knight.plume = k.plume;
+    for (i = 0; i < BUILDS.length; i++)  if (BUILDS[i].id === k.build)   f.knight.build = k.build;
+    for (i = 0; i < HELMS.length; i++)   if (HELMS[i].id === k.helm)     f.knight.helm = k.helm;
+    for (i = 0; i < CAPES.length; i++)   if (CAPES[i].id === k.cape)     f.knight.cape = k.cape;
+    for (i = 0; i < ARMOURS.length; i++) if (ARMOURS[i].id === k.armour) f.knight.armour = k.armour;
 
     var o = (m.opts && typeof m.opts === 'object') ? m.opts : {};
     f.opts.sound   = o.sound !== false;
@@ -960,7 +981,22 @@
     var musSend = a.createGain(); musSend.gain.value = 0.36;
     musLP.connect(musSend); musSend.connect(verb);
 
+    // vinyl crackle, idle at zero until a lo-fi tune wants it
+    var cbuf = a.createBuffer(1, Math.floor(a.sampleRate * 4), a.sampleRate);
+    var cd = cbuf.getChannelData(0);
+    for (var ci = 0; ci < cd.length; ci++) cd[ci] = (Math.random() * 2 - 1) * 0.04;
+    var pops = Math.floor(cd.length * 0.004);
+    for (var pi2 = 0; pi2 < pops; pi2++) cd[Math.floor(Math.random() * cd.length)] = (Math.random() * 2 - 1);
+    var csrc = a.createBufferSource(); csrc.buffer = cbuf; csrc.loop = true;
+    var chp = a.createBiquadFilter(); chp.type = 'highpass'; chp.frequency.value = 700;
+    var clp = a.createBiquadFilter(); clp.type = 'lowpass'; clp.frequency.value = 4200;
+    var cgain = a.createGain(); cgain.gain.value = 0;
+    csrc.connect(chp); chp.connect(clp); clp.connect(cgain); cgain.connect(comp);
+    csrc.start();
+
     A.master = master; A.comp = comp; A.verb = verb; A.sfx = sfx; A.music = music;
+    A.musLP = musLP; A.musSend = musSend; A.chMix = chMix; A.dlMix = dlMix;
+    A.dlTime = dl.delayTime; A.dlFb = dlFb; A.crackle = cgain;
     return a;
   }
 
@@ -1079,86 +1115,86 @@
   // drummer sits behind it, and `comp` chooses block chords or arpeggios.
   var TUNES = [
     // ── jazz
-    { name: 'Ember Blues', gain: 0.79,    genre: 'Jazz',     bpm: 86,  feel: 'swing',    meter: 4, kit: 'brushes', pad: 0,    horn: 0.42,
+    { name: 'Ember Blues', gain: 0.74,    genre: 'Jazz',     bpm: 86,  feel: 'swing',    meter: 4, kit: 'brushes', pad: 0,    horn: 0.42,
       bars: ['F7','Bb7','F7','F7','Bb7','Bb7','F7','F7','Gm7','C7','F7','C7'] },
-    { name: 'Low Lamplight', gain: 0.99,  genre: 'Jazz',     bpm: 72,  feel: 'swing',    meter: 4, kit: 'brushes', pad: 0.5,  horn: 0.34,
+    { name: 'Low Lamplight', gain: 0.73,  genre: 'Jazz',     bpm: 72,  feel: 'swing',    meter: 4, kit: 'brushes', pad: 0.5,  horn: 0.34,
       bars: ['Cm7','F7','Bbmaj7','Gm7','Cm7','F7','Bbmaj7','Bbmaj7'] },
-    { name: 'Smoke & Rye', gain: 0.9,    genre: 'Jazz',     bpm: 96,  feel: 'swing',    meter: 4, kit: 'brushes', pad: 0,    horn: 0.4,
+    { name: 'Smoke & Rye', gain: 0.82,    genre: 'Jazz',     bpm: 96,  feel: 'swing',    meter: 4, kit: 'brushes', pad: 0,    horn: 0.4,
       bars: ['Dm7','Dm7','Gm7','Gm7','Dm7','Dm7','Em7b5','A7'] },
-    { name: 'Last Coals', gain: 0.88,     genre: 'Jazz',     bpm: 104, feel: 'swing',    meter: 4, kit: 'brushes', pad: 0,    horn: 0.36,
+    { name: 'Last Coals', gain: 0.83,     genre: 'Jazz',     bpm: 104, feel: 'swing',    meter: 4, kit: 'brushes', pad: 0,    horn: 0.36,
       bars: ['Am7','D7','Gmaj7','Cmaj7','F#m7b5','B7','Em7','Em7'] },
 
     // ── bossa
-    { name: 'Rain on Canvas', gain: 1.14, genre: 'Bossa',    bpm: 112, feel: 'straight', meter: 4, kit: 'bossa',   pad: 0.35, horn: 0.34,
+    { name: 'Rain on Canvas', gain: 1.02, genre: 'Bossa',    bpm: 112, feel: 'straight', meter: 4, kit: 'bossa',   pad: 0.35, horn: 0.34,
       bars: ['Am7','D7','Gmaj7','Cmaj7','F#m7b5','B7','Em7','A7'] },
-    { name: 'Cinder Bossa', gain: 0.98,   genre: 'Bossa',    bpm: 122, feel: 'straight', meter: 4, kit: 'bossa',   pad: 0.3,  horn: 0.36,
+    { name: 'Cinder Bossa', gain: 0.85,   genre: 'Bossa',    bpm: 122, feel: 'straight', meter: 4, kit: 'bossa',   pad: 0.3,  horn: 0.36,
       bars: ['Dm7','G7','Cmaj7','Fmaj7','Bm7b5','E7','Am7','A7'] },
-    { name: 'Ash & Honey', gain: 1.09,    genre: 'Bossa',    bpm: 84,  feel: 'straight', meter: 4, kit: 'bossa',   pad: 0.55, horn: 0.3,
+    { name: 'Ash & Honey', gain: 0.82,    genre: 'Bossa',    bpm: 84,  feel: 'straight', meter: 4, kit: 'bossa',   pad: 0.55, horn: 0.3,
       bars: ['Fmaj7','Bbmaj7','Am7','Dm7','Gm7','C7','Fmaj7','C7'] },
 
     // ── lo-fi
-    { name: 'Moth Hour', gain: 0.92,      genre: 'Lo-fi',    bpm: 68,  feel: 'straight', meter: 4, kit: 'lofi',    pad: 0.8,  horn: 0.26,
+    { name: 'Moth Hour', gain: 1.12,      genre: 'Lo-fi',    bpm: 68,  feel: 'straight', meter: 4, kit: 'lofi',    pad: 0.8,  horn: 0.26,
       bars: ['Fmaj7','Em7','Dm7','Cmaj7','Fmaj7','Em7','Am7','Am7'] },
     { name: 'Paper Lanterns', gain: 1.01, genre: 'Lo-fi',    bpm: 76,  feel: 'straight', meter: 4, kit: 'lofi',    pad: 0.7,  horn: 0.24,
       bars: ['Dm7','Bbmaj7','Fmaj7','C7','Dm7','Bbmaj7','Gm7','C7'] },
-    { name: 'Slow Tide', gain: 1.03,      genre: 'Lo-fi',    bpm: 82,  feel: 'straight', meter: 4, kit: 'lofi',    pad: 0.65, horn: 0.26,
+    { name: 'Slow Tide', gain: 1.27,      genre: 'Lo-fi',    bpm: 82,  feel: 'straight', meter: 4, kit: 'lofi',    pad: 0.65, horn: 0.26,
       bars: ['Am7','Fmaj7','Cmaj7','G7','Am7','Fmaj7','Dm7','G7'] },
 
     // ── soul
-    { name: 'Velvet Hour', gain: 1.02,    genre: 'Soul',     bpm: 74,  feel: 'straight', meter: 4, kit: 'lofi',    pad: 0.6,  horn: 0.3,
+    { name: 'Velvet Hour', gain: 0.65,    genre: 'Soul',     bpm: 74,  feel: 'straight', meter: 4, kit: 'lofi',    pad: 0.6,  horn: 0.3,
       bars: ['Ebmaj7','Cm7','Fm7','Bb7','Ebmaj7','Cm7','Fm7','Bb7'] },
-    { name: 'Late Rain', gain: 1.02,      genre: 'Soul',     bpm: 68,  feel: 'straight', meter: 4, kit: 'lofi',    pad: 0.7,  horn: 0.28,
+    { name: 'Late Rain', gain: 0.69,      genre: 'Soul',     bpm: 68,  feel: 'straight', meter: 4, kit: 'lofi',    pad: 0.7,  horn: 0.28,
       bars: ['Fmaj7','Dm7','Gm7','C7','Fmaj7','Dm7','Bbmaj7','C7'] },
 
     // ── dub
-    { name: 'Driftwood Dub', gain: 1.06,  genre: 'Dub',      bpm: 72,  feel: 'straight', meter: 4, kit: 'dub',     pad: 0.5,  horn: 0.24,
+    { name: 'Driftwood Dub', gain: 0.94,  genre: 'Dub',      bpm: 72,  feel: 'straight', meter: 4, kit: 'dub',     pad: 0.5,  horn: 0.24,
       bars: ['Am7','Am7','Dm7','Dm7','Am7','Am7','Em7','Em7'] },
-    { name: 'Tin Roof', gain: 0.83,       genre: 'Dub',      bpm: 78,  feel: 'straight', meter: 4, kit: 'dub',     pad: 0.45, horn: 0.26,
+    { name: 'Tin Roof', gain: 0.99,       genre: 'Dub',      bpm: 78,  feel: 'straight', meter: 4, kit: 'dub',     pad: 0.45, horn: 0.26,
       bars: ['Em7','Em7','Am7','Am7','Cmaj7','Cmaj7','B7','B7'] },
 
     // ── folk
     { name: 'Hollow Pines', gain: 0.75,   genre: 'Folk',     bpm: 88,  feel: 'straight', meter: 4, kit: 'none',    pad: 0.4,  horn: 0.22, comp: 'arp' },
-    { name: 'Riverstone', gain: 1.33,     genre: 'Folk',     bpm: 78,  feel: 'straight', meter: 4, kit: 'none',    pad: 0.5,  horn: 0.2,  comp: 'arp' },
+    { name: 'Riverstone', gain: 1.06,     genre: 'Folk',     bpm: 78,  feel: 'straight', meter: 4, kit: 'none',    pad: 0.5,  horn: 0.2,  comp: 'arp' },
 
     // ── nocturne
-    { name: 'Night Glass', gain: 1.11,    genre: 'Nocturne', bpm: 60,  feel: 'straight', meter: 4, kit: 'none',    pad: 0.9,  horn: 0.18, comp: 'arp' },
-    { name: 'Snowlight', gain: 1.03,      genre: 'Nocturne', bpm: 66,  feel: 'straight', meter: 4, kit: 'none',    pad: 0.85, horn: 0.2,  comp: 'arp' },
+    { name: 'Night Glass', gain: 1.34,    genre: 'Nocturne', bpm: 60,  feel: 'straight', meter: 4, kit: 'none',    pad: 0.9,  horn: 0.18, comp: 'arp' },
+    { name: 'Snowlight', gain: 1.64,      genre: 'Nocturne', bpm: 66,  feel: 'straight', meter: 4, kit: 'none',    pad: 0.85, horn: 0.2,  comp: 'arp' },
 
     // ── ambient
-    { name: 'Blue Hour', gain: 1.34,      genre: 'Ambient',  bpm: 74,  feel: 'straight', meter: 4, kit: 'soft',    pad: 0.9,  horn: 0.24,
+    { name: 'Blue Hour', gain: 1.22,      genre: 'Ambient',  bpm: 74,  feel: 'straight', meter: 4, kit: 'soft',    pad: 0.9,  horn: 0.24,
       bars: ['Ebmaj7','Ebmaj7','Dbmaj7','Dbmaj7','Cm7','Cm7','Bbm7','Bbm7'] },
-    { name: 'The Long Watch', gain: 1.37, genre: 'Ambient',  bpm: 62,  feel: 'straight', meter: 4, kit: 'soft',    pad: 1,    horn: 0.22,
+    { name: 'The Long Watch', gain: 1.08, genre: 'Ambient',  bpm: 62,  feel: 'straight', meter: 4, kit: 'soft',    pad: 1,    horn: 0.22,
       bars: ['Gmaj7','Bm7','Em7','Cmaj7','Am7','D7','Gmaj7','Gmaj7'] },
-    { name: 'Ash Drift', gain: 0.97,      genre: 'Ambient',  bpm: 56,  feel: 'straight', meter: 4, kit: 'none',    pad: 1,    horn: 0.16,
+    { name: 'Ash Drift', gain: 1.05,      genre: 'Ambient',  bpm: 56,  feel: 'straight', meter: 4, kit: 'none',    pad: 1,    horn: 0.16,
       bars: ['Cmaj7','Cmaj7','Am7','Am7','Fmaj7','Fmaj7','Gmaj7','Gmaj7'] },
 
     // ── waltz
-    { name: 'Quiet Snow', gain: 0.98,     genre: 'Waltz',    bpm: 104, feel: 'straight', meter: 3, kit: 'soft',    pad: 0.6,  horn: 0.3,
+    { name: 'Quiet Snow', gain: 0.75,     genre: 'Waltz',    bpm: 104, feel: 'straight', meter: 3, kit: 'soft',    pad: 0.6,  horn: 0.3,
       bars: ['Cmaj7','Am7','Dm7','G7','Em7','Am7','Dm7','G7'] },
-    { name: 'Woodsmoke', gain: 1.07,      genre: 'Waltz',    bpm: 92,  feel: 'swing',    meter: 3, kit: 'brushes', pad: 0.4,  horn: 0.32,
+    { name: 'Woodsmoke', gain: 0.8,      genre: 'Waltz',    bpm: 92,  feel: 'swing',    meter: 3, kit: 'brushes', pad: 0.4,  horn: 0.32,
       bars: ['Dm7','Gm7','Cmaj7','Fmaj7','Bm7b5','E7','Am7','Am7'] },
-    { name: 'Ember Waltz', gain: 0.93,    genre: 'Waltz',    bpm: 96,  feel: 'swing',    meter: 3, kit: 'brushes', pad: 0.5,  horn: 0.28,
+    { name: 'Ember Waltz', gain: 0.8,    genre: 'Waltz',    bpm: 96,  feel: 'swing',    meter: 3, kit: 'brushes', pad: 0.5,  horn: 0.28,
       bars: ['Fmaj7','Dm7','Gm7','C7','Fmaj7','Dm7','Bbmaj7','C7'] },
     // ── groove
-    { name: 'Copper Pocket', gain: 1.31, genre: 'Groove',   bpm: 96,  feel: 'straight', meter: 4, kit: 'funk', pad: 0.3,  horn: 0.34,
+    { name: 'Copper Pocket', gain: 1.9, genre: 'Groove',   bpm: 96,  feel: 'straight', meter: 4, kit: 'funk', pad: 0.3,  horn: 0.34,
       bars: ['Dm7','Dm7','Gm7','Gm7','Dm7','Dm7','Am7','Gm7'] },
-    { name: 'Hearth Strut',  gain: 1.31, genre: 'Groove',   bpm: 102, feel: 'swing',    meter: 4, kit: 'funk', pad: 0.25, horn: 0.36,
+    { name: 'Hearth Strut',  gain: 1.9, genre: 'Groove',   bpm: 102, feel: 'swing',    meter: 4, kit: 'funk', pad: 0.25, horn: 0.36,
       bars: ['Fmaj7','Bbmaj7','Fmaj7','C7','Fmaj7','Bbmaj7','Gm7','C7'] },
-    { name: 'Brass Kettle',  gain: 1.21, genre: 'Groove',   bpm: 108, feel: 'straight', meter: 4, kit: 'funk', pad: 0.2,  horn: 0.38,
+    { name: 'Brass Kettle',  gain: 1.9, genre: 'Groove',   bpm: 108, feel: 'straight', meter: 4, kit: 'funk', pad: 0.2,  horn: 0.38,
       bars: ['Cm7','Cm7','Fm7','Fm7','Ebmaj7','Ebmaj7','Bb7','Bb7'] },
-    { name: 'Sunday Coals',  gain: 1.28, genre: 'Groove',   bpm: 88,  feel: 'swing',    meter: 4, kit: 'funk', pad: 0.35, horn: 0.32,
+    { name: 'Sunday Coals',  gain: 1.9, genre: 'Groove',   bpm: 88,  feel: 'swing',    meter: 4, kit: 'funk', pad: 0.35, horn: 0.32,
       bars: ['Gm7','C7','Fmaj7','Dm7','Gm7','C7','Ebmaj7','C7'] },
 
     // ── trip-hop
-    { name: 'Slow Machine',  gain: 1.06, genre: 'Trip-hop', bpm: 76,  feel: 'swing',    meter: 4, kit: 'lofi', pad: 0.75, horn: 0.24,
+    { name: 'Slow Machine',  gain: 1.2, genre: 'Trip-hop', bpm: 76,  feel: 'swing',    meter: 4, kit: 'lofi', pad: 0.75, horn: 0.24,
       bars: ['Am7','Am7','Fmaj7','Fmaj7','Dm7','Dm7','Em7','Em7'] },
     { name: 'Underlamp',     gain: 0.94, genre: 'Trip-hop', bpm: 72,  feel: 'swing',    meter: 4, kit: 'lofi', pad: 0.8,  horn: 0.22,
       bars: ['Cm7','Cm7','Abmaj7','Abmaj7','Fm7','Fm7','Bb7','Bb7'] },
 
     // ── latin
-    { name: 'Fire Samba',    gain: 1.07, genre: 'Latin',    bpm: 130, feel: 'straight', meter: 4, kit: 'bossa', pad: 0.25, horn: 0.4,
+    { name: 'Fire Samba',    gain: 0.85, genre: 'Latin',    bpm: 130, feel: 'straight', meter: 4, kit: 'latin', pad: 0.25, horn: 0.4,
       bars: ['Am7','D7','Gmaj7','Gmaj7','Cmaj7','F#m7b5','B7','Em7'] },
-    { name: 'Cocoa Hour',    gain: 1.03, genre: 'Latin',    bpm: 118, feel: 'straight', meter: 4, kit: 'bossa', pad: 0.4,  horn: 0.36,
+    { name: 'Cocoa Hour',    gain: 0.95, genre: 'Latin',    bpm: 118, feel: 'straight', meter: 4, kit: 'latin', pad: 0.4,  horn: 0.36,
       bars: ['Fmaj7','Gm7','Am7','Bbmaj7','Gm7','C7','Fmaj7','C7'] }
   ];
   // the folk and nocturne sets share a shape, filled in here to keep the table readable
@@ -1171,6 +1207,57 @@
     };
     for (var i = 0; i < TUNES.length; i++) if (late[TUNES[i].name]) TUNES[i].bars = late[TUNES[i].name];
   })();
+
+  // Instruments and room per genre. This is what stops every tune sounding
+  // like the same quartet playing at a different speed.
+  var GENRE = {
+    'Jazz':     { bass: 'upright',   comp: 'rhodes',   lead: 'horn',     lp: 5000, verb: 0.36, delay: 0.12, dtime: 0.40, fb: 0.24, chorus: 0.30, crackle: 0 },
+    'Bossa':    { bass: 'upright',   comp: 'nylon',    lead: 'flute',    lp: 6400, verb: 0.40, delay: 0.10, dtime: 0.34, fb: 0.20, chorus: 0.24, crackle: 0 },
+    'Lo-fi':    { bass: 'sub',       comp: 'wurly',    lead: 'wurly',    lp: 2300, verb: 0.30, delay: 0.22, dtime: 0.46, fb: 0.30, chorus: 0.62, crackle: 0.55 },
+    'Soul':     { bass: 'upright',   comp: 'organ',    lead: 'horn',     lp: 4200, verb: 0.34, delay: 0.12, dtime: 0.38, fb: 0.22, chorus: 0.34, crackle: 0.12 },
+    'Dub':      { bass: 'sub',       comp: 'rhodes',   lead: 'melodica', lp: 3000, verb: 0.52, delay: 0.44, dtime: 0.56, fb: 0.46, chorus: 0.18, crackle: 0 },
+    'Folk':     { bass: 'upright',   comp: 'nylon',    lead: 'flute',    lp: 6800, verb: 0.44, delay: 0.07, dtime: 0.30, fb: 0.16, chorus: 0.12, crackle: 0 },
+    'Nocturne': { bass: 'piano',     comp: 'piano',    lead: 'piano',    lp: 5400, verb: 0.64, delay: 0.14, dtime: 0.50, fb: 0.26, chorus: 0.08, crackle: 0 },
+    'Ambient':  { bass: 'sub',       comp: 'pad',      lead: 'flute',    lp: 3800, verb: 0.72, delay: 0.30, dtime: 0.66, fb: 0.38, chorus: 0.55, crackle: 0 },
+    'Waltz':    { bass: 'upright',   comp: 'piano',    lead: 'horn',     lp: 5200, verb: 0.46, delay: 0.10, dtime: 0.36, fb: 0.20, chorus: 0.20, crackle: 0 },
+    'Groove':   { bass: 'pluckbass', comp: 'clav',     lead: 'horn',     lp: 6800, verb: 0.20, delay: 0.07, dtime: 0.26, fb: 0.16, chorus: 0.12, crackle: 0 },
+    'Trip-hop': { bass: 'sub',       comp: 'wurly',    lead: 'melodica', lp: 1900, verb: 0.46, delay: 0.30, dtime: 0.52, fb: 0.36, chorus: 0.58, crackle: 0.75 },
+    'Latin':    { bass: 'upright',   comp: 'nylon',    lead: 'flute',    lp: 7000, verb: 0.28, delay: 0.07, dtime: 0.28, fb: 0.14, chorus: 0.16, crackle: 0 }
+  };
+  function genreOf(T) { return GENRE[T.genre] || GENRE.Jazz; }
+
+  // slide the room over to the new genre rather than snapping
+  function applyTone(T) {
+    var a = A.ctx; if (!a || !A.musLP) return;
+    var G = genreOf(T), now = a.currentTime, k = 0.5;
+    A.musLP.frequency.setTargetAtTime(G.lp, now, k);
+    A.musSend.gain.setTargetAtTime(G.verb, now, k);
+    A.dlMix.gain.setTargetAtTime(G.delay, now, k);
+    A.dlTime.setTargetAtTime(G.dtime, now, k);
+    A.dlFb.gain.setTargetAtTime(G.fb, now, k);
+    A.chMix.gain.setTargetAtTime(G.chorus, now, k);
+    A.crackle.gain.setTargetAtTime((G.crackle || 0) * 0.016, now, k);
+  }
+
+  // one call site for whichever instrument this genre uses
+  function play(voice, t, freq, dur, vol) {
+    switch (voice) {
+      case 'upright':   upright(t, freq, dur, vol); break;
+      case 'sub':       sub(t, freq, dur, vol); break;
+      case 'pluckbass': pluckbass(t, freq, dur, vol); break;
+      case 'rhodes':    rhodes(t, freq, dur, vol); break;
+      case 'wurly':     wurly(t, freq, dur, vol); break;
+      case 'nylon':     nylon(t, freq, dur, vol); break;
+      case 'organ':     organ(t, freq, dur, vol); break;
+      case 'clav':      clav(t, freq, dur, vol); break;
+      case 'piano':     piano(t, freq, dur, vol); break;
+      case 'melodica':  melodica(t, freq, dur, vol); break;
+      case 'flute':     flute(t, freq, dur, vol); break;
+      case 'horn':      horn(t, freq, dur, vol); break;
+      case 'vibes':     vibes(t, freq, dur, vol); break;
+      default:          rhodes(t, freq, dur, vol);
+    }
+  }
 
   var MUS = { on: true, tune: 0, bar: 0, beat: 0, next: 0, timer: null, lead: 74, phrase: 0, swap: null, sched: [] };
   function mtof(m) { return 440 * Math.pow(2, (m - 69) / 12); }
@@ -1324,6 +1411,142 @@
     o.stop(t + dur + 0.05); o2.stop(t + dur + 0.05); trem.stop(t + dur + 0.05);
   }
 
+
+  // ── the wider instrument cupboard ──────────────────────────────────────
+  // Genres were only ever differing by drum pattern before, which is why they
+  // all sounded like the same band. These are the actual timbres.
+  function env(g, t, dur, vol, attack) {
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol), t + (attack || 0.012));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  }
+  function osc(type, freq, t, dur, detune) {
+    var o = A.ctx.createOscillator();
+    o.type = type; o.frequency.value = freq;
+    if (detune) o.detune.value = detune;
+    o.start(t); o.stop(t + dur + 0.06);
+    return o;
+  }
+
+  // nylon-string guitar — bossa, folk, latin
+  function nylon(t, freq, dur, vol) {
+    var a = A.ctx, g = a.createGain(), f = a.createBiquadFilter();
+    f.type = 'lowpass'; f.Q.value = 1.4;
+    f.frequency.setValueAtTime(3200, t);
+    f.frequency.exponentialRampToValueAtTime(520, t + dur * 0.6);
+    env(g, t, dur, vol, 0.006);
+    osc('triangle', freq, t, dur).connect(f);
+    var h = osc('sine', freq * 2, t, dur * 0.4), hg = a.createGain();
+    hg.gain.value = vol * 0.5; h.connect(hg); hg.connect(f);
+    f.connect(g); g.connect(A.music);
+  }
+  // drawbar organ — soul
+  function organ(t, freq, dur, vol) {
+    var a = A.ctx, g = a.createGain(), lp = a.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 2600;
+    var draw = [1, 0.55, 0.4, 0.22], mult = [1, 2, 3, 4];
+    for (var i = 0; i < 4; i++) {
+      var o = osc('sine', freq * mult[i], t, dur), og = a.createGain();
+      og.gain.value = draw[i]; o.connect(og); og.connect(lp);
+    }
+    var trem = osc('sine', 5.6, t, dur), tg = a.createGain();
+    tg.gain.value = vol * 0.22; trem.connect(tg); tg.connect(g.gain);
+    env(g, t, dur, vol, 0.05);
+    lp.connect(g); g.connect(A.music);
+  }
+  // clavinet — funk
+  function clav(t, freq, dur, vol) {
+    var a = A.ctx, g = a.createGain(), f = a.createBiquadFilter();
+    f.type = 'bandpass'; f.frequency.value = freq * 3.2; f.Q.value = 3.4;
+    env(g, t, Math.min(dur, 0.26), vol, 0.004);
+    osc('square', freq, t, dur).connect(f);
+    f.connect(g); g.connect(A.music);
+  }
+  // deep sub — dub, lo-fi, trip-hop
+  function sub(t, freq, dur, vol) {
+    var a = A.ctx, g = a.createGain(), lp = a.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 220; lp.Q.value = 0.7;
+    env(g, t, dur, vol, 0.03);
+    osc('sine', freq, t, dur).connect(lp);
+    var h = osc('triangle', freq * 2, t, dur * 0.5), hg = a.createGain();
+    hg.gain.value = 0.12; h.connect(hg); hg.connect(lp);
+    lp.connect(g); g.connect(A.music);
+  }
+  // filtered synth bass — funk
+  function pluckbass(t, freq, dur, vol) {
+    var a = A.ctx, g = a.createGain(), f = a.createBiquadFilter();
+    f.type = 'lowpass'; f.Q.value = 7;
+    f.frequency.setValueAtTime(freq * 9, t);
+    f.frequency.exponentialRampToValueAtTime(freq * 1.6, t + 0.14);
+    env(g, t, dur, vol, 0.006);
+    osc('sawtooth', freq, t, dur).connect(f);
+    f.connect(g); g.connect(A.music);
+  }
+  // melodica — dub lead
+  function melodica(t, freq, dur, vol) {
+    var a = A.ctx, g = a.createGain(), f = a.createBiquadFilter();
+    f.type = 'bandpass'; f.frequency.value = freq * 2.4; f.Q.value = 1.6;
+    var o = osc('sawtooth', freq, t, dur);
+    var vib = osc('sine', 5.4, t, dur), vg = a.createGain();
+    vg.gain.setValueAtTime(0, t); vg.gain.linearRampToValueAtTime(freq * 0.009, t + dur * 0.5);
+    vib.connect(vg); vg.connect(o.frequency);
+    env(g, t, dur, vol, 0.06);
+    o.connect(f); f.connect(g); g.connect(A.music);
+  }
+  // upright piano — nocturne, waltz
+  function piano(t, freq, dur, vol) {
+    var a = A.ctx, g = a.createGain();
+    var car = osc('triangle', freq, t, dur);
+    var mod = osc('sine', freq * 3.01, t, dur), mg = a.createGain();
+    mg.gain.setValueAtTime(freq * 1.6, t);
+    mg.gain.exponentialRampToValueAtTime(freq * 0.02, t + 0.22);
+    mod.connect(mg); mg.connect(car.frequency);
+    var lp = a.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3400;
+    env(g, t, dur, vol, 0.005);
+    car.connect(lp); lp.connect(g); g.connect(A.music);
+  }
+  // wurlitzer — lo-fi, trip-hop; deliberately a little out of tune
+  function wurly(t, freq, dur, vol) {
+    var a = A.ctx, g = a.createGain(), lp = a.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 1500; lp.Q.value = 0.8;
+    var det = rand(-14, 14);
+    var car = osc('sine', freq, t, dur, det);
+    var mod = osc('sine', freq * 2.02, t, dur), mg = a.createGain();
+    mg.gain.setValueAtTime(freq * 1.5, t);
+    mg.gain.exponentialRampToValueAtTime(freq * 0.05, t + 0.3);
+    mod.connect(mg); mg.connect(car.frequency);
+    env(g, t, dur, vol, 0.02);
+    car.connect(lp); lp.connect(g); g.connect(A.music);
+  }
+  // flute / tin whistle
+  function flute(t, freq, dur, vol) {
+    var a = A.ctx, g = a.createGain();
+    var o = osc('sine', freq, t, dur);
+    var vib = osc('sine', 5, t, dur), vg = a.createGain();
+    vg.gain.setValueAtTime(0, t); vg.gain.linearRampToValueAtTime(freq * 0.007, t + dur * 0.6);
+    vib.connect(vg); vg.connect(o.frequency);
+    var br = a.createBufferSource(); br.buffer = noiseBuffer(a); br.loop = true;
+    var bf = a.createBiquadFilter(); bf.type = 'bandpass'; bf.frequency.value = freq * 2; bf.Q.value = 2;
+    var bg = a.createGain(); bg.gain.value = vol * 0.1;
+    br.connect(bf); bf.connect(bg); bg.connect(g);
+    br.start(t); br.stop(t + dur + 0.05);
+    env(g, t, dur, vol, 0.08);
+    o.connect(g); g.connect(A.music);
+  }
+  // tuned hand drum — latin
+  function conga(t, freq, vol) {
+    var a = A.ctx, g = a.createGain();
+    var o = a.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(freq, t);
+    o.frequency.exponentialRampToValueAtTime(freq * 0.55, t + 0.16);
+    env(g, t, 0.22, vol, 0.004);
+    o.connect(g); o.start(t); o.stop(t + 0.28);
+    g.connect(A.music);
+    perc(t, 0.04, vol * 0.5, 'bandpass', freq * 4, 1.4);
+  }
+  function clave(t, vol) { perc(t, 0.06, vol, 'bandpass', 2400, 6); }
+  function tamb(t, vol)  { perc(t, 0.1, vol, 'highpass', 7000, 0.6); }
+
   // ── the parts ──────────────────────────────────────────────────────────
   function bassNote(ch, beat, next) {
     var base = 28 + ch.root, t = ch.d.tones, n;
@@ -1366,14 +1589,17 @@
     // leave a breadcrumb so anything watching can find the pulse later
     MUS.sched.push({ t: t, beat: MUS.beat, bar: MUS.bar, spb: spb });
     if (MUS.sched.length > 24) MUS.sched.shift();
+
+    var G = genreOf(T);
     var beat = MUS.beat, bar = MUS.bar, meter = T.meter || 4;
     var last = meter - 1;
     var ch = chordAt(bar);
     var next = chordAt(bar + (beat === last ? 1 : 0));
     var swung = spb * (T.feel === 'swing' ? 0.64 : 0.5);
     var backbeat = meter === 4 ? (beat === 1 || beat === 3) : (beat === 1);
-    // measured per-tune trim, so switching tunes never jumps in volume
     var vg = T.gain || 1;
+    // lo-fi and trip-hop drag behind the beat like tape
+    var lag = (T.genre === 'Lo-fi' || T.genre === 'Trip-hop') ? 0.022 : 0;
 
     // ── the pad breathes once a bar, under everything
     if (T.pad && beat === 0) {
@@ -1381,108 +1607,107 @@
       pad(t, pv, spb * meter * 0.98, (0.028 * T.pad) * vg);
     }
 
-    // ── bass
-    var bn = bassNote(ch, meter === 3 ? beat : beat, next);
-    if (T.kit === 'bossa') {
-      // two-feel: root on one, fifth pushed before the next bar
-      if (beat === 0) upright(t, mtof(28 + ch.root), spb * 1.4, (0.24) * vg);
-      else if (beat === 2) upright(t, mtof(bn), spb * 1.2, (0.2) * vg);
-      else if (beat === last) upright(t + swung, mtof(bn), spb * 0.6, (0.16) * vg);
-    } else if (T.kit === 'soft' || T.kit === 'none') {
-      if (beat === 0 || beat === Math.floor(meter / 2)) upright(t, mtof(bn), spb * 1.5, (0.2) * vg);
-    } else if (T.kit === 'lofi') {
-      if (beat === 0) upright(t, mtof(28 + ch.root), spb * 1.8, (0.26) * vg);
-      else if (beat === 2) upright(t + swung * 0.5, mtof(bn), spb * 1.1, (0.19) * vg);
-    } else if (T.kit === 'dub') {
-      if (beat === 0) upright(t, mtof(28 + ch.root), spb * 2.2, (0.3) * vg);
-      else if (beat === 2) upright(t + swung, mtof(bn), spb * 0.9, (0.22) * vg);
-    } else if (T.kit === 'funk') {
-      if (beat === 0) { upright(t, mtof(28 + ch.root), spb * 0.6, (0.28) * vg);
-                        upright(t + swung, mtof(28 + ch.root + 12), spb * 0.4, (0.14) * vg); }
-      else if (beat === 1) upright(t + swung, mtof(bn), spb * 0.5, (0.2) * vg);
-      else if (beat === last) upright(t, mtof(bn), spb * 0.7, (0.22) * vg);
-    } else {
-      upright(t, mtof(bn), spb * 0.9, (0.24) * vg);         // walking
+    // ── bass, in this genre's voice
+    var bn = bassNote(ch, beat, next);
+    var root = 28 + ch.root;
+    if (G.bass !== 'none') {
+      if (T.kit === 'bossa' || T.kit === 'latin') {
+        if (beat === 0) play(G.bass, t, mtof(root), spb * 1.4, 0.24 * vg);
+        else if (beat === 2) play(G.bass, t, mtof(bn), spb * 1.2, 0.2 * vg);
+        else if (beat === last) play(G.bass, t + swung, mtof(bn), spb * 0.6, 0.16 * vg);
+      } else if (T.kit === 'soft' || T.kit === 'none') {
+        if (beat === 0 || beat === Math.floor(meter / 2)) play(G.bass, t, mtof(bn), spb * 1.5, 0.2 * vg);
+      } else if (T.kit === 'lofi') {
+        if (beat === 0) play(G.bass, t + lag, mtof(root), spb * 1.8, 0.3 * vg);
+        else if (beat === 2) play(G.bass, t + swung * 0.5 + lag, mtof(bn), spb * 1.1, 0.22 * vg);
+      } else if (T.kit === 'dub') {
+        if (beat === 0) play(G.bass, t, mtof(root), spb * 2.2, 0.36 * vg);
+        else if (beat === 2) play(G.bass, t + swung, mtof(bn), spb * 0.9, 0.26 * vg);
+      } else if (T.kit === 'funk') {
+        if (beat === 0) { play(G.bass, t, mtof(root), spb * 0.5, 0.3 * vg);
+                          play(G.bass, t + swung, mtof(root + 12), spb * 0.34, 0.16 * vg); }
+        else if (beat === 1) play(G.bass, t + swung, mtof(bn), spb * 0.42, 0.22 * vg);
+        else if (beat === last) play(G.bass, t, mtof(bn), spb * 0.6, 0.24 * vg);
+      } else {
+        play(G.bass, t, mtof(bn), spb * 0.9, 0.24 * vg);          // walking
+      }
     }
 
     // ── drums
     if (T.kit === 'brushes') {
-      ride(t, (0.075) * vg);
-      if (backbeat) { ride(t + swung, (0.05) * vg); hat(t, (0.035) * vg); brush(t, spb * 0.7, (0.028) * vg); }
+      ride(t, 0.075 * vg);
+      if (backbeat) { ride(t + swung, 0.05 * vg); hat(t, 0.035 * vg); brush(t, spb * 0.7, 0.028 * vg); }
     } else if (T.kit === 'bossa') {
-      shaker(t, (0.03) * vg); shaker(t + swung, (0.022) * vg);
-      if (beat === 0) kick(t, (0.06) * vg);
-      if (beat === 2) kick(t + swung, (0.045) * vg);
-      if (backbeat) rim(t, (0.035) * vg);
+      shaker(t, 0.03 * vg); shaker(t + swung, 0.022 * vg);
+      if (beat === 0) kick(t, 0.06 * vg);
+      if (beat === 2) kick(t + swung, 0.045 * vg);
+      if (backbeat) rim(t, 0.035 * vg);
+    } else if (T.kit === 'latin') {
+      shaker(t, 0.028 * vg); shaker(t + swung, 0.024 * vg);
+      if (beat === 0 || beat === 2) kick(t, 0.05 * vg);
+      conga(t + swung, beat % 2 ? 210 : 160, 0.05 * vg);
+      if (backbeat) conga(t, 300, 0.035 * vg);
+      if (beat === 0 || beat === 3) clave(t + (beat === 3 ? swung : 0), 0.026 * vg);
     } else if (T.kit === 'lofi') {
-      // dusty and behind the beat: soft kick, brushed backbeat, eighth shaker
-      if (beat === 0) kick(t, (0.058) * vg);
-      if (beat === 2) kick(t + swung * 0.5, (0.04) * vg);
-      if (backbeat) { brush(t + 0.012, spb * 0.5, (0.03) * vg); rim(t + 0.012, (0.026) * vg); }
-      shaker(t, (0.018) * vg); shaker(t + swung, (0.013) * vg);
+      if (beat === 0) kick(t + lag, 0.062 * vg);
+      if (beat === 2) kick(t + swung * 0.5 + lag, 0.042 * vg);
+      if (backbeat) { brush(t + lag, spb * 0.5, 0.034 * vg); rim(t + lag, 0.03 * vg); }
+      shaker(t, 0.014 * vg);
     } else if (T.kit === 'dub') {
-      // everything leans off the beat, with lots of space
-      if (beat === 0) kick(t, (0.052) * vg);
-      if (beat === last) kick(t + swung, (0.036) * vg);
-      if (backbeat) rim(t, (0.04) * vg);
-      shaker(t + swung, (0.012) * vg);
+      if (beat === 0) kick(t, 0.062 * vg);
+      if (beat === last) kick(t + swung, 0.04 * vg);
+      if (backbeat) rim(t, 0.045 * vg);
+      shaker(t + swung, 0.012 * vg);
     } else if (T.kit === 'funk') {
-      // in the pocket: kick on the one and the and-of-two, hats on the eighths
-      if (beat === 0) kick(t, (0.062) * vg);
-      if (beat === 1) kick(t + swung, (0.05) * vg);
-      if (beat === 2 && Math.random() < 0.5) kick(t + swung, (0.036) * vg);
-      if (backbeat) { rim(t, (0.045) * vg); brush(t, spb * 0.35, (0.026) * vg); }
-      hat(t, (0.026) * vg);
-      hat(t + swung, (0.019) * vg);
+      if (beat === 0) kick(t, 0.062 * vg);
+      if (beat === 1) kick(t + swung, 0.05 * vg);
+      if (beat === 2 && Math.random() < 0.5) kick(t + swung, 0.036 * vg);
+      if (backbeat) { rim(t, 0.045 * vg); tamb(t, 0.02 * vg); }
+      hat(t, 0.026 * vg); hat(t + swung, 0.019 * vg);
     } else if (T.kit === 'none') {
       // no kit at all — the pad and the arpeggio carry it
-    } else {                                          // 'soft' — barely there
-      if (beat === 0) kick(t, (0.045) * vg);
-      if (backbeat) brush(t, spb * 0.9, (0.022) * vg);
-      shaker(t, (0.014) * vg);
+    } else {
+      if (beat === 0) kick(t, 0.045 * vg);
+      if (backbeat) brush(t, spb * 0.9, 0.022 * vg);
+      shaker(t, 0.014 * vg);
     }
 
-    // ── comping
-    var v = voicing(ch);
+    // ── comping, again in this genre's voice
+    var v = voicing(ch), i, q;
     if (T.comp === 'arp') {
-      // one note of the chord per beat, climbing and falling through the bar
       var seq = v.concat(v.slice(0, -1).reverse());
       var n1 = seq[(bar * meter + beat) % seq.length];
-      pluck(t, mtof(n1), spb * 1.9, (0.05) * vg);
-      if (Math.random() < 0.45) pluck(t + swung, mtof(seq[(bar * meter + beat + 2) % seq.length]), spb * 1.2, (0.032) * vg);
-      if (beat === 0 && Math.random() < 0.5) vibes(t, mtof(v[v.length - 1] + 12), spb * 3, (0.022) * vg);
-    } else if (T.kit === 'funk') {
-      // short stabs, mostly off the beat
-      if (Math.random() < 0.7) {
-        var when2 = Math.random() < 0.65 ? t + swung : t;
-        for (var q = 0; q < v.length; q++) rhodes(when2 + q * 0.008, mtof(v[q]), spb * 0.45, (0.05) * vg);
-      }
+      play(G.comp, t, mtof(n1), spb * 1.9, 0.05 * vg);
+      if (Math.random() < 0.45) play(G.comp, t + swung, mtof(seq[(bar * meter + beat + 2) % seq.length]), spb * 1.2, 0.032 * vg);
+      if (beat === 0 && Math.random() < 0.5) vibes(t, mtof(v[v.length - 1] + 12), spb * 3, 0.022 * vg);
     } else if (T.kit === 'dub') {
-      // the skank: chords on the off-beats, with the odd one left out
       if (Math.random() < 0.82) {
-        for (var d = 0; d < v.length; d++) rhodes(t + swung + d * 0.012, mtof(v[d]), spb * 0.7, (0.038) * vg);
+        for (i = 0; i < v.length; i++) play(G.comp, t + swung + i * 0.012, mtof(v[i]), spb * 0.7, 0.042 * vg);
       }
+    } else if (T.kit === 'funk') {
+      if (Math.random() < 0.72) {
+        var when2 = Math.random() < 0.65 ? t + swung : t;
+        for (q = 0; q < v.length; q++) play(G.comp, when2 + q * 0.008, mtof(v[q]), spb * 0.4, 0.055 * vg);
+      }
+    } else if (G.comp === 'pad') {
+      if (beat === 0) pad(t, v.map(function (m) { return m + 12; }), spb * meter * 0.9, 0.02 * vg);
     } else {
-      var compChance = (T.kit === 'soft' || T.kit === 'lofi') ? 0.36 : (backbeat ? 0.5 : 0.26);
+      var compChance = (T.kit === 'soft' || T.kit === 'lofi') ? 0.4 : (backbeat ? 0.5 : 0.28);
       if (Math.random() < compChance) {
-        var when = (T.feel === 'swing' && Math.random() < 0.6) ? t + swung
-                 : (T.kit === 'lofi' ? t + 0.02 : t);          // lo-fi drags a hair
-        var useVibes = T.pad >= 0.55 && Math.random() < 0.5;
-        for (var i = 0; i < v.length; i++) {
-          if (useVibes) vibes(when + i * 0.03, mtof(v[i]), spb * 2.4, (0.035) * vg);
-          else rhodes(when + i * 0.01, mtof(v[i]), spb * 1.6, (0.055) * vg);
-        }
+        var when = (T.feel === 'swing' && Math.random() < 0.6) ? t + swung : t + lag;
+        for (i = 0; i < v.length; i++) play(G.comp, when + i * 0.012, mtof(v[i]), spb * 1.5, 0.055 * vg);
       }
     }
 
-    // ── the horn sits out for whole bars at a time, then answers
+    // ── the lead sits out for whole bars at a time, then answers
     if (beat === 0) MUS.phrase = Math.random() < (T.horn + 0.12) ? 1 : 0;
-    if (MUS.phrase && Math.random() < T.horn + 0.14) {
+    if (G.lead !== 'none' && MUS.phrase && Math.random() < T.horn + 0.14) {
+      var lvol = (G.lead === 'flute' || G.lead === 'melodica') ? 0.045 : 0.05;
       if (T.feel === 'swing' && Math.random() < 0.45) {
-        horn(t, mtof(leadNote(ch)), swung * 0.9, (0.05) * vg);
-        horn(t + swung, mtof(leadNote(ch)), (spb - swung) * 0.9, (0.045) * vg);
+        play(G.lead, t, mtof(leadNote(ch)), swung * 0.9, lvol * vg);
+        play(G.lead, t + swung, mtof(leadNote(ch)), (spb - swung) * 0.9, lvol * 0.9 * vg);
       } else {
-        horn(t, mtof(leadNote(ch)), spb * (T.kit === 'soft' ? 1.6 : 0.85), (0.05) * vg);
+        play(G.lead, t, mtof(leadNote(ch)), spb * (T.kit === 'none' ? 1.6 : 0.85), lvol * vg);
       }
     }
   }
@@ -1516,6 +1741,7 @@
     if (!MUS.on || MUS.timer) return;
     var a = ac(); if (!a) return;
     MUS.next = a.currentTime + 0.2;
+    applyTone(TUNES[MUS.tune]);
     A.music.gain.cancelScheduledValues(a.currentTime);
     A.music.gain.setValueAtTime(0.0001, a.currentTime);
     A.music.gain.exponentialRampToValueAtTime(MUSIC_LEVEL, a.currentTime + 3);
@@ -1541,6 +1767,7 @@
     var target = ((i % TUNES.length) + TUNES.length) % TUNES.length;
     if (!MUS.on || !MUS.timer) {
       MUS.tune = target; MUS.bar = 0; MUS.beat = 0;
+      applyTone(TUNES[target]);
       refreshTransport();
       return;
     }
@@ -1549,6 +1776,7 @@
     MUS.swap = setTimeout(function () {
       MUS.tune = target;
       MUS.bar = 0; MUS.beat = 0;
+      applyTone(TUNES[target]);
       if (A.ctx) MUS.next = Math.max(MUS.next, A.ctx.currentTime + 0.06);
       duckMusic(1, fade || 0.9);
       refreshTransport();
@@ -2397,6 +2625,40 @@
     { id: 'tide',    name: 'Tide',    plume: '#5AC8FA', tabard: '#2F6D86', trim: '#D6F1FF' },
     { id: 'rose',    name: 'Rose',    plume: '#FF9FC4', tabard: '#8E4468', trim: '#FFE0EE' }
   ];
+  // Two builds. Both are meant to be likeable — the lass is rounder and
+  // softer-featured, the lad squarer and scruffier, neither is the "serious"
+  // one.
+  var BUILDS = [
+    { id: 'lad',  name: 'Lad',  waist: 1.06, head: 9.3, brow: 1,   lash: 0, jaw: 1.1, eye: 2.3, plume: 0.9 },
+    { id: 'lass', name: 'Lass', waist: 0.9,  head: 9.7, brow: 0.5, lash: 1, jaw: 0.85, eye: 2.6, plume: 1.15 }
+  ];
+  var HELMS = [
+    { id: 'dome',    name: 'Dome' },
+    { id: 'horned',  name: 'Horned' },
+    { id: 'winged',  name: 'Winged' },
+    { id: 'hood',    name: 'Hood' },
+    { id: 'circlet', name: 'Circlet' }
+  ];
+  var CAPES = [
+    { id: 'none',  name: 'None' },
+    { id: 'short', name: 'Short' },
+    { id: 'long',  name: 'Long' }
+  ];
+  var ARMOURS = [
+    { id: 'steel',  name: 'Steel',  light: '#CBD2DB', dark: '#94A1AF' },
+    { id: 'bronze', name: 'Bronze', light: '#D9AE7A', dark: '#9C7546' },
+    { id: 'iron',   name: 'Iron',   light: '#9AA0A8', dark: '#63696F' },
+    { id: 'ivory',  name: 'Ivory',  light: '#EDE3D2', dark: '#B9AB93' }
+  ];
+  function pickFrom(list, want, dflt) {
+    for (var i = 0; i < list.length; i++) if (list[i].id === want) return list[i];
+    return dflt || list[0];
+  }
+  function buildOf()  { return pickFrom(BUILDS,  META.knight && META.knight.build); }
+  function helmOf()   { return pickFrom(HELMS,   META.knight && META.knight.helm); }
+  function capeOf()   { return pickFrom(CAPES,   META.knight && META.knight.cape); }
+  function armourOf() { return pickFrom(ARMOURS, META.knight && META.knight.armour); }
+
   function plumeOf() {
     var want = META.knight && META.knight.plume;
     for (var i = 0; i < PLUMES.length; i++) if (PLUMES[i].id === want) return PLUMES[i];
@@ -2415,71 +2677,88 @@
     return (META.knight && META.knight.name) ? META.knight.name : 'the Keeper';
   }
 
-  // opts: { t, scale, flash, expr, tilt, hop, squash, wave, reach, zzz, sit, spin, look }
+  // opts: { t, scale, flash, expr, amt, tilt, hop, squash, wave, reach, zzz, sit, spin, look }
   function drawKnight(g, o) {
-    var P = plumeOf();
+    var P = plumeOf(), B = buildOf(), H = helmOf(), C = capeOf(), AR = armourOf();
     var sc = o.scale || 1;
     var skin  = o.flash ? '#FFD3CF' : '#F7E0C4';
     var skinS = o.flash ? '#E9B4B0' : '#E2C29F';
-    var steel = o.flash ? '#FFD9D6' : '#CBD2DB';
-    var dark  = o.flash ? '#E0A9A6' : '#94A1AF';
+    var steel = o.flash ? '#FFD9D6' : AR.light;
+    var dark  = o.flash ? '#E0A9A6' : AR.dark;
     var hop = o.hop || 0, sit = o.sit || 0;
     var lookX = (o.look || 0) * 1.5;
+    // how strongly he is pulling the face — most of the time, not all the way
+    var amt = o.amt === undefined ? 1 : clamp(o.amt, 0, 1);
+    var W = B.waist;
 
     g.save();
     g.scale(sc, sc);
 
-    // shadow — stays on the ground, shrinks as he leaves it
     g.fillStyle = 'rgba(0,0,0,' + Math.max(0.12, 0.42 - hop * 0.03).toFixed(3) + ')';
     g.beginPath(); g.ellipse(0, 14, 10.5 - hop * 0.42, 3.5 - hop * 0.12, 0, 0, 6.29); g.fill();
 
     g.translate(0, -hop + sit * 4);
     if (o.tilt) g.rotate(o.tilt);
-    // a twirl reads as turning on the spot, not cartwheeling over his feet
     if (o.spin) g.scale(Math.cos(o.spin), 1);
     var sq = o.squash || 0;
     g.scale(1 + sq, 1 - sq);
 
+    // ── cape, behind everything
+    if (C.id !== 'none') {
+      var cl = C.id === 'long' ? 15 : 9.5;
+      g.fillStyle = P.plume;              // the plume colour, so it reads against the tabard
+      g.globalAlpha = 0.85;
+      g.beginPath();
+      g.moveTo(-6.5, -3);
+      g.quadraticCurveTo(-9.5 - Math.sin((o.t || 0) * 2) * 0.8, cl * 0.5, -6, cl);
+      g.quadraticCurveTo(0, cl + 2.4, 6, cl);
+      g.quadraticCurveTo(9.5 + Math.sin((o.t || 0) * 2) * 0.8, cl * 0.5, 6.5, -3);
+      g.closePath(); g.fill();
+      g.globalAlpha = 1;
+      g.strokeStyle = P.trim; g.lineWidth = 0.8; g.globalAlpha = 0.5;
+      g.stroke(); g.globalAlpha = 1;
+    }
+
     // ── little boots
     g.fillStyle = '#5E4C3E';
-    roundRectOn(g, -6.4, 9.6 - sit * 2, 5.2, 4.6, 2.2); g.fill();
-    roundRectOn(g, 1.2, 9.6 - sit * 2, 5.2, 4.6, 2.2); g.fill();
+    roundRectOn(g, -6.4 * W, 9.6 - sit * 2, 5.2, 4.6, 2.2); g.fill();
+    roundRectOn(g, 1.2 * W, 9.6 - sit * 2, 5.2, 4.6, 2.2); g.fill();
 
-    // ── a round little body
+    // ── body
     g.fillStyle = dark;
-    roundRectOn(g, -7.8, -2.6, 15.6, 13.4, 6.8); g.fill();
+    roundRectOn(g, -7.8 * W, -2.6, 15.6 * W, 13.4, 6.8); g.fill();
     g.fillStyle = P.tabard;
     g.beginPath();
-    g.moveTo(-5.4, -2.2); g.lineTo(5.4, -2.2); g.lineTo(4.5, 8.6);
-    g.quadraticCurveTo(0, 11.2, -4.5, 8.6);
+    g.moveTo(-5.4 * W, -2.2); g.lineTo(5.4 * W, -2.2); g.lineTo(4.5 * W, 8.6);
+    g.quadraticCurveTo(0, 11.2, -4.5 * W, 8.6);
     g.closePath(); g.fill();
     g.fillStyle = P.trim; g.globalAlpha = 0.85;
-    roundRectOn(g, -5.4, 0.6, 10.8, 1.1, 0.5); g.fill();
+    roundRectOn(g, -5.4 * W, 0.6, 10.8 * W, 1.1, 0.5); g.fill();
     g.globalAlpha = 1;
 
-    // ── stubby arms
+    // ── arms
     var reach = o.reach || 0, wave = o.wave || 0;
     g.fillStyle = steel;
-    g.save();                                   // left arm holds the shield
-    g.translate(-8.2, 2.2); g.rotate(-0.2 - reach * 0.5);
+    g.save();
+    g.translate(-8.2 * W, 2.2); g.rotate(-0.2 - reach * 0.5);
     g.beginPath(); g.ellipse(0, 0, 2.6, 3.6, 0, 0, 6.29); g.fill();
     g.restore();
-    g.save();                                   // right arm waves or reaches
-    g.translate(7.8, 2);
+    g.save();
+    g.translate(7.8 * W, 2);
     var lift = Math.max(wave, reach);
     g.rotate(0.2 - wave * (1.3 + Math.sin((o.t || 0) * 13) * 0.35) - reach * 1.55);
-    g.beginPath(); g.ellipse(0, 0, 2.6, 3.4, 0, 0, 6.29); g.fill();       // shoulder
-    if (lift > 0.05) {                          // forearm, still attached to it
+    g.beginPath(); g.ellipse(0, 0, 2.6, 3.4, 0, 0, 6.29); g.fill();
+    if (lift > 0.05) {
       g.beginPath(); g.ellipse(0, -3.6 * lift, 2.3, 3.4, 0, 0, 6.29); g.fill();
       g.fillStyle = skin;
-      g.beginPath(); g.arc(0, -6.6 * lift, 1.9, 0, 6.29); g.fill();       // little hand
+      g.beginPath(); g.arc(0, -6.6 * lift, 1.9, 0, 6.29); g.fill();
       g.fillStyle = steel;
     }
     g.restore();
 
-    // shield on the off hand
+    // shield
     g.save();
-    g.translate(-10.4, 3.4); g.rotate(-0.3 - reach * 0.4);
+    g.translate(-10.4 * W, 3.4); g.rotate(-0.3 - reach * 0.4);
     g.fillStyle = dark;
     g.beginPath(); g.ellipse(0, 0, 5.6, 6.6, 0, 0, 6.29); g.fill();
     g.fillStyle = P.tabard;
@@ -2488,106 +2767,166 @@
     g.beginPath(); g.arc(0, 0, 1.5, 0, 6.29); g.fill();
     g.restore();
 
-    // ── a big round face
+    // ── head
+    var hr = B.head;
     g.fillStyle = skin;
-    g.beginPath(); g.arc(0, -10.2, 9.5, 0, 6.29); g.fill();
-    g.fillStyle = skinS;                        // soft chin shading
-    g.beginPath(); g.ellipse(0, -3.6, 6.4, 2.2, 0, 0, Math.PI); g.fill();
+    g.beginPath(); g.arc(0, -10.2, hr, 0, 6.29); g.fill();
+    g.fillStyle = skinS;
+    g.beginPath(); g.ellipse(0, -3.6, 6.4 * B.jaw, 2.2, 0, 0, Math.PI); g.fill();
 
     // ── the face
     var ex = 3.7, ey = -10.4, s, e = o.expr || 'normal';
     var ink = '#3A2E30';
     g.strokeStyle = ink; g.fillStyle = ink; g.lineCap = 'round';
 
-    function eyeArc(cx, up) {                    // a curved, closed eye
+    function eyeArc(cx, up) {
       g.lineWidth = 1.7;
+      var r = 2.3 * (0.6 + 0.4 * amt);
       g.beginPath();
-      if (up) g.arc(cx, ey + 1.1, 2.3, Math.PI * 1.12, Math.PI * 1.88);
-      else    g.arc(cx, ey - 1.1, 2.3, Math.PI * 0.12, Math.PI * 0.88);
+      if (up) g.arc(cx, ey + 1.1, r, Math.PI * 1.12, Math.PI * 1.88);
+      else    g.arc(cx, ey - 1.1, r, Math.PI * 0.12, Math.PI * 0.88);
       g.stroke();
     }
     function eyeBall(cx, r, ry) {
       g.fillStyle = ink;
       g.beginPath(); g.ellipse(cx + lookX, ey, r, ry || r, 0, 0, 6.29); g.fill();
-      g.fillStyle = 'rgba(255,255,255,0.92)';    // the highlight is the whole trick
+      g.fillStyle = 'rgba(255,255,255,0.92)';
       g.beginPath(); g.arc(cx + lookX - r * 0.34, ey - r * 0.42, r * 0.36, 0, 6.29); g.fill();
       g.fillStyle = ink;
+      if (B.lash) {                              // a couple of lashes, not a fan
+        g.strokeStyle = ink; g.lineWidth = 1;
+        g.beginPath();
+        g.moveTo(cx + (cx < 0 ? -1 : 1) * r * 0.9, ey - r * 0.9);
+        g.lineTo(cx + (cx < 0 ? -1 : 1) * (r * 1.7), ey - r * 1.5);
+        g.stroke();
+      }
     }
 
+    var eyeR = B.eye;
     if (e === 'happy' || e === 'content') {
-      eyeArc(-ex, true); eyeArc(ex, true);
+      if (amt < 0.45) { eyeBall(-ex, eyeR * 0.95, eyeR * 1.05); eyeBall(ex, eyeR * 0.95, eyeR * 1.05); }
+      else { eyeArc(-ex, true); eyeArc(ex, true); }
     } else if (e === 'blink') {
       g.lineWidth = 1.7;
       for (s = -1; s <= 1; s += 2) { g.beginPath(); g.moveTo(s * ex - 1.7, ey); g.lineTo(s * ex + 1.7, ey); g.stroke(); }
     } else if (e === 'sleepy') {
       eyeArc(-ex, false); eyeArc(ex, false);
     } else if (e === 'surprised') {
-      eyeBall(-ex, 2.9, 3.2); eyeBall(ex, 2.9, 3.2);
+      eyeBall(-ex, eyeR * (1 + 0.25 * amt), eyeR * (1.1 + 0.3 * amt));
+      eyeBall(ex, eyeR * (1 + 0.25 * amt), eyeR * (1.1 + 0.3 * amt));
     } else if (e === 'shy') {
       eyeArc(-ex, true); eyeArc(ex, true);
     } else if (e === 'grumble') {
-      eyeBall(-ex, 1.9, 1.5); eyeBall(ex, 1.9, 1.5);   // narrowed, not closed
-      g.strokeStyle = ink; g.lineWidth = 1.5;          // brows well clear above
-      g.beginPath(); g.moveTo(-ex - 2.4, ey - 5); g.lineTo(-ex + 1.6, ey - 3.4); g.stroke();
-      g.beginPath(); g.moveTo(ex + 2.4, ey - 5); g.lineTo(ex - 1.6, ey - 3.4); g.stroke();
+      eyeBall(-ex, eyeR * 0.8, eyeR * (0.75 - 0.2 * amt));
+      eyeBall(ex, eyeR * 0.8, eyeR * (0.75 - 0.2 * amt));
+      g.strokeStyle = ink; g.lineWidth = 1.5 * B.brow;
+      g.beginPath(); g.moveTo(-ex - 2.4, ey - 5); g.lineTo(-ex + 1.6, ey - 3.4 - amt * 0.8); g.stroke();
+      g.beginPath(); g.moveTo(ex + 2.4, ey - 5); g.lineTo(ex - 1.6, ey - 3.4 - amt * 0.8); g.stroke();
     } else {
-      eyeBall(-ex, 2.4, 2.7); eyeBall(ex, 2.4, 2.7);
+      eyeBall(-ex, eyeR, eyeR * 1.12); eyeBall(ex, eyeR, eyeR * 1.12);
     }
 
-    // mouth
+    // brows on the lad, faint and only when he means it
+    if (B.brow > 0.8 && amt > 0.5 && (e === 'surprised' || e === 'happy')) {
+      g.strokeStyle = ink; g.lineWidth = 1.2; g.globalAlpha = 0.5;
+      var bl = e === 'surprised' ? 5.6 : 4.8;
+      g.beginPath(); g.moveTo(-ex - 2, ey - bl); g.lineTo(-ex + 1.8, ey - bl - 0.4); g.stroke();
+      g.beginPath(); g.moveTo(ex + 2, ey - bl); g.lineTo(ex - 1.8, ey - bl - 0.4); g.stroke();
+      g.globalAlpha = 1;
+    }
+
+    // mouth — scales with how much he means it
     g.strokeStyle = ink; g.fillStyle = ink; g.lineWidth = 1.5;
     var my = -4.6;
-    if (e === 'happy') {
-      g.beginPath(); g.arc(0, my - 0.6, 2.5, 0.15, Math.PI - 0.15); g.fill();
+    if (e === 'happy' && amt > 0.55) {
+      g.beginPath(); g.arc(0, my - 0.6, 1.6 + amt * 1.1, 0.15, Math.PI - 0.15); g.fill();
       g.fillStyle = '#C97C86';
-      g.beginPath(); g.arc(0, my + 0.5, 1.4, 0.1, Math.PI - 0.1); g.fill();
+      g.beginPath(); g.arc(0, my + 0.5, 0.8 + amt * 0.7, 0.1, Math.PI - 0.1); g.fill();
     } else if (e === 'surprised') {
       g.fillStyle = ink;
-      g.beginPath(); g.ellipse(0, my, 1.5, 1.9, 0, 0, 6.29); g.fill();
+      g.beginPath(); g.ellipse(0, my, 0.9 + amt * 0.7, 1.1 + amt * 0.9, 0, 0, 6.29); g.fill();
     } else if (e === 'grumble') {
-      g.beginPath(); g.arc(0, my + 2.4, 2.2, Math.PI * 1.25, Math.PI * 1.75); g.stroke();
+      g.beginPath(); g.arc(0, my + 2.4, 1.5 + amt * 0.9, Math.PI * 1.25, Math.PI * 1.75); g.stroke();
     } else if (e === 'sleepy') {
-      g.beginPath(); g.ellipse(0, my, 1, 1.3, 0, 0, 6.29); g.fill();
+      g.beginPath(); g.ellipse(0, my, 0.7 + amt * 0.4, 0.9 + amt * 0.5, 0, 0, 6.29); g.fill();
     } else {
-      g.beginPath(); g.arc(0, my - 1, 2.1, 0.35, Math.PI - 0.35); g.stroke();
+      g.beginPath(); g.arc(0, my - 1, 1.5 + amt * 0.8, 0.35, Math.PI - 0.35); g.stroke();
     }
 
-    // blush
     if (e === 'happy' || e === 'content' || e === 'shy' || e === 'surprised') {
-      g.fillStyle = e === 'shy' ? 'rgba(255,120,140,0.55)' : 'rgba(255,140,150,0.42)';
+      var ba = (e === 'shy' ? 0.55 : 0.42) * (0.35 + 0.65 * amt);
+      g.fillStyle = 'rgba(255,' + (e === 'shy' ? 120 : 140) + ',150,' + ba.toFixed(3) + ')';
       g.beginPath(); g.ellipse(-6.6, -6.6, 2.4, 1.5, 0, 0, 6.29); g.fill();
       g.beginPath(); g.ellipse(6.6, -6.6, 2.4, 1.5, 0, 0, 6.29); g.fill();
     }
 
-    // ── helmet: a dome and cheek guards, leaving the face open
+    // ── headgear
     g.fillStyle = steel;
-    g.beginPath();
-    g.arc(0, -11.4, 10.2, Math.PI, 0);
-    g.lineTo(10.2, -13.4); g.lineTo(-10.2, -13.4);
-    g.closePath(); g.fill();
-    g.fillStyle = dark;
-    roundRectOn(g, -10.6, -14.6, 21.2, 2.9, 1.4); g.fill();     // brim
-    g.fillStyle = steel;
-    roundRectOn(g, -10.9, -13.4, 3.1, 8.2, 1.5); g.fill();      // cheek guards
-    roundRectOn(g, 7.8, -13.4, 3.1, 8.2, 1.5); g.fill();
-    g.fillStyle = P.trim;
-    g.beginPath(); g.arc(0, -13.2, 1, 0, 6.29); g.fill();
+    if (H.id === 'hood') {
+      g.fillStyle = P.tabard;
+      g.beginPath(); g.arc(0, -11, hr + 1.9, Math.PI * 0.98, Math.PI * 2.02); g.fill();
+      g.beginPath();
+      g.moveTo(-hr - 1.9, -11); g.quadraticCurveTo(-hr - 3, -3, -hr + 1.5, -2);
+      g.lineTo(-hr + 1.5, -6); g.closePath(); g.fill();
+      g.beginPath();
+      g.moveTo(hr + 1.9, -11); g.quadraticCurveTo(hr + 3, -3, hr - 1.5, -2);
+      g.lineTo(hr - 1.5, -6); g.closePath(); g.fill();
+    } else if (H.id === 'circlet') {
+      g.fillStyle = P.trim;
+      roundRectOn(g, -hr - 0.6, -15.4, (hr + 0.6) * 2, 2.4, 1.2); g.fill();
+      g.beginPath(); g.moveTo(0, -19.4); g.lineTo(2.2, -15.2); g.lineTo(-2.2, -15.2); g.closePath(); g.fill();
+    } else {
+      g.beginPath();
+      g.arc(0, -11.4, hr + 0.7, Math.PI, 0);
+      g.lineTo(hr + 0.7, -13.4); g.lineTo(-hr - 0.7, -13.4);
+      g.closePath(); g.fill();
+      g.fillStyle = dark;
+      roundRectOn(g, -hr - 1.1, -14.6, (hr + 1.1) * 2, 2.9, 1.4); g.fill();
+      g.fillStyle = steel;
+      roundRectOn(g, -hr - 1.4, -13.4, 3.1, 8.2, 1.5); g.fill();
+      roundRectOn(g, hr - 1.7, -13.4, 3.1, 8.2, 1.5); g.fill();
+      g.fillStyle = P.trim;
+      g.beginPath(); g.arc(0, -13.2, 1, 0, 6.29); g.fill();
+
+      if (H.id === 'horned') {
+        g.fillStyle = '#EFE6D2';
+        for (s = -1; s <= 1; s += 2) {
+          g.beginPath();
+          g.moveTo(s * (hr - 1), -17.6);
+          g.quadraticCurveTo(s * (hr + 5.4), -19.6, s * (hr + 4.2), -24.4);
+          g.quadraticCurveTo(s * (hr + 2.2), -20.6, s * (hr - 1.4), -19.6);
+          g.closePath(); g.fill();
+        }
+      } else if (H.id === 'winged') {
+        g.fillStyle = '#EFE6D2';
+        for (s = -1; s <= 1; s += 2) {
+          g.beginPath();
+          g.moveTo(s * (hr - 1.4), -17);
+          g.quadraticCurveTo(s * (hr + 6.6), -19.4, s * (hr + 7.4), -14.2);
+          g.quadraticCurveTo(s * (hr + 3), -16.2, s * (hr - 1.4), -15.2);
+          g.closePath(); g.fill();
+        }
+      }
+    }
 
     // ── plume
-    g.fillStyle = P.plume;
-    var sway = Math.sin((o.t || 0) * 4) * 0.13 + (o.tilt || 0) * -0.7;
-    g.save();
-    g.translate(0, -21.2);
-    g.rotate(sway);
-    g.beginPath();
-    g.moveTo(0, 2.4);
-    g.quadraticCurveTo(-6, -2.4, -2.6, -10);
-    g.quadraticCurveTo(0.7, -4.8, 3.7, -8.6);
-    g.quadraticCurveTo(4.6, -1.6, 0, 2.4);
-    g.closePath(); g.fill();
-    g.restore();
+    if (H.id !== 'circlet') {
+      g.fillStyle = P.plume;
+      var pl = B.plume;
+      var sway = Math.sin((o.t || 0) * 4) * 0.13 + (o.tilt || 0) * -0.7;
+      g.save();
+      g.translate(0, H.id === 'hood' ? -19 : -21.2);
+      g.rotate(sway);
+      g.scale(pl, pl);
+      g.beginPath();
+      g.moveTo(0, 2.4);
+      g.quadraticCurveTo(-6, -2.4, -2.6, -10);
+      g.quadraticCurveTo(0.7, -4.8, 3.7, -8.6);
+      g.quadraticCurveTo(4.6, -1.6, 0, 2.4);
+      g.closePath(); g.fill();
+      g.restore();
+    }
 
-    // dozing
     if (o.zzz) {
       g.font = '700 7px -apple-system, system-ui, sans-serif';
       for (var z = 0; z < 3; z++) {
@@ -3061,7 +3400,8 @@
     blink: 1.8, hop: 0, tilt: 0, wave: 0, reach: 0, zzz: 0, sit: 0,
     spin: 0, squash: 0, look: 0, lookT: 0,
     hearts: [], props: [], taps: 0, tapT: 0, petting: 0, pet: 0,
-    onStage: false, lastReact: '', bounce: 0, danceT: 0
+    onStage: false, lastReact: '', bounce: 0, danceT: 0,
+    amt: 0.5, amtTarget: 0.5
   };
 
   // weight, and how long he might keep at it
@@ -3096,7 +3436,7 @@
     KN.act = force || picked.id;
     KN.actT = rand(picked.dur[0], picked.dur[1]);
     KN.props.length = 0;
-    if (KN.act === 'ember') KN.props.push({ kind: 'ember', x: rand(-6, 6), y: 6, vx: rand(-5, 5), vy: -9, life: KN.actT });
+    if (KN.act === 'ember') KN.props.push({ kind: 'ember', x: rand(-6, 6), y: 6, vx: rand(-5, 5), vy: -9, ph: rand(0, 6.28), life: KN.actT });
     if (KN.act === 'moth')  KN.props.push({ kind: 'moth', x: rand(-14, 14), y: -14, ph: rand(0, 6.28), life: KN.actT });
   }
 
@@ -3104,7 +3444,12 @@
     KN.hearts.push({ x: rand(-7, 7), y: -18, vy: rand(-16, -24), vx: rand(-6, 6),
                      life: 1.5, max: 1.5, kind: kind || 'heart', r: rand(0.8, 1.2) });
   }
-  function knFeel(expr, secs) { KN.expr = expr; KN.exprT = secs; }
+  // Idle faces sit around half strength so he mostly just looks like he is
+  // thinking about something; reactions push it up.
+  function knFeel(expr, secs, amt) {
+    KN.expr = expr; KN.exprT = secs;
+    KN.amtTarget = amt === undefined ? rand(0.3, 0.6) : amt;
+  }
 
   function updateKnight(dt) {
     var i;
@@ -3129,7 +3474,8 @@
       KN.pet = Math.min(1, KN.pet + dt * 4);
       KN.tilt = Math.sin(S.time * 5) * 0.07 * KN.pet;
       KN.wave = 0; KN.reach = 0; KN.zzz = 0; KN.sit = Math.min(0.4, KN.sit + dt);
-      if (KN.exprT <= 0) knFeel('content', 0.25);
+      if (KN.exprT <= 0) knFeel('content', 0.25, Math.min(1, 0.55 + KN.pet * 0.45));
+      KN.amt += (KN.amtTarget - KN.amt) * Math.min(1, dt * 4);
       if (Math.random() < dt * 2.2) knHeart('heart');
       return;
     }
@@ -3210,23 +3556,27 @@
     KN.tilt = tilt;
 
     KN.blink -= dt;
-    if (KN.blink <= 0) { KN.blink = rand(1.8, 6); knFeel('blink', rand(0.1, 0.16)); }
-    if (KN.exprT <= 0) KN.expr = expr;
+    if (KN.blink <= 0) { KN.blink = rand(1.8, 6); knFeel('blink', rand(0.1, 0.16), 1); }
+    if (KN.exprT <= 0) {
+      if (KN.expr !== expr) KN.amtTarget = rand(0.25, 0.62);   // a fresh, partial reading
+      KN.expr = expr;
+    }
+    KN.amt += (KN.amtTarget - KN.amt) * Math.min(1, dt * 4);
   }
 
   // ── bothering him ──────────────────────────────────────────────────────
   // A bag of reactions rather than one response, so he never answers the
   // same way twice running.
   var KN_REACTS = [
-    { id: 'hop',    w: 3,   go: function () { knFeel('happy', rand(1, 1.8)); KN.hop = rand(5.5, 8); KN.squash = -0.1; knHeart('heart'); bell(rand(820, 960), 0.28, 0.032, 3.2); } },
-    { id: 'giggle', w: 2.4, go: function () { knFeel('happy', 1.6); KN.bounce = 0.55; knHeart('heart'); knHeart('heart');
+    { id: 'hop',    w: 3,   go: function () { knFeel('happy', rand(1, 1.8), rand(0.7, 1)); KN.hop = rand(5.5, 8); KN.squash = -0.1; knHeart('heart'); bell(rand(820, 960), 0.28, 0.032, 3.2); } },
+    { id: 'giggle', w: 2.4, go: function () { knFeel('happy', 1.6, rand(0.8, 1)); KN.bounce = 0.55; knHeart('heart'); knHeart('heart');
                                               bell(700, 0.22, 0.028, 3.4); bell(880, 0.24, 0.026, 3.4, 0.09); } },
-    { id: 'shy',    w: 1.6, go: function () { knFeel('shy', rand(1.4, 2.2)); KN.look = rand(0, 1) > 0.5 ? 1 : -1; KN.lookT = 2; knHeart('heart'); bell(590, 0.4, 0.026, 2.6); } },
-    { id: 'spin',   w: 1.2, go: function () { knFeel('happy', 1.4); KN.spin = 6.28; knHeart('note'); bell(660, 0.3, 0.03, 2.8); bell(990, 0.3, 0.024, 2.8, 0.1); } },
-    { id: 'wave',   w: 1.4, go: function () { knFeel('happy', 1.6); KN.act = 'wave'; KN.actT = 2; bell(760, 0.26, 0.03, 3); } },
-    { id: 'jump',   w: 1.1, go: function () { knFeel('surprised', 1.1); KN.hop = 9; KN.squash = -0.14; bell(1050, 0.2, 0.03, 3.6); } },
-    { id: 'ignore', w: 0.9, go: function () { knFeel('blink', 0.5); bell(430, 0.2, 0.018, 2.4); } },
-    { id: 'grump',  w: 0.7, go: function () { knFeel('grumble', 1.6); KN.tilt = 0.12; bell(300, 0.34, 0.03, 1.6); } }
+    { id: 'shy',    w: 1.6, go: function () { knFeel('shy', rand(1.4, 2.2), rand(0.6, 0.9)); KN.look = rand(0, 1) > 0.5 ? 1 : -1; KN.lookT = 2; knHeart('heart'); bell(590, 0.4, 0.026, 2.6); } },
+    { id: 'spin',   w: 1.2, go: function () { knFeel('happy', 1.4, rand(0.7, 1)); KN.spin = 6.28; knHeart('note'); bell(660, 0.3, 0.03, 2.8); bell(990, 0.3, 0.024, 2.8, 0.1); } },
+    { id: 'wave',   w: 1.4, go: function () { knFeel('happy', 1.6, rand(0.55, 0.85)); KN.act = 'wave'; KN.actT = 2; bell(760, 0.26, 0.03, 3); } },
+    { id: 'jump',   w: 1.1, go: function () { knFeel('surprised', 1.1, rand(0.8, 1)); KN.hop = 9; KN.squash = -0.14; bell(1050, 0.2, 0.03, 3.6); } },
+    { id: 'ignore', w: 0.9, go: function () { knFeel('blink', 0.5, rand(0.2, 0.4)); bell(430, 0.2, 0.018, 2.4); } },
+    { id: 'grump',  w: 0.7, go: function () { knFeel('grumble', 1.6, rand(0.5, 0.85)); KN.tilt = 0.12; bell(300, 0.34, 0.03, 1.6); } }
   ];
 
   function knightPoke() {
@@ -3235,7 +3585,7 @@
 
     // pester him and he stops being charmed by it
     if (KN.taps >= 5 && Math.random() < 0.7) {
-      knFeel('grumble', 1.8);
+      knFeel('grumble', 1.8, rand(0.7, 1));
       KN.bounce = 0.4;
       knHeart('note');
       bell(260, 0.4, 0.032, 1.5);
@@ -3256,7 +3606,7 @@
   function knightPet() {
     if (KN.petting <= 0) {
       bell(rand(600, 700), 0.4, 0.026, 2.6);
-      if (Math.random() < 0.25) { knFeel('surprised', 0.5); KN.hop = 4; }   // caught him off guard
+      if (Math.random() < 0.25) { knFeel('surprised', 0.5, rand(0.7, 1)); KN.hop = 4; }   // caught him off guard
     }
     KN.petting = 0.35;
   }
@@ -3286,6 +3636,7 @@
     g.scale(sc, sc);
     for (var pi = 0; pi < KN.props.length; pi++) {
       var pr = KN.props[pi];
+      if (!isFinite(pr.x) || !isFinite(pr.y)) continue;
       if (pr.kind === 'ember') {
         var eg = g.createRadialGradient(pr.x, pr.y, 0, pr.x, pr.y, 4);
         eg.addColorStop(0, 'rgba(255,236,170,0.95)');
@@ -3305,7 +3656,7 @@
     g.restore();
 
     drawKnight(g, {
-      t: S.time, scale: sc, expr: KN.expr, look: KN.look,
+      t: S.time, scale: sc, expr: KN.expr, amt: KN.amt, look: KN.look,
       tilt: KN.tilt, hop: KN.hop, squash: KN.squash, spin: KN.spin,
       wave: KN.wave, reach: KN.reach, zzz: KN.zzz, sit: KN.sit
     });
@@ -3380,6 +3731,29 @@
     }
     return out;
   }
+  function wardrobeRow(label, slot, list, current) {
+    var segs = '';
+    for (var i = 0; i < list.length; i++) {
+      segs += '<button class="seg' + (list[i].id === current ? ' on' : '') + '" ' +
+              'data-wear="' + slot + '" data-id="' + list[i].id + '">' + esc(list[i].name) + '</button>';
+    }
+    return '<div class="wearrow"><span>' + esc(label) + '</span><div class="segs wrap">' + segs + '</div></div>';
+  }
+  function bindWardrobe() {
+    var btns = elCard.querySelectorAll('[data-wear]');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].addEventListener('click', function () {
+        var slot = this.getAttribute('data-wear');
+        META.knight[slot] = this.getAttribute('data-id');
+        saveMeta();
+        var row = this.parentNode.querySelectorAll('.seg');
+        for (var j = 0; j < row.length; j++) row[j].classList.toggle('on', row[j] === this);
+        paintPortrait();
+        UI.toggle();
+      });
+    }
+  }
+
   function bindPlumes() {
     var sw = elCard.querySelectorAll('[data-plume]');
     for (var i = 0; i < sw.length; i++) {
@@ -3409,6 +3783,12 @@
       '<input id="nameIn" class="nameIn" maxlength="14" autocomplete="off" spellcheck="false" ' +
         'placeholder="Name your knight" value="' + esc(META.knight.name) + '">' +
       '<div class="plumes">' + plumeSwatches() + '</div>' +
+      '<div class="wearlist">' +
+        wardrobeRow('Build',  'build',  BUILDS,  buildOf().id) +
+        wardrobeRow('Helm',   'helm',   HELMS,   helmOf().id) +
+        wardrobeRow('Cape',   'cape',   CAPES,   capeOf().id) +
+        wardrobeRow('Armour', 'armour', ARMOURS, armourOf().id) +
+      '</div>' +
       '<button class="go" id="btnName">' + (first ? 'Take the Watch' : 'Save') + '</button>' +
       (first ? '' : '<button class="ghost" id="btnNameBack">Back to camp</button>') +
       (first ? '' : '<button class="ghost danger" id="btnWipe">Start over from nothing</button>') +
@@ -3418,6 +3798,7 @@
     );
     hookPortrait();
     bindPlumes();
+    bindWardrobe();
     var input = document.getElementById('nameIn');
     var commit = function () {
       var n = cleanName(input.value);
@@ -4127,7 +4508,7 @@
   // opt-in inspection hook for tuning/QA: open with #debug
   if (/[?#]debug/.test(location.href)) window.__NW = { S: S, K: K, D: D, META: META, UPGRADES: UPGRADES, PERKS: PERKS,
       flare: doFlare, swing: doSwing, lightAt: lightAt, stick: stick, KN: KN, updateKnight: updateKnight, knightPoke: knightPoke, knightPet: knightPet, beatNow: beatNow, drawKnight: drawKnight, A: A, MUS: MUS, TUNES: TUNES,
-      startMusic: startMusic, nextTune: nextTune, setMusic: setMusic, SFX: SFX, UI: UI, ac: ac,
+      startMusic: startMusic, nextTune: nextTune, setMusic: setMusic, SFX: SFX, UI: UI, ac: ac, switchTo: switchTo, applyTone: applyTone, GENRE: GENRE,
       music: { parseChord: parseChord, voicing: voicing, bassNote: bassNote,
                leadNote: leadNote, chordAt: chordAt, QUAL: QUAL, mtof: mtof }, recalc: recalc, saveMeta: saveMeta, rollDraft: rollDraft, take: takeUpgrade };
   resize();
