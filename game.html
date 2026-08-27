@@ -360,6 +360,21 @@
   .feat:not(.got) .fe{color:var(--mute);opacity:.6}
 
   /* ---------- run summary extras ---------- */
+  .stage{
+    position:relative;display:block;width:100%;margin-bottom:18px;padding:10px 0 14px;
+    border-radius:22px;cursor:pointer;
+    border:1px solid var(--line);
+    background:radial-gradient(80% 90% at 50% 78%, rgba(255,159,10,0.13), rgba(20,16,14,0.35) 68%, transparent);
+    touch-action:none;-webkit-user-select:none;user-select:none;
+    transition:background .3s ease;
+  }
+  .stage:active{background:radial-gradient(80% 90% at 50% 78%, rgba(255,159,10,0.2), rgba(20,16,14,0.4) 68%, transparent)}
+  .portrait.stage-knight{width:210px;height:210px;margin:0 auto;display:block;background:none;pointer-events:none}
+  .stagename{text-align:center;margin-top:2px;pointer-events:none}
+  .stagename b{display:block;font:700 22px/1.15 var(--display);letter-spacing:-.01em;color:var(--bone)}
+  .stagename span{display:block;margin-top:4px;font:600 10px/1 var(--body);letter-spacing:.18em;
+    text-transform:uppercase;color:var(--ember)}
+
   .knight{
     display:flex;align-items:center;gap:14px;text-align:left;
     border:1px solid var(--line);border-radius:18px;padding:12px 15px;margin-bottom:18px;
@@ -555,7 +570,7 @@
   var gctx = groundCvs.getContext('2d');
 
   var W = 0, H = 0, DPR = 1;
-  var BUILD = 'v1.3.0';        // bump on every deploy — shown in-game for support
+  var BUILD = 'v1.4.0';        // bump on every deploy — shown in-game for support
   var MUTE_KEY = 'keeper.nightwatch.mute';
   var MUSIC_KEY = 'keeper.nightwatch.music';
 
@@ -2385,24 +2400,28 @@
     return (META.knight && META.knight.name) ? META.knight.name : 'the Keeper';
   }
 
-  // opts: { bob, flash, carry, face, swing, swingDir, brandArc, lantern, scale }
+  // opts: { t, scale, flash, expr, tilt, hop, wave, zzz, carry }
   function drawKnight(g, o) {
     var P = plumeOf();
     var sc = o.scale || 1;
     var steel = o.flash ? '#FFD9D6' : '#C9CFD8';
     var steelDark = o.flash ? '#E0A9A6' : '#8E97A4';
+    var hop = o.hop || 0;
 
     g.save();
     g.scale(sc, sc);
 
-    // shadow
-    g.fillStyle = 'rgba(0,0,0,0.45)';
-    g.beginPath(); g.ellipse(0, 13, 11, 4, 0, 0, 6.29); g.fill();
+    // shadow stays on the ground and shrinks as he leaves it
+    g.fillStyle = 'rgba(0,0,0,' + (0.45 - hop * 0.03).toFixed(3) + ')';
+    g.beginPath(); g.ellipse(0, 13, 11 - hop * 0.55, 4 - hop * 0.18, 0, 0, 6.29); g.fill();
+
+    g.translate(0, -hop);
+    if (o.tilt) g.rotate(o.tilt);
 
     // little round shield on the off hand
     g.save();
     g.translate(-11, 1);
-    g.rotate(-0.25);
+    g.rotate(-0.25 + (o.wave || 0) * -0.5);
     g.fillStyle = steelDark;
     g.beginPath(); g.ellipse(0, 0, 6.2, 7.4, 0, 0, 6.29); g.fill();
     g.fillStyle = P.tabard;
@@ -2410,6 +2429,18 @@
     g.fillStyle = P.trim;
     g.beginPath(); g.arc(0, 0, 1.7, 0, 6.29); g.fill();
     g.restore();
+
+    // a small waving hand on the other side
+    if (o.wave) {
+      g.save();
+      g.translate(10, 0);
+      g.rotate(-0.9 - Math.sin((o.t || 0) * 12) * 0.4 * o.wave);
+      g.strokeStyle = steelDark; g.lineWidth = 2.6; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(0, 0); g.lineTo(0, -8); g.stroke();
+      g.fillStyle = steel;
+      g.beginPath(); g.arc(0, -9.5, 2.4, 0, 6.29); g.fill();
+      g.restore();
+    }
 
     // body — a stubby tabard over mail
     g.fillStyle = steelDark;
@@ -2427,22 +2458,56 @@
     g.fillStyle = steel;
     g.beginPath(); g.arc(0, -11, 9.4, Math.PI, 0); g.fill();
     roundRectOn(g, -9.4, -11, 18.8, 11, 4.5); g.fill();
-    // visor slit
     g.fillStyle = '#1A1A22';
     roundRectOn(g, -6.4, -10.4, 12.8, 4.2, 2); g.fill();
-    // two friendly pinpricks of light inside
-    g.fillStyle = o.flash ? '#FFC9C4' : '#FFE9A8';
-    g.beginPath(); g.arc(-2.6, -8.3, 1.25, 0, 6.29); g.fill();
-    g.beginPath(); g.arc(2.6, -8.3, 1.25, 0, 6.29); g.fill();
+
+    // ── the face, such as it is: two lights behind the visor
+    var eye = o.flash ? '#FFC9C4' : '#FFE9A8';
+    var ex = 2.6, ey = -8.3, s2;
+    g.fillStyle = eye; g.strokeStyle = eye; g.lineCap = 'round';
+    if (o.expr === 'happy' || o.expr === 'content') {
+      var lift = o.expr === 'happy' ? 1.75 : 1.5;
+      g.lineWidth = 1.5;
+      for (s2 = -1; s2 <= 1; s2 += 2) {
+        g.beginPath(); g.arc(s2 * ex, ey + 0.9, lift, Math.PI * 1.15, Math.PI * 1.85); g.stroke();
+      }
+    } else if (o.expr === 'blink') {
+      g.lineWidth = 1.5;
+      for (s2 = -1; s2 <= 1; s2 += 2) {
+        g.beginPath(); g.moveTo(s2 * ex - 1.7, ey); g.lineTo(s2 * ex + 1.7, ey); g.stroke();
+      }
+    } else if (o.expr === 'sleepy') {
+      g.lineWidth = 1.4;
+      for (s2 = -1; s2 <= 1; s2 += 2) {
+        g.beginPath(); g.arc(s2 * ex, ey - 0.7, 1.7, Math.PI * 0.12, Math.PI * 0.88); g.stroke();
+      }
+    } else if (o.expr === 'surprised') {
+      g.beginPath(); g.arc(-ex, ey, 1.85, 0, 6.29); g.fill();
+      g.beginPath(); g.arc(ex, ey, 1.85, 0, 6.29); g.fill();
+    } else if (o.expr === 'look') {
+      var lx = Math.cos((o.t || 0) * 1.1) * 0.9;
+      g.beginPath(); g.arc(-ex + lx, ey, 1.25, 0, 6.29); g.fill();
+      g.beginPath(); g.arc(ex + lx, ey, 1.25, 0, 6.29); g.fill();
+    } else {
+      g.beginPath(); g.arc(-ex, ey, 1.25, 0, 6.29); g.fill();
+      g.beginPath(); g.arc(ex, ey, 1.25, 0, 6.29); g.fill();
+    }
+
     // cheek plates + rivet
     g.fillStyle = steelDark;
     roundRectOn(g, -9.4, -5.4, 18.8, 2.6, 1.3); g.fill();
     g.fillStyle = P.trim;
     g.beginPath(); g.arc(0, -4.1, 0.9, 0, 6.29); g.fill();
+    // a pleased little flush on the cheek plates
+    if (o.expr === 'happy' || o.expr === 'content') {
+      g.fillStyle = 'rgba(255,140,150,0.5)';
+      g.beginPath(); g.ellipse(-6.6, -4.2, 2, 1.1, 0, 0, 6.29); g.fill();
+      g.beginPath(); g.ellipse(6.6, -4.2, 2, 1.1, 0, 0, 6.29); g.fill();
+    }
 
     // plume
     g.fillStyle = P.plume;
-    var sway = Math.sin((o.t || 0) * 4) * 0.12;
+    var sway = Math.sin((o.t || 0) * 4) * 0.12 + (o.tilt || 0) * -0.6;
     g.save();
     g.translate(0, -19.4);
     g.rotate(sway);
@@ -2454,8 +2519,21 @@
     g.closePath(); g.fill();
     g.restore();
 
+    // dozing
+    if (o.zzz) {
+      g.fillStyle = 'rgba(232,220,200,' + (0.5 * o.zzz).toFixed(3) + ')';
+      g.font = '700 7px -apple-system, system-ui, sans-serif';
+      for (var z = 0; z < 3; z++) {
+        var zt = ((o.t || 0) * 0.5 + z * 0.33) % 1;
+        g.globalAlpha = (1 - zt) * o.zzz;
+        g.fillText('z', 9 + zt * 7, -18 - zt * 13);
+      }
+      g.globalAlpha = 1;
+    }
+
     g.restore();
   }
+
   function roundRectOn(g, x, y, w, h, r) {
     g.beginPath();
     g.moveTo(x + r, y);
@@ -2905,6 +2983,113 @@
     elPause.classList.toggle('on', on);
   }
 
+  // ── his little life ────────────────────────────────────────────────────
+  // On the camp screen he is not a portrait, he is a small person with
+  // nothing to do. He potters, and you can bother him.
+  var KN = {
+    act: 'idle', actT: 2, expr: 'normal', exprT: 0,
+    blink: 1.8, hop: 0, tilt: 0, wave: 0, zzz: 0,
+    hearts: [], taps: 0, tapT: 0, petting: 0, pet: 0, bounce: 0
+  };
+  var KN_ACTS = [
+    { id: 'idle',    w: 5, dur: [2.5, 5] },
+    { id: 'look',    w: 3, dur: [2.5, 4] },
+    { id: 'wave',    w: 1.6, dur: [1.8, 2.6] },
+    { id: 'stretch', w: 1.6, dur: [1.6, 2.2] },
+    { id: 'doze',    w: 1.4, dur: [4, 7] }
+  ];
+  function knightAct() {
+    var total = 0, i;
+    for (i = 0; i < KN_ACTS.length; i++) total += KN_ACTS[i].w;
+    var roll = Math.random() * total, acc = 0, pickd = KN_ACTS[0];
+    for (i = 0; i < KN_ACTS.length; i++) { acc += KN_ACTS[i].w; if (roll <= acc) { pickd = KN_ACTS[i]; break; } }
+    KN.act = pickd.id;
+    KN.actT = rand(pickd.dur[0], pickd.dur[1]);
+  }
+  function knHeart(kind) {
+    KN.hearts.push({ x: rand(-7, 7), y: -16, vy: rand(-16, -24), vx: rand(-6, 6),
+                     life: 1.5, max: 1.5, kind: kind || 'heart', r: rand(0.8, 1.2) });
+  }
+  function knFeel(expr, secs) { KN.expr = expr; KN.exprT = secs; }
+
+  function updateKnight(dt) {
+    // hearts drift up whatever he is doing
+    for (var i = KN.hearts.length - 1; i >= 0; i--) {
+      var h = KN.hearts[i];
+      h.life -= dt;
+      if (h.life <= 0) { KN.hearts.splice(i, 1); continue; }
+      h.y += h.vy * dt; h.x += h.vx * dt; h.vy *= (1 - dt * 0.6);
+    }
+
+    KN.hop = Math.max(0, KN.hop - dt * 26);
+    if (KN.bounce > 0) { KN.bounce -= dt; KN.hop = Math.max(KN.hop, Math.abs(Math.sin(KN.bounce * 15)) * 5 * KN.bounce); }
+    KN.tapT = Math.max(0, KN.tapT - dt);
+    if (KN.tapT <= 0) KN.taps = 0;
+
+    // being petted overrides everything, because of course it does
+    if (KN.petting > 0) {
+      KN.petting -= dt;
+      KN.pet = Math.min(1, KN.pet + dt * 4);
+      KN.tilt = Math.sin(S.time * 5) * 0.07 * KN.pet;
+      KN.wave = 0; KN.zzz = 0;
+      knFeel('content', 0.3);
+      if (Math.random() < dt * 2.2) knHeart('heart');
+      return;
+    }
+    KN.pet = Math.max(0, KN.pet - dt * 2);
+
+    if (KN.exprT > 0) { KN.exprT -= dt; }
+
+    KN.actT -= dt;
+    if (KN.actT <= 0) knightAct();
+
+    // gestures belonging to the current pottering
+    KN.wave = KN.act === 'wave' ? Math.min(1, KN.wave + dt * 5) : Math.max(0, KN.wave - dt * 5);
+    KN.zzz  = KN.act === 'doze' ? Math.min(1, KN.zzz + dt * 1.2) : Math.max(0, KN.zzz - dt * 3);
+    if (KN.act === 'stretch') {
+      KN.tilt = Math.sin(S.time * 2.2) * 0.11;
+      KN.hop = Math.max(KN.hop, 1.4 + Math.sin(S.time * 2.2) * 1.4);
+    } else if (KN.act !== 'doze') {
+      KN.tilt = Math.sin(S.time * 1.1) * 0.02;
+    } else {
+      KN.tilt = 0.1;
+    }
+
+    // blinking, unless his eyes are already doing something
+    KN.blink -= dt;
+    if (KN.blink <= 0) { KN.blink = rand(2.4, 5.5); knFeel('blink', 0.13); }
+
+    if (KN.exprT <= 0) {
+      KN.expr = KN.act === 'doze' ? 'sleepy'
+              : KN.act === 'look' ? 'look'
+              : KN.act === 'wave' ? 'happy'
+              : 'normal';
+    }
+  }
+
+  // tap him
+  function knightPoke(x, y) {
+    KN.taps++; KN.tapT = 1.6;
+    if (KN.taps >= 4) {                       // enough, thank you
+      knFeel('surprised', 1.1);
+      KN.bounce = 0.5;
+      knHeart('note');
+      bell(720, 0.3, 0.035, 3.4);
+      KN.taps = 0;
+    } else {
+      knFeel('happy', 1.4);
+      KN.hop = 6.5;
+      KN.act = 'idle'; KN.actT = 1.6;
+      knHeart('heart');
+      bell(880 + KN.taps * 90, 0.28, 0.032, 3.2);
+    }
+    buzz(8);
+  }
+  function knightPet() {
+    if (KN.petting <= 0) bell(660, 0.4, 0.028, 2.6);
+    KN.petting = 0.35;
+  }
+
   var portraitCv = null;
   function paintPortrait() {
     var cv = portraitCv;
@@ -2925,7 +3110,31 @@
     var sc = Math.min(w, h) / ((BOT - TOP) * 1.28);
     g.save();
     g.translate(w / 2, h / 2 - MID * sc);
-    drawKnight(g, { t: S.time, scale: sc });
+    drawKnight(g, {
+      t: S.time, scale: sc, expr: KN.expr,
+      tilt: KN.tilt, hop: KN.hop, wave: KN.wave, zzz: KN.zzz
+    });
+    // whatever he is feeling about it
+    for (var i = 0; i < KN.hearts.length; i++) {
+      var hh = KN.hearts[i], a = clamp(hh.life / hh.max, 0, 1);
+      g.save();
+      g.scale(sc, sc);
+      g.globalAlpha = a;
+      g.fillStyle = hh.kind === 'note' ? 'rgba(255,214,110,0.95)' : 'rgba(255,138,160,0.95)';
+      if (hh.kind === 'note') {
+        g.beginPath(); g.arc(hh.x, hh.y, 1.5 * hh.r, 0, 6.29); g.fill();
+        g.fillRect(hh.x + 1.1 * hh.r, hh.y - 5 * hh.r, 0.7 * hh.r, 5 * hh.r);
+      } else {
+        var r = 1.7 * hh.r;
+        g.beginPath();
+        g.moveTo(hh.x, hh.y + r);
+        g.bezierCurveTo(hh.x - r * 1.6, hh.y - r * 0.35, hh.x - r * 0.5, hh.y - r * 1.5, hh.x, hh.y - r * 0.5);
+        g.bezierCurveTo(hh.x + r * 0.5, hh.y - r * 1.5, hh.x + r * 1.6, hh.y - r * 0.35, hh.x, hh.y + r);
+        g.closePath(); g.fill();
+      }
+      g.restore();
+    }
+    g.globalAlpha = 1;
     g.restore();
   }
 
@@ -2939,6 +3148,31 @@
   function hideVeil() { elVeil.classList.add('hide'); }
   function on(id, fn) { var el = document.getElementById(id); if (el) el.addEventListener('click', fn); }
   function hookPortrait() { portraitCv = document.getElementById('portrait'); paintPortrait(); }
+
+  // Poke him and he perks up; drag across him and he leans into it.
+  function bindStage() {
+    var st = document.getElementById('stage');
+    if (!st) return;
+    var down = false, moved = 0, sx = 0, sy = 0;
+    st.addEventListener('pointerdown', function (e) {
+      down = true; moved = 0; sx = e.clientX; sy = e.clientY;
+      try { st.setPointerCapture(e.pointerId); } catch (err) {}
+    });
+    st.addEventListener('pointermove', function (e) {
+      if (!down) return;
+      moved += Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy);
+      sx = e.clientX; sy = e.clientY;
+      if (moved > 24) knightPet();          // a stroke, not a tap
+    });
+    var end = function (e) {
+      if (!down) return;
+      down = false;
+      if (moved <= 24) knightPoke();
+      try { st.releasePointerCapture(e.pointerId); } catch (err) {}
+    };
+    st.addEventListener('pointerup', end);
+    st.addEventListener('pointercancel', end);
+  }
   function plumeSwatches() {
     var cur = plumeOf().id, out = '';
     for (var i = 0; i < PLUMES.length; i++) {
@@ -3072,7 +3306,10 @@
   function nextUnlockNote(level) {
     var soon = [];
     for (var i = 0; i < UPGRADES.length; i++) if (UPGRADES[i].lv === level + 1) soon.push(UPGRADES[i].name);
-    return soon.length ? ' · unlocks ' + soon.join(' & ') : '';
+    if (!soon.length) return '';
+    var shown = soon.slice(0, 2).join(' & ');
+    if (soon.length > 2) shown += ' +' + (soon.length - 2) + ' more';
+    return ' · unlocks ' + shown;
   }
   function upChips(map, big) {
     var out = '', ids = Object.keys(map || {});
@@ -3105,33 +3342,20 @@
       '<div class="eyebrow">The Keeper</div>' +
       '<h1>Night<em>Watch</em></h1>' +
       storageWarning() +
-      (META.knight.name
-        ? '<div class="knight">' +
-            '<canvas id="portrait" class="portrait"></canvas>' +
-            '<div class="kinfo">' +
-              '<b>' + esc(META.knight.name) + '</b>' +
-              '<span>' + esc(knightTitle()) + '</span>' +
-              '<u>' + plural(META.lifeNights, 'night') + ' held · ' +
-                      plural(META.lifeKills, 'shade') + ' dispelled</u>' +
-            '</div>' +
-          '</div>'
-        : '') +
+      '<div class="stage" id="stage">' +
+        '<canvas id="portrait" class="portrait stage-knight"></canvas>' +
+        (META.knight.name
+          ? '<div class="stagename"><b>' + esc(META.knight.name) + '</b>' +
+            '<span>' + esc(knightTitle()) + '</span></div>'
+          : '<div class="stagename"><b>A knight with no name</b><span>waiting by the fire</span></div>') +
+      '</div>' +
       (META.runs
-        ? levelStrip() +
-          '<div class="tally sm">' +
+        ? '<div class="tally sm">' +
+            '<div><span>Nights held</span><b>' + META.lifeNights + '</b></div>' +
             '<div><span>Best night</span><b>' + META.bestNight + '</b></div>' +
-            '<div><span>Best score</span><b>' + META.bestScore.toLocaleString() + '</b></div>' +
-            '<div><span>Watches</span><b>' + META.runs + '</b></div>' +
-          '</div>'
-        : '<p class="lede">The fire is the only thing between you and what waits past the light. Keep it burning until dawn.</p>' +
-          '<ul class="rules">' +
-            '<li><span class="glyph">🪵</span><span>Walk over <b>logs</b> to pick one up. Carry it into the fire to feed it.</span></li>' +
-            '<li><span class="glyph">🔥</span><span>The fire burns down on its own — and a bigger fire throws a <b>wider ring of light</b>.</span></li>' +
-            '<li><span class="glyph">👁</span><span><b>Shades</b> crawl in from the dark to drain it. Light burns them; your lantern helps.</span></li>' +
-            '<li><span class="glyph">🔥</span><span>Swing the <b>brand</b> to drive them off — free and fast, but you must aim it and get close.</span></li>' +
-            '<li><span class="glyph">✦</span><span><b>Flare</b> clears all around you at once, but it costs fire. Later nights bring <b>husks</b> that shrug off firelight.</span></li>' +
-            '<li><span class="glyph">🌅</span><span>Survive to <b>dawn</b> and you draft an upgrade. Embers you earn buy permanent gear.</span></li>' +
-          '</ul>') +
+            '<div><span>Shades</span><b>' + META.lifeKills + '</b></div>' +
+          '</div>' + levelStrip()
+        : '<p class="lede">Keep his fire burning until dawn.</p>') +
       '<button class="go" id="btnStart">Take the Watch</button>' +
       '<div class="row2">' +
         '<button class="ghost" id="btnShop">Provisions</button>' +
@@ -3143,9 +3367,7 @@
       '</div>' +
       transportHtml(true) +
       buildFoot() +
-      '<div class="foot">Drag to move · Brand to swing · Flare when surrounded</div>' +
-
-      '<div class="foot">' + (locked ? locked + ' upgrades still locked · level up to draft them' : 'Every upgrade unlocked') + '</div>'
+      '<div class="foot">Tap him. He likes that.</div>'
     );
     on('btnStart', function () {
       if (!META.knight.name) nameKnight(startGame); else startGame();
@@ -3156,6 +3378,7 @@
     on('btnSettings', function () { settingsScreen(menu); });
     bindTransport(function () { musicScreen(menu); });
     hookPortrait();
+    bindStage();
   }
 
   // ── provisions: spend embers on things that persist ───────────────────────
@@ -3219,6 +3442,26 @@
     on('btnBack', menu);
   }
 
+  function howToPlay(back) {
+    S.mode = 'menu';
+    veil(
+      '<div class="eyebrow">How to play</div>' +
+      '<h1>The <em>Watch</em></h1>' +
+      '<ul class="rules">' +
+        '<li><span class="glyph">🪵</span><span>Wood drifts into your arms when you get near. Carry it into the fire.</span></li>' +
+        '<li><span class="glyph">🔥</span><span>The fire burns down on its own, and a bigger fire throws a <b>wider ring of light</b>.</span></li>' +
+        '<li><span class="glyph">👁</span><span><b>Shades</b> come in from the dark to drain it. Light burns them, and dispelling one mends you a little.</span></li>' +
+        '<li><span class="glyph">🗡</span><span>Swing the <b>brand</b> to drive them off — free and fast, but you have to aim it.</span></li>' +
+        '<li><span class="glyph">✦</span><span><b>Flare</b> clears all around you at once, but it costs fire.</span></li>' +
+        '<li><span class="glyph">🌅</span><span>Live to <b>dawn</b> and you draft an upgrade. Embers you earn buy permanent gear.</span></li>' +
+      '</ul>' +
+      '<button class="ghost" id="btnBack">Back</button>' +
+      buildFoot(),
+      'wide'
+    );
+    on('btnBack', back || menu);
+  }
+
   // ── settings ──────────────────────────────────────────────────────────────
   // Every row is the same shape: a label, a line of help, and two or more
   // choices. Picking one writes it straight through to the saved record.
@@ -3260,7 +3503,10 @@
       '<div class="eyebrow">Settings</div>' +
       '<h1>How It <em>Plays</em></h1>' +
       '<div class="setlist">' + rows + '</div>' +
-      '<button class="ghost" id="btnMusicFromSet">Browse the music</button>' +
+      '<div class="row2">' +
+        '<button class="ghost" id="btnMusicFromSet">Music</button>' +
+        '<button class="ghost" id="btnHow">How to play</button>' +
+      '</div>' +
       '<button class="ghost" id="btnBack">Back</button>' +
       buildFoot(),
       'wide'
@@ -3279,6 +3525,7 @@
       });
     }
     on('btnMusicFromSet', function () { musicScreen(function () { settingsScreen(back); }); });
+    on('btnHow', function () { howToPlay(function () { settingsScreen(back); }); });
     on('btnBack', back || menu);
   }
 
@@ -3638,7 +3885,7 @@
     }
     render();
     syncHud();
-    if (portraitCv) paintPortrait();
+    if (portraitCv) { updateKnight(dt); paintPortrait(); }
   }
 
   // ────────────────────────────────────────────────────────────── boot
@@ -3682,7 +3929,7 @@
   document.addEventListener('keydown', wakeAudio);
   // opt-in inspection hook for tuning/QA: open with #debug
   if (/[?#]debug/.test(location.href)) window.__NW = { S: S, K: K, D: D, META: META, UPGRADES: UPGRADES, PERKS: PERKS,
-      flare: doFlare, swing: doSwing, lightAt: lightAt, stick: stick, A: A, MUS: MUS, TUNES: TUNES,
+      flare: doFlare, swing: doSwing, lightAt: lightAt, stick: stick, KN: KN, updateKnight: updateKnight, A: A, MUS: MUS, TUNES: TUNES,
       startMusic: startMusic, nextTune: nextTune, setMusic: setMusic, SFX: SFX, UI: UI, ac: ac,
       music: { parseChord: parseChord, voicing: voicing, bassNote: bassNote,
                leadNote: leadNote, chordAt: chordAt, QUAL: QUAL, mtof: mtof }, recalc: recalc, saveMeta: saveMeta, rollDraft: rollDraft, take: takeUpgrade };
