@@ -3114,10 +3114,10 @@
   // for a lad. Same fellow either way — it is how he comes across, not who
   // he is.
   var BUILD_BASE = { id: 'lad', name: 'Lad', waist: 1.06, head: 9.3, brow: 1, lash: 0,
-                     jaw: 1.1, eye: 2.3, plume: 0.9, blush: 0, scruff: 0 };
+                     eye: 2.3, plume: 0.9, scruff: 0 };
   var BUILD_FOR = {
-    lass: { head: 9.7, waist: 0.99, brow: 0.6, jaw: 0.94, eye: 2.62, plume: 1.1, blush: 1, scruff: 0 },
-    lad:  { head: 9.3, waist: 1.06, brow: 1,   jaw: 1.1,  eye: 2.3,  plume: 0.9, blush: 0, scruff: 1 }
+    lass: { head: 9.7, waist: 0.99, brow: 0.62, eye: 2.62, plume: 1.1, scruff: 0 },
+    lad:  { head: 9.3, waist: 1.06, brow: 1,    eye: 2.3,  plume: 0.9, scruff: 1 }
   };
   var _buildCache = {};
   function buildKey(k) {
@@ -3356,8 +3356,6 @@
     var hr = B.head;
     g.fillStyle = skin;
     g.beginPath(); g.arc(0, -9.6, hr, 0, 6.29); g.fill();
-    g.fillStyle = skinS;
-    g.beginPath(); g.ellipse(0, -3.4, 5.6 * B.jaw, 2, 0, 0, Math.PI); g.fill();
 
     if (back) {
       // the back of his head: hair over almost all of it, one ear, no face
@@ -3383,20 +3381,32 @@
       drawHead(g, H, hr, accent, cloth, trim, HR, o);
       g.restore();
     } else {
+      g.fillStyle = skin;                          // ears, so the head has corners
+      for (var er = -1; er <= 1; er += 2) {
+        g.beginPath(); g.ellipse(er * (hr - 0.5), -8.6, 1.4, 2, 0, 0, 6.29); g.fill();
+      }
+      g.fillStyle = skinS;
+      for (er = -1; er <= 1; er += 2) {
+        g.beginPath(); g.ellipse(er * (hr - 0.3), -8.6, 0.55, 1, 0, 0, 6.29); g.fill();
+      }
       if (H.hair !== false) {
+        // The cap comes over the crown and down past the temples, and the
+        // fringe sweeps up clear of his eyes rather than sitting on them.
         g.fillStyle = HR.v;
         g.beginPath();
-        g.arc(0, -10, hr + 0.5, Math.PI * 1.02, Math.PI * 1.98);
-        g.lineTo(hr * 0.9, -10.4);
-        g.lineTo(hr * 0.55, -12.6);
-        g.lineTo(-hr * 0.2, -11.2);
-        g.lineTo(-hr * 0.85, -12.4);
+        g.arc(0, -10.2, hr + 0.5, Math.PI * 1.04, Math.PI * 1.96);
+        g.bezierCurveTo(hr * 0.7, -15.2, hr * 0.16, -16.4, -hr * 0.3, -15.8);
+        g.bezierCurveTo(-hr * 0.68, -15.3, -hr * 0.9, -13.8, -hr * 0.999, -12.05);
         g.closePath(); g.fill();
-        if (B.scruff) {                        // a tuft that never lies flat
+        g.fillStyle = 'rgba(255,255,255,0.07)';      // a little light off the top
+        g.beginPath();
+        g.ellipse(-hr * 0.34, -16.2, hr * 0.42, 1.5, -0.34, 0, 6.29); g.fill();
+        if (B.scruff) {                              // a bit of it never lies flat
+          g.fillStyle = HR.v;
           g.beginPath();
-          g.moveTo(-hr * 0.1, -hr - 8.6);
-          g.quadraticCurveTo(hr * 0.5, -hr - 13.4, hr * 0.86, -hr - 9.2);
-          g.quadraticCurveTo(hr * 0.4, -hr - 9.8, -hr * 0.1, -hr - 8.6);
+          g.moveTo(-hr * 0.26, -hr - 8.9);
+          g.bezierCurveTo(hr * 0.06, -hr - 12.6, hr * 0.6, -hr - 12.2, hr * 0.82, -hr - 9.6);
+          g.bezierCurveTo(hr * 0.38, -hr - 10.9, hr * 0.02, -hr - 10.0, -hr * 0.26, -hr - 8.9);
           g.fill();
         }
       }
@@ -3508,30 +3518,46 @@
 
 
   function drawFace(g, o, B, amt, skin) {
-    var ex = 3.5, ey = -9.8, s, e = o.expr || 'normal';
+    // Eyes a shade above the middle of the head, brows up on the forehead the
+    // hair no longer covers, mouth high enough to leave him a chin.
+    var ex = 3.7, ey = -10.3, s, e = o.expr || 'normal';
+    var browY = -13.2, my = -5.2;
     var lookX = (o.look || 0) * 1.5;
-    var ink = '#3A2E30';
-    g.strokeStyle = ink; g.fillStyle = ink; g.lineCap = 'round';
+    var ink = '#3B2F31';
+    g.strokeStyle = ink; g.fillStyle = ink; g.lineCap = 'round'; g.lineJoin = 'round';
 
-    function eyeArc(cx, up) {
-      g.lineWidth = 1.6;
-      var r = 2.2 * (0.6 + 0.4 * amt);
+    function eyeArc(cx, up) {                  // a closed, happy eye
+      g.strokeStyle = ink; g.lineWidth = 1.7;
+      var r = 2.3 * (0.6 + 0.4 * amt);
       g.beginPath();
-      if (up) g.arc(cx, ey + 1, r, Math.PI * 1.12, Math.PI * 1.88);
-      else    g.arc(cx, ey - 1, r, Math.PI * 0.12, Math.PI * 0.88);
+      if (up) g.arc(cx, ey + 1.1, r, Math.PI * 1.1, Math.PI * 1.9);
+      else    g.arc(cx, ey - 1.1, r, Math.PI * 0.1, Math.PI * 0.9);
       g.stroke();
     }
     function eyeBall(cx, r, ry) {
+      ry = ry || r;
       g.fillStyle = ink;
-      g.beginPath(); g.ellipse(cx + lookX, ey, r, ry || r, 0, 0, 6.29); g.fill();
-      g.fillStyle = 'rgba(255,255,255,0.92)';
-      g.beginPath(); g.arc(cx + lookX - r * 0.34, ey - r * 0.42, r * 0.36, 0, 6.29); g.fill();
-      g.fillStyle = ink;
+      g.beginPath(); g.ellipse(cx + lookX, ey, r, ry, 0, 0, 6.29); g.fill();
+      // one clean catchlight and a small one opposite it, which is what makes
+      // a flat dot read as an eye rather than a hole
+      g.fillStyle = 'rgba(255,255,255,0.95)';
+      g.beginPath(); g.arc(cx + lookX - r * 0.36, ey - ry * 0.4, r * 0.38, 0, 6.29); g.fill();
+      g.fillStyle = 'rgba(255,255,255,0.4)';
+      g.beginPath(); g.arc(cx + lookX + r * 0.42, ey + ry * 0.42, r * 0.17, 0, 6.29); g.fill();
       if (B.lash) {
         g.strokeStyle = ink; g.lineWidth = 0.9;
         g.beginPath();
-        g.moveTo(cx + (cx < 0 ? -1 : 1) * r * 0.9, ey - r * 0.9);
-        g.lineTo(cx + (cx < 0 ? -1 : 1) * (r * 1.7), ey - r * 1.5);
+        g.moveTo(cx + (cx < 0 ? -1 : 1) * r * 0.9, ey - ry * 0.9);
+        g.lineTo(cx + (cx < 0 ? -1 : 1) * (r * 1.7), ey - ry * 1.5);
+        g.stroke();
+      }
+    }
+    function brows(tilt, lift) {               // both at once, and level with each other
+      g.strokeStyle = ink; g.lineWidth = 1.2 * B.brow; g.lineCap = 'round';
+      for (var b = -1; b <= 1; b += 2) {
+        g.beginPath();
+        g.moveTo(b * (ex + 2.1), browY + lift - tilt);
+        g.quadraticCurveTo(b * ex, browY + lift - tilt - 0.7, b * (ex - 1.9), browY + lift + tilt);
         g.stroke();
       }
     }
@@ -3540,117 +3566,126 @@
     if (e === 'happy' || e === 'content') {
       if (amt < 0.45) { eyeBall(-ex, eyeR * 0.95, eyeR * 1.05); eyeBall(ex, eyeR * 0.95, eyeR * 1.05); }
       else { eyeArc(-ex, true); eyeArc(ex, true); }
+      brows(-0.35, -0.5);
     } else if (e === 'blink') {
-      g.lineWidth = 1.6;
-      for (s = -1; s <= 1; s += 2) { g.beginPath(); g.moveTo(s * ex - 1.6, ey); g.lineTo(s * ex + 1.6, ey); g.stroke(); }
+      g.strokeStyle = ink; g.lineWidth = 1.7;
+      for (s = -1; s <= 1; s += 2) { g.beginPath(); g.moveTo(s * ex - 1.7, ey); g.lineTo(s * ex + 1.7, ey); g.stroke(); }
+      brows(0, 0);
     } else if (e === 'sleepy') {
       eyeArc(-ex, false); eyeArc(ex, false);
+      brows(0.22, 0.45);
     } else if (e === 'surprised') {
       eyeBall(-ex, eyeR * (1 + 0.25 * amt), eyeR * (1.1 + 0.3 * amt));
       eyeBall(ex, eyeR * (1 + 0.25 * amt), eyeR * (1.1 + 0.3 * amt));
+      brows(-0.2, -1.3 - amt * 0.5);
     } else if (e === 'shy') {
       eyeArc(-ex, true); eyeArc(ex, true);
+      brows(-0.5, -0.2);
     } else if (e === 'think') {
       eyeBall(-ex, eyeR * 0.9, eyeR * 0.75); eyeBall(ex, eyeR * 0.9, eyeR * 0.75);
-      g.strokeStyle = ink; g.lineWidth = 1.1; g.globalAlpha = 0.6;
-      g.beginPath(); g.moveTo(ex - 1.6, ey - 4.2); g.lineTo(ex + 2, ey - 5); g.stroke();
-      g.globalAlpha = 1;
+      g.strokeStyle = ink; g.lineWidth = 1.2 * B.brow;
+      g.beginPath();                                        // one up, one level
+      g.moveTo(-ex - 2.1, browY); g.quadraticCurveTo(-ex, browY - 0.7, -ex + 1.9, browY);
+      g.stroke();
+      g.beginPath();
+      g.moveTo(ex + 2.1, browY - 1.5); g.quadraticCurveTo(ex, browY - 2.4, ex - 1.9, browY - 1.2);
+      g.stroke();
     } else if (e === 'grumble') {
-      eyeBall(-ex, eyeR * 0.8, eyeR * (0.75 - 0.2 * amt));
-      eyeBall(ex, eyeR * 0.8, eyeR * (0.75 - 0.2 * amt));
-      g.strokeStyle = ink; g.lineWidth = 1.4 * B.brow;
-      g.beginPath(); g.moveTo(-ex - 2.2, ey - 4.6); g.lineTo(-ex + 1.5, ey - 3.2 - amt * 0.8); g.stroke();
-      g.beginPath(); g.moveTo(ex + 2.2, ey - 4.6); g.lineTo(ex - 1.5, ey - 3.2 - amt * 0.8); g.stroke();
+      eyeBall(-ex, eyeR * 0.82, eyeR * (0.78 - 0.18 * amt));
+      eyeBall(ex, eyeR * 0.82, eyeR * (0.78 - 0.18 * amt));
+      g.strokeStyle = ink; g.lineWidth = 1.35 * B.brow;     // knitted, pointing in and down
+      for (s = -1; s <= 1; s += 2) {
+        g.beginPath();
+        g.moveTo(s * (ex + 2.2), browY - 0.9);
+        g.lineTo(s * (ex - 1.5), browY + 1.5 + amt * 0.7);
+        g.stroke();
+      }
     } else {
       eyeBall(-ex, eyeR, eyeR * 1.12); eyeBall(ex, eyeR, eyeR * 1.12);
+      brows(0, 0);
     }
 
-    g.strokeStyle = ink; g.fillStyle = ink; g.lineWidth = 1.4;
-    var my = -4.4;
+    g.strokeStyle = ink; g.fillStyle = ink; g.lineWidth = 1.5;
     if (e === 'happy' && amt > 0.55) {
-      g.beginPath(); g.arc(0, my - 0.6, 1.5 + amt, 0.15, Math.PI - 0.15); g.fill();
+      g.beginPath(); g.arc(0, my - 0.7, 1.7 + amt, 0.14, Math.PI - 0.14); g.fill();
       g.fillStyle = '#C97C86';
-      g.beginPath(); g.arc(0, my + 0.4, 0.7 + amt * 0.6, 0.1, Math.PI - 0.1); g.fill();
+      g.beginPath(); g.arc(0, my + 0.4, 0.8 + amt * 0.6, 0.1, Math.PI - 0.1); g.fill();
     } else if (e === 'surprised') {
       g.fillStyle = ink;
-      g.beginPath(); g.ellipse(0, my, 0.8 + amt * 0.6, 1 + amt * 0.8, 0, 0, 6.29); g.fill();
+      g.beginPath(); g.ellipse(0, my, 0.85 + amt * 0.6, 1.1 + amt * 0.8, 0, 0, 6.29); g.fill();
     } else if (e === 'grumble') {
-      g.beginPath(); g.arc(0, my + 2.2, 1.4 + amt * 0.8, Math.PI * 1.25, Math.PI * 1.75); g.stroke();
+      g.beginPath(); g.arc(0, my + 2.4, 1.6 + amt * 0.8, Math.PI * 1.22, Math.PI * 1.78); g.stroke();
     } else if (e === 'sleepy') {
-      g.beginPath(); g.ellipse(0, my, 0.7 + amt * 0.35, 0.9 + amt * 0.45, 0, 0, 6.29); g.fill();
+      g.beginPath(); g.ellipse(0, my, 0.75 + amt * 0.35, 0.95 + amt * 0.45, 0, 0, 6.29); g.fill();
     } else if (e === 'think') {
-      g.beginPath(); g.moveTo(-1.4, my); g.lineTo(1.4, my - 0.5); g.stroke();
+      g.beginPath(); g.moveTo(-1.5, my + 0.2); g.lineTo(1.5, my - 0.4); g.stroke();
     } else {
-      g.beginPath(); g.arc(0, my - 1, 1.4 + amt * 0.7, 0.35, Math.PI - 0.35); g.stroke();
-    }
-
-    var warm = (e === 'happy' || e === 'content' || e === 'shy' || e === 'surprised');
-    if (warm || B.blush) {
-      var ba = warm ? (e === 'shy' ? 0.55 : 0.4) * (0.35 + 0.65 * amt) : 0.26;
-      g.fillStyle = 'rgba(255,' + (e === 'shy' ? 120 : 140) + ',150,' + ba.toFixed(3) + ')';
-      g.beginPath(); g.ellipse(-6.2, -6.2, 2.2, 1.4, 0, 0, 6.29); g.fill();
-      g.beginPath(); g.ellipse(6.2, -6.2, 2.2, 1.4, 0, 0, 6.29); g.fill();
-    }
-    if (B.scruff) {                          // a day he did not bother shaving
-      g.globalAlpha = 0.16; g.fillStyle = ink;
-      g.beginPath(); g.ellipse(0, -2.6, 4.6, 1.9, 0, 0, Math.PI); g.fill();
-      g.globalAlpha = 1;
+      g.beginPath(); g.arc(0, my - 1.1, 1.8 + amt * 0.7, 0.32, Math.PI - 0.32); g.stroke();
     }
   }
 
   function drawHead(g, H, hr, accent, cloth, trim, HR, o) {
     var s;
     if (H.id === 'none') return;
+    // Every hat sits on the same line, high enough to leave his eyes alone —
+    // a brim across the pupils was making him look half asleep in all of them.
+    // The crown is a slice of his own head, so nothing floats or bites in.
+    var hy = -13.5;
+    var a1 = Math.PI * 1.127, a2 = Math.PI * 1.873;
+    var hw = Math.sqrt(Math.max(0, (hr + 0.5) * (hr + 0.5) - (hy + 9.6) * (hy + 9.6)));
+    function crown(pad) {
+      var r = hr + 0.5 + (pad || 0);
+      g.beginPath(); g.arc(0, -9.6, r, a1, a2); g.closePath(); g.fill();
+    }
     if (H.id === 'cap') {
       g.fillStyle = accent;
-      g.beginPath(); g.arc(0, -10.6, hr + 0.4, Math.PI * 1.03, Math.PI * 1.97); g.fill();
-      roundRectOn(g, -hr - 0.4, -12.4, (hr + 0.4) * 2, 2.6, 1.2); g.fill();
-      g.beginPath(); g.ellipse(hr - 1, -11.4, 6.4, 1.7, -0.06, 0, 6.29); g.fill();   // brim
+      crown(0);
+      roundRectOn(g, -hw - 0.6, hy - 2.4, (hw + 0.6) * 2, 2.6, 1.1); g.fill();
+      g.beginPath(); g.ellipse(hw - 1.4, hy - 1, 6.6, 1.8, -0.06, 0, 6.29); g.fill();   // brim
       g.fillStyle = trim;
-      g.beginPath(); g.arc(0, -16.6, 1.1, 0, 6.29); g.fill();
+      g.beginPath(); g.arc(0, -18.4, 1.1, 0, 6.29); g.fill();                           // button
     } else if (H.id === 'beanie') {
       g.fillStyle = accent;
-      g.beginPath(); g.arc(0, -11.2, hr + 0.8, Math.PI * 1.02, Math.PI * 1.98); g.fill();
-      roundRectOn(g, -hr - 0.8, -12.6, (hr + 0.8) * 2, 3.2, 1.5); g.fill();
-      g.fillStyle = trim; g.globalAlpha = 0.8;
-      roundRectOn(g, -hr - 1, -11.4, (hr + 1) * 2, 2.4, 1.2); g.fill();
+      crown(1.7);
+      roundRectOn(g, -hw - 1.3, hy - 2.8, (hw + 1.3) * 2, 3, 1.4); g.fill();
+      g.fillStyle = trim; g.globalAlpha = 0.85;                                          // turned-up brim
+      roundRectOn(g, -hw - 1.3, hy - 2.5, (hw + 1.3) * 2, 2.5, 1.2); g.fill();
       g.globalAlpha = 1;
       g.fillStyle = accent;
-      g.beginPath(); g.arc(0, -18.6, 2.1, 0, 6.29); g.fill();                        // bobble
+      g.beginPath(); g.arc(0, -21.6, 2.2, 0, 6.29); g.fill();                            // bobble
     } else if (H.id === 'bandana') {
       g.fillStyle = accent;
-      g.beginPath(); g.arc(0, -11.4, hr + 0.5, Math.PI * 1.05, Math.PI * 1.95); g.fill();
-      roundRectOn(g, -hr - 0.5, -13, (hr + 0.5) * 2, 2.8, 1.2); g.fill();
-      g.beginPath();                                                                  // knot tail
-      g.moveTo(-hr, -12.4); g.lineTo(-hr - 4.4, -9.6); g.lineTo(-hr - 1.2, -9); g.closePath(); g.fill();
+      crown(0);
+      roundRectOn(g, -hw - 0.5, hy - 2.6, (hw + 0.5) * 2, 2.8, 1.2); g.fill();
+      g.beginPath();                                                                     // knot tail
+      g.moveTo(-hw - 0.2, hy - 2.4); g.lineTo(-hw - 5, hy + 0.6); g.lineTo(-hw - 1.4, hy + 1.4);
+      g.closePath(); g.fill();
     } else if (H.id === 'hood') {
       g.fillStyle = accent;
-      g.beginPath(); g.arc(0, -10, hr + 1.8, Math.PI * 0.98, Math.PI * 2.02); g.fill();
+      crown(2.4);
+      // the sides fall past his cheeks, framing the face rather than covering it
       for (s = -1; s <= 1; s += 2) {
         g.beginPath();
-        g.moveTo(s * (hr + 1.8), -10);
-        g.quadraticCurveTo(s * (hr + 2.8), -2.6, s * (hr - 1.4), -1.6);
-        g.lineTo(s * (hr - 1.4), -5.6);
+        g.moveTo(s * (hw + 2.4), hy + 0.6);
+        g.quadraticCurveTo(s * (hr + 3.6), -6.4, s * (hr - 0.2), -1.2);
+        g.quadraticCurveTo(s * (hr - 1.2), -5.4, s * (hr - 2.6), -7.4);
         g.closePath(); g.fill();
       }
     } else if (H.id === 'bucket') {
       g.fillStyle = accent;
-      g.beginPath(); g.arc(0, -11.6, hr - 0.4, Math.PI, 0); g.fill();
-      roundRectOn(g, -hr + 0.4, -12.6, (hr - 0.4) * 2, 2.6, 1); g.fill();
-      g.beginPath(); g.ellipse(0, -10.4, hr + 3.4, 2, 0, 0, 6.29); g.fill();
+      crown(-0.6);
+      roundRectOn(g, -hw + 0.4, hy - 2.4, (hw - 0.4) * 2, 2.6, 1); g.fill();
+      g.beginPath(); g.ellipse(0, hy - 0.2, hw + 4.2, 2, 0, 0, 6.29); g.fill();          // floppy brim
     } else if (H.id === 'helm') {
       g.fillStyle = '#CBD2DB';
-      g.beginPath();
-      g.arc(0, -10.8, hr + 0.7, Math.PI, 0);
-      g.lineTo(hr + 0.7, -12.8); g.lineTo(-hr - 0.7, -12.8);
-      g.closePath(); g.fill();
+      crown(1.1);
       g.fillStyle = '#94A1AF';
-      roundRectOn(g, -hr - 1.1, -14, (hr + 1.1) * 2, 2.7, 1.3); g.fill();
-      g.fillStyle = '#CBD2DB';
-      roundRectOn(g, -hr - 1.4, -12.8, 3, 7.6, 1.4); g.fill();
-      roundRectOn(g, hr - 1.6, -12.8, 3, 7.6, 1.4); g.fill();
-      g.fillStyle = accent;                                                            // plume
-      g.save(); g.translate(0, -20.4); g.rotate(Math.sin((o.t || 0) * 4) * 0.13);
+      roundRectOn(g, -hw - 1.1, hy - 2.5, (hw + 1.1) * 2, 2.7, 1.3); g.fill();           // browband
+      g.fillStyle = '#CBD2DB';                                                            // cheek guards
+      roundRectOn(g, -hr - 1.2, hy + 0.2, 3, 7, 1.4); g.fill();
+      roundRectOn(g, hr - 1.8, hy + 0.2, 3, 7, 1.4); g.fill();
+      g.fillStyle = accent;                                                               // plume
+      g.save(); g.translate(0, -20.8); g.rotate(Math.sin((o.t || 0) * 4) * 0.13);
       g.beginPath();
       g.moveTo(0, 2.4); g.quadraticCurveTo(-5.4, -2.2, -2.4, -9);
       g.quadraticCurveTo(0.6, -4.4, 3.4, -7.8); g.quadraticCurveTo(4.2, -1.4, 0, 2.4);
