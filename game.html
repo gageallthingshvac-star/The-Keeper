@@ -178,6 +178,18 @@
   #veilback.on{display:block}
   #veilback:active{transform:scale(.92);border-color:var(--ember)}
   #veil.hide #veilback{display:none}
+  #veilgear{
+    position:fixed;z-index:6;display:none;
+    top:calc(var(--safeT) + 12px);right:calc(var(--safeR) + 12px);
+    width:42px;height:42px;border-radius:50%;cursor:pointer;
+    border:1px solid var(--line);background:rgba(20,16,14,0.86);
+    color:var(--mute);font:400 19px/1 var(--body);padding:0;
+    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+    transition:transform .3s ease,color .2s ease,border-color .2s ease;
+  }
+  #veilgear.on{display:block}
+  #veilgear:active{transform:rotate(60deg) scale(.92);color:var(--ember);border-color:var(--ember)}
+  #veil.hide #veilgear{display:none}
   .card{width:100%;max-width:380px;text-align:center;animation:rise .5s cubic-bezier(.2,.9,.25,1) both}
   @keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
   .eyebrow{font:700 10px/1 var(--body);letter-spacing:.28em;text-transform:uppercase;color:var(--ember);margin-bottom:14px}
@@ -390,6 +402,32 @@
   .stagename b{display:block;font:700 22px/1.15 var(--display);letter-spacing:-.01em;color:var(--bone)}
   .stagename span{display:block;margin-top:4px;font:600 10px/1 var(--body);letter-spacing:.18em;
     text-transform:uppercase;color:var(--ember)}
+  .purse{
+    display:flex;justify-content:center;margin:0 0 18px;
+  }
+  .purse b{
+    display:inline-flex;align-items:baseline;gap:8px;padding:9px 17px;border-radius:999px;
+    border:1px solid rgba(255,159,10,0.32);background:rgba(255,159,10,0.09);
+    font:700 17px/1 var(--display);color:var(--ember);letter-spacing:-.01em;
+  }
+  .purse b i{font-style:normal;font-size:13px;line-height:1}
+  .sc i{font-style:normal;font-size:11px;opacity:.62;margin-right:3px}
+  .purse b u{
+    font:600 10px/1 var(--body);letter-spacing:.2em;text-transform:uppercase;
+    color:var(--mute);text-decoration:none;
+  }
+  .brand{font:700 11px/1 var(--body);letter-spacing:.34em;text-transform:uppercase;
+    color:var(--mute);margin:0 0 14px}
+  .stage.hero{padding:0 0 16px;margin-bottom:14px}
+  .stage.hero .portrait.stage-knight{height:264px;border-radius:22px 22px 0 0}
+  .stage.hero .stagename b{font-size:26px}
+  .metaline{
+    display:flex;flex-wrap:wrap;justify-content:center;gap:6px 16px;margin:0 0 20px;
+    font:500 11px/1 var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--mute);
+  }
+  .metaline b{color:var(--bone);font-weight:700;letter-spacing:.04em}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-top:10px}
+  .row3 .ghost{margin-top:0;padding:14px 4px;font-size:12.5px}
   .stagename u{display:block;margin-top:5px;font:500 12px/1.3 var(--body);color:var(--mute);text-decoration:none}
   .stage.still{cursor:default}
   .ghost.treat{margin-top:10px}
@@ -610,7 +648,7 @@
 <div id="build"></div>
 <div id="toast"><div class="t1"></div><div class="t2"></div></div>
 
-<div id="veil"><button id="veilback" aria-label="Back" title="Back">‹</button><div class="card" id="card"></div></div>
+<div id="veil"><button id="veilback" aria-label="Back" title="Back">‹</button><button id="veilgear" aria-label="Settings" title="Settings">⚙</button><div class="card" id="card"></div></div>
 
 <script>
 (function () {
@@ -630,7 +668,7 @@
   var ZOOM = 0.7;
   var VS = 1;                     // device pixels per field unit
   function px(n) { return n / ZOOM; }   // n screen pixels, in field units
-  var BUILD = 'v1.13.2';        // bump on every deploy — shown in-game for support
+  var BUILD = 'v1.14.0';        // bump on every deploy — shown in-game for support
   var MUTE_KEY = 'keeper.nightwatch.mute';
   var MUSIC_KEY = 'keeper.nightwatch.music';
 
@@ -688,20 +726,25 @@
   // keeper — the dopamine has to go somewhere, and it goes into his legs.
   var RIG_DESC = [
     'A better screen for him. Happier keeper, quicker feet.',
-    'A proper panel and a light strip. +6% speed, +15% mending.',
-    'Second monitor. He has opinions about it. +12% speed, +30% mending.',
-    'Curved ultrawide, lit underneath. +18% speed, +45% mending.',
-    'The full battlestation. He is beside himself. +24% speed, +60% mending.'
+    'A proper panel and a light strip. He walks a little lighter and mends a little better.',
+    'Second monitor. He has opinions about it. Quicker on his feet, quicker to patch himself up.',
+    'Curved ultrawide, lit underneath. A good deal quicker, and he mends a good deal better.',
+    'The full battlestation. He is beside himself. Fastest on his feet, and quickest to mend.'
   ];
+
+  // Rank words instead of percentages. A number you cannot check is just a
+  // sales pitch, so each rank says how much better it feels, in plain English.
+  var MORE = ['a little', 'noticeably', 'a good deal', 'a great deal', 'far'];
+  function moreBy(r) { return MORE[clamp(Math.round(r), 1, MORE.length) - 1]; }
   var PERKS = [
-    { id: 'provisions', name: 'Provisions',      glyph: '🎒', ranks: 5, cost: [40, 75, 120, 180, 260],
+    { id: 'provisions', name: 'Packed Satchel',  glyph: '🎒', ranks: 5, cost: [40, 75, 120, 180, 260],
       desc: function (r) { return 'Start each run with +' + (r * 7) + ' fire.'; } },
     { id: 'richwood',   name: 'Woodcraft',       glyph: '🪓', ranks: 4, cost: [55, 100, 170, 260],
       desc: function (r) { return 'Every log is worth +' + (r * 2) + ' fire.'; } },
     { id: 'boots',      name: 'Worn Boots',      glyph: '👢', ranks: 4, cost: [45, 85, 140, 210],
-      desc: function (r) { return 'Walk ' + (r * 4) + '% faster.'; } },
+      desc: function (r) { return 'Walk ' + moreBy(r) + ' faster.'; } },
     { id: 'lamp',       name: 'Oil Reserve',     glyph: '🏮', ranks: 4, cost: [50, 90, 150, 220],
-      desc: function (r) { return 'Lantern reaches ' + (r * 6) + '% farther.'; } },
+      desc: function (r) { return 'Your lantern reaches ' + moreBy(r) + ' farther.'; } },
     { id: 'flint',      name: 'Good Flint',      glyph: '⚡', ranks: 3, cost: [70, 130, 210],
       desc: function (r) { return 'Flare costs ' + r + ' less fire.'; } },
     { id: 'reroll',     name: 'Second Thoughts', glyph: '🔄', ranks: 2, cost: [120, 260],
@@ -711,9 +754,9 @@
     { id: 'mail',       name: "Squire's Mail",   glyph: '⛓', ranks: 4, cost: [60, 110, 180, 270],
       desc: function (r) { return '+' + (r * 8) + ' maximum health.'; } },
     { id: 'draught',    name: 'Warm Blood',      glyph: '🩸', ranks: 4, cost: [65, 120, 200, 300],
-      desc: function (r) { return 'Mend ' + (r * 25) + '% more from each shade.'; } },
+      desc: function (r) { return 'Every shade you dispel mends you ' + moreBy(r) + ' more.'; } },
     { id: 'sifter',     name: 'Ash Sifter',      glyph: '⚱️', ranks: 4, cost: [80, 150, 240, 360],
-      desc: function (r) { return 'Earn ' + (r * 12) + '% more embers.'; } },
+      desc: function (r) { return 'Every watch pays out ' + moreBy(r) + ' more embers.'; } },
     { id: 'rig',        name: 'The Rig',         glyph: '🖥', ranks: 4, cost: [90, 170, 290, 450],
       desc: function (r) { return RIG_DESC[r] || RIG_DESC[4]; } },
     { id: 'kettle',     name: 'Hot Kettle',      glyph: '🫖', ranks: 3, cost: [70, 130, 220],
@@ -725,35 +768,35 @@
   var UPGRADES = [
     // ── keeping the fire fed
     { id: 'seasoned',   name: 'Seasoned Wood',  glyph: '🪵', tier: 1, max: 4, lv: 1, desc: 'Each log feeds the fire +6.' },
-    { id: 'banked',     name: 'Banked Coals',   glyph: '🔥', tier: 1, max: 4, lv: 1, desc: 'The fire burns down 12% slower.' },
+    { id: 'banked',     name: 'Banked Coals',   glyph: '🔥', tier: 1, max: 4, lv: 1, desc: 'The fire burns down slower.' },
     { id: 'hearth',     name: 'Deep Hearth',    glyph: '🧱', tier: 1, max: 3, lv: 1, desc: '+20 maximum fire.' },
-    { id: 'cache',      name: 'Kindling Cache', glyph: '🌾', tier: 1, max: 3, lv: 1, desc: 'Wood turns up 25% more often.' },
-    { id: 'reach',      name: 'Long Reach',     glyph: '🤲', tier: 1, max: 2, lv: 1, desc: '+45% range on gathering and feeding.' },
+    { id: 'cache',      name: 'Kindling Cache', glyph: '🌾', tier: 1, max: 3, lv: 1, desc: 'Wood turns up more often.' },
+    { id: 'reach',      name: 'Long Reach',     glyph: '🤲', tier: 1, max: 2, lv: 1, desc: 'A much longer reach for gathering and feeding.' },
     { id: 'hoard',      name: 'Woodpile',       glyph: '🪟', tier: 1, max: 2, lv: 1, desc: 'Two more logs can lie about at once.' },
     { id: 'firstlight', name: 'First Light',    glyph: '🌅', tier: 1, max: 3, lv: 1, desc: 'Dawn restores +16 more fire.' },
     { id: 'broadback',  name: 'Broad Back',     glyph: '💪', tier: 2, max: 2, lv: 2, desc: 'Carry two more logs per trip.' },
 
     // ── the light itself
-    { id: 'lantern',    name: 'Bright Lantern', glyph: '🏮', tier: 1, max: 3, lv: 1, desc: 'Your lantern reaches 28% farther.' },
-    { id: 'ward',       name: 'Warding Ring',   glyph: '⭕', tier: 1, max: 3, lv: 1, desc: 'Firelight reaches 15% farther.' },
-    { id: 'hungry',     name: 'Hungry Light',   glyph: '☀️', tier: 2, max: 3, lv: 2, desc: 'Light burns shades 30% faster.' },
+    { id: 'lantern',    name: 'Bright Lantern', glyph: '🏮', tier: 1, max: 3, lv: 1, desc: 'Your lantern reaches a good deal farther.' },
+    { id: 'ward',       name: 'Warding Ring',   glyph: '⭕', tier: 1, max: 3, lv: 1, desc: 'Firelight reaches a little farther.' },
+    { id: 'hungry',     name: 'Hungry Light',   glyph: '☀️', tier: 2, max: 3, lv: 2, desc: 'Light burns shades away faster.' },
     { id: 'nightsight', name: 'Nightsight',     glyph: '👁', tier: 2, max: 1, lv: 4, desc: 'See wood and shades clearly through the dark.' },
 
     // ── the flare
     { id: 'cheap',      name: 'Cheap Flare',    glyph: '💠', tier: 1, max: 3, lv: 1, desc: 'Flare costs 3 less fire.' },
-    { id: 'quick',      name: 'Quick Flare',    glyph: '⏱', tier: 1, max: 3, lv: 1, desc: 'Flare recharges 30% faster.' },
-    { id: 'wide',       name: 'Wide Flare',     glyph: '📡', tier: 1, max: 3, lv: 1, desc: 'Flare reaches 30% farther.' },
+    { id: 'quick',      name: 'Quick Flare',    glyph: '⏱', tier: 1, max: 3, lv: 1, desc: 'Flare comes back to you sooner.' },
+    { id: 'wide',       name: 'Wide Flare',     glyph: '📡', tier: 1, max: 3, lv: 1, desc: 'Flare reaches a good deal farther.' },
     { id: 'cinder',     name: 'Cinder Trail',   glyph: '✨', tier: 2, max: 2, lv: 3, desc: 'Flares leave burning ground behind them.' },
     { id: 'backdraft',  name: 'Backdraft',      glyph: '💨', tier: 2, max: 2, lv: 3, desc: 'Flare returns 2 fire for every shade it catches.' },
 
     // ── the brand
-    { id: 'longbrand',  name: 'Long Brand',     glyph: '🔥', tier: 1, max: 3, lv: 1, desc: 'The swing reaches 35% farther.' },
-    { id: 'deft',       name: 'Deft Hands',     glyph: '🤚', tier: 1, max: 3, lv: 1, desc: 'The swing covers 26% more ground.' },
+    { id: 'longbrand',  name: 'Long Brand',     glyph: '🔥', tier: 1, max: 3, lv: 1, desc: 'The swing reaches a good deal farther.' },
+    { id: 'deft',       name: 'Deft Hands',     glyph: '🤚', tier: 1, max: 3, lv: 1, desc: 'The swing covers more ground.' },
     { id: 'whitehot',   name: 'White-Hot Brand',glyph: '🌡', tier: 1, max: 3, lv: 1, desc: 'The brand hits far harder.' },
     { id: 'sweep',      name: 'Sweeping Brand', glyph: '🌀', tier: 2, max: 1, lv: 3, desc: 'The swing comes all the way around you.' },
 
     // ── the keeper
-    { id: 'feet',       name: 'Sure Feet',      glyph: '👣', tier: 1, max: 3, lv: 1, desc: 'Walk 13% faster.' },
+    { id: 'feet',       name: 'Sure Feet',      glyph: '👣', tier: 1, max: 3, lv: 1, desc: 'Walk a little faster.' },
     { id: 'nerve',      name: 'Iron Nerve',     glyph: '🛡', tier: 1, max: 2, lv: 1, desc: 'Take 2 less damage, and guard for longer after a hit.' },
     { id: 'hearty',     name: 'Padded Gambeson',glyph: '🧥', tier: 1, max: 3, lv: 1, desc: '+25 maximum health.' },
     { id: 'mend',       name: 'Field Dressing', glyph: '💚', tier: 2, max: 1, lv: 2, desc: 'Dawn patches you up completely.' },
@@ -762,7 +805,7 @@
 
     // ── the deep cuts
     { id: 'tinder',     name: 'Tinderburst',    glyph: '🔆', tier: 2, max: 2, lv: 5, desc: 'Dispelled shades leave motes of fire to gather.' },
-    { id: 'veteran',    name: "Watchman's Eye", glyph: '🎖', tier: 2, max: 2, lv: 5, desc: '+25% score from everything.' },
+    { id: 'veteran',    name: "Watchman's Eye", glyph: '🎖', tier: 2, max: 2, lv: 5, desc: 'Everything you do scores higher.' },
     { id: 'pyre',       name: 'Pyre',           glyph: '💥', tier: 3, max: 1, lv: 6, desc: 'Every 4th log you feed sets off a free flare.' },
     { id: 'emberheart', name: 'Ember Heart',    glyph: '🫀', tier: 3, max: 1, lv: 7, desc: 'The first time the fire dies, it catches again at 35.' }
   ];
@@ -780,7 +823,7 @@
     { id: 'kill100', name: 'Dispeller',        desc: 'Dispel 100 shades in one run.',       embers: 100, test: function (r) { return r.kills >= 100; } },
     { id: 'husk10',  name: 'Husk Breaker',     desc: 'Dispel 10 husks in one run.',         embers: 90,  test: function (r) { return r.husks >= 10; } },
     { id: 'clean4',  name: 'Steady Hand',      desc: 'Reach night 4 without ever flaring.', embers: 120, test: function (r) { return r.night >= 4 && r.flares === 0; } },
-    { id: 'stack8',  name: 'Well Provisioned', desc: 'Hold 8 upgrades at once.',            embers: 100, test: function (r) { return r.upCount >= 8; } },
+    { id: 'stack8',  name: 'Well Stocked',     desc: 'Hold 8 upgrades at once.',            embers: 100, test: function (r) { return r.upCount >= 8; } },
     { id: 'heat10',  name: 'White Heat',       desc: 'Reach heat ×10.',                     embers: 130, test: function (r) { return r.bestHeat >= 10; } },
     { id: 'untouched', name: 'Untouched',     desc: 'Reach night 4 without taking a single hit.', embers: 140, test: function (r) { return r.night >= 4 && r.damage === 0; } },
     { id: 'brand40', name: 'Brandbearer',      desc: 'Dispel 40 shades with the brand in one run.', embers: 110, test: function (r) { return r.brandKills >= 40; } },
@@ -4015,21 +4058,37 @@
   // A fixed sky — same stars every visit, because it is the same sky.
   var CAMP_STARS = (function () {
     var r = mulberry32(90210), out = [];
-    for (var i = 0; i < 46; i++) {
-      out.push({ x: -170 + r() * 340, y: -63 + r() * 42, r: 0.35 + r() * 0.75, ph: r() * 6.28 });
+    for (var i = 0; i < 72; i++) {
+      out.push({ x: -200 + r() * 400, y: -114 + r() * 94, r: 0.3 + r() * 0.8, ph: r() * 6.28 });
     }
     return out;
   })();
+  var CAMP_MOON = { x: -44, y: -88, r: 7.4 };
 
   function drawCamp(g, t, fireLevel) {
     var i;
     // the sky he keeps looking up at
     for (i = 0; i < CAMP_STARS.length; i++) {
       var st2 = CAMP_STARS[i];
-      var tw = 0.35 + 0.35 * Math.sin(t * 0.8 + st2.ph);
+      var tw = 0.3 + 0.32 * Math.sin(t * 0.8 + st2.ph);
       g.fillStyle = 'rgba(206,216,255,' + tw.toFixed(3) + ')';
       g.beginPath(); g.arc(st2.x, st2.y, st2.r, 0, 6.29); g.fill();
     }
+    // and the moon that keeps him company on the far side of it. The crescent
+    // is one path: the lit disc, then a second disc wound the other way, which
+    // punches the shadow out of it without touching the halo underneath.
+    var mx = CAMP_MOON.x, my = CAMP_MOON.y;
+    var halo = g.createRadialGradient(mx, my, 1, mx, my, 30);
+    halo.addColorStop(0, 'rgba(198,212,255,0.17)');
+    halo.addColorStop(0.45, 'rgba(198,212,255,0.055)');
+    halo.addColorStop(1, 'rgba(198,212,255,0)');
+    g.fillStyle = halo;
+    g.beginPath(); g.arc(mx, my, 30, 0, 6.29); g.fill();
+    g.beginPath();
+    g.arc(mx, my, CAMP_MOON.r, 0, 6.29);
+    g.arc(mx + 3.6, my - 1.7, CAMP_MOON.r - 0.5, 0, 6.29, true);
+    g.fillStyle = 'rgba(228,234,255,0.82)';
+    g.fill();
     // ground
     var gg = g.createLinearGradient(0, -6, 0, 34);
     gg.addColorStop(0, 'rgba(84,56,34,0.62)');
@@ -4954,7 +5013,9 @@
     }
     // the camera drifts after him rather than snapping, and stops at the
     // edges of the camp so you never see past the last thing he owns
-    var camWant = 10;                   // the camp all fits; the shot does not need to move
+    // he is the subject, so the shot stays on him, stopping at the ends of the
+    // camp so you never pan off past the last thing he owns
+    var camWant = clamp(KN.x, -50, 72);
     KN.cam += (camWant - KN.cam) * Math.min(1, dt * 1.8);
     // the fire answers whatever he is doing to it
     var fWant = KN.act === 'rub' ? 0.5 : (KN.act === 'poke' || KN.act === 'haul') ? 1.14 : 1;
@@ -5325,11 +5386,11 @@
   // The lobby: his whole camp, with him living in it.
   // Wide enough to hold his whole camp at once, so the lobby is a fixed shot
   // of the place rather than a camera chasing him around it.
-  var CAMP_VIEW = 306;
+  var CAMP_VIEW = 178;
   var CAMP_GND = 8;         // the y everything in camp stands on
   function paintCamp(g, w, h) {
     var sc = w / CAMP_VIEW;
-    var base = h * 0.84;
+    var base = h * 0.88;
     var cam = KN.cam;
     g.save();
     g.translate(w / 2 - cam * sc, base);
@@ -5510,7 +5571,9 @@
     veilBackFn = null;
     f();
   });
-  function veil(html, cls, back) {
+  var elVeilGear = document.getElementById('veilgear');
+  elVeilGear.addEventListener('click', function () { UI.tap(); settingsScreen(menu); });
+  function veil(html, cls, back, gear) {
     portraitCv = null;
     KN.onStage = false;
     elCard.className = 'card' + (cls ? ' ' + cls : '');
@@ -5519,8 +5582,12 @@
     elVeil.scrollTop = 0;
     veilBackFn = back || null;
     elVeilBack.classList.toggle('on', !!back);
+    elVeilGear.classList.toggle('on', !!gear);
   }
-  function hideVeil() { elVeil.classList.add('hide'); veilBackFn = null; elVeilBack.classList.remove('on'); }
+  function hideVeil() {
+    elVeil.classList.add('hide'); veilBackFn = null;
+    elVeilBack.classList.remove('on'); elVeilGear.classList.remove('on');
+  }
   function on(id, fn) { var el = document.getElementById(id); if (el) el.addEventListener('click', fn); }
   function hookPortrait() { portraitCv = document.getElementById('portrait'); paintPortrait(); }
 
@@ -5862,12 +5929,17 @@
     '</div>';
   }
 
+  // What you have to spend, said plainly and in one place.
+  function emberChip() {
+    return '<div class="purse"><b><i>\u2726</i>' + META.embers.toLocaleString() +
+      '<u>embers</u></b></div>';
+  }
+
   function levelStrip() {
     var L = levelInfo(META.xp);
     var pct = clamp(L.into / L.need, 0, 1) * 100;
     return '<div class="lvl">' +
-      '<div class="lvl-top"><b>Keeper level ' + L.level + '</b>' +
-        '<span class="embers">' + META.embers.toLocaleString() + ' <i>embers</i></span></div>' +
+      '<div class="lvl-top"><b>Keeper level ' + L.level + '</b></div>' +
       '<div class="xp"><i style="width:' + pct.toFixed(1) + '%"></i></div>' +
       '<div class="lvl-sub">' + L.into.toLocaleString() + ' / ' + L.need.toLocaleString() + ' to level ' + (L.level + 1) + nextUnlockNote(L.level) + '</div>' +
     '</div>';
@@ -5907,44 +5979,39 @@
     var feats = 0;
     for (var j = 0; j < ACHIEVEMENTS.length; j++) if (META.ach[ACHIEVEMENTS[j].id]) feats++;
 
+    var L = nextLandmark(), away = nightsToNext();
     veil(
-      '<div class="eyebrow">The Keeper</div>' +
-      '<h1>Night<em>Watch</em></h1>' +
+      '<div class="brand">Night Watch</div>' +
       storageWarning() +
-      '<div class="stage" id="stage">' +
+      '<div class="stage hero" id="stage">' +
         '<canvas id="portrait" class="portrait stage-knight"></canvas>' +
         (META.knight.name
           ? '<div class="stagename"><b>' + esc(META.knight.name) + '</b>' +
-            '<span>' + esc(knightTitle()) + '</span>' +
             '<u>' + esc(campRoll()) + '</u></div>'
-          : '<div class="stagename"><b>A keeper with no name</b><span>waiting by the fire</span></div>') +
+          : '<div class="stagename"><b>A keeper with no name</b><u>waiting by the fire</u></div>') +
       '</div>' +
-      (META.runs
-        ? '<div class="tally sm">' +
-            '<div><span>Tonight</span><b>' + META.night + '</b></div>' +
-            '<div><span>Nights held</span><b>' + META.lifeNights + '</b></div>' +
-            '<div><span>Shades</span><b>' + META.lifeKills + '</b></div>' +
-          '</div>' + levelStrip()
-        : '<p class="lede">Keep his fire lit until dawn. Somebody out there is walking towards it.</p>') +
-      journeyStrip(false) +
+      '<div class="metaline">' +
+        '<span>Night <b>' + META.night + '</b></span>' +
+        (L ? '<span>' + esc(L.st) + ' in <b>' + (away <= 1 ? 'one night' : away + ' nights') + '</b></span>'
+           : '<span>The whole road <b>walked</b></span>') +
+      '</div>' +
+      emberChip() +
       '<button class="go" id="btnStart">' +
         (isLandmarkNight(META.night)
-          ? 'Night ' + META.night + ' · ' + esc((nextLandmark() || {}).name || 'the last stretch')
+          ? 'Night ' + META.night + ' · ' + esc((L || {}).name || 'the last stretch')
           : 'Take the Watch · Night ' + META.night) + '</button>' +
       (isLandmarkNight(META.night)
         ? '<div class="foot hi">You reach it tonight. You will not be out there alone.</div>' : '') +
       '<button class="ghost treat" id="btnTreat">' + esc(treatLabel()) + '</button>' +
-      '<div class="row2">' +
-        '<button class="ghost" id="btnShop">Provisions</button>' +
+      '<div class="row3">' +
+        '<button class="ghost" id="btnShop">Stores</button>' +
         '<button class="ghost" id="btnFeats">Feats · ' + feats + '/' + ACHIEVEMENTS.length + '</button>' +
-      '</div>' +
-      '<div class="row2">' +
-        '<button class="ghost" id="btnKnight">' + (META.knight.name ? 'Your keeper' : 'Name your keeper') + '</button>' +
-        '<button class="ghost" id="btnSettings">Settings</button>' +
+        '<button class="ghost" id="btnKnight">' + (META.knight.name ? 'Keeper' : 'Name him') + '</button>' +
       '</div>' +
       transportHtml(true) +
-      buildFoot() +
-      '<div class="foot">Tap him. He likes that.</div>'
+      '<div class="foot">Tap him. He likes that.</div>' +
+      buildFoot(),
+      '', null, true
     );
     on('btnStart', function () {
       if (!META.knight.name) nameKnight(startGame); else startGame();
@@ -5953,13 +6020,12 @@
     on('btnShop', shop);
     on('btnFeats', feats2);
     on('btnKnight', function () { nameKnight(menu); });
-    on('btnSettings', function () { settingsScreen(menu); });
     bindTransport(function () { musicScreen(menu); });
     hookPortrait();
     bindStage();
   }
 
-  // ── provisions: spend embers on things that persist ───────────────────────
+  // ── the stores: spend embers on things that persist ──────────────────────
   function shop() {
     S.mode = 'menu';
     var rows = '';
@@ -5979,12 +6045,14 @@
           '</div>' +
           (maxed
             ? '<div class="sc done">MAX</div>'
-            : '<button class="sc' + (afford ? ' can' : '') + '" data-perk="' + P.id + '">' + cost + '</button>') +
+            : '<button class="sc' + (afford ? ' can' : '') + '" data-perk="' + P.id + '">' +
+                '<i>\u2726</i>' + cost + '</button>') +
         '</div>';
     }
     veil(
-      '<div class="eyebrow">Provisions</div>' +
+      '<div class="eyebrow">The Stores</div>' +
       '<h1>Spend <em>Embers</em></h1>' +
+      emberChip() +
       levelStrip() +
       '<div class="explain">' +
         '<div><i>🔥</i><span><b>What they buy.</b> Gear on this page, kept forever — ' +
@@ -6224,6 +6292,7 @@
     veil(
       '<div class="eyebrow">Feats</div>' +
       '<h1>The <em>Ledger</em></h1>' +
+      emberChip() +
       '<div class="shoplist">' + rows + '</div>' +
       '<button class="ghost" id="btnBack">Back to camp</button>' +
       buildFoot(),
