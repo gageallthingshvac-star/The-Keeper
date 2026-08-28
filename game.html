@@ -441,6 +441,8 @@
   }
   .hchip b{font:700 13px/1 var(--display);letter-spacing:0;color:var(--bone);text-transform:none}
   .hchip.warn{border-color:rgba(255,69,58,0.5);color:#FFB4AE;letter-spacing:.04em;text-transform:none}
+  .hchip.em{color:var(--ember);border-color:rgba(255,159,10,0.3);background:rgba(255,159,10,0.08)}
+  .hchip.em b{color:var(--ember)}
   .homemus{
     position:absolute;z-index:3;right:calc(var(--safeR) + 62px);top:calc(var(--safeT) + 12px);
     display:flex;flex-direction:column;align-items:center;gap:1px;padding:4px 9px 6px;
@@ -495,6 +497,22 @@
   .ghost.treat{margin-top:10px}
   .foot.hi{color:var(--ember);font-weight:600}
   .lede.sm{font-size:14px;margin:2px 0 14px;color:var(--mute)}
+  .card.tip{max-width:400px}
+  .card.night{max-width:340px;text-align:center}
+  .nightcard{animation:nightIn .6s cubic-bezier(.2,.9,.25,1) both}
+  @keyframes nightIn{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:none}}
+  h1.bignight{font-size:34px;margin-bottom:12px;letter-spacing:.01em}
+  h1.bignight em{display:inline;font-size:64px;line-height:1;margin-left:6px}
+  .card.night .lede{margin-bottom:22px}
+  .tiplist{list-style:none;text-align:left;margin:0 0 24px}
+  .tiplist li{
+    position:relative;padding:0 0 0 20px;margin-bottom:15px;
+    font:400 14.5px/1.55 var(--body);color:#C4B9AB;
+  }
+  .tiplist li:before{
+    content:'';position:absolute;left:2px;top:8px;width:6px;height:6px;border-radius:50%;
+    background:var(--ember);opacity:.75;
+  }
   .road{
     border:1px solid var(--line);border-radius:16px;padding:13px 15px;margin:0 0 16px;
     background:linear-gradient(120deg,rgba(38,28,20,0.5),rgba(20,16,14,0.4));
@@ -727,17 +745,17 @@
   var W = 0, H = 0, DPR = 1;
   // The field is drawn smaller than life so more of it fits on the glass. All
   // the game's numbers stay in field units; only the transform knows about it.
-  var ZOOM = 0.7;
+  var ZOOM = 0.6;
   var VS = 1;                     // device pixels per field unit
   function px(n) { return n / ZOOM; }   // n screen pixels, in field units
-  var BUILD = 'v1.19.2';        // bump on every deploy — shown in-game for support
+  var BUILD = 'v1.20.0';        // bump on every deploy — shown in-game for support
   var MUTE_KEY = 'keeper.nightwatch.mute';
   var MUSIC_KEY = 'keeper.nightwatch.music';
 
   // ────────────────────────────────────────────────────────────── tuning
   var FIELD = 1.4286;            // = 1 / ZOOM, spelled out so the tuning reads
   var K = {
-    keeperSpeed: 152 * FIELD,   // unhurried on purpose: this is a calm game
+    keeperSpeed: 118 * FIELD,   // unhurried on purpose: this is a calm game
     keeperR: 14,
     lampR: 84 * FIELD,
     fireCoreR: 34,
@@ -1005,7 +1023,7 @@
                        cape: 'hoodie', armour: 'chestnut', cut: 'swept' },
              player: { name: '', gender: '', hue: 'ember', met: 0, theme: true },
              night: 1, up: {}, pets: [], partner: '', treats: 0,
-             dog: { name: '' }, camp: [], reached: 0,
+             dog: { name: '' }, camp: [], reached: 0, seen: {},
              opts: { sound: true, music: true, stick: 'drift', hand: 'left',
                      aim: true, haptics: true, loop: false } };
   }
@@ -1044,6 +1062,9 @@
       for (i = 0; i < ACHIEVEMENTS.length; i++) {
         if (m.ach[ACHIEVEMENTS[i].id]) f.ach[ACHIEVEMENTS[i].id] = 1;
       }
+    }
+    if (m.seen && typeof m.seen === 'object') {          // notes already read
+      for (var sk in TIPS) if (TIPS.hasOwnProperty(sk) && m.seen[sk]) f.seen[sk] = 1;
     }
     var k = (m.knight && typeof m.knight === 'object') ? m.knight : {};
     f.knight.name = cleanName(k.name);
@@ -6352,6 +6373,51 @@
   });
   var elVeilGear = document.getElementById('veilgear');
   elVeilGear.addEventListener('click', function () { UI.tap(); settingsScreen(menu); });
+  // A short note the first time you open something, and never again. Every
+  // one of them is a thing you would otherwise have to guess.
+  var TIPS = {
+    watch: { t: 'The watch', l: [
+      'Wood turns up in the dark. Walk over it and it comes to you \u2014 carry it into the fire to feed it.',
+      'The fire burns down on its own, and a bigger fire throws a wider ring of light.',
+      'Shades come in to drain it. Light burns them; swing the brand to drive them off; the flare clears all round you but costs fire.',
+      'Last until dawn and you keep going. Let the fire out and you start the night again.'] },
+    stores: { t: 'The Stores', l: [
+      'Embers are what every watch pays out, and they are yours for good.',
+      'Everything here is permanent \u2014 buy a rank once and it applies to every night from now on.',
+      'The drafts you take at dawn are separate, and only last the night you take them.'] },
+    feats:  { t: 'Feats', l: [
+      'One-off bounties. The first time you manage one it pays out in embers and stays ticked.',
+      'You do not have to chase them. They happen while you play.'] },
+    friend: { t: 'Your friend', l: [
+      'Everything about how he looks lives here \u2014 his name, his clothes, his hat, his hair.',
+      'Change any of it whenever you like. It costs nothing.'] },
+    shelf:  { t: 'The Shelf', l: [
+      'Thirty-two tunes, played live rather than looped, so no two nights sound the same.',
+      'Skip, pause and pick from the bar in the corner of the camp.'] },
+    dawn:   { t: 'Dawn', l: [
+      'You held it. Take one upgrade for the road \u2014 it lasts as long as this run does.',
+      'Then it is back to camp, and the next night whenever you are ready.'] },
+  };
+  function seenTip(id) { return !!(META.seen && META.seen[id]); }
+  function withTip(id, go) {
+    var T = TIPS[id];
+    if (!T || seenTip(id)) { go(); return; }
+    if (!META.seen) META.seen = {};
+    META.seen[id] = 1; saveMeta();
+    S.mode = 'menu';
+    showChrome(false);
+    var body = '';
+    for (var i = 0; i < T.l.length; i++) body += '<li>' + T.l[i] + '</li>';
+    veil(
+      '<div class="eyebrow">First time here</div>' +
+      '<h1>' + esc(T.t) + '</h1>' +
+      '<ul class="tiplist">' + body + '</ul>' +
+      '<button class="go" id="btnTipOn">Got it</button>',
+      'tip', null
+    );
+    on('btnTipOn', go);
+  }
+
   function veil(html, cls, back, gear) {
     portraitCv = null;
     KN.onStage = false;
@@ -6803,18 +6869,16 @@
       '<div class="hometop">' +
         '<span class="hchip">Night <b>' + META.night + '</b></span>' +
         (L ? '<span class="hchip">' + esc(L.st) + ' <b>' +
-               (away <= 1 ? 'tonight' : 'in ' + away + ' nights') + '</b></span>'
+               (away <= 1 ? 'tonight' : 'in ' + away) + '</b></span>'
            : '<span class="hchip">The whole road <b>walked</b></span>') +
+        '<span class="hchip em">\u2726 <b>' + META.embers.toLocaleString() + '</b></span>' +
         (STORE_OK && !SAVE_FAILED ? ''
           : '<span class="hchip warn">Progress won\u2019t save in this window \u2014 see Settings</span>') +
       '</div>' +
       '<div class="homebar">' +
-        (META.knight.name
-          ? '<div class="homename"><b>' + esc(META.knight.name) + '</b>' +
-            '<u>' + esc(campRoll()) + '</u></div>'
-          : '<div class="homename"><b>He has no name yet</b><u>waiting by the fire</u></div>') +
+        '<div class="homename"><b>' +
+          (META.knight.name ? esc(META.knight.name) : 'He has no name yet') + '</b></div>' +
         '<div class="homedoing" id="homeDoing">' + esc(doingLine()) + '</div>' +
-        emberChip() +
         '<button class="go" id="btnStart">' +
           (isLandmarkNight(META.night)
             ? 'Night ' + META.night + ' · ' + esc((L || {}).name || 'the last stretch')
@@ -6828,18 +6892,18 @@
           '<button class="ghost" id="btnKnight">' +
             (META.knight.name ? esc(shortName(META.knight.name)) : 'Name him') + '</button>' +
         '</div>' +
-        '<div class="homefoot">Tap him \u00b7 Night Watch ' + BUILD + '</div>' +
       '</div>',
       'home', null, true
     );
     on('btnStart', function () {
-      if (!META.knight.name) nameKnight(startGame); else startGame();
+      var go = function () { withTip('watch', beginNight); };
+      if (!META.knight.name) nameKnight(go); else go();
     });
     on('btnTreat', giveTreat);
-    on('btnShop', shop);
-    on('btnFeats', feats2);
-    on('btnKnight', function () { nameKnight(menu); });
-    bindTransport(function () { musicScreen(menu); });
+    on('btnShop', function () { withTip('stores', shop); });
+    on('btnFeats', function () { withTip('feats', feats2); });
+    on('btnKnight', function () { withTip('friend', function () { nameKnight(menu); }); });
+    bindTransport(function () { withTip('shelf', function () { musicScreen(menu); }); });
     hookPortrait();
     bindStage();
   }
@@ -7148,6 +7212,7 @@
   }
 
   function nightHeld() {
+    if (!seenTip('dawn')) { withTip('dawn', nightHeld); return; }
     duckMusic(0.55, 0.4);
     S.mode = 'draft';
     showChrome(false);
@@ -7260,6 +7325,48 @@
   }
   function finishRun() { return finishNight(false); }
 
+  // Something short before every night: the number, and one line about what
+  // this one is. Taps through, or goes on its own.
+  var NIGHT_LINES = [
+    'The wood is stacked. The kettle is off.',
+    'Cold coming in off the hills tonight.',
+    'Quiet so far. That never lasts.',
+    'He has banked the coals and turned the lamp up.',
+    'Nothing out there yet.',
+    'A long one, by the look of the sky.',
+    'The dog has gone in. He always knows first.',
+    'Clear overhead. You will see them coming.'
+  ];
+  var nightGo = null;
+  function nightCard() {
+    var L = nextLandmark(), lm = isLandmarkNight(META.night);
+    var sub = lm
+      ? 'You reach ' + esc((L || {}).name || 'the end of the road') + ' before morning.'
+      : esc(NIGHT_LINES[(META.night * 7 + 3) % NIGHT_LINES.length]);
+    S.mode = 'menu';
+    showChrome(false);
+    veil(
+      '<div class="nightcard">' +
+        '<div class="eyebrow">' + (lm ? esc((L || {}).st || '') : 'Take the watch') + '</div>' +
+        '<h1 class="bignight">Night <em>' + META.night + '</em></h1>' +
+        '<p class="lede">' + sub + '</p>' +
+        '<div class="foot">tap to begin</div>' +
+      '</div>',
+      'night', null
+    );
+    var card = document.getElementById('card');
+    var fired = false;
+    nightGo = function () {
+      if (fired) return; fired = true;
+      if (card) card.removeEventListener('pointerdown', nightGo);
+      nightGo = null;
+      startGame();
+    };
+    if (card) card.addEventListener('pointerdown', nightGo);
+    setTimeout(function () { if (nightGo) nightGo(); }, 2300);
+  }
+  function beginNight() { nightCard(); }
+
   function startGame() {
     TREAT.on = 0; TREAT.eat = 0; TREAT.crumbs.length = 0;   // nothing left lying about
     S.up = META.up;     // the drafts he has taken are his, and they stay his
@@ -7295,7 +7402,6 @@
     startMusic();
     duckMusic(1, 0.8);
     last = performance.now();
-    toast('Night 1', knightName() + ' takes the watch');
   }
 
   function togglePause() {
