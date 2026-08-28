@@ -389,6 +389,7 @@
   .feat.got{opacity:1;border-color:rgba(255,159,10,0.32)}
   .feat.got .fk{color:var(--ember);background:rgba(255,159,10,0.12)}
   .fe{flex:none;font:700 12px/1 var(--mono);color:var(--core);opacity:.85}
+  .fe i{font-style:normal;font-size:9px;margin-right:3px;opacity:.8}
   .feat:not(.got) .fe{color:var(--mute);opacity:.6}
 
   /* ---------- run summary extras ---------- */
@@ -534,6 +535,10 @@
   .road-bar i{display:block;height:100%;border-radius:3px;
     background:linear-gradient(90deg,var(--go2),var(--go1));box-shadow:0 0 10px var(--glow)}
   .road-sub{font:500 11px/1.4 var(--body);color:var(--mute)}
+  /* something true about where he is walking to, in his voice */
+  .road-fact{margin-top:10px;padding-top:10px;border-top:1px solid rgba(232,220,200,0.09);
+    font:500 12px/1.5 var(--body);color:#b8ac9c;font-style:italic}
+  .road.arrived .road-fact{margin-top:9px;padding-top:9px}
   .road.done{text-align:center}
   .road.done b{display:block;font:700 16px/1.2 var(--display);color:var(--bone)}
   .road.done span{display:block;margin-top:5px;font:500 12px/1.4 var(--body);color:var(--mute)}
@@ -587,6 +592,8 @@
 
   .plumes{display:flex;gap:10px;justify-content:center;margin-bottom:20px}
   .plumes.wrap{flex-wrap:wrap;gap:12px}
+  .plumes.inrow{margin-bottom:0;justify-content:flex-start;flex-wrap:wrap;gap:7px}
+  .plumes.inrow .sw{width:34px;height:34px}
   .askrow{display:flex;gap:10px;margin-top:14px}
   .askrow button{flex:1;margin-top:0}
   .sw{
@@ -758,7 +765,7 @@
   var ZOOM = 0.6;
   var VS = 1;                     // device pixels per field unit
   function px(n) { return n / ZOOM; }   // n screen pixels, in field units
-  var BUILD = 'v1.23.0';        // bump on every deploy — shown in-game for support
+  var BUILD = 'v1.24.0';        // bump on every deploy — shown in-game for support
   var MUTE_KEY = 'keeper.nightwatch.mute';
   var MUSIC_KEY = 'keeper.nightwatch.music';
 
@@ -2485,8 +2492,10 @@
         stick.ox += dx * (1 - MAX / d);
         stick.oy += dy * (1 - MAX / d);
         dx = stick.x - stick.ox; dy = stick.y - stick.oy;
+      } else {                             // fixed: the origin stays put
+        dx *= MAX / d; dy *= MAX / d;
       }
-      d = MAX;                             // fixed: the origin stays put
+      d = MAX;
     }
     var dead = px(7);
     var n = d < dead ? 0 : clamp((d - dead) / (MAX - dead), 0, 1);
@@ -6337,9 +6346,11 @@
   // slide the strip under the camera instead of re-pathing it every frame.
   var CAM_LO = -102, CAM_HI = 72;
   var campBack = null;
-  // The card you land on when you hold a night is called Back at Camp, and it
-  // used to show a night sky an instant after you watched the sun come up.
-  function campDawn() { return S.mode === 'draft' ? 1 : 0; }
+  // The cards you land on straight after watching the sun come up used to show
+  // a night sky. Any screen that is a morning says so; every other screen is a
+  // night, because veil() puts it back before the screen is built.
+  var campMorning = 0;
+  function campDawn() { return campMorning; }
   function campBackdrop(w, h, dpr, base, sc) {
     var dw = campDawn();
     if (campBack && campBack.w === w && campBack.h === h &&
@@ -6606,6 +6617,7 @@
   function veil(html, cls, back, gear) {
     portraitCv = null;
     KN.onStage = false;
+    campMorning = 0;
     elCard.className = 'card' + (cls ? ' ' + cls : '');
     elCard.innerHTML = html;
     elVeil.classList.remove('hide');
@@ -6849,8 +6861,9 @@
       '<canvas id="portrait" class="portrait big"></canvas>' +
       '<input id="nameIn" class="nameIn" maxlength="14" autocomplete="off" spellcheck="false" ' +
         'placeholder="' + (first ? 'Give him a name' : 'His name') + '" value="' + esc(META.knight.name) + '">' +
-      '<div class="plumes">' + plumeSwatches() + '</div>' +
       '<div class="wearlist">' +
+        '<div class="wearrow"><span>Colour</span>' +
+          '<div class="plumes inrow">' + plumeSwatches() + '</div></div>' +
         wardrobeRow('Wearing','cape',   OUTFITS, outfitOf().id) +
         wardrobeRow('Head',   'helm',   HEADS,   headOf().id) +
         wardrobeRow('Hair',   'armour', HAIRS,   hairOf().id) +
@@ -6969,12 +6982,18 @@
     var walked = (META.night - 1) - done * LM_NIGHTS;
     var pct = clamp(walked / LM_NIGHTS, 0, 1) * 100;
     var away = nightsToNext();
+    // He reads about the next stop from his chair, which is the nicest way to
+    // meet one of these — but he is only in that chair about a fifth of the
+    // time, and it took nearly four minutes of watching before the first fact
+    // came out. Nobody waits in camp that long, so the road carries one too.
+    var fact = L.facts && L.facts.length ? L.facts[META.night % L.facts.length] : '';
     return '<div class="road">' +
       '<div class="road-top"><span>Next stop</span><b>' + esc(L.name) + '</b></div>' +
       '<div class="road-bar"><i style="width:' + pct.toFixed(1) + '%"></i></div>' +
       '<div class="road-sub">' + esc(L.st) + ' · ' +
         (away <= 1 ? 'one more night' : away + ' more nights') +
         (compact ? '' : ' · ' + done + ' of ' + LANDMARKS.length + ' behind you') + '</div>' +
+      (fact ? '<div class="road-fact">' + esc(fact) + '</div>' : '') +
     '</div>';
   }
 
@@ -7362,7 +7381,7 @@
       rows += '<div class="feat' + (got ? ' got' : '') + '">' +
         '<div class="fk">' + (got ? '✓' : '·') + '</div>' +
         '<div class="fb"><b>' + esc(A.name) + '</b><span>' + esc(A.desc) + '</span></div>' +
-        '<div class="fe">' + A.embers + '</div>' +
+        '<div class="fe"><i>✦</i>' + A.embers + '</div>' +
       '</div>';
     }
     veil(
@@ -7452,6 +7471,7 @@
       buildFoot(),
       'wide', function () { endParty(); if (!arrivals(menu)) menu(); }
     );
+    campMorning = 1;
     hookPortrait();
     var btns = elCard.querySelectorAll('button[data-up]');
     for (var b = 0; b < btns.length; b++) {
@@ -7745,6 +7765,11 @@
         '<canvas id="portrait" class="portrait stage-knight"></canvas>' +
       '</div>' +
       '<p class="lede">' + lede + '</p>' +
+      (L.facts && L.facts.length
+        ? '<div class="road arrived"><div class="road-top"><span>' + esc(L.st) +
+            '</span><b>' + esc(L.name) + '</b></div>' +
+          '<div class="road-fact">' + esc(L.facts[0]) + '</div></div>'
+        : '') +
       '<div class="tally sm">' +
         '<div><span>Landmarks</span><b>' + META.reached + ' / ' + LANDMARKS.length + '</b></div>' +
         '<div><span>Nights held</span><b>' + META.lifeNights + '</b></div>' +
@@ -7755,6 +7780,7 @@
       buildFoot(),
       'wide', function () { endParty(); if (!arrivals(after)) (after || menu)(); }
     );
+    campMorning = 1;
     hookPortrait();
     UI.win();
     on('btnOn', function () { endParty(); if (!arrivals(after)) (after || menu)(); });
