@@ -430,7 +430,7 @@
   }
   .homestage .portrait.stage-knight{width:100%;height:100%;border-radius:0}
   .hometop{
-    position:absolute;z-index:2;left:calc(var(--safeL) + 14px);top:calc(var(--safeT) + 78px);
+    position:absolute;z-index:2;left:calc(var(--safeL) + 14px);top:calc(var(--safeT) + 84px);
     right:calc(var(--safeR) + 14px);display:flex;flex-wrap:wrap;gap:7px;pointer-events:none;
   }
   .hchip{
@@ -443,10 +443,17 @@
   .hchip.warn{border-color:rgba(255,69,58,0.5);color:#FFB4AE;letter-spacing:.04em;text-transform:none}
   .homemus{
     position:absolute;z-index:3;right:calc(var(--safeR) + 62px);top:calc(var(--safeT) + 12px);
-    display:flex;align-items:center;gap:4px;padding:5px 7px;border-radius:999px;
-    border:1px solid var(--line);background:rgba(14,11,10,0.66);
+    display:flex;flex-direction:column;align-items:center;gap:1px;padding:4px 9px 6px;
+    border-radius:19px;border:1px solid var(--line);background:rgba(14,11,10,0.7);
     backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);
   }
+  .homemus .mrow{display:flex;align-items:center;gap:4px}
+  .homemus .mname{
+    max-width:154px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font:700 9.5px/1.2 var(--body);letter-spacing:.13em;text-transform:uppercase;
+    color:var(--bone);opacity:.72;
+  }
+  .homemus .mname.off{opacity:.4}
   .homemus .tb{
     width:30px;height:30px;border-radius:50%;border:0;background:none;padding:0;
     color:var(--mute);display:grid;place-items:center;cursor:pointer;
@@ -456,12 +463,6 @@
   .homemus .tb:active{transform:scale(.9)}
   .homemus .tb svg{width:13px;height:12px}
   .homemus .tb.big svg{width:12px;height:14px}
-  .hometune{
-    position:absolute;z-index:3;right:calc(var(--safeR) + 12px);top:calc(var(--safeT) + 56px);
-    max-width:62%;text-align:right;pointer-events:none;
-    font:600 10px/1.3 var(--body);letter-spacing:.1em;text-transform:uppercase;color:#6E6560;
-    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  }
   .homebar{
     position:absolute;z-index:2;left:0;right:0;bottom:0;text-align:center;
     padding:64px calc(var(--safeR) + 20px) calc(var(--safeB) + 14px) calc(var(--safeL) + 20px);
@@ -471,6 +472,11 @@
   .homename b{display:block;font:700 27px/1.1 var(--display);letter-spacing:-.015em;color:var(--bone)}
   .homename u{display:block;margin-top:5px;font:500 12.5px/1.3 var(--body);color:var(--mute);
     text-decoration:none}
+  .homedoing{
+    margin:7px 0 0;font:600 12px/1.3 var(--body);letter-spacing:.01em;
+    color:var(--ember);opacity:.82;
+  }
+
   .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-top:9px}
   .row3 .ghost{margin-top:0;padding:13px 4px;font-size:12.5px}
   .homebar .go{margin-top:0}
@@ -724,7 +730,7 @@
   var ZOOM = 0.7;
   var VS = 1;                     // device pixels per field unit
   function px(n) { return n / ZOOM; }   // n screen pixels, in field units
-  var BUILD = 'v1.17.0';        // bump on every deploy — shown in-game for support
+  var BUILD = 'v1.18.0';        // bump on every deploy — shown in-game for support
   var MUTE_KEY = 'keeper.nightwatch.mute';
   var MUSIC_KEY = 'keeper.nightwatch.music';
 
@@ -3507,6 +3513,12 @@
       }
       g.strokeStyle = '#5F392E'; g.lineWidth = 0.55;
       g.beginPath(); g.moveTo(0, -7.1); g.lineTo(0, -0.4); g.stroke();
+    } else if (item === 'rag') {
+      g.fillStyle = '#C9BBA4';
+      g.beginPath();
+      g.moveTo(-2.6, -0.6); g.quadraticCurveTo(0.4, -3.4, 3.2, -0.9);
+      g.quadraticCurveTo(1.2, 2.6, -2.6, -0.6);
+      g.closePath(); g.fill();
     } else if (item === 'marsh') {
       g.strokeStyle = '#7A5433'; g.lineWidth = 1.2;
       g.beginPath(); g.moveTo(0, 0); g.lineTo(7, -2.4); g.stroke();
@@ -4255,7 +4267,7 @@
     fire:  { x: 0,    stand: -16, face: 1 },
     pot:   { x: 0,    stand: 18,  face: -1 },   // the tripod hangs over the fire
     wood:  { x: -32,  stand: -28, face: -1 },
-    bed:   { x: -112, stand: -107, face: 1 },   // the tent — he sleeps inside it
+    bed:   { x: -112, stand: -109, face: 1 },   // the tent — he sleeps inside it
     kennel:{ x: -60,  stand: -70, face: 1 },
     chair: { x: 60,   stand: 60,  face: -1 },   // his reading chair, turned to the fire
     desk:  { x: 104,  stand: 104, face: 1 },   // square in front of it, back to you
@@ -5066,7 +5078,7 @@
     armL: undefined, armR: undefined, item: null, itemL: null,
     blink: 1.8, hop: 0, tilt: 0, lean: 0, zzz: 0, sit: 0,
     crouch: 0, lie: 0, back: 0, headTilt: 0, lift: 0, treatT: 0, faceYou: 0, factT: 0,
-    spin: 0, squash: 0, look: 0, lookD: 0, lookT: 0,
+    spin: 0, squash: 0, look: 0, lookD: 0, lookT: 0, sc: 1,
     hearts: [], props: [], taps: 0, tapT: 0, petting: 0, pet: 0,
     onStage: false, lastReact: '', bounce: 0, danceT: 0,
     amt: 0.5, amtTarget: 0.5,
@@ -5160,6 +5172,32 @@
 
   // He only says what he actually knows: a line asking for something he was
   // never told is dropped rather than filled with a guess.
+  // Half of what he gets up to is legible from across the room and half is
+  // not, so the lobby just says it. One short line, under his name.
+  var KN_DOING = {
+    idle:  'taking a breath',        warm:  'warming his hands',
+    poke:  'poking the fire',        rub:   'thawing his hands out',
+    stir:  'stirring the pot',       sip:   'having a brew',
+    marsh: 'toasting a marshmallow', chop:  'splitting wood',
+    haul:  'carrying wood over',     nap:   'having a nap',
+    tidy:  'tidying the bedroll',    game:  'playing his game',
+    sit:   'sitting a while',        stars: 'watching the stars',
+    panel: 'wiping the solar panel', wander:'having a wander',
+    moth:  'watching a moth',        ember: 'chasing an ember',
+    stretch:'having a stretch',      dance: 'dancing to this one',
+    wave:  'waving at you'
+  };
+  function doingLine() {
+    if (KN.walking > 0.5) return 'on his way over';
+    if (KN.petting > 0)   return 'enjoying that';
+    if (KN.act === 'read') {
+      var L = nextLandmark();
+      return L ? 'reading up on ' + L.st : 'reading';
+    }
+    if (KN.treatT > 4.5)  return 'watching the dog with it';
+    return KN_DOING[KN.act] || 'pottering about';
+  }
+
   function knightSay(kind) {
     var pool = KN_SAYS[kind] || KN_SAYS.world, ok = [], i;
     for (i = 0; i < pool.length; i++) {
@@ -5538,7 +5576,7 @@
     }
 
     var A2 = KN.act, wobble = Math.sin(S.time * 2) * 0.03;
-    var armL, armR, item = null, itemL = null, expr = 'normal', lookD = 0;
+    var armL, armR, item = null, itemL = null, expr = 'normal', lookD = 0, bodySc = 1;
     var tilt = wobble, lean = 0, sit = 0, zzz = 0;
     var crouch = 0, lie = 0, back = 0, headTilt = 0, lift = 0;
 
@@ -5650,9 +5688,11 @@
       armR = -0.98; armL = 0.98; lean = -0.07; headTilt = -0.05;
       expr = 'normal';
     } else if (A2 === 'nap') {
-      // flat out on the bedroll
+      // Curled up on the bedroll rather than laid out flat — knees in, arms
+      // tucked, and drawn a shade smaller so he fits inside the tent.
       lie = 1; zzz = 1; tilt = 0; expr = 'sleepy';
-      armL = 0.5; armR = -0.25; headTilt = 0.3;
+      bodySc = 0.74;
+      armL = 0.22; armR = -0.18; headTilt = 0.34;   // arms tucked along him, not out
     } else if (A2 === 'tidy') {
       // bent over, sweeping things back where they belong
       crouch = 0.55;
@@ -5702,6 +5742,7 @@
       armR = -2.5 + Math.sin(S.time * 2.6) * 0.2;
       armL = 2.3 - Math.sin(S.time * 2.6 + 0.6) * 0.2;
       headTilt = -0.16; lean = 0.05;
+      item = 'rag';
       expr = peek2 ? 'happy' : 'think';
       if (peek2) KN.look = 0;
     } else if (A2 === 'stretch') {
@@ -5739,6 +5780,7 @@
 
     KN.armL = armL; KN.armR = armR; KN.item = item; KN.itemL = itemL;
     KN.lookD += (lookD - KN.lookD) * Math.min(1, dt * 7);
+    KN.sc += (bodySc - KN.sc) * Math.min(1, dt * 4);
     KN.tilt = tilt;
     KN.lean += (lean - KN.lean) * Math.min(1, dt * 6);
     KN.sit += (sit - KN.sit) * Math.min(1, dt * 4);
@@ -5932,7 +5974,7 @@
     g.save();
     g.translate(KN.x, CAMP_GND - 14);
     drawKnight(g, {
-      t: S.time, scale: 1, expr: KN.expr, amt: KN.amt, look: KN.look, lookD: KN.lookD,
+      t: S.time, scale: KN.sc, expr: KN.expr, amt: KN.amt, look: KN.look, lookD: KN.lookD,
       tilt: KN.tilt, hop: KN.hop, squash: KN.squash, spin: KN.spin,
       lean: KN.lean, zzz: KN.zzz, sit: KN.sit, flip: KN.face,
       crouch: KN.crouch, lie: KN.lie, back: KN.back, headTilt: KN.headTilt, lift: KN.lift,
@@ -5960,7 +6002,7 @@
     g.translate(w / 2, h / 2 - MID * sc);
     g.scale(sc, sc);
     drawKnight(g, {
-      t: S.time, scale: 1, expr: KN.expr, amt: KN.amt, look: KN.look, lookD: KN.lookD,
+      t: S.time, scale: KN.sc, expr: KN.expr, amt: KN.amt, look: KN.look, lookD: KN.lookD,
       tilt: KN.tilt, hop: KN.hop, squash: KN.squash, spin: KN.spin,
       zzz: KN.zzz, sit: KN.sit * 0.5, flip: 1, crouch: KN.crouch * 0.4,
       armL: KN.armL, armR: KN.armR, item: KN.item, itemL: KN.itemL
@@ -6392,7 +6434,8 @@
   function refreshTransport() {
     var lob = document.getElementById('homeTune');
     if (lob) {
-      lob.textContent = tuneName() + (MUS.on ? '' : ' · paused');
+      lob.textContent = tuneName();
+      lob.classList.toggle('off', !MUS.on);
       var lp2 = document.querySelector('.homemus #mPlay');
       if (lp2) lp2.innerHTML = playGlyph();
     }
@@ -6507,6 +6550,7 @@
         '<canvas id="portrait" class="portrait stage-knight"></canvas>' +
       '</div>' +
       '<div class="homemus">' +
+        '<div class="mrow">' +
         '<button class="tb" id="mPrev" aria-label="Previous tune">' +
           '<svg viewBox="0 0 16 14"><path d="M15 1.5v11L7 7l8-5.5zM6 1.5v11L1 7l5-5.5z" fill="currentColor"/></svg>' +
         '</button>' +
@@ -6518,8 +6562,9 @@
           '<svg viewBox="0 0 16 14"><path d="M1 2h14M1 7h14M1 12h9" stroke="currentColor" stroke-width="1.8" ' +
             'stroke-linecap="round" fill="none"/></svg>' +
         '</button>' +
+        '</div>' +
+        '<div class="mname' + (MUS.on ? '' : ' off') + '" id="homeTune">' + esc(tuneName()) + '</div>' +
       '</div>' +
-      '<div class="hometune" id="homeTune">' + esc(tuneName()) + '</div>' +
       '<div class="hometop">' +
         '<span class="hchip">Night <b>' + META.night + '</b></span>' +
         (L ? '<span class="hchip">' + esc(L.st) + ' <b>' +
@@ -6533,6 +6578,7 @@
           ? '<div class="homename"><b>' + esc(META.knight.name) + '</b>' +
             '<u>' + esc(campRoll()) + '</u></div>'
           : '<div class="homename"><b>A keeper with no name</b><u>waiting by the fire</u></div>') +
+        '<div class="homedoing" id="homeDoing">' + esc(doingLine()) + '</div>' +
         emberChip() +
         '<button class="go" id="btnStart">' +
           (isLandmarkNight(META.night)
@@ -7222,7 +7268,11 @@
     // nobody. Skipping it there is most of a frame back on a phone.
     if (!elVeil.classList.contains('full')) { render(); }
     syncHud();
-    if (portraitCv) { syncFolk(); syncPets(); updateKnight(dt); updateDog(dt); updatePets(dt); paintPortrait(); }
+    if (portraitCv) {
+      syncFolk(); syncPets(); updateKnight(dt); updateDog(dt); updatePets(dt); paintPortrait();
+      var doing = document.getElementById('homeDoing');
+      if (doing) { var dl = doingLine(); if (doing.textContent !== dl) doing.textContent = dl; }
+    }
   }
 
   // ────────────────────────────────────────────────────────────── boot
