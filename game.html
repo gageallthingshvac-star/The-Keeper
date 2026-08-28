@@ -748,7 +748,7 @@
   var ZOOM = 0.6;
   var VS = 1;                     // device pixels per field unit
   function px(n) { return n / ZOOM; }   // n screen pixels, in field units
-  var BUILD = 'v1.20.0';        // bump on every deploy — shown in-game for support
+  var BUILD = 'v1.21.0';        // bump on every deploy — shown in-game for support
   var MUTE_KEY = 'keeper.nightwatch.mute';
   var MUSIC_KEY = 'keeper.nightwatch.music';
 
@@ -818,7 +818,7 @@
   function moreBy(r) { return MORE[clamp(Math.round(r), 1, MORE.length) - 1]; }
   var PERKS = [
     { id: 'provisions', name: 'Packed Satchel',  glyph: '🎒', ranks: 5, cost: [40, 75, 120, 180, 260],
-      desc: function (r) { return 'Start each run with +' + (r * 7) + ' fire.'; } },
+      desc: function (r) { return 'Start each night with +' + (r * 7) + ' fire.'; } },
     { id: 'richwood',   name: 'Woodcraft',       glyph: '🪓', ranks: 4, cost: [55, 100, 170, 260],
       desc: function (r) { return 'Every log is worth +' + (r * 2) + ' fire.'; } },
     { id: 'boots',      name: 'Worn Boots',      glyph: '👢', ranks: 4, cost: [45, 85, 140, 210],
@@ -899,15 +899,15 @@
     { id: 'dawn5',   name: 'Deep Watch',       desc: 'Reach night 5.',                      embers: 60,  test: function (r) { return r.night >= 5; } },
     { id: 'dawn8',   name: 'Long Vigil',       desc: 'Reach night 8.',                      embers: 150, test: function (r) { return r.night >= 8; } },
     { id: 'dawn12',  name: 'Old Friends',      desc: 'Reach night 12.',                     embers: 400, test: function (r) { return r.night >= 12; } },
-    { id: 'wood50',  name: 'Woodcutter',       desc: 'Feed 50 logs in one run.',            embers: 80,  test: function (r) { return r.logs >= 50; } },
-    { id: 'kill100', name: 'Dispeller',        desc: 'Dispel 100 shades in one run.',       embers: 100, test: function (r) { return r.kills >= 100; } },
-    { id: 'husk10',  name: 'Husk Breaker',     desc: 'Dispel 10 husks in one run.',         embers: 90,  test: function (r) { return r.husks >= 10; } },
+    { id: 'wood50',  name: 'Woodcutter',       desc: 'Feed 50 logs in one night.',            embers: 80,  test: function (r) { return r.logs >= 50; } },
+    { id: 'kill100', name: 'Dispeller',        desc: 'Dispel 100 shades in one night.',       embers: 100, test: function (r) { return r.kills >= 100; } },
+    { id: 'husk10',  name: 'Husk Breaker',     desc: 'Dispel 10 husks in one night.',         embers: 90,  test: function (r) { return r.husks >= 10; } },
     { id: 'clean4',  name: 'Steady Hand',      desc: 'Reach night 4 without ever flaring.', embers: 120, test: function (r) { return r.night >= 4 && r.flares === 0; } },
     { id: 'stack8',  name: 'Well Stocked',     desc: 'Hold 8 upgrades at once.',            embers: 100, test: function (r) { return r.upCount >= 8; } },
     { id: 'heat10',  name: 'White Heat',       desc: 'Reach heat ×10.',                     embers: 130, test: function (r) { return r.bestHeat >= 10; } },
     { id: 'untouched', name: 'Untouched',     desc: 'Reach night 4 without taking a single hit.', embers: 140, test: function (r) { return r.night >= 4 && r.damage === 0; } },
-    { id: 'brand40', name: 'Brandbearer',      desc: 'Dispel 40 shades with the brand in one run.', embers: 110, test: function (r) { return r.brandKills >= 40; } },
-    { id: 'score10k',name: 'Ten Thousand',     desc: 'Score 10,000 in one run.',            embers: 200, test: function (r) { return r.score >= 10000; } }
+    { id: 'brand40', name: 'Brandbearer',      desc: 'Dispel 40 shades with the brand in one night.', embers: 110, test: function (r) { return r.brandKills >= 40; } },
+    { id: 'score10k',name: 'Ten Thousand',     desc: 'Score 10,000 in one night.',            embers: 200, test: function (r) { return r.score >= 10000; } }
   ];
 
   // The long road. Every couple of keeper levels puts another one behind you,
@@ -2374,14 +2374,20 @@
   // ────────────────────────────────────────────────────────────── spawning
   // wood gets scarcer and lies farther out as the nights wear on
   function logInterval() { return K.logEvery + Math.min(1.9, (nightP(S.night) - 1) * 0.2); }
-  function logMinDist() { return Math.min(Math.min(W, H) * 0.42, (128 + (nightP(S.night) - 1) * 15) * FIELD); }
+  // Distance is the tension; not being able to see was never the tension. The
+  // logs carry their own ember now, so they can sit as far out as they always did.
+  function logMinDist() { return Math.min(Math.min(W, H) * 0.40, (126 + (nightP(S.night) - 1) * 15) * FIELD); }
+  // and a ceiling, so nothing lands in a corner you would spend half the night
+  // walking to. The arena is taller than it is wide; the play is round.
+  function logMaxDist() { return Math.min(W, H) * 0.72; }
 
   function spawnLog() {
     if (S.logs.length >= D.maxLogs) return;
-    var minD = logMinDist();
+    var minD = logMinDist(), maxD = logMaxDist();
     for (var tries = 0; tries < 30; tries++) {
       var x = rand(px(46), W - px(46)), y = rand(px(88), H - px(96));
-      if (dist(x, y, S.fire.x, S.fire.y) < minD) continue;
+      var dd = dist(x, y, S.fire.x, S.fire.y);
+      if (dd < minD || dd > maxD) continue;
       S.logs.push({ x: x, y: y, a: rand(0, Math.PI), pop: 0 });
       return;
     }
@@ -3974,9 +3980,11 @@
       grd.addColorStop(0.55, 'rgba(' + tint + ',0.72)');
       grd.addColorStop(1, 'rgba(12,7,28,0)');
       ctx.fillStyle = grd;
+      // A shade out in the dark used to be a 0.12-alpha outline on black, so
+      // the first you knew of one was when it reached the fire.
       ctx.strokeStyle = 'rgba(' + (s.t.rim || '150,120,220') + ',' +
-        ((0.12 + 0.3 * li) * (0.5 + 0.5 * hpF)).toFixed(3) + ')';
-      ctx.lineWidth = 1.4;
+        ((0.5 + 0.2 * li) * (0.5 + 0.5 * hpF)).toFixed(3) + ')';
+      ctx.lineWidth = 1.7;
       ctx.beginPath();
       ctx.moveTo(-s.r + wob * 0.3, s.r * 0.5);
       ctx.quadraticCurveTo(-s.r * 1.1, -s.r * 0.9, wob, -s.r * 1.25);
@@ -3986,6 +3994,25 @@
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
+
+      // Two points of light, brightest out in the dark and fading as it comes
+      // into the fire's reach. Measured, a shade in the dark was only a tenth
+      // brighter than the ground behind it; the eyes are what you actually see
+      // coming, which is the whole point of having to watch for them.
+      var far = 1 - clamp(li * 2.2, 0, 1);
+      if (far > 0.03) {
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = (0.28 + 0.52 * far) * (0.45 + 0.55 * hpF);
+        ctx.fillStyle = 'rgba(' + (s.t.rim || '170,140,240') + ',0.95)';
+        var eyy = -s.r * 0.24, eyx = s.r * 0.33, eyr = s.r * 0.15;
+        ctx.beginPath(); ctx.arc(-eyx + wob * 0.2, eyy, eyr, 0, 6.29); ctx.fill();
+        ctx.beginPath(); ctx.arc(eyx + wob * 0.2, eyy, eyr, 0, 6.29); ctx.fill();
+        ctx.globalAlpha = (0.12 + 0.2 * far) * hpF;
+        ctx.beginPath(); ctx.arc(-eyx + wob * 0.2, eyy, eyr * 3.2, 0, 6.29); ctx.fill();
+        ctx.beginPath(); ctx.arc(eyx + wob * 0.2, eyy, eyr * 3.2, 0, 6.29); ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+      }
 
       // burning-away shimmer — a scorched rim, so the body stays dark.
       // A husk shrugs most of it off, which is the visual tell that it will last.
@@ -4075,6 +4102,23 @@
     g.addColorStop(1, 'rgba(255,90,20,0)');
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.arc(S.fire.x, S.fire.y, lr, 0, 6.29); ctx.fill();
+
+    // Every log carries its own ember. Drawn after the darkness so it survives
+    // it — before this you were hunting brown shapes on a black field, which is
+    // most of what a night was.
+    for (var li2 = 0; li2 < S.logs.length; li2++) {
+      var lg = S.logs[li2];
+      var lp = 0.55 + 0.45 * clamp(lg.pop, 0, 1);
+      var pulse = 0.82 + 0.18 * Math.sin(S.time * 2.4 + lg.a * 3);
+      var lgr = ctx.createRadialGradient(lg.x, lg.y, 0, lg.x, lg.y, px(46) * lp);
+      lgr.addColorStop(0, 'rgba(255,168,72,' + (0.3 * lp * pulse).toFixed(3) + ')');
+      lgr.addColorStop(0.4, 'rgba(255,132,40,' + (0.1 * lp * pulse).toFixed(3) + ')');
+      lgr.addColorStop(1, 'rgba(255,120,30,0)');
+      ctx.fillStyle = lgr;
+      ctx.beginPath(); ctx.arc(lg.x, lg.y, px(46) * lp, 0, 6.29); ctx.fill();
+      ctx.fillStyle = 'rgba(255,206,132,' + (0.5 * lp * pulse).toFixed(3) + ')';
+      ctx.beginPath(); ctx.ellipse(lg.x - px(5), lg.y, px(3.4), px(2.2), lg.a, 0, 6.29); ctx.fill();
+    }
 
     var k = S.keeper;
     var g2 = ctx.createRadialGradient(k.x, k.y, 0, k.x, k.y, D.lampR);
@@ -4390,7 +4434,7 @@
     }
     return out;
   })();
-  var CAMP_MOON = { x: -44, y: -88, r: 7.4 };
+  var CAMP_MOON = { x: -44, y: -152, r: 8.4 };
 
   // One ridge of hills: a soft silhouette summed from a couple of sines, filled
   // down past the horizon so the ground gradient lands on top of it.
@@ -4426,8 +4470,8 @@
     g.fillStyle = 'rgba(228,234,255,0.82)';
     g.fill();
     // the country he is crossing, two ridges deep — the same country each time
-    campRidge(g, -78, 34, 0.016, 2.1, 'rgba(52,47,98,0.50)');
-    campRidge(g, -58, 20, 0.029, 5.4, 'rgba(28,24,56,0.82)');
+    campRidge(g, -116, 52, 0.014, 2.1, 'rgba(52,47,98,0.46)');
+    campRidge(g, -74, 30, 0.026, 5.4, 'rgba(28,24,56,0.8)');
     var gg = g.createLinearGradient(0, -6, 0, 34);
     gg.addColorStop(0, 'rgba(84,56,34,0.62)');
     gg.addColorStop(0.55, 'rgba(48,34,38,0.42)');
@@ -6384,7 +6428,7 @@
     stores: { t: 'The Stores', l: [
       'Embers are what every watch pays out, and they are yours for good.',
       'Everything here is permanent \u2014 buy a rank once and it applies to every night from now on.',
-      'The drafts you take at dawn are separate, and only last the night you take them.'] },
+      'The upgrades you draft at dawn are separate, and they stay with you too.'] },
     feats:  { t: 'Feats', l: [
       'One-off bounties. The first time you manage one it pays out in embers and stays ticked.',
       'You do not have to chase them. They happen while you play.'] },
@@ -6395,8 +6439,8 @@
       'Thirty-two tunes, played live rather than looped, so no two nights sound the same.',
       'Skip, pause and pick from the bar in the corner of the camp.'] },
     dawn:   { t: 'Dawn', l: [
-      'You held it. Take one upgrade for the road \u2014 it lasts as long as this run does.',
-      'Then it is back to camp, and the next night whenever you are ready.'] },
+      'You held it. Take one upgrade for the road \u2014 it stays with you for the rest of the journey.',
+      'Then it is back to camp, and the next night whenever you are ready.'] }
   };
   function seenTip(id) { return !!(META.seen && META.seen[id]); }
   function withTip(id, go) {
@@ -6937,13 +6981,7 @@
       '<h1>Spend <em>Embers</em></h1>' +
       emberChip() +
       levelStrip() +
-      '<div class="explain">' +
-        '<div><i>🔥</i><span><b>What they buy.</b> Gear on this page, kept forever — ' +
-          'every rank you buy applies to every run from now on.</span></div>' +
-        '<div><i>🌙</i><span><b>How you earn them.</b> Every watch pays out when it ends: ' +
-          'further nights and higher scores pay more.</span></div>' +
-        '<div><i>🎖</i><span><b>Bonus.</b> Each Feat pays a one-time bounty the first time you manage it.</span></div>' +
-      '</div>' +
+      '<div class="lede sm">Bought once and kept for good. Every watch you finish pays out more.</div>' +
       '<div class="shoplist">' + rows + '</div>' +
       '<button class="ghost" id="btnBack">Back to camp</button>' +
       buildFoot(),
@@ -7493,7 +7531,7 @@
         achHtml +
         (levelled ? '<div class="levelup">Watch level ' + out.after + nextUnlockNote(out.after - 1) + '</div>' : '') +
         '<div class="lvl tight">' +
-          '<div class="lvl-top"><b>Level ' + L.level + '</b><span class="embers">' + META.embers.toLocaleString() + ' <i>embers</i></span></div>' +
+          '<div class="lvl-top"><b>Watch level ' + L.level + '</b></div>' +
           '<div class="xp"><i style="width:' + pct.toFixed(1) + '%"></i></div>' +
         '</div>' +
         '<div class="held big">' + upChips(S.up, true) + '</div>' +
