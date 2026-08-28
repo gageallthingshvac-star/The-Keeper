@@ -97,6 +97,8 @@
     color:var(--bone);text-shadow:0 1px 8px #000;
   }
   #stats small{display:block;font:600 9px/1 var(--body);letter-spacing:.14em;color:var(--mute);text-transform:uppercase;margin-bottom:4px}
+  #stats small.scr{margin-bottom:0}
+  #stats small.scr b{font:700 13px/1 var(--mono);letter-spacing:.02em;color:var(--bone);margin-left:5px}
 
   /* ---------- Controls ---------- */
   .btn{
@@ -144,7 +146,9 @@
     position:absolute;left:0;right:0;bottom:0;height:0%;
     background:rgba(255,159,10,0.14);transition:height .08s linear;
   }
-  #flare span{position:relative;z-index:1}
+  #flare span{position:relative;z-index:1;display:block;text-align:center}
+  #flare span u{display:block;margin-top:3px;font:700 8.5px/1 var(--mono);letter-spacing:.06em;
+    text-decoration:none;opacity:.72}
   #flare.cool{color:#7d7369;border-color:var(--line);box-shadow:none}
   #flare.ready{animation:flarePulse 2.6s ease-in-out infinite}
   @keyframes flarePulse{
@@ -434,10 +438,10 @@
     right:calc(var(--safeR) + 14px);display:flex;flex-wrap:wrap;gap:7px;pointer-events:none;
   }
   .hchip{
-    display:inline-flex;align-items:baseline;gap:6px;padding:7px 12px;border-radius:999px;
+    display:inline-flex;align-items:baseline;gap:5px;padding:7px 10px;border-radius:999px;
     border:1px solid var(--line);background:rgba(14,11,10,0.62);
     backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);
-    font:600 10px/1 var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--mute);
+    font:600 10px/1 var(--body);letter-spacing:.11em;text-transform:uppercase;color:var(--mute);
   }
   .hchip b{font:700 13px/1 var(--display);letter-spacing:0;color:var(--bone);text-transform:none}
   .hchip.warn{border-color:rgba(255,69,58,0.5);color:#FFB4AE;letter-spacing:.04em;text-transform:none}
@@ -714,7 +718,7 @@
       <div class="bar thin" id="hpBar"><i></i></div>
     </div>
   </div>
-  <div id="stats"><small>Night <span id="nightNum">1</span></small><span id="scoreNum">0</span></div>
+  <div id="stats"><small>Night <span id="nightNum">1</span></small><small class="scr">Score <b id="scoreNum">0</b></small></div>
 </div>
 <div id="hud2"><div id="heat"></div><div id="chips"></div></div>
 
@@ -722,7 +726,7 @@
   <svg width="14" height="16" viewBox="0 0 14 16" fill="none"><rect x="1" y="1" width="4" height="14" rx="1.4" fill="currentColor"/><rect x="9" y="1" width="4" height="14" rx="1.4" fill="currentColor"/></svg>
 </button>
 
-<button class="btn" id="flare" aria-label="Flare"><div class="fill"></div><span>Flare</span></button>
+<button class="btn" id="flare" aria-label="Flare"><div class="fill"></div><span>Flare<u id="flareCost"></u></span></button>
 <button class="btn" id="brand" aria-label="Swing the brand"><div class="fill"></div><span>Brand</span></button>
 
 <div id="build"></div>
@@ -748,7 +752,7 @@
   var ZOOM = 0.6;
   var VS = 1;                     // device pixels per field unit
   function px(n) { return n / ZOOM; }   // n screen pixels, in field units
-  var BUILD = 'v1.21.0';        // bump on every deploy — shown in-game for support
+  var BUILD = 'v1.22.0';        // bump on every deploy — shown in-game for support
   var MUTE_KEY = 'keeper.nightwatch.mute';
   var MUSIC_KEY = 'keeper.nightwatch.music';
 
@@ -816,6 +820,7 @@
   // sales pitch, so each rank says how much better it feels, in plain English.
   var MORE = ['a little', 'noticeably', 'a good deal', 'a great deal', 'far'];
   function moreBy(r) { return MORE[clamp(Math.round(r), 1, MORE.length) - 1]; }
+  function lcFirst(t) { return t.charAt(0).toLowerCase() + t.slice(1); }
   var PERKS = [
     { id: 'provisions', name: 'Packed Satchel',  glyph: '🎒', ranks: 5, cost: [40, 75, 120, 180, 260],
       desc: function (r) { return 'Start each night with +' + (r * 7) + ' fire.'; } },
@@ -934,7 +939,7 @@
     { st: 'Nevada',        name: 'the Hoover Dam', facts: [
       'The Hoover Dam came in two years early. Two years! I cannot get a lean-to up in a fortnight.',
       'They poured the Hoover Dam in blocks with cooling pipes through them. In one solid pour the concrete would still be cooling now.',
-      'The Hoover Dam sits right on the state line, so one end of it is an hour ahead of the other.'] },
+      'Nevada is at one end of the Hoover Dam and Arizona at the other, and Arizona never moves its clocks. Half the year the two ends of it disagree about the time.'] },
     { st: 'California',    name: 'the Golden Gate Bridge', facts: [
       'The Golden Gate is painted a colour called International Orange, chosen because you can still see it through fog.',
       'The Golden Gate opened in 1937, and its towers stand seven hundred and forty-six feet up.',
@@ -1170,14 +1175,6 @@
     return { level: l, into: xp - spent, need: need };
   }
   function keeperLevel() { return levelInfo(META.xp).level; }
-  // For a button that has to hold his name: drop the honorific if he has one.
-  function shortName(n) {
-    var bits = String(n || '').trim().split(/\s+/);
-    if (bits.length > 1 && /^(sir|dame|lord|lady|the|old|young)$/i.test(bits[0])) bits.shift();
-    var out = bits.join(' ');
-    return out.length > 11 ? out.slice(0, 10) + '\u2026' : (out || n);
-  }
-
   function u(id) { return S.up[id] || 0; }
   function pk(id) { return META.perks[id] || 0; }
   function upCount() { var n = 0; for (var k in S.up) n += S.up[k]; return n; }
@@ -4344,6 +4341,7 @@
       'reset when you close the tab. Open the game in a normal window to keep them.</div>';
   }
   var elFlareFill = flareBtn.querySelector('.fill');
+  var elFlareCost = document.getElementById('flareCost');
   var elBrandFill = brandBtn.querySelector('.fill');
   var elHud2 = document.getElementById('hud2');
   var elHeat = document.getElementById('heat');
@@ -4366,7 +4364,7 @@
     elScore.textContent = Math.round(S.score).toLocaleString();
     // heat pill + held-upgrade chips
     if (S.heat > 1) {
-      elHeat.textContent = '×' + S.heat;
+      elHeat.textContent = 'Heat ×' + S.heat;
       elHeat.className = 'show' + (S.heat >= 15 ? ' hot' : S.heat >= 7 ? ' warm' : '');
       elHeat.style.opacity = clamp(S.heatT / 1.2, 0.35, 1);
     } else if (elHeat.className !== '') { elHeat.className = ''; }
@@ -4375,6 +4373,8 @@
 
     var charging = S.keeper.cd > 0;
     var poor = S.fuel < D.flareCost + 2;
+    // it goes grey when the fire cannot spare the wood; now it says how much
+    if (elFlareCost.textContent !== '-' + D.flareCost) elFlareCost.textContent = '-' + D.flareCost;
     var cd = clamp(1 - S.keeper.cd / D.flareCd, 0, 1);
     elFlareFill.style.height = charging ? (cd * 100).toFixed(0) + '%' : '0%';
     flareBtn.classList.toggle('cool', charging || poor);
@@ -6437,7 +6437,7 @@
       'Change any of it whenever you like. It costs nothing.'] },
     shelf:  { t: 'The Shelf', l: [
       'Thirty-two tunes, played live rather than looped, so no two nights sound the same.',
-      'Skip, pause and pick from the bar in the corner of the camp.'] },
+      'Skip, pause and pick from the bar along the top of the camp screen.'] },
     dawn:   { t: 'Dawn', l: [
       'You held it. Take one upgrade for the road \u2014 it stays with you for the rest of the journey.',
       'Then it is back to camp, and the next night whenever you are ready.'] }
@@ -6912,10 +6912,10 @@
       '</div>' +
       '<div class="hometop">' +
         '<span class="hchip">Night <b>' + META.night + '</b></span>' +
-        (L ? '<span class="hchip">' + esc(L.st) + ' <b>' +
-               (away <= 1 ? 'tonight' : 'in ' + away) + '</b></span>'
-           : '<span class="hchip">The whole road <b>walked</b></span>') +
         '<span class="hchip em">\u2726 <b>' + META.embers.toLocaleString() + '</b></span>' +
+        (L ? '<span class="hchip">' + esc(L.st) + ' <b>' +
+               (away <= 1 ? 'tonight' : away + ' nights') + '</b></span>'
+           : '<span class="hchip">The whole road <b>walked</b></span>') +
         (STORE_OK && !SAVE_FAILED ? ''
           : '<span class="hchip warn">Progress won\u2019t save in this window \u2014 see Settings</span>') +
       '</div>' +
@@ -6934,7 +6934,7 @@
           '<button class="ghost" id="btnShop">Stores</button>' +
           '<button class="ghost" id="btnFeats">Feats · ' + feats + '/' + ACHIEVEMENTS.length + '</button>' +
           '<button class="ghost" id="btnKnight">' +
-            (META.knight.name ? esc(shortName(META.knight.name)) : 'Name him') + '</button>' +
+            (META.knight.name ? 'Who He Is' : 'Name him') + '</button>' +
         '</div>' +
       '</div>',
       'home', null, true
@@ -6967,7 +6967,8 @@
           '<div class="sg">' + P.glyph + '</div>' +
           '<div class="sb">' +
             '<b>' + esc(P.name) + '</b>' +
-            '<span>' + esc(P.desc(Math.min(r + (maxed ? 0 : 1), P.ranks))) + '</span>' +
+            '<span>' + (r && !maxed ? 'Next: ' + esc(lcFirst(P.desc(Math.min(r + 1, P.ranks))))
+                                       : esc(P.desc(Math.min(r + (maxed ? 0 : 1), P.ranks)))) + '</span>' +
             '<div class="pips">' + pips + '</div>' +
           '</div>' +
           (maxed
@@ -7498,8 +7499,6 @@
     var out = finishRun();
     var r = out.r;
     var levelled = out.after > out.before;
-    var L = levelInfo(META.xp);
-    var pct = clamp(L.into / L.need, 0, 1) * 100;
 
     var achHtml = '';
     if (out.newAch.length) {
@@ -7529,11 +7528,8 @@
           '<div class="tot"><span>Embers banked</span><u>' + META.embers.toLocaleString() + '</u></div>' +
         '</div>' +
         achHtml +
-        (levelled ? '<div class="levelup">Watch level ' + out.after + nextUnlockNote(out.after - 1) + '</div>' : '') +
-        '<div class="lvl tight">' +
-          '<div class="lvl-top"><b>Watch level ' + L.level + '</b></div>' +
-          '<div class="xp"><i style="width:' + pct.toFixed(1) + '%"></i></div>' +
-        '</div>' +
+        (levelled ? '<div class="levelup">Levelled up to ' + out.after + nextUnlockNote(out.after - 1) + '</div>' : '') +
+        levelStrip() +
         '<div class="held big">' + upChips(S.up, true) + '</div>' +
         '<button class="go" id="btnAgain">Take Night ' + META.night + ' Again</button>' +
         '<div class="row2">' +
