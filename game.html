@@ -581,7 +581,7 @@
     border:1px solid var(--line);background:rgba(20,16,14,0.5);
   }
   .wearrow>span{
-    flex:none;width:58px;font:700 10px/1 var(--body);letter-spacing:.13em;
+    flex:none;width:64px;white-space:nowrap;font:700 10px/1 var(--body);letter-spacing:.13em;
     text-transform:uppercase;color:var(--mute);
   }
   .segs.wrap{flex:1;flex-wrap:wrap;border:none;border-radius:0;gap:5px;justify-content:flex-end}
@@ -592,8 +592,8 @@
 
   .plumes{display:flex;gap:10px;justify-content:center;margin-bottom:20px}
   .plumes.wrap{flex-wrap:wrap;gap:12px}
-  .plumes.inrow{margin-bottom:0;justify-content:flex-start;flex-wrap:wrap;gap:7px}
-  .plumes.inrow .sw{width:34px;height:34px}
+  .plumes.inrow{margin-bottom:0;justify-content:flex-start;flex-wrap:wrap;gap:6px}
+  .plumes.inrow .sw{width:33px;height:33px}
   .askrow{display:flex;gap:10px;margin-top:14px}
   .askrow button{flex:1;margin-top:0}
   .sw{
@@ -765,7 +765,7 @@
   var ZOOM = 0.6;
   var VS = 1;                     // device pixels per field unit
   function px(n) { return n / ZOOM; }   // n screen pixels, in field units
-  var BUILD = 'v1.24.0';        // bump on every deploy — shown in-game for support
+  var BUILD = 'v1.25.0';        // bump on every deploy — shown in-game for support
   var MUTE_KEY = 'keeper.nightwatch.mute';
   var MUSIC_KEY = 'keeper.nightwatch.music';
 
@@ -1419,16 +1419,16 @@
   }
 
   var SFX = {
-    pick:  function () { bell(784, 0.34, 0.05, 3.01); },
+    pick:  function () { bell(784, 0.34, 0.072, 3.01); },
     feed:  function () { bell(196, 0.7, 0.075, 1.5); air(0.34, 0.05, 700, 240); },
     flare: function () { air(0.5, 0.07, 1500, 320); bell(392, 0.66, 0.055, 1.5); bell(587, 0.5, 0.035, 2.01, 0.05); },
-    kill:  function () { bell(1046, 0.3, 0.03, 3.5); },
+    kill:  function () { bell(1046, 0.3, 0.072, 3.5); },
     hurt:  function () { bell(146, 0.42, 0.07, 1.2); air(0.2, 0.045, 380, 150); },
-    swing: function (hit) { air(hit ? 0.24 : 0.19, hit ? 0.055 : 0.035, hit ? 1900 : 1300, hit ? 420 : 560);
-                           if (hit) bell(330, 0.24, 0.035, 1.5); },
+    swing: function (hit) { air(hit ? 0.24 : 0.19, hit ? 0.12 : 0.095, hit ? 1900 : 1300, hit ? 420 : 560);
+                           if (hit) bell(330, 0.24, 0.075, 1.5); },
     dawn:  function () { [523, 659, 784, 1047].forEach(function (f, i) { bell(f, 1.1, 0.045, 2.01, i * 0.13); }); },
     dead:  function () { [392, 311, 233, 196].forEach(function (f, i) { bell(f, 1.4, 0.055, 1.5, i * 0.24); }); },
-    low:   function () { bell(110, 0.7, 0.045, 1.2); }
+    low:   function () { bell(110, 0.7, 0.10, 1.2); }
   };
 
   // ── interface: a soft wooden tap, and warmer tones for real decisions ───
