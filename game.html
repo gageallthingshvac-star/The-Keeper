@@ -11,7 +11,7 @@
 <meta name="theme-color" content="#08060a" />
 <style>
   :root{
-    --bg:#08060a;
+    --bg:#0B0705;
     --ember:#FF9F0A;
     --core:#FFD60A;
     --glow:rgba(255,159,10,0.45);
@@ -88,8 +88,8 @@
   #dawnLine.on{opacity:1}
   #dawnLine i{
     display:block;height:100%;width:0%;
-    background:linear-gradient(90deg,#2a3550,#5E5CE6 60%,#9AD5FF);
-    box-shadow:0 0 8px rgba(94,92,230,0.7);
+    background:linear-gradient(90deg,#3A2230,#B4646E 58%,#FFD6A0);
+    box-shadow:0 0 8px rgba(255,180,120,0.6);
     transition:width .12s linear;
   }
   #stats{
@@ -165,7 +165,7 @@
   #veil{
     position:fixed;inset:0;z-index:4;display:grid;place-items:center;
     padding:calc(var(--safeT) + 24px) 26px calc(var(--safeB) + 24px);
-    background:radial-gradient(120% 90% at 50% 45%, rgba(24,14,8,0.72), rgba(4,3,5,0.94) 70%);
+    background:radial-gradient(120% 90% at 50% 45%, rgba(34,19,11,0.74), rgba(9,5,4,0.94) 70%);
     backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);
     transition:opacity .4s ease;
   }
@@ -330,7 +330,7 @@
   .xp{height:6px;border-radius:4px;background:rgba(232,220,200,0.10);overflow:hidden}
   .xp i{
     display:block;height:100%;border-radius:4px;
-    background:linear-gradient(90deg,#5E5CE6,#9AD5FF);box-shadow:0 0 10px rgba(94,92,230,0.5);
+    background:linear-gradient(90deg,#B4646E,#FFD6A0);box-shadow:0 0 10px rgba(255,180,120,0.42);
   }
   .lvl-sub{margin-top:8px;font:500 10px/1.5 var(--body);letter-spacing:.06em;color:#6b635c;text-transform:uppercase}
 
@@ -397,11 +397,11 @@
     position:relative;display:block;width:100%;margin-bottom:18px;padding:10px 0 14px;
     border-radius:22px;cursor:pointer;
     border:1px solid var(--line);
-    background:radial-gradient(80% 90% at 50% 80%, rgba(255,159,10,0.16), rgba(26,22,58,0.5) 62%, rgba(14,13,38,0.62));
+    background:radial-gradient(80% 90% at 50% 80%, rgba(255,159,10,0.16), rgba(58,32,34,0.5) 62%, rgba(28,16,16,0.62));
     touch-action:none;-webkit-user-select:none;user-select:none;
     transition:background .3s ease;
   }
-  .stage:active{background:radial-gradient(80% 90% at 50% 80%, rgba(255,159,10,0.24), rgba(30,26,64,0.55) 62%, rgba(14,13,38,0.66))}
+  .stage:active{background:radial-gradient(80% 90% at 50% 80%, rgba(255,159,10,0.24), rgba(66,36,38,0.55) 62%, rgba(28,16,16,0.66))}
   .portrait.stage-knight{width:100%;height:200px;margin:0;display:block;background:none;pointer-events:none}
   .stagename{text-align:center;margin-top:2px;pointer-events:none}
   .stagename b{display:block;font:700 22px/1.15 var(--display);letter-spacing:-.01em;color:var(--bone)}
@@ -697,9 +697,9 @@
   .newfeats u{text-decoration:none;font:700 12px/1 var(--mono);color:var(--core)}
   .levelup{
     border-radius:14px;padding:12px 14px;margin-bottom:14px;
-    background:linear-gradient(120deg,rgba(94,92,230,0.28),rgba(154,213,255,0.12));
-    border:1px solid rgba(120,118,255,0.45);
-    font:700 12.5px/1.4 var(--body);color:#DDE6FF;
+    background:linear-gradient(120deg,rgba(196,110,110,0.26),rgba(255,206,150,0.12));
+    border:1px solid rgba(255,168,120,0.42);
+    font:700 12.5px/1.4 var(--body);color:#FFE6CC;
     animation:rise .5s cubic-bezier(.2,.9,.25,1) both;
   }
 
@@ -765,7 +765,7 @@
   var ZOOM = 0.6;
   var VS = 1;                     // device pixels per field unit
   function px(n) { return n / ZOOM; }   // n screen pixels, in field units
-  var BUILD = 'v1.25.0';        // bump on every deploy — shown in-game for support
+  var BUILD = 'v1.26.0';        // bump on every deploy — shown in-game for support
   var MUTE_KEY = 'keeper.nightwatch.mute';
   var MUSIC_KEY = 'keeper.nightwatch.music';
 
@@ -2189,10 +2189,10 @@
     var r = mulberry32(1337);
     gctx.clearRect(0, 0, W, H);
     var g = gctx.createRadialGradient(W / 2, H / 2, 20, W / 2, H / 2, Math.max(W, H) * 0.8);
-    g.addColorStop(0, '#523016');
-    g.addColorStop(0.28, '#33202A');
-    g.addColorStop(0.62, '#181435');
-    g.addColorStop(1, '#0A0820');
+    g.addColorStop(0, '#5A3517');
+    g.addColorStop(0.28, '#3A2320');
+    g.addColorStop(0.62, '#2A1A1C');
+    g.addColorStop(1, '#170E12');
     gctx.fillStyle = g;
     gctx.fillRect(0, 0, W, H);
 
@@ -4063,9 +4063,9 @@
   function nightSheet() {
     if (_sheet && _sheetH === H) return _sheet;
     var g = dctx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, 'rgba(26,30,84,0.885)');
-    g.addColorStop(0.5, 'rgba(17,15,54,0.9)');
-    g.addColorStop(1, 'rgba(10,8,32,0.915)');
+    g.addColorStop(0, 'rgba(58,34,40,0.885)');
+    g.addColorStop(0.5, 'rgba(42,23,28,0.9)');
+    g.addColorStop(1, 'rgba(28,15,19,0.915)');
     _sheet = g; _sheetH = H;
     return g;
   }
@@ -4561,19 +4561,19 @@
     // other way, which punches the shadow out without touching the halo.
     var mx = CAMP_MOON.x, my = CAMP_MOON.y;
     var halo = g.createRadialGradient(mx, my, 1, mx, my, 30);
-    halo.addColorStop(0, 'rgba(198,212,255,0.17)');
-    halo.addColorStop(0.45, 'rgba(198,212,255,0.055)');
-    halo.addColorStop(1, 'rgba(198,212,255,0)');
+    halo.addColorStop(0, 'rgba(255,226,190,0.17)');
+    halo.addColorStop(0.45, 'rgba(255,226,190,0.055)');
+    halo.addColorStop(1, 'rgba(255,226,190,0)');
     g.fillStyle = halo;
     g.beginPath(); g.arc(mx, my, 30, 0, 6.29); g.fill();
     g.beginPath();
     g.arc(mx, my, CAMP_MOON.r, 0, 6.29);
     g.arc(mx + 3.6, my - 1.7, CAMP_MOON.r - 0.5, 0, 6.29, true);
-    g.fillStyle = 'rgba(228,234,255,0.82)';
+    g.fillStyle = 'rgba(255,242,220,0.82)';
     g.fill();
     // the country he is crossing, two ridges deep — the same country each time
-    campRidge(g, -116, 52, 0.014, 2.1, 'rgba(52,47,98,0.46)');
-    campRidge(g, -74, 30, 0.026, 5.4, 'rgba(28,24,56,0.8)');
+    campRidge(g, -116, 52, 0.014, 2.1, 'rgba(84,58,74,0.46)');
+    campRidge(g, -74, 30, 0.026, 5.4, 'rgba(48,30,36,0.8)');
     var gg = g.createLinearGradient(0, -6, 0, 34);
     gg.addColorStop(0, 'rgba(84,56,34,0.62)');
     gg.addColorStop(0.55, 'rgba(48,34,38,0.42)');
@@ -4632,7 +4632,7 @@
     for (var i = 0; i < CAMP_STARS.length; i++) {
       var st2 = CAMP_STARS[i];
       var tw = 0.3 + 0.32 * Math.sin(t * 0.8 + st2.ph);
-      g.fillStyle = 'rgba(206,216,255,' + tw.toFixed(3) + ')';
+      g.fillStyle = 'rgba(250,226,196,' + tw.toFixed(3) + ')';
       g.beginPath(); g.arc(st2.x, st2.y, st2.r, 0, 6.29); g.fill();
     }
   }
@@ -5516,58 +5516,68 @@
   ];
 
   // things he wonders about, and things he wonders about you
+  // Everything he says is about the same thing: getting comfortable. He is out
+  // here all night either way, so the whole art of it is being warm while he
+  // does it — the chair in the right spot, the log at the right angle, boots
+  // off, somebody to sit with. (The landmark facts are separate and stay as
+  // they are: those are the bits he read in his book.)
   var KN_SAYS = {
-    world: ["This wood's burning better than the last lot.",
-            'Somebody lit this fire long before me. I would like to thank them for it.',
-            'Something moved out there. Probably a rabbit.',
-            'It always gets cold about now. Every night, same hour.',
-            "I keep meaning to fix that lean-to. I keep not doing it.",
-            "Stew's nearly there. Nearly.",
-            'Do you reckon the stars are fires too? With somebody sat by them?',
-            'Found a really good stick today. It is over by the woodpile if you want to see it.',
-            'The solar panel only works when the sun is out, which out here is basically never.',
-            'People ask if I get bored. I honestly never have.',
-            'This is my favourite part of the night. Right about now.',
-            "I have been doing this longer than I can count and I still like it.",
-            'It is quiet out here. That is sort of the whole point.',
-            'The flame in there is older than any town it has lit. I only carry it about.',
-            'When I get there they light theirs off mine and I still have mine. That is the good bit.',
-            'A match would be quicker. It would also be the wrong fire.',
-            'Some towns leave the lamp out on a post for me. Some hand it over in a jar. I like the jar ones.'],
-    you:   ['You still there?', 'What is it like where you are?',
-            'Have you got a fire of your own?', 'You watch me a lot. I do not mind it.',
-            'Warm where you are sitting?', 'Do you sleep, out there?',
-            'You can say something back, you know. I would not mind.',
-            'I like it when you turn up.',
-            'Have you got a camp too, or just the one chair?',
-            'What do you get up to when I am not looking?'],
-    named: ['Evening, {p}.', 'You came back. Good.',
-            '{p}. I was hoping that was you.',
-            'You ever get cold out there, {p}?', 'Stay a bit, {p}.'],
+    world: ['That is it caught properly. Now we are comfortable.',
+            'Got the log sat at just the right angle. It will burn like that all night.',
+            'This is the bit where it stops being cold and starts being warm.',
+            'I have moved this chair four times tonight. This is the spot. This is definitely the spot.',
+            'Boots off. We do not tell anyone about the boots.',
+            "Stew's nearly there. Nearly. Worth the wait, mind.",
+            'There is a knack to sitting close enough and not too close. I have got it.',
+            'Found a really good stick today. Propped by the woodpile. Four minutes of warmth, that.',
+            'Warm all the way through at last. Took an hour but we got there.',
+            'People ask if I get bored out here. I honestly never have. I get comfortable.',
+            'This is my favourite part of the night. Right about now, once everything has settled.',
+            'I have been doing this longer than I can count and I still get cosy every single time.',
+            'It is quiet out here and it is warm just here. That is sort of the whole point.',
+            'Blanket over the knees. That is the entire trick, that is.',
+            'Nothing left to do now but sit here and be warm.',
+            'Fire, pot, somewhere to put my feet. That is the lot. That will do me.',
+            'Settled. Properly settled. Nobody move anything.',
+            'I keep meaning to fix that lean-to. I keep being too comfortable to get up.'],
+    you:   ['You comfortable over there?', 'Warm where you are sitting?',
+            'Have you got a fire of your own to sit at?',
+            'Have you got somewhere soft, out there?',
+            'Shuffle up a bit if you are cold. There is room.',
+            'You watch me a lot. I do not mind. It is warmer here for having somebody about.',
+            'Do you get to sleep somewhere warm, out there?',
+            'You can say something back, you know. I am not going anywhere. Far too comfortable.',
+            'I like it when you turn up. Place feels warmer for it.',
+            'Have you got a camp too, or just the one chair?'],
+    named: ['Evening, {p}. Sit down, you are letting the cold in.',
+            'You came back. Good. Kettle is on.',
+            '{p}. I was hoping that was you. Budge up.',
+            'You ever get cold out there, {p}?',
+            'Stay a bit, {p}. It has gone lovely and warm.'],
     // only ever said to a lad — easy company, a bit of ribbing
-    lad:   ['You would like it out here. Nothing to do and all night to do it.',
-            'If you had a fire, would you look after it as well as I look after mine? Be honest.',
-            'I nearly caught a moth earlier. We are not going to talk about it.',
-            'Between us, {p}, I have no idea what I am doing. Going well though.',
-            'Go on then. Say something clever.',
-            'I built that lean-to myself. Do not look at it too closely.',
-            'One of these nights I will beat my own best. Then what.'],
+    lad:   ['You would like it out here. Nothing to do all night but get warm and do nothing.',
+            'If you had a fire, would you get it this comfortable? Be honest.',
+            'Got up after a moth earlier and lost my warm spot. We are not going to talk about it.',
+            'Between us, {p}, I have no idea what I am doing. Very comfortable though.',
+            'Go on then, say something clever. I am too warm to think of anything.',
+            'I built that lean-to myself. Do not look at it too closely. It keeps the wind off.',
+            'One of these nights I will be this comfortable before midnight. Then what.'],
     // only ever said to a lass — softer, a shade more careful
     lass:  ['I saved you the warm side, {p}.',
-            'You do not have to say anything. It is just nice you are here.',
-            'Found a good flat stone today. Put it on your side of the fire.',
+            'You do not have to say anything. It is just nice you are sat there.',
+            'Found a good flat stone today. Warmed it through and put it on your side.',
             'Is it cold where you are? I would send some of this over if I could.',
-            'I tidied up a bit. Before you got here. Not because you were coming.',
+            'I tidied up so it would be nicer to sit in. Before you got here. Not because you were coming.',
             'Stew is better tonight. I was sort of hoping you would turn up for it.',
-            'You always show up on the long nights. I have noticed that.'],
+            'You always turn up on the long nights, when it takes the most getting comfortable.'],
     // only ever said once he has been told — see the filter in knightSay
-    knew:  ['I painted the sign {c} because you like {c}. Can you see it?',
-            'A {g} keeping watch with me. That suits the pair of us.',
+    knew:  ['I painted the sign {c} because you like {c}. Whole place is cosier for it.',
+            'A {g} keeping warm with me. That suits the pair of us.',
             'If it gets cold out there, {p}, come and sit closer.',
-            'You never did say what you do when you are not here, {p}.',
-            'I told the fire your name. It did not answer, but it listened.',
-            'Whole place has gone a bit {c}. Good call, {p}.',
-            'Is every {g} out there as quiet as you are?']
+            'You never did say where you sit, when you are not here, {p}.',
+            'I told the fire your name. It did not answer, but it settled right down.',
+            'Whole place has gone a bit {c}. Good call, {p}. Cosier for it.',
+            'Is every {g} out there as easy to sit with as you are?']
   };
 
   function genderWord() { return META.player.gender === 'lass' ? 'lass' : 'lad'; }
@@ -5577,13 +5587,13 @@
   // Half of what he gets up to is legible from across the room and half is
   // not, so the lobby just says it. One short line, under his name.
   var KN_DOING = {
-    idle:  'taking a breath',        warm:  'warming his hands',
+    idle:  'getting comfortable',    warm:  'warming his hands',
     poke:  'poking the fire',        rub:   'thawing his hands out',
     stir:  'stirring the pot',       sip:   'having a brew',
     marsh: 'toasting a marshmallow', chop:  'splitting wood',
     haul:  'carrying wood over',     nap:   'having a nap',
     tidy:  'tidying the bedroll',    game:  'playing his game',
-    sit:   'sitting a while',        stars: 'watching the stars',
+    sit:   'settling in',            stars: 'watching the stars',
     panel: 'wiping the solar panel', wander:'having a wander',
     moth:  'watching a moth',        ember: 'chasing an ember',
     stretch:'having a stretch',      dance: 'dancing to this one',
@@ -5787,9 +5797,10 @@
     var f = META.partner || META.knight.name || 'somebody';
     return P.note.replace(/\{d\}/g, d).replace(/\{f\}/g, f);
   }
-  var CHEERS = ['That is another one!', 'Dawn already. Look at that.', 'We held it, {p}!',
-    'Not a single one got through. Well, one did.', 'Every night is a good night eventually.',
-    'Somebody put the kettle on.', 'I told you it was the best job.'];
+  var CHEERS = ['That is another one.', 'Dawn already, and I had just got comfortable.',
+    'We held it, {p}. Kettle?', 'Not a single one got through. Well, one did.',
+    'Every night is a good night eventually.', 'Somebody put the kettle on.',
+    'Warm the whole way through. Best job there is.'];
   function startParty(kind) {
     KN.say = CHEERS[Math.floor(Math.random() * CHEERS.length)]
       .replace(/\{p\}/g, META.player.name || 'you');
@@ -6727,13 +6738,13 @@
       btn: 'Carrying it where?', expr: 'content', act: 'warm' },
     { say: 'Every town out there keeps one lamp lit at its landmark, and every one of those lamps was lit from this same flame. When a town lets theirs go out, somebody has to walk the flame back to them. That somebody is me.',
       btn: 'You walk it there?', expr: 'happy', act: 'poke' },
-    { say: 'All the way there. And it cannot go out on the road — a match will not do, it has to be this fire — so wherever I stop for the night, I sit up and keep it.',
+    { say: 'All the way there. And it cannot go out on the road — a match will not do, it has to be this fire — so wherever I stop for the night, I make myself comfortable and sit up with it.',
       btn: 'And the nights?', expr: 'happy', act: 'haul' },
-    { say: 'At night the shades come and lean on it to smother it. So we feed it wood and we see the morning in. Wood is easy out here, and I am quick. Best job there is.',
+    { say: 'At night the shades come and lean on it to smother it. So we feed it wood and we see the morning in. Wood is easy out here and I am quick, and the rest of the night I get to be warm. Best job there is.',
       btn: 'Let us keep it lit', expr: 'happy', act: 'chop' },
-    { say: 'Good. Then paint the place — what colour do you like?',
+    { say: 'Good. Then let us make it somewhere you would want to sit — what colour do you like?',
       ask: 'hue', expr: 'happy', act: 'idle' },
-    { say: 'There. Much more like it. Thank you.', btn: 'Any time', expr: 'content', act: 'idle' },
+    { say: 'There. Much cosier. Thank you.', btn: 'Any time', expr: 'content', act: 'idle' },
     { say: 'One last thing. I have never had a name of my own. Would you pick me one?',
       btn: 'Gladly', expr: 'shy', act: 'idle' }
   ];
@@ -7540,14 +7551,14 @@
   // Something short before every night: the number, and one line about what
   // this one is. Taps through, or goes on its own.
   var NIGHT_LINES = [
-    'The wood is stacked. The kettle is off.',
-    'Cold coming in off the hills tonight.',
+    'The wood is stacked and the kettle is off. He has found his spot.',
+    'Cold coming in off the hills. He has pulled the chair round to the fire.',
     'Quiet so far. That never lasts.',
-    'He has banked the coals and turned the lamp up.',
-    'Nothing out there yet.',
-    'A long one, by the look of the sky.',
+    'He has banked the coals, turned the lamp up, and got his feet under him.',
+    'Nothing out there yet. Blanket over the knees.',
+    'A long one, by the look of the sky. Good job he is comfortable.',
     'The dog has gone in. He always knows first.',
-    'Clear overhead. You will see them coming.'
+    'Clear overhead. You will see them coming from the warm.'
   ];
   var nightGo = null;
   function nightCard() {
