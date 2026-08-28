@@ -730,7 +730,7 @@
   var ZOOM = 0.7;
   var VS = 1;                     // device pixels per field unit
   function px(n) { return n / ZOOM; }   // n screen pixels, in field units
-  var BUILD = 'v1.19.1';        // bump on every deploy — shown in-game for support
+  var BUILD = 'v1.19.2';        // bump on every deploy — shown in-game for support
   var MUTE_KEY = 'keeper.nightwatch.mute';
   var MUSIC_KEY = 'keeper.nightwatch.music';
 
@@ -1228,7 +1228,6 @@
 
   // ────────────────────────────────────────────────────────────── helpers
   function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
-  function lerp(a, b, t) { return a + (b - a) * t; }
   function rand(a, b) { return a + Math.random() * (b - a); }
   function dist2(ax, ay, bx, by) { var dx = ax - bx, dy = ay - by; return dx * dx + dy * dy; }
   function dist(ax, ay, bx, by) { return Math.sqrt(dist2(ax, ay, bx, by)); }
@@ -5013,7 +5012,7 @@
     for (i = 0; i < TREAT.crumbs.length; i++) {
       var c = TREAT.crumbs[i];
       g.fillStyle = 'rgba(196,142,84,' + Math.max(0, c.life / 0.7).toFixed(2) + ')';
-      g.beginPath(); g.arc(TREAT.x + (c.x - TREAT.x), c.y, 0.8, 0, 6.29); g.fill();
+      g.beginPath(); g.arc(c.x, c.y, 0.8, 0, 6.29); g.fill();
     }
     if (!TREAT.on) return;
     var u = Math.min(1, TREAT.t / 0.42);
@@ -6813,7 +6812,7 @@
         (META.knight.name
           ? '<div class="homename"><b>' + esc(META.knight.name) + '</b>' +
             '<u>' + esc(campRoll()) + '</u></div>'
-          : '<div class="homename"><b>A keeper with no name</b><u>waiting by the fire</u></div>') +
+          : '<div class="homename"><b>He has no name yet</b><u>waiting by the fire</u></div>') +
         '<div class="homedoing" id="homeDoing">' + esc(doingLine()) + '</div>' +
         emberChip() +
         '<button class="go" id="btnStart">' +
@@ -7158,7 +7157,6 @@
     renderDraft(offer, out);
   }
 
-  function openDraft() { nightHeld(); }
 
   function renderDraft(offer, out) {
     var cards = '';
@@ -7263,6 +7261,7 @@
   function finishRun() { return finishNight(false); }
 
   function startGame() {
+    TREAT.on = 0; TREAT.eat = 0; TREAT.crumbs.length = 0;   // nothing left lying about
     S.up = META.up;     // the drafts he has taken are his, and they stay his
     recalc();
     S.mode = 'play';
