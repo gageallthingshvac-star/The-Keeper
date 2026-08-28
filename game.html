@@ -730,7 +730,7 @@
   var ZOOM = 0.7;
   var VS = 1;                     // device pixels per field unit
   function px(n) { return n / ZOOM; }   // n screen pixels, in field units
-  var BUILD = 'v1.19.0';        // bump on every deploy — shown in-game for support
+  var BUILD = 'v1.19.1';        // bump on every deploy — shown in-game for support
   var MUTE_KEY = 'keeper.nightwatch.mute';
   var MUSIC_KEY = 'keeper.nightwatch.music';
 
@@ -4983,6 +4983,75 @@
       P.ph += dt;
     }
   }
+  // The treat: a puff of dust, then it pushes up out of the ground, wobbles
+  // to a stop, and waits for him.
+  function updateTreat(dt) {
+    var i;
+    if (TREAT.on) {
+      TREAT.t += dt;
+      if (TREAT.eat > 0) {
+        TREAT.eat -= dt;
+        if (TREAT.eat <= 0) {
+          TREAT.on = 0;
+          for (i = 0; i < 5; i++) {
+            TREAT.crumbs.push({ x: TREAT.x + rand(-3, 3), y: -3, vx: rand(-16, 16),
+                                vy: rand(-26, -10), life: 0.7 });
+          }
+        }
+      }
+    }
+    for (i = TREAT.crumbs.length - 1; i >= 0; i--) {
+      var c = TREAT.crumbs[i];
+      c.life -= dt;
+      if (c.life <= 0) { TREAT.crumbs.splice(i, 1); continue; }
+      c.x += c.vx * dt; c.y += c.vy * dt; c.vy += 84 * dt;
+    }
+  }
+
+  function drawTreat(g, t) {
+    var i;
+    for (i = 0; i < TREAT.crumbs.length; i++) {
+      var c = TREAT.crumbs[i];
+      g.fillStyle = 'rgba(196,142,84,' + Math.max(0, c.life / 0.7).toFixed(2) + ')';
+      g.beginPath(); g.arc(TREAT.x + (c.x - TREAT.x), c.y, 0.8, 0, 6.29); g.fill();
+    }
+    if (!TREAT.on) return;
+    var u = Math.min(1, TREAT.t / 0.42);
+    // eases past its resting height and settles back, so it reads as a pop
+    var rise = u < 1 ? (1 - Math.pow(1 - u, 3)) * 10.5 : 8 + Math.sin((TREAT.t - 0.42) * 9) * 2.2 *
+               Math.max(0, 1 - (TREAT.t - 0.42) * 2.4);
+    var spin = Math.min(1, TREAT.t / 0.5) * 0.16 + Math.sin(TREAT.t * 2.2) * 0.04;
+    g.save(); g.translate(TREAT.x, 0);
+    if (TREAT.t < 0.5) {                                  // the dirt it came up through
+      var pa = Math.max(0, 1 - TREAT.t / 0.5);
+      g.fillStyle = 'rgba(150,116,80,' + (pa * 0.5).toFixed(2) + ')';
+      for (i = -2; i <= 2; i++) {
+        g.beginPath();
+        g.arc(i * 3.4 * (1 + (1 - pa) * 0.9), 6 - (1 - pa) * 4 - Math.abs(i) * 0.8,
+              1.6 * pa + 0.5, 0, 6.29);
+        g.fill();
+      }
+    }
+    g.fillStyle = 'rgba(0,0,0,0.28)';
+    g.beginPath(); g.ellipse(0, 7.4, 3 - rise * 0.09, 1, 0, 0, 6.29); g.fill();
+    g.translate(0, 7.6 - rise); g.rotate(spin);
+    g.fillStyle = '#B5793F';                              // a small bone-shaped biscuit
+    roundRectOn(g, -2.5, -0.95, 5, 1.9, 0.9); g.fill();
+    for (i = -1; i <= 1; i += 2) {
+      g.beginPath(); g.arc(i * 2.5, -0.85, 0.95, 0, 6.29); g.fill();
+      g.beginPath(); g.arc(i * 2.5, 0.85, 0.95, 0, 6.29); g.fill();
+    }
+    g.fillStyle = 'rgba(255,236,200,0.3)';
+    roundRectOn(g, -1.9, -0.8, 3.8, 0.7, 0.35); g.fill();
+    if (TREAT.t > 0.6) {                                  // a little sparkle so it is noticed
+      var sp = 0.35 + 0.35 * Math.sin(t * 4);
+      g.fillStyle = 'rgba(255,226,150,' + sp.toFixed(2) + ')';
+      g.beginPath(); g.arc(4.2, -3.4, 0.75, 0, 6.29); g.fill();
+      g.beginPath(); g.arc(-4.4, -2.4, 0.55, 0, 6.29); g.fill();
+    }
+    g.restore();
+  }
+
   function drawPet(g, P, t) {
     var k = P.kind, wob = Math.sin(P.ph * 2.2) * 0.6;
     g.save();
@@ -5147,6 +5216,7 @@
 
   function drawCampFront(g, t) {
     drawChopBlock(g, t);
+    drawTreat(g, t);
     // The tent's doorway shade and its tied-back flap are drawn after him, so
     // when he turns in for a nap he is inside the tent rather than beside it.
     g.save(); g.translate(CAMP.bed.x, 0);
@@ -5385,6 +5455,9 @@
   // asleep in his house or busy with something in the grass.
   var DOG = { x: -50, tx: -50, face: 1, step: 0, walking: 0, sit: 0, sleep: 0,
               wag: 0, hop: 0, bark: 0, head: 0, act: 'follow', actT: 3, party: 0 };
+  // A biscuit that pops up out of the ground in front of the kennel when you
+  // press the button, sits there until he gets to it, then goes.
+  var TREAT = { on: 0, x: 0, t: 0, eat: 0, crumbs: [] };
   var DOG_ACTS = ['follow', 'follow', 'follow', 'kennel', 'sniff', 'sit', 'chase', 'watch'];
 
   function dogAct() {
@@ -5401,10 +5474,13 @@
     DOG.actT -= dt;
     if (DOG.actT <= 0) dogAct();
     if (DOG.act === 'treat') {
-      DOG.tx = CAMP.kennel.x + 16;                 // straight to the bowl
-      if (Math.abs(DOG.x - DOG.tx) < 4 && Math.random() < dt * 3) {
-        KN.hearts.push({ x: DOG.x + rand(-4, 4), y: -12, vy: rand(-14, -20), vx: rand(-5, 5),
-                         life: 1.3, max: 1.3, kind: 'heart', r: rand(0.6, 1) });
+      DOG.tx = TREAT.on ? TREAT.x : CAMP.kennel.x + 16;
+      if (Math.abs(DOG.x - DOG.tx) < 5) {
+        if (TREAT.on && TREAT.t > 0.5 && !TREAT.eat) TREAT.eat = 0.75;   // nose down, gone
+        if (Math.random() < dt * 3) {
+          KN.hearts.push({ x: DOG.x + rand(-4, 4), y: -12, vy: rand(-14, -20), vx: rand(-5, 5),
+                           life: 1.3, max: 1.3, kind: 'heart', r: rand(0.6, 1) });
+        }
       }
     } else if (DOG.act === 'follow' || DOG.act === 'chase') {
       var want = KN.x + (KN.x > DOG.x ? -16 : 16);
@@ -5573,6 +5649,8 @@
     META.treats++;
     saveMeta();
     DOG.act = 'treat'; DOG.actT = 7; DOG.tx = CAMP.kennel.x + 16;
+    TREAT.on = 1; TREAT.t = 0; TREAT.eat = 0; TREAT.crumbs.length = 0;
+    TREAT.x = CAMP.kennel.x + 12;   // on the ground in front of his house
     knHeart('heart'); knHeart('heart');
     UI.buy();
     var b = document.getElementById('btnTreat');
@@ -7428,7 +7506,8 @@
     if (!elVeil.classList.contains('full')) { render(); }
     syncHud();
     if (portraitCv) {
-      syncFolk(); syncPets(); updateKnight(dt); updateDog(dt); updatePets(dt); paintPortrait();
+      syncFolk(); syncPets(); updateKnight(dt); updateDog(dt); updatePets(dt);
+      updateTreat(dt); paintPortrait();
       var doing = document.getElementById('homeDoing');
       if (doing) { var dl = doingLine(); if (doing.textContent !== dl) doing.textContent = dl; }
     }
@@ -7476,7 +7555,7 @@
   document.addEventListener('keydown', wakeAudio);
   // opt-in inspection hook for tuning/QA: open with #debug
   if (/[?#]debug/.test(location.href)) window.__NW = { S: S, K: K, D: D, META: META, UPGRADES: UPGRADES, PERKS: PERKS,
-      flare: doFlare, swing: doSwing, spawnShade: spawnShade, lightAt: lightAt, stick: stick, KN: KN, CAMP: CAMP, drawCamp: drawCamp, drawCampFront: drawCampFront, DOG: DOG, FOLK: FOLK, PETS: PETS, drawDog: drawDog, drawPet: drawPet, PET_KINDS: PET_KINDS, folkPose: folkPose, updateDog: updateDog, syncFolk: syncFolk, startParty: startParty, endParty: endParty, LANDMARKS: LANDMARKS, journeyIndex: journeyIndex, ZOOM: ZOOM, field: function () { return { w: W, h: H }; }, KN_ACTS: KN_ACTS, knightSay: knightSay, knightFact: knightFact, nextLandmark: nextLandmark, knightAct: knightAct, updateKnight: updateKnight, knightPoke: knightPoke, knightPet: knightPet, beatNow: beatNow, drawKnight: drawKnight, A: A, MUS: MUS, TUNES: TUNES,
+      flare: doFlare, swing: doSwing, spawnShade: spawnShade, lightAt: lightAt, stick: stick, KN: KN, CAMP: CAMP, drawCamp: drawCamp, drawCampFront: drawCampFront, DOG: DOG, FOLK: FOLK, PETS: PETS, drawDog: drawDog, drawPet: drawPet, PET_KINDS: PET_KINDS, folkPose: folkPose, updateDog: updateDog, updateTreat: updateTreat, TREAT: TREAT, syncFolk: syncFolk, startParty: startParty, endParty: endParty, LANDMARKS: LANDMARKS, journeyIndex: journeyIndex, ZOOM: ZOOM, field: function () { return { w: W, h: H }; }, KN_ACTS: KN_ACTS, knightSay: knightSay, knightFact: knightFact, nextLandmark: nextLandmark, knightAct: knightAct, updateKnight: updateKnight, knightPoke: knightPoke, knightPet: knightPet, beatNow: beatNow, drawKnight: drawKnight, A: A, MUS: MUS, TUNES: TUNES,
       startMusic: startMusic, nextTune: nextTune, setMusic: setMusic, SFX: SFX, UI: UI, ac: ac, switchTo: switchTo, applyTone: applyTone, GENRE: GENRE,
       music: { parseChord: parseChord, voicing: voicing, bassNote: bassNote,
                leadNote: leadNote, chordAt: chordAt, QUAL: QUAL, mtof: mtof }, recalc: recalc, saveMeta: saveMeta, rollDraft: rollDraft, take: takeUpgrade };
