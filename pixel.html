@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+<title>Night Watch</title>
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#0f0a12" />
+<style>
+  :root{
+    --bg:#0f0a12; --bone:#f2e4cc; --mute:#9a8676; --ember:#ffb547; --core:#ffeeb8;
+    --danger:#e0561c; --line:rgba(242,228,204,0.16); --panel:rgba(24,16,20,0.9);
+    --body:-apple-system,"SF Pro Text",system-ui,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+    --safeT:env(safe-area-inset-top,0px); --safeB:env(safe-area-inset-bottom,0px);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{
+    width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--bone);
+    font-family:var(--body);overscroll-behavior:none;touch-action:none;
+    user-select:none;-webkit-user-select:none;
+  }
+  #app{position:fixed;inset:0;display:flex;flex-direction:column;
+    padding:calc(var(--safeT) + 8px) 0 calc(var(--safeB) + 8px)}
+
+  /* ── the readout ─────────────────────────────────────────────── */
+  #hud{flex:none;padding:0 14px 8px;display:flex;flex-direction:column;gap:6px}
+  .row{display:flex;align-items:center;gap:10px}
+  .lbl{font:700 9px/1 var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--mute)}
+  .num{margin-left:auto;font:700 15px/1 var(--mono);color:var(--bone)}
+  .bar{height:12px;border-radius:2px;background:rgba(242,228,204,0.1);
+    border:1px solid rgba(242,228,204,0.14);overflow:hidden}
+  .bar i{display:block;height:100%;width:60%;transition:width .12s linear;
+    background:linear-gradient(90deg,#c94513,#ef7a22 55%,#ffb547)}
+  .bar.low i{background:linear-gradient(90deg,#8f2b08,#e0561c);animation:pulse .55s infinite alternate}
+  @keyframes pulse{to{opacity:.55}}
+  #dawnbar{height:5px;border-radius:2px;background:rgba(242,228,204,0.08);overflow:hidden}
+  #dawnbar i{display:block;height:100%;width:0%;
+    background:linear-gradient(90deg,#3a2230,#b4646e 58%,#ffd6a0)}
+
+  /* ── the world ───────────────────────────────────────────────── */
+  #stage{flex:1;position:relative;display:flex;flex-direction:column;
+    align-items:center;justify-content:flex-start;min-height:0;
+    background:radial-gradient(120% 60% at 50% 22%,rgba(70,38,26,0.5),rgba(15,10,18,0) 70%)}
+  #view{display:block;image-rendering:pixelated;image-rendering:crisp-edges;
+    width:100%;height:auto;max-height:calc(100% - 34px);object-fit:contain;background:#0c0810}
+
+  /* ── the road, twenty nights of it ───────────────────────────── */
+  #road{flex:none;display:flex;gap:5px;justify-content:center;align-items:center;
+    padding:13px 16px 0;width:100%}
+  #road i{width:9px;height:9px;border-radius:2px;display:block;
+    background:rgba(242,228,204,0.12);transition:background .3s}
+  #road i.done{background:rgba(255,181,71,0.72)}
+  #road i.now{background:var(--core);box-shadow:0 0 9px rgba(255,181,71,0.9)}
+
+  /* ── controls ────────────────────────────────────────────────── */
+  #pad{flex:none;display:flex;align-items:flex-end;justify-content:space-between;
+    padding:10px 16px 0;gap:12px}
+  .keys{display:flex;gap:12px}
+  .key{width:76px;height:76px;border-radius:20px;display:grid;place-items:center;
+    border:1px solid var(--line);background:var(--panel);color:var(--bone);
+    font:700 26px/1 var(--body);cursor:pointer;transition:transform .06s,background .1s}
+  .key:active,.key.on{transform:scale(.94);background:rgba(255,181,71,0.2);border-color:var(--ember)}
+  .key.act{width:92px;height:92px;border-radius:26px;color:var(--ember);
+    font:700 11px/1 var(--body);letter-spacing:.14em;
+    background:radial-gradient(120% 120% at 50% 20%,rgba(120,50,10,0.9),rgba(24,16,20,0.9));
+    border-color:rgba(255,181,71,0.5)}
+  .key.act.cool{color:#7d6a56;border-color:var(--line);background:var(--panel)}
+
+  /* ── cards ───────────────────────────────────────────────────── */
+  #veil{position:fixed;inset:0;z-index:9;display:grid;place-items:center;padding:22px;
+    background:radial-gradient(120% 90% at 50% 45%,rgba(34,19,11,0.8),rgba(9,5,4,0.96) 70%);
+    overflow-y:auto;transition:opacity .3s}
+  #veil.hide{opacity:0;pointer-events:none}
+  .card{width:100%;max-width:380px;text-align:center;display:flex;flex-direction:column;gap:14px}
+  .eyebrow{font:700 10px/1 var(--body);letter-spacing:.2em;text-transform:uppercase;color:var(--ember)}
+  h1{font:800 40px/1.04 var(--body);letter-spacing:-.02em}
+  h1 em{font-style:normal;color:var(--ember);display:block}
+  .lede{font:400 15px/1.5 var(--body);color:var(--mute)}
+  .tally{display:flex;gap:8px}
+  .tally div{flex:1;padding:11px 6px;border:1px solid var(--line);border-radius:12px}
+  .tally span{display:block;font:700 8px/1 var(--body);letter-spacing:.14em;
+    text-transform:uppercase;color:var(--mute);margin-bottom:6px}
+  .tally b{font:700 19px/1 var(--mono)}
+  button.go{padding:17px;border-radius:15px;border:none;cursor:pointer;
+    font:800 17px/1 var(--body);color:#2a1a08;
+    background:linear-gradient(180deg,#ffc86b,#ef9a22);box-shadow:0 0 26px rgba(255,160,50,0.4)}
+  button.ghost{padding:13px;border-radius:13px;cursor:pointer;
+    font:600 14px/1 var(--body);color:var(--bone);
+    border:1px solid var(--line);background:transparent}
+  .rules{text-align:left;display:flex;flex-direction:column;gap:9px;
+    padding:14px;border:1px solid var(--line);border-radius:14px}
+  .rules p{font:400 13.5px/1.45 var(--body);color:var(--mute)}
+  .rules b{color:var(--bone);font-weight:700}
+  .nights{display:flex;flex-wrap:wrap;gap:4px;justify-content:center}
+  .nights i{width:13px;height:13px;border-radius:3px;background:rgba(242,228,204,0.11);
+    display:block;font-style:normal}
+  .nights i.done{background:var(--ember)}
+  .nights i.now{background:var(--bone);box-shadow:0 0 8px rgba(255,181,71,0.8)}
+  .foot{font:500 10px/1.5 var(--mono);color:#6b5c4e;letter-spacing:.05em}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hud">
+    <div class="row"><span class="lbl">Fire</span><span class="num" id="fireNum">60</span></div>
+    <div class="bar" id="fireBar"><i></i></div>
+    <div id="dawnbar"><i></i></div>
+    <div class="row">
+      <span class="lbl">Night <b id="nightNum" style="color:var(--bone)">1</b></span>
+      <span class="lbl" id="carryLbl">Carrying 0</span>
+      <span class="num" id="tillDawn">40s</span>
+    </div>
+  </div>
+  <div id="stage">
+    <canvas id="view"></canvas>
+    <div id="road"></div>
+  </div>
+  <div id="pad">
+    <div class="keys">
+      <button class="key" id="kL" aria-label="Left">◀</button>
+      <button class="key" id="kR" aria-label="Right">▶</button>
+    </div>
+    <button class="key act" id="kA" aria-label="Swing">SWING</button>
+  </div>
+</div>
+<div id="veil"><div class="card" id="card"></div></div>
+<script>
+(function () {
+  'use strict';
+  var BUILD = 'v1.0.0';
+
+  // ── measurements ──────────────────────────────────────────────────────────
+  var TILE = 16;
+  var W = TILE * 25;                         // 25 tiles across, always
+  var WORLD = TILE * 75;                     // 1200 — three windows of road
+  // how tall the window is depends on the phone: a tall screen gets more sky
+  var H, GY;
+  (function fit() {
+    var st = document.getElementById('stage').getBoundingClientRect();
+    var wpx = st.width || window.innerWidth || 390;
+    var hpx = st.height || (window.innerHeight || 844) * 0.62;
+    var tall = Math.round(hpx / (wpx / W) / TILE) * TILE;
+    H = Math.max(TILE * 14, Math.min(TILE * 28, tall));
+    GY = Math.round(H * 0.75 / TILE) * TILE;   // the grass line
+  })();
+  var GUY_H = 40, GUY_W = 18;                // 2.5 tiles tall, just over one wide
+  var FIREX = Math.round(WORLD * 0.5);       // camp sits at the middle of the world
+
+  var RAMPS = {
+    sky:    ['#120c1c', '#1d1430', '#2b1d40', '#3d2a4c', '#553a54'],
+    far:    ['#2a2038', '#372a45', '#463456'],
+    tree:   ['#1d2a24', '#26382c', '#314736'],
+    grass:  ['#243a22', '#31502c', '#3f6635', '#4f7d40'],
+    dirt:   ['#2b1d12', '#3a2718', '#4a3220', '#5c4029', '#6e4e33'],
+    stone:  ['#38352f', '#4c4841', '#635e55', '#7b7568'],
+    tent:   ['#2c4a33', '#3f6b45', '#568c56', '#6fa869'],
+    wood:   ['#33210f', '#4a3018', '#654222', '#83572d', '#a06f3d'],
+    fire:   ['#8f2b08', '#c94513', '#ef7a22', '#ffb547', '#ffeeb8'],
+    skin:   ['#8a5f42', '#b8865a', '#dbab7c', '#f2cfa4'],
+    cloth:  ['#5e2018', '#8a3324', '#b84a33', '#d96b4a'],
+    hair:   ['#2b1b10', '#43291a', '#5e3a24'],
+    dog:    ['#4a2f18', '#6b4423', '#8a5a30', '#a9743f'],
+    metal:  ['#2e2b28', '#484440', '#6b665f', '#918b82'],
+    shade:  ['#2a2246', '#453a68', '#6b5aa0', '#b7a6f2']
+  };
+  var C = {};
+  for (var rk in RAMPS) for (var ri = 0; ri < RAMPS[rk].length; ri++) C[rk + ri] = RAMPS[rk][ri];
+
+  function hash(x, y) {
+    var h = x * 374761393 + y * 668265263;
+    h = (h ^ (h >> 13)) * 1274126177;
+    return ((h ^ (h >> 16)) >>> 0) / 4294967295;
+  }
+  function mkPx(ctx) {
+    return function (c, x, y, w, h2) { ctx.fillStyle = c; ctx.fillRect(x | 0, y | 0, w || 1, h2 || 1); };
+  }
+  function box(px, fill, edge, x, y, w, h2) { px(edge, x, y, w, h2); px(fill, x + 1, y + 1, w - 2, h2 - 2); }
+  function disc(px, col, cx, cy, rx, ry) {
+    for (var y = -ry; y <= ry; y++) {
+      var w2 = Math.round(rx * Math.sqrt(Math.max(0, 1 - (y * y) / (ry * ry))));
+      if (w2 > 0) px(col, cx - w2, cy + y, w2 * 2 + 1, 1);
+    }
+  }
+
+  // ── him ───────────────────────────────────────────────────────────────────
+  function guy(px, x, feetY, t, face, mode, step) {
+    var f = face < 0 ? -1 : 1;
+    var y = feetY - GUY_H;
+    var walk = mode === 'walk';
+    var bob = walk ? (Math.floor(step) % 2 ? 1 : 0) : (Math.sin(t * 1.6) > 0 ? 0 : 1);
+    y += bob;
+
+    if (mode === 'sit') {
+      var kx = x + (f > 0 ? 2 : -14);
+      px(C.wood0, kx, y + 27, 14, 8); px(C.wood1, kx + 1, y + 28, 12, 6);
+      var sx = x + (f > 0 ? 12 : -14);
+      px(C.wood0, sx, y + 33, 6, 8); px(C.wood1, sx + 1, y + 34, 4, 7);
+      px(C.hair0, sx - (f > 0 ? 0 : 2), y + 40, 8, 3);
+    } else {
+      var sw = walk ? Math.sin(step * Math.PI) * 5 : 0;
+      var la = Math.round(sw), lb = -Math.round(sw);
+      px(C.wood0, x - 7 + la, y + 28, 6, 12); px(C.wood1, x - 6 + la, y + 28, 4, 11);
+      px(C.wood0, x + 1 + lb, y + 28, 6, 12); px(C.wood1, x + 2 + lb, y + 28, 4, 11);
+      px(C.hair0, x - 8 + la, y + 37, 7, 3);
+      px(C.hair0, x + 1 + lb, y + 37, 7, 3);
+    }
+
+    box(px, C.cloth1, C.cloth0, x - 9, y + 16, 18, 13);
+    px(C.cloth2, x - 8 + (f > 0 ? 9 : 0), y + 17, 8, 11);
+    px(C.cloth3, x - 8 + (f > 0 ? 14 : 0), y + 17, 2, 11);
+    px(C.cloth0, x - 8, y + 26, 16, 2);
+    px(C.wood2, x - 4, y + 26, 8, 2);
+
+    var swing = walk ? Math.round(Math.sin(step * Math.PI) * 3) : 0;
+    px(C.cloth0, x - 12, y + 17 + swing, 4, 10); px(C.cloth1, x - 11, y + 18 + swing, 2, 9);
+    px(C.cloth0, x + 8, y + 17 - swing, 4, 10);  px(C.cloth2, x + 9, y + 18 - swing, 2, 9);
+    px(C.skin1, x - 12, y + 26 + swing, 4, 4);   px(C.skin2, x + 8, y + 26 - swing, 4, 4);
+
+    box(px, C.skin2, C.skin0, x - 8, y + 2, 17, 15);
+    px(C.skin3, x - 7 + (f > 0 ? 8 : 0), y + 3, 8, 13);
+    px(C.skin1, x - 7, y + 15, 15, 1);
+    var blink = (t % 4.1) < 0.14;
+    var ex = x - 5 + (f > 0 ? 3 : 0);
+    px(C.hair0, ex, y + 8, 3, blink ? 1 : 4);
+    px(C.hair0, ex + 6, y + 8, 3, blink ? 1 : 4);
+    if (!blink) { px('#e9f0ff', ex, y + 8, 2, 2); px('#e9f0ff', ex + 6, y + 8, 2, 2); }
+    px(C.skin1, x - 1 + (f > 0 ? 3 : 0), y + 13, 3, 1);
+    px(C.hair1, x - 9, y, 19, 6); px(C.hair2, x - 8, y, 17, 3);
+    px(C.hair0, x - 9 - (f > 0 ? 0 : 1), y + 3, 4, 9);
+    px(C.hair0, x + 6 + (f > 0 ? 1 : 0), y + 3, 4, 9);
+    px(C.hair2, x - 6, y - 1, 11, 1);
+  }
+
+  function armful(px, x, feetY, n, face) {
+    var f = face < 0 ? -1 : 1;
+    var cx = x + f * 4;
+    for (var i = 0; i < n; i++) {
+      var ly = feetY - 17 - i * 5;
+      px(C.wood0, cx - 12, ly - 5, 24, 7);
+      px(C.wood2, cx - 12, ly - 4, 24, 5);
+      px(C.wood3, cx - 11, ly - 4, 22, 2);
+      disc(px, C.wood0, cx - 12, ly - 2, 3, 3); disc(px, C.wood1, cx - 12, ly - 2, 2, 2);
+      disc(px, C.wood0, cx + 12, ly - 2, 3, 3); disc(px, C.wood2, cx + 12, ly - 2, 2, 2);
+    }
+    px(C.cloth0, cx - 13 * f, feetY - 22, 5, 5);
+    px(C.skin2, cx - 13 * f, feetY - 20, 4, 4);
+  }
+
+  // ── the fire, drawn wherever the camera has put it ────────────────────────
+  function campfire(px, fx, t, lvl, baseY) {
+    var TONGUE = [
+      { w: 15, h: 1.00, sp: 3.3, ox: -5, c: [C.fire0, C.fire1] },
+      { w: 12, h: 0.86, sp: 4.7, ox:  6, c: [C.fire1, C.fire2] },
+      { w:  9, h: 1.12, sp: 6.1, ox:  0, c: [C.fire2, C.fire3] },
+      { w:  5, h: 0.66, sp: 8.4, ox:  1, c: [C.fire3, C.fire4] }
+    ];
+    var base = 2.5 * TILE * 0.42 * (0.35 + lvl * 0.75);
+    for (var ti = 0; ti < TONGUE.length; ti++) {
+      var T = TONGUE[ti];
+      var th = Math.round(base * T.h * (1 + Math.sin(t * T.sp + ti) * 0.09));
+      var tw = T.w * (0.55 + lvl * 0.5);
+      for (var fy = 0; fy < th; fy++) {
+        var u = fy / th;
+        var prof = Math.sqrt(Math.max(0, 1 - u)) * (1 - u * 0.25);
+        var ww = Math.max(1, Math.round(tw * prof));
+        var lean = Math.round(Math.sin(u * 2.4 + t * T.sp * 0.5 + ti) * u * u * 7);
+        px(u > 0.62 ? T.c[1] : T.c[0], fx + T.ox - ww + lean, baseY - 8 - fy, ww * 2, 1);
+      }
+    }
+    for (var lg = 0; lg < 3; lg++) {
+      px(C.wood0, fx - 11 + lg * 7, baseY - 9 + lg, 15, 5);
+      px(C.wood1, fx - 10 + lg * 7, baseY - 8 + lg, 13, 3);
+      px(C.fire1, fx - 9 + lg * 7, baseY - 7 + lg, 11, 1);
+    }
+    for (var sr = 0; sr < 11; sr++) {
+      var sa = sr * 0.57, sx2 = fx + Math.round(Math.cos(sa) * 24), sy2 = baseY - 3 + Math.round(Math.sin(sa) * 3);
+      disc(px, C.stone1, sx2, sy2, 3, 2); px(C.stone3, sx2 - 2, sy2 - 1, 3, 1);
+    }
+    for (var k = 0; k < 12; k++) {
+      var sp = (t * 11 + k * 4.1) % 62, sy3 = baseY - 14 - base - sp;
+      if (sy3 > 10) {
+        var sw = 1 + Math.round(sp / 24);
+        px(sp > 36 ? C.far1 : C.far2, fx + Math.round(Math.sin(sp * 0.11 + k) * (2 + sp * 0.17)), sy3 | 0, sw, sw);
+      }
+    }
+    for (var e = 0; e < 8; e++) {
+      var ep = (t * 16 + e * 5.2) % 42, ey = baseY - 12 - base - ep;
+      if (ey > 14) px(ep > 28 ? C.fire2 : C.fire4, fx + Math.round(Math.sin(ep * 0.4 + e * 2) * 7), ey | 0, 1, 1);
+    }
+  }
+
+  // one warm light at the fire, a smaller one on his lamp
+  function lightPass(ctx, fx, fy, reach, lx, ly, lamp, dawn) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    var lm = ctx.createRadialGradient(fx, fy, 8, fx, fy, reach);
+    lm.addColorStop(0, '#ffffff'); lm.addColorStop(0.30, '#f0d5b8');
+    lm.addColorStop(0.62, '#a68a7c'); lm.addColorStop(1, dawn);
+    ctx.fillStyle = lm; ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'lighter';
+    if (lamp > 0) {
+      var pm = ctx.createRadialGradient(lx, ly, 2, lx, ly, 34);
+      pm.addColorStop(0, 'rgba(255,186,96,' + (0.30 * lamp).toFixed(3) + ')');
+      pm.addColorStop(0.5, 'rgba(255,150,60,' + (0.11 * lamp).toFixed(3) + ')');
+      pm.addColorStop(1, 'rgba(255,140,50,0)');
+      ctx.fillStyle = pm; ctx.fillRect(0, 0, W, H);
+    }
+    var bl = ctx.createRadialGradient(fx, fy - 8, 2, fx, fy - 8, reach * 0.6);
+    bl.addColorStop(0, 'rgba(255,150,60,0.46)'); bl.addColorStop(0.4, 'rgba(255,110,40,0.14)');
+    bl.addColorStop(1, 'rgba(255,90,30,0)');
+    ctx.fillStyle = bl; ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  }
+
+  // ── the ground, baked once across the whole world ─────────────────────────
+  var terrain = document.createElement('canvas');
+  terrain.width = WORLD; terrain.height = H;
+  var tctx = terrain.getContext('2d');
+  var tpx = mkPx(tctx);
+
+  function rgb(h) { return [parseInt(h.substr(1, 2), 16), parseInt(h.substr(3, 2), 16), parseInt(h.substr(5, 2), 16)]; }
+  function bakeTerrain() {
+    tctx.clearRect(0, 0, WORLD, H);
+    var soil = [C.grass3, C.grass2, C.grass1, C.grass0, C.dirt0, C.dirt1, C.dirt2, C.dirt3, C.dirt4].map(rgb);
+    var img = tctx.createImageData(WORLD, H - GY), d = img.data, o = 0;
+    var deepest = Math.max(1, H - GY - 4);
+    for (var gy = GY; gy < H; gy++) for (var gx = 0; gx < WORLD; gx++) {
+      var depth = gy - GY, n = hash(gx, gy), ci;
+      if (depth < 4) ci = depth === 0 ? 0 : depth < 2 ? 1 : 2;
+      else {
+        ci = n > 0.82 ? 8 : n > 0.6 ? 7 : n > 0.25 ? 6 : 5;
+        if ((gx % TILE === 0 || depth % TILE === 4) && n > 0.3) ci = 4;
+      }
+      if (depth === 3 && n > 0.7) ci = 3;
+      var c3 = soil[ci], k2 = depth < 4 ? 1 : 1 - Math.min(0.62, (depth - 4) / deepest * 0.7);
+      d[o++] = c3[0] * k2; d[o++] = c3[1] * k2; d[o++] = c3[2] * k2; d[o++] = 255;
+    }
+    tctx.putImageData(img, 0, GY);
+    for (var tf = 0; tf < WORLD; tf += 3) {
+      if (hash(tf, 91) > 0.55) {
+        var th = 1 + Math.round(hash(tf, 7) * 2);
+        tpx(C.grass3, tf, GY - th, 1, th);
+        if (hash(tf, 11) > 0.7) tpx(C.grass2, tf + 1, GY - 1, 1, 1);
+      }
+    }
+    for (var st = 0; st < 64; st++) {
+      var sx = Math.round((st + 0.5) / 64 * WORLD + (hash(st * 7919 + 3, 31) - 0.5) * 16);
+      var sy = GY + 8 + Math.round(hash(st * 7919 + 3, 37) * 40);
+      var rw = 2 + Math.round(hash(st * 7919 + 3, 41) * 3);
+      disc(tpx, C.stone1, sx, sy, rw, Math.max(1, rw - 1));
+      tpx(C.stone2, sx - rw + 1, sy - 1, rw, 1);
+    }
+
+    // pines, standing on the grass line, thinning out near the camp
+    for (var pt = 0; pt < 17; pt++) {
+      var sd = pt * 7919 + 5;
+      var px2 = Math.round((pt + 0.5) / 17 * WORLD + (hash(sd, 53) - 0.5) * 46);
+      if (Math.abs(px2 - FIREX) < 160) continue;
+      pine(tpx, px2, GY, 5 + Math.round(hash(sd, 59) * 6), hash(sd, 61));
+    }
+    // rocks big enough to sit on, out along the road
+    for (var bo = 0; bo < 14; bo++) {
+      var bx = Math.round((bo + 0.5) / 14 * WORLD + (hash(bo * 7919 + 7, 67) - 0.5) * 40);
+      if (Math.abs(bx - FIREX) < 110) continue;
+      disc(tpx, C.stone0, bx, GY - 3, 11, 7);
+      disc(tpx, C.stone1, bx, GY - 4, 10, 6);
+      tpx(C.stone2, bx - 7, GY - 9, 9, 2);
+    }
+    camp(tpx);
+  }
+
+  var PINE = ['#121a15', '#18241d', '#213026', '#2c4033'];
+  function pine(px, x, baseY, tiles, v) {
+    v = v || 0;
+    var hgt = tiles * TILE;
+    var lean = v > 0.72 ? 1 : v < 0.24 ? -1 : 0;   // not one of them stands straight
+    px('#241708', x - 3, baseY - 14, 7, 14);
+    px(C.wood1, x - 2, baseY - 14, 4, 13);
+    var tiers = tiles + 1;
+    for (var i = 0; i < tiers; i++) {
+      var u = i / tiers;
+      var wRow = Math.round((1 - u) * (5 + tiles) + 3);
+      var yTop = baseY - 10 - Math.round(u * (hgt - 14)) - 14;
+      var off = Math.round(lean * u * 3);
+      for (var r = 0; r < 14; r++) {
+        var ww = Math.round(wRow * (r / 14) * 0.9) + 2;
+        px(PINE[0], x + off - ww - 1, yTop + r, ww * 2 + 3, 1);
+        px(PINE[1], x + off - ww, yTop + r, ww * 2 + 1, 1);
+        px(PINE[2], x + off - ww, yTop + r, Math.max(1, ww), 1);
+        if (r > 10) px(PINE[3], x + off - ww, yTop + r, Math.max(1, ww - 2), 1);
+      }
+    }
+    px(PINE[2], x + Math.round(lean * 3) - 1, baseY - hgt - 16, 2, 5);
+  }
+
+  var LPL = FIREX - 186, LPR = FIREX + 186, LTOP = GY - 78, LSAG = 20;
+
+  // the camp itself: tent, tripod, seat log — all fixed, so all baked
+  function camp(px) {
+    var TX = FIREX - TILE * 7, TW = 40, TH = 56;
+    for (var ty = 0; ty < TH; ty++) {
+      var half = Math.round((ty / TH) * TW);
+      px(C.tent0, TX - half - 1, GY - TH + ty, half * 2 + 3, 1);
+      px(C.tent1, TX - half, GY - TH + ty, half * 2 + 1, 1);
+      px(C.tent2, TX - half, GY - TH + ty, half, 1);
+      px(C.tent3, TX - half, GY - TH + ty, 2, 1);
+      if (ty % 9 === 0) px(C.tent0, TX - half + 2, GY - TH + ty, half * 2 - 3, 1);
+    }
+    box(px, C.tent0, C.tree0, TX - 9, GY - 26, 18, 26);
+    px(C.tent1, TX - 8, GY - 25, 3, 24);
+    for (var gl = 0; gl < 30; gl++) px(C.wood1, TX - TW - 2 - gl, GY - TH + 8 + gl, 1, 1);
+
+    var KX = FIREX - TILE * 3, KTOP = GY - TILE * 3, PW = 12;
+    for (var tl = 0; tl < TILE * 3; tl++) {
+      var spread = Math.round(tl * 0.34);
+      px(C.metal1, KX - spread, KTOP + tl, 1, 1); px(C.metal0, KX - spread, KTOP + tl + 1, 1, 1);
+      px(C.metal1, KX + spread, KTOP + tl, 1, 1); px(C.metal0, KX + spread, KTOP + tl + 1, 1, 1);
+      if (tl > 12) px(C.metal0, KX + Math.round(spread * 0.3), KTOP + tl, 1, 1);
+    }
+    px(C.metal2, KX - 2, KTOP - 2, 5, 3);
+    px(C.metal0, KX, KTOP + 1, 1, 9);
+    for (var py = 0; py < TILE; py++) {
+      var u4 = py / (TILE - 1), pw = Math.round(PW - u4 * u4 * PW * 0.42);
+      px(C.metal0, KX - pw - 1, GY - TILE * 2 + py, pw * 2 + 3, 1);
+      px(C.metal1, KX - pw, GY - TILE * 2 + py, pw * 2 + 1, 1);
+      px(C.metal2, KX - pw, GY - TILE * 2 + py, Math.max(1, pw - 2), 1);
+    }
+    box(px, C.metal2, C.metal0, KX - PW - 2, GY - TILE * 2 - 3, PW * 2 + 5, 4);
+
+    for (var wx = LPL; wx <= LPR; wx++) {
+      var u5 = (wx - LPL) / (LPR - LPL);
+      px(C.wood0, wx, LTOP + Math.round(Math.sin(u5 * Math.PI) * LSAG), 1, 1);
+    }
+    box(px, C.wood2, C.wood0, LPL - 2, LTOP, 5, GY - LTOP);
+    box(px, C.wood2, C.wood0, LPR - 2, LTOP, 5, GY - LTOP);
+
+    var LX = FIREX + TILE * 3, LW = 5 * TILE;
+    box(px, C.wood2, C.wood0, LX, GY - TILE, LW, TILE);
+    px(C.wood3, LX + 1, GY - TILE + 1, LW - 2, 5);
+    for (var kn = 0; kn < 4; kn++) px(C.wood1, LX + 12 + kn * 16, GY - 9, 4, 3);
+    disc(px, C.wood1, LX + 1, GY - 8, 5, 7); disc(px, C.wood3, LX + 1, GY - 8, 3, 5);
+  }
+  bakeTerrain();
+
+  // ── the dog, who sleeps by the log and is drawn live so his tail moves ────
+  function dog(px, dx, dy, t) {
+    disc(px, C.dog0, dx, dy - 5, 13, 6);
+    disc(px, C.dog2, dx, dy - 6, 12, 5);
+    disc(px, C.dog3, dx - 4, dy - 7, 7, 2);
+    px(C.dog0, dx - 13, dy - 4, 6, 4); px(C.dog1, dx - 12, dy - 4, 4, 3);
+    disc(px, C.dog0, dx + 12, dy - 9, 6, 5);
+    disc(px, C.dog2, dx + 12, dy - 10, 5, 4);
+    px(C.dog0, dx + 15, dy - 7, 5, 4); px(C.dog1, dx + 16, dy - 7, 4, 3);
+    px(C.hair0, dx + 19, dy - 7, 2, 2);
+    px(C.dog1, dx + 8, dy - 15, 4, 5); px(C.dog0, dx + 8, dy - 15, 1, 5);
+    px(C.hair0, dx + 14, dy - 10, 2, 3); px('#e9f0ff', dx + 14, dy - 10, 1, 1);
+    px(C.dog1, dx - 5, dy - 1, 5, 2); px(C.dog1, dx + 4, dy - 1, 5, 2);
+    var wag = Math.sin(t * 5) > 0 ? 0 : 3;
+    px(C.dog1, dx - 18, dy - 6 - wag, 6, 3); px(C.dog2, dx - 18, dy - 6 - wag, 4, 2);
+  }
+
+  function logSprite(px, lx, t, i) {
+    px(C.wood0, lx - 13, GY - 9, 26, 9);
+    px(C.wood2, lx - 13, GY - 8, 26, 7);
+    px(C.wood3, lx - 12, GY - 8, 24, 2);
+    disc(px, C.wood0, lx - 13, GY - 5, 3, 4); disc(px, C.wood1, lx - 13, GY - 5, 2, 3);
+    disc(px, C.wood0, lx + 13, GY - 5, 3, 4); disc(px, C.wood2, lx + 13, GY - 5, 2, 3);
+    var glow = 0.5 + 0.5 * Math.sin(t * 2.4 + i * 1.7);
+    px(glow > 0.5 ? C.fire3 : C.fire2, lx - 2, GY - 5, 4, 2);
+  }
+
+  function shadeSprite(px, sh, t, k) {
+    var ex = sh.x | 0, ey = sh.y | 0;
+    var tail = Math.round(Math.sin(t * 4 + sh.ph) * 3);
+    disc(px, C.shade0, ex, ey + 6 + tail, 7, 8);
+    disc(px, C.shade0, ex, ey, 11, 10);
+    disc(px, C.shade1, ex, ey - 1, 10, 8);
+    disc(px, C.shade2, ex, ey - 4, 7, 4);
+    var bl = (t * 1.3 + k) % 5 < 0.18;
+    if (!bl) {
+      px(C.shade3, ex - 5, ey - 3, 4, 4); px(C.shade3, ex + 2, ey - 3, 4, 4);
+      px('#e8e0ff', ex - 5, ey - 3, 2, 2); px('#e8e0ff', ex + 2, ey - 3, 2, 2);
+    }
+  }
+
+  // ── the twenty nights, written out one at a time ──────────────────────────
+  // len: seconds until dawn.  drain: fuel a second the fire eats.
+  // gap: seconds between shades.  spd: how fast they come.
+  // wood: seconds between logs appearing.  lying: how many may lie about at once.
+  var NIGHTS = [
+    { len: 40, drain: 1.40, gap: 12.0, spd: 14, wood: 3.2, lying: 6, name: 'The first watch',   note: 'Wood burns. Fetch more.' },
+    { len: 42, drain: 1.60, gap:  9.0, spd: 15, wood: 3.1, lying: 6, name: 'Something moved',   note: 'Swing the brand at anything cold.' },
+    { len: 43, drain: 1.80, gap:  8.0, spd: 16, wood: 3.0, lying: 6, name: 'Two of them',       note: 'They come from both ends of the road.' },
+    { len: 44, drain: 2.00, gap:  7.0, spd: 17, wood: 3.0, lying: 6, name: 'A colder wind',     note: 'The fire eats faster tonight.' },
+    { len: 45, drain: 2.20, gap:  6.4, spd: 17, wood: 2.9, lying: 6, name: 'Frost on the grass',note: 'Carry three at a time. It saves a trip.' },
+    { len: 46, drain: 2.40, gap:  5.8, spd: 18, wood: 2.8, lying: 6, name: 'The long dark',     note: 'Keep the fire high and you can see them coming.' },
+    { len: 47, drain: 2.55, gap:  5.3, spd: 18, wood: 2.8, lying: 6, name: 'Low cloud',         note: 'No stars. Only what you light yourself.' },
+    { len: 48, drain: 2.70, gap:  4.9, spd: 19, wood: 2.7, lying: 6, name: 'They learned',      note: 'They wait for you to walk away.' },
+    { len: 49, drain: 2.85, gap:  4.5, spd: 19, wood: 2.6, lying: 6, name: 'Deep in the pines', note: 'Wood falls further out now.' },
+    { len: 50, drain: 3.00, gap:  4.2, spd: 20, wood: 2.6, lying: 6, name: 'Halfway',           note: 'Ten behind you. Ten to go.' },
+    { len: 51, drain: 3.10, gap:  3.9, spd: 20, wood: 2.5, lying: 6, name: 'The wind turns',    note: 'Feed early. Feed often.' },
+    { len: 52, drain: 3.20, gap:  3.6, spd: 21, wood: 2.5, lying: 6, name: 'Thin ice',          note: 'The fire will not forgive a wasted trip.' },
+    { len: 52, drain: 3.30, gap:  3.4, spd: 21, wood: 2.4, lying: 7, name: 'A hard frost',      note: 'Stay near enough to turn around.' },
+    { len: 53, drain: 3.40, gap:  3.2, spd: 22, wood: 2.4, lying: 7, name: 'Something bigger',  note: 'They are quicker than last week.' },
+    { len: 54, drain: 3.50, gap:  3.0, spd: 22, wood: 2.3, lying: 7, name: 'The dog wakes',     note: 'Even he can hear them now.' },
+    { len: 55, drain: 3.60, gap:  2.9, spd: 23, wood: 2.3, lying: 7, name: 'No moon',           note: 'Your light is the only light.' },
+    { len: 55, drain: 3.50, gap:  2.8, spd: 23, wood: 2.2, lying: 7, name: 'The road narrows',  note: 'Fewer places to find wood.' },
+    { len: 56, drain: 3.55, gap:  2.8, spd: 24, wood: 2.1, lying: 7, name: 'Sleet',             note: 'Wet wood, hungry fire.' },
+    { len: 57, drain: 3.60, gap:  2.9, spd: 25, wood: 2.0, lying: 7, name: 'One before dawn',   note: 'Almost through. Do not put it down.' },
+    { len: 58, drain: 3.70, gap:  2.8, spd: 26, wood: 2.0, lying: 7, name: 'The last night',    note: 'Hold it until the sun comes over the hill.' }
+  ];
+
+  var FUEL_MAX = 100, FUEL_START = 62, LOG_FUEL = 20, MAXCARRY = 3;
+  var SPEED = 76, SWING_CD = 0.38, SWING_RANGE = 34, BITE = 11;
+
+  // ── save ──────────────────────────────────────────────────────────────────
+  var KEY = 'nightwatch.pixel.v1';
+  var save = { night: 1, best: 0, kept: 0 };
+  try { var raw = localStorage.getItem(KEY); if (raw) { var o = JSON.parse(raw); if (o && o.night) save = o; } } catch (e) {}
+  function store() { try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) {} }
+
+  // ── sound, kept quiet ─────────────────────────────────────────────────────
+  var AC = null, muted = false;
+  function ac() {
+    if (!AC) { var A = window.AudioContext || window.webkitAudioContext; if (A) AC = new A(); }
+    if (AC && AC.state === 'suspended') AC.resume();
+    return AC;
+  }
+  function bell(freq, dur, vol, bright) {
+    if (muted) return;
+    var a = ac(); if (!a) return;
+    var t0 = a.currentTime;
+    var o = a.createOscillator(), g = a.createGain(), f = a.createBiquadFilter();
+    o.type = 'triangle'; o.frequency.setValueAtTime(freq, t0);
+    f.type = 'lowpass'; f.frequency.setValueAtTime(bright || 1800, t0);
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(vol, t0 + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(f); f.connect(g); g.connect(a.destination);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  }
+
+  // ── state ─────────────────────────────────────────────────────────────────
+  var view = document.getElementById('view'), ctx = view.getContext('2d');
+  view.width = W; view.height = H;
+  ctx.imageSmoothingEnabled = false;
+  var px = mkPx(ctx);
+
+  var BAND = [0, 0.20, 0.36, 0.50, 0.60].map(function (u) { return Math.round(GY * u); });
+  var RIDGE = Math.round(GY * 0.66), TLINE = Math.round(GY * 0.875);
+  var STARS = 110, STARY = Math.round(GY * 0.66);
+
+  var S = null, running = false, t = 0;
+
+  function newNight(n) {
+    var cfg = NIGHTS[Math.min(n, NIGHTS.length) - 1];
+    S = {
+      n: n, cfg: cfg, left: cfg.len, fuel: FUEL_START, cam: 0,
+      x: FIREX + 30, dir: -1, step: 0, carry: 0, moving: 0,
+      swing: 0, swingCd: 0, feed: 0,
+      logs: [], shades: [], sparks: [], puffs: [],
+      woodT: 0.6, shadeT: Math.min(4, cfg.gap), fed: 0, driven: 0,
+      shake: 0, over: null
+    };
+    for (var i = 0; i < 3; i++) dropLog();
+    markRoad(n);
+  }
+
+  function dropLog() {
+    if (!S || S.logs.length >= S.cfg.lying) return;
+    var tries = 0, x;
+    do {
+      var side = Math.random() < 0.5 ? -1 : 1;
+      var out = 150 + Math.pow(Math.random(), 1.6) * 430;
+      x = FIREX + side * out;
+      if (x < 40 || x > WORLD - 40) x = FIREX - side * out;
+      tries++;
+    } while (tries < 24 && ((x > FIREX - 175 && x < FIREX + 142) || nearLog(x)));
+    S.logs.push({ x: x, born: 0 });
+  }
+  function nearLog(x) {
+    for (var i = 0; i < S.logs.length; i++) if (Math.abs(S.logs[i].x - x) < 34) return true;
+    return false;
+  }
+
+  function spawnShade() {
+    var cap = 3 + Math.floor(S.n / 8);
+    if (S.shades.length >= cap) return;
+    var side = Math.random() < 0.5 ? -1 : 1;
+    var d = 210 + Math.random() * 260;
+    var sx = FIREX + side * d;
+    if (sx < 20 || sx > WORLD - 20) side = -side, sx = FIREX + side * d;
+    S.shades.push({
+      x: sx, y: GY - 46 - Math.random() * 54, y0: 0, ph: Math.random() * 6.28,
+      side: side, d0: Math.abs(sx - FIREX), hurt: 0
+    });
+    S.shades[S.shades.length - 1].y0 = S.shades[S.shades.length - 1].y;
+  }
+
+  function burst(x, y, n, up) {
+    for (var i = 0; i < n; i++) S.sparks.push({
+      x: x + (Math.random() - 0.5) * 18, y: y,
+      vx: (Math.random() - 0.5) * 46, vy: -(up || 26) - Math.random() * 44, life: 1
+    });
+  }
+
+  // ── input ─────────────────────────────────────────────────────────────────
+  var held = { l: false, r: false, a: false };
+  function bindKey(el, set) {
+    var down = function (e) { e.preventDefault(); set(true); el.classList.add('on'); ac(); };
+    var up = function (e) { e.preventDefault(); set(false); el.classList.remove('on'); };
+    el.addEventListener('touchstart', down, { passive: false });
+    el.addEventListener('touchend', up, { passive: false });
+    el.addEventListener('touchcancel', up, { passive: false });
+    el.addEventListener('mousedown', down);
+    window.addEventListener('mouseup', up);
+    el.addEventListener('mouseleave', up);
+  }
+  bindKey(document.getElementById('kL'), function (v) { held.l = v; });
+  bindKey(document.getElementById('kR'), function (v) { held.r = v; });
+  bindKey(document.getElementById('kA'), function (v) { held.a = v; });
+  window.addEventListener('keydown', function (e) {
+    if (e.repeat) return;
+    var k = e.key.toLowerCase();
+    if (k === 'a' || k === 'arrowleft') held.l = true;
+    else if (k === 'd' || k === 'arrowright') held.r = true;
+    else if (k === ' ' || k === 'arrowup' || k === 'w') { held.a = true; e.preventDefault(); }
+    else if (k === 'm') muted = !muted;
+    else return;
+    ac();
+  });
+  window.addEventListener('keyup', function (e) {
+    var k = e.key.toLowerCase();
+    if (k === 'a' || k === 'arrowleft') held.l = false;
+    else if (k === 'd' || k === 'arrowright') held.r = false;
+    else if (k === ' ' || k === 'arrowup' || k === 'w') held.a = false;
+  });
+
+  // ── one tick of the night ─────────────────────────────────────────────────
+  function step(dt) {
+    var cfg = S.cfg;
+
+    // walking
+    var mv = (held.r ? 1 : 0) - (held.l ? 1 : 0);
+    if (mv) { S.dir = mv; S.x += mv * SPEED * dt; S.step += dt * 5.4; S.moving = 1; }
+    else S.moving = 0;
+    S.x = Math.max(18, Math.min(WORLD - 18, S.x));
+
+    // the brand
+    if (S.swingCd > 0) S.swingCd -= dt;
+    if (S.swing > 0) S.swing -= dt;
+    if (held.a && S.swingCd <= 0) {
+      S.swingCd = SWING_CD; S.swing = 0.22;
+      bell(190, 0.14, 0.05, 900);
+      var hx = S.x + S.dir * 18;
+      for (var i = S.shades.length - 1; i >= 0; i--) {
+        var sh = S.shades[i];
+        if (Math.abs(sh.x - hx) < SWING_RANGE && Math.abs(sh.y - (GY - 22)) < 30) {
+          S.shades.splice(i, 1); S.driven++;
+          burst(sh.x, sh.y, 9, 14);
+          bell(560, 0.2, 0.06, 2400);
+        }
+      }
+    }
+
+    // picking wood up on the way past
+    for (var j = S.logs.length - 1; j >= 0; j--) {
+      S.logs[j].born += dt;
+      if (S.carry < MAXCARRY && Math.abs(S.logs[j].x - S.x) < 17) {
+        S.logs.splice(j, 1); S.carry++;
+        bell(300, 0.1, 0.045, 1400);
+      }
+    }
+    S.woodT -= dt;
+    if (S.woodT <= 0) { S.woodT = cfg.wood; dropLog(); }
+
+    // feeding, which happens simply by standing at the stones
+    if (S.feed > 0) S.feed -= dt;
+    if (S.carry > 0 && Math.abs(S.x - FIREX) < 34 && S.feed <= 0) {
+      S.carry--; S.fed++; S.feed = 0.34;
+      S.fuel = Math.min(FUEL_MAX, S.fuel + LOG_FUEL);
+      burst(FIREX, GY - 14, 12, 30);
+      bell(420, 0.26, 0.05, 1700);
+    }
+
+    // the shades
+    S.shadeT -= dt;
+    if (S.shadeT <= 0) { S.shadeT = cfg.gap; spawnShade(); }
+    for (var k = S.shades.length - 1; k >= 0; k--) {
+      var s2 = S.shades[k];
+      var toward = FIREX - s2.x;
+      s2.x += Math.sign(toward) * cfg.spd * dt;
+      var prog = 1 - Math.min(1, Math.abs(FIREX - s2.x) / s2.d0);
+      s2.y = s2.y0 + (GY - 24 - s2.y0) * prog + Math.sin(t * 1.4 + s2.ph) * 4;
+      if (Math.abs(FIREX - s2.x) < 26) {
+        S.shades.splice(k, 1);
+        S.fuel = Math.max(0, S.fuel - BITE);
+        S.shake = 0.3;
+        bell(96, 0.5, 0.07, 500);
+        for (var p = 0; p < 8; p++) S.puffs.push({
+          x: FIREX + (Math.random() - 0.5) * 26, y: GY - 20,
+          vx: (Math.random() - 0.5) * 24, vy: -12 - Math.random() * 20, life: 1
+        });
+      }
+    }
+
+    // sparks and puffs
+    for (var q = S.sparks.length - 1; q >= 0; q--) {
+      var sp = S.sparks[q];
+      sp.life -= dt * 0.95; if (sp.life <= 0) { S.sparks.splice(q, 1); continue; }
+      sp.x += sp.vx * dt; sp.y += sp.vy * dt; sp.vy += 42 * dt;
+    }
+    for (var r = S.puffs.length - 1; r >= 0; r--) {
+      var pf = S.puffs[r];
+      pf.life -= dt * 0.7; if (pf.life <= 0) { S.puffs.splice(r, 1); continue; }
+      pf.x += pf.vx * dt; pf.y += pf.vy * dt; pf.vy += 6 * dt;
+    }
+    if (S.shake > 0) S.shake -= dt;
+
+    // the fire, and the clock
+    S.fuel = Math.max(0, S.fuel - cfg.drain * dt);
+    S.left -= dt;
+    if (S.fuel <= 0) { finish(false); return; }
+    if (S.left <= 0) { S.left = 0; finish(true); return; }
+
+    // camera
+    var want = Math.max(0, Math.min(WORLD - W, S.x - W / 2));
+    S.cam += (want - S.cam) * Math.min(1, dt * 7);
+  }
+
+  // ── one frame ─────────────────────────────────────────────────────────────
+  function draw() {
+    var cam = Math.round(S.cam) + (S.shake > 0 ? Math.round((Math.random() - 0.5) * 4) : 0);
+    var lvl = S.fuel / FUEL_MAX;
+    var dawn = Math.max(0, 1 - S.left / 8);        // the last eight seconds go pale
+
+    // sky, with the horizon warming as dawn comes on
+    for (var b = 0; b < 5; b++) {
+      var col = RAMPS.sky[b];
+      if (dawn > 0) col = mix(col, ['#241a2c', '#3b2740', '#5e3a4a', '#8a5352', '#c1785c'][b], dawn);
+      px(col, 0, BAND[b], W, (b < 4 ? BAND[b + 1] : GY) - BAND[b]);
+    }
+    if (dawn < 0.75) {                              // stars, scattered right across it
+      var drift = Math.round(cam * 0.06);
+      for (var st = 0; st < STARS; st++) {
+        var sx = Math.round(hash(st, 17) * W) - drift % W;
+        if (sx < 0) sx += W; if (sx >= W) sx -= W;
+        var sy = 3 + Math.round(hash(st, 23) * STARY);
+        var tw = Math.sin(t * (0.8 + hash(st, 29) * 1.6) + st * 2.1);
+        if (tw < -0.55) continue;
+        var mag = hash(st, 31);
+        var fade = dawn > 0.4 ? 1 : 0;
+        px(mag > 0.93 ? (fade ? '#a99cb4' : '#ffe9c0') : mag > 0.6 ? (fade ? '#8f849e' : '#d6cee2')
+          : (fade ? '#6d6480' : '#9d94ad'), sx, sy, 1, 1);
+        if (mag > 0.96) { px('#fff6dc', sx - 1, sy, 1, 1); px('#fff6dc', sx + 1, sy, 1, 1); }
+      }
+    }
+    if (dawn < 0.8) {                               // the moon, well up by now
+      var mx = Math.round(W * 0.2), my = Math.round(GY * 0.19);
+      var mA = dawn > 0.4 ? '#9d8f9c' : '#ded7ea', mB = dawn > 0.4 ? '#b3a4b0' : '#fbf6ff';
+      disc(px, mA, mx, my, 13, 13); disc(px, mB, mx - 1, my - 1, 10, 10);
+      disc(px, mA, mx - 4, my - 4, 3, 3); disc(px, mA, mx + 3, my + 2, 2, 2);
+      disc(px, mA, mx - 1, my + 6, 2, 2);
+    }
+    for (var cl = 0; cl < 3; cl++) {                // haze lying over the hills
+      var cy = Math.round(GY * (0.50 + cl * 0.07));
+      var cw = 110 + cl * 40, cx = ((t * (2.4 + cl) + cl * 151 - cam * 0.05) % (W + cw * 2)) - cw;
+      var cc = dawn > 0.3 ? mix(RAMPS.sky[4], '#b3705e', dawn) : RAMPS.sky[4];
+      px(cc, cx + 10, cy, cw - 20, 2);
+      px(cc, cx, cy + 2, cw, 3);
+      px(cc, cx + 22, cy + 5, cw - 52, 2);
+    }
+    if (dawn > 0.15) {                              // the sun, coming up behind the hill
+      var sunY = RIDGE + 18 - Math.round(dawn * 28);
+      disc(px, dawn > 0.55 ? '#ffdfa0' : '#e8a06e', Math.round(W * 0.74), sunY, 15, 15);
+      disc(px, dawn > 0.55 ? '#fff3cf' : '#f5bd83', Math.round(W * 0.74), sunY - 1, 11, 11);
+    }
+
+    // two ridges, moving slower than the ground
+    var far = Math.round(cam * 0.22), mid = Math.round(cam * 0.48);
+    for (var hx = 0; hx < W; hx++) {
+      var wx = hx + far;
+      var h1 = RIDGE - Math.round(11 * Math.sin(wx * 0.019) + 6 * Math.sin(wx * 0.043 + 1));
+      px(C.far2, hx, h1, 1, 2); px(C.far1, hx, h1 + 2, 1, GY - h1 - 2);
+    }
+    for (var tx = 0; tx < W; tx++) {
+      var wx2 = tx + mid;
+      var tb = TLINE - Math.round(7 * Math.abs(Math.sin(wx2 * 0.08)) + 4 * Math.sin(wx2 * 0.028));
+      px(C.tree2, tx, tb, 1, 2); px(C.tree1, tx, tb + 2, 1, GY - tb - 2);
+      if (hash(wx2, 3) > 0.86) px(C.tree0, tx, tb - 2, 1, 3);
+    }
+
+    // the baked world, one slice of it
+    ctx.drawImage(terrain, cam, 0, W, H, 0, 0, W, H);
+
+    // wood on the ground
+    for (var i = 0; i < S.logs.length; i++) {
+      var lx = Math.round(S.logs[i].x) - cam;
+      if (lx > -30 && lx < W + 30) logSprite(px, lx, t, i);
+    }
+
+    for (var L = 1; L < 13; L++) {
+      var u6 = L / 13, blx = Math.round(LPL + u6 * (LPR - LPL)) - cam;
+      if (blx < -6 || blx > W + 6) continue;
+      var bly = LTOP + Math.round(Math.sin(u6 * Math.PI) * LSAG);
+      px(C.wood0, blx, bly + 1, 1, 2);
+      var on = Math.sin(t * 1.5 + L * 1.7) > -0.55;
+      disc(px, on ? C.fire4 : C.fire3, blx, bly + 5, 2, 3);
+      px(on ? '#fffbe6' : C.fire4, blx - 1, bly + 4, 1, 1);
+    }
+
+    dog(px, FIREX + 148 - cam, GY - 1, t);
+    campfire(px, FIREX - cam, t, Math.max(0.06, lvl), GY);
+
+    for (var q = 0; q < S.sparks.length; q++) {
+      var sp = S.sparks[q];
+      px(sp.life > 0.5 ? C.fire4 : C.fire2, (sp.x | 0) - cam, sp.y | 0, 2, 2);
+    }
+    for (var r = 0; r < S.puffs.length; r++) {
+      var pf = S.puffs[r];
+      px(pf.life > 0.5 ? C.shade2 : C.shade1, (pf.x | 0) - cam, pf.y | 0, 2, 2);
+    }
+    for (var k = 0; k < S.shades.length; k++) {
+      var sh = S.shades[k];
+      if (sh.x - cam > -24 && sh.x - cam < W + 24)
+        shadeSprite(px, { x: sh.x - cam, y: sh.y, ph: sh.ph }, t, k);
+    }
+
+    // him
+    var hx2 = Math.round(S.x) - cam;
+    guy(px, hx2, GY, t, S.dir, S.moving ? 'walk' : 'idle', S.step);
+    if (S.carry) armful(px, hx2, GY, S.carry, S.dir);
+
+    // the brand in his hand — lit, and swept when he swings
+    var reach = S.swing > 0 ? 14 + Math.round((0.22 - S.swing) * 90) : 12;
+    var by = GY - 20 + (S.swing > 0 ? Math.round((0.22 - S.swing) * 34) - 4 : 0);
+    px(C.wood1, hx2 + S.dir * 11, by, S.dir * (reach - 4) || 1, 3);
+    px(C.fire3, hx2 + S.dir * reach, by - 1, 4, 4);
+    px(C.fire4, hx2 + S.dir * reach, by - 1, 3, 3);
+    px('#fffbe6', hx2 + S.dir * reach + 1, by, 1, 1);
+
+    var reachR = 96 + lvl * 96;
+    var deep = dawn > 0 ? mix('#4a4258', '#a99184', dawn) : '#4a4258';
+    lightPass(ctx, FIREX - cam, GY - 16, reachR, hx2 + S.dir * reach, by, 1, deep);
+  }
+
+  function mix(a, b, u) {
+    function n(h) { return [parseInt(h.substr(1, 2), 16), parseInt(h.substr(3, 2), 16), parseInt(h.substr(5, 2), 16)]; }
+    var A = n(a), B = n(b), o = '#';
+    for (var i = 0; i < 3; i++) {
+      var v = Math.round(A[i] + (B[i] - A[i]) * u).toString(16);
+      o += v.length < 2 ? '0' + v : v;
+    }
+    return o;
+  }
+
+  // ── the readout ───────────────────────────────────────────────────────────
+  var elFireNum = document.getElementById('fireNum'),
+      elFireBar = document.getElementById('fireBar'),
+      elFireFill = elFireBar.querySelector('i'),
+      elDawn = document.getElementById('dawnbar').querySelector('i'),
+      elNight = document.getElementById('nightNum'),
+      elCarry = document.getElementById('carryLbl'),
+      elTill = document.getElementById('tillDawn');
+
+  var elRoad = document.getElementById('road');
+  (function () {
+    var h = '';
+    for (var i = 0; i < NIGHTS.length; i++) h += '<i></i>';
+    elRoad.innerHTML = h;
+  })();
+  function markRoad(n) {
+    var d = elRoad.children;
+    for (var i = 0; i < d.length; i++)
+      d[i].className = i + 1 < n ? 'done' : i + 1 === n ? 'now' : '';
+  }
+
+  function hud() {
+    var pctF = Math.round(S.fuel / FUEL_MAX * 100);
+    elFireNum.textContent = pctF;
+    elFireFill.style.width = pctF + '%';
+    elFireBar.classList.toggle('low', pctF < 25);
+    elDawn.style.width = Math.round((1 - S.left / S.cfg.len) * 100) + '%';
+    elNight.textContent = S.n;
+    elCarry.textContent = 'Carrying ' + S.carry + '/' + MAXCARRY;
+    elTill.textContent = Math.ceil(S.left) + 's';
+  }
+
+  // ── cards ─────────────────────────────────────────────────────────────────
+  var veil = document.getElementById('veil'), card = document.getElementById('card');
+  function show(html) { card.innerHTML = html; veil.classList.remove('hide'); running = false; }
+  function hide() { veil.classList.add('hide'); running = true; }
+
+  function strip(upto) {
+    var s = '<div class="nights">';
+    for (var i = 1; i <= NIGHTS.length; i++)
+      s += '<i class="' + (i < upto ? 'done' : i === upto ? 'now' : '') + '"></i>';
+    return s + '</div>';
+  }
+  function bindGo(fn, id) {
+    var b = document.getElementById(id || 'go');
+    if (b) b.addEventListener('click', function () { ac(); fn(); });
+  }
+
+  function title() {
+    newNight(Math.min(save.night, NIGHTS.length));
+    show(
+      '<div class="eyebrow">' + (save.best >= NIGHTS.length ? 'The whole road, walked' : 'Night Watch') + '</div>' +
+      '<h1>Keep it<em>burning</em></h1>' +
+      '<p class="lede">Twenty nights on the road. One fire between you and the dark.</p>' +
+      '<div class="rules">' +
+        '<p><b>◀ ▶</b> walk. Step over wood to pick it up — three at a time.</p>' +
+        '<p><b>Stand at the stones</b> and he feeds the fire himself, one log at a time.</p>' +
+        '<p><b>SWING</b> the brand at the shades. Let one reach the fire and it takes a bite out of it.</p>' +
+        '<p>Hold until dawn. That is the whole of it.</p>' +
+      '</div>' +
+      strip(save.night) +
+      '<button class="go" id="go">' + (save.night > 1 ? 'Continue — night ' + save.night : 'Begin the first night') + '</button>' +
+      (save.night > 1 ? '<button class="ghost" id="restart">Start again from night 1</button>' : '') +
+      '<div class="foot">' + (save.best ? 'Best: night ' + save.best + ' · ' : '') + BUILD + '</div>'
+    );
+    bindGo(function () { intro(save.night); });
+    bindGo(function () { save.night = 1; save.kept = 0; store(); title(); }, 'restart');
+  }
+
+  function intro(n) {
+    n = Math.min(n, NIGHTS.length);
+    newNight(n);
+    var cfg = NIGHTS[n - 1];
+    show(
+      '<div class="eyebrow">Night ' + n + ' of ' + NIGHTS.length + '</div>' +
+      '<h1>' + cfg.name + '</h1>' +
+      '<p class="lede">' + cfg.note + '</p>' +
+      '<div class="tally">' +
+        '<div><span>Until dawn</span><b>' + cfg.len + 's</b></div>' +
+        '<div><span>Fire eats</span><b>' + cfg.drain.toFixed(1) + '/s</b></div>' +
+        '<div><span>Shades</span><b>' + (cfg.gap >= 12 ? 'few' : 'every ' + cfg.gap.toFixed(0) + 's') + '</b></div>' +
+      '</div>' +
+      strip(n) +
+      '<button class="go" id="go">Take the watch</button>'
+    );
+    bindGo(function () { hide(); });
+  }
+
+  function finish(survived) {
+    running = false;
+    if (survived) {
+      bell(523, 0.5, 0.06, 2600);
+      setTimeout(function () { bell(784, 0.7, 0.05, 2800); }, 170);
+      save.kept++;
+      if (S.n > save.best) save.best = S.n;
+      if (S.n >= NIGHTS.length) { save.night = NIGHTS.length; store(); return won(); }
+      save.night = S.n + 1; store();
+      var next = NIGHTS[S.n];
+      show(
+        '<div class="eyebrow">Dawn</div>' +
+        '<h1>Night ' + S.n + '<em>held</em></h1>' +
+        '<p class="lede">The sun comes over the hill and the fire is still going. Sit down a minute.</p>' +
+        '<div class="tally">' +
+          '<div><span>Logs fed</span><b>' + S.fed + '</b></div>' +
+          '<div><span>Driven off</span><b>' + S.driven + '</b></div>' +
+          '<div><span>Fire left</span><b>' + Math.round(S.fuel) + '</b></div>' +
+        '</div>' +
+        strip(S.n + 1) +
+        '<p class="lede">Next: <b style="color:var(--bone)">' + next.name + '</b></p>' +
+        '<button class="go" id="go">On to night ' + (S.n + 1) + '</button>' +
+        '<button class="ghost" id="stop">Turn in for now</button>'
+      );
+      var nn = S.n + 1;
+      bindGo(function () { intro(nn); });
+      bindGo(function () { title(); }, 'stop');
+    } else {
+      bell(140, 0.8, 0.07, 700);
+      if (S.n > save.best) save.best = S.n;
+      store();
+      var n2 = S.n;
+      show(
+        '<div class="eyebrow">The fire went out</div>' +
+        '<h1>Night ' + n2 + '<em>lost</em></h1>' +
+        '<p class="lede">He sat in the cold until the sky turned grey on its own. No harm done — but the dark got its way tonight.</p>' +
+        '<div class="tally">' +
+          '<div><span>Held for</span><b>' + Math.round(S.cfg.len - S.left) + 's</b></div>' +
+          '<div><span>Logs fed</span><b>' + S.fed + '</b></div>' +
+          '<div><span>Driven off</span><b>' + S.driven + '</b></div>' +
+        '</div>' +
+        strip(n2) +
+        '<button class="go" id="go">Take night ' + n2 + ' again</button>' +
+        '<button class="ghost" id="stop">Back to the road</button>'
+      );
+      bindGo(function () { intro(n2); });
+      bindGo(function () { title(); }, 'stop');
+    }
+  }
+
+  function won() {
+    show(
+      '<div class="eyebrow">Twenty nights</div>' +
+      '<h1>You kept it<em>all the way</em></h1>' +
+      '<p class="lede">Every night on the road, and the fire never once went out. Put the brand down. You have earned the morning.</p>' +
+      '<div class="tally">' +
+        '<div><span>Nights held</span><b>' + NIGHTS.length + '</b></div>' +
+        '<div><span>Logs fed</span><b>' + S.fed + '</b></div>' +
+        '<div><span>Driven off</span><b>' + S.driven + '</b></div>' +
+      '</div>' +
+      strip(NIGHTS.length + 1) +
+      '<button class="go" id="go">Walk it again</button>' +
+      '<div class="foot">' + BUILD + '</div>'
+    );
+    bindGo(function () { save.night = 1; store(); intro(1); });
+  }
+
+  // ── loop, fixed step ──────────────────────────────────────────────────────
+  var last = performance.now(), acc = 0, STEP = 1 / 60;
+  function frame(now) {
+    var dt = Math.min(0.25, (now - last) / 1000); last = now;
+    t += dt;
+    if (running && S) {
+      acc += dt;
+      var guard = 0;
+      while (acc >= STEP && running && guard++ < 8) { step(STEP); acc -= STEP; }
+      hud();
+    }
+    if (S) draw();
+    document.getElementById('kA').classList.toggle('cool', !!(S && S.swingCd > 0));
+    requestAnimationFrame(frame);
+  }
+
+  title();
+  requestAnimationFrame(frame);
+
+  window.__NW = {
+    get s() { return S; }, nights: NIGHTS, build: BUILD,
+    hold: function (k, v) { held[k] = v; },
+    tap: function (id) { var e = document.getElementById(id); if (e) e.click(); },
+    skip: function () { if (S) S.left = 0.02; },
+    geo: { W: W, H: H, GY: GY, WORLD: WORLD, FIREX: FIREX },
+    tick: function (dt) { if (S && running) step(dt); },
+    begin: function (n) { newNight(n); running = true; veil.classList.add('hide'); },
+    live: function () { return running; },
+    mute: function (v) { muted = v; }
+  };
+})();
+</script>
+</body>
+</html>
