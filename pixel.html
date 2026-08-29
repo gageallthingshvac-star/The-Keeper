@@ -47,6 +47,15 @@
   #view{display:block;image-rendering:pixelated;image-rendering:crisp-edges;
     width:100%;height:auto;max-height:calc(100% - 34px);object-fit:contain;background:#0c0810}
 
+  #banner{position:absolute;left:0;right:0;top:14%;text-align:center;padding:0 22px;
+    pointer-events:none;opacity:0;transition:opacity .5s}
+  #banner.on{opacity:1}
+  #banner b{display:block;font:800 19px/1.2 var(--body);color:#fff6e6;
+    text-shadow:0 2px 3px #000,0 3px 14px rgba(0,0,0,0.9)}
+  #banner span{display:block;margin:5px auto 0;max-width:20em;
+    font:600 11.5px/1.45 var(--body);color:var(--core);
+    text-shadow:0 2px 3px #000,0 3px 12px rgba(0,0,0,0.9)}
+
   /* ── the road, twenty nights of it ───────────────────────────── */
   #road{flex:none;display:flex;gap:5px;justify-content:center;align-items:center;
     padding:13px 16px 0;width:100%}
@@ -58,16 +67,21 @@
   /* ── controls ────────────────────────────────────────────────── */
   #pad{flex:none;display:flex;align-items:flex-end;justify-content:space-between;
     padding:10px 16px 0;gap:12px}
-  .keys{display:flex;gap:12px}
+  .keys{display:flex;gap:12px;align-items:flex-end}
   .key{width:76px;height:76px;border-radius:20px;display:grid;place-items:center;
     border:1px solid var(--line);background:var(--panel);color:var(--bone);
     font:700 26px/1 var(--body);cursor:pointer;transition:transform .06s,background .1s}
   .key:active,.key.on{transform:scale(.94);background:rgba(255,181,71,0.2);border-color:var(--ember)}
-  .key.act{width:92px;height:92px;border-radius:26px;color:var(--ember);
-    font:700 11px/1 var(--body);letter-spacing:.14em;
+  .key.act{width:88px;height:88px;border-radius:25px;color:var(--ember);
+    font:700 11px/1.35 var(--body);letter-spacing:.13em;white-space:pre-line;
     background:radial-gradient(120% 120% at 50% 20%,rgba(120,50,10,0.9),rgba(24,16,20,0.9));
     border-color:rgba(255,181,71,0.5)}
   .key.act.cool{color:#7d6a56;border-color:var(--line);background:var(--panel)}
+  .key.hop{width:68px;height:68px;border-radius:19px;color:#cbbba4;
+    font:700 10px/1 var(--body);letter-spacing:.12em}
+  .key.act.go{color:#2a1a08;border-color:#ffc86b;
+    background:linear-gradient(180deg,#ffc86b,#ef9a22);
+    box-shadow:0 0 22px rgba(255,160,50,0.45)}
 
   /* ── cards ───────────────────────────────────────────────────── */
   #veil{position:fixed;inset:0;z-index:9;display:grid;place-items:center;padding:22px;
@@ -105,7 +119,7 @@
 <body>
 <div id="app">
   <div id="hud">
-    <div class="row"><span class="lbl">Fire</span><span class="num" id="fireNum">60</span></div>
+    <div class="row"><span class="lbl" id="fireLbl">Fire</span><span class="num" id="fireNum">60</span></div>
     <div class="bar" id="fireBar"><i></i></div>
     <div id="dawnbar"><i></i></div>
     <div class="row">
@@ -116,6 +130,7 @@
   </div>
   <div id="stage">
     <canvas id="view"></canvas>
+    <div id="banner"></div>
     <div id="road"></div>
   </div>
   <div id="pad">
@@ -123,14 +138,17 @@
       <button class="key" id="kL" aria-label="Left">◀</button>
       <button class="key" id="kR" aria-label="Right">▶</button>
     </div>
-    <button class="key act" id="kA" aria-label="Swing">SWING</button>
+    <div class="keys">
+      <button class="key hop" id="kJ" aria-label="Jump">JUMP</button>
+      <button class="key act" id="kA" aria-label="Swing">SWING</button>
+    </div>
   </div>
 </div>
 <div id="veil"><div class="card" id="card"></div></div>
 <script>
 (function () {
   'use strict';
-  var BUILD = 'v1.0.0';
+  var BUILD = 'v1.1.0';
 
   // ── measurements ──────────────────────────────────────────────────────────
   var TILE = 16;
@@ -190,16 +208,22 @@
     var f = face < 0 ? -1 : 1;
     var y = feetY - GUY_H;
     var walk = mode === 'walk';
-    var bob = walk ? (Math.floor(step) % 2 ? 1 : 0) : (Math.sin(t * 1.6) > 0 ? 0 : 1);
+    var bob = walk ? (Math.floor(step) % 2 ? 1 : 0)
+            : mode === 'jump' ? 0 : (Math.sin(t * 1.6) > 0 ? 0 : 1);
     y += bob;
 
-    if (mode === 'sit') {
+    if (mode === 'jump') {
+      px(C.wood0, x - 7, y + 27, 6, 10); px(C.wood1, x - 6, y + 27, 4, 9);
+      px(C.wood0, x + 1, y + 29, 6, 9);  px(C.wood1, x + 2, y + 29, 4, 8);
+      px(C.hair0, x - 8, y + 35, 7, 3);
+      px(C.hair0, x + 1, y + 36, 7, 3);
+    } else if (mode === 'sit') {
       var kx = x + (f > 0 ? 2 : -14);
       px(C.wood0, kx, y + 27, 14, 8); px(C.wood1, kx + 1, y + 28, 12, 6);
       var sx = x + (f > 0 ? 12 : -14);
       px(C.wood0, sx, y + 33, 6, 8); px(C.wood1, sx + 1, y + 34, 4, 7);
       px(C.hair0, sx - (f > 0 ? 0 : 2), y + 40, 8, 3);
-    } else {
+    } else if (mode !== 'jump') {
       var sw = walk ? Math.sin(step * Math.PI) * 5 : 0;
       var la = Math.round(sw), lb = -Math.round(sw);
       px(C.wood0, x - 7 + la, y + 28, 6, 12); px(C.wood1, x - 6 + la, y + 28, 4, 11);
@@ -214,7 +238,7 @@
     px(C.cloth0, x - 8, y + 26, 16, 2);
     px(C.wood2, x - 4, y + 26, 8, 2);
 
-    var swing = walk ? Math.round(Math.sin(step * Math.PI) * 3) : 0;
+    var swing = mode === 'jump' ? -3 : walk ? Math.round(Math.sin(step * Math.PI) * 3) : 0;
     px(C.cloth0, x - 12, y + 17 + swing, 4, 10); px(C.cloth1, x - 11, y + 18 + swing, 2, 9);
     px(C.cloth0, x + 8, y + 17 - swing, 4, 10);  px(C.cloth2, x + 9, y + 18 - swing, 2, 9);
     px(C.skin1, x - 12, y + 26 + swing, 4, 4);   px(C.skin2, x + 8, y + 26 - swing, 4, 4);
@@ -250,7 +274,7 @@
   }
 
   // ── the fire, drawn wherever the camera has put it ────────────────────────
-  function campfire(px, fx, t, lvl, baseY) {
+  function campfire(px, fx, t, lvl, baseY, day) {
     var TONGUE = [
       { w: 15, h: 1.00, sp: 3.3, ox: -5, c: [C.fire0, C.fire1] },
       { w: 12, h: 0.86, sp: 4.7, ox:  6, c: [C.fire1, C.fire2] },
@@ -283,7 +307,8 @@
       var sp = (t * 11 + k * 4.1) % 62, sy3 = baseY - 14 - base - sp;
       if (sy3 > 10) {
         var sw = 1 + Math.round(sp / 24);
-        px(sp > 36 ? C.far1 : C.far2, fx + Math.round(Math.sin(sp * 0.11 + k) * (2 + sp * 0.17)), sy3 | 0, sw, sw);
+        px(sp > 36 ? (day ? '#c9d6de' : C.far1) : (day ? '#aebcc6' : C.far2),
+           fx + Math.round(Math.sin(sp * 0.11 + k) * (2 + sp * 0.17)), sy3 | 0, sw, sw);
       }
     }
     for (var e = 0; e < 8; e++) {
@@ -302,7 +327,7 @@
     ctx.fillStyle = lm; ctx.fillRect(0, 0, W, H);
     ctx.globalCompositeOperation = 'lighter';
     if (lamp > 0) {
-      var pm = ctx.createRadialGradient(lx, ly, 2, lx, ly, 34);
+      var pm = ctx.createRadialGradient(lx, ly, 2, lx, ly, 42);
       pm.addColorStop(0, 'rgba(255,186,96,' + (0.30 * lamp).toFixed(3) + ')');
       pm.addColorStop(0.5, 'rgba(255,150,60,' + (0.11 * lamp).toFixed(3) + ')');
       pm.addColorStop(1, 'rgba(255,140,50,0)');
@@ -315,6 +340,42 @@
     ctx.restore();
   }
 
+  // ── the shape of the road ─────────────────────────────────────────────────
+  // Terraced, the way that game does it: a step of one tile he walks up on his
+  // own, a step of two he has to jump. The camp itself stays flat.
+  var RISE = [
+    { x0:   30, x1:  330, up: 1 },
+    { x0:   64, x1:  286, up: 2 },
+    { x0:  108, x1:  212, up: 3 },
+    { x0:  300, x1:  356, up: 2 },      // a ledge on its own, two tiles up
+    { x0:  848, x1: 1010, up: 1 },
+    { x0:  880, x1:  964, up: 2 },
+    { x0: 1024, x1: 1104, up: 2 },      // another, out east
+    { x0: 1044, x1: 1084, up: 3 },
+    { x0: 1140, x1: 1200, up: 1 }
+  ];
+  var DIP = [{ x0: 1108, x1: 1140, down: 1 }];   // a dry creek
+  var FLAT0 = FIREX - 230, FLAT1 = FIREX + 230;  // the camp, level from end to end
+  var GROUND;
+  function buildGround() {
+    GROUND = new Int16Array(WORLD);
+    for (var x = 0; x < WORLD; x++) {
+      var lvl = 0, i;
+      if (x < FLAT0 || x > FLAT1) {
+        for (i = 0; i < RISE.length; i++)
+          if (x >= RISE[i].x0 && x < RISE[i].x1) lvl = Math.max(lvl, RISE[i].up);
+        for (i = 0; i < DIP.length; i++)
+          if (x >= DIP[i].x0 && x < DIP[i].x1) lvl = Math.min(lvl, -DIP[i].down);
+      }
+      GROUND[x] = GY - lvl * TILE;
+    }
+  }
+  buildGround();
+  function groundY(x) {
+    var i = x | 0;
+    return GROUND[i < 0 ? 0 : i >= WORLD ? WORLD - 1 : i];
+  }
+
   // ── the ground, baked once across the whole world ─────────────────────────
   var terrain = document.createElement('canvas');
   terrain.width = WORLD; terrain.height = H;
@@ -325,31 +386,44 @@
   function bakeTerrain() {
     tctx.clearRect(0, 0, WORLD, H);
     var soil = [C.grass3, C.grass2, C.grass1, C.grass0, C.dirt0, C.dirt1, C.dirt2, C.dirt3, C.dirt4].map(rgb);
-    var img = tctx.createImageData(WORLD, H - GY), d = img.data, o = 0;
+    var wall = [[52, 36, 22], [60, 42, 27], [69, 49, 31]];
+    var TOP = GY - TILE * 3;
+    var img = tctx.createImageData(WORLD, H - TOP), d = img.data, o = 0;
     var deepest = Math.max(1, H - GY - 4);
-    for (var gy = GY; gy < H; gy++) for (var gx = 0; gx < WORLD; gx++) {
-      var depth = gy - GY, n = hash(gx, gy), ci;
+    for (var gy = TOP; gy < H; gy++) for (var gx = 0; gx < WORLD; gx++) {
+      var surf = GROUND[gx], depth = gy - surf;
+      if (depth < 0) {
+        if (gy < GY) { o += 4; continue; }             // open sky, left clear
+        var wn = hash(gx, gy);                          // below the line: earth wall
+        var wc = wall[wn > 0.7 ? 2 : wn > 0.35 ? 1 : 0];
+        var wk = 1 - Math.min(0.34, (gy - GY) / deepest * 0.6);
+        d[o++] = wc[0] * wk; d[o++] = wc[1] * wk; d[o++] = wc[2] * wk; d[o++] = 255;
+        continue;
+      }
+      var n = hash(gx, gy), ci;
       if (depth < 4) ci = depth === 0 ? 0 : depth < 2 ? 1 : 2;
       else {
         ci = n > 0.82 ? 8 : n > 0.6 ? 7 : n > 0.25 ? 6 : 5;
-        if ((gx % TILE === 0 || depth % TILE === 4) && n > 0.3) ci = 4;
+        if ((gx % TILE === 0 || gy % TILE === 4) && n > 0.3) ci = 4;
       }
       if (depth === 3 && n > 0.7) ci = 3;
       var c3 = soil[ci], k2 = depth < 4 ? 1 : 1 - Math.min(0.62, (depth - 4) / deepest * 0.7);
       d[o++] = c3[0] * k2; d[o++] = c3[1] * k2; d[o++] = c3[2] * k2; d[o++] = 255;
     }
-    tctx.putImageData(img, 0, GY);
+    tctx.putImageData(img, 0, TOP);
     for (var tf = 0; tf < WORLD; tf += 3) {
       if (hash(tf, 91) > 0.55) {
-        var th = 1 + Math.round(hash(tf, 7) * 2);
-        tpx(C.grass3, tf, GY - th, 1, th);
-        if (hash(tf, 11) > 0.7) tpx(C.grass2, tf + 1, GY - 1, 1, 1);
+        var th = 1 + Math.round(hash(tf, 7) * 2), tg = GROUND[tf];
+        tpx(C.grass3, tf, tg - th, 1, th);
+        if (hash(tf, 11) > 0.7) tpx(C.grass2, tf + 1, tg - 1, 1, 1);
       }
     }
     for (var st = 0; st < 64; st++) {
       var sx = Math.round((st + 0.5) / 64 * WORLD + (hash(st * 7919 + 3, 31) - 0.5) * 16);
-      var sy = GY + 8 + Math.round(hash(st * 7919 + 3, 37) * 40);
+      sx = Math.max(2, Math.min(WORLD - 3, sx));
+      var sy = GROUND[sx] + 10 + Math.round(hash(st * 7919 + 3, 37) * 40);
       var rw = 2 + Math.round(hash(st * 7919 + 3, 41) * 3);
+      if (sy > H - 4) continue;
       disc(tpx, C.stone1, sx, sy, rw, Math.max(1, rw - 1));
       tpx(C.stone2, sx - rw + 1, sy - 1, rw, 1);
     }
@@ -359,31 +433,33 @@
       var sd = pt * 7919 + 5;
       var px2 = Math.round((pt + 0.5) / 17 * WORLD + (hash(sd, 53) - 0.5) * 46);
       if (Math.abs(px2 - FIREX) < 160) continue;
-      pine(tpx, px2, GY, 5 + Math.round(hash(sd, 59) * 6), hash(sd, 61));
+      pine(tpx, px2, groundY(px2), 5 + Math.round(hash(sd, 59) * 6), hash(sd, 61));
     }
     // rocks big enough to sit on, out along the road
     for (var bo = 0; bo < 14; bo++) {
       var bx = Math.round((bo + 0.5) / 14 * WORLD + (hash(bo * 7919 + 7, 67) - 0.5) * 40);
       if (Math.abs(bx - FIREX) < 110) continue;
-      disc(tpx, C.stone0, bx, GY - 3, 11, 7);
-      disc(tpx, C.stone1, bx, GY - 4, 10, 6);
-      tpx(C.stone2, bx - 7, GY - 9, 9, 2);
+      var by2 = groundY(bx);
+      disc(tpx, C.stone0, bx, by2 - 3, 11, 7);
+      disc(tpx, C.stone1, bx, by2 - 4, 10, 6);
+      tpx(C.stone2, bx - 7, by2 - 9, 9, 2);
     }
-    camp(tpx);
+    campProps(tpx);
   }
 
-  var PINE = ['#121a15', '#18241d', '#213026', '#2c4033'];
+  var PINE = ['#1a2820', '#233729', '#2e4835', '#3c5c42'];
   function pine(px, x, baseY, tiles, v) {
     v = v || 0;
     var hgt = tiles * TILE;
     var lean = v > 0.72 ? 1 : v < 0.24 ? -1 : 0;   // not one of them stands straight
     px('#241708', x - 3, baseY - 14, 7, 14);
     px(C.wood1, x - 2, baseY - 14, 4, 13);
-    var tiers = tiles + 1;
+    var tiers = tiles + 1, crown = baseY;
     for (var i = 0; i < tiers; i++) {
       var u = i / tiers;
       var wRow = Math.round((1 - u) * (5 + tiles) + 3);
       var yTop = baseY - 10 - Math.round(u * (hgt - 14)) - 14;
+      crown = Math.min(crown, yTop);
       var off = Math.round(lean * u * 3);
       for (var r = 0; r < 14; r++) {
         var ww = Math.round(wRow * (r / 14) * 0.9) + 2;
@@ -393,13 +469,13 @@
         if (r > 10) px(PINE[3], x + off - ww, yTop + r, Math.max(1, ww - 2), 1);
       }
     }
-    px(PINE[2], x + Math.round(lean * 3) - 1, baseY - hgt - 16, 2, 5);
+    px(PINE[2], x + Math.round(lean * 3) - 1, crown - 4, 2, 6);
   }
 
   var LPL = FIREX - 186, LPR = FIREX + 186, LTOP = GY - 78, LSAG = 20;
 
   // the camp itself: tent, tripod, seat log — all fixed, so all baked
-  function camp(px) {
+  function campProps(px) {
     var TX = FIREX - TILE * 7, TW = 40, TH = 56;
     for (var ty = 0; ty < TH; ty++) {
       var half = Math.round((ty / TH) * TW);
@@ -411,7 +487,10 @@
     }
     box(px, C.tent0, C.tree0, TX - 9, GY - 26, 18, 26);
     px(C.tent1, TX - 8, GY - 25, 3, 24);
-    for (var gl = 0; gl < 30; gl++) px(C.wood1, TX - TW - 2 - gl, GY - TH + 8 + gl, 1, 1);
+    var gx0 = TX - TW - 2, gy0 = GY - TH + 10, gn = GY - gy0;
+    for (var gl = 0; gl <= gn; gl++)
+      px(C.wood1, gx0 - Math.round(gl * 0.62), gy0 + gl, 1, 1);
+    px(C.metal1, gx0 - Math.round(gn * 0.62) - 1, GY - 3, 3, 5);
 
     var KX = FIREX - TILE * 3, KTOP = GY - TILE * 3, PW = 12;
     for (var tl = 0; tl < TILE * 3; tl++) {
@@ -462,14 +541,14 @@
     px(C.dog1, dx - 18, dy - 6 - wag, 6, 3); px(C.dog2, dx - 18, dy - 6 - wag, 4, 2);
   }
 
-  function logSprite(px, lx, t, i) {
-    px(C.wood0, lx - 13, GY - 9, 26, 9);
-    px(C.wood2, lx - 13, GY - 8, 26, 7);
-    px(C.wood3, lx - 12, GY - 8, 24, 2);
-    disc(px, C.wood0, lx - 13, GY - 5, 3, 4); disc(px, C.wood1, lx - 13, GY - 5, 2, 3);
-    disc(px, C.wood0, lx + 13, GY - 5, 3, 4); disc(px, C.wood2, lx + 13, GY - 5, 2, 3);
+  function logSprite(px, lx, ly, t, i) {
+    px(C.wood0, lx - 13, ly - 9, 26, 9);
+    px(C.wood2, lx - 13, ly - 8, 26, 7);
+    px(C.wood3, lx - 12, ly - 8, 24, 2);
+    disc(px, C.wood0, lx - 13, ly - 5, 3, 4); disc(px, C.wood1, lx - 13, ly - 5, 2, 3);
+    disc(px, C.wood0, lx + 13, ly - 5, 3, 4); disc(px, C.wood2, lx + 13, ly - 5, 2, 3);
     var glow = 0.5 + 0.5 * Math.sin(t * 2.4 + i * 1.7);
-    px(glow > 0.5 ? C.fire3 : C.fire2, lx - 2, GY - 5, 4, 2);
+    px(glow > 0.5 ? C.fire3 : C.fire2, lx - 2, ly - 5, 4, 2);
   }
 
   function shadeSprite(px, sh, t, k) {
@@ -513,8 +592,20 @@
     { len: 58, drain: 3.70, gap:  2.8, spd: 26, wood: 2.0, lying: 7, name: 'The last night',    note: 'Hold it until the sun comes over the hill.' }
   ];
 
+  function cfgFor(n) {
+    if (n <= NIGHTS.length) return NIGHTS[n - 1];
+    var k = n - NIGHTS.length, b = NIGHTS[NIGHTS.length - 1];
+    return {
+      len: Math.min(78, b.len + k), drain: Math.min(5.4, b.drain + k * 0.05),
+      gap: Math.max(1.8, b.gap - k * 0.03), spd: Math.min(34, b.spd + k * 0.2),
+      wood: Math.max(1.6, b.wood - k * 0.02), lying: 7,
+      name: 'The road goes on', note: 'Past the twenty now. As far as you like.'
+    };
+  }
+
   var FUEL_MAX = 100, FUEL_START = 62, LOG_FUEL = 20, MAXCARRY = 3;
   var SPEED = 76, SWING_CD = 0.38, SWING_RANGE = 34, BITE = 11;
+  var GRAV = 900, JUMPV = 268, STEP_UP = 17;   // one tile he walks up, two he jumps
 
   // ── save ──────────────────────────────────────────────────────────────────
   var KEY = 'nightwatch.pixel.v1';
@@ -556,16 +647,33 @@
   var S = null, running = false, t = 0;
 
   function newNight(n) {
-    var cfg = NIGHTS[Math.min(n, NIGHTS.length) - 1];
+    var cfg = cfgFor(n);
     S = {
-      n: n, cfg: cfg, left: cfg.len, fuel: FUEL_START, cam: 0,
-      x: FIREX + 30, dir: -1, step: 0, carry: 0, moving: 0,
+      mode: 'night', n: n, cfg: cfg, left: cfg.len, fuel: FUEL_START, cam: 0,
+      x: FIREX + 30, y: GY, vy: 0, onGround: true, jumpHeld: false,
+      dir: -1, step: 0, carry: 0, moving: 0,
       swing: 0, swingCd: 0, feed: 0,
       logs: [], shades: [], sparks: [], puffs: [],
       woodT: 0.6, shadeT: Math.min(4, cfg.gap), fed: 0, driven: 0,
       shake: 0, over: null
     };
     for (var i = 0; i < 3; i++) dropLog();
+    markRoad(n);
+  }
+
+  // ── the camp between nights: no clock, no shades, just the place ──────────
+  var SIGN = FIREX + 252;
+  function newCamp() {
+    var n = save.night;
+    S = {
+      mode: 'day', n: n, cfg: cfgFor(n), left: 0, fuel: 44, cam: 0,
+      x: FIREX + 46, y: GY, vy: 0, onGround: true, jumpHeld: false,
+      dir: -1, step: 0, carry: 0, moving: 0,
+      swing: 0, swingCd: 0, feed: 0,
+      logs: [], shades: [], sparks: [], puffs: [],
+      woodT: 0, shadeT: 0, fed: 0, driven: 0,
+      shake: 0, birds: 0, over: null
+    };
     markRoad(n);
   }
 
@@ -579,7 +687,7 @@
       if (x < 40 || x > WORLD - 40) x = FIREX - side * out;
       tries++;
     } while (tries < 24 && ((x > FIREX - 175 && x < FIREX + 142) || nearLog(x)));
-    S.logs.push({ x: x, born: 0 });
+    S.logs.push({ x: x, y: groundY(x), born: 0 });
   }
   function nearLog(x) {
     for (var i = 0; i < S.logs.length; i++) if (Math.abs(S.logs[i].x - x) < 34) return true;
@@ -608,9 +716,11 @@
   }
 
   // ── input ─────────────────────────────────────────────────────────────────
-  var held = { l: false, r: false, a: false };
-  function bindKey(el, set) {
-    var down = function (e) { e.preventDefault(); set(true); el.classList.add('on'); ac(); };
+  var held = { l: false, r: false, a: false, j: false };
+  var taps = { a: 0, j: 0 };
+  function took(k) { if (taps[k]) { taps[k] = 0; return true; } return false; }
+  function bindKey(el, set, tap) {
+    var down = function (e) { e.preventDefault(); set(true); if (tap) taps[tap]++; el.classList.add('on'); ac(); };
     var up = function (e) { e.preventDefault(); set(false); el.classList.remove('on'); };
     el.addEventListener('touchstart', down, { passive: false });
     el.addEventListener('touchend', up, { passive: false });
@@ -621,13 +731,15 @@
   }
   bindKey(document.getElementById('kL'), function (v) { held.l = v; });
   bindKey(document.getElementById('kR'), function (v) { held.r = v; });
-  bindKey(document.getElementById('kA'), function (v) { held.a = v; });
+  bindKey(document.getElementById('kJ'), function (v) { held.j = v; }, 'j');
+  bindKey(document.getElementById('kA'), function (v) { held.a = v; }, 'a');
   window.addEventListener('keydown', function (e) {
     if (e.repeat) return;
     var k = e.key.toLowerCase();
     if (k === 'a' || k === 'arrowleft') held.l = true;
     else if (k === 'd' || k === 'arrowright') held.r = true;
-    else if (k === ' ' || k === 'arrowup' || k === 'w') { held.a = true; e.preventDefault(); }
+    else if (k === ' ' || k === 'arrowup' || k === 'w') { held.j = true; taps.j++; e.preventDefault(); }
+    else if (k === 'f' || k === 'j' || k === 'x' || k === 'arrowdown') { held.a = true; taps.a++; e.preventDefault(); }
     else if (k === 'm') muted = !muted;
     else return;
     ac();
@@ -636,29 +748,66 @@
     var k = e.key.toLowerCase();
     if (k === 'a' || k === 'arrowleft') held.l = false;
     else if (k === 'd' || k === 'arrowright') held.r = false;
-    else if (k === ' ' || k === 'arrowup' || k === 'w') held.a = false;
+    else if (k === ' ' || k === 'arrowup' || k === 'w') held.j = false;
+    else if (k === 'f' || k === 'j' || k === 'x' || k === 'arrowdown') held.a = false;
   });
 
-  // ── one tick of the night ─────────────────────────────────────────────────
+  // ── one tick, of a night or of a day at the camp ──────────────────────────
   function step(dt) {
     var cfg = S.cfg;
+    var day = S.mode === 'day';
+    var hitA = held.a || took('a'), hitJ = held.j || took('j');
 
-    // walking
+    // walking, over ground that is not all one height
     var mv = (held.r ? 1 : 0) - (held.l ? 1 : 0);
-    if (mv) { S.dir = mv; S.x += mv * SPEED * dt; S.step += dt * 5.4; S.moving = 1; }
-    else S.moving = 0;
-    S.x = Math.max(18, Math.min(WORLD - 18, S.x));
+    S.moving = 0;
+    if (mv) {
+      S.dir = mv;
+      var nx = Math.max(18, Math.min(WORLD - 18, S.x + mv * SPEED * dt));
+      var ng = groundY(nx);
+      if (ng >= S.y - STEP_UP) {                 // low enough to walk or step onto
+        S.x = nx;
+        if (S.onGround && ng < S.y) S.y = ng;    // up the step
+      }
+      if (S.onGround) { S.step += dt * 5.4; S.moving = 1; }
+    }
+
+    // the jump, and the fall that follows it
+    var g = groundY(S.x);
+    if (hitJ && S.onGround && !S.jumpHeld) {
+      S.vy = -JUMPV; S.onGround = false; S.jumpHeld = true;
+      bell(240, 0.09, 0.035, 1100);
+    }
+    if (!held.j) S.jumpHeld = false;
+    if (!S.onGround) {
+      S.vy += GRAV * dt;
+      S.y += S.vy * dt;
+      if (S.vy > 0 && S.y >= g) { S.y = g; S.vy = 0; S.onGround = true; }
+    } else if (g > S.y + 1) {                    // he walked off the edge of it
+      S.onGround = false; S.vy = 0;
+    } else S.y = g;
+
+    if (day) {
+      S.fuel = 44 + Math.sin(t * 0.7) * 4;
+      if (S.swing > 0) S.swing -= dt;
+      if (S.swingCd > 0) S.swingCd -= dt;
+      if (hitA && S.swingCd <= 0) { S.swingCd = 0.5; startNight(S.n); return; }
+      if (S.shake > 0) S.shake -= dt;
+      var want0 = Math.max(0, Math.min(WORLD - W, S.x - W / 2));
+      S.cam += (want0 - S.cam) * Math.min(1, dt * 7);
+      return;
+    }
 
     // the brand
     if (S.swingCd > 0) S.swingCd -= dt;
     if (S.swing > 0) S.swing -= dt;
-    if (held.a && S.swingCd <= 0) {
+    if (hitA && S.swingCd <= 0) {
       S.swingCd = SWING_CD; S.swing = 0.22;
       bell(190, 0.14, 0.05, 900);
       var hx = S.x + S.dir * 18;
       for (var i = S.shades.length - 1; i >= 0; i--) {
         var sh = S.shades[i];
-        if (Math.abs(sh.x - hx) < SWING_RANGE && Math.abs(sh.y - (GY - 22)) < 30) {
+        if (Math.abs(sh.x - hx) < SWING_RANGE && Math.abs(sh.y - (S.y - 22)) < 32) {
           S.shades.splice(i, 1); S.driven++;
           burst(sh.x, sh.y, 9, 14);
           bell(560, 0.2, 0.06, 2400);
@@ -669,7 +818,8 @@
     // picking wood up on the way past
     for (var j = S.logs.length - 1; j >= 0; j--) {
       S.logs[j].born += dt;
-      if (S.carry < MAXCARRY && Math.abs(S.logs[j].x - S.x) < 17) {
+      if (S.carry < MAXCARRY && Math.abs(S.logs[j].x - S.x) < 17
+          && Math.abs(S.logs[j].y - S.y) < 26) {
         S.logs.splice(j, 1); S.carry++;
         bell(300, 0.1, 0.045, 1400);
       }
@@ -732,10 +882,14 @@
   }
 
   // ── one frame ─────────────────────────────────────────────────────────────
+  var DAYSKY = ['#3a79ad', '#5b96c6', '#86b6da', '#b2d2e9', '#dcebf2'];
   function draw() {
     var cam = Math.round(S.cam) + (S.shake > 0 ? Math.round((Math.random() - 0.5) * 4) : 0);
     var lvl = S.fuel / FUEL_MAX;
-    var dawn = Math.max(0, 1 - S.left / 8);        // the last eight seconds go pale
+    var day = S.mode === 'day';
+    var dawn = day ? 0 : Math.max(0, 1 - S.left / 8);   // the last eight seconds go pale
+
+    if (day) { drawDay(cam, lvl); return; }
 
     // sky, with the horizon warming as dawn comes on
     for (var b = 0; b < 5; b++) {
@@ -799,19 +953,11 @@
     // wood on the ground
     for (var i = 0; i < S.logs.length; i++) {
       var lx = Math.round(S.logs[i].x) - cam;
-      if (lx > -30 && lx < W + 30) logSprite(px, lx, t, i);
+      if (lx > -30 && lx < W + 30) logSprite(px, lx, S.logs[i].y, t, i);
     }
 
-    for (var L = 1; L < 13; L++) {
-      var u6 = L / 13, blx = Math.round(LPL + u6 * (LPR - LPL)) - cam;
-      if (blx < -6 || blx > W + 6) continue;
-      var bly = LTOP + Math.round(Math.sin(u6 * Math.PI) * LSAG);
-      px(C.wood0, blx, bly + 1, 1, 2);
-      var on = Math.sin(t * 1.5 + L * 1.7) > -0.55;
-      disc(px, on ? C.fire4 : C.fire3, blx, bly + 5, 2, 3);
-      px(on ? '#fffbe6' : C.fire4, blx - 1, bly + 4, 1, 1);
-    }
-
+    signpost(px, SIGN - cam, groundY(SIGN), S.n);
+    lights(cam, 0);
     dog(px, FIREX + 148 - cam, GY - 1, t);
     campfire(px, FIREX - cam, t, Math.max(0.06, lvl), GY);
 
@@ -830,21 +976,108 @@
     }
 
     // him
-    var hx2 = Math.round(S.x) - cam;
-    guy(px, hx2, GY, t, S.dir, S.moving ? 'walk' : 'idle', S.step);
-    if (S.carry) armful(px, hx2, GY, S.carry, S.dir);
+    var hx2 = Math.round(S.x) - cam, hy2 = Math.round(S.y);
+    var pose = !S.onGround ? 'jump' : S.moving ? 'walk' : 'idle';
+    guy(px, hx2, hy2, t, S.dir, pose, S.step);
+    if (S.carry) armful(px, hx2, hy2, S.carry, S.dir);
 
     // the brand in his hand — lit, and swept when he swings
     var reach = S.swing > 0 ? 14 + Math.round((0.22 - S.swing) * 90) : 12;
-    var by = GY - 20 + (S.swing > 0 ? Math.round((0.22 - S.swing) * 34) - 4 : 0);
+    var by = hy2 - 20 + (S.swing > 0 ? Math.round((0.22 - S.swing) * 34) - 4 : 0);
     px(C.wood1, hx2 + S.dir * 11, by, S.dir * (reach - 4) || 1, 3);
     px(C.fire3, hx2 + S.dir * reach, by - 1, 4, 4);
     px(C.fire4, hx2 + S.dir * reach, by - 1, 3, 3);
     px('#fffbe6', hx2 + S.dir * reach + 1, by, 1, 1);
 
     var reachR = 96 + lvl * 96;
-    var deep = dawn > 0 ? mix('#4a4258', '#a99184', dawn) : '#4a4258';
+    var deep = dawn > 0 ? mix('#544c66', '#a99184', dawn) : '#544c66';
     lightPass(ctx, FIREX - cam, GY - 16, reachR, hx2 + S.dir * reach, by, 1, deep);
+  }
+
+  // ── the camp by daylight ──────────────────────────────────────────────────
+  function drawDay(cam, lvl) {
+    for (var b = 0; b < 5; b++)
+      px(DAYSKY[b], 0, BAND[b], W, (b < 4 ? BAND[b + 1] : GY) - BAND[b]);
+    var sunX = Math.round(W * 0.78) - Math.round(cam * 0.04);
+    disc(px, '#ffe9ad', sunX, Math.round(GY * 0.16), 17, 17);
+    disc(px, '#fffbe4', sunX, Math.round(GY * 0.16), 13, 13);
+    for (var cl = 0; cl < 5; cl++) {              // proper daylight cloud
+      var cy = Math.round(GY * (0.12 + cl * 0.1));
+      var cw = 54 + cl * 22;
+      var cx = ((t * (3 + cl * 1.4) + cl * 149 - cam * 0.08) % (W + cw * 2)) - cw;
+      px('#e9f2f7', cx + 10, cy, cw - 20, 5);
+      px('#ffffff', cx + 14, cy, cw - 34, 3);
+      px('#e9f2f7', cx, cy + 5, cw, 5);
+      px('#cfdde8', cx + 4, cy + 9, cw - 12, 2);
+    }
+    var far = Math.round(cam * 0.22), mid = Math.round(cam * 0.48);
+    for (var hx = 0; hx < W; hx++) {
+      var wx = hx + far;
+      var h1 = RIDGE - Math.round(11 * Math.sin(wx * 0.019) + 6 * Math.sin(wx * 0.043 + 1));
+      px('#9fb0d0', hx, h1, 1, 2); px('#8496bc', hx, h1 + 2, 1, GY - h1 - 2);
+    }
+    for (var tx = 0; tx < W; tx++) {
+      var wx2 = tx + mid;
+      var tb = TLINE - Math.round(7 * Math.abs(Math.sin(wx2 * 0.08)) + 4 * Math.sin(wx2 * 0.028));
+      px('#3f6247', tx, tb, 1, 2); px('#2f4a36', tx, tb + 2, 1, GY - tb - 2);
+      if (hash(wx2, 3) > 0.86) px('#25392a', tx, tb - 2, 1, 3);
+    }
+    ctx.drawImage(terrain, cam, 0, W, H, 0, 0, W, H);
+    signpost(px, SIGN - cam, groundY(SIGN), S.n);
+    lights(cam, 0.35);
+    dog(px, FIREX + 148 - cam, GY - 1, t);
+    campfire(px, FIREX - cam, t, Math.max(0.2, lvl), GY, 1);
+    birds(cam);
+    var hx3 = Math.round(S.x) - cam, hy3 = Math.round(S.y);
+    guy(px, hx3, hy3, t, S.dir, !S.onGround ? 'jump' : S.moving ? 'walk' : 'idle', S.step);
+    ctx.save();                                   // a wash of warm morning over it all
+    ctx.globalCompositeOperation = 'multiply';
+    var wm = ctx.createLinearGradient(0, 0, 0, H);
+    wm.addColorStop(0, '#e8ecf6'); wm.addColorStop(0.6, '#fff3e2'); wm.addColorStop(1, '#f6dfc6');
+    ctx.fillStyle = wm; ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'lighter';
+    var gl = ctx.createRadialGradient(FIREX - cam, GY - 14, 2, FIREX - cam, GY - 14, 70);
+    gl.addColorStop(0, 'rgba(255,150,60,0.2)'); gl.addColorStop(1, 'rgba(255,120,40,0)');
+    ctx.fillStyle = gl; ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  }
+
+  function birds(cam) {
+    for (var i = 0; i < 5; i++) {
+      var sp = 16 + i * 3;
+      var bx = ((t * sp + i * 220 - cam * 0.3) % (W + 90)) - 45;
+      var by = Math.round(GY * (0.2 + i * 0.045)) + Math.round(Math.sin(t * 0.7 + i) * 5);
+      var f = Math.sin(t * 7 + i * 2) > 0 ? 0 : 1;
+      px('#3d4a5c', bx - 3, by + f, 3, 1); px('#3d4a5c', bx + 1, by + f, 3, 1);
+      px('#3d4a5c', bx, by + 1, 1, 1);
+    }
+  }
+
+  // the post at the edge of camp, with the night ahead burned into it
+  function signpost(px, x, baseY, n) {
+    if (x < -30 || x > W + 30) return;
+    px(C.wood0, x - 3, baseY - 46, 6, 46);
+    px(C.wood1, x - 2, baseY - 45, 3, 44);
+    box(px, C.wood2, C.wood0, x - 20, baseY - 62, 41, 19);
+    px(C.wood3, x - 19, baseY - 61, 39, 6);
+    for (var i = 0; i < Math.min(n, 10); i++)
+      px(C.wood0, x - 16 + i * 4, baseY - 54, 2, 7);
+    if (n > 10) px(C.fire2, x + 12, baseY - 54, 6, 7);
+    px(C.stone1, x - 7, baseY - 3, 15, 4);
+    px(C.stone2, x - 6, baseY - 4, 12, 2);
+  }
+
+  function lights(cam, dim) {
+    for (var L = 1; L < 13; L++) {
+      var u6 = L / 13, blx = Math.round(LPL + u6 * (LPR - LPL)) - cam;
+      if (blx < -6 || blx > W + 6) continue;
+      var bly = LTOP + Math.round(Math.sin(u6 * Math.PI) * LSAG);
+      px(C.wood0, blx, bly + 1, 1, 2);
+      var on = Math.sin(t * 1.5 + L * 1.7) > -0.55;
+      if (dim) { disc(px, on ? C.fire3 : C.fire1, blx, bly + 5, 2, 3); continue; }
+      disc(px, on ? C.fire4 : C.fire3, blx, bly + 5, 2, 3);
+      px(on ? '#fffbe6' : C.fire4, blx - 1, bly + 4, 1, 1);
+    }
   }
 
   function mix(a, b, u) {
@@ -875,13 +1108,24 @@
   function markRoad(n) {
     var d = elRoad.children;
     for (var i = 0; i < d.length; i++)
-      d[i].className = i + 1 < n ? 'done' : i + 1 === n ? 'now' : '';
+      d[i].className = n > d.length ? 'done' : i + 1 < n ? 'done' : i + 1 === n ? 'now' : '';
   }
 
+  var elFireLbl = document.getElementById('fireLbl');
   function hud() {
     var pctF = Math.round(S.fuel / FUEL_MAX * 100);
     elFireNum.textContent = pctF;
     elFireFill.style.width = pctF + '%';
+    if (S.mode === 'day') {
+      elFireLbl.textContent = 'Camp';
+      elFireBar.classList.remove('low');
+      elDawn.style.width = '0%';
+      elNight.textContent = S.n;
+      elCarry.textContent = save.best ? 'Best night ' + save.best : 'Rested';
+      elTill.textContent = 'ahead';
+      return;
+    }
+    elFireLbl.textContent = 'Fire';
     elFireBar.classList.toggle('low', pctF < 25);
     elDawn.style.width = Math.round((1 - S.left / S.cfg.len) * 100) + '%';
     elNight.textContent = S.n;
@@ -905,44 +1149,48 @@
     if (b) b.addEventListener('click', function () { ac(); fn(); });
   }
 
+  var elBan = document.getElementById('banner'), banT = null;
+  function banner(head, sub, hold) {
+    elBan.innerHTML = '<b>' + head + '</b><span>' + sub + '</span>';
+    elBan.classList.add('on');
+    clearTimeout(banT);
+    banT = setTimeout(function () { elBan.classList.remove('on'); }, hold || 2600);
+  }
+
+  var elA = document.getElementById('kA'), elJ = document.getElementById('kJ');
+  function camp() {
+    newCamp();
+    hide();
+    elA.textContent = 'TAKE\nWATCH';
+    elA.classList.add('go');
+    banner('Camp', 'Wander as far as you like. TAKE WATCH when you are ready.', 3400);
+  }
+  function startNight(n) {
+    var cfg = cfgFor(n);
+    newNight(n);
+    elA.textContent = 'SWING';
+    elA.classList.remove('go');
+    banner('Night ' + n + ' · ' + cfg.name, cfg.note, 3000);
+  }
+
   function title() {
-    newNight(Math.min(save.night, NIGHTS.length));
+    newCamp();
     show(
       '<div class="eyebrow">' + (save.best >= NIGHTS.length ? 'The whole road, walked' : 'Night Watch') + '</div>' +
       '<h1>Keep it<em>burning</em></h1>' +
       '<p class="lede">Twenty nights on the road. One fire between you and the dark.</p>' +
       '<div class="rules">' +
-        '<p><b>◀ ▶</b> walk. Step over wood to pick it up — three at a time.</p>' +
+        '<p><b>◀ ▶</b> walk, <b>JUMP</b> for anything more than a step high.</p>' +
+        '<p>Step over wood to pick it up — three at a time.</p>' +
         '<p><b>Stand at the stones</b> and he feeds the fire himself, one log at a time.</p>' +
         '<p><b>SWING</b> the brand at the shades. Let one reach the fire and it takes a bite out of it.</p>' +
-        '<p>Hold until dawn. That is the whole of it.</p>' +
+        '<p>Hold until dawn, then walk back to camp and rest.</p>' +
       '</div>' +
       strip(save.night) +
-      '<button class="go" id="go">' + (save.night > 1 ? 'Continue — night ' + save.night : 'Begin the first night') + '</button>' +
-      (save.night > 1 ? '<button class="ghost" id="restart">Start again from night 1</button>' : '') +
+      '<button class="go" id="go">' + (save.night > 1 ? 'Back to camp — night ' + save.night + ' ahead' : 'Walk out to the camp') + '</button>' +
       '<div class="foot">' + (save.best ? 'Best: night ' + save.best + ' · ' : '') + BUILD + '</div>'
     );
-    bindGo(function () { intro(save.night); });
-    bindGo(function () { save.night = 1; save.kept = 0; store(); title(); }, 'restart');
-  }
-
-  function intro(n) {
-    n = Math.min(n, NIGHTS.length);
-    newNight(n);
-    var cfg = NIGHTS[n - 1];
-    show(
-      '<div class="eyebrow">Night ' + n + ' of ' + NIGHTS.length + '</div>' +
-      '<h1>' + cfg.name + '</h1>' +
-      '<p class="lede">' + cfg.note + '</p>' +
-      '<div class="tally">' +
-        '<div><span>Until dawn</span><b>' + cfg.len + 's</b></div>' +
-        '<div><span>Fire eats</span><b>' + cfg.drain.toFixed(1) + '/s</b></div>' +
-        '<div><span>Shades</span><b>' + (cfg.gap >= 12 ? 'few' : 'every ' + cfg.gap.toFixed(0) + 's') + '</b></div>' +
-      '</div>' +
-      strip(n) +
-      '<button class="go" id="go">Take the watch</button>'
-    );
-    bindGo(function () { hide(); });
+    bindGo(function () { camp(); });
   }
 
   function finish(survived) {
@@ -952,9 +1200,9 @@
       setTimeout(function () { bell(784, 0.7, 0.05, 2800); }, 170);
       save.kept++;
       if (S.n > save.best) save.best = S.n;
-      if (S.n >= NIGHTS.length) { save.night = NIGHTS.length; store(); return won(); }
       save.night = S.n + 1; store();
-      var next = NIGHTS[S.n];
+      if (S.n === NIGHTS.length) return won();
+      var next = cfgFor(S.n + 1);
       show(
         '<div class="eyebrow">Dawn</div>' +
         '<h1>Night ' + S.n + '<em>held</em></h1>' +
@@ -966,11 +1214,10 @@
         '</div>' +
         strip(S.n + 1) +
         '<p class="lede">Next: <b style="color:var(--bone)">' + next.name + '</b></p>' +
-        '<button class="go" id="go">On to night ' + (S.n + 1) + '</button>' +
-        '<button class="ghost" id="stop">Turn in for now</button>'
+        '<button class="go" id="go">Back to camp</button>' +
+        '<button class="ghost" id="stop">Put it down for now</button>'
       );
-      var nn = S.n + 1;
-      bindGo(function () { intro(nn); });
+      bindGo(function () { camp(); });
       bindGo(function () { title(); }, 'stop');
     } else {
       bell(140, 0.8, 0.07, 700);
@@ -987,10 +1234,10 @@
           '<div><span>Driven off</span><b>' + S.driven + '</b></div>' +
         '</div>' +
         strip(n2) +
-        '<button class="go" id="go">Take night ' + n2 + ' again</button>' +
-        '<button class="ghost" id="stop">Back to the road</button>'
+        '<button class="go" id="go">Back to camp</button>' +
+        '<button class="ghost" id="stop">Put it down for now</button>'
       );
-      bindGo(function () { intro(n2); });
+      bindGo(function () { camp(); });
       bindGo(function () { title(); }, 'stop');
     }
   }
@@ -1006,10 +1253,11 @@
         '<div><span>Driven off</span><b>' + S.driven + '</b></div>' +
       '</div>' +
       strip(NIGHTS.length + 1) +
-      '<button class="go" id="go">Walk it again</button>' +
+      '<p class="lede">The road does not end there. It just stops being counted.</p>' +
+      '<button class="go" id="go">Back to camp — night ' + save.night + ' ahead</button>' +
       '<div class="foot">' + BUILD + '</div>'
     );
-    bindGo(function () { save.night = 1; store(); intro(1); });
+    bindGo(function () { camp(); });
   }
 
   // ── loop, fixed step ──────────────────────────────────────────────────────
@@ -1024,7 +1272,8 @@
       hud();
     }
     if (S) draw();
-    document.getElementById('kA').classList.toggle('cool', !!(S && S.swingCd > 0));
+    elA.classList.toggle('cool', !!(S && S.mode === 'night' && S.swingCd > 0));
+    elJ.classList.toggle('on', !!(S && !S.onGround));
     requestAnimationFrame(frame);
   }
 
@@ -1034,11 +1283,13 @@
   window.__NW = {
     get s() { return S; }, nights: NIGHTS, build: BUILD,
     hold: function (k, v) { held[k] = v; },
+    ground: groundY,
     tap: function (id) { var e = document.getElementById(id); if (e) e.click(); },
     skip: function () { if (S) S.left = 0.02; },
     geo: { W: W, H: H, GY: GY, WORLD: WORLD, FIREX: FIREX },
     tick: function (dt) { if (S && running) step(dt); },
-    begin: function (n) { newNight(n); running = true; veil.classList.add('hide'); },
+    begin: function (n) { startNight(n); running = true; veil.classList.add('hide'); },
+    camp: function () { camp(); },
     live: function () { return running; },
     mute: function (v) { muted = v; }
   };
