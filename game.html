@@ -765,7 +765,7 @@
   var ZOOM = 0.6;
   var VS = 1;                     // device pixels per field unit
   function px(n) { return n / ZOOM; }   // n screen pixels, in field units
-  var BUILD = 'v1.26.0';        // bump on every deploy — shown in-game for support
+  var BUILD = 'v1.27.0';        // bump on every deploy — shown in-game for support
   var MUTE_KEY = 'keeper.nightwatch.mute';
   var MUSIC_KEY = 'keeper.nightwatch.music';
 
@@ -1248,7 +1248,7 @@
     keeper: { x: 0, y: 0, vx: 0, vy: 0, carry: 0, cd: 0, stun: 0, face: 0,
               flip: 1, step: 0, walk: 0, lean: 0, stepT: 0, lunge: 0 },
     logs: [], shades: [], parts: [],
-    logT: 0, spawnT: 0, shake: 0, dawnHold: 0, hitstop: 0, partyNote: '', draftOut: null,
+    logT: 0, spawnT: 0, shake: 0, dawnHold: 0, hitstop: 0, partyNote: '', draftOut: null, smoke: [],
     ally: null, allyHits: 0,
     kills: 0, logsBurned: 0, muted: false,
     // progression + feedback
@@ -2330,6 +2330,36 @@
   function lightRadius() {
     return (74 + (S.fuel / D.maxFuel) * 196 + S.fire.flare * 90) * D.fireLight * FIELD;
   }
+  // Firelight is never steady. This rides the drawn glow only — lightRadius()
+  // and lightAt() are what the game actually runs on and they stay exact, so
+  // the light can breathe without a single number of the balance moving.
+  function lightFlicker() {
+    return 1 + Math.sin(S.time * 7.3) * 0.017
+             + Math.sin(S.time * 2.9 + 1.3) * 0.025
+             + Math.sin(S.time * 13.1 + 0.7) * 0.009;
+  }
+  // There is one light in this camp and it sits on the ground in the middle of
+  // it, so every shadow points straight out from the fire and gets longer the
+  // further out the thing stands. A shadow is not a dark shape painted on the
+  // ground — it is light that never arrived — so these go back into the night
+  // sheet after the fire has punched its light out of it. Past the light there
+  // is nothing left to cast.
+  function castShadow(g, x, y, w, h, lr) {
+    var dx = x - S.fire.x, dy = y - S.fire.y;
+    var d = Math.hypot(dx, dy);
+    var lit = clamp(1 - d / lr, 0, 1);
+    if (lit < 0.06) return;
+    var nx = d > 0.001 ? dx / d : 0, ny = d > 0.001 ? dy / d : 1;
+    var stretch = 1 + clamp(d / (lr * 0.5), 0, 2.2);   // long ones out at the rim
+    var off = h * 0.34 * stretch;
+    g.save();
+    g.translate(x + nx * off, y + ny * off);
+    g.rotate(Math.atan2(ny, nx));
+    g.globalAlpha = clamp(0.72 * lit, 0, 0.8);
+    g.fillStyle = 'rgba(16,7,5,1)';
+    g.beginPath(); g.ellipse(0, 0, w * (0.55 + stretch * 0.55), h * 0.33, 0, 0, 6.29); g.fill();
+    g.restore();
+  }
   function lightAt(x, y) {
     var lr = lightRadius();
     var f = clamp(1 - dist(x, y, S.fire.x, S.fire.y) / lr, 0, 1);
@@ -2650,6 +2680,20 @@
 
     // embers off the fire
     if (Math.random() < dt * (12 + S.fuel * 0.5)) ember(S.fire.x, S.fire.y - 8);
+    if (S.fuel > 1 && Math.random() < dt * (2.4 + S.fuel * 0.055)) {
+      S.smoke.push({ x: S.fire.x + rand(-6, 6), y: S.fire.y - rand(26, 40),
+        vx: rand(-5, 5), vy: rand(-30, -20), r: rand(7, 12),
+        life: rand(2.2, 3.6), max: 3.6, w: rand(0, 6.28) });
+    }
+    for (var sm = S.smoke.length - 1; sm >= 0; sm--) {
+      var pf = S.smoke[sm];
+      pf.life -= dt;
+      if (pf.life <= 0) { S.smoke.splice(sm, 1); continue; }
+      pf.x += (pf.vx + Math.sin(S.time * 0.7 + pf.w) * 7) * dt;
+      pf.y += pf.vy * dt;
+      pf.vy *= Math.pow(0.55, dt);      // it slows as it cools
+      pf.r += 13 * dt;                  // and spreads
+    }
 
     // particles
     for (var p = S.parts.length - 1; p >= 0; p--) {
@@ -3008,6 +3052,7 @@
     drawCinders();
     drawLogs();
     drawFire();
+    drawSmoke();
     drawShades();
     drawAlly();
     drawKeeper();
@@ -3031,8 +3076,6 @@
       ctx.translate(l.x, l.y);
       ctx.rotate(l.a);
       ctx.scale(sc, sc);
-      ctx.fillStyle = 'rgba(0,0,0,0.4)';
-      ctx.beginPath(); ctx.ellipse(0, 6, 16, 5, 0, 0, 6.29); ctx.fill();
       ctx.fillStyle = 'rgb(' + Math.round(74 + li * 116) + ',' + Math.round(46 + li * 72) + ',' + Math.round(26 + li * 26) + ')';
       roundRect(-16, -6, 32, 12, 6); ctx.fill();
       ctx.strokeStyle = 'rgba(20,12,8,0.75)'; ctx.lineWidth = 1.4;
@@ -3041,6 +3084,25 @@
       ctx.beginPath(); ctx.ellipse(-15, 0, 3, 5.5, 0, 0, 6.29); ctx.fill();
       ctx.restore();
     }
+  }
+
+  function drawSmoke() {
+    if (!S.smoke.length) return;
+    ctx.save();
+    for (var i = 0; i < S.smoke.length; i++) {
+      var p = S.smoke[i];
+      var t = clamp(p.life / p.max, 0, 1);
+      var rise = clamp((p.max - p.life) / 0.55, 0, 1);   // fades up rather than popping in
+      var a = 0.3 * t * t * rise;
+      if (a < 0.004) continue;
+      var g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
+      g.addColorStop(0, 'rgba(122,100,90,' + a.toFixed(3) + ')');
+      g.addColorStop(0.55, 'rgba(96,76,70,' + (a * 0.55).toFixed(3) + ')');
+      g.addColorStop(1, 'rgba(72,56,52,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.29); ctx.fill();
+    }
+    ctx.restore();
   }
 
   function drawCinders() {
@@ -4072,11 +4134,12 @@
 
   // darkness mask: the night sheet with the light punched out of it
   function drawDarkness() {
+    var flick = lightFlicker();
     // At dawn the dark comes off the field rather than staying put until the
     // card arrives — by the time the sun is clear of the ridge you can see camp.
     var lift = S.mode === 'dawn' ? 1 - 0.86 * smooth(clamp(1 - S.dawnHold / K.dawnHold, 0, 1)) : 1;
     if (lift < 0.02) return;          // nothing of it left to show; do not build it
-    var lr = lightRadius();
+    var lr = lightRadius() * flick;
     dctx.setTransform(VS, 0, 0, VS, 0, 0);
     dctx.globalCompositeOperation = 'source-over';
     dctx.fillStyle = nightSheet();
@@ -4102,6 +4165,14 @@
     dctx.beginPath(); dctx.arc(k.x, k.y, D.lampR, 0, 6.29); dctx.fill();
 
     dctx.globalCompositeOperation = 'source-over';
+    for (var si = 0; si < S.logs.length; si++) {
+      var sl = S.logs[si], ssc = 0.6 + 0.4 * sl.pop;
+      castShadow(dctx, sl.x, sl.y, 15 * ssc, 12 * ssc, lr);
+    }
+    castShadow(dctx, k.x, k.y, 13, 32 + k.carry * 4, lr);
+    if (S.ally) castShadow(dctx, S.ally.x, S.ally.y, 12, 30, lr);
+    dctx.globalAlpha = 1;
+
     if (lift < 1) ctx.globalAlpha = lift;
     ctx.drawImage(darkCvs, 0, 0, W, H);
     ctx.globalAlpha = 1;
@@ -4137,7 +4208,7 @@
 
   // warm additive bloom, drawn on top of the darkness
   function drawGlow() {
-    var lr = lightRadius();
+    var lr = lightRadius() * lightFlicker();
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
 
@@ -7597,7 +7668,7 @@
     S.mode = 'play';
     S.time = 0; S.night = META.night; S.nightT = 0; S.score = 0;
     S.logs.length = 0; S.shades.length = 0; S.parts.length = 0;
-    S.motes.length = 0; S.cinders.length = 0; S.floats.length = 0;
+    S.motes.length = 0; S.cinders.length = 0; S.floats.length = 0; S.smoke.length = 0;
     S.logT = 0.6; S.spawnT = 3.2; S.shake = 0;
     S.kills = 0; S.logsBurned = 0; S.husks = 0; S.flares = 0;
     S.heat = 0; S.heatT = 0; S.bestHeat = 0;
@@ -7884,7 +7955,7 @@
   document.addEventListener('keydown', wakeAudio);
   // opt-in inspection hook for tuning/QA: open with #debug
   if (/[?#]debug/.test(location.href)) window.__NW = { S: S, K: K, D: D, META: META, UPGRADES: UPGRADES, PERKS: PERKS,
-      flare: doFlare, swing: doSwing, spawnShade: spawnShade, lightAt: lightAt, stick: stick, KN: KN, CAMP: CAMP, drawCamp: drawCamp, drawCampFront: drawCampFront, DOG: DOG, FOLK: FOLK, PETS: PETS, drawDog: drawDog, drawPet: drawPet, PET_KINDS: PET_KINDS, folkPose: folkPose, updateDog: updateDog, updateTreat: updateTreat, TREAT: TREAT, syncFolk: syncFolk, startParty: startParty, endParty: endParty, LANDMARKS: LANDMARKS, journeyIndex: journeyIndex, ZOOM: ZOOM, field: function () { return { w: W, h: H }; }, KN_ACTS: KN_ACTS, knightSay: knightSay, knightFact: knightFact, nextLandmark: nextLandmark, knightAct: knightAct, updateKnight: updateKnight, knightPoke: knightPoke, knightPet: knightPet, beatNow: beatNow, drawKnight: drawKnight, A: A, MUS: MUS, TUNES: TUNES,
+      flare: doFlare, swing: doSwing, spawnShade: spawnShade, lightAt: lightAt, lightFlicker: lightFlicker, lightRadius: lightRadius, stick: stick, KN: KN, CAMP: CAMP, drawCamp: drawCamp, drawCampFront: drawCampFront, DOG: DOG, FOLK: FOLK, PETS: PETS, drawDog: drawDog, drawPet: drawPet, PET_KINDS: PET_KINDS, folkPose: folkPose, updateDog: updateDog, updateTreat: updateTreat, TREAT: TREAT, syncFolk: syncFolk, startParty: startParty, endParty: endParty, LANDMARKS: LANDMARKS, journeyIndex: journeyIndex, ZOOM: ZOOM, field: function () { return { w: W, h: H }; }, KN_ACTS: KN_ACTS, knightSay: knightSay, knightFact: knightFact, nextLandmark: nextLandmark, knightAct: knightAct, updateKnight: updateKnight, knightPoke: knightPoke, knightPet: knightPet, beatNow: beatNow, drawKnight: drawKnight, A: A, MUS: MUS, TUNES: TUNES,
       startMusic: startMusic, nextTune: nextTune, setMusic: setMusic, SFX: SFX, UI: UI, ac: ac, switchTo: switchTo, applyTone: applyTone, GENRE: GENRE,
       music: { parseChord: parseChord, voicing: voicing, bassNote: bassNote,
                leadNote: leadNote, chordAt: chordAt, QUAL: QUAL, mtof: mtof }, recalc: recalc, saveMeta: saveMeta, rollDraft: rollDraft, take: takeUpgrade };
