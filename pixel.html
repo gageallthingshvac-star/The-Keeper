@@ -138,6 +138,20 @@
     border-radius:50%;background:#9a8676;transition:transform .18s,background .18s}
   .opt.on .sw{background:rgba(255,181,71,0.42)}
   .opt.on .sw::after{transform:translateX(18px);background:var(--ember)}
+  #peekWrap{display:grid;place-items:center;padding:10px 0 2px}
+  #peek{image-rendering:pixelated;width:132px;height:auto;
+    border:1px solid var(--line);border-radius:14px;background:#1b1522}
+  .pickRow{text-align:left}
+  .pickRow > span{display:block;font:700 9px/1 var(--body);letter-spacing:.16em;
+    text-transform:uppercase;color:var(--mute);margin:0 0 7px 2px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{width:34px;height:34px;border-radius:11px;cursor:pointer;flex:none;
+    border:2px solid transparent;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.45)}
+  .chip.on{border-color:var(--bone);box-shadow:0 0 12px rgba(255,181,71,0.55)}
+  .chip.none{background:repeating-linear-gradient(45deg,#2a222c,#2a222c 4px,#1a151c 4px,#1a151c 8px)}
+  .word{padding:9px 13px;border-radius:11px;cursor:pointer;font:700 12px/1 var(--body);
+    border:1px solid var(--line);background:transparent;color:var(--mute)}
+  .word.on{border-color:var(--ember);color:var(--bone);background:rgba(255,181,71,0.14)}
 </style>
 </head>
 <body>
@@ -175,7 +189,7 @@
 <script>
 (function () {
   'use strict';
-  var BUILD = 'v1.2.0';
+  var BUILD = 'v1.3.0';
 
   // ── measurements ──────────────────────────────────────────────────────────
   var TILE = 16;
@@ -231,62 +245,175 @@
   }
 
   // ── him ───────────────────────────────────────────────────────────────────
-  function guy(px, x, feetY, t, face, mode, step) {
+  // Same fellow throughout — bowl-ish hair, big steady eyes, heavy coat — but
+  // every ramp is a lookup, so you can dress him how you like.
+  var SKINS = [
+    { n: 'Fair',  r: ['#a06a4e', '#c98f66', '#e8b98d', '#f7dcb8'] },
+    { n: 'Warm',  r: ['#8a5f42', '#b8865a', '#dbab7c', '#f2cfa4'] },
+    { n: 'Brown', r: ['#5c3a26', '#7d5333', '#a06d46', '#c08d61'] },
+    { n: 'Deep',  r: ['#33200f', '#4d3120', '#68432c', '#875b40'] }
+  ];
+  var HAIRS = [
+    { n: 'Brown',  r: ['#2b1b10', '#43291a', '#5e3a24'] },
+    { n: 'Black',  r: ['#14121a', '#221f2c', '#34313f'] },
+    { n: 'Ginger', r: ['#5a2408', '#8a3a10', '#bd571d'] },
+    { n: 'Fair',   r: ['#6b4a1e', '#9a7431', '#c9a052'] },
+    { n: 'Grey',   r: ['#3a3a40', '#5f5f68', '#8e8e97'] }
+  ];
+  var COATS = [
+    { n: 'Rust',    r: ['#5e2018', '#8a3324', '#b84a33', '#d96b4a'] },
+    { n: 'Pine',    r: ['#16321f', '#265130', '#387444', '#4f965c'] },
+    { n: 'Slate',   r: ['#152a44', '#22436b', '#325f93', '#4a80bb'] },
+    { n: 'Mustard', r: ['#4a3208', '#77520f', '#a5761c', '#cf9c33'] },
+    { n: 'Plum',    r: ['#331830', '#532d51', '#784773', '#9d6899'] },
+    { n: 'Ash',     r: ['#20242a', '#363c45', '#505863', '#6f7987'] }
+  ];
+  var STYLES = ['Cropped', 'Long', 'Wool hat'];
+  var SCARVES = [
+    { n: 'None',   r: null },
+    { n: 'Cream',  r: ['#8f8574', '#d6cbb2', '#f0e7d0'] },
+    { n: 'Red',    r: ['#5e2018', '#a83a26', '#d4694c'] },
+    { n: 'Teal',   r: ['#11383a', '#1f6266', '#348c92'] }
+  ];
+  var LOOK = { skin: 1, hair: 0, coat: 0, style: 0, scarf: 1 };
+  function SK() { return SKINS[LOOK.skin % SKINS.length].r; }
+  function HR() { return HAIRS[LOOK.hair % HAIRS.length].r; }
+  function CO() { return COATS[LOOK.coat % COATS.length].r; }
+  function SC() { return SCARVES[LOOK.scarf % SCARVES.length].r; }
+
+  // arms is 0 (down), or an angle in radians for both arms together
+  function guy(px, x, feetY, t, face, mode, step, arms) {
     var f = face < 0 ? -1 : 1;
+    var K = SK(), H = HR(), O = CO(), V = SC();
     var y = feetY - GUY_H;
     var walk = mode === 'walk';
+    var still = mode === 'idle' || mode === 'sit';
     var bob = walk ? (Math.floor(step) % 2 ? 1 : 0)
-            : mode === 'jump' ? 0 : (Math.sin(t * 1.6) > 0 ? 0 : 1);
+            : (mode === 'jump' || mode === 'kneel' || mode === 'work') ? 0
+            : (Math.sin(t * 1.6) > 0 ? 0 : 1);
     y += bob;
+    var crouch = mode === 'kneel' ? 6 : 0;
+    y += crouch;
 
+    // ── legs ────────────────────────────────────────────────────────────────
+    function boot(bx, by, h2) {
+      px(O[0], bx, by, 6, h2 - 4);
+      px(O[1], bx + 1, by, 4, h2 - 5);
+      px(H[0], bx - 1, by + h2 - 5, 8, 3);          // the boot
+      px(H[1], bx, by + h2 - 5, 6, 1);
+    }
     if (mode === 'jump') {
-      px(C.wood0, x - 7, y + 27, 6, 10); px(C.wood1, x - 6, y + 27, 4, 9);
-      px(C.wood0, x + 1, y + 29, 6, 9);  px(C.wood1, x + 2, y + 29, 4, 8);
-      px(C.hair0, x - 8, y + 35, 7, 3);
-      px(C.hair0, x + 1, y + 36, 7, 3);
+      boot(x - 7, y + 27, 14); boot(x + 1, y + 29, 12);
+    } else if (mode === 'kneel') {
+      px(O[0], x - 8, y + 21, 7, 9); px(O[1], x - 7, y + 22, 5, 8);     // back thigh
+      px(O[0], x - 13, y + 28, 12, 6); px(O[1], x - 12, y + 29, 10, 4); // shin flat down
+      px(H[0], x - 15, y + 30, 6, 4); px(H[1], x - 14, y + 30, 4, 1);
+      px(O[0], x, y + 20, 9, 7); px(O[1], x + 1, y + 21, 7, 5);         // front thigh
+      px(O[0], x + 5, y + 25, 7, 9); px(O[1], x + 6, y + 26, 5, 8);     // shin down
+      px(H[0], x + 3, y + 31, 9, 3); px(H[1], x + 4, y + 31, 6, 1);
     } else if (mode === 'sit') {
       var kx = x + (f > 0 ? 2 : -14);
-      px(C.wood0, kx, y + 27, 14, 8); px(C.wood1, kx + 1, y + 28, 12, 6);
+      px(O[0], kx, y + 27, 14, 8); px(O[1], kx + 1, y + 28, 12, 6);
       var sx = x + (f > 0 ? 12 : -14);
-      px(C.wood0, sx, y + 33, 6, 8); px(C.wood1, sx + 1, y + 34, 4, 7);
-      px(C.hair0, sx - (f > 0 ? 0 : 2), y + 40, 8, 3);
-    } else if (mode !== 'jump') {
+      px(O[0], sx, y + 33, 6, 8); px(O[1], sx + 1, y + 34, 4, 7);
+      px(H[0], sx - (f > 0 ? 0 : 2), y + 40, 8, 3);
+    } else {
       var sw = walk ? Math.sin(step * Math.PI) * 5 : 0;
-      var la = Math.round(sw), lb = -Math.round(sw);
-      px(C.wood0, x - 7 + la, y + 28, 6, 12); px(C.wood1, x - 6 + la, y + 28, 4, 11);
-      px(C.wood0, x + 1 + lb, y + 28, 6, 12); px(C.wood1, x + 2 + lb, y + 28, 4, 11);
-      px(C.hair0, x - 8 + la, y + 37, 7, 3);
-      px(C.hair0, x + 1 + lb, y + 37, 7, 3);
+      boot(x - 7 + Math.round(sw), y + 28, 12);
+      boot(x + 1 - Math.round(sw), y + 28, 12);
     }
 
-    box(px, C.cloth1, C.cloth0, x - 9, y + 16, 18, 13);
-    px(C.cloth2, x - 8 + (f > 0 ? 9 : 0), y + 17, 8, 11);
-    px(C.cloth3, x - 8 + (f > 0 ? 14 : 0), y + 17, 2, 11);
-    px(C.cloth0, x - 8, y + 26, 16, 2);
-    px(C.wood2, x - 4, y + 26, 8, 2);
+    // ── coat ────────────────────────────────────────────────────────────────
+    box(px, O[1], O[0], x - 9, y + 15, 18, 15);
+    px(O[2], x - 8 + (f > 0 ? 9 : 0), y + 16, 8, 13);              // lit down one side
+    px(O[3], x - 8 + (f > 0 ? 14 : 0), y + 16, 2, 13);
+    px(O[0], x - 1, y + 16, 2, 13);                                // the front seam
+    px(O[3], x - 3, y + 19, 2, 2); px(O[3], x - 3, y + 24, 2, 2);  // two buttons
+    px(O[0], x - 8, y + 27, 16, 2);                                // belt
+    px(C.metal2, x - 3, y + 27, 6, 2); px(C.metal0, x - 2, y + 28, 4, 1);
 
-    var swing = mode === 'jump' ? -3 : walk ? Math.round(Math.sin(step * Math.PI) * 3) : 0;
-    px(C.cloth0, x - 12, y + 17 + swing, 4, 10); px(C.cloth1, x - 11, y + 18 + swing, 2, 9);
-    px(C.cloth0, x + 8, y + 17 - swing, 4, 10);  px(C.cloth2, x + 9, y + 18 - swing, 2, 9);
-    px(C.skin1, x - 12, y + 26 + swing, 4, 4);   px(C.skin2, x + 8, y + 26 - swing, 4, 4);
+    // ── arms ────────────────────────────────────────────────────────────────
+    var swing = mode === 'jump' ? -4 : walk ? Math.round(Math.sin(step * Math.PI) * 3) : 0;
+    if (arms) {                                     // both arms lifted together
+      var ax = Math.round(Math.cos(arms) * 9), ay = Math.round(Math.sin(arms) * 9);
+      px(O[0], x - 12, y + 16, 4, 4); px(O[0], x + 8, y + 16, 4, 4);
+      for (var q2 = 0; q2 < 9; q2++) {
+        var qx = Math.round(q2 / 9 * ax), qy = Math.round(q2 / 9 * ay);
+        px(O[0], x - 12 + qx, y + 17 + qy, 4, 4);
+        px(O[1], x - 11 + qx, y + 18 + qy, 2, 3);
+      }
+      px(K[2], x - 12 + ax, y + 17 + ay, 4, 4);
+      px(K[3], x - 11 + ax, y + 18 + ay, 2, 2);
+    } else {
+      px(O[0], x - 12, y + 16 + swing, 4, 11); px(O[1], x - 11, y + 17 + swing, 2, 10);
+      px(O[0], x + 8, y + 16 - swing, 4, 11);  px(O[2], x + 9, y + 17 - swing, 2, 10);
+      px(O[3], x - 12, y + 24 + swing, 4, 2);  px(O[3], x + 8, y + 24 - swing, 4, 2);  // cuffs
+      px(K[1], x - 12, y + 26 + swing, 4, 4);  px(K[2], x + 8, y + 26 - swing, 4, 4);
+    }
 
-    box(px, C.skin2, C.skin0, x - 8, y + 2, 17, 15);
-    px(C.skin3, x - 7 + (f > 0 ? 8 : 0), y + 3, 8, 13);
-    px(C.skin1, x - 7, y + 15, 15, 1);
-    var blink = (t % 4.1) < 0.14;
-    var ex = x - 5 + (f > 0 ? 3 : 0);
-    px(C.hair0, ex, y + 8, 3, blink ? 1 : 4);
-    px(C.hair0, ex + 6, y + 8, 3, blink ? 1 : 4);
-    if (!blink) { px('#e9f0ff', ex, y + 8, 2, 2); px('#e9f0ff', ex + 6, y + 8, 2, 2); }
-    px(C.skin1, x - 1 + (f > 0 ? 3 : 0), y + 13, 3, 1);
-    px(C.hair1, x - 9, y, 19, 6); px(C.hair2, x - 8, y, 17, 3);
-    px(C.hair0, x - 9 - (f > 0 ? 0 : 1), y + 3, 4, 9);
-    px(C.hair0, x + 6 + (f > 0 ? 1 : 0), y + 3, 4, 9);
-    px(C.hair2, x - 6, y - 1, 11, 1);
+    // ── head ────────────────────────────────────────────────────────────────
+    px(K[1], x - 3, y + 13, 6, 3);                                 // neck
+    box(px, K[2], K[0], x - 8, y + 2, 17, 14);
+    px(K[3], x - 7 + (f > 0 ? 8 : 0), y + 3, 8, 12);               // lit cheek
+    px(K[1], x - 7, y + 14, 15, 1);                                // under the jaw
+    px(K[1], x + (f > 0 ? -10 : 8), y + 8, 2, 4);                  // the far ear
+    px(K[0], x + (f > 0 ? -10 : 8), y + 11, 2, 1);
+
+    var blink = (t % 4.1) < 0.14 || (t % 4.1) > 4.02;
+    var ex = x - 5 + (f > 0 ? 3 : 0), ey0 = y + 8;
+    px(H[0], ex - 1, ey0 - 2, 4, 1); px(H[0], ex + 5, ey0 - 2, 4, 1);   // brows
+    if (blink) {
+      px(K[0], ex, ey0 + 1, 3, 1); px(K[0], ex + 6, ey0 + 1, 3, 1);
+    } else {
+      px('#f4f2ff', ex, ey0, 3, 3); px('#f4f2ff', ex + 6, ey0, 3, 3);
+      var pd = f > 0 ? 1 : 0;
+      px('#241a26', ex + pd, ey0, 2, 3); px('#241a26', ex + 6 + pd, ey0, 2, 3);
+      px('#ffffff', ex + pd, ey0, 1, 1); px('#ffffff', ex + 6 + pd, ey0, 1, 1);
+    }
+    px(K[1], x - 1 + (f > 0 ? 4 : -1), y + 10, 2, 3);              // nose
+    px(K[0], x - 1 + (f > 0 ? 4 : -1), y + 12, 2, 1);
+    px(K[0], x - 2 + (f > 0 ? 3 : 0), y + 13, 4, 1);               // mouth
+
+    // ── hair, three ways ────────────────────────────────────────────────────
+    if (LOOK.style === 2) {                                        // a wool hat
+      var HB = V || ['#8f8574', '#d6cbb2', '#f0e7d0'];
+      px(H[0], x - 8, y + 3, 17, 3);
+      box(px, HB[1], HB[0], x - 9, y - 3, 19, 8);
+      px(HB[2], x - 8, y - 2, 8, 2);
+      for (var rb = 0; rb < 19; rb += 3) px(HB[0], x - 9 + rb, y - 3, 1, 8);
+      px(HB[0], x - 10, y + 4, 21, 4); px(HB[1], x - 9, y + 5, 19, 2);
+      disc(px, HB[2], x, y - 6, 3, 3); disc(px, HB[1], x, y - 6, 2, 2);
+    } else {
+      px(H[1], x - 9, y, 19, 6); px(H[2], x - 8, y, 17, 3);
+      px(H[2], x - 6, y - 1, 11, 1);
+      var sideH = LOOK.style === 1 ? 13 : 9;
+      px(H[0], x - 9 - (f > 0 ? 0 : 1), y + 3, 4, sideH);
+      px(H[0], x + 6 + (f > 0 ? 1 : 0), y + 3, 4, sideH);
+      px(H[1], x - 8 - (f > 0 ? 0 : 1), y + 3, 1, sideH - 2);
+      if (LOOK.style === 1) {                                      // tied back
+        px(H[0], x - f * 10, y + 6, 4, 12);
+        px(H[1], x - f * 10 + 1, y + 7, 2, 10);
+        px(C.wood2, x - f * 10, y + 9, 4, 2);
+      }
+    }
+
+    // ── scarf ───────────────────────────────────────────────────────────────
+    if (V) {
+      px(V[0], x - 9, y + 15, 18, 4);
+      px(V[1], x - 8, y + 15, 16, 3);
+      px(V[2], x - 8, y + 15, 6, 1);
+      var flap = walk ? Math.round(Math.sin(step * Math.PI) * 2) : Math.round(Math.sin(t * 1.4) * 1);
+      px(V[0], x - f * 8, y + 18, 5, 9 + flap);
+      px(V[1], x - f * 8 + 1, y + 18, 3, 8 + flap);
+      px(V[2], x - f * 8 + 1, y + 25 + flap, 3, 2);
+    } else {
+      px(O[0], x - 6, y + 14, 12, 3);                              // a plain collar
+      px(O[2], x - 5, y + 14, 5, 2);
+    }
   }
 
   function armful(px, x, feetY, n, face) {
-    var f = face < 0 ? -1 : 1;
+    var f = face < 0 ? -1 : 1, K = SK(), O = CO();
     var cx = x + f * 4;
     for (var i = 0; i < n; i++) {
       var ly = feetY - 17 - i * 5;
@@ -296,52 +423,102 @@
       disc(px, C.wood0, cx - 12, ly - 2, 3, 3); disc(px, C.wood1, cx - 12, ly - 2, 2, 2);
       disc(px, C.wood0, cx + 12, ly - 2, 3, 3); disc(px, C.wood2, cx + 12, ly - 2, 2, 2);
     }
-    px(C.cloth0, cx - 13 * f, feetY - 22, 5, 5);
-    px(C.skin2, cx - 13 * f, feetY - 20, 4, 4);
+    px(O[0], cx - 13 * f, feetY - 22, 5, 5);
+    px(K[2], cx - 13 * f, feetY - 20, 4, 4);
   }
 
-  // ── the fire, drawn wherever the camera has put it ────────────────────────
+  // ── the fire ──────────────────────────────────────────────────────────────
+  // A proper flame: a bed of coals, three logs leaning in, then a body of fire
+  // drawn column by column — tall in the middle, ragged at the edges, white at
+  // the heart and red where it thins out. Licks break off the top and die.
+  function flameCol(u, t2, lvl, seed) {
+    // u is -1..1 across the fire. A bell, roughened, breathing.
+    var bell = Math.pow(Math.max(0, 1 - u * u), 0.62);
+    var wob = Math.sin(t2 * 6.1 + u * 5.2 + seed) * 0.10
+            + Math.sin(t2 * 11.3 - u * 8.1 + seed * 2) * 0.055
+            + Math.sin(t2 * 2.7 + u * 2.1) * 0.07;
+    return Math.max(0, bell * (1 + wob)) * (0.34 + lvl * 0.78);
+  }
   function campfire(px, fx, t, lvl, baseY, day, lean) {
     lean = lean || 0;
-    var TONGUE = [
-      { w: 15, h: 1.00, sp: 3.3, ox: -5, c: [C.fire0, C.fire1] },
-      { w: 12, h: 0.86, sp: 4.7, ox:  6, c: [C.fire1, C.fire2] },
-      { w:  9, h: 1.12, sp: 6.1, ox:  0, c: [C.fire2, C.fire3] },
-      { w:  5, h: 0.66, sp: 8.4, ox:  1, c: [C.fire3, C.fire4] }
-    ];
-    var base = 2.5 * TILE * 0.42 * (0.35 + lvl * 0.75);
-    for (var ti = 0; ti < TONGUE.length; ti++) {
-      var T = TONGUE[ti];
-      var th = Math.round(base * T.h * (1 + Math.sin(t * T.sp + ti) * 0.09));
-      var tw = T.w * (0.55 + lvl * 0.5);
-      for (var fy = 0; fy < th; fy++) {
-        var u = fy / th;
-        var prof = Math.sqrt(Math.max(0, 1 - u)) * (1 - u * 0.25);
-        var ww = Math.max(1, Math.round(tw * prof));
-        var bend = Math.round(Math.sin(u * 2.4 + t * T.sp * 0.5 + ti) * u * u * 7 + lean * u * u * 4);
-        px(u > 0.62 ? T.c[1] : T.c[0], fx + T.ox - ww + bend, baseY - 8 - fy, ww * 2, 1);
+    var HOT = [C.fire0, C.fire1, C.fire2, C.fire3, C.fire4, '#fffdf2'];
+
+    // ── the ring of stones it sits in
+    for (var sr = 0; sr < 11; sr++) {
+      var sa = sr * 0.57, sx2 = fx + Math.round(Math.cos(sa) * 24);
+      var sy2 = baseY - 3 + Math.round(Math.sin(sa) * 3);
+      disc(px, C.stone0, sx2, sy2 + 1, 4, 3);
+      disc(px, C.stone1, sx2, sy2, 3, 2);
+      px(C.stone3, sx2 - 2, sy2 - 1, 3, 1);
+    }
+
+    // ── the bed of coals, breathing
+    var glow = 0.5 + 0.5 * Math.sin(t * 1.9);
+    for (var cx2 = -17; cx2 <= 17; cx2++) {
+      var ch2 = Math.round(Math.pow(Math.max(0, 1 - (cx2 / 18) * (cx2 / 18)), 0.5) * 4);
+      if (ch2 <= 0) continue;
+      var n2 = hash(cx2 + 40, 3);
+      var hot = n2 * 0.6 + glow * 0.4 + lvl * 0.3;
+      px(hot > 0.86 ? C.fire3 : hot > 0.66 ? C.fire2 : hot > 0.44 ? C.fire1 : C.fire0,
+         fx + cx2, baseY - 2 - ch2, 1, ch2 + 2);
+    }
+
+    // ── three logs, two leaning in and one across the front
+    for (var lg = 0; lg < 2; lg++) {
+      var d = lg ? 1 : -1;
+      for (var k2 = 0; k2 < 20; k2++) {
+        var lx = fx + d * (19 - k2), ly = baseY - 3 - Math.round(k2 * 0.62);
+        px(C.wood0, lx, ly, 2, 5);
+        px(k2 > 13 ? C.fire1 : C.wood2, lx, ly + 1, 2, 3);
+        if (k2 > 15) px(C.fire2, lx, ly + 2, 2, 1);
       }
     }
-    for (var lg = 0; lg < 3; lg++) {
-      px(C.wood0, fx - 11 + lg * 7, baseY - 9 + lg, 15, 5);
-      px(C.wood1, fx - 10 + lg * 7, baseY - 8 + lg, 13, 3);
-      px(C.fire1, fx - 9 + lg * 7, baseY - 7 + lg, 11, 1);
+    px(C.wood0, fx - 15, baseY - 6, 30, 6);
+    px(C.wood2, fx - 15, baseY - 5, 30, 4);
+    px(C.wood3, fx - 14, baseY - 5, 28, 1);
+    for (var kn2 = 0; kn2 < 3; kn2++) px(C.wood1, fx - 10 + kn2 * 10, baseY - 4, 3, 2);
+    px(C.fire1, fx - 12, baseY - 2, 24, 1);
+
+    // ── the flame itself
+    var W2 = Math.round(8 + lvl * 6), TALL = 12 + lvl * 26;
+    var frame = Math.floor(t * 15);                 // the edge crackles, frame by frame
+    for (var i = -W2; i <= W2; i++) {
+      var u = i / W2;
+      var h2 = Math.round(flameCol(u, t, lvl, 0) * TALL
+                        + (hash(i + 60, frame) - 0.42) * 4);
+      if (h2 <= 1) continue;
+      var bx = fx + i;
+      for (var r = 0; r < h2; r++) {
+        var v = r / Math.max(1, h2 - 1);            // 0 at the base, 1 at the tip
+        var core = Math.max(0, 1 - Math.abs(u) * 2.7) * (1 - v * 1.55);
+        var shift = Math.round((v * v) * (lean * 4 + Math.sin(t * 2.2 + u * 3) * 1.8));
+        var ci = core > 0.52 ? 5 : core > 0.26 ? 4 : v < 0.4 ? 3 : v < 0.68 ? 2 : v < 0.88 ? 1 : 0;
+        px(HOT[ci], bx + shift, baseY - 5 - r, 1, 1);
+      }
     }
-    for (var sr = 0; sr < 11; sr++) {
-      var sa = sr * 0.57, sx2 = fx + Math.round(Math.cos(sa) * 24), sy2 = baseY - 3 + Math.round(Math.sin(sa) * 3);
-      disc(px, C.stone1, sx2, sy2, 3, 2); px(C.stone3, sx2 - 2, sy2 - 1, 3, 1);
+    // ── licks breaking off the top and going out
+    for (var q = 0; q < 4; q++) {
+      var lp = (t * 1.7 + q * 0.29) % 1;
+      if (lp > 0.88) continue;
+      var lh = Math.round(TALL * 0.74) + Math.round(lp * 13);
+      var lw = lp < 0.35 ? 2 : 1;
+      var lxx = fx + Math.round(Math.sin(t * 2.4 + q * 2.1) * (2 + lp * 5)) + Math.round(lean * lp * 5);
+      px(lp < 0.35 ? HOT[4] : lp < 0.66 ? HOT[3] : HOT[2], lxx, baseY - 5 - lh, lw, lw + 1);
     }
+
+    // ── smoke and embers going up
     for (var k = 0; k < 12; k++) {
-      var sp = (t * 11 + k * 4.1) % 62, sy3 = baseY - 14 - base - sp;
+      var sp = (t * 11 + k * 4.1) % 62, sy3 = baseY - 10 - TALL - sp;
       if (sy3 > 10) {
         var sw = 1 + Math.round(sp / 24);
         px(sp > 36 ? (day ? '#c9d6de' : C.far1) : (day ? '#aebcc6' : C.far2),
            fx + Math.round(Math.sin(sp * 0.11 + k) * (2 + sp * 0.17)), sy3 | 0, sw, sw);
       }
     }
-    for (var e = 0; e < 8; e++) {
-      var ep = (t * 16 + e * 5.2) % 42, ey = baseY - 12 - base - ep;
-      if (ey > 14) px(ep > 28 ? C.fire2 : C.fire4, fx + Math.round(Math.sin(ep * 0.4 + e * 2) * 7), ey | 0, 1, 1);
+    for (var e = 0; e < 9; e++) {
+      var ep = (t * 16 + e * 5.2) % 42, ey = baseY - 8 - TALL - ep;
+      if (ey > 14) px(ep > 28 ? C.fire2 : C.fire4,
+        fx + Math.round(Math.sin(ep * 0.4 + e * 2) * 7) + Math.round(lean * ep * 0.2), ey | 0, 1, 1);
     }
   }
 
@@ -502,11 +679,11 @@
 
   // ── where everything in camp stands ───────────────────────────────────────
   var AT = {
-    chop:  FIREX - 236,   // block and axe
-    tent:  FIREX - 178,
-    barrel:FIREX - 120,
-    stool: FIREX -  96,   // with the whetstone on it
-    pile:  FIREX -  66,   // the woodpile
+    chop:  FIREX - 222,   // block and axe
+    tent:  FIREX - 168,
+    barrel:FIREX - 114,
+    stool: FIREX -  88,   // with the whetstone on it
+    pile:  FIREX -  62,   // the woodpile
     pot:   FIREX -  34,   // tripod and kettle
     fire:  FIREX,
     seat:  FIREX +  44,   // log, eighty long
@@ -515,7 +692,7 @@
     chest: FIREX + 206,   // with the lantern on it
     sign:  FIREX + 272
   };
-  var LPL = FIREX - 240, LPR = FIREX + 240, LTOP = GY - 78, LSAG = 20;
+  var LPL = FIREX - 252, LPR = FIREX + 246, LTOP = GY - 78, LSAG = 20;
   var SIGN = AT.sign;
 
   // the camp: all of it fixed, so all of it baked
@@ -546,11 +723,6 @@
     box(px, C.wood2, C.wood0, CX - 11, GY - 17, 23, 17);
     px(C.wood3, CX - 10, GY - 16, 21, 4);
     for (var rg = 0; rg < 3; rg++) px(C.wood1, CX - 8 + rg * 7, GY - 12, 2, 11);
-    px(C.wood0, CX + 3, GY - 34, 3, 19);                        // haft
-    px(C.wood2, CX + 4, GY - 33, 1, 18);
-    px(C.metal0, CX + 1, GY - 39, 9, 7);                        // head
-    px(C.metal2, CX + 2, GY - 38, 7, 3);
-    px(C.metal3, CX + 8, GY - 38, 2, 5);
     for (var ch = 0; ch < 5; ch++)                              // chips on the ground
       px(C.wood3, CX - 16 + ch * 8, GY - 2, 3, 2);
 
@@ -604,7 +776,7 @@
     var lgl = groundY(LPL), lgr = groundY(LPR);
     box(px, C.wood2, C.wood0, LPL - 2, LTOP, 5, lgl - LTOP);
     box(px, C.wood2, C.wood0, LPR - 2, LTOP, 5, lgr - LTOP);
-    var shy = LTOP + Math.round(Math.sin(0.16 * Math.PI) * LSAG), sxx = LPL + 62;
+    var shy = LTOP + Math.round(Math.sin(0.09 * Math.PI) * LSAG), sxx = LPL + 30;
     px(C.cloth0, sxx - 7, shy + 4, 8, 12); px(C.cloth1, sxx - 6, shy + 5, 6, 11);   // sleeves
     px(C.cloth0, sxx + 19, shy + 4, 8, 12); px(C.cloth2, sxx + 20, shy + 5, 6, 11);
     box(px, C.cloth1, C.cloth0, sxx, shy + 2, 20, 19);
@@ -612,8 +784,8 @@
     px(C.cloth0, sxx + 7, shy + 2, 6, 3);                                            // collar
     for (var hm = 0; hm < 20; hm += 4) px(C.cloth0, sxx + hm, shy + 20 + (hm % 8 ? 1 : 0), 4, 2);
     px(C.metal2, sxx + 4, shy + 1, 2, 3); px(C.metal2, sxx + 14, shy + 1, 2, 3);
-    var bly = LTOP + Math.round(Math.sin(0.3 * Math.PI) * LSAG);
-    var blx = LPL + 108;                                       // and a blanket, hanging
+    var bly = LTOP + Math.round(Math.sin(0.19 * Math.PI) * LSAG);
+    var blx = LPL + 66;                                        // and a blanket, hanging
     for (var br = 0; br < 26; br++) {
       var taper = br < 3 ? (3 - br) * 2 : 0;
       var hem = br > 22 ? Math.round(Math.sin(br * 1.7) * 2) : 0;
@@ -699,6 +871,16 @@
     }
   }
 
+  // left standing in the block between jobs
+  function axeInBlock(px, x) {
+    if (x < -14 || x > W + 14) return;
+    px(C.wood0, x + 3, GY - 34, 3, 19);
+    px(C.wood2, x + 4, GY - 33, 1, 18);
+    px(C.metal0, x + 1, GY - 39, 9, 7);
+    px(C.metal2, x + 2, GY - 38, 7, 3);
+    px(C.metal3, x + 8, GY - 38, 2, 5);
+  }
+
   // a stack of split logs by the fire, however many he got through
   function woodpile(px, x, n) {
     if (n <= 0) return;
@@ -759,13 +941,18 @@
   // ── what he can get done before dark ──────────────────────────────────────
   var PILE_MAX = 5;
   var CHORES = [
-    { id: 'wood',   x: 0, verb: 'SPLIT\nWOOD',  did: 'Split',  say: 'One more on the pile.',        max: PILE_MAX },
-    { id: 'kettle', x: 0, verb: 'FILL\nKETTLE', did: 'Brewed', say: 'Something hot. He walks quicker on it.', max: 1 },
-    { id: 'brand',  x: 0, verb: 'TRIM\nBRAND',  did: 'Trimmed', say: 'A cleaner edge. It reaches further.',   max: 1 },
-    { id: 'banked', x: 0, verb: 'BANK\nFIRE',   did: 'Banked', say: 'Coals raked up. It starts higher.',      max: 1 },
-    { id: 'dog',    x: 0, verb: 'FEED\nDOG',    did: 'Fed him', say: 'He will bark a good deal sooner now.',  max: 1 }
+    { id: 'wood',   x: 0, verb: 'SPLIT\nWOOD',  did: 'Split',  say: 'One more on the pile.',
+      max: PILE_MAX, dur: 1.9, beats: [0.42, 0.92], off: 27 },
+    { id: 'kettle', x: 0, verb: 'FILL\nKETTLE', did: 'Brewed', say: 'Something hot. He walks quicker on it.',
+      max: 1, dur: 1.8, beats: [0.34, 0.76], off: 29 },
+    { id: 'brand',  x: 0, verb: 'TRIM\nBRAND',  did: 'Trimmed', say: 'A cleaner edge. It reaches further.',
+      max: 1, dur: 1.7, beats: [0.22, 0.44, 0.66, 0.88], off: 26 },
+    { id: 'banked', x: 0, verb: 'BANK\nFIRE',   did: 'Banked', say: 'Coals raked up. It starts higher.',
+      max: 1, dur: 1.6, beats: [0.24, 0.54, 0.84], off: 36 },
+    { id: 'dog',    x: 0, verb: 'FEED\nDOG',    did: 'Fed him', say: 'He will bark a good deal sooner now.',
+      max: 1, dur: 2.3, beats: [0.2, 0.34, 0.78], off: 34 }
   ];
-  CHORES[0].x = AT.chop; CHORES[1].x = AT.pot; CHORES[2].x = AT.stool;
+  CHORES[0].x = AT.chop; CHORES[1].x = AT.barrel; CHORES[2].x = AT.stool;
   CHORES[3].x = AT.fire; CHORES[4].x = AT.bowl;
   var PREP = null;
   function resetPrep() { PREP = { wood: 0, kettle: 0, brand: 0, banked: 0, dog: 0 }; }
@@ -788,9 +975,13 @@
 
   // ── save ──────────────────────────────────────────────────────────────────
   var KEY = 'nightwatch.pixel.v1';
-  var save = { night: 1, best: 0, kept: 0, logs: 0, muted: false, music: true, buzz: true };
+  var save = { night: 1, best: 0, kept: 0, logs: 0, muted: false, music: true, buzz: true, look: null };
   try { var raw = localStorage.getItem(KEY); if (raw) { var o = JSON.parse(raw); if (o && o.night) save = o; } } catch (e) {}
   function store() { try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) {} }
+  function loadLook() {
+    if (!save.look) return;
+    for (var k in LOOK) if (typeof save.look[k] === 'number') LOOK[k] = save.look[k];
+  }
 
   // ── sound, kept quiet ─────────────────────────────────────────────────────
   var AC = null, muted = !!save.muted;
@@ -926,7 +1117,7 @@
     var n = save.night;
     resetPrep();
     S = {
-      mode: 'day', n: n, cfg: cfgFor(n), left: 0, fuel: 44, cam: 0,
+      mode: 'day', n: n, cfg: cfgFor(n), left: 0, fuel: 96, cam: 0,
       spd: SPEED, rng: SWING_RANGE, cd: SWING_CD, dogged: 0, pile: 0, pileT: 0, chore: null,
       x: FIREX + 46, y: GY, vy: 0, onGround: true, jumpHeld: false,
       dir: -1, step: 0, carry: 0, moving: 0,
@@ -969,10 +1160,11 @@
     S.shades[S.shades.length - 1].y0 = S.shades[S.shades.length - 1].y;
   }
 
-  function burst(x, y, n, up) {
+  function burst(x, y, n, up, cols, spread, grav) {
     for (var i = 0; i < n; i++) S.sparks.push({
-      x: x + (Math.random() - 0.5) * 18, y: y,
-      vx: (Math.random() - 0.5) * 46, vy: -(up || 26) - Math.random() * 44, life: 1
+      x: x + (Math.random() - 0.5) * (spread || 18), y: y,
+      vx: (Math.random() - 0.5) * 46, vy: -(up || 26) - Math.random() * 44,
+      life: 1, c: cols || null, g: grav
     });
   }
 
@@ -1055,17 +1247,19 @@
     } else S.y = g;
 
     if (day) {
-      S.fuel = 44 + Math.sin(t * 0.7) * 4;
+      S.fuel = 94 + Math.sin(t * 0.7) * 5;   // at camp it is banked right up
       if (S.swing > 0) S.swing -= dt;
       if (S.swingCd > 0) S.swingCd -= dt;
       if (S.chore) {                               // head down, getting on with it
-        S.chore.left -= dt;
-        S.swing = 0.22 - (S.chore.left % 0.44) * 0.5;
-        if (S.chore.left <= 0) {
-          var c = S.chore.c; S.chore = null;
+        var K2 = S.chore;
+        K2.left -= dt;
+        K2.p = 1 - Math.max(0, K2.left) / K2.dur;
+        for (var bi = 0; bi < K2.c.beats.length; bi++)
+          if (!K2.hit[bi] && K2.p >= K2.c.beats[bi]) { K2.hit[bi] = 1; choreBeat(K2.c.id, bi); }
+        if (K2.left <= 0) {
+          var c = K2.c; S.chore = null;
           PREP[c.id]++;
-          burst(S.x + S.dir * 12, S.y - 20, 6, 20);
-          bell(c.id === 'wood' ? 210 : 470, 0.24, 0.05, 1700);
+          bell(c.id === 'wood' ? 210 : 470, 0.26, 0.05, 1700);
           banner(c.did, c.say, 1700);
         }
         return;
@@ -1074,8 +1268,11 @@
         var st = stationAt(S.x);
         S.swingCd = 0.35;
         if (st && !st.done) {
-          S.chore = { c: st.c, left: 0.9 };
-          S.dir = st.c.x >= S.x ? 1 : -1;
+          S.chore = { c: st.c, left: st.c.dur, dur: st.c.dur, p: 0, hit: [] };
+          var sd = S.x < st.c.x ? -1 : 1;           // he steps round to face the job
+          S.x = st.c.x + st.c.off * sd;
+          S.y = groundY(S.x); S.onGround = true; S.vy = 0;
+          S.dir = -sd;
           bell(150, 0.1, 0.04, 800);
         } else if (st) {
           bell(160, 0.12, 0.03, 700);            // done already — walk clear to set out
@@ -1160,7 +1357,7 @@
     for (var q = S.sparks.length - 1; q >= 0; q--) {
       var sp = S.sparks[q];
       sp.life -= dt * 0.95; if (sp.life <= 0) { S.sparks.splice(q, 1); continue; }
-      sp.x += sp.vx * dt; sp.y += sp.vy * dt; sp.vy += 42 * dt;
+      sp.x += sp.vx * dt; sp.y += sp.vy * dt; sp.vy += (sp.g == null ? 42 : sp.g) * dt;
     }
     for (var r = S.puffs.length - 1; r >= 0; r--) {
       var pf = S.puffs[r];
@@ -1257,6 +1454,7 @@
 
     signpost(px, SIGN - cam, groundY(SIGN), S.n);
     woodpile(px, AT.pile - cam, S.pile);
+    axeInBlock(px, AT.chop - cam);
     lights(cam, 0);
     var watchful = 0;
     for (var wi = 0; wi < S.shades.length; wi++)
@@ -1274,7 +1472,8 @@
 
     for (var q = 0; q < S.sparks.length; q++) {
       var sp = S.sparks[q];
-      px(sp.life > 0.5 ? C.fire4 : C.fire2, (sp.x | 0) - cam, sp.y | 0, 2, 2);
+      var cc2 = sp.c || [C.fire4, C.fire2];
+      px(sp.life > 0.5 ? cc2[0] : cc2[1], (sp.x | 0) - cam, sp.y | 0, sp.c ? 1 : 2, sp.c ? 1 : 2);
     }
     for (var r = 0; r < S.puffs.length; r++) {
       var pf = S.puffs[r];
@@ -1423,6 +1622,221 @@
   // how far the flame leans, and how much of it you can see through
   function windLean(kind) { return kind === 'wind' ? Math.sin(t * 0.9) * 0.9 + 1.2 : 0; }
 
+  // ── the five chores, each with its own bit of business ────────────────────
+  // Every one is driven off p (0 at the start of the job, 1 at the end). The
+  // sounds and the bursts fire on beats, from step(), so they land on the frame
+  // the arm does.
+  var KIB = ['#8a5a30', '#5b3a1e'], WCHIP = ['#a06f3d', '#654222'],
+      SPARKC = ['#fff3c8', '#ef7a22'], WATER = ['#8fc6d6', '#3d6f80'];
+
+  function choreBeat(id, i) {
+    var K = SK(), x = S.x, y = S.y;
+    if (id === 'wood') {
+      burst(AT.chop, GY - 20, 14, 46, WCHIP, 20, 200);
+      bell(120, 0.13, 0.06, 620); bell(300, 0.07, 0.035, 1500);
+      S.shake = 0.12;
+    } else if (id === 'kettle') {
+      if (i === 0) { burst(AT.barrel, GY - 24, 10, 22, WATER, 14, 150); bell(340, 0.16, 0.04, 1200); }
+      else { burst(AT.barrel + 10, GY - 20, 6, 8, WATER, 6, 240); bell(620, 0.1, 0.03, 2400); }
+    } else if (id === 'brand') {
+      burst(AT.stool + (i % 2 ? 8 : -8), GY - 20, 7, 34, SPARKC, 4, 120);
+      bell(700 + i * 40, 0.1, 0.035, 3200);
+    } else if (id === 'banked') {
+      burst(AT.fire, GY - 12, 12, 52, null, 18);
+      bell(190, 0.15, 0.04, 900);
+    } else if (id === 'dog') {
+      if (i === 0) { burst(AT.bowl, GY - 12, 12, 16, KIB, 8, 300); bell(420, 0.12, 0.035, 2200); }
+      else if (i === 1) bell(300, 0.16, 0.04, 1500);
+      else { bell(520, 0.11, 0.05, 2000); setTimeout(function () { bell(430, 0.16, 0.045, 1700); }, 110); }
+    }
+  }
+
+  // a shaft with a head on the end of it, pointing wherever his arms point
+  function tool(px, gx, gy, ang, len, kind) {
+    var cx2 = Math.cos(ang), sy2 = Math.sin(ang);
+    for (var i = -6; i < len; i++)
+      px(i > len - 5 ? C.wood1 : C.wood0,
+         Math.round(gx + cx2 * i), Math.round(gy + sy2 * i), 2, 2);
+    var hx2 = Math.round(gx + cx2 * len), hy2 = Math.round(gy + sy2 * len);
+    if (kind === 'axe') {
+      px(C.metal0, hx2 - 4, hy2 - 4, 9, 8);
+      px(C.metal2, hx2 - 3, hy2 - 3, 7, 4);
+      px(C.metal3, hx2 + 2, hy2 - 4, 3, 8);
+    } else if (kind === 'brand') {
+      px(C.fire2, hx2 - 2, hy2 - 2, 5, 5);
+      px(C.fire3, hx2 - 1, hy2 - 2, 3, 4);
+      px(C.fire4, hx2 - 1, hy2 - 1, 2, 2);
+    } else if (kind === 'kettle') {
+      px(C.metal0, hx2 - 6, hy2 - 3, 13, 10);          // body, wider at the base
+      px(C.metal1, hx2 - 5, hy2 - 2, 11, 8);
+      px(C.metal2, hx2 - 4, hy2 - 1, 3, 5);            // a highlight down one side
+      px(C.metal0, hx2 - 4, hy2 - 6, 9, 3);            // lid
+      px(C.metal1, hx2 - 3, hy2 - 5, 7, 1);
+      px(C.metal2, hx2 - 1, hy2 - 8, 3, 2);            // knob
+      px(C.metal0, hx2 + 6, hy2 - 3, 5, 3);            // spout
+      px(C.metal1, hx2 + 7, hy2 - 3, 3, 1);
+      px(C.metal0, hx2 - 9, hy2 - 5, 3, 8);            // handle
+      px(C.metal0, hx2 - 9, hy2 - 6, 6, 2);
+    }
+  }
+  // Point his arms at a spot in the world and hand back everything needed to
+  // draw the tool reaching it: the angle to pass to guy(), where his hands end
+  // up, and how long the shaft has to be to touch.
+  function reach(hx, hy, crouch, tx, ty) {
+    var sx2 = hx, sy2 = hy - GUY_H + crouch + 19;
+    var ang = Math.atan2(ty - sy2, tx - sx2);
+    var d = Math.max(10, Math.sqrt((tx - sx2) * (tx - sx2) + (ty - sy2) * (ty - sy2)));
+    return { a: ang, x: sx2 + Math.cos(ang) * 9, y: sy2 + Math.sin(ang) * 9, len: d - 9 };
+  }
+  function lerp(a, b, u) { return a + (b - a) * u; }
+
+  // returns true when it has drawn him itself
+  function choreArt(px, cam) {
+    if (!S.chore) return false;
+    var K2 = S.chore, id = K2.c.id, p = Math.max(0, Math.min(1, K2.p));
+    var hx = Math.round(S.x) - cam, hy = Math.round(S.y), f = S.dir;
+
+    if (id === 'wood') {
+      // Two strokes. Over the shoulder, then down through the round on the block.
+      var u = (p * 2) % 1;
+      var stump = AT.chop - cam, top = GY - 26;
+      var tgt, lean2;
+      if (u < 0.44) {                                  // winding up and back
+        var w1 = u / 0.44;
+        tgt = { x: lerp(hx - f * 4, hx + f * 13, w1), y: lerp(GY - 34, GY - 62, w1) };
+        lean2 = -2;
+      } else if (u < 0.58) {                           // the stroke itself
+        var w2 = (u - 0.44) / 0.14;
+        tgt = { x: lerp(hx + f * 13, stump, w2), y: lerp(GY - 62, top, w2) };
+        lean2 = 3;
+      } else {                                         // straightening up again
+        var w3 = (u - 0.58) / 0.42;
+        tgt = { x: lerp(stump, hx - f * 4, w3), y: lerp(top, GY - 34, w3) };
+        lean2 = 1;
+      }
+      if (u < 0.5) {                                   // the round waiting for it
+        disc(px, C.wood0, stump, GY - 22, 7, 7); disc(px, C.wood2, stump, GY - 22, 6, 6);
+        disc(px, C.wood3, stump, GY - 22, 3, 3);
+      }
+      var R = reach(hx + lean2, hy, 0, tgt.x, tgt.y);
+      guy(px, hx + lean2, hy, t, f, 'work', 0, R.a);
+      tool(px, R.x, R.y, R.a, Math.max(16, Math.min(24, R.len)), 'axe');
+      return true;
+    }
+
+    if (id === 'kettle') {
+      // Held out, dipped under, then lifted dripping.
+      var bx2 = AT.barrel - cam;
+      var dip = p < 0.3 ? p / 0.3 : p < 0.72 ? 1 : 1 - (p - 0.72) / 0.28;
+      var ty2 = lerp(GY - 40, GY - 20, dip) + (p > 0.3 && p < 0.72 ? Math.sin(t * 9) * 1 : 0);
+      var R2 = reach(hx, hy, 6, lerp(hx - f * 12, bx2, dip), ty2);
+      guy(px, hx, hy, t, f, 'kneel', 0, R2.a);
+      tool(px, R2.x, R2.y, R2.a, R2.len, 'kettle');
+      if (p > 0.3 && p < 0.76) {                       // the water moving in the butt
+        for (var w = -8; w <= 8; w += 2)
+          px(w % 4 ? WATER[0] : WATER[1], bx2 + w,
+             GY - 23 + Math.round(Math.sin(t * 9 + w * 0.7) * 1.4), 2, 1);
+      }
+      if (p > 0.76) for (var dr = 0; dr < 4; dr++) {   // and running off it
+        var dy2 = ((t * 60 + dr * 9) % 18);
+        px(WATER[0], R2.x + Math.cos(R2.a) * R2.len + dr * 3 - 4, R2.y + 6 + dy2, 1, 2);
+      }
+      return true;
+    }
+
+    if (id === 'brand') {
+      // Long strokes across the whetstone, both ways, sparks off each end.
+      var stx = AT.stool - cam, side = Math.sin(p * 4 * Math.PI);
+      var R3 = reach(hx, hy, 6, stx + side * 7, GY - 21);
+      guy(px, hx, hy, t, f, 'kneel', 0, R3.a);
+      tool(px, R3.x, R3.y, R3.a, Math.max(14, R3.len), 'brand');
+      px(C.stone3, stx - 5, GY - 20, 11, 1);           // the stone catching the light
+      return true;
+    }
+
+    if (id === 'banked') {
+      // Three long rakes right through the coals.
+      var fx3 = AT.fire - cam, poke = (p * 3) % 1;
+      var deep = poke < 0.45 ? poke / 0.45 : 1 - (poke - 0.45) / 0.55;
+      var R4 = reach(hx, hy, 6, lerp(hx - f * 20, fx3, deep), lerp(GY - 34, GY - 7, deep));
+      guy(px, hx, hy, t, f, 'kneel', 0, R4.a);
+      tool(px, R4.x, R4.y, R4.a, 28, 'brand');
+      return true;
+    }
+
+    if (id === 'dog') {
+      // He tips the bag out, then the dog comes over and gets on with it.
+      var bwx = AT.bowl - cam, pour = p < 0.34;
+      var g5;
+      if (pour) {
+        var R5 = reach(hx, hy, 6, bwx, GY - 28);
+        guy(px, hx, hy, t, f, 'kneel', 0, R5.a);
+        g5 = { x: R5.x + Math.cos(R5.a) * Math.min(R5.len, 20),
+               y: R5.y + Math.sin(R5.a) * Math.min(R5.len, 20) };
+      } else {
+        guy(px, hx, hy, t, f, 'kneel', 0, 0);
+        g5 = { x: hx + f * 15, y: GY - 8 };            // set down beside him
+      }
+      px(C.cloth0, g5.x - 5, g5.y - 9, 11, 14);        // the sack
+      px(C.cloth1, g5.x - 4, g5.y - 8, 9, 12);
+      px(C.cloth2, g5.x - 4, g5.y - 8, 3, 12);
+      px(C.cloth0, g5.x - 3, g5.y - 10, 7, 2);
+      px(C.wood1, g5.x - 3, g5.y - 11, 7, 2);
+      if (pour) for (var kb = 0; kb < 6; kb++) {
+        var span = Math.max(6, GY - 8 - (g5.y + 5));
+        var ky = ((t * 110 + kb * 9) % span);
+        px(kb % 2 ? KIB[0] : KIB[1], g5.x + Math.round(Math.sin(kb * 2) * 2), g5.y + 5 + ky, 2, 2);
+      }
+      var dEnd = AT.bowl - 15;
+      var ddx = p < 0.34 ? AT.dog
+              : p < 0.62 ? AT.dog + (dEnd - AT.dog) * ((p - 0.34) / 0.28)
+              : dEnd;
+      var eating = p > 0.62;
+      dogAt(px, Math.round(ddx) - cam, GY - 1, eating, 1, eating ? 0 : t);
+      if (eating) for (var cr = 0; cr < 3; cr++)
+        px(KIB[1], AT.bowl - cam - 4 + cr * 4, GY - 8 - (cr % 2), 2, 2);
+      return true;
+    }
+    return false;
+  }
+
+  // the dog, upright and busy rather than curled up
+  function dogAt(px, dx, dy, eating, face, walkT) {
+    var g = face < 0 ? -1 : 1;
+    var bob2 = eating ? Math.round(Math.abs(Math.sin(t * 9)) * 3) : 0;
+    // ── body: deeper at the chest, tucked at the waist
+    for (var by3 = 0; by3 < 12; by3++) {
+      var uu = by3 / 11;
+      var lft = dx - 13 + Math.round(uu * uu * 3), rgt = dx + 12 - Math.round(uu * 2);
+      px(C.dog0, lft, dy - 16 + by3, rgt - lft + 1, 1);
+      px(by3 < 3 ? C.dog3 : by3 < 8 ? C.dog2 : C.dog1, lft + 1, dy - 16 + by3, rgt - lft - 1, 1);
+    }
+    disc(px, C.dog0, dx + 9 * g, dy - 12, 6, 6);       // chest
+    disc(px, C.dog2, dx + 9 * g, dy - 13, 5, 5);
+    disc(px, C.dog0, dx - 10 * g, dy - 12, 6, 6);      // haunch
+    disc(px, C.dog1, dx - 10 * g, dy - 13, 5, 5);
+    for (var lg2 = 0; lg2 < 4; lg2++) {                // four legs, stepping if walking
+      var lx2 = dx - 10 + (lg2 < 2 ? lg2 * 5 : 12 + (lg2 - 2) * 5);
+      var st3 = walkT ? Math.round(Math.sin(walkT * 9 + lg2 * 2.2) * 2) : 0;
+      px(C.dog0, lx2 + st3, dy - 7, 4, 7); px(C.dog1, lx2 + 1 + st3, dy - 7, 2, 6);
+      px(C.hair0, lx2 + st3, dy - 2, 5, 2);
+    }
+    var hx3 = dx + g * 15, hy3 = dy - 21 + bob2;       // head
+    px(C.dog0, dx + g * 9, dy - 20, 8, 8);             // neck
+    px(C.dog2, dx + g * 9, dy - 19, 7, 6);
+    disc(px, C.dog0, hx3, hy3, 7, 6); disc(px, C.dog2, hx3, hy3 - 1, 6, 5);
+    px(C.dog0, hx3 + (g > 0 ? 2 : -8), hy3 + 1, 7, 5);
+    px(C.dog1, hx3 + (g > 0 ? 3 : -7), hy3 + 1, 5, 4);
+    px(C.hair0, hx3 + (g > 0 ? 7 : -8), hy3 + 2, 2, 2);              // nose
+    px(C.dog1, hx3 - g * 4, hy3 - 8, 4, 7); px(C.dog0, hx3 - g * 4, hy3 - 8, 1, 7);  // ear
+    px(C.hair0, hx3 + (g > 0 ? 2 : -3), hy3 - 2, 2, 2);
+    px('#e9f0ff', hx3 + (g > 0 ? 2 : -3), hy3 - 2, 1, 1);
+    if (eating) px(C.cloth2, hx3 + (g > 0 ? 6 : -7), hy3 + 5, 3, 1);  // tongue
+    var wag2 = Math.sin(t * (eating ? 16 : 8)) * 5;                   // tail
+    px(C.dog1, dx - g * 20, dy - 19 - Math.round(wag2), 8, 3);
+    px(C.dog2, dx - g * 20 + (g > 0 ? 0 : 2), dy - 19 - Math.round(wag2), 6, 2);
+  }
+
   // ── the camp by daylight ──────────────────────────────────────────────────
   function drawDay(cam, lvl) {
     for (var b = 0; b < 5; b++)
@@ -1454,6 +1868,7 @@
     ctx.drawImage(terrain, cam, 0, W, H, 0, 0, W, H);
     signpost(px, SIGN - cam, groundY(SIGN), S.n);
     woodpile(px, AT.pile - cam, PREP ? PREP.wood : 0);
+    if (!(S.chore && S.chore.c.id === 'wood')) axeInBlock(px, AT.chop - cam);
     lights(cam, 0.35);
     var job = S.chore ? S.chore.c : choreAt(S.x);
     if (job && PREP[job.id] < job.max) {                                     // an arrow bobbing over the job
@@ -1463,11 +1878,13 @@
       px('#ffeeb8', jx - 2, jy + 2, 5, 2); px('#ffeeb8', jx - 1, jy + 4, 3, 2);
       px('#ffeeb8', jx, jy + 6, 1, 2);
     }
-    dog(px, AT.dog - cam, GY - 1, t, 0);
+    if (!(S.chore && S.chore.c.id === 'dog')) dog(px, AT.dog - cam, GY - 1, t, 0);
     campfire(px, FIREX - cam, t, Math.max(0.2, lvl), GY, 1);
     birds(cam);
-    var hx3 = Math.round(S.x) - cam, hy3 = Math.round(S.y);
-    guy(px, hx3, hy3, t, S.dir, !S.onGround ? 'jump' : S.moving ? 'walk' : 'idle', S.step);
+    if (!choreArt(px, cam)) {
+      var hx3 = Math.round(S.x) - cam, hy3 = Math.round(S.y);
+      guy(px, hx3, hy3, t, S.dir, !S.onGround ? 'jump' : S.moving ? 'walk' : 'idle', S.step);
+    }
     ctx.save();                                   // a wash of warm morning over it all
     ctx.globalCompositeOperation = 'multiply';
     var wm = ctx.createLinearGradient(0, 0, 0, H);
@@ -1604,6 +2021,60 @@
   var elSnd = document.getElementById('kSnd'), elPause = document.getElementById('kPause');
   elSnd.addEventListener('click', function () { ac(); settings(); });
   function soundSwitch() { elSnd.classList.toggle('off', muted && save.music === false); }
+
+  // ── dressing him ──────────────────────────────────────────────────────────
+  var peek = null, peekCtx = null, peekPx = null;
+  function looksCard(back) {
+    function chips(key, list, kind) {
+      var h2 = '<div class="pickRow"><span>' + kind + '</span><div class="chips">';
+      for (var i = 0; i < list.length; i++) {
+        var r = list[i].r;
+        var bg = r ? 'background:linear-gradient(135deg,' + r[r.length - 1] + ' 0 50%,' + r[1] + ' 50% 100%)' : '';
+        h2 += '<button class="chip' + (r ? '' : ' none') + (LOOK[key] === i ? ' on' : '') +
+              '" style="' + bg + '" data-key="' + key + '" data-i="' + i +
+              '" title="' + list[i].n + '"></button>';
+      }
+      return h2 + '</div></div>';
+    }
+    var h = '<div class="eyebrow">The keeper</div><h1>Dress him<em>how you like</em></h1>' +
+      '<div id="peekWrap"><canvas id="peek" width="46" height="58"></canvas></div>' +
+      chips('coat', COATS, 'Coat') +
+      chips('skin', SKINS, 'Skin') +
+      chips('hair', HAIRS, 'Hair') +
+      chips('scarf', SCARVES, 'Scarf') +
+      '<div class="pickRow"><span>Style</span><div class="chips">';
+    for (var st = 0; st < STYLES.length; st++)
+      h += '<button class="word' + (LOOK.style === st ? ' on' : '') + '" data-key="style" data-i="' +
+           st + '">' + STYLES[st] + '</button>';
+    h += '</div></div><button class="go" id="go">That\u2019s him</button>';
+    var wasLive = !!(S && S.mode === 'day');
+    show(h);
+    peek = document.getElementById('peek');
+    peekCtx = peek.getContext('2d');
+    peekCtx.imageSmoothingEnabled = false;
+    peekPx = mkPx(peekCtx);
+    var all = card.querySelectorAll('[data-key]');
+    for (var j = 0; j < all.length; j++) all[j].addEventListener('click', function () {
+      var k = this.getAttribute('data-key'), v = +this.getAttribute('data-i');
+      LOOK[k] = v; save.look = LOOK; store();
+      var sibs = card.querySelectorAll('[data-key="' + k + '"]');
+      for (var q = 0; q < sibs.length; q++) sibs[q].classList.toggle('on', sibs[q] === this);
+      bell(420, 0.1, 0.04, 1900);
+    });
+    bindGo(function () {
+      peek = null;
+      if (back) back();
+      else if (wasLive) { veil.classList.add('hide'); running = true; last = performance.now(); }
+      else title();
+    });
+  }
+  function drawPeek() {
+    if (!peek || !peekCtx) return;
+    peekCtx.fillStyle = '#1b1522'; peekCtx.fillRect(0, 0, 46, 58);
+    for (var g = 0; g < 46; g += 2) peekPx('#221a29', g, 52, 1, 6);
+    peekPx('#2b2233', 0, 52, 46, 2);
+    guy(peekPx, 23, 52, t, Math.sin(t * 0.55) > 0 ? 1 : -1, 'idle', 0);
+  }
   function buzz(ms) {
     if (save.buzz === false || !navigator.vibrate) return;
     try { navigator.vibrate(ms); } catch (e) {}
@@ -1621,7 +2092,8 @@
       h += '<button class="opt' + (on[rows[i].k] ? ' on' : '') + '" data-k="' + rows[i].k + '">' +
            '<span class="txt"><b>' + rows[i].name + '</b><i>' + rows[i].help + '</i></span>' +
            '<span class="sw"></span></button>';
-    h += '</div><button class="go" id="go">Done</button>' +
+    h += '</div><button class="ghost" id="him">Dress the keeper</button>' +
+         '<button class="go" id="go">Done</button>' +
          '<div class="foot">Keys: A D or arrows to walk · space to jump · F to swing · M to mute</div>';
     var wasLive = !!(S && S.mode === 'day');
     show(h);
@@ -1635,6 +2107,7 @@
       if (k === 'sound' && !muted) bell(520, 0.12, 0.05, 2000);
       if (k === 'buzz' && save.buzz !== false) buzz(20);
     });
+    bindGo(function () { looksCard(function () { settings(back); }); }, 'him');
     bindGo(function () {
       if (back) back();
       else if (wasLive) { veil.classList.add('hide'); running = true; last = performance.now(); }
@@ -1695,6 +2168,7 @@
       '</div>' +
       strip(save.night) +
       '<button class="go" id="go">' + (save.night > 1 ? 'Back to camp — night ' + save.night + ' ahead' : 'Walk out to the camp') + '</button>' +
+      '<button class="ghost" id="him">The keeper</button>' +
       '<button class="ghost" id="cog">Settings</button>' +
       '<div class="foot">' +
         (save.best ? 'Best: night ' + save.best + ' · ' : '') +
@@ -1704,6 +2178,7 @@
     );
     bindGo(function () { camp(); });
     bindGo(function () { settings(title); }, 'cog');
+    bindGo(function () { looksCard(title); }, 'him');
   }
 
   function finish(survived) {
@@ -1790,6 +2265,7 @@
       hud();
     }
     if (S) draw();
+    drawPeek();
     if (S && S.mode === 'day') {
       var st2 = S.chore ? null : stationAt(S.x);
       var want = st2 ? (st2.done ? 'DONE' : st2.c.verb) : 'TAKE\nWATCH';
@@ -1802,6 +2278,7 @@
     requestAnimationFrame(frame);
   }
 
+  loadLook();
   soundSwitch();
   title();
   requestAnimationFrame(frame);
@@ -1813,7 +2290,8 @@
     tap: function (id) { var e = document.getElementById(id); if (e) e.click(); },
     skip: function () { if (S) S.left = 0.02; },
     geo: { W: W, H: H, GY: GY, WORLD: WORLD, FIREX: FIREX },
-    at: AT, prep: function () { return PREP; },
+    at: AT, prep: function () { return PREP; }, terrain: terrain,
+    look: function () { return LOOK; }, drawGuy: guy,
     tick: function (dt) { if (S && running) step(dt); },
     begin: function (n) { startNight(n); running = true; veil.classList.add('hide'); },
     camp: function () { camp(); },
