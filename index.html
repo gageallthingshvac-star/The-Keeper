@@ -3955,6 +3955,38 @@
     g.closePath();
   }
 
+
+  // ── name-tag helper ──────────────────────────────────────────────────
+  function drawNameTagAt(g, x, y, label, fs) {
+    if (!label) return;
+    fs = fs || 8;
+    g.save();
+    g.font = 'bold ' + fs + 'px -apple-system,'SF Pro Display',sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    var tw = g.measureText(label).width;
+    var pw = tw + fs * 1.5, ph = fs * 1.75, rx = fs * 0.38;
+    g.fillStyle = 'rgba(10,6,4,0.82)';
+    g.beginPath();
+    g.moveTo(x - pw/2 + rx, y - ph/2);
+    g.lineTo(x + pw/2 - rx, y - ph/2);
+    g.arcTo(x + pw/2, y - ph/2, x + pw/2, y - ph/2 + rx, rx);
+    g.lineTo(x + pw/2, y + ph/2 - rx);
+    g.arcTo(x + pw/2, y + ph/2, x + pw/2 - rx, y + ph/2, rx);
+    g.lineTo(x - pw/2 + rx, y + ph/2);
+    g.arcTo(x - pw/2, y + ph/2, x - pw/2, y + ph/2 - rx, rx);
+    g.lineTo(x - pw/2, y - ph/2 + rx);
+    g.arcTo(x - pw/2, y - ph/2, x - pw/2 + rx, y - ph/2, rx);
+    g.closePath();
+    g.fill();
+    g.strokeStyle = 'rgba(232,220,200,0.28)';
+    g.lineWidth = fs * 0.09;
+    g.stroke();
+    g.fillStyle = '#E8DCC8';
+    g.fillText(label, x, y);
+    g.restore();
+  }
+
   function drawKeeper() {
     var k = S.keeper;
     // the bob rides the stride rather than a metronome, so his head dips on
@@ -4012,6 +4044,8 @@
     ctx.beginPath(); ctx.arc(lx, ly, 3.4, 0, 6.29); ctx.fill();
 
     ctx.restore();
+    var _pn = (typeof META!=='undefined'&&META.player&&META.player.name)?META.player.name:'You';
+    drawNameTagAt(ctx, k.x, k.y - 54, _pn, 9);
   }
 
   // She works the far side of the fire on the nights it matters.
@@ -4036,6 +4070,8 @@
       armR: -2.1 + Math.sin(A2.t * 3) * 0.2, armL: 1.2
     });
     ctx.restore();
+    var _an = (typeof META!=='undefined')?(META.partner||(META.knight&&META.knight.name)||'Friend'):'Friend';
+    drawNameTagAt(ctx, A2.x, A2.y - 47, _an, 9);
   }
 
   function drawShades() {
@@ -6486,6 +6522,7 @@
       g.scale(0.87, 0.87);
       drawKnight(g, folkPose(F2, S.time));
       g.restore();
+      drawNameTagAt(g, F2.x, CAMP_GND - 44, F2.name || '', 6);
     }
 
     // the rest of the animals
@@ -6495,6 +6532,7 @@
       g.scale(1.25, 1.25);
       drawPet(g, PETS[pi2], S.time);
       g.restore();
+      drawNameTagAt(g, PETS[pi2].x, CAMP_GND - 22, PETS[pi2].name || '', 6);
     }
 
     // the dog
@@ -6504,6 +6542,8 @@
                  sit: DOG.sit, sleep: DOG.sleep, wag: DOG.wag, hop: DOG.hop,
                  head: DOG.head, bark: DOG.bark });
     g.restore();
+    var _dn = (typeof META!=='undefined'&&META.dog&&META.dog.name)?META.dog.name:'Dog';
+    drawNameTagAt(g, DOG.x, CAMP_GND - 19, _dn, 6);
 
     g.save();
     g.translate(KN.x, CAMP_GND - 14);
@@ -6516,6 +6556,8 @@
       armL: KN.armL, armR: KN.armR, item: KN.item, itemL: KN.itemL
     });
     g.restore();
+    var _kn = (typeof META!=='undefined'&&META.knight&&META.knight.name)?META.knight.name:'Friend';
+    drawNameTagAt(g, KN.x, CAMP_GND - 52, _kn, 6);
 
     drawCampFront(g, S.time);
     drawKnFeels(g);
