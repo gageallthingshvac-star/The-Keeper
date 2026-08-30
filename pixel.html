@@ -195,6 +195,28 @@
   .nameIn{padding:14px;border-radius:13px;border:1px solid var(--line);
     background:rgba(242,228,204,0.06);color:var(--bone);font:600 16px/1 var(--body);
     width:100%;text-align:center}
+  .arm{border:1px solid var(--line);border-radius:14px;padding:12px 13px;text-align:left;
+    display:flex;flex-direction:column;gap:7px;background:rgba(255,181,71,0.03)}
+  .arm.has{background:rgba(255,181,71,0.08)}
+  .arm.on{border-color:var(--ember);box-shadow:0 0 14px rgba(255,181,71,0.22)}
+  .armTop{display:flex;align-items:center;gap:9px}
+  .armTop b{font:700 15px/1.2 var(--body);color:var(--bone)}
+  .pips{margin-left:auto;font-style:normal;color:var(--ember);letter-spacing:.16em;font-size:11px}
+  .arm p{font:400 13px/1.45 var(--body);color:var(--mute);margin:0}
+  .armBuy{padding:10px 12px;border-radius:11px;cursor:pointer;font:700 13px/1 var(--body);
+    border:1px solid var(--line);background:rgba(255,181,71,0.10);color:var(--bone)}
+  .armBuy:disabled{opacity:.4;color:var(--mute);background:transparent}
+  .armBuy.pick{background:transparent;color:var(--mute)}
+  .armWhen{font:600 11px/1.3 var(--body);color:#6b5c4e;letter-spacing:.04em}
+  .armWhen.on{color:var(--ember)}
+  .joinRow{display:flex;gap:11px;align-items:center;text-align:left;
+    border:1px solid var(--line);border-radius:14px;padding:12px}
+  .joinRow b{font:700 14px/1.2 var(--body);color:var(--bone);display:block}
+  .joinRow i{font:400 12.5px/1.4 var(--body);color:var(--mute);font-style:normal;display:block;margin-top:3px}
+  .joinRow em{font:600 12px/1.3 var(--body);color:var(--ember);font-style:normal;display:block;margin-top:5px}
+  .lamps{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
+  .lamps i{width:9px;height:16px;border-radius:2px;background:rgba(242,228,204,0.13);display:block}
+  .lamps i.lit{background:linear-gradient(180deg,#ffe6a8,#ff9a2e);box-shadow:0 0 9px rgba(255,154,46,0.9)}
   .codeBox{font:600 11px/1.55 var(--mono);color:var(--ember);text-align:left;
     background:rgba(0,0,0,0.32);border:1px solid var(--line);border-radius:12px;
     padding:12px;word-break:break-all;max-height:104px;overflow:auto;-webkit-user-select:all;
@@ -278,7 +300,7 @@
 <script>
 (function () {
   'use strict';
-  var BUILD = 'v1.12.0';
+  var BUILD = 'v2.0.0';
 
   // ── measurements ──────────────────────────────────────────────────────────
   var TILE = 16;
@@ -1071,14 +1093,23 @@
     var tipx = gx + Math.cos(ang) * len, tipy = gy + Math.sin(ang) * len;
     var cx2 = Math.cos(ang), cy2 = Math.sin(ang);
 
-    if (u >= 0 && u > 0.34 && u < 0.8) {              // the sweep it leaves behind
-      for (var q = 1; q <= 5; q++) {
-        var back = u - q * 0.05;
+    // The sweep: a thick burning crescent, not a scratch. How wide it is is
+    // how hard the thing hits, so a torch leaves half a wheel of fire behind.
+    var arcW = W.arc || 1;
+    if (u >= 0 && u > 0.30 && u < 0.86) {
+      for (var q = 1; q <= 9; q++) {
+        var back = u - q * 0.038;
         if (back < 0.42) continue;
         var ab = lerp(-2.45, 0.30, (back - 0.42) / 0.58);
         var an = f > 0 ? ab : Math.PI - ab;
-        px(q < 3 ? C.fire3 : C.fire1,
-           Math.round(sx + Math.cos(an) * (len + 9)), Math.round(sy + Math.sin(an) * (len + 9)), 2, 2);
+        var fade = 1 - q / 9;
+        var band = Math.max(1, Math.round(arcW * (1 + fade * 3.4)));
+        for (var rr = 0; rr < band; rr++) {
+          var rad = len + 9 - rr * 3;
+          px(fade > 0.62 ? '#fffbe6' : fade > 0.4 ? C.fire4 : fade > 0.2 ? C.fire3 : C.fire1,
+             Math.round(sx + Math.cos(an) * rad) - 1, Math.round(sy + Math.sin(an) * rad) - 1,
+             fade > 0.35 ? 3 : 2, fade > 0.35 ? 3 : 2);
+        }
       }
     }
     for (var i = -5; i < len; i++)                    // the shaft
@@ -1098,13 +1129,57 @@
       px(C.fire4, tipx - 2, tipy - 3, 5, 7);
       px('#fffbe6', tipx - 1, tipy - 2, 3, 4);
       px(C.metal2, tipx - 5, tipy - 7, 11, 2);
+    } else if (W.kind === 'bow') {
+      px(C.wood1, tipx - 1, tipy - 7, 2, 15);
+      px(C.wood0, tipx - 3, tipy - 6, 2, 3);
+      px(C.wood0, tipx - 3, tipy + 4, 2, 3);
+      px(C.fire3, tipx + 1, tipy - 1, 3, 3);
+    } else if (W.kind === 'lock') {
+      px(C.wood0, tipx - 8, tipy - 2, 12, 5);
+      px(C.metal0, tipx + 2, tipy - 1, 8, 3);
+      px(C.metal2, tipx + 3, tipy - 1, 6, 1);
+      px(C.fire2, tipx - 3, tipy - 4, 3, 3);
     } else {
-      px(C.fire2, tipx - 2, tipy - 2, 6, 6);
-      px(C.fire3, tipx - 1, tipy - 2, 4, 5);
-      px(C.fire4, tipx - 1, tipy - 1, 3, 3);
-      px('#fffbe6', tipx, tipy, 1, 1);
+      // the torch: a proper head of pitch, wide and bright
+      disc(px, C.fire1, tipx - 5, tipy - 5, 11, 11);
+      disc(px, C.fire2, tipx - 4, tipy - 4, 9, 9);
+      disc(px, C.fire3, tipx - 3, tipy - 3, 7, 7);
+      disc(px, C.fire4, tipx - 2, tipy - 2, 5, 5);
+      px('#fffbe6', tipx - 1, tipy - 1, 3, 3);
     }
     return { x: tipx, y: tipy };
+  }
+
+  // One of the five great lamps: a stone leg, a cage, and either four years
+  // of nothing in it or the reason you walked here.
+  function lampPost(px, x, lit, glow) {
+    if (x < -34 || x > W + 34) return;
+    var base = GY, top = GY - LAMP_H;
+    for (var i = 0; i < LAMP_H - 16; i++) {           // the leg, tapering
+      var wdt = 11 - Math.round(i / 12);
+      px(i % 9 < 4 ? '#4b4352' : '#3d3644', x - (wdt >> 1), base - 4 - i, wdt, 1);
+    }
+    px('#2f2a36', x - 9, base - 5, 18, 5);            // the footing
+    px('#5a5162', x - 8, base - 6, 16, 2);
+    px('#4b4352', x - 8, top + 4, 16, 3);             // the cage
+    px('#4b4352', x - 8, top - 10, 16, 3);
+    for (var b2 = -7; b2 <= 7; b2 += 3) px('#413a4c', x + b2, top - 8, 1, 12);
+    px('#2f2a36', x - 6, top - 15, 12, 5);            // the hood
+    px('#5a5162', x - 5, top - 14, 10, 2);
+    if (lit) {
+      var f = 0.7 + 0.3 * Math.sin(t * 7.3 + x);
+      disc(px, C.fire1, x - 6, top - 6, 12, 12);
+      disc(px, C.fire3, x - 4, top - 5, 8, 9);
+      disc(px, C.fire4, x - 3, top - 4, 6, 7);
+      disc(px, '#fffbe6', x - 1 - (f > 0.85 ? 1 : 0), top - 2, 3, 4);
+      for (var q = 0; q < 3; q++) {
+        var sy2 = top - 16 - ((t * 26 + q * 13 + x) % 22);
+        px(C.fire2, x - 2 + ((q * 7 + Math.round(t * 3)) % 5), Math.round(sy2), 1, 1);
+      }
+    } else {
+      px('#241f2b', x - 4, top - 5, 8, 9);            // cold, and it shows
+      if (glow) { disc(px, C.fire1, x - 3, top - 3, 6, 5); }
+    }
   }
 
   // left standing in the block between jobs
@@ -1140,35 +1215,37 @@
   // gap: seconds between shades.  spd: how fast they come.
   // wood: seconds between logs appearing.  lying: how many may lie about at once.
   var NIGHTS = [
-    { len: 40, drain: 1.40, gap: 12.0, spd: 14, wood: 3.2, lying: 6, wx: 'clear', name: 'The first watch',   note: 'Wood burns down. The circle shrinks with it. Fetch more.' },
-    { len: 42, drain: 1.60, gap:  9.0, spd: 15, wood: 3.1, lying: 6, wx: 'clear', name: 'Something moved',   note: 'Swing the lit brand at anything that reaches the stones.' },
-    { len: 43, drain: 1.80, gap:  8.0, spd: 16, wood: 3.0, lying: 6, wx: 'clear', name: 'Two of them',       note: 'They lean on both ends of the ring at once.' },
-    { len: 44, drain: 2.00, gap:  7.0, spd: 17, wood: 3.0, lying: 6, wx: 'wind', name: 'A colder wind',     note: 'Wind off the moor. The fire spends itself faster.' },
-    { len: 45, drain: 2.20, gap:  6.4, spd: 17, wood: 2.9, lying: 6, wx: 'frost', name: 'Frost on the grass',note: 'Carry three at a time. Every trip is time outside the light.' },
-    { len: 46, drain: 2.40, gap:  5.8, spd: 18, wood: 2.8, lying: 6, wx: 'clear', name: 'The long dark',     note: 'Keep it high and the ring reaches far enough to see them coming.' },
-    { len: 47, drain: 2.55, gap:  5.3, spd: 18, wood: 2.8, lying: 6, wx: 'fog', name: 'Low cloud',         note: 'No stars, no moon. Only what you light yourself.' },
-    { len: 48, drain: 2.70, gap:  4.9, spd: 19, wood: 2.7, lying: 6, wx: 'clear', name: 'They learned',      note: 'They wait for you to step out of the light for wood.' },
-    { len: 49, drain: 2.85, gap:  4.5, spd: 19, wood: 2.6, lying: 6, wx: 'clear', name: 'Deep in the pines', note: 'Deadfall lies further from the stones now.' },
-    { len: 50, drain: 3.00, gap:  4.2, spd: 20, wood: 2.6, lying: 6, wx: 'clear', name: 'Halfway',           note: 'Ten behind you by morning. Ten more between here and the Point.' },
-    { len: 51, drain: 3.10, gap:  3.9, spd: 20, wood: 2.5, lying: 6, wx: 'wind', name: 'The wind turns',    note: 'Feed early. Feed often.' },
-    { len: 52, drain: 3.20, gap:  3.6, spd: 21, wood: 2.5, lying: 6, wx: 'snow', name: 'Thin ice',          note: 'The ring will not forgive a wasted trip.' },
-    { len: 52, drain: 3.30, gap:  3.4, spd: 21, wood: 2.4, lying: 7, wx: 'frost', name: 'A hard frost',      note: 'Stay near enough to the stones to get back inside them.' },
-    { len: 53, drain: 3.40, gap:  3.2, spd: 22, wood: 2.4, lying: 7, wx: 'clear', name: 'Something bigger',  note: 'They are quicker than last week.' },
-    { len: 54, drain: 3.50, gap:  3.0, spd: 22, wood: 2.3, lying: 7, wx: 'wind', name: 'The dog wakes',     note: 'Even the dog can hear them leaning on it now.' },
-    { len: 55, drain: 3.60, gap:  2.9, spd: 23, wood: 2.3, lying: 7, wx: 'dark', name: 'No moon',           note: 'Nothing overhead. Your ring is the only lit thing for a mile.' },
-    { len: 55, drain: 3.50, gap:  2.8, spd: 23, wood: 2.2, lying: 7, wx: 'fog', name: 'The road narrows',  note: 'Cliff on one side. Fewer places to find wood.' },
-    { len: 56, drain: 3.55, gap:  2.8, spd: 24, wood: 2.1, lying: 7, wx: 'sleet', name: 'Sleet',             note: 'Wet wood, hungry fire, narrow ring.' },
-    { len: 57, drain: 3.60, gap:  2.9, spd: 25, wood: 2.0, lying: 7, wx: 'clear', name: 'One before dawn',   note: 'One ring short of the Point. Do not put it down now.' },
-    { len: 58, drain: 3.70, gap:  2.8, spd: 26, wood: 2.0, lying: 7, wx: 'snow', name: 'The last night',    note: 'Hold it till the sun comes over the hill. Then you can see the mole.' }
+    { len: 40, drain: 1.90, gap: 7.00, spd: 17, wood: 2.9, lying: 6, wx: 'clear', name: 'The first watch', note: 'Wood burns down. The circle shrinks with it. Fetch more.' },
+    { len: 42, drain: 2.10, gap: 6.00, spd: 18, wood: 2.9, lying: 6, wx: 'clear', name: 'Something moved', note: 'Swing the lit torch at anything that reaches the stones.' },
+    { len: 43, drain: 2.30, gap: 5.40, spd: 18, wood: 2.8, lying: 6, wx: 'clear', name: 'Two of them', note: 'They lean on both ends of the ring at once.' },
+    { len: 45, drain: 2.50, gap: 5.00, spd: 19, wood: 2.8, lying: 6, wx: 'clear', name: 'The Milestone', note: 'A cold lamp stands west of the ring. Carry fire to it.' },
+    { len: 46, drain: 2.60, gap: 4.60, spd: 19, wood: 2.7, lying: 6, wx: 'wind', name: 'A colder wind', note: 'Wind off the moor. The fire spends itself faster.' },
+    { len: 47, drain: 2.80, gap: 4.30, spd: 20, wood: 2.7, lying: 6, wx: 'frost', name: 'Frost on the grass', note: 'Carry all you can. Every trip is time outside the light.' },
+    { len: 48, drain: 2.95, gap: 3.90, spd: 21, wood: 2.5, lying: 6, wx: 'clear', name: 'The long dark', note: 'Keep it high and the ring reaches far enough to see them coming.' },
+    { len: 50, drain: 3.10, gap: 3.70, spd: 21, wood: 2.5, lying: 6, wx: 'fog', name: 'The Broken Arch', note: 'The lamp is east, up on the bank. You will have to jump with it.' },
+    { len: 51, drain: 3.15, gap: 3.60, spd: 22, wood: 2.4, lying: 6, wx: 'clear', name: 'They learned', note: 'They wait for you to step out of the light for wood.' },
+    { len: 52, drain: 3.25, gap: 3.45, spd: 22, wood: 2.4, lying: 6, wx: 'clear', name: 'Halfway', note: 'Ten behind you by morning. Ten more between here and the Point.' },
+    { len: 53, drain: 3.35, gap: 3.30, spd: 23, wood: 2.3, lying: 6, wx: 'wind', name: 'The wind turns', note: 'Feed early. Feed often.' },
+    { len: 54, drain: 3.45, gap: 3.15, spd: 23, wood: 2.3, lying: 6, wx: 'snow', name: 'The Split Oak', note: 'West, and high up. The longest walk yet with fire in your hands.' },
+    { len: 55, drain: 3.55, gap: 3.00, spd: 24, wood: 2.2, lying: 7, wx: 'frost', name: 'A hard frost', note: 'Stay near enough to the stones to get back inside them.' },
+    { len: 58, drain: 3.90, gap: 2.20, spd: 25, wood: 2.1, lying: 7, wx: 'clear', name: 'Something bigger', note: 'They are quicker than last week, and there are more of them.' },
+    { len: 60, drain: 4.15, gap: 2.00, spd: 26, wood: 2.0, lying: 7, wx: 'wind', name: 'The dog wakes', note: 'Even the dog can hear them leaning on it now.' },
+    { len: 62, drain: 4.40, gap: 1.85, spd: 27, wood: 2.0, lying: 7, wx: 'dark', name: 'The Watchtower', note: 'Nothing overhead. The brazier on the roof has been cold for years.' },
+    { len: 64, drain: 4.55, gap: 1.82, spd: 27, wood: 1.9, lying: 7, wx: 'fog', name: 'The road narrows', note: 'Cliff on one side. Fewer places to find wood.' },
+    { len: 66, drain: 4.70, gap: 1.78, spd: 28, wood: 1.9, lying: 7, wx: 'sleet', name: 'Sleet', note: 'Wet wood, hungry fire, narrow ring.' },
+    { len: 68, drain: 4.85, gap: 1.72, spd: 28, wood: 1.8, lying: 7, wx: 'clear', name: 'One before the Point', note: 'One ring short. Do not put it down now.' },
+    { len: 72, drain: 5.00, gap: 1.65, spd: 29, wood: 1.8, lying: 7, wx: 'snow', name: 'The Mole Light', note: 'The last of the five. Light it and the whole road is lit behind you.' }
   ];
 
   function cfgFor(n) {
     if (n <= NIGHTS.length) return NIGHTS[n - 1];
     var k = n - NIGHTS.length, b = NIGHTS[NIGHTS.length - 1];
     return {
-      len: Math.min(78, b.len + k), drain: Math.min(5.4, b.drain + k * 0.05),
-      gap: Math.max(1.8, b.gap - k * 0.03), spd: Math.min(34, b.spd + k * 0.2),
-      wood: Math.max(1.6, b.wood - k * 0.02), lying: 7,
+      // Past the Point you are strong and you are going back for people, so
+      // the road has to keep up with the help you keep gaining.
+      len: Math.min(90, b.len + k * 1.5), drain: Math.min(7.0, b.drain + k * 0.13),
+      gap: Math.max(1.1, b.gap - k * 0.055), spd: Math.min(40, b.spd + k * 0.5),
+      wood: Math.max(1.3, b.wood - k * 0.035), lying: 7,
       wx: ['clear', 'snow', 'wind', 'fog', 'clear', 'sleet'][k % 6],
       name: 'Rings past the Point', note: 'Past the twenty now. Somebody has to keep them dry.'
     };
@@ -1188,6 +1265,12 @@
     { at: 3, s: 'I keep meaning to fix that tent flap.' },
     { at: 3, s: "There's a lit village three days back where they wouldn't sell me matches. Odd place." },
     { at: 4, s: 'Harrow Point. A light on the mole that nobody has to sit up with.' },
+    { at: 4, s: 'Five lamps between here and the sea. Four years dark, all of them.' },
+    { at: 5, s: 'Chest is over there if you have embers to spend. I keep the account honest.' },
+    { at: 8, s: 'A lamp does not need you once it is lit. That is the whole appeal.' },
+    { at: 12, s: 'Two lit behind us. I keep looking back at them like they might have stopped.' },
+    { at: 16, s: 'Somebody will walk this road next winter and not have to carry anything.' },
+    { at: 21, s: 'Now we go back down it. There are people sat in the dark who have not looked up yet.' },
     { at: 4, s: 'Nine houses and a bell on a post. That\u2019s the whole of it.' },
     { at: 5, s: "Most people turn back about now. You haven't." },
     { at: 6, s: "Kettle takes forever on this fire. I don't mind. Gives me something to watch." },
@@ -1218,7 +1301,9 @@
     { at: 9,  need: 'restless', s: "You said you weren't sleeping. It's a bad club to be in." },
     { at: 10, need: 'sister',   s: "You asked about her. Nobody's asked about her in a long time." },
     { at: 14, need: 'hope',     s: "You reckon she might still be there. I've decided to agree with you." },
-    { at: 19, need: 'itslit',   s: 'You called it the light before I dared to. I keep hearing you say it.' }
+    { at: 19, need: 'itslit',   s: 'You called it the light before I dared to. I keep hearing you say it.' },
+    { at: 6,  need: 'gotlamp',  s: 'You carried fire out to a lamp for me. I did not have to ask twice.' },
+    { at: 10, need: 'gotit',    s: 'Ring of light and nothing else. You had it on the second night.' }
   ];
   function musing() {
     var pool = [];
@@ -1291,17 +1376,20 @@
             { t: 'So what do you call him?', k: 'dogask',
               r: ['"Dog." Out loud. It\u2019s not my best work.'] }] },
 
-    { n: 4, topic: 'point',
-      him: ["You've probably been wondering where we're walking to.",
-            'Harrow Point. Nine houses, a beach, and a light out on the mole.',
-            "A proper light. Not a fire somebody has to sit up feeding \u2014 one that just burns."],
-      ask: [{ t: 'How far is it?', k: 'howfar',
-              r: ['Twenty rings. Twenty nights, if we make every one of them by dark.'] },
-            { t: "A light that doesn't need feeding?", k: 'asked_light',
-              r: ["That's the story. It hasn't gone out in ninety years.",
-                  "I'd like to stand under something I don't have to keep alive."] },
-            { t: "What's waiting for you there?", k: 'asked_point',
-              r: ['Someone. I hope.', "I'll tell you properly. Just not tonight."] }] },
+    { n: 4, topic: 'lamps',
+      him: ['Look west of the stones. That grey finger with the cage on top.',
+            'This road was lit end to end once. Five great lamps, a few nights apart, ' +
+            'and between them you could walk the whole way after dark.',
+            'They went out. That is the actual reason I am walking it \u2014 not just to get ' +
+            'to the Point, but to put them back.'],
+      ask: [{ t: 'We can light it from our fire?', k: 'gotlamp',
+              r: ['Take a light off the stones and carry it out there. Both hands.',
+                  "You cannot swing with a light in your hands, so pick your moment."] },
+            { t: 'Why did they go out?', k: 'whyout',
+              r: ['Nobody left to feed them. It is not more complicated than that.'] },
+            { t: 'How far is it to the Point?', k: 'howfar',
+              r: ['Twenty rings. Twenty nights, if we make every one of them by dark.',
+                  'Five lamps along the way, and the last one is the mole light itself.'] }] },
 
     { n: 5, topic: 'road',
       him: ["Four rings behind us, and you haven't missed one of them.",
@@ -1338,7 +1426,7 @@
             { t: "Honestly? I'd rather be here.", k: 'here',
               r: ['...Right.', 'Well. Good.'] }] },
 
-    { n: 8, topic: 'sleep',
+    { n: 8, topic: 'sleep', alt: 1,
       him: ['Odd question, but do you sleep alright?'],
       ask: [{ t: 'Most nights, yeah.', k: 'sleeps',
               r: ['Good. Hang on to that.'] },
@@ -1382,7 +1470,7 @@
             { t: 'Say it again.', k: 'nellname',
               r: ['...Nell.', 'Yeah. That was easier.'] }] },
 
-    { n: 12, topic: 'road',
+    { n: 12, topic: 'lamps',
       him: ['Found the long axe in the ring two back. Kettle still on the hook.',
             "Somebody laid a fire there and never lit it.",
             "You can tell. The wood was stacked and the stones were cold."],
@@ -1426,15 +1514,17 @@
               r: ['Sleep with the light on and not be the one holding it.',
                   "I haven't done that in four years."] }] },
 
-    { n: 16, topic: 'road',
-      him: ['The poker came out of a forge with no roof left on it.',
-            'Every ring on this road belonged to someone. I try to use it well.'],
-      ask: [{ t: 'You do.', k: 'praise',
-              r: ["That's the aim, anyway."] },
-            { t: "What'll you leave behind?", k: 'leave',
-              r: ['A stack of dry wood in every ring we sat in.',
+    { n: 16, topic: 'lamps',
+      him: ['The tower. Three floors of nothing and a brazier on the roof.',
+            'People sat up in that for a living once \u2014 paid, in a rota, with a roof.',
+            'Same job we do. They just had better arrangements.'],
+      ask: [{ t: 'What happened to them?', k: 'whattower',
+              r: ['The rota stopped. Then the roof went. Then the brazier.',
+                  'In that order, I think, though nobody wrote it down.'] },
+            { t: "What'll we leave behind?", k: 'leave',
+              r: ['A stack of dry wood in every ring we sat in, and five lamps burning.',
                   "It's what you do. Somebody's behind us."] },
-            { t: 'Where did the brand come from?', k: 'brandask',
+            { t: 'Where did your torch come from?', k: 'brandask',
               r: ["My own fire, first night out. It's the only thing I carry that's actually mine."] }] },
 
     { n: 17, topic: 'end',
@@ -1468,9 +1558,10 @@
             { t: 'Tell her whatever you want.', k: 'easy',
               r: ["Then I'll tell her the truth and let her make of it what she likes."] }] },
 
-    { n: 20, topic: 'end',
-      him: ['Last ring.',
-            "Tomorrow we walk in under a light neither of us has to feed.",
+    { n: 20, topic: 'lamps',
+      him: ['Last ring, and the last lamp. The mole light itself.',
+            'Light that one and the whole road is lit behind us, end to end, ' +
+            'the way it was before either of us was born.',
             "Whatever's down there, this part was good. I mean that."],
       ask: [{ t: 'It was good for me too.', k: 'mutual',
               r: ["Then that's both of us, and it's settled.",
@@ -1564,6 +1655,24 @@
     { id: 'proud',  from: 18, topic: 'us', q: 'Are you glad you started walking?',
       a: ["I wasn't, for a long stretch of it.",
           "I am tonight, and tonight's the only one I get a vote on."] },
+    { id: 'lamps',  from: 4,  topic: 'lamps', q: 'Are there really only five?',
+      a: ['Five great ones. There were little ones between, but those are long gone.',
+          'Five is what a person can carry fire to. That was the whole design of it.'] },
+    { id: 'lamplast', from: 8, topic: 'lamps', need: 'gotlamp', q: 'How long does a lamp stay lit?',
+      a: ['Years, if the hood holds. They were built to be left.',
+          'That is the difference between a lamp and a fire. A fire needs you.'] },
+    { id: 'whocare', from: 12, topic: 'lamps', q: 'Who is it we are lighting them for?',
+      a: ['Whoever is behind us. Somebody always is.',
+          'I have passed people going the other way with nothing but a lantern and nerve.'] },
+    { id: 'emb',    from: 5, until: 14, topic: 'camp', q: 'What are the embers for?',
+      a: ['Anything in the chest. He keeps a running account and he is honest about it.',
+          'Drive one off the stones and you get a little. Light a lamp and you get a lot.'] },
+    { id: 'goat',   from: 6,  topic: 'camp', q: 'Where do the animals keep coming from?',
+      a: ['Out of the dark, mostly, and they will not be talked out of it.',
+          'I have stopped questioning anything that walks into a lit ring and stays.'] },
+    { id: 'people', from: 21, topic: 'us', q: 'How many are still out there?',
+      a: ['On this road? More than I want to think about.',
+          'They will have heard the lamps go up. That is the point of lamps.'] },
     { id: 'name2',  from: 19, topic: 'us', q: 'Will you remember my name after all this?',
       a: ['{you}.',
           "I've been saying it to myself between the rings. It stuck."] }
@@ -1583,12 +1692,17 @@
     { id: 'dog',    x: 0, verb: 'FEED\nDOG',    did: 'Fed him', say: 'He will bark a good deal sooner now.',
       max: 1, dur: 2.3, beats: [0.2, 0.34, 0.78], off: 34 },
     { id: 'talk',   x: 0, verb: 'SIT\nWITH HIM', did: '', say: '', talk: 1,
-      max: 1, dur: 0, beats: [], off: 30 }
+      max: 1, dur: 0, beats: [], off: 30 },
+    { id: 'arms',   x: 0, verb: 'THE\nCHEST',    did: '', say: '', arms: 1,
+      max: 99, dur: 0, beats: [], off: 28 }
   ];
   CHORES[0].x = AT.chop; CHORES[1].x = AT.barrel; CHORES[2].x = AT.stool;
   CHORES[3].x = AT.fire; CHORES[4].x = AT.bowl;  CHORES[5].x = AT.seat + 40;
+  CHORES[6].x = AT.chest;
   var PREP = null;
-  function resetPrep() { PREP = { wood: 0, kettle: 0, brand: 0, banked: 0, dog: 0, talk: 0 }; }
+  function resetPrep() {
+    PREP = { wood: 0, kettle: 0, brand: 0, banked: 0, dog: 0, talk: 0, arms: 0 };
+  }
   function prepDone() {
     return PREP.wood + PREP.kettle + PREP.brand + PREP.banked + PREP.dog + PREP.talk;
   }
@@ -1602,39 +1716,158 @@
   function choreAt(x) { var st = stationAt(x); return st && !st.done ? st.c : null; }
 
   var FUEL_MAX = 100, FUEL_START = 62, LOG_FUEL = 20, MAXCARRY = 3;
+  var LAMP_H = 74, LIGHT_LIFE = 13;      // how tall a lamp stands, how long a carried light lasts
   var SPEED = 76, SWING_CD = 0.38, SWING_RANGE = 34, BITE = 11;
 
   // ── what he swings ────────────────────────────────────────────────────────
-  // Fire is the only thing that touches them, so every one of these carries
-  // some. One new one every five nights: longer, quicker, and each hits more
-  // of them at once — the road answers back a little harder each time.
+  // Fire is the only thing that touches them, so everything here carries some.
+  // The torch you start with. The rest are found on the road and paid for in
+  // embers, and every one of them takes three levels of work after that.
   var WEAPONS = [
-    { at: 1,  id: 'brand',   name: 'The brand',      kind: 'brand',
-      say: 'A lit stick out of the fire. Nothing else touches them.',
-      reach: 36, cd: 0.38, hits: 1, dmg: 1, dur: 0.30, kb: 0,  trail: 0, high: 22 },
-    { at: 6,  id: 'hatchet', name: 'The hatchet',    kind: 'axe',
-      say: 'Head kept in the coals between swings. It bites where the brand only pushed.',
-      reach: 41, cd: 0.34, hits: 2, dmg: 1, dur: 0.28, kb: 16, trail: 0, high: 26 },
-    { at: 11, id: 'longaxe', name: 'The long axe',   kind: 'axe',
-      say: 'Two hands, and the head glowing. One swing clears the whole arc.',
-      reach: 49, cd: 0.32, hits: 3, dmg: 2, dur: 0.30, kb: 28, trail: 0, high: 32 },
-    { at: 16, id: 'poker',   name: 'The iron poker', kind: 'poker',
-      say: 'Straight out of the coals and it stays hot. Whatever it touches keeps burning.',
-      reach: 55, cd: 0.28, hits: 4, dmg: 2, dur: 0.26, kb: 24, trail: 1, high: 34 },
-    { at: 21, id: 'light',   name: 'The old light',  kind: 'light',
-      say: 'A lantern on a chain. Carry the light to them instead of waiting.',
-      reach: 63, cd: 0.24, hits: 6, dmg: 3, dur: 0.24, kb: 36, trail: 2, high: 38 }
+    { id: 'torch', name: 'The torch', kind: 'torch', at: 1, cost: 0,
+      say: 'A whole head of pitch and rag. It does not cut them \u2014 it knocks them off their feet.',
+      note: 'Wide, heavy, and it throws them back off the stones.',
+      reach: 46, cd: 0.34, hits: 3, dmg: 1, dur: 0.30, kb: 40, high: 28, arc: 1.5, trail: 0 },
+    { id: 'longaxe', name: 'The long axe', kind: 'axe', at: 4, cost: 70,
+      say: 'Two hands, head kept in the coals. One swing clears the whole arc.',
+      note: 'Slower than the torch and it hurts a great deal more.',
+      reach: 57, cd: 0.35, hits: 4, dmg: 2, dur: 0.32, kb: 28, high: 34, arc: 1.2, trail: 0 },
+    { id: 'bow', name: 'The fire-bow', kind: 'bow', at: 8, cost: 170,
+      say: 'Arrows with rag round the head. You can put one out past the stones now.',
+      note: 'Reaches them before they reach you. Nothing much up close.',
+      reach: 26, cd: 0.52, hits: 1, dmg: 2, dur: 0.22, kb: 8, high: 20, arc: 0.7,
+      shot: 'arrow', speed: 330, range: 290, pierce: 1, sdmg: 2, trail: 0 },
+    { id: 'lock', name: 'The firelock', kind: 'lock', at: 12, cost: 320,
+      say: 'Powder and a pan of coals. Loud, filthy, and it takes a whole rank of them.',
+      note: 'A spread of embers. Slow to load, and it clears a lane.',
+      reach: 24, cd: 0.95, hits: 1, dmg: 2, dur: 0.26, kb: 14, high: 18, arc: 0.6,
+      shot: 'shot', speed: 300, range: 190, pellets: 5, spread: 0.30, pierce: 2, sdmg: 2, trail: 0 },
+    { id: 'light', name: 'The old light', kind: 'light', at: 16, cost: 560,
+      say: 'A lantern that has not gone out in ninety years. It finds them on its own.',
+      note: 'Throws a spark at the nearest of them without being asked.',
+      reach: 58, cd: 0.30, hits: 6, dmg: 2, dur: 0.26, kb: 40, high: 36, arc: 1.8,
+      shot: 'spark', speed: 250, range: 250, pierce: 1, sdmg: 2, aim: 1, auto: 1.15, trail: 2 }
   ];
-  function wepFor(n) {
-    var w = WEAPONS[0];
-    for (var i = 0; i < WEAPONS.length; i++) if (n >= WEAPONS[i].at) w = WEAPONS[i];
-    return w;
+  var UPG_COST = [0, 90, 200, 380];                  // to reach level 1, 2, 3
+  var ARM_MAX = 3;
+
+  function wepById(id) {
+    for (var i = 0; i < WEAPONS.length; i++) if (WEAPONS[i].id === id) return WEAPONS[i];
+    return WEAPONS[0];
+  }
+  function owned(id) { return id === 'torch' || (save.arms && save.arms[id] != null); }
+  function armLvl(id) { return (save.arms && save.arms[id]) || 0; }
+  // what a weapon actually does once he has worked on it
+  function wepStats(id) {
+    var B = wepById(id), L = armLvl(id), o = {};
+    for (var k in B) o[k] = B[k];
+    o.lvl = L;
+    o.reach = B.reach + L * 5;
+    o.cd = B.cd * (1 - L * 0.09);
+    o.dmg = B.dmg + (L >= 2 ? 1 : 0);
+    o.sdmg = (B.sdmg || 0) + (L >= 2 ? 1 : 0);
+    o.hits = B.hits + (L >= 3 ? 2 : L >= 1 ? 1 : 0);
+    o.kb = B.kb + L * 7;
+    if (B.pellets) o.pellets = B.pellets + L;
+    if (B.auto) o.auto = B.auto * (1 - L * 0.12);
+    if (B.range) o.range = B.range + L * 24;
+    return o;
+  }
+  function wepFor(n) {                                // what he is carrying tonight
+    var id = save.wep && owned(save.wep) ? save.wep : 'torch';
+    return wepStats(id);
   }
   function wepTier(n) {
     var k = 0;
-    for (var i = 0; i < WEAPONS.length; i++) if (n >= WEAPONS[i].at) k = i;
+    for (var i = 0; i < WEAPONS.length; i++) if (owned(WEAPONS[i].id)) k = i;
     return k;
   }
+  // anything he could buy tonight but has not
+  function offered(n) {
+    var out = [];
+    for (var i = 0; i < WEAPONS.length; i++) {
+      var Wp = WEAPONS[i];
+      if (n >= Wp.at && !owned(Wp.id)) out.push(Wp);
+    }
+    return out;
+  }
+
+  // ── the five great lamps ──────────────────────────────────────────────────
+  // The road used to be lit end to end. These are what is left of it, and
+  // putting them back is the whole of why he is walking rather than hiding.
+  var LANDMARKS = [
+    { at: 4,  id: 'mile',  name: 'The Milestone',    x: 372,
+      of: 'A stone finger with a cage on top. First of them, and the nearest to home.',
+      him: 'That is the first of the five. Nobody has been up it in four years.' },
+    { at: 8,  id: 'arch',  name: 'The Broken Arch',  x: 880,
+      of: 'Half a bridge with a lamp still bolted to the standing side.',
+      him: 'They lit that one from a boat, once. We will have to do it the hard way.' },
+    { at: 12, id: 'oak',   name: 'The Split Oak',    x: 208,
+      of: 'Lightning took the top off it. Somebody hung a lamp in what was left.',
+      him: 'Struck once and still standing. I have always liked that one.' },
+    { at: 16, id: 'tower', name: 'The Watchtower',   x: 1054,
+      of: 'Three floors of nothing and a brazier on the roof.',
+      him: 'People sat up in that for a living once. Same job as ours.' },
+    { at: 20, id: 'mole',  name: 'The Mole Light',   x: 1170,
+      of: 'The last one. From the top of it you can see Harrow Point.',
+      him: 'That is the one. Light that and the whole road is lit behind us.' }
+  ];
+  function markFor(n) {
+    for (var i = 0; i < LANDMARKS.length; i++) if (LANDMARKS[i].at === n) return LANDMARKS[i];
+    return null;
+  }
+  function litMark(id) { return save.lamps && save.lamps.indexOf(id) >= 0; }
+
+  // ── who walks with you ────────────────────────────────────────────────────
+  // One every five nights. None of them fight; they take a job off the two of
+  // you, which is the only kind of help that matters out here.
+  var ANIMALS = [
+    { at: 5,  id: 'goat',  name: 'The goat',  of: 'Carries a load nobody else wants to.',
+      perk: 'You can carry four logs instead of three.',
+      him: 'She followed us out of the last ring and would not be talked out of it.' },
+    { at: 10, id: 'crow',  name: 'The crow',  of: 'Sits high and watches the dark.',
+      perk: 'The Quiet cannot stay hidden from you.',
+      him: 'He sees them before either of us does. I have stopped arguing with him.' },
+    { at: 15, id: 'cat',   name: 'The cat',   of: 'Sleeps on the woodpile, which turns out to matter.',
+      perk: 'Nothing steals wood off the ground any more.',
+      him: 'The thieves have not been back since she arrived. Draw your own conclusions.' },
+    { at: 20, id: 'pony',  name: 'The pony',  of: 'Hauls dry wood between the rings.',
+      perk: 'The fire burns down a fifth slower.',
+      him: 'He came with a cart and no owner. We have not asked.' }
+  ];
+  function hasPet(id) { return save.pets && save.pets.indexOf(id) >= 0; }
+  function petFor(n) {
+    for (var i = 0; i < ANIMALS.length; i++) if (ANIMALS[i].at === n) return ANIMALS[i];
+    return null;
+  }
+
+  // ── and after the twenty ──────────────────────────────────────────────────
+  // Past the Point the road keeps going, and it is full of people who sat up
+  // alone until their ring went out. You go back for them, three nights apart.
+  var FOLK = [
+    { at: 23, id: 'mara',  name: 'Mara',   of: 'Held the eighth ring on her own for two winters.',
+      perk: 'She feeds the fire while you are away from it.',
+      him: 'She had four logs left and was rationing them. Four.' },
+    { at: 26, id: 'obie',  name: 'Obie',   of: 'A lamplighter, before there was nothing left to light.',
+      perk: 'The ring starts every night a good deal wider.',
+      him: 'He knew every lamp on this road by name. He wept at the tower.' },
+    { at: 29, id: 'sella', name: 'Sella',  of: 'Walked out of the dark with a bow and no explanation.',
+      perk: 'She puts an arrow into anything that gets close to the stones.',
+      him: 'I asked where she learned it. She said "here". That was the whole answer.' },
+    { at: 32, id: 'tam',   name: 'Tam',    of: 'Twelve, and better with an axe than either of us.',
+      perk: 'Wood turns up on the pile without anyone fetching it.',
+      him: 'He asked whether we were the ones relighting them. Word gets about.' },
+    { at: 35, id: 'nell',  name: 'Nell',   of: 'Four summers at the Point, keeping the mole light in.',
+      perk: 'She holds the far side of the ring. Nothing gets past her.',
+      him: 'She said "you took your time." I have not stopped grinning.' }
+  ];
+  function hasFolk(id) { return save.folk && save.folk.indexOf(id) >= 0; }
+  function folkFor(n) {
+    for (var i = 0; i < FOLK.length; i++) if (FOLK[i].at === n) return FOLK[i];
+    return null;
+  }
+  function joinedCount() { return (save.pets ? save.pets.length : 0) + (save.folk ? save.folk.length : 0); }
+
   var GUARD = 1;                 // the deliberation beat; off only for tests
   var GRAV = 900, JUMPV = 268, STEP_UP = 17;   // one tile he walks up, two he jumps
 
@@ -1649,7 +1882,8 @@
   var KEY2 = 'nightwatch.pixel.v1.keep';
   var save = { night: 1, best: 0, kept: 0, logs: 0, muted: false, music: true, buzz: true,
                look: null, mem: null, tune: 0, loop: false, vox: true, metHim: 0,
-               him: 'Wren', build: '' };
+               him: 'Wren', build: '',
+               emb: 0, wep: 'torch', arms: null, lamps: null, pets: null, folk: null };
 
   function readSlot(k) {
     try {
@@ -1684,7 +1918,8 @@
   // A save code moves the nights, the names, the look and everything he
   // remembers across by hand.
   var CODE_KEYS = { n: 'night', b: 'best', k: 'kept', g: 'logs', h: 'metHim',
-                    w: 'him', o: 'look', m: 'mem', t: 'tune' };
+                    w: 'him', o: 'look', m: 'mem', t: 'tune',
+                    e: 'emb', v: 'wep', r: 'arms', p: 'lamps', z: 'pets', f: 'folk' };
   function b64(str) {
     return btoa(unescape(encodeURIComponent(str)))
       .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -1742,7 +1977,7 @@
   }
   function applyCode(got) {
     merge(got);
-    loadMem(); loadLook(); loadHim(); loadMusic();
+    loadMem(); loadLook(); loadHim(); loadKit(); loadMusic();
     store();
     return true;
   }
@@ -1775,6 +2010,15 @@
   function loadHim() {
     if (typeof save.him === 'string' && save.him) HIM.name = save.him;
     save.him = HIM.name;
+  }
+  // everything he has picked up on the road, in one place
+  function loadKit() {
+    if (!save.arms || typeof save.arms !== 'object') save.arms = {};
+    if (!Array.isArray(save.lamps)) save.lamps = [];
+    if (!Array.isArray(save.pets)) save.pets = [];
+    if (!Array.isArray(save.folk)) save.folk = [];
+    if (typeof save.emb !== 'number' || !isFinite(save.emb)) save.emb = 0;
+    if (!save.wep || !owned(save.wep)) save.wep = 'torch';
   }
 
   // ── sound, kept quiet ─────────────────────────────────────────────────────
@@ -2883,6 +3127,10 @@
       cd: wepFor(n).cd - PREP.brand * 0.04,
       trails: [],
       dogged: PREP.dog, pile: PREP.wood, pileT: 0,
+      carryMax: MAXCARRY + (hasPet('goat') ? 1 : 0),
+      helpT: 3, arrowT: 4, autoT: 0, emb: 0,
+      lamp: markFor(n), lampLit: 0, light: 0, rite: 0, riteT: 0,
+      shots: [],
       x: FIREX + 30, y: GY, vy: 0, onGround: true, jumpHeld: false,
       dir: -1, step: 0, carry: 0, moving: 0,
       swing: 0, swingCd: 0, feed: 0,
@@ -2890,8 +3138,18 @@
       woodT: 0.6, shadeT: Math.min(4, cfg.gap), fed: 0, driven: 0, bitten: 0, foot: 0,
       shake: 0, over: null
     };
+    if (S.lamp && litMark(S.lamp.id)) { S.lampLit = 1; }
+    if (hasPet('pony')) S.cfg = slower(cfg, 0.8);
+    if (hasFolk('obie')) S.fuel = Math.min(FUEL_MAX, S.fuel + 16);
     for (var i = 0; i < 3; i++) dropLog();
     markRoad(n);
+  }
+
+  // the pony hauls dry wood, so the fire spends itself slower
+  function slower(cfg, k) {
+    var o = {}; for (var q in cfg) o[q] = cfg[q];
+    o.drain = cfg.drain * k;
+    return o;
   }
 
   // ── the camp between nights: no clock, no shades, just the place ──────────
@@ -2948,44 +3206,63 @@
     { id: 'quiet',   from: 17, hp: 2, spd: 0.88, bite: 1.3, lo: 34, hi: 92,  w: 2,
       name: 'The Quiet',  of: 'You will not see it until the light happens to land on it.', hidden: 1 },
     { id: 'thief',   from: 19, hp: 1, spd: 1.75, bite: 0,   lo: 10, hi: 26,  w: 2,
-      name: 'Ember thief', of: 'Not interested in the fire. It is after the wood you left lying.', steals: 1 }
+      name: 'Ember thief', of: 'Not interested in the fire. It is after the wood you left lying.', steals: 1 },
+    { id: 'wisp',    from: 10, hp: 1, spd: 1.95, bite: 0.7, lo: 48, hi: 104, w: 3,
+      name: 'Wisp',       of: 'Quick and thin and never quite where you swung.' },
+    { id: 'maw',     from: 15, hp: 4, spd: 0.66, bite: 2.2, lo: 18, hi: 44,  w: 2,
+      name: 'The Maw',    of: 'Slow, and it takes a bite worth two of anything else.' },
+    { id: 'swarm',   from: 18, hp: 1, spd: 1.70, bite: 0.6, lo: 30, hi: 88,  w: 4,
+      name: 'Cinderflies', of: 'They come three and four at a time. Swing wide.', many: 3 },
+    { id: 'dredge',  from: 22, hp: 6, spd: 0.60, bite: 2.6, lo: 20, hi: 40,  w: 2,
+      name: 'Dredge',     of: 'Something the dark built out of what it took. Shoot it.', armour: 1 }
   ];
   function beastFor(n) {
     var pool = [], i, b;
     for (i = 0; i < BEASTS.length; i++) {
       b = BEASTS[i];
       if (n < b.from) continue;
-      var fresh = n - b.from < 4 ? 2 : 0;             // a new one shows up often at first
+      // A new one shows up often at first — but a tough newcomer flooding the
+      // road turned the night it arrives into a wall rather than a step.
+      var fresh = n - b.from < 4 ? Math.max(0, 3 - b.hp) : 0;
       for (var k = 0; k < b.w + fresh; k++) pool.push(b);
     }
     return pool[Math.floor(Math.random() * pool.length)] || BEASTS[0];
   }
 
   function spawnShade() {
-    var cap = 3 + Math.round((S.tier || 0) * 1.6) + Math.floor(S.n / 9);
+    // The road answers the armoury. Carry the lantern and it sends crowds.
+    var cap = 4 + Math.round((S.tier || 0) * 2.4) + Math.floor(S.n / 6);
     if (S.shades.length >= cap) return;
     var B = beastFor(S.n);
     var side = Math.random() < 0.5 ? -1 : 1;
     var d = 210 + Math.random() * 260;
     var sx = FIREX + side * d;
     if (sx < 20 || sx > WORLD - 20) side = -side, sx = FIREX + side * d;
+    if (B.hidden && hasPet('crow')) B = { ...B, hidden: 0 };
     if (MEM && !MEM.tags['met_' + B.id]) {          // he names it the first time
       MEM.tags['met_' + B.id] = 1; store();
       banner(B.name, B.of, 2800);
     }
-    var y0 = GY - B.lo - Math.random() * (B.hi - B.lo);
-    S.shades.push({
-      b: B, x: sx, y: y0, y0: y0, ph: Math.random() * 6.28,
-      side: side, d0: Math.abs(sx - FIREX),
-      hp: B.hp, maxhp: B.hp, flash: 0, stun: 0, burn: 0, got: 0
-    });
+    // some of them do not arrive on their own
+    for (var m = 0; m < (B.many || 1) && S.shades.length < cap; m++) {
+      var y0 = GY - B.lo - Math.random() * (B.hi - B.lo);
+      var mx = sx + side * m * 22;
+      S.shades.push({
+        b: B, x: mx, y: y0, y0: y0, ph: Math.random() * 6.28,
+        side: side, d0: Math.abs(mx - FIREX),
+        hp: B.hp, maxhp: B.hp, flash: 0, stun: 0, burn: 0, got: 0
+      });
+    }
   }
 
   // one swing: everything in the arc over his head and down in front of him
   function strike(W) {
-    var lo = S.y - 6, hi = S.y - 20 - W.high;
-    var x0 = Math.min(S.x - 6, S.x + S.dir * W.reach);
-    var x1 = Math.max(S.x + 6, S.x + S.dir * W.reach);
+    // The arc is a wedge, not a line. A torch is a great burning head on a
+    // stick and it takes anything stood in front of him, high or low.
+    var pad = 10 * (W.arc || 1);
+    var lo = S.y - 6 + pad, hi = S.y - 20 - W.high - pad;
+    var x0 = Math.min(S.x - 6, S.x + S.dir * W.reach) - pad;
+    var x1 = Math.max(S.x + 6, S.x + S.dir * W.reach) + pad;
     var got = 0;
     for (var i = S.shades.length - 1; i >= 0 && got < W.hits; i--) {
       var sh = S.shades[i];
@@ -2994,7 +3271,7 @@
       got++;
       hurt(i, W.dmg, S.dir, W.kb);
     }
-    if (got) bell(560, 0.2, 0.06, 2400);
+    if (got) { bell(560, 0.2, 0.06, 2400); S.shake = Math.max(S.shake, 0.12 * (W.arc || 1)); }
     else bell(240, 0.08, 0.025, 700);
     if (W.trail) {                                  // the poker and the light leave fire
       for (var q = 0; q <= 5; q++) {
@@ -3005,14 +3282,81 @@
       }
     }
   }
+  // ── things he sends out past the stones ───────────────────────────────────
+  function nearestShade(fromX, fromY, maxD) {
+    var best = null, bd = maxD == null ? 1e9 : maxD;
+    for (var i = 0; i < S.shades.length; i++) {
+      var sh = S.shades[i], d = Math.abs(sh.x - fromX) + Math.abs(sh.y - fromY) * 0.6;
+      if (d < bd) { bd = d; best = sh; }
+    }
+    return best;
+  }
+  function launch(W, vx, vy, homing) {
+    S.shots.push({ x: S.x + S.dir * 12, y: S.y - 22, vx: vx, vy: vy,
+                   dmg: W.sdmg || W.dmg, left: W.pierce || 1, kind: W.shot,
+                   life: (W.range || 240) / Math.max(40, Math.abs(vx) + Math.abs(vy)) + 0.2,
+                   home: homing || null, kb: Math.round((W.kb || 0) * 0.4) });
+  }
+  function fire(W) {
+    if (!W.shot) return;
+    if (W.shot === 'shot') {                           // a pan of embers, all at once
+      for (var q = 0; q < (W.pellets || 4); q++) {
+        var a2 = (Math.random() - 0.5) * (W.spread || 0.3);
+        launch(W, S.dir * W.speed * Math.cos(a2), W.speed * Math.sin(a2) * 0.5);
+      }
+      bell(120, 0.24, 0.07, 900);
+      S.shake = Math.max(S.shake, 0.2);
+      return;
+    }
+    if (W.aim) {                                       // the lantern picks its own
+      var tgt = nearestShade(S.x, S.y - 22, W.range);
+      if (!tgt) return;
+      var dx = tgt.x - S.x, dy = tgt.y - (S.y - 22), m = Math.hypot(dx, dy) || 1;
+      launch(W, dx / m * W.speed, dy / m * W.speed, tgt);
+      bell(880, 0.1, 0.03, 3000);
+      return;
+    }
+    launch(W, S.dir * W.speed, -22);                   // the bow
+    bell(640, 0.12, 0.035, 2200);
+  }
+  function stepShots(dt) {
+    for (var i = S.shots.length - 1; i >= 0; i--) {
+      var b = S.shots[i];
+      b.life -= dt;
+      if (b.home) {                                    // it follows what it was thrown at
+        if (S.shades.indexOf(b.home) < 0) b.home = null;
+        else {
+          var dx = b.home.x - b.x, dy = b.home.y - b.y, m = Math.hypot(dx, dy) || 1,
+              sp = Math.hypot(b.vx, b.vy);
+          b.vx += (dx / m * sp - b.vx) * Math.min(1, dt * 7);
+          b.vy += (dy / m * sp - b.vy) * Math.min(1, dt * 7);
+        }
+      } else b.vy += 60 * dt;
+      b.x += b.vx * dt; b.y += b.vy * dt;
+      if (b.life <= 0 || b.y > groundY(b.x) - 2 || b.x < 4 || b.x > WORLD - 4) {
+        burst(b.x, b.y, 4, 12, ['#ffd27a', '#c96a1e'], 8);
+        S.shots.splice(i, 1); continue;
+      }
+      for (var k = S.shades.length - 1; k >= 0; k--) {
+        var sh = S.shades[k];
+        if (Math.abs(sh.x - b.x) > 13 || Math.abs(sh.y - b.y) > 13) continue;
+        hurt(k, b.dmg, b.vx > 0 ? 1 : -1, b.kb, 1);
+        if (--b.left <= 0) { S.shots.splice(i, 1); }
+        break;
+      }
+    }
+  }
+
   // damage one of them; drive it off if that finishes it
-  function hurt(i, dmg, dir, kb) {
+  function hurt(i, dmg, dir, kb, shot) {
     var sh = S.shades[i];
+    if (sh.b && sh.b.armour && !shot) dmg = Math.max(1, Math.floor(dmg / 2));
     sh.hp -= dmg;
     sh.flash = 0.14;
     if (kb) { sh.x += dir * kb; sh.stun = 0.22; }
     if (sh.hp <= 0) {
       S.shades.splice(i, 1); S.driven++;
+      S.emb += 1 + ((sh.b && sh.b.hp) || 1);           // embers, off the ones you drive off
       burst(sh.x, sh.y, 11, 16);
     } else {
       burst(sh.x, sh.y, 4, 10, ['#c9b6ff', '#6b5aa0'], 8);
@@ -3182,6 +3526,7 @@
       if (hitA && S.swingCd <= 0) {
         var st = stationAt(S.x);
         S.swingCd = 0.35;
+        if (st && !st.done && st.c.arms) { armsCard(); return; }
         if (st && !st.done && st.c.talk) {
           S.x = st.c.x + (S.x < st.c.x ? -1 : 1) * st.c.off;
           S.y = groundY(S.x); S.dir = S.x < st.c.x ? 1 : -1;
@@ -3209,6 +3554,64 @@
       return;
     }
 
+    // ── the lamp, and the fire you have to carry to it ──────────────────
+    // This is the point of the whole walk. On a landmark night a cold lamp
+    // stands out past the ring; you take a light off the fire and carry it
+    // there, and while you are carrying it you cannot swing at anything.
+    if (S.rite) {
+      S.riteT += dt;
+      if (S.riteT > 0.55 && !S.riteFlare) {
+        S.riteFlare = 1;
+        S.lampLit = 1;
+        burst(S.lamp.x, GY - LAMP_H, 46, 90, ['#fffbe6', '#ffd27a', '#ff9a2e'], 26, -30);
+        S.shake = 0.5;
+        bell(180, 0.9, 0.08, 1400);
+        setTimeout(function () { bell(520, 1.1, 0.06, 2800); }, 200);
+        if (save.lamps.indexOf(S.lamp.id) < 0) { save.lamps.push(S.lamp.id); store(); }
+        S.emb += 40;
+        banner(S.lamp.name + ' \u2014 lit',
+               'That is one more of the five. The road is lit that far behind you.', 5200);
+      }
+      if (S.riteT > 2.4) { S.rite = 0; S.light = 0; }
+      S.moving = 0;
+    } else if (S.light > 0) {
+      S.light -= dt;
+      if (S.light <= 0) {
+        S.light = 0;
+        banner('It went out', 'Back to the fire and take another. Do not run with it.', 4000);
+        bell(150, 0.4, 0.05, 700);
+      } else if (Math.random() < dt * 22) {
+        S.sparks.push({ x: S.x + S.dir * 8, y: S.y - 26, vx: (Math.random() - 0.5) * 10,
+                        vy: -14 - Math.random() * 10, life: 0.5, g: 10 });
+      }
+    }
+    var atLamp = !!(S.lamp && !S.lampLit && Math.abs(S.x - S.lamp.x) < 26);
+    var atFire = Math.abs(S.x - FIREX) < 32;
+    if (hitA && !S.rite) {
+      if (S.light > 0 && atLamp) {                     // put it to the lamp
+        S.rite = 1; S.riteT = 0; S.riteFlare = 0; S.dir = 1;
+        S.swing = 0; S.swingCd = 0.6;
+      } else if (S.light <= 0 && atFire && S.lamp && !S.lampLit && S.fuel > 18) {
+        S.light = LIGHT_LIFE; S.fuel = Math.max(0, S.fuel - 6);
+        bell(700, 0.2, 0.05, 2600);
+        banner('Carrying fire', 'It burns down as you walk, and you cannot swing while you hold it.', 4600);
+        hitA = false;
+      }
+    }
+    if (S.rite) {                                      // nothing else happens mid-rite
+      S.left -= dt;
+      S.fuel = Math.max(0, S.fuel - cfg.drain * dt * 0.4);
+      var wantR = Math.max(0, Math.min(WORLD - W, S.x - W / 2));
+      S.cam += (wantR - S.cam) * Math.min(1, dt * 7);
+      for (var qs = S.sparks.length - 1; qs >= 0; qs--) {
+        var sq = S.sparks[qs];
+        sq.life -= dt * 0.95; if (sq.life <= 0) { S.sparks.splice(qs, 1); continue; }
+        sq.x += sq.vx * dt; sq.y += sq.vy * dt; sq.vy += (sq.g == null ? 42 : sq.g) * dt;
+      }
+      if (S.shake > 0) S.shake -= dt;
+      return;
+    }
+
     // ── the swing, over the top and down
     var WEP = S.wep || WEAPONS[0];
     if (S.swingCd > 0) S.swingCd -= dt;
@@ -3216,10 +3619,17 @@
       S.swing -= dt;
       if (S.swing <= WEP.dur * 0.42 && !S.landed) { S.landed = 1; strike(WEP); }
     }
-    if (hitA && S.swingCd <= 0) {
+    if (hitA && S.swingCd <= 0 && !S.light) {
       S.swingCd = S.cd || WEP.cd; S.swing = WEP.dur; S.landed = 0;
-      bell(WEP.kind === 'brand' ? 190 : 150, 0.14, 0.05, 900);
+      fire(WEP);
+      bell(WEP.kind === 'torch' ? 190 : 150, 0.14, 0.05, 900);
     }
+    // the old light does not wait to be asked
+    if (WEP.aim && WEP.auto && !S.light) {
+      S.autoT -= dt;
+      if (S.autoT <= 0) { S.autoT = WEP.auto; fire(WEP); }
+    }
+    stepShots(dt);
     for (var tr = S.trails.length - 1; tr >= 0; tr--) {      // fire left hanging
       var TR = S.trails[tr];
       TR.life -= dt;
@@ -3238,7 +3648,7 @@
     // picking wood up on the way past
     for (var j = S.logs.length - 1; j >= 0; j--) {
       S.logs[j].born += dt;
-      if (S.carry < MAXCARRY && Math.abs(S.logs[j].x - S.x) < 17
+      if (S.carry < (S.carryMax || MAXCARRY) && Math.abs(S.logs[j].x - S.x) < 17
           && Math.abs(S.logs[j].y - S.y) < 26) {
         S.logs.splice(j, 1); S.carry++;
         bell(300, 0.1, 0.045, 1400);
@@ -3247,7 +3657,7 @@
     S.woodT -= dt;
     if (S.woodT <= 0) { S.woodT = cfg.wood; dropLog(); }
     if (S.pileT > 0) S.pileT -= dt;
-    if (S.pile > 0 && S.carry < MAXCARRY && S.pileT <= 0
+    if (S.pile > 0 && S.carry < (S.carryMax || MAXCARRY) && S.pileT <= 0
         && Math.abs(S.x - AT.chop) > 0 && Math.abs(S.x - AT.pile) < 20) {
       S.pile--; S.carry++; S.pileT = 0.3;
       bell(300, 0.1, 0.045, 1400);
@@ -3262,6 +3672,38 @@
       bell(420, 0.26, 0.05, 1700);
     }
 
+    // ── the ones who came back with you ─────────────────────────────────
+    if (hasFolk('mara')) {                             // she feeds it while you are away
+      S.helpT -= dt;
+      if (S.helpT <= 0 && Math.abs(S.x - FIREX) > 90 && S.fuel < FUEL_MAX - LOG_FUEL) {
+        S.helpT = 9; S.fuel = Math.min(FUEL_MAX, S.fuel + LOG_FUEL * 0.7);
+        burst(FIREX, GY - 14, 7, 24);
+      }
+    }
+    if (hasFolk('sella')) {                            // an arrow into anything close in
+      S.arrowT -= dt;
+      if (S.arrowT <= 0) {
+        var near = null;
+        for (var na = 0; na < S.shades.length; na++)
+          if (Math.abs(S.shades[na].x - FIREX) < 120 &&
+              (!near || Math.abs(S.shades[na].x - FIREX) < Math.abs(near.x - FIREX))) near = S.shades[na];
+        if (near) {
+          S.arrowT = 3.4;
+          hurt(S.shades.indexOf(near), 2, near.x > FIREX ? 1 : -1, 14);
+          bell(700, 0.09, 0.03, 2400);
+        } else S.arrowT = 0.5;
+      }
+    }
+    if (hasFolk('tam') && S.logs.length < 3 && Math.random() < dt * 0.5) dropLog();
+    if (hasFolk('nell')) {                             // she holds the far side
+      for (var nf = S.shades.length - 1; nf >= 0; nf--) {
+        var fs = S.shades[nf];
+        if (Math.sign(fs.x - FIREX) === -S.dir && Math.abs(fs.x - FIREX) < 46 && Math.random() < dt * 2.2) {
+          hurt(nf, 2, fs.x > FIREX ? 1 : -1, 20);
+        }
+      }
+    }
+
     // the shades
     S.shadeT -= dt;
     if (S.shadeT <= 0) { S.shadeT = cfg.gap; spawnShade(); }
@@ -3271,6 +3713,11 @@
       if (s2.stun > 0) { s2.stun -= dt; continue; }
 
       // the thief goes for wood on the ground, not for the fire
+      if (B2.steals && hasPet('cat')) {                // she sees them off the woodpile
+        S.shades.splice(k, 1);
+        burst(s2.x, s2.y, 6, 14, ['#c9b6ff', '#6b5aa0'], 10);
+        continue;
+      }
       if (B2.steals) {
         var want = null;
         for (var lj = 0; lj < S.logs.length; lj++)
@@ -3452,6 +3899,23 @@
                     Math.abs(sh.x - FIREX) < reachR0);
     }
 
+    if (S.lamp) lampPost(px, Math.round(S.lamp.x) - cam, S.lampLit,
+                         S.light > 0 && Math.abs(S.x - S.lamp.x) < 40);
+    for (var bq = 0; S.shots && bq < S.shots.length; bq++) {   // arrows, shot, sparks
+      var bb = S.shots[bq], bx = Math.round(bb.x) - cam, byy = Math.round(bb.y);
+      if (bb.kind === 'arrow') {
+        var ad = bb.vx > 0 ? 1 : -1;
+        px(C.wood1, bx - ad * 5, byy, 7, 1);
+        px(C.fire3, bx, byy - 1, 3, 3);
+        px(C.fire4, bx, byy, 2, 2);
+      } else if (bb.kind === 'shot') {
+        px(C.fire2, bx, byy, 2, 2); px(C.fire4, bx, byy, 1, 1);
+      } else {
+        disc(px, C.fire2, bx - 2, byy - 2, 5, 5);
+        px('#fffbe6', bx, byy, 2, 2);
+      }
+    }
+
     // him
     var hx2 = Math.round(S.x) - cam, hy2 = Math.round(S.y);
     for (var tq = 0; tq < S.trails.length; tq++) {   // fire hanging in the air
@@ -3464,7 +3928,17 @@
     guy(px, hx2, hy2, t, S.dir, pose, S.step);
     if (S.carry) armful(px, hx2, hy2, S.carry, S.dir);
 
-    var tip = weapon(px, hx2, hy2, S.dir, S.wep || WEAPONS[0], S.swing);
+    var tip;
+    if (S.light > 0 || S.rite) {                     // both hands on the fire he is carrying
+      var lyy = hy2 - GUY_H + (S.rite ? 6 - Math.min(14, S.riteT * 20) : 14);
+      var lxx = hx2 + S.dir * 7;
+      px(C.wood0, lxx - 1, lyy + 4, 2, 12);
+      disc(px, C.fire1, lxx - 4, lyy - 4, 9, 9);
+      disc(px, C.fire3, lxx - 3, lyy - 3, 7, 7);
+      disc(px, C.fire4, lxx - 2, lyy - 2, 5, 5);
+      px('#fffbe6', lxx, lyy, 2, 2);
+      tip = { x: lxx, y: lyy };
+    } else tip = weapon(px, hx2, hy2, S.dir, S.wep || WEAPONS[0], S.swing);
     var by = tip.y;
 
     weather(S.cfg.wx, cam, lvl);
@@ -3472,6 +3946,27 @@
     var reachR = reachR0;
     var deep = dawn > 0 ? mix('#544c66', '#a99184', dawn) : '#544c66';
     lightPass(ctx, FIREX - cam, GY - 16, reachR, tip.x, tip.y, 1, deep);
+    if (S.lamp && S.lampLit) {                       // the lamp throws its own, and it is bigger
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      var lg = ctx.createRadialGradient(S.lamp.x - cam, GY - LAMP_H - 4, 3,
+                                        S.lamp.x - cam, GY - LAMP_H - 4, 132);
+      lg.addColorStop(0, 'rgba(255,214,140,0.52)');
+      lg.addColorStop(0.42, 'rgba(255,160,70,0.18)');
+      lg.addColorStop(1, 'rgba(255,140,50,0)');
+      ctx.fillStyle = lg; ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+    }
+    if (S.rite) {                                    // the moment it catches
+      var fl = S.riteT < 0.55 ? 0 : Math.max(0, 1 - (S.riteT - 0.55) / 1.5);
+      if (fl > 0) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = 'rgba(255,236,190,' + (fl * fl * 0.85).toFixed(3) + ')';
+        ctx.fillRect(0, 0, W, H);
+        ctx.restore();
+      }
+    }
 
     if (lvl < 0.22) {                              // the fire is going: the edges close in
       ctx.save();
@@ -4209,9 +4704,13 @@
                 "Same trick. Fire's the only thing that touches them."] }
         ] },
       { l: ["I'm walking to a place called Harrow Point. Twenty rings of stone between here and it.",
-            "There's a light on the mole there that nobody has to sit up feeding.",
-            'One ring a day. Miss one by dark and it stops being a journey.'],
+            'This road was lit end to end once. Five great lamps, a few nights apart.',
+            'Somebody stopped feeding them and now the whole of it is dark, and everyone ' +
+            'on it is sat in a circle six feet across, on their own.'],
         act: function () { S.pose = null; S.dir = -1; } },
+      { l: ['So I am going to put them back. All five, and the mole light last.',
+            'One ring a day, and where there is a lamp, I carry fire out to it and light it.',
+            'Then the road stays lit whether either of us is stood on it or not.'] },
       { l: ['I can hold them off the stones. I can keep the wood coming in.',
             "What I can't do is both, and the fire is smaller every night I try.",
             'Not on my own. Not any more.'] },
@@ -4489,6 +4988,71 @@
     feed(callback().concat(T.him));
   }
 
+  // ── the chest ─────────────────────────────────────────────────────────────
+  // Embers come off the things you drive away and out of the lamps you light.
+  // Everything in here is paid for in them, and then worked on three times.
+  function armsCard(back) {
+    function row(Wp) {
+      var have = owned(Wp.id), L = armLvl(Wp.id), n = save.night;
+      var can = n >= Wp.at;
+      var next = have ? (L < ARM_MAX ? UPG_COST[L + 1] : null) : Wp.cost;
+      var carrying = save.wep === Wp.id;
+      var h2 = '<div class="arm' + (have ? ' has' : '') + (carrying ? ' on' : '') + '">' +
+        '<div class="armTop"><b>' + Wp.name + '</b>' +
+        (have ? '<i class="pips">' + ('\u25cf'.repeat(L) + '\u25cb'.repeat(ARM_MAX - L)) + '</i>' : '') +
+        '</div><p>' + Wp.note + '</p>';
+      if (!can) h2 += '<span class="armWhen">Not found until night ' + Wp.at + '</span>';
+      else if (!have)
+        h2 += '<button class="armBuy" data-buy="' + Wp.id + '"' +
+              (save.emb < Wp.cost ? ' disabled' : '') + '>Take it \u00b7 ' + Wp.cost + ' embers</button>';
+      else {
+        if (next != null)
+          h2 += '<button class="armBuy" data-up="' + Wp.id + '"' +
+                (save.emb < next ? ' disabled' : '') + '>Work on it \u00b7 ' + next + ' embers</button>';
+        else h2 += '<span class="armWhen">As good as it gets</span>';
+        h2 += carrying ? '<span class="armWhen on">Carrying this one</span>'
+                       : '<button class="armBuy pick" data-use="' + Wp.id + '">Carry this one</button>';
+      }
+      return h2 + '</div>';
+    }
+    function draw3() {
+      var h = '<div class="eyebrow">The chest</div><h1>What he<em>carries</em></h1>' +
+        '<p class="lede">You have <b style="color:var(--ember)">' + save.emb + '</b> embers. ' +
+        'They come off whatever you drive off the stones, and there are forty in every lamp you light.</p>';
+      for (var i = 0; i < WEAPONS.length; i++) h += row(WEAPONS[i]);
+      h += '<button class="go" id="go">Back to it</button>';
+      show(h);
+      var bs = card.querySelectorAll('[data-buy],[data-up],[data-use]');
+      for (var j = 0; j < bs.length; j++) bs[j].addEventListener('click', function () {
+        ac();
+        var buy = this.getAttribute('data-buy'), up = this.getAttribute('data-up'),
+            use = this.getAttribute('data-use');
+        if (buy) {
+          var Wp = wepById(buy);
+          if (save.emb < Wp.cost) return;
+          save.emb -= Wp.cost; save.arms[buy] = 0; save.wep = buy;
+          bell(520, 0.3, 0.06, 2400);
+          banner(Wp.name, fill(Wp.say), 5200);
+        } else if (up) {
+          var L2 = armLvl(up);
+          if (L2 >= ARM_MAX || save.emb < UPG_COST[L2 + 1]) return;
+          save.emb -= UPG_COST[L2 + 1]; save.arms[up] = L2 + 1;
+          bell(660, 0.26, 0.06, 2800);
+          banner(wepById(up).name + ' \u00b7 worked on',
+                 'Longer in the reach, quicker back, and it hurts more.', 3600);
+        } else if (use) { save.wep = use; bell(430, 0.14, 0.05, 2000); }
+        store();
+        if (S) S.wep = wepFor(save.night);
+        draw3();
+      });
+      bindGo(function () {
+        if (back) back();
+        else { veil.classList.add('hide'); running = true; last = performance.now(); }
+      });
+    }
+    draw3();
+  }
+
   // ── dressing him ──────────────────────────────────────────────────────────
   var peek = null, peekCtx = null, peekPx = null;
   function looksCard(back) {
@@ -4712,19 +5276,23 @@
 
   function startNight(n) {
     var cfg = cfgFor(n);
-    var wasWep = S && S.wep ? S.wep.id : null;
     newNight(n);
     if (save.music !== false) musicOn(true);
     elA.textContent = 'SWING';
     elA.classList.remove('go');
-    var W2 = S.wep;
-    if (W2.at === n) {                            // the night a new one arrives
-      banner('Night ' + n + ' · ' + W2.name, fill(W2.say), 3600);
+    var LM = markFor(n);
+    banner('Night ' + n + ' \u00b7 ' + cfg.name,
+           cfg.note + (cfg.wx === 'clear' ? '' : '  \u00b7  ' + (SKYWORD[cfg.wx] || '')), 3200);
+    if (LM && !litMark(LM.id)) {
       bell(300, 0.3, 0.06, 2200);
       setTimeout(function () { bell(450, 0.4, 0.05, 2600); }, 180);
-    } else {
-      banner('Night ' + n + ' · ' + cfg.name,
-             cfg.note + (cfg.wx === 'clear' ? '' : '  ·  ' + (SKYWORD[cfg.wx] || '')), 3000);
+      setTimeout(function () {
+        // only if we are still on that night — this used to land on the next one
+        if (!S || S.mode !== 'night' || S.n !== n || S.lampLit) return;
+        banner(LM.name + ' stands here',
+               'Take a light off the fire and carry it out to the lamp. You cannot swing ' +
+               'while you are holding it, and it burns down as you walk.', 7000);
+      }, 3600);
     }
   }
 
@@ -4734,15 +5302,20 @@
       '<div class="eyebrow">' + (save.best >= NIGHTS.length ? 'The whole road, walked' : 'Night Watch') + '</div>' +
       '<h1>Keep it<em>burning</em></h1>' +
       '<p class="lede">The dark is a thing out here, and it does not cross firelight. ' +
-        'Twenty rings of stone between the road and Harrow Point. One of you feeds it, ' +
-        'one of you keeps them off it.</p>' +
+        'Twenty rings of stone to Harrow Point, and five great lamps along the way ' +
+        'that have been cold for four years. You are going to light all of them.</p>' +
+      lampStrip() +
       '<div class="rules">' +
         '<p><b>◀ ▶</b> walk, <b>JUMP</b> for anything more than a step high.</p>' +
-        '<p>Step over wood to pick it up — three at a time.</p>' +
-        '<p><b>Stand at the stones</b> and he feeds the fire himself, one log at a time. ' +
-          'The higher it burns, the wider the ring.</p>' +
-        '<p><b>SWING</b> the lit brand at whatever comes. Let one reach the stones and it ' +
+        '<p>Step over wood to pick it up. <b>Stand at the stones</b> and he feeds the ' +
+          'fire, one log at a time — the higher it burns, the wider the ring.</p>' +
+        '<p><b>SWING</b> the torch at whatever comes. Let one reach the stones and it ' +
           'takes a bite out of the fire.</p>' +
+        '<p>Every fourth night a <b>cold lamp</b> stands out past the ring. ' +
+          '<b>TAKE LIGHT</b> at the fire and carry it there — you cannot swing while ' +
+          'you hold it, and it burns down as you walk.</p>' +
+        '<p>Whatever you drive off leaves <b>embers</b>. Spend them at the chest on ' +
+          'better weapons, and on making the ones you have worse to be hit by.</p>' +
         '<p>Hold until dawn. They go back down with the sun.</p>' +
       '</div>' +
       strip(save.night) +
@@ -4750,17 +5323,21 @@
         '</b>. ' + knownLine() + '</p>' + bondPips() : '') +
       '<button class="go" id="go">' + (save.night > 1 ? 'Back to camp — night ' + save.night + ' ahead' : 'Walk out to the camp') + '</button>' +
       deckHTML(1) +
+      '<button class="ghost" id="arm">The chest \u00b7 ' + save.emb + ' embers</button>' +
       '<button class="ghost" id="him">The keeper</button>' +
       '<button class="ghost" id="cog">Settings</button>' +
       '<div class="foot">' +
         (save.best ? 'Best: night ' + save.best + ' · ' : '') +
         (save.kept ? save.kept + ' held · ' : '') +
-        (save.logs ? save.logs + ' logs on the fire · ' : '') +
+        ((save.lamps || []).length ? save.lamps.length + '/5 lamps lit · ' : '') +
+        (joinedCount() ? joinedCount() + ' walking with you · ' : '') +
+        (save.emb ? save.emb + ' embers · ' : '') +
         BUILD + '</div>'
     );
     bindGo(function () { camp(); });
     bindGo(function () { settings(title); }, 'cog');
     bindGo(function () { looksCard(title); }, 'him');
+    bindGo(function () { armsCard(title); }, 'arm');
     bindDeck(function () { shelfCard(title); });
   }
 
@@ -4772,76 +5349,122 @@
       nextTune();
       save.kept++;
       save.logs = (save.logs || 0) + S.fed;
+      var clean = S.bitten === 0;
+      var earned = S.emb + (clean ? 25 : 0) + 6;
+      save.emb += earned;
       if (S.n > save.best) save.best = S.n;
       save.night = S.n + 1; store();
-      if (S.n === NIGHTS.length) return won();
+
+      // whoever turned up tonight
+      var joinPet = petFor(S.n), joinFolk = folkFor(S.n), join = null;
+      if (joinPet && !hasPet(joinPet.id)) { save.pets.push(joinPet.id); join = joinPet; }
+      else if (joinFolk && !hasFolk(joinFolk.id)) { save.folk.push(joinFolk.id); join = joinFolk; }
+      if (join) store();
+
+      if (S.n === NIGHTS.length && litMark('mole')) return won(earned, join);
+
       var next = cfgFor(S.n + 1);
-      var clean = S.bitten === 0;
       var his = clean
         ? ['Not one of them got to the stones. That was you.',
            'I watched the whole of that. Never dipped once.'][S.n % 2]
         : S.fuel < 25
-          ? ['That was close. I could feel it going.',
+          ? ['That was close. I could feel the ring closing.',
              'Another minute and there would not have been a ring left to stand in.'][S.n % 2]
           : ['Held. Good.', 'That is another one behind us.',
              'You are getting quicker at this.'][S.n % 3];
-      show(
-        '<div class="eyebrow">' + (clean ? 'Dawn · not a mark on it' : 'Dawn') + '</div>' +
-        '<h1>Night ' + S.n + '<em>' + (clean ? 'held clean' : 'held') + '</em></h1>' +
-        '<p class="lede">&ldquo;' + fill(his) + '&rdquo;</p>' +
+      var lamp = S.lamp;
+      var h = '<div class="eyebrow">' +
+        (S.lampLit && lamp ? lamp.name + ' \u00b7 lit' : clean ? 'Dawn \u00b7 not a mark on it' : 'Dawn') +
+        '</div><h1>Night ' + S.n + '<em>' + (clean ? 'held clean' : 'held') + '</em></h1>' +
+        '<p class="lede">&ldquo;' + fill(S.lampLit && lamp ? lamp.him : his) + '&rdquo;</p>' +
         '<div class="tally">' +
           '<div><span>Logs fed</span><b>' + S.fed + '</b></div>' +
           '<div><span>Driven off</span><b>' + S.driven + '</b></div>' +
-          '<div><span>Fire left</span><b>' + Math.round(S.fuel) + '</b></div>' +
-        '</div>' +
-        strip(S.n + 1) +
-        '<p class="lede">Next: <b style="color:var(--bone)">' + next.name + '</b></p>' +
+          '<div><span>Embers</span><b>+' + earned + '</b></div>' +
+        '</div>' + lampStrip();
+      if (lamp && !S.lampLit)
+        h += '<p class="lede">' + lamp.name + ' is still cold. It will be standing there ' +
+             'whenever you walk this night again.</p>';
+      if (join)
+        h += '<div class="joinRow"><span style="font-size:26px">' +
+             ({ goat: '\ud83d\udc10', crow: '\ud83d\udc26', cat: '\ud83d\udc08', pony: '\ud83d\udc0e' }[join.id] || '\ud83d\udd25') +
+             '</span><span><b>' + join.name + ' is walking with you</b><i>' + join.of +
+             '</i><em>' + join.perk + '</em></span></div>' +
+             '<p class="lede">&ldquo;' + fill(join.him) + '&rdquo;</p>';
+      var buyable = offered(S.n + 1);
+      if (buyable.length)
+        h += '<p class="lede">There is <b style="color:var(--bone)">' + buyable[0].name +
+             '</b> in the chest now, if you have the embers for it.</p>';
+      h += strip(S.n + 1) +
+        '<p class="lede">Next: <b style="color:var(--bone)">' + next.name + '</b>' +
+        (markFor(S.n + 1) ? ' \u00b7 <b style="color:var(--ember)">' + markFor(S.n + 1).name + '</b>' : '') +
+        '</p>' +
         '<button class="go" id="go">Back to camp</button>' +
-        '<button class="ghost" id="stop">Put it down for now</button>'
-      );
+        (buyable.length || save.emb >= 90 ? '<button class="ghost" id="arm">The chest \u00b7 ' + save.emb + ' embers</button>' : '') +
+        '<button class="ghost" id="stop">Put it down for now</button>';
+      show(h);
       bindGo(function () { camp(); });
+      bindGo(function () { newCamp(); armsCard(function () { camp(); }); }, 'arm');
       bindGo(function () { title(); }, 'stop');
     } else {
       bell(140, 0.8, 0.07, 700);
       save.logs = (save.logs || 0) + S.fed;
+      save.emb += Math.round(S.emb * 0.5);
       if (S.n > save.best) save.best = S.n;
       store();
       var n2 = S.n;
       show(
-        '<div class="eyebrow">The fire went out</div>' +
+        '<div class="eyebrow">The ring closed</div>' +
         '<h1>Night ' + n2 + '<em>lost</em></h1>' +
-        '<p class="lede">The last of it went down to embers and the ring closed to nothing. ' +
-        'He got through the night with his back to the stones and said very little about it. ' +
-        'Nothing lost but the night — walk it again.</p>' +
+        '<p class="lede">The last of it went down to embers and the circle came in to nothing. ' +
+        'He got through with his back to the stones and said very little about it. ' +
+        'Nothing lost but the night \u2014 walk it again.</p>' +
         '<div class="tally">' +
           '<div><span>Held for</span><b>' + Math.round(S.cfg.len - S.left) + 's</b></div>' +
           '<div><span>Logs fed</span><b>' + S.fed + '</b></div>' +
           '<div><span>Driven off</span><b>' + S.driven + '</b></div>' +
         '</div>' +
-        strip(n2) +
+        lampStrip() + strip(n2) +
         '<button class="go" id="go">Back to camp</button>' +
+        '<button class="ghost" id="arm">The chest \u00b7 ' + save.emb + ' embers</button>' +
         '<button class="ghost" id="stop">Put it down for now</button>'
       );
       bindGo(function () { camp(); });
+      bindGo(function () { newCamp(); armsCard(function () { camp(); }); }, 'arm');
       bindGo(function () { title(); }, 'stop');
     }
   }
 
-  function won() {
+  // the five lamps, lit or not
+  function lampStrip() {
+    var h = '<div class="lamps">';
+    for (var i = 0; i < LANDMARKS.length; i++)
+      h += '<i class="' + (litMark(LANDMARKS[i].id) ? 'lit' : '') + '" title="' +
+           LANDMARKS[i].name + '"></i>';
+    return h + '</div>';
+  }
+
+  function won(earned, join) {
     show(
-      '<div class="eyebrow">Twenty nights</div>' +
-      '<h1>You kept it<em>all the way</em></h1>' +
-      '<p class="lede">Twenty rings, every one of them lit till morning, and the last ' +
-      'mile walked in under a light neither of you has to feed. Put the brand down.</p>' +
+      '<div class="eyebrow">All five lamps</div>' +
+      '<h1>The road<em>is lit</em></h1>' +
+      '<p class="lede">Twenty rings held, and every one of the five great lamps burning behind ' +
+      'you. From the top of the mole you can see Harrow Point, and it has a light in it.</p>' +
+      lampStrip() +
       '<div class="tally">' +
         '<div><span>Nights held</span><b>' + NIGHTS.length + '</b></div>' +
         '<div><span>Logs fed</span><b>' + S.fed + '</b></div>' +
         '<div><span>Driven off</span><b>' + S.driven + '</b></div>' +
       '</div>' +
+      (join ? '<div class="joinRow"><span style="font-size:26px">\ud83d\udc0e</span><span><b>' +
+              join.name + ' is walking with you</b><i>' + join.of + '</i><em>' + join.perk +
+              '</em></span></div>' : '') +
+      '<p class="lede">&ldquo;Now we go back down it. There are people sat in the dark on ' +
+      'this road who do not know it is lit yet.&rdquo;</p>' +
+      '<p class="lede">Past the twenty the nights keep coming, and every third one you ' +
+      'find somebody. Five of them, all the way to the Point.</p>' +
       strip(NIGHTS.length + 1) +
-      '<p class="lede">There are stones past the Point too, and somebody has to keep ' +
-      'them dry. The road does not end. It just stops being counted.</p>' +
-      '<button class="go" id="go">Back to camp — night ' + save.night + ' ahead</button>' +
+      '<button class="go" id="go">Back down the road \u00b7 night ' + save.night + '</button>' +
       '<div class="foot">' + BUILD + '</div>'
     );
     bindGo(function () { camp(); });
@@ -4880,6 +5503,7 @@
   loadMem();
   loadLook();
   loadHim();
+  loadKit();
   store();                       // stamp the build and fill the reserve slot
   soundSwitch();
   if (save.metHim) title(); else meetCard();
@@ -4921,6 +5545,9 @@
       sing(a2.currentTime + 0.05, f, d, 0.28, vow);
     },
     setNight: function (n) { save.night = n; store(); },
+    landmarks: function () { return LANDMARKS; }, animals: function () { return ANIMALS; },
+    folk: function () { return FOLK; }, arms: function () { return WEAPONS; },
+    upgCost: function () { return UPG_COST; },
     talks: function () { return TALKS; }, asks: function () { return ASKS; },
     meet: function () { return MEET; }, barks: function () { return BARKS; },
     chores: function () { return CHORES; },
