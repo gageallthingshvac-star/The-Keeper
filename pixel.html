@@ -168,6 +168,15 @@
   .nameIn{padding:14px;border-radius:13px;border:1px solid var(--line);
     background:rgba(242,228,204,0.06);color:var(--bone);font:600 16px/1 var(--body);
     width:100%;text-align:center}
+  .codeBox{font:600 11px/1.55 var(--mono);color:var(--ember);text-align:left;
+    background:rgba(0,0,0,0.32);border:1px solid var(--line);border-radius:12px;
+    padding:12px;word-break:break-all;max-height:104px;overflow:auto;-webkit-user-select:all;
+    user-select:all}
+  .codeRow{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+  .note{font:600 12.5px/1.45 var(--body);color:var(--mute);min-height:17px}
+  .note.ok{color:var(--ember)}
+  .note.bad{color:#e0866a}
+  .lede.small{font-size:12.5px}
   .bond{display:flex;gap:5px;justify-content:center;align-items:center}
   .bond i{width:8px;height:8px;border-radius:2px;background:rgba(242,228,204,0.14);display:block}
   .bond i.on{background:var(--ember);box-shadow:0 0 7px rgba(255,181,71,0.8)}
@@ -242,7 +251,7 @@
 <script>
 (function () {
   'use strict';
-  var BUILD = 'v1.7.0';
+  var BUILD = 'v1.8.0';
 
   // ── measurements ──────────────────────────────────────────────────────────
   var TILE = 16;
@@ -1399,20 +1408,122 @@
   var GRAV = 900, JUMPV = 268, STEP_UP = 17;   // one tile he walks up, two he jumps
 
   // ── save ──────────────────────────────────────────────────────────────────
-  var KEY = 'nightwatch.pixel.v1';
+  // The key never changes from one build to the next, and loading merges what
+  // was stored over the current defaults rather than replacing them. So a save
+  // written by an older version keeps every night, every name and every choice
+  // it had, and quietly picks up whatever this version added. A second slot
+  // holds a copy in reserve, and it is only ever written by a save that has got
+  // at least as far, so a bad start can never bury a good one.
+  var KEY  = 'nightwatch.pixel.v1';        // never version this — see saveCode()
+  var KEY2 = 'nightwatch.pixel.v1.keep';
   var save = { night: 1, best: 0, kept: 0, logs: 0, muted: false, music: true, buzz: true,
-               look: null, mem: null, tune: 0, loop: false, vox: true, metHim: 0 };
-  // merge what was stored over the defaults, so a save written by an older
-  // build keeps everything it had and picks up whatever is new
-  try {
-    var raw = localStorage.getItem(KEY);
-    if (raw) {
+               look: null, mem: null, tune: 0, loop: false, vox: true, metHim: 0,
+               him: 'Wren', build: '' };
+
+  function readSlot(k) {
+    try {
+      var raw = localStorage.getItem(k);
+      if (!raw) return null;
       var o = JSON.parse(raw);
-      if (o && typeof o === 'object')
-        for (var sk in o) if (Object.prototype.hasOwnProperty.call(o, sk)) save[sk] = o[sk];
+      return o && typeof o === 'object' ? o : null;
+    } catch (e) { return null; }
+  }
+  function merge(o) {
+    if (!o) return;
+    for (var sk in o) if (Object.prototype.hasOwnProperty.call(o, sk)) save[sk] = o[sk];
+  }
+  // how far along a save is, so an emptier one never overwrites a fuller one
+  function depth(o) {
+    if (!o) return -1;
+    return (+o.best || 0) * 1000 + (+o.night || 0) * 10 + (o.metHim ? 1 : 0);
+  }
+  function store() {
+    save.build = BUILD;
+    var txt;
+    try { txt = JSON.stringify(save); } catch (e) { return; }
+    try { localStorage.setItem(KEY, txt); } catch (e) {}
+    try {
+      if (depth(save) >= depth(readSlot(KEY2))) localStorage.setItem(KEY2, txt);
+    } catch (e) {}
+  }
+
+  // ── carrying a save to another copy of the game ───────────────────────────
+  // What a browser stores belongs to wherever the page was opened from, so a
+  // freshly downloaded file, another phone or another browser starts empty.
+  // A save code moves the nights, the names, the look and everything he
+  // remembers across by hand.
+  var CODE_KEYS = { n: 'night', b: 'best', k: 'kept', g: 'logs', h: 'metHim',
+                    w: 'him', o: 'look', m: 'mem', t: 'tune' };
+  function b64(str) {
+    return btoa(unescape(encodeURIComponent(str)))
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function unb64(str) {
+    var s2 = String(str).replace(/-/g, '+').replace(/_/g, '/');
+    while (s2.length % 4) s2 += '=';
+    return decodeURIComponent(escape(atob(s2)));
+  }
+  function sumOf(str) {                        // small digest, four base36 chars
+    var h = 0x811c9dc5;
+    for (var i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
     }
-  } catch (e) {}
-  function store() { try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) {} }
+    return ('000' + h.toString(36)).slice(-4);
+  }
+  function saveCode() {
+    var out = {};
+    for (var c in CODE_KEYS)
+      if (save[CODE_KEYS[c]] !== undefined && save[CODE_KEYS[c]] !== null)
+        out[c] = save[CODE_KEYS[c]];
+    var body = b64(JSON.stringify(out));
+    return 'NW1.' + body + '.' + sumOf(body);
+  }
+  // nothing comes back unless the code is whole, ours, and shaped like a save
+  function readCode(txt) {
+    if (!txt) return null;
+    var s2 = String(txt).replace(/\s+/g, ''), at = s2.indexOf('NW1.');
+    if (at < 0) return null;
+    var parts = s2.slice(at).split('.');
+    if (parts.length !== 3 || !parts[1] || parts[2] !== sumOf(parts[1])) return null;
+    var o;
+    try { o = JSON.parse(unb64(parts[1])); } catch (e) { return null; }
+    if (!o || typeof o !== 'object') return null;
+    var got = {};
+    for (var c2 in CODE_KEYS)
+      if (o[c2] !== undefined && o[c2] !== null) got[CODE_KEYS[c2]] = o[c2];
+    if (typeof got.night !== 'number' || !(got.night >= 1) || got.night > 999) return null;
+    if (got.mem !== undefined && typeof got.mem !== 'object') return null;
+    if (got.look !== undefined && typeof got.look !== 'object') return null;
+    if (got.him !== undefined && typeof got.him !== 'string') return null;
+    return got;
+  }
+  function saveLink() { return location.href.split('#')[0] + '#s=' + saveCode(); }
+  // a link is read once and then wiped from the bar, so an old one that is
+  // still sitting in a tab cannot undo nights played since
+  function fromLink() {
+    var m = /[#&]s=([^&]+)/.exec(location.hash || '');
+    if (!m) return null;
+    var got = null;
+    try { got = readCode(decodeURIComponent(m[1])); } catch (e) {}
+    try { history.replaceState(null, '', location.href.split('#')[0]); } catch (e) {}
+    return got;
+  }
+  function applyCode(got) {
+    merge(got);
+    loadMem(); loadLook(); loadHim(); loadMusic();
+    store();
+    return true;
+  }
+
+  // pick up where the player left off: the fuller of the two slots, unless the
+  // page was opened from a save link that has got further than either
+  (function restore() {
+    var a = readSlot(KEY), b = readSlot(KEY2);
+    merge(depth(b) > depth(a) ? b : a);
+    var link = fromLink();
+    if (link && depth(link) > depth(save)) merge(link);
+  })();
   function loadMusic() {
     MUS.on = save.music !== false;
     MUS.loop = !!save.loop;
@@ -1429,6 +1540,10 @@
   function loadLook() {
     if (!save.look) return;
     for (var k in LOOK) if (typeof save.look[k] === 'number') LOOK[k] = save.look[k];
+  }
+  function loadHim() {
+    if (typeof save.him === 'string' && save.him) HIM.name = save.him;
+    save.him = HIM.name;
   }
 
   // ── sound, kept quiet ─────────────────────────────────────────────────────
@@ -4008,7 +4123,11 @@
     for (var st = 0; st < STYLES.length; st++)
       h += '<button class="word' + (LOOK.style === st ? ' on' : '') + '" data-key="style" data-i="' +
            st + '">' + STYLES[st] + '</button>';
-    h += '</div></div><button class="go" id="go">That\u2019s him</button>';
+    h += '</div></div>' +
+         '<div class="pickRow"><span>What he goes by</span>' +
+         '<input class="nameIn" id="himN" maxlength="12" value="' +
+         HIM.name.replace(/"/g, '') + '" /></div>' +
+         '<button class="go" id="go">That\u2019s him</button>';
     var wasLive = !!(S && S.mode === 'day');
     show(h);
     peek = document.getElementById('peek');
@@ -4022,6 +4141,12 @@
       var sibs = card.querySelectorAll('[data-key="' + k + '"]');
       for (var q = 0; q < sibs.length; q++) sibs[q].classList.toggle('on', sibs[q] === this);
       bell(420, 0.1, 0.04, 1900);
+    });
+    var himIn = document.getElementById('himN');
+    if (himIn) himIn.addEventListener('input', function () {
+      var v = (this.value || '').replace(/[<>&"]/g, '').trim().slice(0, 12);
+      HIM.name = v || 'Wren';
+      save.him = HIM.name; store();
     });
     bindGo(function () {
       peek = null;
@@ -4042,6 +4167,76 @@
     try { navigator.vibrate(ms); } catch (e) {}
   }
 
+  // ── carrying a save ───────────────────────────────────────────────────────
+  function carryCard(back) {
+    function line() {
+      var bits = ['Night ' + (save.night || 1)];
+      if (save.best) bits.push('best ' + save.best);
+      if (MEM && MEM.you) bits.push(HIM.name + ' calls you ' + fill('{you}'));
+      return bits.join(' \u00b7 ');
+    }
+    var h = '<div class="eyebrow">Your progress</div>' +
+      '<h1>Carry it<em>anywhere</em></h1>' +
+      '<p class="lede">It is kept here on its own, updates included \u2014 you will never ' +
+      'start over because the game got a new version. This is for taking it somewhere else: ' +
+      'another browser, another phone, or a fresh copy of the file.</p>' +
+      '<div class="pickRow"><span>Held right now</span></div>' +
+      '<p class="lede small" id="mine">' + line() + '</p>' +
+      '<div class="codeBox" id="cd">' + saveCode() + '</div>' +
+      '<div class="codeRow">' +
+        '<button class="word" id="cpC">Copy code</button>' +
+        '<button class="word" id="cpL">Copy link</button>' +
+      '</div>' +
+      '<div class="pickRow"><span>Bring one in</span></div>' +
+      '<input class="nameIn" id="inC" placeholder="paste a save code" />' +
+      '<button class="ghost" id="ld">Load that save</button>' +
+      '<div class="note" id="nt"></div>' +
+      '<button class="go" id="go">Back</button>';
+    show(h);
+    var nt = document.getElementById('nt');
+    function say(txt, bad) {
+      nt.textContent = txt;
+      nt.className = 'note ' + (bad ? 'bad' : 'ok');
+    }
+    function copy(txt, what) {
+      var done = function () { say(what + ' copied. Paste it wherever you like.', 0); };
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(txt).then(done, fallback);
+          return;
+        }
+      } catch (e) {}
+      fallback();
+      function fallback() {
+        try {
+          var ta = document.createElement('textarea');
+          ta.value = txt;
+          ta.style.cssText = 'position:fixed;opacity:0;left:0;top:0';
+          document.body.appendChild(ta);
+          ta.select();
+          var ok = document.execCommand('copy');
+          document.body.removeChild(ta);
+          if (ok) return done();
+        } catch (e2) {}
+        say('Could not reach the clipboard \u2014 select the code and copy it by hand.', 1);
+      }
+    }
+    bindGo(function () { copy(saveCode(), 'Code'); }, 'cpC');
+    bindGo(function () { copy(saveLink(), 'Link'); }, 'cpL');
+    bindGo(function () {
+      var inp = document.getElementById('inC');
+      var got = readCode(inp && inp.value);
+      if (!got) return say('That code is not whole \u2014 nothing here was touched.', 1);
+      applyCode(got);
+      inp.value = '';
+      document.getElementById('mine').textContent = line();
+      document.getElementById('cd').textContent = saveCode();
+      say('Brought back. ' + line() + '.', 0);
+      bell(420, 0.16, 0.05, 1900);
+    }, 'ld');
+    bindGo(function () { if (back) back(); else title(); });
+  }
+
   function settings(back) {
     var rows = [
       { k: 'music', name: 'Music', help: 'A slow round on strings, a little darker once the sun goes down.' },
@@ -4058,6 +4253,7 @@
            '<span class="sw"></span></button>';
     h += '</div>' + deckHTML(1) +
          '<button class="ghost" id="him">Dress the keeper</button>' +
+         '<button class="ghost" id="carry">Carry your progress</button>' +
          '<button class="go" id="go">Done</button>' +
          '<div class="foot">Keys: A D or arrows to walk · space to jump · F to swing · M to mute</div>';
     var wasLive = !!(S && S.mode === 'day');
@@ -4075,6 +4271,7 @@
     });
     bindDeck(function () { shelfCard(function () { settings(back); }); });
     bindGo(function () { looksCard(function () { settings(back); }); }, 'him');
+    bindGo(function () { carryCard(function () { settings(back); }); }, 'carry');
     bindGo(function () {
       if (back) back();
       else if (wasLive) { veil.classList.add('hide'); running = true; last = performance.now(); }
@@ -4280,6 +4477,8 @@
   loadMusic();
   loadMem();
   loadLook();
+  loadHim();
+  store();                       // stamp the build and fill the reserve slot
   soundSwitch();
   if (save.metHim) title(); else meetCard();
   requestAnimationFrame(frame);
@@ -4293,6 +4492,9 @@
     geo: { W: W, H: H, GY: GY, WORLD: WORLD, FIREX: FIREX },
     at: AT, prep: function () { return PREP; }, terrain: terrain,
     look: function () { return LOOK; }, drawGuy: guy,
+    save: function () { return save; }, him: function () { return HIM; },
+    code: saveCode, link: saveLink, readCode: readCode, applyCode: applyCode,
+    store: store, keys: [KEY, KEY2],
     drawBeast: shadeSprite,
     mem: function () { return MEM; }, nights: NIGHTS, weapons: WEAPONS, beasts: BEASTS,
     tunes: TUNES, genres: GENRE, music: function () { return MUS; },
