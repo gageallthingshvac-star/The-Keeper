@@ -199,6 +199,9 @@
     border:1px solid var(--line);border-radius:12px;background:transparent;
     cursor:pointer;text-align:left;color:var(--bone);font:600 14px/1.2 var(--body)}
   .trk small{margin-left:auto;font:500 11px/1 var(--mono);color:var(--mute)}
+  .trk .vx{font-style:normal;font:700 8px/1 var(--body);letter-spacing:.14em;
+    text-transform:uppercase;color:#0f2417;background:#a9dfa2;
+    padding:3px 5px;border-radius:4px;margin-left:8px}
   .trk.on{border-color:var(--ember);background:rgba(255,181,71,0.13)}
   .trk.on small{color:var(--ember)}
 </style>
@@ -238,7 +241,7 @@
 <script>
 (function () {
   'use strict';
-  var BUILD = 'v1.5.0';
+  var BUILD = 'v1.6.0';
 
   // ── measurements ──────────────────────────────────────────────────────────
   var TILE = 16;
@@ -1339,7 +1342,7 @@
   // ── save ──────────────────────────────────────────────────────────────────
   var KEY = 'nightwatch.pixel.v1';
   var save = { night: 1, best: 0, kept: 0, logs: 0, muted: false, music: true, buzz: true,
-               look: null, mem: null, tune: 0, loop: false };
+               look: null, mem: null, tune: 0, loop: false, vox: true };
   try { var raw = localStorage.getItem(KEY); if (raw) { var o = JSON.parse(raw); if (o && o.night) save = o; } } catch (e) {}
   function store() { try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) {} }
   function loadMusic() {
@@ -1490,7 +1493,7 @@
     // ── jazz
     { name: 'Ember Blues', gain: 0.74,    genre: 'Jazz',     bpm: 86,  feel: 'swing',    meter: 4, kit: 'brushes', pad: 0,    horn: 0.42,
       bars: ['F7','Bb7','F7','F7','Bb7','Bb7','F7','F7','Gm7','C7','F7','C7'] },
-    { name: 'Low Lamplight', gain: 0.73,  genre: 'Jazz',     bpm: 72,  feel: 'swing',    meter: 4, kit: 'brushes', pad: 0.5,  horn: 0.34,
+    { name: 'Low Lamplight', gain: 0.73,  genre: 'Jazz',     bpm: 72,  feel: 'swing',    meter: 4, kit: 'brushes', pad: 0.5,  horn: 0.34, vox: 'ah',
       bars: ['Cm7','F7','Bbmaj7','Gm7','Cm7','F7','Bbmaj7','Bbmaj7'] },
     { name: 'Smoke & Rye', gain: 0.82,    genre: 'Jazz',     bpm: 96,  feel: 'swing',    meter: 4, kit: 'brushes', pad: 0,    horn: 0.4,
       bars: ['Dm7','Dm7','Gm7','Gm7','Dm7','Dm7','Em7b5','A7'] },
@@ -1510,11 +1513,11 @@
       bars: ['Fmaj7','Em7','Dm7','Cmaj7','Fmaj7','Em7','Am7','Am7'] },
     { name: 'Paper Lanterns', gain: 1.01, genre: 'Lo-fi',    bpm: 76,  feel: 'straight', meter: 4, kit: 'lofi',    pad: 0.7,  horn: 0.24,
       bars: ['Dm7','Bbmaj7','Fmaj7','C7','Dm7','Bbmaj7','Gm7','C7'] },
-    { name: 'Slow Tide', gain: 1.27,      genre: 'Lo-fi',    bpm: 82,  feel: 'straight', meter: 4, kit: 'lofi',    pad: 0.65, horn: 0.26,
+    { name: 'Slow Tide', gain: 1.27,      genre: 'Lo-fi',    bpm: 82,  feel: 'straight', meter: 4, kit: 'lofi',    pad: 0.65, horn: 0.26, vox: 'ah',
       bars: ['Am7','Fmaj7','Cmaj7','G7','Am7','Fmaj7','Dm7','G7'] },
 
     // ── soul
-    { name: 'Velvet Hour', gain: 0.65,    genre: 'Soul',     bpm: 74,  feel: 'straight', meter: 4, kit: 'lofi',    pad: 0.6,  horn: 0.3,
+    { name: 'Velvet Hour', gain: 0.65,    genre: 'Soul',     bpm: 74,  feel: 'straight', meter: 4, kit: 'lofi',    pad: 0.6,  horn: 0.3, vox: 'ah',
       bars: ['Ebmaj7','Cm7','Fm7','Bb7','Ebmaj7','Cm7','Fm7','Bb7'] },
     { name: 'Late Rain', gain: 0.69,      genre: 'Soul',     bpm: 68,  feel: 'straight', meter: 4, kit: 'lofi',    pad: 0.7,  horn: 0.28,
       bars: ['Fmaj7','Dm7','Gm7','C7','Fmaj7','Dm7','Bbmaj7','C7'] },
@@ -1536,7 +1539,7 @@
     // ── ambient
     { name: 'Blue Hour', gain: 1.22,      genre: 'Ambient',  bpm: 74,  feel: 'straight', meter: 4, kit: 'soft',    pad: 0.9,  horn: 0.24,
       bars: ['Ebmaj7','Ebmaj7','Dbmaj7','Dbmaj7','Cm7','Cm7','Bbm7','Bbm7'] },
-    { name: 'The Long Watch', gain: 1.08, genre: 'Ambient',  bpm: 62,  feel: 'straight', meter: 4, kit: 'soft',    pad: 1,    horn: 0.22,
+    { name: 'The Long Watch', gain: 1.08, genre: 'Ambient',  bpm: 62,  feel: 'straight', meter: 4, kit: 'soft',    pad: 1,    horn: 0.22, vox: 'ah',
       bars: ['Gmaj7','Bm7','Em7','Cmaj7','Am7','D7','Gmaj7','Gmaj7'] },
     { name: 'Ash Drift', gain: 1.05,      genre: 'Ambient',  bpm: 56,  feel: 'straight', meter: 4, kit: 'none',    pad: 1,    horn: 0.16,
       bars: ['Cmaj7','Cmaj7','Am7','Am7','Fmaj7','Fmaj7','Gmaj7','Gmaj7'] },
@@ -1568,7 +1571,39 @@
     { name: 'Fire Samba',    gain: 0.85, genre: 'Latin',    bpm: 130, feel: 'straight', meter: 4, kit: 'latin', pad: 0.25, horn: 0.4,
       bars: ['Am7','D7','Gmaj7','Gmaj7','Cmaj7','F#m7b5','B7','Em7'] },
     { name: 'Cocoa Hour',    gain: 0.95, genre: 'Latin',    bpm: 118, feel: 'straight', meter: 4, kit: 'latin', pad: 0.4,  horn: 0.36,
-      bars: ['Fmaj7','Gm7','Am7','Bbmaj7','Gm7','C7','Fmaj7','C7'] }
+      bars: ['Fmaj7','Gm7','Am7','Bbmaj7','Gm7','C7','Fmaj7','C7'] },
+
+    // ── rock
+    { name: 'Roadside Fire',  gain: 2.3, genre: 'Rock',   bpm: 128, feel: 'straight', meter: 4, kit: 'rock', pad: 0.2,  horn: 0.34,
+      bars: ['Am7','Am7','Fmaj7','Fmaj7','Cmaj7','Cmaj7','G7','G7'] },
+    { name: 'Nine Miles Out', gain: 2.2, genre: 'Rock',   bpm: 138, feel: 'straight', meter: 4, kit: 'rock', pad: 0.15, horn: 0.3,
+      bars: ['Em7','Em7','Cmaj7','Cmaj7','Gmaj7','Gmaj7','D7','D7'] },
+    { name: 'Hold the Line',  gain: 2.3,  genre: 'Rock',   bpm: 120, feel: 'straight', meter: 4, kit: 'rock', pad: 0.25, horn: 0.32, vox: 'ah',
+      bars: ['Dm7','Dm7','Bbmaj7','Bbmaj7','Fmaj7','Fmaj7','C7','C7'] },
+    { name: 'Til the Sun',    gain: 2.3,  genre: 'Rock',   bpm: 112, feel: 'swing',    meter: 4, kit: 'rock', pad: 0.2,  horn: 0.36, vox: 'ah',
+      bars: ['Gm7','Gm7','Ebmaj7','Ebmaj7','Bbmaj7','Bbmaj7','F7','F7'] },
+
+    // ── ballad
+    { name: 'Long Way Home',  gain: 2.1,  genre: 'Ballad', bpm: 72,  feel: 'straight', meter: 4, kit: 'slow', pad: 0.55, horn: 0.28, vox: 'ah',
+      bars: ['Cmaj7','Am7','Fmaj7','G7','Cmaj7','Am7','Dm7','G7'] },
+    { name: 'Harrow Point',   gain: 2.1, genre: 'Ballad', bpm: 66,  feel: 'straight', meter: 4, kit: 'slow', pad: 0.6,  horn: 0.26, vox: 'oo',
+      bars: ['Fmaj7','Dm7','Bbmaj7','C7','Fmaj7','Dm7','Gm7','C7'] },
+    { name: 'Four Summers',   gain: 2.2, genre: 'Ballad', bpm: 60,  feel: 'straight', meter: 3, kit: 'slow', pad: 0.7,  horn: 0.24, vox: 'oo',
+      bars: ['Am7','Fmaj7','Cmaj7','G7','Am7','Fmaj7','Dm7','Em7'] },
+
+    // ── blues
+    { name: 'Kerosene',       gain: 2.2, genre: 'Blues',  bpm: 96,  feel: 'swing',    meter: 4, kit: 'rock', pad: 0.2,  horn: 0.4,
+      bars: ['A7','A7','D7','D7','A7','A7','E7','D7'] },
+    { name: 'Two Lamps',      gain: 2.2,  genre: 'Blues',  bpm: 84,  feel: 'swing',    meter: 4, kit: 'slow', pad: 0.3,  horn: 0.38, vox: 'ah',
+      bars: ['Gm7','Gm7','Cm7','Cm7','Gm7','Gm7','D7','Cm7'] },
+
+    // ── indie
+    { name: 'Paper Boats',    gain: 2.0, genre: 'Indie',  bpm: 104, feel: 'straight', meter: 4, kit: 'rock', pad: 0.4,  horn: 0.3,  vox: 'ah',
+      bars: ['Dmaj7','Bm7','Gmaj7','A7','Dmaj7','Bm7','Em7','A7'] },
+    { name: 'Streetlight',    gain: 2.1,  genre: 'Indie',  bpm: 96,  feel: 'straight', meter: 4, kit: 'rock', pad: 0.5,  horn: 0.28,
+      bars: ['Cmaj7','Em7','Am7','Fmaj7','Cmaj7','Em7','Dm7','G7'] },
+    { name: 'Small Hours',    gain: 2.1, genre: 'Indie',  bpm: 88,  feel: 'straight', meter: 4, kit: 'slow', pad: 0.6,  horn: 0.26, vox: 'oo',
+      bars: ['Emaj7','C#m7','Amaj7','B7','Emaj7','C#m7','F#m7','B7'] }
   ];
   // the folk and nocturne sets share a shape, filled in here to keep the table readable
   (function () {
@@ -1595,7 +1630,11 @@
     'Waltz':    { bass: 'upright',   comp: 'piano',    lead: 'horn',     lp: 5200, verb: 0.46, delay: 0.10, dtime: 0.36, fb: 0.20, chorus: 0.20, crackle: 0 },
     'Groove':   { bass: 'pluckbass', comp: 'clav',     lead: 'horn',     lp: 6800, verb: 0.20, delay: 0.07, dtime: 0.26, fb: 0.16, chorus: 0.12, crackle: 0 },
     'Trip-hop': { bass: 'sub',       comp: 'wurly',    lead: 'melodica', lp: 1900, verb: 0.46, delay: 0.30, dtime: 0.52, fb: 0.36, chorus: 0.58, crackle: 0.75 },
-    'Latin':    { bass: 'upright',   comp: 'nylon',    lead: 'flute',    lp: 7000, verb: 0.28, delay: 0.07, dtime: 0.28, fb: 0.14, chorus: 0.16, crackle: 0 }
+    'Latin':    { bass: 'upright',   comp: 'nylon',    lead: 'flute',    lp: 7000, verb: 0.28, delay: 0.07, dtime: 0.28, fb: 0.14, chorus: 0.16, crackle: 0 },
+    'Rock':     { bass: 'bassgtr',   comp: 'eguitar',  lead: 'eguitar',  lp: 7600, verb: 0.20, delay: 0.06, dtime: 0.24, fb: 0.12, chorus: 0.10, crackle: 0 },
+    'Ballad':   { bass: 'bassgtr',   comp: 'cleanguitar', lead: 'eguitar', lp: 6200, verb: 0.48, delay: 0.14, dtime: 0.42, fb: 0.24, chorus: 0.30, crackle: 0 },
+    'Blues':    { bass: 'bassgtr',   comp: 'organ',    lead: 'eguitar',  lp: 5200, verb: 0.30, delay: 0.09, dtime: 0.32, fb: 0.18, chorus: 0.14, crackle: 0.08 },
+    'Indie':    { bass: 'bassgtr',   comp: 'cleanguitar', lead: 'cleanguitar', lp: 7000, verb: 0.40, delay: 0.20, dtime: 0.38, fb: 0.28, chorus: 0.42, crackle: 0 }
   };
   function genreOf(T) { return GENRE[T.genre] || GENRE.Jazz; }
 
@@ -1614,8 +1653,123 @@
 
   // one call site for whichever instrument this genre uses
 
+  // ── rock ──────────────────────────────────────────────────────────────────
+  // A shaping curve, so the guitars break up rather than just get louder.
+  var DRIVE = null;
+  function driveCurve(amount) {
+    var n = 1024, c = new Float32Array(n), k = amount;
+    for (var i = 0; i < n; i++) {
+      var x = (i * 2) / n - 1;
+      c[i] = (1 + k) * x / (1 + k * Math.abs(x));
+    }
+    return c;
+  }
+  function shaper(amount) {
+    var a = A.ctx, ws = a.createWaveShaper();
+    ws.curve = driveCurve(amount); ws.oversample = '2x';
+    return ws;
+  }
+  // waveshaping leaves a standing offset; every amp has one of these after it
+  function dcBlock(hz) {
+    var f = A.ctx.createBiquadFilter();
+    f.type = 'highpass'; f.frequency.value = hz || 55; f.Q.value = 0.7;
+    return f;
+  }
+  // overdriven electric: two detuned saws through the shaper, then a cabinet
+  function eguitar(t, freq, dur, vol) {
+    var a = A.ctx;
+    var g = a.createGain(), ws = shaper(9), cab = a.createBiquadFilter(), pres = a.createBiquadFilter();
+    cab.type = 'lowpass'; cab.frequency.value = 3200; cab.Q.value = 0.9;
+    pres.type = 'peaking'; pres.frequency.value = 1800; pres.gain.value = 5; pres.Q.value = 1.1;
+    var o1 = osc('sawtooth', freq, t, dur, -7), o2 = osc('sawtooth', freq, t, dur, 8);
+    var pre = a.createGain(); pre.gain.value = 0.5;
+    var dc = dcBlock(80);
+    o1.connect(pre); o2.connect(pre);
+    pre.connect(ws); ws.connect(dc); dc.connect(pres); pres.connect(cab); cab.connect(g);
+    env(g, t, dur, vol * 0.30, 0.006);
+    g.connect(A.music);
+  }
+  // clean electric: chimey, a bit of body, no dirt
+  function cleanguitar(t, freq, dur, vol) {
+    var a = A.ctx;
+    var g = a.createGain(), lp = a.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.setValueAtTime(4200, t);
+    lp.frequency.exponentialRampToValueAtTime(1500, t + dur * 0.8);
+    var o1 = osc('sawtooth', freq, t, dur, -4), o2 = osc('triangle', freq * 2, t, dur, 5);
+    var g2 = a.createGain(); g2.gain.value = 0.3;
+    o2.connect(g2); g2.connect(lp); o1.connect(lp); lp.connect(g);
+    env(g, t, dur, vol * 0.48, 0.004);
+    g.connect(A.music);
+  }
+  // electric bass, picked
+  function bassgtr(t, freq, dur, vol) {
+    var a = A.ctx;
+    var g = a.createGain(), lp = a.createBiquadFilter(), ws = shaper(2);
+    lp.type = 'lowpass'; lp.frequency.setValueAtTime(1600, t);
+    lp.frequency.exponentialRampToValueAtTime(420, t + dur * 0.7);
+    var o1 = osc('sawtooth', freq, t, dur), o2 = osc('sine', freq / 2, t, dur);
+    var sub2 = a.createGain(); sub2.gain.value = 0.6;
+    var dcb = dcBlock(32);
+    o2.connect(sub2); sub2.connect(lp); o1.connect(ws); ws.connect(dcb); dcb.connect(lp); lp.connect(g);
+    env(g, t, dur, vol * 0.48, 0.005);
+    g.connect(A.music);
+  }
+  // ── a voice ───────────────────────────────────────────────────────────────
+  // Three bandpass formants over a saw, with a little vibrato. Wordless — it
+  // sings the changes rather than any words, which is what this game wants.
+  var VOWEL = {
+    ah: [700, 1220, 2600], oo: [320, 800, 2540],
+    oh: [450, 800, 2830],  ee: [300, 2200, 3000], mm: [260, 1100, 2400]
+  };
+  var SUNG = 0;
+  function sing(t, freq, dur, vol, vowel) {
+    SUNG++;
+    var a = A.ctx, F = VOWEL[vowel] || VOWEL.ah;
+    var src = a.createGain();
+    var o1 = osc('sawtooth', freq, t, dur, -5), o2 = osc('sawtooth', freq, t, dur, 6);
+    var breath = a.createBufferSource(); breath.buffer = noiseBuffer(a); breath.loop = true;
+    var bg = a.createGain(); bg.gain.value = 0.012;
+    breath.connect(bg); bg.connect(src);
+    o1.connect(src); o2.connect(src);
+    var vib = osc('sine', 5.2, t, dur), vibAmt = a.createGain();
+    vibAmt.gain.value = freq * 0.011;
+    vib.connect(vibAmt); vibAmt.connect(o1.frequency); vibAmt.connect(o2.frequency);
+    var out = a.createGain();
+    for (var i = 0; i < 3; i++) {
+      var f = a.createBiquadFilter();
+      f.type = 'bandpass'; f.frequency.value = F[i]; f.Q.value = i === 0 ? 7 : 9;
+      var fg = a.createGain(); fg.gain.value = [1, 0.55, 0.24][i];
+      src.connect(f); f.connect(fg); fg.connect(out);
+    }
+    var tilt = a.createBiquadFilter();
+    tilt.type = 'lowpass'; tilt.frequency.value = 3600;
+    var g = a.createGain();
+    out.connect(tilt); tilt.connect(g); g.connect(A.music);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol), t + Math.min(0.18, dur * 0.28));
+    g.gain.setValueAtTime(Math.max(0.0002, vol), t + dur * 0.72);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    breath.start(t); breath.stop(t + dur + 0.05);
+  }
+  function snare(t, vol) {
+    perc(t, 0.16, vol, 'bandpass', 1900, 0.9);
+    var a = A.ctx, g = a.createGain(), o = osc('triangle', 190, t, 0.09);
+    env(g, t, 0.09, vol * 0.5, 0.002); o.connect(g); g.connect(A.music);
+  }
+  function crash(t, vol) { perc(t, 1.5, vol, 'highpass', 5200, 0.5); }
+  function tom(t, freq, vol) {
+    var a = A.ctx, g = a.createGain(), o = a.createOscillator();
+    o.type = 'sine'; o.frequency.setValueAtTime(freq, t);
+    o.frequency.exponentialRampToValueAtTime(freq * 0.6, t + 0.2);
+    env(g, t, 0.24, vol, 0.004); o.connect(g); g.connect(A.music);
+    o.start(t); o.stop(t + 0.3);
+  }
+
   function play(voice, t, freq, dur, vol) {
     switch (voice) {
+      case 'eguitar':     eguitar(t, freq, dur, vol); break;
+      case 'cleanguitar': cleanguitar(t, freq, dur, vol); break;
+      case 'bassgtr':     bassgtr(t, freq, dur, vol); break;
       case 'upright':   upright(t, freq, dur, vol); break;
       case 'sub':       sub(t, freq, dur, vol); break;
       case 'pluckbass': pluckbass(t, freq, dur, vol); break;
@@ -2004,6 +2158,13 @@
                           play(G.bass, t + swung, mtof(root + 12), spb * 0.34, 0.16 * vg); }
         else if (beat === 1) play(G.bass, t + swung, mtof(bn), spb * 0.42, 0.22 * vg);
         else if (beat === last) play(G.bass, t, mtof(bn), spb * 0.6, 0.24 * vg);
+      } else if (T.kit === 'rock') {
+        play(G.bass, t, mtof(root - 12), spb * 0.62, 0.30 * vg);
+        if (beat === last || Math.random() < 0.3)
+          play(G.bass, t + swung, mtof(bn - 12), spb * 0.42, 0.22 * vg);
+      } else if (T.kit === 'slow') {
+        if (beat === 0) play(G.bass, t, mtof(root - 12), spb * 2.2, 0.26 * vg);
+        else if (beat === 2) play(G.bass, t, mtof(bn - 12), spb * 1.6, 0.2 * vg);
       } else {
         play(G.bass, t, mtof(bn), spb * 0.9, 0.24 * vg);          // walking
       }
@@ -2040,6 +2201,18 @@
       if (beat === 2 && Math.random() < 0.5) kick(t + swung, 0.036 * vg);
       if (backbeat) { rim(t, 0.045 * vg); tamb(t, 0.02 * vg); }
       hat(t, 0.026 * vg); hat(t + swung, 0.019 * vg);
+    } else if (T.kit === 'rock') {
+      if (beat === 0) { kick(t, 0.075 * vg); if (bar % 4 === 0) crash(t, 0.05 * vg); }
+      if (beat === 2) kick(t, 0.062 * vg);
+      if (beat === 2 && Math.random() < 0.35) kick(t + swung, 0.04 * vg);
+      if (backbeat) snare(t, 0.06 * vg);
+      hat(t, 0.03 * vg); hat(t + swung, 0.024 * vg);
+      if (beat === last && Math.random() < 0.18) { tom(t + swung, 180, 0.05 * vg); tom(t + swung * 1.4, 140, 0.05 * vg); }
+    } else if (T.kit === 'slow') {
+      if (beat === 0) kick(t, 0.062 * vg);
+      if (backbeat) snare(t, 0.045 * vg);
+      if (beat === 2) kick(t + swung, 0.034 * vg);
+      hat(t + swung, 0.017 * vg);
     } else if (T.kit === 'none') {
       // no kit at all — the pad and the arpeggio carry it
     } else {
@@ -2065,6 +2238,17 @@
         var when2 = Math.random() < 0.65 ? t + swung : t;
         for (q = 0; q < v.length; q++) play(G.comp, when2 + q * 0.008, mtof(v[q]), spb * 0.4, 0.055 * vg);
       }
+    } else if (T.kit === 'rock') {
+      var pw = [v[0] - 12, v[0] - 5, v[0]];        // a power chord, on the beat
+      for (i = 0; i < pw.length; i++) play(G.comp, t + i * 0.004, mtof(pw[i]), spb * 0.9, 0.05 * vg);
+      if (Math.random() < 0.45)
+        for (i = 0; i < pw.length; i++) play(G.comp, t + swung + i * 0.004, mtof(pw[i]), spb * 0.4, 0.032 * vg);
+    } else if (T.kit === 'slow') {
+      if (beat === 0 || beat === 2) {
+        var seq2 = v.concat([v[0] + 12]);
+        for (i = 0; i < seq2.length; i++)
+          play(G.comp, t + i * (spb * 0.22), mtof(seq2[i]), spb * 1.8, 0.038 * vg);
+      }
     } else if (G.comp === 'pad') {
       if (beat === 0) pad(t, v.map(function (m) { return m + 12; }), spb * meter * 0.9, 0.02 * vg);
     } else {
@@ -2072,6 +2256,23 @@
       if (Math.random() < compChance) {
         var when = (T.feel === 'swing' && Math.random() < 0.6) ? t + swung : t + lag;
         for (i = 0; i < v.length; i++) play(G.comp, when + i * 0.012, mtof(v[i]), spb * 1.5, 0.055 * vg);
+      }
+    }
+
+    // ── the voice: long notes over the changes, resting between phrases
+    if (T.vox && save.vox !== false) {
+      if (beat === 0) {
+        MUS.vline = (MUS.vline || 0) + 1;
+        MUS.vrest = (MUS.vline % 4 === 0);          // a bar off every fourth
+      }
+      if (!MUS.vrest) {
+        var vv = voicing(ch);
+        var deg = [0, 2, 1, 2][beat % 4];
+        var vn = vv[Math.min(deg, vv.length - 1)] + 12;
+        var vow = T.vox === 'oo' ? 'oo' : ['ah', 'oh', 'ah', 'oo'][(bar + beat) % 4];
+        if (beat === 0 || beat === Math.floor(meter / 2) || Math.random() < 0.3)
+          sing(t + (T.feel === 'swing' && beat % 2 ? swung : 0), mtof(vn),
+               spb * (beat === 0 ? 1.7 : 1.1), 0.085 * vg, vow);
       }
     }
 
@@ -3334,7 +3535,9 @@
       for (var k = 0; k < byGenre[order[g]].length; k++) {
         var idx = byGenre[order[g]][k];
         h += '<button class="trk' + (idx === MUS.tune ? ' on' : '') + '" data-i="' + idx + '">' +
-             TUNES[idx].name + '<small>' + TUNES[idx].bpm + '</small></button>';
+             TUNES[idx].name +
+             (TUNES[idx].vox ? '<em class="vx">sung</em>' : '') +
+             '<small>' + TUNES[idx].bpm + '</small></button>';
       }
       h += '</div>';
     }
@@ -3546,9 +3749,11 @@
     var rows = [
       { k: 'music', name: 'Music', help: 'A slow round on strings, a little darker once the sun goes down.' },
       { k: 'sound', name: 'Sound', help: 'The fire, the brand, his boots, the shades.' },
+      { k: 'vox',   name: 'Vocals',    help: 'Someone singing over the changes on about a third of the shelf.' },
       { k: 'buzz',  name: 'Vibration', help: 'A short buzz when a shade reaches the fire. Phones only.' }
     ];
-    var on = { music: save.music !== false, sound: !muted, buzz: save.buzz !== false };
+    var on = { music: save.music !== false, sound: !muted,
+               vox: save.vox !== false, buzz: save.buzz !== false };
     var h = '<div class="eyebrow">Settings</div><h1>How it<em>sounds</em></h1><div class="opts">';
     for (var i = 0; i < rows.length; i++)
       h += '<button class="opt' + (on[rows[i].k] ? ' on' : '') + '" data-k="' + rows[i].k + '">' +
@@ -3565,6 +3770,7 @@
       var k = this.getAttribute('data-k');
       if (k === 'sound') { muted = !muted; save.muted = muted; }
       else if (k === 'music') { setMusic(save.music === false); }
+      else if (k === 'vox') save.vox = save.vox === false;
       else save.buzz = save.buzz === false;
       store(); this.classList.toggle('on'); soundSwitch();
       if (k === 'sound' && !muted) bell(520, 0.12, 0.05, 2000);
@@ -3806,6 +4012,13 @@
       return at - t0 + 0.6;
     },
     pick: function (i) { switchTo(i, 0); },
+    setVox: function (v) { save.vox = v; },
+    sung: function () { return SUNG; },
+    singOne: function (f, d, vow) {
+      var a2 = ac(); if (!a2) return;
+      if (A.music) A.music.gain.setValueAtTime(MUSIC_LEVEL, a2.currentTime);
+      sing(a2.currentTime + 0.05, f, d, 0.28, vow);
+    },
     setNight: function (n) { save.night = n; store(); },
     tick: function (dt) { if (S && running) step(dt); },
     begin: function (n) { startNight(n); running = true; veil.classList.add('hide'); },
