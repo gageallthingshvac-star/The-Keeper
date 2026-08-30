@@ -278,7 +278,7 @@
 <script>
 (function () {
   'use strict';
-  var BUILD = 'v1.10.0';
+  var BUILD = 'v1.11.0';
 
   // ── measurements ──────────────────────────────────────────────────────────
   var TILE = 16;
@@ -1755,11 +1755,18 @@
   function rand(a2, b2) { return a2 + Math.random() * (b2 - a2); }
   var A = { ctx: null, master: null, comp: null, sfx: null, music: null, verb: null, noise: null };
   var MUSIC_LEVEL = 0.5;
+  // One amp per instrument means the whole part goes through it together, so
+  // these set where the band sits against the rest of the shelf.
+  // Driving the amp harder and turning it down after keeps the level where it
+  // belongs while rounding off the peaks, which is the whole point of an amp.
+  var GTR_IN = 0.9, GTR_OUT = 0.34, BASS_IN = 1.5, BASS_OUT = 0.5;
 
   function ac() {
     if (A.ctx) {
       if (A.ctx.state === 'suspended' && A.ctx.resume) {
         try { var pr = A.ctx.resume(); if (pr && pr.catch) pr.catch(function () {}); } catch (e) {}
+        // it was asleep; the clock ran on without us, so pick the beat up here
+        if (MUS.timer && MUS.next < A.ctx.currentTime) MUS.next = A.ctx.currentTime + 0.15;
       }
       return A.ctx;
     }
@@ -1777,7 +1784,7 @@
 
     // a small warm room, so nothing lands bone dry
     var verb = a.createConvolver();
-    verb.buffer = impulse(a, 2.4, 2.6);
+    verb.buffer = impulse(a, 1.7, 2.9);
     var verbG = a.createGain(); verbG.gain.value = 0.75;
     verb.connect(verbG); verbG.connect(comp);
 
@@ -1827,6 +1834,32 @@
     var cgain = a.createGain(); cgain.gain.value = 0;
     csrc.connect(chp); chp.connect(clp); clp.connect(cgain); cgain.connect(comp);
     csrc.start();
+
+    // Two amplifiers, built once and left standing. The guitars used to put
+    // up their own \u2014 a fresh oversampled waveshaper, a cabinet and a presence
+    // filter for every single note \u2014 which is why the rock tunes cost about
+    // eleven times what the rest of the shelf did and crackled on a phone.
+    // A real band plugs into one amp each, and it sounds better for it.
+    var gPre = a.createGain(); gPre.gain.value = GTR_IN;
+    var gWs = a.createWaveShaper(); gWs.curve = driveCurve(9); gWs.oversample = '2x';
+    var gDc = a.createBiquadFilter(); gDc.type = 'highpass'; gDc.frequency.value = 80; gDc.Q.value = 0.7;
+    var gPres = a.createBiquadFilter();
+    gPres.type = 'peaking'; gPres.frequency.value = 1800; gPres.gain.value = 5; gPres.Q.value = 1.1;
+    var gCab = a.createBiquadFilter();
+    gCab.type = 'lowpass'; gCab.frequency.value = 3200; gCab.Q.value = 0.9;
+    var gOut = a.createGain(); gOut.gain.value = GTR_OUT;
+    gPre.connect(gWs); gWs.connect(gDc); gDc.connect(gPres); gPres.connect(gCab);
+    gCab.connect(gOut); gOut.connect(music);
+
+    var bPre = a.createGain(); bPre.gain.value = BASS_IN;
+    var bWs = a.createWaveShaper(); bWs.curve = driveCurve(2); bWs.oversample = 'none';
+    var bDc = a.createBiquadFilter(); bDc.type = 'highpass'; bDc.frequency.value = 32; bDc.Q.value = 0.7;
+    var bCab = a.createBiquadFilter();
+    bCab.type = 'lowpass'; bCab.frequency.value = 2200; bCab.Q.value = 0.5;
+    var bOut = a.createGain(); bOut.gain.value = BASS_OUT;
+    bPre.connect(bWs); bWs.connect(bDc); bDc.connect(bCab);
+    bCab.connect(bOut); bOut.connect(music);
+    A.ampGtr = gPre; A.ampBass = bPre;
 
     A.master = master; A.comp = comp; A.verb = verb; A.sfx = sfx; A.music = music;
     A.musLP = musLP; A.musSend = musSend; A.chMix = chMix; A.dlMix = dlMix;
@@ -2038,39 +2071,25 @@
 
   // ── rock ──────────────────────────────────────────────────────────────────
   // A shaping curve, so the guitars break up rather than just get louder.
-  var DRIVE = null;
+  var DRIVE = {};
   function driveCurve(amount) {
+    if (DRIVE[amount]) return DRIVE[amount];
     var n = 1024, c = new Float32Array(n), k = amount;
     for (var i = 0; i < n; i++) {
       var x = (i * 2) / n - 1;
       c[i] = (1 + k) * x / (1 + k * Math.abs(x));
     }
+    DRIVE[amount] = c;
     return c;
   }
-  function shaper(amount) {
-    var a = A.ctx, ws = a.createWaveShaper();
-    ws.curve = driveCurve(amount); ws.oversample = '2x';
-    return ws;
-  }
-  // waveshaping leaves a standing offset; every amp has one of these after it
-  function dcBlock(hz) {
-    var f = A.ctx.createBiquadFilter();
-    f.type = 'highpass'; f.frequency.value = hz || 55; f.Q.value = 0.7;
-    return f;
-  }
-  // overdriven electric: two detuned saws through the shaper, then a cabinet
+  // overdriven electric: two detuned saws, straight into the amp in the corner
   function eguitar(t, freq, dur, vol) {
     var a = A.ctx;
-    var g = a.createGain(), ws = shaper(9), cab = a.createBiquadFilter(), pres = a.createBiquadFilter();
-    cab.type = 'lowpass'; cab.frequency.value = 3200; cab.Q.value = 0.9;
-    pres.type = 'peaking'; pres.frequency.value = 1800; pres.gain.value = 5; pres.Q.value = 1.1;
+    var g = a.createGain();
     var o1 = osc('sawtooth', freq, t, dur, -7), o2 = osc('sawtooth', freq, t, dur, 8);
-    var pre = a.createGain(); pre.gain.value = 0.5;
-    var dc = dcBlock(80);
-    o1.connect(pre); o2.connect(pre);
-    pre.connect(ws); ws.connect(dc); dc.connect(pres); pres.connect(cab); cab.connect(g);
-    env(g, t, dur, vol * 0.30, 0.006);
-    g.connect(A.music);
+    o1.connect(g); o2.connect(g);
+    env(g, t, dur, vol * 0.42, 0.006);
+    g.connect(A.ampGtr);
   }
   // clean electric: chimey, a bit of body, no dirt
   function cleanguitar(t, freq, dur, vol) {
@@ -2084,18 +2103,18 @@
     env(g, t, dur, vol * 0.48, 0.004);
     g.connect(A.music);
   }
-  // electric bass, picked
+  // electric bass, picked: the dirty string through the bass amp, the sub
+  // underneath it clean, both meeting at this note's own tone control
   function bassgtr(t, freq, dur, vol) {
     var a = A.ctx;
-    var g = a.createGain(), lp = a.createBiquadFilter(), ws = shaper(2);
+    var g = a.createGain(), lp = a.createBiquadFilter();
     lp.type = 'lowpass'; lp.frequency.setValueAtTime(1600, t);
     lp.frequency.exponentialRampToValueAtTime(420, t + dur * 0.7);
     var o1 = osc('sawtooth', freq, t, dur), o2 = osc('sine', freq / 2, t, dur);
     var sub2 = a.createGain(); sub2.gain.value = 0.6;
-    var dcb = dcBlock(32);
-    o2.connect(sub2); sub2.connect(lp); o1.connect(ws); ws.connect(dcb); dcb.connect(lp); lp.connect(g);
-    env(g, t, dur, vol * 0.48, 0.005);
-    g.connect(A.music);
+    o1.connect(lp); o2.connect(sub2); sub2.connect(lp);
+    env(g, t, dur, vol * 0.52, 0.005);
+    lp.connect(g); g.connect(A.ampBass);
   }
   // ── a voice ───────────────────────────────────────────────────────────────
   // Three bandpass formants over a saw, with a little vibrato. Wordless — it
@@ -2673,13 +2692,40 @@
   }
 
 
+  // How far ahead of the speakers the band is written out. The old third of
+  // a second was less than one bad frame on a slow phone: the thread would
+  // stall, the beats would come due while nothing was running, and the next
+  // tick would hand the whole lot to the sound card at once. That burst is
+  // what "glitching" was. Nearly a second of runway rides out any stall the
+  // game can produce, and the gain ramps on stopping and swapping are longer
+  // than the queue, so nothing is heard hanging over.
+  var LOOKAHEAD = 0.9, TICK_MS = 40;
+
   function musicTick() {
     var a = A.ctx;
     if (!a || !MUS.timer) return;
     var T = TUNES[MUS.tune];
     var spb = 60 / T.bpm, meter = T.meter || 4;
+    var now = a.currentTime;
+    MUS.ticks = (MUS.ticks || 0) + 1;
+    MUS.head = MUS.next - now;
+    if (MUS.worst == null || MUS.head < MUS.worst) MUS.worst = MUS.head;
+
+    // If beats have already come due, the thread was held up. Never post them
+    // late \u2014 walk the count on in silence and come back in on the next beat
+    // that is still ahead, so the bar and the chord stay where they should be.
+    if (MUS.next < now) {
+      MUS.late = (MUS.late || 0) + 1;
+      var skipped = 0;
+      while (MUS.next < now + 0.03 && skipped++ < 4096) {
+        MUS.next += spb;
+        if (++MUS.beat >= meter) { MUS.beat = 0; MUS.bar++; }
+      }
+      MUS.dropped = (MUS.dropped || 0) + skipped;
+    }
+
     var guard = 0;
-    while (MUS.next < a.currentTime + 0.3 && guard++ < 32) {
+    while (MUS.next < now + LOOKAHEAD && guard++ < 96) {
       playBeat(MUS.next, spb);
       MUS.next += spb;
       if (++MUS.beat >= meter) { MUS.beat = 0; MUS.bar++; }
@@ -2706,7 +2752,7 @@
     A.music.gain.cancelScheduledValues(a.currentTime);
     A.music.gain.setValueAtTime(0.0001, a.currentTime);
     A.music.gain.exponentialRampToValueAtTime(MUSIC_LEVEL, a.currentTime + 3);
-    MUS.timer = setInterval(musicTick, 30);
+    MUS.timer = setInterval(musicTick, TICK_MS);
   }
   function stopMusic(fade) {
     if (MUS.timer) { clearInterval(MUS.timer); MUS.timer = null; }
@@ -2740,7 +2786,10 @@
       save.tune = target; store();
       MUS.bar = 0; MUS.beat = 0;
       applyTone(TUNES[target]);
-      if (A.ctx) MUS.next = Math.max(MUS.next, A.ctx.currentTime + 0.06);
+      // start the new one now rather than behind the queue: what is already
+      // written out is down at eight percent under the duck, so the two
+      // overlap as a crossfade instead of making you wait a bar for the change
+      if (A.ctx) MUS.next = A.ctx.currentTime + 0.12;
       duckMusic(1, fade || 0.9);
       refreshTransport();
     }, fade ? 700 : 230);
@@ -4740,6 +4789,10 @@
   function frame(now) {
     var dt = Math.min(0.25, (now - last) / 1000); last = now;
     t += dt;
+    // Write the band out here as well as on the timer. A frame callback runs
+    // the moment the thread is free again, where an interval can sit behind
+    // whatever held things up; between the two the queue never runs dry.
+    if (MUS.timer) musicTick();
     if (running && S) {
       acc += dt;
       var guard = 0;
@@ -4809,6 +4862,14 @@
     callbacks: function () { return CALLBACKS; }, musings: function () { return MUSINGS; },
     talk: function () { talkCard(); }, banner: banner, readTime: readTime,
     noGuard: function (v) { GUARD = v ? 0 : 1; },
+    audio: function () {
+      var a2 = A.ctx;
+      return { now: a2 ? a2.currentTime : 0, next: MUS.next, head: MUS.head,
+               worst: MUS.worst, late: MUS.late || 0, ticks: MUS.ticks || 0,
+               dropped: MUS.dropped || 0, bar: MUS.bar, beat: MUS.beat,
+               on: !!MUS.timer, state: a2 ? a2.state : 'none' };
+    },
+    resetAudioStats: function () { MUS.worst = null; MUS.late = 0; MUS.ticks = 0; MUS.dropped = 0; },
     tick: function (dt) { if (S && running) step(dt); },
     begin: function (n) { startNight(n); running = true; veil.classList.add('hide'); },
     camp: function () { camp(); },
