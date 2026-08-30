@@ -100,6 +100,7 @@
     background:radial-gradient(120% 90% at 50% 45%,rgba(34,19,11,0.8),rgba(9,5,4,0.96) 70%);
     overflow-y:auto;transition:opacity .3s}
   #veil.hide{opacity:0;pointer-events:none}
+  #veil.lit{background:linear-gradient(180deg,rgba(12,7,10,0.55) 0 44%,rgba(12,7,10,0.9) 78%)}
   .card{width:100%;max-width:380px;text-align:center;display:flex;flex-direction:column;gap:14px}
   .eyebrow{font:700 10px/1 var(--body);letter-spacing:.2em;text-transform:uppercase;color:var(--ember)}
   h1{font:800 40px/1.04 var(--body);letter-spacing:-.02em}
@@ -241,7 +242,7 @@
 <script>
 (function () {
   'use strict';
-  var BUILD = 'v1.6.0';
+  var BUILD = 'v1.7.0';
 
   // ── measurements ──────────────────────────────────────────────────────────
   var TILE = 16;
@@ -1137,6 +1138,64 @@
     };
   }
 
+  // ── what he says to himself ───────────────────────────────────────────────
+  // Left alone at camp he potters, and thinks out loud. Gated by how far along
+  // the road you are, so nothing lands before it should.
+  var MUSINGS = [
+    { at: 1, s: 'Fire wants feeding before it wants anything else. Everything after that is detail.' },
+    { at: 1, s: 'I have walked this road a long time. It does not get shorter.' },
+    { at: 1, s: 'Grass is damp. Means a cold one.' },
+    { at: 1, s: 'That dog turned up on his own and has never once explained himself.' },
+    { at: 1, s: 'Wood on the left of the road burns better than wood on the right. No idea why.' },
+    { at: 2, s: 'They do not like the light. That is the only rule I have got.' },
+    { at: 2, s: 'You learn to hear them before you see them. Sort of a cold in the ears.' },
+    { at: 3, s: 'I keep meaning to fix that tent flap.' },
+    { at: 3, s: 'There is a village three days back where they would not let me buy matches. Odd place.' },
+    { at: 4, s: 'Harrow Point. That is the name of it. You can hear the sea from the last mile.' },
+    { at: 4, s: 'Nine houses and a bell on a post. That is the whole of it.' },
+    { at: 5, s: 'Most people stop about now. You have not.' },
+    { at: 5, s: 'I do not sleep much. Hour after dawn, mostly.' },
+    { at: 6, s: 'Kettle takes forever on this fire. I do not mind. Gives me something to watch.' },
+    { at: 6, s: 'Split it small. Small burns hot. Big burns long. You want hot when they come.' },
+    { at: 7, s: 'I was a fair hand at nothing much before this.' },
+    { at: 8, s: 'Nell would have had this fire twice the height and told me off for the wood.' },
+    { at: 8, s: 'She is my sister. Was. Is. I have not settled on which.' },
+    { at: 9, s: 'The pines thin out after the next ridge. More sky, less wood. Trade-off.' },
+    { at: 10, s: 'Halfway. I did not think I would say that out loud.' },
+    { at: 11, s: 'Found this axe in a barn. Somebody left in a hurry and did not come back for it.' },
+    { at: 12, s: 'I have started thinking about what I say to her. Have not got past the first line.' },
+    { at: 13, s: 'Four summers. She said end of every summer. That was four ago.' },
+    { at: 14, s: 'I was not afraid of them, first few nights. I was afraid of finishing this on my own.' },
+    { at: 15, s: 'Salt on the wind now, if you stand up on the rise.' },
+    { at: 16, s: 'Everything on this road belonged to somebody. I try to use it well.' },
+    { at: 17, s: 'If she is not there I will sit on the shingle a while and then think about it.' },
+    { at: 18, s: 'Two more. Then whatever is down there is down there.' },
+    { at: 19, s: 'I would like to be able to tell her somebody kept the fire with me.' },
+    { at: 20, s: 'Last one. Odd feeling.' },
+    // ones he only says once he knows something about you
+    { at: 3, need: 'restless', s: 'You said you were not sleeping. It is a bad club to be in.' },
+    { at: 5, need: 'adrift',   s: 'Not much on, you said. There is plenty on out here. Mostly wood.' },
+    { at: 5, need: 'here',     s: 'You said you would rather be here. I think about that more than I should.' },
+    { at: 6, need: 'sister',   s: 'You asked about her. Nobody has asked about her in a long time.' },
+    { at: 8, need: 'stay',     s: 'You said you were not going anywhere. I have held on to that.' },
+    { at: 12, need: 'hope',    s: 'You reckon she might still be there. I have decided to agree with you.' },
+    { at: 14, need: 'namedog', s: 'The dog has a name now and it is your fault.' }
+  ];
+  function musing() {
+    var pool = [];
+    for (var i = 0; i < MUSINGS.length; i++) {
+      var M = MUSINGS[i];
+      if (S.n < M.at) continue;
+      if (M.need && !tag(M.need)) continue;
+      if (MEM && MEM.tags['said' + i] && Math.random() < 0.8) continue;   // prefer new ones
+      pool.push({ i: i, s: M.s });
+    }
+    if (!pool.length) return null;
+    var got = pool[Math.floor(Math.random() * pool.length)];
+    if (MEM) { MEM.tags['said' + got.i] = 1; }
+    return got.s;
+  }
+
   // ── him, and you ──────────────────────────────────────────────────────────
   // He gives a little, then asks a little, and remembers what you said. The
   // road has somewhere it is going and he tells you where in his own time.
@@ -1342,8 +1401,17 @@
   // ── save ──────────────────────────────────────────────────────────────────
   var KEY = 'nightwatch.pixel.v1';
   var save = { night: 1, best: 0, kept: 0, logs: 0, muted: false, music: true, buzz: true,
-               look: null, mem: null, tune: 0, loop: false, vox: true };
-  try { var raw = localStorage.getItem(KEY); if (raw) { var o = JSON.parse(raw); if (o && o.night) save = o; } } catch (e) {}
+               look: null, mem: null, tune: 0, loop: false, vox: true, metHim: 0 };
+  // merge what was stored over the defaults, so a save written by an older
+  // build keeps everything it had and picks up whatever is new
+  try {
+    var raw = localStorage.getItem(KEY);
+    if (raw) {
+      var o = JSON.parse(raw);
+      if (o && typeof o === 'object')
+        for (var sk in o) if (Object.prototype.hasOwnProperty.call(o, sk)) save[sk] = o[sk];
+    }
+  } catch (e) {}
   function store() { try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) {} }
   function loadMusic() {
     MUS.on = save.music !== false;
@@ -2602,6 +2670,61 @@
     else if (k === 'f' || k === 'j' || k === 'x' || k === 'arrowdown') held.a = false;
   });
 
+  // ── left to himself ───────────────────────────────────────────────────────
+  // Take your hands off the controls at camp and he gets on with his evening.
+  // Touch anything and you have him back on the same frame.
+  var HAUNTS = [
+    { at: 'fire',   act: 'poke',  hold: 3.4 },
+    { at: 'pile',   act: 'stack', hold: 3.0 },
+    { at: 'pot',    act: 'stir',  hold: 3.2 },
+    { at: 'bowl',   act: 'pet',   hold: 3.8 },
+    { at: 'chop',   act: 'stack', hold: 2.8 },
+    { at: 'barrel', act: 'stir',  hold: 2.6 },
+    { at: 'seat',   act: 'sit',   hold: 5.0 },
+    { at: 'tent',   act: 'look',  hold: 2.4 },
+    { at: 'sign',   act: 'look',  hold: 3.6 }
+  ];
+  function idleAbout(dt, moving) {
+    if (moving || held.a || held.j || S.chore) {     // you took over
+      S.idleT = 0; S.auto = null; return;
+    }
+    S.idleT = (S.idleT || 0) + dt;
+    if (S.idleT < 3.2) return;
+
+    if (!S.auto) {                                   // pick somewhere to be
+      var H = HAUNTS[Math.floor(Math.random() * HAUNTS.length)];
+      var side = Math.random() < 0.5 ? -1 : 1;
+      S.auto = { x: AT[H.at] + side * (H.act === 'sit' ? 34 : 26),
+                 act: H.act, hold: H.hold, phase: 'walk', left: 0, dir: -side };
+      S.sayT = S.sayT == null ? 4 : S.sayT;
+    }
+    var A2 = S.auto;
+    if (A2.phase === 'walk') {
+      var d = A2.x - S.x;
+      if (Math.abs(d) < 3) { A2.phase = 'do'; A2.left = A2.hold; S.dir = A2.dir; S.moving = 0; }
+      else {
+        var step2 = Math.sign(d) * SPEED * 0.55 * dt;
+        var nx2 = S.x + step2, ng2 = groundY(nx2);
+        if (ng2 >= S.y - STEP_UP) { S.x = nx2; if (S.onGround && ng2 < S.y) S.y = ng2; }
+        else A2.phase = 'do', A2.left = 1.2;         // something in the way; give up on it
+        S.dir = Math.sign(d) || S.dir;
+        S.step += dt * 4.2; S.moving = 1;
+        S.y = groundY(S.x);
+      }
+    } else {
+      A2.left -= dt; S.moving = 0;
+      if (A2.left <= 0) S.auto = null;
+    }
+
+    // and every so often he says something
+    S.sayT -= dt;
+    if (S.sayT <= 0) {
+      S.sayT = 9 + Math.random() * 7;
+      var line = musing();
+      if (line) { banner(HIM.name, line, 3600); store(); }
+    }
+  }
+
   // ── one tick, of a night or of a day at the camp ──────────────────────────
   function step(dt) {
     var cfg = S.cfg;
@@ -2684,6 +2807,8 @@
         return;
       }
       if (S.shake > 0) S.shake -= dt;
+      if (S.walkTo || S.pose) { meetTick(dt); return; }
+      idleAbout(dt, mv);
       var want0 = Math.max(0, Math.min(WORLD - W, S.x - W / 2));
       S.cam += (want0 - S.cam) * Math.min(1, dt * 7);
       return;
@@ -3287,8 +3412,10 @@
 
   // ── the camp by daylight ──────────────────────────────────────────────────
   function drawDay(cam, lvl) {
+    var du = S.dusk || 0;
     for (var b = 0; b < 5; b++)
-      px(DAYSKY[b], 0, BAND[b], W, (b < 4 ? BAND[b + 1] : GY) - BAND[b]);
+      px(du ? mix(DAYSKY[b], ['#2a1c30', '#3c2740', '#5c3a48', '#8a5a52', '#c08a68'][b], du)
+            : DAYSKY[b], 0, BAND[b], W, (b < 4 ? BAND[b + 1] : GY) - BAND[b]);
     var sunX = Math.round(W * 0.78) - Math.round(cam * 0.04);
     disc(px, '#ffe9ad', sunX, Math.round(GY * 0.16), 17, 17);
     disc(px, '#fffbe4', sunX, Math.round(GY * 0.16), 13, 13);
@@ -3305,12 +3432,14 @@
     for (var hx = 0; hx < W; hx++) {
       var wx = hx + far;
       var h1 = RIDGE - Math.round(11 * Math.sin(wx * 0.019) + 6 * Math.sin(wx * 0.043 + 1));
-      px('#9fb0d0', hx, h1, 1, 2); px('#8496bc', hx, h1 + 2, 1, GY - h1 - 2);
+      px(du ? mix('#9fb0d0', '#5e4f6e', du) : '#9fb0d0', hx, h1, 1, 2);
+      px(du ? mix('#8496bc', '#4b3f5c', du) : '#8496bc', hx, h1 + 2, 1, GY - h1 - 2);
     }
     for (var tx = 0; tx < W; tx++) {
       var wx2 = tx + mid;
       var tb = TLINE - Math.round(7 * Math.abs(Math.sin(wx2 * 0.08)) + 4 * Math.sin(wx2 * 0.028));
-      px('#3f6247', tx, tb, 1, 2); px('#2f4a36', tx, tb + 2, 1, GY - tb - 2);
+      px(du ? mix('#3f6247', '#22331f', du) : '#3f6247', tx, tb, 1, 2);
+      px(du ? mix('#2f4a36', '#1a281a', du) : '#2f4a36', tx, tb + 2, 1, GY - tb - 2);
       if (hash(wx2, 3) > 0.86) px('#25392a', tx, tb - 2, 1, 3);
     }
     ctx.drawImage(terrain, cam, 0, W, H, 0, 0, W, H);
@@ -3331,12 +3460,47 @@
     birds(cam);
     if (!choreArt(px, cam)) {
       var hx3 = Math.round(S.x) - cam, hy3 = Math.round(S.y);
-      guy(px, hx3, hy3, t, S.dir, !S.onGround ? 'jump' : S.moving ? 'walk' : 'idle', S.step);
+      var A3 = S.auto;
+      if (S.pose) {
+        if (S.pose === 'feed') {
+          var Rf = reach(hx3, hy3, 6, AT.fire - cam, GY - 12);
+          guy(px, hx3, hy3, t, S.dir, 'kneel', 0, Rf.a);
+          var fx4 = Rf.x + Math.cos(Rf.a) * 14, fy4 = Rf.y + Math.sin(Rf.a) * 14;
+          px(C.wood0, fx4 - 8, fy4 - 3, 17, 6); px(C.wood2, fx4 - 8, fy4 - 2, 17, 4);
+        } else {
+          guy(px, hx3, hy3 - (S.pose === 'sit' ? 8 : 0), t, S.dir, S.pose, S.step);
+        }
+      } else if (A3 && A3.phase === 'do') {
+        if (A3.act === 'sit') {
+          guy(px, hx3, hy3 - 8, t, S.dir, 'sit', 0);
+        } else if (A3.act === 'poke' || A3.act === 'pet' || A3.act === 'stir') {
+          var tgt2 = A3.act === 'poke' ? { x: AT.fire - cam, y: GY - 8 }
+                   : A3.act === 'pet'  ? { x: AT.bowl - cam, y: GY - 14 }
+                   : { x: (A3.x < AT.pot ? AT.pot : AT.barrel) - cam, y: GY - 26 };
+          var reach2 = 0.4 + 0.6 * Math.abs(Math.sin(t * 2.2));
+          var R6 = reach(hx3, hy3, 6, lerp(hx3 - S.dir * 16, tgt2.x, reach2),
+                         lerp(GY - 32, tgt2.y, reach2));
+          guy(px, hx3, hy3, t, S.dir, 'kneel', 0, R6.a);
+          if (A3.act === 'poke') tool(px, R6.x, R6.y, R6.a, 22, 'brand');
+        } else if (A3.act === 'stack') {
+          var lift = Math.abs(Math.sin(t * 1.8));
+          var R7 = reach(hx3, hy3, 0, hx3 + S.dir * 16, GY - 12 - lift * 20);
+          guy(px, hx3, hy3, t, S.dir, 'work', 0, R7.a);
+          var lx3 = R7.x + Math.cos(R7.a) * 12, ly3 = R7.y + Math.sin(R7.a) * 12;
+          disc(px, C.wood0, lx3, ly3, 5, 5); disc(px, C.wood2, lx3, ly3, 4, 4);
+        } else {
+          guy(px, hx3, hy3, t, S.dir, 'idle', 0);
+        }
+      } else {
+        guy(px, hx3, hy3, t, S.dir, !S.onGround ? 'jump' : S.moving ? 'walk' : 'idle', S.step);
+      }
     }
     ctx.save();                                   // a wash of warm morning over it all
     ctx.globalCompositeOperation = 'multiply';
     var wm = ctx.createLinearGradient(0, 0, 0, H);
-    wm.addColorStop(0, '#e8ecf6'); wm.addColorStop(0.6, '#fff3e2'); wm.addColorStop(1, '#f6dfc6');
+    wm.addColorStop(0, du ? mix('#e8ecf6', '#4a4260', du) : '#e8ecf6');
+    wm.addColorStop(0.6, du ? mix('#fff3e2', '#7b5f5c', du) : '#fff3e2');
+    wm.addColorStop(1, du ? mix('#f6dfc6', '#6d5450', du) : '#f6dfc6');
     ctx.fillStyle = wm; ctx.fillRect(0, 0, W, H);
     ctx.globalCompositeOperation = 'lighter';
     var gl = ctx.createRadialGradient(FIREX - cam, GY - 14, 2, FIREX - cam, GY - 14, 70);
@@ -3558,6 +3722,139 @@
       else if (wasLive) { veil.classList.add('hide'); running = true; last = performance.now(); }
       else title();
     });
+  }
+
+  // ── the night you meet him ────────────────────────────────────────────────
+  // Dusk, a fire nearly out, and a man on a log who has been on his own too
+  // long. It plays once. The scene moves as the lines do.
+  function newMeet() {
+    resetPrep();
+    S = {
+      mode: 'day', n: 1, cfg: cfgFor(1), left: 0, fuel: 8, cam: 0,
+      dusk: 0.62, pose: 'sit', scene: 0,
+      x: AT.seat + 46, y: GY, vy: 0, onGround: true, jumpHeld: false,
+      wep: wepFor(1), tier: 0, trails: [],
+      spd: SPEED, rng: SWING_RANGE, cd: SWING_CD, dogged: 0, pile: 0, pileT: 0, chore: null,
+      dir: -1, step: 0, carry: 0, moving: 0,
+      swing: 0, swingCd: 0, feed: 0,
+      logs: [], shades: [], sparks: [], puffs: [],
+      woodT: 0, shadeT: 0, fed: 0, driven: 0, bitten: 0, foot: 0,
+      shake: 0, birds: 0, over: null, auto: null, idleT: 0
+    };
+    S.cam = Math.max(0, Math.min(WORLD - W, S.x - W / 2));
+    hud();
+  }
+  // walk him somewhere over a second or so, then hold a pose
+  function meetMove(toX, pose, then) {
+    S.walkTo = { x: toX, pose: pose, then: then };
+  }
+  function meetTick(dt) {
+    if (!S.walkTo) return;
+    var d = S.walkTo.x - S.x;
+    if (Math.abs(d) < 3) {
+      S.pose = S.walkTo.pose; S.moving = 0;
+      var fn = S.walkTo.then; S.walkTo = null; if (fn) fn();
+      return;
+    }
+    S.pose = null;
+    S.dir = Math.sign(d);
+    S.x += Math.sign(d) * SPEED * 0.6 * dt;
+    S.y = groundY(S.x);
+    S.step += dt * 4.6; S.moving = 1;
+    S.cam += (Math.max(0, Math.min(WORLD - W, S.x - W / 2)) - S.cam) * Math.min(1, dt * 5);
+  }
+
+  function meetCard() {
+    newMeet();
+    veil.classList.add('lit');
+    var beats = [
+      { l: ['…'] },
+      { l: ['You are the first thing up this road in nine days that was not weather.'] },
+      { l: ['Do not stand out there. Come in by it.', 'Such as it is.'],
+        act: function () { S.pose = null; S.dir = -1; } },
+      { ask: [
+          { t: 'What happened to your fire?', k: 'asked_fire',
+            r: ['I let it get away from me. That is the honest answer.',
+                'You do that a few nights running and it stops being an accident.'] },
+          { t: 'Are you all right?', k: 'kind',
+            r: ['… Nobody has asked me that in a while.', 'I will be, in a minute.'] },
+          { t: '(say nothing, and wait)', k: 'quiet',
+            r: ['Right. You are one of those.', 'That is all right. I talk enough for two.'] }
+        ] },
+      { l: ['Here. Watch.'],
+        act: function () { meetMove(AT.fire + 28, 'feed'); } },
+      { l: ['There.'], act: function () {
+          S.fuel = 62; S.dusk = 0.5; burst(AT.fire, GY - 12, 16, 40); bell(300, 0.3, 0.06, 2000);
+        } },
+      { l: ['It does not take much. It just takes somebody to be there when it dips.'] },
+      { l: ['I am going up this road to a place called Harrow Point.',
+            'Twenty nights, near enough, if nothing goes wrong.'],
+        act: function () { S.pose = null; S.dir = -1; } },
+      { l: ['Things come at the light out here. I can hold them off.',
+            'What I cannot do is hold them off and keep the fire up at the same time.',
+            'Not on my own. Not any more.'] },
+      { ask: [
+          { t: 'Then I will keep the fire.', k: 'stay',
+            r: ['… Right.', 'Right. Good.'] },
+          { t: 'What comes at the light?', k: 'why',
+            r: ['You will see one tonight. Do not let it get near the stones.'] },
+          { t: 'Why twenty nights?', k: 'curious',
+            r: ['Because that is how far it is.', 'I have counted it more than once.'] }
+        ] },
+      { l: ['Sun is nearly down. Have a look round the camp while there is light.',
+            'Then come and take the watch.'] }
+    ];
+    var bi = 0, li = 0, said = [];
+
+    function draw2() {
+      var B = beats[bi];
+      var h = '<div class="eyebrow">The road to Harrow Point</div>' +
+              '<div class="talk"><div class="who">' + HIM.name + '</div>';
+      for (var i = 0; i < said.length; i++)
+        h += '<p class="said' + (said[i].me ? ' me' : '') + '" style="animation-delay:' +
+             Math.min(0.4, i * 0.05) + 's">' + fill(said[i].t) + '</p>';
+      h += '</div>';
+      if (B && B.ask) {
+        h += '<div class="picks">';
+        for (var q = 0; q < B.ask.length; q++)
+          h += '<button class="pick" data-q="' + q + '">' + B.ask[q].t + '</button>';
+        h += '</div>';
+        show(h);
+        var ps = card.querySelectorAll('.pick');
+        for (var j = 0; j < ps.length; j++) ps[j].addEventListener('click', function () {
+          var A4 = B.ask[+this.getAttribute('data-q')];
+          MEM.tags[A4.k] = 1; MEM.bond += 2; store();
+          said.push({ t: A4.t, me: 1 });
+          for (var r = 0; r < A4.r.length; r++) said.push({ t: A4.r[r] });
+          bell(430, 0.12, 0.04, 1900);
+          bi++; li = 0; draw2();
+        });
+        return;
+      }
+      h += '<button class="go" id="go">' + (bi >= beats.length - 1 && li >= (B ? B.l.length : 0)
+            ? 'Have a look round' : 'Go on') + '</button>';
+      show(h);
+      bindGo(function () {
+        var C3 = beats[bi];
+        if (C3 && li < C3.l.length) {
+          said.push({ t: C3.l[li++] });
+          if (li === 1 && C3.act) C3.act();
+          draw2();
+          return;
+        }
+        bi++; li = 0;
+        if (bi >= beats.length) {
+          save.metHim = 1; MEM.bond += 2; store();
+          veil.classList.remove('lit');
+          camp();
+          return;
+        }
+        draw2();
+      });
+    }
+    said.push({ t: beats[0].l[0] });
+    bi = 0; li = 1;
+    draw2();
   }
 
   // ── sitting with him ──────────────────────────────────────────────────────
@@ -3984,7 +4281,7 @@
   loadMem();
   loadLook();
   soundSwitch();
-  title();
+  if (save.metHim) title(); else meetCard();
   requestAnimationFrame(frame);
 
   window.__NW = {
