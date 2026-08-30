@@ -152,6 +152,24 @@
   .word{padding:9px 13px;border-radius:11px;cursor:pointer;font:700 12px/1 var(--body);
     border:1px solid var(--line);background:transparent;color:var(--mute)}
   .word.on{border-color:var(--ember);color:var(--bone);background:rgba(255,181,71,0.14)}
+  .talk{display:flex;flex-direction:column;gap:11px;text-align:left}
+  .said{font:400 16px/1.5 var(--body);color:var(--bone);opacity:0;
+    transform:translateY(6px);animation:rise .45s forwards}
+  .said.me{color:var(--ember);text-align:right;font-style:italic}
+  @keyframes rise{to{opacity:1;transform:none}}
+  .who{font:700 9px/1 var(--body);letter-spacing:.18em;text-transform:uppercase;
+    color:var(--mute);margin-bottom:-4px}
+  .picks{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+  .pick{padding:14px;border-radius:13px;cursor:pointer;text-align:left;
+    font:500 14.5px/1.4 var(--body);color:var(--bone);
+    border:1px solid var(--line);background:rgba(255,181,71,0.05)}
+  .pick:active{background:rgba(255,181,71,0.18);border-color:var(--ember)}
+  .nameIn{padding:14px;border-radius:13px;border:1px solid var(--line);
+    background:rgba(242,228,204,0.06);color:var(--bone);font:600 16px/1 var(--body);
+    width:100%;text-align:center}
+  .bond{display:flex;gap:5px;justify-content:center;align-items:center}
+  .bond i{width:8px;height:8px;border-radius:2px;background:rgba(242,228,204,0.14);display:block}
+  .bond i.on{background:var(--ember);box-shadow:0 0 7px rgba(255,181,71,0.8)}
 </style>
 </head>
 <body>
@@ -189,7 +207,7 @@
 <script>
 (function () {
   'use strict';
-  var BUILD = 'v1.3.0';
+  var BUILD = 'v1.4.0';
 
   // ── measurements ──────────────────────────────────────────────────────────
   var TILE = 16;
@@ -857,18 +875,165 @@
     px(glow > 0.5 ? C.fire3 : C.fire2, lx - 2, ly - 5, 4, 2);
   }
 
-  function shadeSprite(px, sh, t, k) {
-    var ex = sh.x | 0, ey = sh.y | 0;
-    var tail = Math.round(Math.sin(t * 4 + sh.ph) * 3);
-    disc(px, C.shade0, ex, ey + 6 + tail, 7, 8);
-    disc(px, C.shade0, ex, ey, 11, 10);
-    disc(px, C.shade1, ex, ey - 1, 10, 8);
-    disc(px, C.shade2, ex, ey - 4, 7, 4);
+  // ── the bestiary, drawn ───────────────────────────────────────────────────
+  function shadeSprite(px, sh, t, k, lit) {
+    var B = sh.b || BEASTS[0], ex = sh.x | 0, ey = sh.y | 0;
+    var hurtNow = sh.flash > 0 && Math.sin(t * 60) > 0;
+    var A = hurtNow ? ['#ffd8d8', '#ffb0b0', '#ff8c8c', '#fff'] :
+            sh.burn > 0 ? [C.fire1, C.fire2, C.fire3, '#fff3c8'] :
+            [C.shade0, C.shade1, C.shade2, '#e8e0ff'];
     var bl = (t * 1.3 + k) % 5 < 0.18;
-    if (!bl) {
-      px(C.shade3, ex - 5, ey - 3, 4, 4); px(C.shade3, ex + 2, ey - 3, 4, 4);
-      px('#e8e0ff', ex - 5, ey - 3, 2, 2); px('#e8e0ff', ex + 2, ey - 3, 2, 2);
+
+    if (B.id === 'crawler') {                        // low, wide, many legs
+      var sc = Math.sin(t * 14 + sh.ph);
+      disc(px, A[0], ex, ey, 11, 6);
+      disc(px, A[1], ex, ey - 1, 9, 5);
+      px(A[2], ex - 6, ey - 3, 12, 2);
+      for (var lg = 0; lg < 6; lg++) {
+        var lx = ex - 9 + lg * 4, dn = (lg % 2 ? sc : -sc) > 0 ? 3 : 1;
+        px(A[0], lx, ey + 3, 2, dn + 2);
+      }
+      if (!bl) { px(A[3], ex - 4, ey - 3, 2, 2); px(A[3], ex + 2, ey - 3, 2, 2); }
+      return;
     }
+    if (B.id === 'moth') {                           // two beating wings
+      var flap = Math.abs(Math.sin(t * 9 + sh.ph));
+      var wh = 4 + Math.round(flap * 8), ww = 13 - Math.round(flap * 4);
+      for (var wr = -wh; wr <= wh; wr++) {          // a wing, not a plank
+        var wu = Math.abs(wr) / wh;
+        var span = Math.round(ww * (1 - wu * wu * 0.72)) - (wr > wh * 0.4 ? 3 : 0);
+        if (span < 1) continue;
+        px(A[0], ex - 2 - span, ey + wr, span, 1);
+        px(wr < 0 ? A[1] : A[0], ex - 1 - span, ey + wr, span - 1, 1);
+        px(A[0], ex + 3, ey + wr, span, 1);
+        px(wr < 0 ? A[1] : A[0], ex + 3, ey + wr, span - 1, 1);
+        if (Math.abs(wr) < 2) { px(A[2], ex - 2 - span, ey + wr, span, 1); px(A[2], ex + 3, ey + wr, span, 1); }
+      }
+      disc(px, A[0], ex, ey, 3, 6); disc(px, A[1], ex, ey - 1, 2, 4);
+      if (!bl) { px(A[3], ex - 2, ey - 4, 2, 2); px(A[3], ex + 1, ey - 4, 2, 2); }
+      px(A[2], ex - 3, ey - 8, 2, 4); px(A[2], ex + 2, ey - 8, 2, 4);   // antennae
+      return;
+    }
+    if (B.id === 'hollow') {                         // tall, thin, hooded
+      px(A[0], ex - 5, ey - 12, 11, 30);
+      px(A[1], ex - 4, ey - 11, 9, 28);
+      px(A[2], ex - 4, ey - 11, 3, 26);
+      disc(px, A[0], ex, ey - 14, 7, 7); disc(px, A[1], ex, ey - 15, 6, 6);
+      px(A[0], ex - 7, ey - 16, 15, 5);              // the hood
+      px(A[1], ex - 6, ey - 15, 13, 3);
+      if (!bl) { px(A[3], ex - 4, ey - 13, 3, 2); px(A[3], ex + 2, ey - 13, 3, 2); }
+      var sway = Math.round(Math.sin(t * 2 + sh.ph) * 3);
+      px(A[0], ex - 8 + sway, ey - 6, 4, 13); px(A[0], ex + 5 + sway, ey - 6, 4, 13);
+      return;
+    }
+    if (B.id === 'frost') {                          // spiked, and it fumes cold
+      var F = hurtNow ? A : ['#2a4a5e', '#3f6c86', '#69a3c0', '#d6f0ff'];
+      disc(px, F[0], ex, ey, 11, 11); disc(px, F[1], ex, ey - 1, 9, 9);
+      for (var sp2 = 0; sp2 < 7; sp2++) {
+        var a2 = sp2 * 0.9 + t * 0.4;
+        px(F[2], ex + Math.round(Math.cos(a2) * 11), ey + Math.round(Math.sin(a2) * 11), 3, 3);
+      }
+      if (!bl) { px(F[3], ex - 4, ey - 3, 3, 3); px(F[3], ex + 2, ey - 3, 3, 3); }
+      for (var fz = 0; fz < 3; fz++) {
+        var fy = ((t * 22 + fz * 9) % 26);
+        px('#a8d4e6', ex - 6 + fz * 6, ey + 8 + fy, 1, 2);
+      }
+      return;
+    }
+    if (B.id === 'gnasher') {                        // jaws, and plenty of them
+      var chomp = Math.abs(Math.sin(t * 11 + sh.ph)) * 5;
+      disc(px, A[0], ex, ey, 13, 9); disc(px, A[1], ex, ey - 1, 11, 8);
+      px(A[0], ex - 12, ey - 2 - Math.round(chomp), 24, 5);     // upper jaw
+      px(A[0], ex - 12, ey + 2 + Math.round(chomp), 24, 5);     // lower
+      for (var tk = 0; tk < 6; tk++) {
+        px('#f2ecff', ex - 10 + tk * 4, ey + 1 - Math.round(chomp), 2, 3);
+        px('#f2ecff', ex - 8 + tk * 4, ey + 1 + Math.round(chomp), 2, 3);
+      }
+      if (!bl) { px(A[3], ex - 7, ey - 7, 3, 3); px(A[3], ex + 4, ey - 7, 3, 3); }
+      return;
+    }
+    if (B.id === 'quiet') {                          // only its eyes, until the light finds it
+      if (lit) {
+        disc(px, A[0], ex, ey, 10, 13); disc(px, A[1], ex, ey - 2, 8, 10);
+        px(A[0], ex - 9, ey + 6, 18, 8);
+      }
+      if (!bl) {
+        px('#fff', ex - 5, ey - 4, 3, 2); px('#fff', ex + 2, ey - 4, 3, 2);
+        px('#b9a6ff', ex - 5, ey - 5, 3, 1); px('#b9a6ff', ex + 2, ey - 5, 3, 1);
+      }
+      return;
+    }
+    if (B.id === 'thief') {                          // small, quick, carrying nothing yet
+      disc(px, A[0], ex, ey, 8, 6); disc(px, A[1], ex, ey - 1, 6, 5);
+      px(A[0], ex + 5, ey - 4, 6, 5); px(A[1], ex + 6, ey - 4, 4, 3);
+      px(A[2], ex - 9, ey - 2, 5, 2);
+      var run = Math.sin(t * 18 + sh.ph) > 0 ? 2 : 0;
+      px(A[0], ex - 4, ey + 4, 2, 3 + run); px(A[0], ex + 2, ey + 4, 2, 5 - run);
+      if (!bl) { px('#ffd86a', ex + 7, ey - 3, 2, 2); }
+      return;
+    }
+    // the plain shade, as it always was
+    var tail = Math.round(Math.sin(t * 4 + sh.ph) * 3);
+    disc(px, A[0], ex, ey + 6 + tail, 7, 8);
+    disc(px, A[0], ex, ey, 11, 10);
+    disc(px, A[1], ex, ey - 1, 10, 8);
+    disc(px, A[2], ex, ey - 4, 7, 4);
+    if (!bl) {
+      px(A[2], ex - 5, ey - 3, 4, 4); px(A[2], ex + 2, ey - 3, 4, 4);
+      px(A[3], ex - 5, ey - 3, 2, 2); px(A[3], ex + 2, ey - 3, 2, 2);
+    }
+  }
+
+  // ── what is in his hand, mid-swing ────────────────────────────────────────
+  function weapon(px, hx, hy, f, W, sw) {
+    var u = sw > 0 ? 1 - sw / W.dur : -1;
+    var ang;                                          // resting, then over and down
+    if (u < 0) ang = f > 0 ? -0.35 : Math.PI + 0.35;
+    else {
+      var a = u < 0.42 ? lerp(-0.6, -2.45, u / 0.42)  // up and back over the shoulder
+                       : lerp(-2.45, 0.30, (u - 0.42) / 0.58);
+      ang = f > 0 ? a : Math.PI - a;
+    }
+    var sx = hx, sy = hy - GUY_H + 19;
+    var gx = sx + Math.cos(ang) * 9, gy = sy + Math.sin(ang) * 9;
+    var len = W.reach - 14;
+    var tipx = gx + Math.cos(ang) * len, tipy = gy + Math.sin(ang) * len;
+    var cx2 = Math.cos(ang), cy2 = Math.sin(ang);
+
+    if (u >= 0 && u > 0.34 && u < 0.8) {              // the sweep it leaves behind
+      for (var q = 1; q <= 5; q++) {
+        var back = u - q * 0.05;
+        if (back < 0.42) continue;
+        var ab = lerp(-2.45, 0.30, (back - 0.42) / 0.58);
+        var an = f > 0 ? ab : Math.PI - ab;
+        px(q < 3 ? C.fire3 : C.fire1,
+           Math.round(sx + Math.cos(an) * (len + 9)), Math.round(sy + Math.sin(an) * (len + 9)), 2, 2);
+      }
+    }
+    for (var i = -5; i < len; i++)                    // the shaft
+      px(i > len - 6 ? C.wood1 : C.wood0, Math.round(gx + cx2 * i), Math.round(gy + cy2 * i), 2, 2);
+
+    if (W.kind === 'axe') {
+      px(C.metal0, tipx - 4, tipy - 5, 9, 10);
+      px(C.metal2, tipx - 3, tipy - 4, 7, 5);
+      px(C.metal3, tipx + 2, tipy - 5, 3, 10);
+    } else if (W.kind === 'poker') {
+      px(C.metal0, tipx - 2, tipy - 2, 5, 5);
+      px(C.fire2, tipx - 1, tipy - 1, 3, 3);
+      px(C.fire4, tipx, tipy, 2, 2);
+    } else if (W.kind === 'light') {
+      px(C.metal0, tipx - 5, tipy - 6, 11, 13);
+      px(C.fire3, tipx - 3, tipy - 4, 7, 9);
+      px(C.fire4, tipx - 2, tipy - 3, 5, 7);
+      px('#fffbe6', tipx - 1, tipy - 2, 3, 4);
+      px(C.metal2, tipx - 5, tipy - 7, 11, 2);
+    } else {
+      px(C.fire2, tipx - 2, tipy - 2, 6, 6);
+      px(C.fire3, tipx - 1, tipy - 2, 4, 5);
+      px(C.fire4, tipx - 1, tipy - 1, 3, 3);
+      px('#fffbe6', tipx, tipy, 1, 1);
+    }
+    return { x: tipx, y: tipy };
   }
 
   // left standing in the block between jobs
@@ -938,6 +1103,141 @@
     };
   }
 
+  // ── him, and you ──────────────────────────────────────────────────────────
+  // He gives a little, then asks a little, and remembers what you said. The
+  // road has somewhere it is going and he tells you where in his own time.
+  var HIM = { name: 'Wren' };
+  var MEM = null;
+  function newMem() {
+    return { you: '', bond: 0, tags: {}, seen: [], asked: [], night: 0 };
+  }
+  function tag(k) { return MEM && MEM.tags[k]; }
+  function fill(str) {
+    return str.replace(/\{you\}/g, MEM && MEM.you ? MEM.you : 'friend')
+              .replace(/\{him\}/g, HIM.name);
+  }
+
+  // Each night has one of these. `him` are his lines. `ask` is what he puts to
+  // you; each answer sets a tag he can lean on later. `after` is what he says
+  // back, keyed by the tag.
+  var TALKS = [
+    { n: 1, him: ['You came. I did not think you would.',
+                  'Sit a minute. The wood can wait.',
+                  'I am Wren. What do I call you?'],
+      name: 1,
+      after: { any: ['{you}. Right. I will not forget it.'] } },
+
+    { n: 2, him: ['You held it. That is the whole of the job, and most people cannot.',
+                  'Can I ask — do you sleep well?'],
+      ask: [{ t: 'Most nights, yes.', k: 'sleeps', r: ['Good. Hold on to that one.'] },
+            { t: 'Not really. Not lately.', k: 'restless', r: ['No. Nor me.', 'That is partly why I walk.'] },
+            { t: 'I would rather hear about you.', k: 'curious', r: ['Ha. Fair enough.', 'Another night, then.'] }] },
+
+    { n: 3, him: ['My sister used to do this bit. The fire, I mean. She was better at it.',
+                  'She would have had it twice this high by now and told me off for the wood I picked.'],
+      ask: [{ t: 'What was she like?', k: 'sister', r: ['Loud. Kind. Impossible to argue with.',
+                                                        'She would have liked you, I think.'] },
+            { t: 'Where is she now?', k: 'asked_where', r: ['That is the walk. I will tell you when we are further along.'] }] },
+
+    { n: 4, him: ['There is a place at the end of this road. Harrow Point.',
+                  'You can hear the sea from the last mile of it. That is where I am going.'] },
+
+    { n: 5, him: ['Five nights. You have not missed one.',
+                  'I have had people walk with me before. They tend to stop around now.'],
+      ask: [{ t: 'I am not going anywhere.', k: 'stay', r: ['All right.', 'All right, then.'] },
+            { t: 'Why do they stop?', k: 'why', r: ['Because it is the same thing every night and I am not much of a talker.',
+                                                    'You are still here, though.'] }] },
+
+    { n: 6, him: ['I split the wood differently since you came. Smaller. Burns hotter.',
+                  'Small thing. But it was your being here that made me bother.'] },
+
+    { n: 7, him: ['Do you mind me asking what you do, when you are not here?'],
+      ask: [{ t: 'Work, mostly. It is a lot.', k: 'tired', r: ['Then this is a strange rest.', 'I will take it if you will.'] },
+            { t: 'Not much. That is the trouble.', k: 'adrift', r: ['I know that feeling well enough.',
+                                                                    'The road is good for it. Something to do with your hands.'] },
+            { t: 'I would rather be here.', k: 'here', r: ['...Right.', 'Well. Good.'] }] },
+
+    { n: 8, him: ['Her name was Nell. My sister.',
+                  'I have not said it out loud in a long while.'],
+      ask: [{ t: 'Nell. That is a good name.', k: 'kind', r: ['It is, is it not.'] },
+            { t: 'Thank you for telling me.', k: 'kind', r: ['You made it easy. That is not nothing.'] }] },
+
+    { n: 9, him: ['The dog turned up on night two of the whole thing. I never named him.',
+                  'Felt like it would be presumptuous.'],
+      ask: [{ t: 'You should name him.', k: 'namedog', r: ['Maybe. You pick, then. I will use whatever you say.'] },
+            { t: 'He seems fine as he is.', k: 'nodog', r: ['That is what I thought. He has not complained.'] }] },
+
+    { n: 10, him: ['Halfway. Ten behind us.',
+                   'I want to say something and I am going to make a hash of it, so — thank you.',
+                   'For the nights. For asking. It is easier with someone watching the other side.'] },
+
+    { n: 11, him: ['I found the long axe in a barn two ridges back. Somebody left in a hurry.',
+                   'I keep thinking about who.'] },
+
+    { n: 12, him: ['Cold one. Is it cold where you are?'],
+      ask: [{ t: 'Warmer than here.', k: 'warm', r: ['Good. Stay there. I will do the standing about.'] },
+            { t: 'Cold enough.', k: 'cold', r: ['Then we are both at it.'] }] },
+
+    { n: 13, him: ['She said she would wait at the Point. End of every summer, she said.',
+                   'That was four summers ago now.'],
+      ask: [{ t: 'She might still be there.', k: 'hope', r: ['She might.', 'You are the first person to say so out loud.'] },
+            { t: 'And if she is not?', k: 'honest', r: ['Then I will have walked it. That is worth something on its own.',
+                                                        'I would rather you asked than not.'] }] },
+
+    { n: 14, him: ['You know what I was afraid of, the first few nights? Not them.',
+                   'Getting to the end of the road on my own.'] },
+
+    { n: 15, him: ['Fifteen. There is a fair chance we finish this.'],
+      ask: [{ t: 'We will.', k: 'stay', r: ['Right.'] },
+            { t: 'One night at a time.', k: 'steady', r: ['That is the way to do it. That is exactly the way.'] }] },
+
+    { n: 16, him: ['The poker came out of a forge with the roof gone.',
+                   'Everything on this road belonged to somebody. I try to use it well.'] },
+
+    { n: 17, him: ['If you had one thing waiting at the end of a long walk, what would you want it to be?'],
+      ask: [{ t: 'Somebody who knew me.', k: 'known', r: ['Yes.', 'Yes, that is the one.'] },
+            { t: 'Somewhere to stop.', k: 'rest', r: ['That is the honest answer. I might be after both.'] },
+            { t: 'I would want you to get yours.', k: 'forhim', r: ['...', 'You are not making this easy on me.'] }] },
+
+    { n: 18, him: ['Three left. I can smell salt on the wind at the top of the rise.',
+                   'I went up to look. Could not see anything. But it is there.'] },
+
+    { n: 19, him: ['If she is at the Point, I want to be able to tell her about you.',
+                   'What should I say?'],
+      ask: [{ t: 'That I kept the fire.', k: 'kept', r: ['That will do. That will do nicely.'] },
+            { t: 'That you were not alone.', k: 'notalone', r: ['Yes.', 'That is the bit that matters.'] },
+            { t: 'Tell her whatever you like.', k: 'easy', r: ['Then I will tell her the truth and let her make of it what she wants.'] }] },
+
+    { n: 20, him: ['Last one. Whatever is down there is down there.',
+                   'Whatever happens tomorrow, this part was good. I mean it.',
+                   'Keep it going one more night, {you}.'] }
+  ];
+  function talkFor(n) {
+    for (var i = 0; i < TALKS.length; i++) if (TALKS[i].n === n) return TALKS[i];
+    return { n: n, him: ['Long past the twenty now.',
+                         'I did not plan for this bit. Glad of the company all the same.'] };
+  }
+
+  // things you can put to him, once you have a reason to
+  var ASKS = [
+    { id: 'sea',   need: null,       q: 'Have you seen the sea?',
+      a: ['Once. I was small. Nell held on to the back of my coat the whole time.'] },
+    { id: 'nell',  need: 'sister',   q: 'Tell me more about Nell.',
+      a: ['She could start a fire in the rain. I have never managed it.',
+          'She used to say the trick was to stop apologising to the wood.'] },
+    { id: 'dark',  need: null,       q: 'What are they, really?',
+      a: ['I have thought about it a lot and I have got nowhere.',
+          'They only come at light. That is all I know for certain.'] },
+    { id: 'you',   need: 'restless', q: 'Do you sleep, out here?',
+      a: ['In the hour after dawn. It is the only hour I trust.'] },
+    { id: 'point', need: null,       q: 'What is Harrow Point like?',
+      a: ['A shingle beach and about nine houses. A bell on a post for the boats.',
+          'Nell rang it every time we arrived. Drove the whole village mad.'] },
+    { id: 'stay',  need: 'stay',     q: 'What happens after the Point?',
+      a: ['I have not let myself think that far.',
+          'If you are still about, I will think about it then.'] }
+  ];
+
   // ── what he can get done before dark ──────────────────────────────────────
   var PILE_MAX = 5;
   var CHORES = [
@@ -950,15 +1250,16 @@
     { id: 'banked', x: 0, verb: 'BANK\nFIRE',   did: 'Banked', say: 'Coals raked up. It starts higher.',
       max: 1, dur: 1.6, beats: [0.24, 0.54, 0.84], off: 36 },
     { id: 'dog',    x: 0, verb: 'FEED\nDOG',    did: 'Fed him', say: 'He will bark a good deal sooner now.',
-      max: 1, dur: 2.3, beats: [0.2, 0.34, 0.78], off: 34 }
+      max: 1, dur: 2.3, beats: [0.2, 0.34, 0.78], off: 34 },
+    { id: 'talk',   x: 0, verb: 'SIT\nWITH HIM', did: '', say: '', talk: 1,
+      max: 1, dur: 0, beats: [], off: 30 }
   ];
   CHORES[0].x = AT.chop; CHORES[1].x = AT.barrel; CHORES[2].x = AT.stool;
-  CHORES[3].x = AT.fire; CHORES[4].x = AT.bowl;
+  CHORES[3].x = AT.fire; CHORES[4].x = AT.bowl;  CHORES[5].x = AT.seat + 40;
   var PREP = null;
-  function resetPrep() { PREP = { wood: 0, kettle: 0, brand: 0, banked: 0, dog: 0 }; }
+  function resetPrep() { PREP = { wood: 0, kettle: 0, brand: 0, banked: 0, dog: 0, talk: 0 }; }
   function prepDone() {
-    var n = PREP.wood + PREP.kettle + PREP.brand + PREP.banked + PREP.dog;
-    return n;
+    return PREP.wood + PREP.kettle + PREP.brand + PREP.banked + PREP.dog + PREP.talk;
   }
   function stationAt(x) {
     for (var i = 0; i < CHORES.length; i++) {
@@ -971,13 +1272,52 @@
 
   var FUEL_MAX = 100, FUEL_START = 62, LOG_FUEL = 20, MAXCARRY = 3;
   var SPEED = 76, SWING_CD = 0.38, SWING_RANGE = 34, BITE = 11;
+
+  // ── what he swings ────────────────────────────────────────────────────────
+  // One new one every five nights. Longer, quicker, and each hits more of them
+  // at once — the road answers back a little harder than the weapon each time.
+  var WEAPONS = [
+    { at: 1,  id: 'brand',   name: 'The brand',      kind: 'brand',
+      say: 'A stick out of the fire. It has done the job so far.',
+      reach: 36, cd: 0.38, hits: 1, dmg: 1, dur: 0.30, kb: 0,  trail: 0, high: 22 },
+    { at: 6,  id: 'hatchet', name: 'The hatchet',    kind: 'axe',
+      say: 'Off the chopping block. It bites where the brand only pushed.',
+      reach: 41, cd: 0.34, hits: 2, dmg: 1, dur: 0.28, kb: 16, trail: 0, high: 26 },
+    { at: 11, id: 'longaxe', name: 'The long axe',   kind: 'axe',
+      say: 'Two hands on it. One swing clears the whole arc.',
+      reach: 49, cd: 0.32, hits: 3, dmg: 2, dur: 0.30, kb: 28, trail: 0, high: 32 },
+    { at: 16, id: 'poker',   name: 'The iron poker', kind: 'poker',
+      say: 'Straight out of the coals. Whatever it touches keeps burning.',
+      reach: 55, cd: 0.28, hits: 4, dmg: 2, dur: 0.26, kb: 24, trail: 1, high: 34 },
+    { at: 21, id: 'light',   name: 'The old light',  kind: 'light',
+      say: 'A lantern on a chain. It has not gone out yet and it is not going to.',
+      reach: 63, cd: 0.24, hits: 6, dmg: 3, dur: 0.24, kb: 36, trail: 2, high: 38 }
+  ];
+  function wepFor(n) {
+    var w = WEAPONS[0];
+    for (var i = 0; i < WEAPONS.length; i++) if (n >= WEAPONS[i].at) w = WEAPONS[i];
+    return w;
+  }
+  function wepTier(n) {
+    var k = 0;
+    for (var i = 0; i < WEAPONS.length; i++) if (n >= WEAPONS[i].at) k = i;
+    return k;
+  }
   var GRAV = 900, JUMPV = 268, STEP_UP = 17;   // one tile he walks up, two he jumps
 
   // ── save ──────────────────────────────────────────────────────────────────
   var KEY = 'nightwatch.pixel.v1';
-  var save = { night: 1, best: 0, kept: 0, logs: 0, muted: false, music: true, buzz: true, look: null };
+  var save = { night: 1, best: 0, kept: 0, logs: 0, muted: false, music: true, buzz: true,
+               look: null, mem: null };
   try { var raw = localStorage.getItem(KEY); if (raw) { var o = JSON.parse(raw); if (o && o.night) save = o; } } catch (e) {}
   function store() { try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) {} }
+  function loadMem() {
+    MEM = save.mem && typeof save.mem === 'object' ? save.mem : newMem();
+    if (!MEM.tags) MEM.tags = {};
+    if (!MEM.seen) MEM.seen = [];
+    if (!MEM.asked) MEM.asked = [];
+    save.mem = MEM;
+  }
   function loadLook() {
     if (!save.look) return;
     for (var k in LOOK) if (typeof save.look[k] === 'number') LOOK[k] = save.look[k];
@@ -1097,9 +1437,11 @@
     S = {
       mode: 'night', n: n, cfg: cfg, left: cfg.len,
       fuel: FUEL_START + PREP.banked * 14, cam: 0,
+      wep: wepFor(n), tier: wepTier(n),
       spd: SPEED + PREP.kettle * 9,
-      rng: SWING_RANGE + PREP.brand * 7,
-      cd: SWING_CD - PREP.brand * 0.05,
+      rng: wepFor(n).reach + PREP.brand * 7,
+      cd: wepFor(n).cd - PREP.brand * 0.04,
+      trails: [],
       dogged: PREP.dog, pile: PREP.wood, pileT: 0,
       x: FIREX + 30, y: GY, vy: 0, onGround: true, jumpHeld: false,
       dir: -1, step: 0, carry: 0, moving: 0,
@@ -1118,6 +1460,7 @@
     resetPrep();
     S = {
       mode: 'day', n: n, cfg: cfgFor(n), left: 0, fuel: 96, cam: 0,
+      wep: wepFor(save.night), tier: wepTier(save.night), trails: [],
       spd: SPEED, rng: SWING_RANGE, cd: SWING_CD, dogged: 0, pile: 0, pileT: 0, chore: null,
       x: FIREX + 46, y: GY, vy: 0, onGround: true, jumpHeld: false,
       dir: -1, step: 0, carry: 0, moving: 0,
@@ -1146,18 +1489,95 @@
     return false;
   }
 
+  // ── what comes for the fire ───────────────────────────────────────────────
+  // Each has its own height, pace and way of moving, so the same swing does not
+  // answer all of them. New ones arrive as the weapons do, and a little sooner.
+  var BEASTS = [
+    { id: 'shade',   from: 1,  hp: 1, spd: 1.00, bite: 1.0, lo: 42, hi: 96,  w: 3,
+      name: 'Shade',      of: 'It drifts. It only wants the light gone.' },
+    { id: 'crawler', from: 3,  hp: 1, spd: 1.55, bite: 0.8, lo: 8,  hi: 16,  w: 3,
+      name: 'Crawler',    of: 'Keeps low and comes quick. Swing early.' },
+    { id: 'moth',    from: 5,  hp: 1, spd: 1.10, bite: 1.0, lo: 74, hi: 130, w: 3,
+      name: 'Ashmoth',    of: 'Rides high, then folds and dives at the flame.', dive: 1 },
+    { id: 'hollow',  from: 8,  hp: 2, spd: 0.78, bite: 1.5, lo: 26, hi: 58,  w: 2,
+      name: 'Hollow',     of: 'Thin and slow and takes two to put down.' },
+    { id: 'frost',   from: 11, hp: 2, spd: 0.94, bite: 1.2, lo: 30, hi: 80,  w: 2,
+      name: 'Frostling',  of: 'Where it passes the fire has to work harder.', chill: 1 },
+    { id: 'gnasher', from: 14, hp: 3, spd: 1.35, bite: 1.0, lo: 10, hi: 34,  w: 2,
+      name: 'Gnasher',    of: 'Three good hits. Do not let it get past you.' },
+    { id: 'quiet',   from: 17, hp: 2, spd: 0.88, bite: 1.3, lo: 34, hi: 92,  w: 2,
+      name: 'The Quiet',  of: 'You will not see it until the firelight finds it.', hidden: 1 },
+    { id: 'thief',   from: 19, hp: 1, spd: 1.75, bite: 0,   lo: 10, hi: 26,  w: 2,
+      name: 'Ember thief', of: 'Not after the fire. After the wood you left lying.', steals: 1 }
+  ];
+  function beastFor(n) {
+    var pool = [], i, b;
+    for (i = 0; i < BEASTS.length; i++) {
+      b = BEASTS[i];
+      if (n < b.from) continue;
+      var fresh = n - b.from < 4 ? 2 : 0;             // a new one shows up often at first
+      for (var k = 0; k < b.w + fresh; k++) pool.push(b);
+    }
+    return pool[Math.floor(Math.random() * pool.length)] || BEASTS[0];
+  }
+
   function spawnShade() {
-    var cap = 3 + Math.floor(S.n / 8);
+    var cap = 3 + Math.round((S.tier || 0) * 1.6) + Math.floor(S.n / 9);
     if (S.shades.length >= cap) return;
+    var B = beastFor(S.n);
     var side = Math.random() < 0.5 ? -1 : 1;
     var d = 210 + Math.random() * 260;
     var sx = FIREX + side * d;
     if (sx < 20 || sx > WORLD - 20) side = -side, sx = FIREX + side * d;
+    if (MEM && !MEM.tags['met_' + B.id]) {          // he names it the first time
+      MEM.tags['met_' + B.id] = 1; store();
+      banner(B.name, B.of, 2800);
+    }
+    var y0 = GY - B.lo - Math.random() * (B.hi - B.lo);
     S.shades.push({
-      x: sx, y: GY - 46 - Math.random() * 54, y0: 0, ph: Math.random() * 6.28,
-      side: side, d0: Math.abs(sx - FIREX), hurt: 0
+      b: B, x: sx, y: y0, y0: y0, ph: Math.random() * 6.28,
+      side: side, d0: Math.abs(sx - FIREX),
+      hp: B.hp, maxhp: B.hp, flash: 0, stun: 0, burn: 0, got: 0
     });
-    S.shades[S.shades.length - 1].y0 = S.shades[S.shades.length - 1].y;
+  }
+
+  // one swing: everything in the arc over his head and down in front of him
+  function strike(W) {
+    var lo = S.y - 6, hi = S.y - 20 - W.high;
+    var x0 = Math.min(S.x - 6, S.x + S.dir * W.reach);
+    var x1 = Math.max(S.x + 6, S.x + S.dir * W.reach);
+    var got = 0;
+    for (var i = S.shades.length - 1; i >= 0 && got < W.hits; i--) {
+      var sh = S.shades[i];
+      if (sh.x < x0 - 8 || sh.x > x1 + 8) continue;
+      if (sh.y > lo || sh.y < hi) continue;
+      got++;
+      hurt(i, W.dmg, S.dir, W.kb);
+    }
+    if (got) bell(560, 0.2, 0.06, 2400);
+    else bell(240, 0.08, 0.025, 700);
+    if (W.trail) {                                  // the poker and the light leave fire
+      for (var q = 0; q <= 5; q++) {
+        var u = q / 5;
+        S.trails.push({ x: S.x + S.dir * (10 + u * (W.reach - 10)),
+                        y: S.y - 18 - Math.sin(u * Math.PI) * (W.high * 0.7),
+                        life: 0.5 + W.trail * 0.35 });
+      }
+    }
+  }
+  // damage one of them; drive it off if that finishes it
+  function hurt(i, dmg, dir, kb) {
+    var sh = S.shades[i];
+    sh.hp -= dmg;
+    sh.flash = 0.14;
+    if (kb) { sh.x += dir * kb; sh.stun = 0.22; }
+    if (sh.hp <= 0) {
+      S.shades.splice(i, 1); S.driven++;
+      burst(sh.x, sh.y, 11, 16);
+    } else {
+      burst(sh.x, sh.y, 4, 10, ['#c9b6ff', '#6b5aa0'], 8);
+      bell(330, 0.1, 0.04, 1600);
+    }
   }
 
   function burst(x, y, n, up, cols, spread, grav) {
@@ -1267,6 +1687,12 @@
       if (hitA && S.swingCd <= 0) {
         var st = stationAt(S.x);
         S.swingCd = 0.35;
+        if (st && !st.done && st.c.talk) {
+          S.x = st.c.x + (S.x < st.c.x ? -1 : 1) * st.c.off;
+          S.y = groundY(S.x); S.dir = S.x < st.c.x ? 1 : -1;
+          talkCard();
+          return;
+        }
         if (st && !st.done) {
           S.chore = { c: st.c, left: st.c.dur, dur: st.c.dur, p: 0, hit: [] };
           var sd = S.x < st.c.x ? -1 : 1;           // he steps round to face the job
@@ -1286,22 +1712,31 @@
       return;
     }
 
-    // the brand
+    // ── the swing, over the top and down
+    var WEP = S.wep || WEAPONS[0];
     if (S.swingCd > 0) S.swingCd -= dt;
-    if (S.swing > 0) S.swing -= dt;
+    if (S.swing > 0) {
+      S.swing -= dt;
+      if (S.swing <= WEP.dur * 0.42 && !S.landed) { S.landed = 1; strike(WEP); }
+    }
     if (hitA && S.swingCd <= 0) {
-      S.swingCd = S.cd || SWING_CD; S.swing = 0.22;
-      bell(190, 0.14, 0.05, 900);
-      var hx = S.x + S.dir * 18;
-      for (var i = S.shades.length - 1; i >= 0; i--) {
-        var sh = S.shades[i];
-        if (Math.abs(sh.x - hx) < (S.rng || SWING_RANGE) && Math.abs(sh.y - (S.y - 22)) < 32) {
-          S.shades.splice(i, 1); S.driven++;
-          burst(sh.x, sh.y, 9, 14);
-          bell(560, 0.2, 0.06, 2400);
+      S.swingCd = S.cd || WEP.cd; S.swing = WEP.dur; S.landed = 0;
+      bell(WEP.kind === 'brand' ? 190 : 150, 0.14, 0.05, 900);
+    }
+    for (var tr = S.trails.length - 1; tr >= 0; tr--) {      // fire left hanging
+      var TR = S.trails[tr];
+      TR.life -= dt;
+      if (TR.life <= 0) { S.trails.splice(tr, 1); continue; }
+      for (var ti2 = S.shades.length - 1; ti2 >= 0; ti2--) {
+        var sh2 = S.shades[ti2];
+        if (sh2.burn > 0) continue;
+        if (Math.abs(sh2.x - TR.x) < 13 && Math.abs(sh2.y - TR.y) < 13) {
+          sh2.burn = 0.5; hurt(ti2, 1, TR.x < sh2.x ? 1 : -1, 8);
         }
       }
     }
+    for (var bi2 = S.shades.length - 1; bi2 >= 0; bi2--)
+      if (S.shades[bi2].burn > 0) S.shades[bi2].burn -= dt;
 
     // picking wood up on the way past
     for (var j = S.logs.length - 1; j >= 0; j--) {
@@ -1334,14 +1769,43 @@
     S.shadeT -= dt;
     if (S.shadeT <= 0) { S.shadeT = cfg.gap; spawnShade(); }
     for (var k = S.shades.length - 1; k >= 0; k--) {
-      var s2 = S.shades[k];
+      var s2 = S.shades[k], B2 = s2.b || BEASTS[0];
+      if (s2.flash > 0) s2.flash -= dt;
+      if (s2.stun > 0) { s2.stun -= dt; continue; }
+
+      // the thief goes for wood on the ground, not for the fire
+      if (B2.steals) {
+        var want = null;
+        for (var lj = 0; lj < S.logs.length; lj++)
+          if (!want || Math.abs(S.logs[lj].x - s2.x) < Math.abs(want.x - s2.x)) want = S.logs[lj];
+        var goX = want ? want.x : FIREX;
+        s2.x += Math.sign(goX - s2.x) * cfg.spd * B2.spd * dt;
+        s2.y = groundY(s2.x) - 14 + Math.sin(t * 6 + s2.ph) * 2;
+        if (want && Math.abs(want.x - s2.x) < 12) {
+          S.logs.splice(S.logs.indexOf(want), 1);
+          S.shades.splice(k, 1);
+          bell(210, 0.2, 0.05, 900);
+          burst(s2.x, s2.y, 8, 20, ['#a06f3d', '#4a3018'], 10);
+        }
+        continue;
+      }
+
       var toward = FIREX - s2.x;
-      s2.x += Math.sign(toward) * cfg.spd * dt;
+      s2.x += Math.sign(toward) * cfg.spd * B2.spd * dt;
       var prog = 1 - Math.min(1, Math.abs(FIREX - s2.x) / s2.d0);
-      s2.y = s2.y0 + (GY - 24 - s2.y0) * prog + Math.sin(t * 1.4 + s2.ph) * 4;
+      if (B2.dive) {                                   // rides high then folds and drops
+        var d2 = prog < 0.66 ? 0 : (prog - 0.66) / 0.34;
+        s2.y = s2.y0 + (GY - 22 - s2.y0) * (d2 * d2) + Math.sin(t * 3.1 + s2.ph) * 6;
+      } else if (B2.lo < 20) {                         // stays down on the ground
+        s2.y = groundY(s2.x) - B2.lo + Math.sin(t * 7 + s2.ph) * 2;
+      } else {
+        s2.y = s2.y0 + (GY - 24 - s2.y0) * prog + Math.sin(t * 1.4 + s2.ph) * 4;
+      }
+
       if (Math.abs(FIREX - s2.x) < 26) {
         S.shades.splice(k, 1);
-        S.fuel = Math.max(0, S.fuel - BITE);
+        S.fuel = Math.max(0, S.fuel - BITE * B2.bite);
+        if (B2.chill) S.chill = 3.2;                   // the light shrinks for a moment
         S.bitten++;
         S.shake = 0.3;
         buzz(30);
@@ -1352,6 +1816,7 @@
         });
       }
     }
+    if (S.chill > 0) S.chill -= dt;
 
     // sparks and puffs
     for (var q = S.sparks.length - 1; q >= 0; q--) {
@@ -1368,6 +1833,8 @@
 
     // the fire, and the clock
     S.fuel = Math.max(0, S.fuel - cfg.drain * dt);
+    if (S.fuel < 22 && !S.cried && S.left > 6) { S.cried = 1; bark('low'); }
+    if (S.fuel > 40) S.cried = 0;
     S.left -= dt;
     if (S.fuel <= 0) { finish(false); return; }
     if (S.left <= 0) { S.left = 0; finish(true); return; }
@@ -1386,6 +1853,7 @@
     var dawn = day ? 0 : Math.max(0, 1 - S.left / 8);   // the last eight seconds go pale
 
     if (day) { drawDay(cam, lvl); return; }
+    var reachR0 = (96 + lvl * 96) * (S.chill > 0 ? 0.72 : 1);
 
     // sky, with the horizon warming as dawn comes on
     for (var b = 0; b < 5; b++) {
@@ -1481,29 +1949,32 @@
     }
     for (var k = 0; k < S.shades.length; k++) {
       var sh = S.shades[k];
-      if (sh.x - cam > -24 && sh.x - cam < W + 24)
-        shadeSprite(px, { x: sh.x - cam, y: sh.y, ph: sh.ph }, t, k);
+      if (sh.x - cam > -30 && sh.x - cam < W + 30)
+        shadeSprite(px, { x: sh.x - cam, y: sh.y, ph: sh.ph, b: sh.b,
+                          flash: sh.flash, burn: sh.burn }, t, k,
+                    Math.abs(sh.x - FIREX) < reachR0);
     }
 
     // him
     var hx2 = Math.round(S.x) - cam, hy2 = Math.round(S.y);
+    for (var tq = 0; tq < S.trails.length; tq++) {   // fire hanging in the air
+      var TQ = S.trails[tq], tf = Math.min(1, TQ.life);
+      px(tf > 0.55 ? C.fire4 : tf > 0.3 ? C.fire3 : C.fire1,
+         Math.round(TQ.x) - cam, Math.round(TQ.y), 3, 3);
+    }
+
     var pose = !S.onGround ? 'jump' : S.moving ? 'walk' : 'idle';
     guy(px, hx2, hy2, t, S.dir, pose, S.step);
     if (S.carry) armful(px, hx2, hy2, S.carry, S.dir);
 
-    // the brand in his hand — lit, and swept when he swings
-    var reach = S.swing > 0 ? 14 + Math.round((0.22 - S.swing) * 90) : 12;
-    var by = hy2 - 20 + (S.swing > 0 ? Math.round((0.22 - S.swing) * 34) - 4 : 0);
-    px(C.wood1, hx2 + S.dir * 11, by, S.dir * (reach - 4) || 1, 3);
-    px(C.fire3, hx2 + S.dir * reach, by - 1, 4, 4);
-    px(C.fire4, hx2 + S.dir * reach, by - 1, 3, 3);
-    px('#fffbe6', hx2 + S.dir * reach + 1, by, 1, 1);
+    var tip = weapon(px, hx2, hy2, S.dir, S.wep || WEAPONS[0], S.swing);
+    var by = tip.y;
 
     weather(S.cfg.wx, cam, lvl);
 
-    var reachR = 96 + lvl * 96;
+    var reachR = reachR0;
     var deep = dawn > 0 ? mix('#544c66', '#a99184', dawn) : '#544c66';
-    lightPass(ctx, FIREX - cam, GY - 16, reachR, hx2 + S.dir * reach, by, 1, deep);
+    lightPass(ctx, FIREX - cam, GY - 16, reachR, tip.x, tip.y, 1, deep);
 
     if (lvl < 0.22) {                              // the fire is going: the edges close in
       ctx.save();
@@ -1995,7 +2466,10 @@
 
   // ── cards ─────────────────────────────────────────────────────────────────
   var veil = document.getElementById('veil'), card = document.getElementById('card');
-  function show(html) { card.innerHTML = html; veil.classList.remove('hide'); running = false; }
+  function show(html) {
+    card.innerHTML = html; veil.classList.remove('hide'); running = false;
+    if (elBan) { elBan.classList.remove('on'); clearTimeout(banT); }
+  }
   function hide() { veil.classList.add('hide'); running = true; }
 
   function strip(upto) {
@@ -2021,6 +2495,133 @@
   var elSnd = document.getElementById('kSnd'), elPause = document.getElementById('kPause');
   elSnd.addEventListener('click', function () { ac(); settings(); });
   function soundSwitch() { elSnd.classList.toggle('off', muted && save.music === false); }
+
+  // ── sitting with him ──────────────────────────────────────────────────────
+  function knownLine() {
+    var b = MEM ? MEM.bond : 0;
+    return b < 4 ? 'You have only just met.'
+         : b < 9 ? 'He is getting used to you being there.'
+         : b < 15 ? 'He talks more than he did.'
+         : b < 22 ? 'He tells you things he has not said out loud in years.'
+         : 'He would not want to walk the rest of it without you.';
+  }
+  function bondPips() {
+    var lvl = Math.min(6, Math.floor((MEM ? MEM.bond : 0) / 3));
+    var h = '<div class="bond">';
+    for (var i = 0; i < 6; i++) h += '<i class="' + (i < lvl ? 'on' : '') + '"></i>';
+    return h + '</div>';
+  }
+  // a line that leans on something you already told him
+  var CALLBACKS = [
+    { need: 'restless', at: 6,  say: 'You said you were not sleeping. Any better?' },
+    { need: 'adrift',   at: 9,  say: 'You said there was not much on. I have thought about that a fair bit.' },
+    { need: 'tired',    at: 9,  say: 'Still a lot on, at yours?' },
+    { need: 'here',     at: 11, say: 'You said you would rather be here. I have kept that one.' },
+    { need: 'sister',   at: 12, say: 'You asked what she was like. I have thought of six more things since.' },
+    { need: 'hope',     at: 16, say: 'You said she might still be there. I have been leaning on that.' },
+    { need: 'honest',   at: 16, say: 'You asked what if she is not. I am glad one of us said it.' },
+    { need: 'namedog',  at: 13, say: 'The dog answers to whatever I call him now. I blame you.' },
+    { need: 'forhim',   at: 19, say: 'You said you wanted me to get mine. I have not forgotten that.' }
+  ];
+  function callback() {
+    if (!MEM) return [];
+    for (var i = 0; i < CALLBACKS.length; i++) {
+      var C2 = CALLBACKS[i];
+      if (S.n < C2.at || tag('cb' + i)) continue;
+      if (!tag(C2.need)) continue;
+      MEM.tags['cb' + i] = 1; store();
+      return [C2.say];
+    }
+    return [];
+  }
+
+  function talkCard() {
+    var T = talkFor(S.n);
+    var lines = callback().concat(T.him);
+    var step2 = 0, said = [];
+
+    function render() {
+      var h = '<div class="eyebrow">Night ' + S.n + ' · by the fire</div>' +
+              '<div class="talk"><div class="who">' + HIM.name + '</div>';
+      for (var i = 0; i < said.length; i++)
+        h += '<p class="said' + (said[i].me ? ' me' : '') + '" style="animation-delay:' +
+             Math.min(0.5, i * 0.06) + 's">' + fill(said[i].t) + '</p>';
+      h += '</div>';
+
+      if (step2 < lines.length) {
+        h += '<button class="go" id="go">Go on</button>';
+        show(h);
+        bindGo(function () { said.push({ t: lines[step2++] }); render(); });
+        return;
+      }
+      if (T.name && !MEM.you) {                     // he asks what to call you
+        h += '<input class="nameIn" id="nm" maxlength="14" placeholder="your name" />' +
+             '<button class="go" id="go">Tell him</button>';
+        show(h);
+        var inp = document.getElementById('nm');
+        setTimeout(function () { try { inp.focus(); } catch (e) {} }, 60);
+        bindGo(function () {
+          var v = (inp.value || '').replace(/[<>&]/g, '').trim().slice(0, 14);
+          MEM.you = v || 'friend';
+          MEM.bond += 2; store();
+          lines = (T.after && T.after.any) || ['Right.'];
+          step2 = 0; said.push({ t: MEM.you, me: 1 }); render();
+        });
+        return;
+      }
+      if (T.ask && !tag('ask' + S.n)) {             // what he wants to know
+        h += '<div class="picks">';
+        for (var q = 0; q < T.ask.length; q++)
+          h += '<button class="pick" data-q="' + q + '">' + fill(T.ask[q].t) + '</button>';
+        h += '</div>';
+        show(h);
+        var ps = card.querySelectorAll('.pick');
+        for (var j = 0; j < ps.length; j++) ps[j].addEventListener('click', function () {
+          var A = T.ask[+this.getAttribute('data-q')];
+          MEM.tags[A.k] = 1; MEM.bond += 2; store();
+          said.push({ t: A.t, me: 1 });
+          lines = A.r.slice(); step2 = 0; MEM.tags['ask' + S.n] = 1;
+          bell(430, 0.12, 0.04, 1900);
+          render();
+        });
+        return;
+      }
+      // your turn: whatever you have earned the right to ask
+      var open2 = [];
+      for (var a = 0; a < ASKS.length; a++) {
+        var K = ASKS[a];
+        if (K.need && !tag(K.need)) continue;
+        if (MEM.asked.indexOf(K.id) >= 0) continue;
+        open2.push(K);
+      }
+      if (open2.length) {
+        h += '<div class="who" style="margin-top:8px">Ask him</div><div class="picks">';
+        for (var o = 0; o < Math.min(3, open2.length); o++)
+          h += '<button class="pick" data-a="' + open2[o].id + '">' + open2[o].q + '</button>';
+        h += '</div>';
+      }
+      h += '<button class="ghost" id="stop">Leave him to it</button>' + bondPips();
+      show(h);
+      var qs = card.querySelectorAll('[data-a]');
+      for (var m = 0; m < qs.length; m++) qs[m].addEventListener('click', function () {
+        var id = this.getAttribute('data-a'), K2 = null;
+        for (var z = 0; z < ASKS.length; z++) if (ASKS[z].id === id) K2 = ASKS[z];
+        MEM.asked.push(id); MEM.bond += 1; store();
+        said.push({ t: K2.q, me: 1 });
+        lines = K2.a.slice(); step2 = 0;
+        bell(380, 0.12, 0.04, 1800);
+        render();
+      });
+      bindGo(function () {
+        PREP.talk = 1;
+        if (MEM.seen.indexOf(S.n) < 0) MEM.seen.push(S.n);
+        MEM.night = S.n; store();
+        veil.classList.add('hide'); running = true; last = performance.now();
+      }, 'stop');
+    }
+    said.push({ t: lines[step2++] });
+    render();
+  }
 
   // ── dressing him ──────────────────────────────────────────────────────────
   var peek = null, peekCtx = null, peekPx = null;
@@ -2143,14 +2744,35 @@
     banner('Camp', 'Chores are marked with an arrow. TAKE WATCH out on the road when you are ready.', 4200);
     elSnd.classList.toggle('off', muted);
   }
+  var BARKS = {
+    fresh: ['Careful of that one. It is new.', 'Something different tonight. Watch it.'],
+    low:   ['{you} — the fire.', 'It is getting low. I cannot reach it from here.',
+            'We are going to lose it.'],
+    clean: ['Not one of them got near. That was you.', 'Clean night. I saw it.'],
+    close: ['Behind you.', 'On your side.']
+  };
+  function bark(kind) {
+    var L = BARKS[kind];
+    if (!L) return;
+    banner(HIM.name, fill(L[Math.floor(Math.random() * L.length)]), 2200);
+  }
+
   function startNight(n) {
     var cfg = cfgFor(n);
+    var wasWep = S && S.wep ? S.wep.id : null;
     newNight(n);
     if (save.music !== false) musicOn(true);
     elA.textContent = 'SWING';
     elA.classList.remove('go');
-    banner('Night ' + n + ' · ' + cfg.name,
-           cfg.note + (cfg.wx === 'clear' ? '' : '  ·  ' + (SKYWORD[cfg.wx] || '')), 3000);
+    var W2 = S.wep;
+    if (W2.at === n) {                            // the night a new one arrives
+      banner('Night ' + n + ' · ' + W2.name, fill(W2.say), 3600);
+      bell(300, 0.3, 0.06, 2200);
+      setTimeout(function () { bell(450, 0.4, 0.05, 2600); }, 180);
+    } else {
+      banner('Night ' + n + ' · ' + cfg.name,
+             cfg.note + (cfg.wx === 'clear' ? '' : '  ·  ' + (SKYWORD[cfg.wx] || '')), 3000);
+    }
   }
 
   function title() {
@@ -2167,6 +2789,8 @@
         '<p>Hold until dawn, then walk back to camp and rest.</p>' +
       '</div>' +
       strip(save.night) +
+      (MEM && MEM.you ? '<p class="lede">He calls you <b style="color:var(--bone)">' + fill('{you}') +
+        '</b>. ' + knownLine() + '</p>' + bondPips() : '') +
       '<button class="go" id="go">' + (save.night > 1 ? 'Back to camp — night ' + save.night + ' ahead' : 'Walk out to the camp') + '</button>' +
       '<button class="ghost" id="him">The keeper</button>' +
       '<button class="ghost" id="cog">Settings</button>' +
@@ -2193,12 +2817,18 @@
       if (S.n === NIGHTS.length) return won();
       var next = cfgFor(S.n + 1);
       var clean = S.bitten === 0;
+      var his = clean
+        ? ['Not one of them got near. That was you.',
+           'I watched the whole of that. Not a mark on it.'][S.n % 2]
+        : S.fuel < 25
+          ? ['That was close. I could feel it going.',
+             'Another minute of that and we would have been sat in the dark.'][S.n % 2]
+          : ['Held. Good.', 'That is another one behind us.',
+             'You are getting quicker at this.'][S.n % 3];
       show(
         '<div class="eyebrow">' + (clean ? 'Dawn · not a mark on it' : 'Dawn') + '</div>' +
         '<h1>Night ' + S.n + '<em>' + (clean ? 'held clean' : 'held') + '</em></h1>' +
-        '<p class="lede">' + (clean
-          ? 'Not one of them got near the stones. The sun comes over the hill on a fire you never let dip.'
-          : 'The sun comes over the hill and the fire is still going. Sit down a minute.') + '</p>' +
+        '<p class="lede">&ldquo;' + fill(his) + '&rdquo;</p>' +
         '<div class="tally">' +
           '<div><span>Logs fed</span><b>' + S.fed + '</b></div>' +
           '<div><span>Driven off</span><b>' + S.driven + '</b></div>' +
@@ -2278,6 +2908,7 @@
     requestAnimationFrame(frame);
   }
 
+  loadMem();
   loadLook();
   soundSwitch();
   title();
@@ -2292,6 +2923,9 @@
     geo: { W: W, H: H, GY: GY, WORLD: WORLD, FIREX: FIREX },
     at: AT, prep: function () { return PREP; }, terrain: terrain,
     look: function () { return LOOK; }, drawGuy: guy,
+    drawBeast: shadeSprite,
+    mem: function () { return MEM; }, nights: NIGHTS, weapons: WEAPONS, beasts: BEASTS,
+    setNight: function (n) { save.night = n; store(); },
     tick: function (dt) { if (S && running) step(dt); },
     begin: function (n) { startNight(n); running = true; veil.classList.add('hide'); },
     camp: function () { camp(); },
