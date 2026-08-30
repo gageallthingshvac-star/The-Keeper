@@ -278,7 +278,7 @@
 <script>
 (function () {
   'use strict';
-  var BUILD = 'v1.11.0';
+  var BUILD = 'v1.12.0';
 
   // ── measurements ──────────────────────────────────────────────────────────
   var TILE = 16;
@@ -1140,26 +1140,26 @@
   // gap: seconds between shades.  spd: how fast they come.
   // wood: seconds between logs appearing.  lying: how many may lie about at once.
   var NIGHTS = [
-    { len: 40, drain: 1.40, gap: 12.0, spd: 14, wood: 3.2, lying: 6, wx: 'clear', name: 'The first watch',   note: 'Wood burns. Fetch more.' },
-    { len: 42, drain: 1.60, gap:  9.0, spd: 15, wood: 3.1, lying: 6, wx: 'clear', name: 'Something moved',   note: 'Swing the brand at anything cold.' },
-    { len: 43, drain: 1.80, gap:  8.0, spd: 16, wood: 3.0, lying: 6, wx: 'clear', name: 'Two of them',       note: 'They come from both ends of the road.' },
-    { len: 44, drain: 2.00, gap:  7.0, spd: 17, wood: 3.0, lying: 6, wx: 'wind', name: 'A colder wind',     note: 'The fire eats faster tonight.' },
-    { len: 45, drain: 2.20, gap:  6.4, spd: 17, wood: 2.9, lying: 6, wx: 'frost', name: 'Frost on the grass',note: 'Carry three at a time. It saves a trip.' },
-    { len: 46, drain: 2.40, gap:  5.8, spd: 18, wood: 2.8, lying: 6, wx: 'clear', name: 'The long dark',     note: 'Keep the fire high and you can see them coming.' },
-    { len: 47, drain: 2.55, gap:  5.3, spd: 18, wood: 2.8, lying: 6, wx: 'fog', name: 'Low cloud',         note: 'No stars. Only what you light yourself.' },
-    { len: 48, drain: 2.70, gap:  4.9, spd: 19, wood: 2.7, lying: 6, wx: 'clear', name: 'They learned',      note: 'They wait for you to walk away.' },
-    { len: 49, drain: 2.85, gap:  4.5, spd: 19, wood: 2.6, lying: 6, wx: 'clear', name: 'Deep in the pines', note: 'Wood falls further out now.' },
-    { len: 50, drain: 3.00, gap:  4.2, spd: 20, wood: 2.6, lying: 6, wx: 'clear', name: 'Halfway',           note: 'Ten behind you. Ten to go.' },
+    { len: 40, drain: 1.40, gap: 12.0, spd: 14, wood: 3.2, lying: 6, wx: 'clear', name: 'The first watch',   note: 'Wood burns down. The circle shrinks with it. Fetch more.' },
+    { len: 42, drain: 1.60, gap:  9.0, spd: 15, wood: 3.1, lying: 6, wx: 'clear', name: 'Something moved',   note: 'Swing the lit brand at anything that reaches the stones.' },
+    { len: 43, drain: 1.80, gap:  8.0, spd: 16, wood: 3.0, lying: 6, wx: 'clear', name: 'Two of them',       note: 'They lean on both ends of the ring at once.' },
+    { len: 44, drain: 2.00, gap:  7.0, spd: 17, wood: 3.0, lying: 6, wx: 'wind', name: 'A colder wind',     note: 'Wind off the moor. The fire spends itself faster.' },
+    { len: 45, drain: 2.20, gap:  6.4, spd: 17, wood: 2.9, lying: 6, wx: 'frost', name: 'Frost on the grass',note: 'Carry three at a time. Every trip is time outside the light.' },
+    { len: 46, drain: 2.40, gap:  5.8, spd: 18, wood: 2.8, lying: 6, wx: 'clear', name: 'The long dark',     note: 'Keep it high and the ring reaches far enough to see them coming.' },
+    { len: 47, drain: 2.55, gap:  5.3, spd: 18, wood: 2.8, lying: 6, wx: 'fog', name: 'Low cloud',         note: 'No stars, no moon. Only what you light yourself.' },
+    { len: 48, drain: 2.70, gap:  4.9, spd: 19, wood: 2.7, lying: 6, wx: 'clear', name: 'They learned',      note: 'They wait for you to step out of the light for wood.' },
+    { len: 49, drain: 2.85, gap:  4.5, spd: 19, wood: 2.6, lying: 6, wx: 'clear', name: 'Deep in the pines', note: 'Deadfall lies further from the stones now.' },
+    { len: 50, drain: 3.00, gap:  4.2, spd: 20, wood: 2.6, lying: 6, wx: 'clear', name: 'Halfway',           note: 'Ten behind you by morning. Ten more between here and the Point.' },
     { len: 51, drain: 3.10, gap:  3.9, spd: 20, wood: 2.5, lying: 6, wx: 'wind', name: 'The wind turns',    note: 'Feed early. Feed often.' },
-    { len: 52, drain: 3.20, gap:  3.6, spd: 21, wood: 2.5, lying: 6, wx: 'snow', name: 'Thin ice',          note: 'The fire will not forgive a wasted trip.' },
-    { len: 52, drain: 3.30, gap:  3.4, spd: 21, wood: 2.4, lying: 7, wx: 'frost', name: 'A hard frost',      note: 'Stay near enough to turn around.' },
+    { len: 52, drain: 3.20, gap:  3.6, spd: 21, wood: 2.5, lying: 6, wx: 'snow', name: 'Thin ice',          note: 'The ring will not forgive a wasted trip.' },
+    { len: 52, drain: 3.30, gap:  3.4, spd: 21, wood: 2.4, lying: 7, wx: 'frost', name: 'A hard frost',      note: 'Stay near enough to the stones to get back inside them.' },
     { len: 53, drain: 3.40, gap:  3.2, spd: 22, wood: 2.4, lying: 7, wx: 'clear', name: 'Something bigger',  note: 'They are quicker than last week.' },
-    { len: 54, drain: 3.50, gap:  3.0, spd: 22, wood: 2.3, lying: 7, wx: 'wind', name: 'The dog wakes',     note: 'Even he can hear them now.' },
-    { len: 55, drain: 3.60, gap:  2.9, spd: 23, wood: 2.3, lying: 7, wx: 'dark', name: 'No moon',           note: 'Your light is the only light.' },
-    { len: 55, drain: 3.50, gap:  2.8, spd: 23, wood: 2.2, lying: 7, wx: 'fog', name: 'The road narrows',  note: 'Fewer places to find wood.' },
-    { len: 56, drain: 3.55, gap:  2.8, spd: 24, wood: 2.1, lying: 7, wx: 'sleet', name: 'Sleet',             note: 'Wet wood, hungry fire.' },
-    { len: 57, drain: 3.60, gap:  2.9, spd: 25, wood: 2.0, lying: 7, wx: 'clear', name: 'One before dawn',   note: 'Almost through. Do not put it down.' },
-    { len: 58, drain: 3.70, gap:  2.8, spd: 26, wood: 2.0, lying: 7, wx: 'snow', name: 'The last night',    note: 'Hold it until the sun comes over the hill.' }
+    { len: 54, drain: 3.50, gap:  3.0, spd: 22, wood: 2.3, lying: 7, wx: 'wind', name: 'The dog wakes',     note: 'Even the dog can hear them leaning on it now.' },
+    { len: 55, drain: 3.60, gap:  2.9, spd: 23, wood: 2.3, lying: 7, wx: 'dark', name: 'No moon',           note: 'Nothing overhead. Your ring is the only lit thing for a mile.' },
+    { len: 55, drain: 3.50, gap:  2.8, spd: 23, wood: 2.2, lying: 7, wx: 'fog', name: 'The road narrows',  note: 'Cliff on one side. Fewer places to find wood.' },
+    { len: 56, drain: 3.55, gap:  2.8, spd: 24, wood: 2.1, lying: 7, wx: 'sleet', name: 'Sleet',             note: 'Wet wood, hungry fire, narrow ring.' },
+    { len: 57, drain: 3.60, gap:  2.9, spd: 25, wood: 2.0, lying: 7, wx: 'clear', name: 'One before dawn',   note: 'One ring short of the Point. Do not put it down now.' },
+    { len: 58, drain: 3.70, gap:  2.8, spd: 26, wood: 2.0, lying: 7, wx: 'snow', name: 'The last night',    note: 'Hold it till the sun comes over the hill. Then you can see the mole.' }
   ];
 
   function cfgFor(n) {
@@ -1170,7 +1170,7 @@
       gap: Math.max(1.8, b.gap - k * 0.03), spd: Math.min(34, b.spd + k * 0.2),
       wood: Math.max(1.6, b.wood - k * 0.02), lying: 7,
       wx: ['clear', 'snow', 'wind', 'fog', 'clear', 'sleet'][k % 6],
-      name: 'The road goes on', note: 'Past the twenty now. As far as you like.'
+      name: 'Rings past the Point', note: 'Past the twenty now. Somebody has to keep them dry.'
     };
   }
 
@@ -1179,43 +1179,46 @@
   // the road you are, so nothing lands before it should.
   var MUSINGS = [
     { at: 1, s: 'Fire wants feeding before it wants anything else. Everything after that is detail.' },
-    { at: 1, s: "I've been walking this road a long time. It doesn't get shorter." },
+    { at: 1, s: 'Ring only reaches as far as the light does. Keep it high and you get more room.' },
     { at: 1, s: "Grass is damp. That'll be a cold one." },
-    { at: 1, s: 'That dog turned up on his own and has never once explained himself.' },
+    { at: 1, s: 'That dog walked in out of the dark and has never once explained himself.' },
     { at: 1, s: 'Wood on the left of the road burns better than wood on the right. No idea why.' },
-    { at: 2, s: "They don't like the light. That's the only rule I've got." },
+    { at: 2, s: "They can't cross it. That's the only rule I've got and it has held so far." },
     { at: 2, s: 'You learn to hear them before you see them. Sort of a cold in the ears.' },
     { at: 3, s: 'I keep meaning to fix that tent flap.' },
-    { at: 3, s: "There's a village three days back where they wouldn't sell me matches. Odd place." },
-    { at: 4, s: "Harrow Point. You can hear the sea from the last mile of it." },
+    { at: 3, s: "There's a lit village three days back where they wouldn't sell me matches. Odd place." },
+    { at: 4, s: 'Harrow Point. A light on the mole that nobody has to sit up with.' },
     { at: 4, s: 'Nine houses and a bell on a post. That\u2019s the whole of it.' },
-    { at: 5, s: "Most people stop about now. You haven't." },
+    { at: 5, s: "Most people turn back about now. You haven't." },
     { at: 6, s: "Kettle takes forever on this fire. I don't mind. Gives me something to watch." },
     { at: 6, s: 'Split it small. Small burns hot, big burns long. You want hot when they come.' },
     { at: 7, s: 'I was a fair hand at nothing much before this.' },
+    { at: 7, s: 'Somebody laid these stones a day apart the whole way. I think about them often.' },
     { at: 8, s: "I don't sleep much. Hour after dawn, mostly." },
-    { at: 9, s: "Pines thin out after the next ridge. More sky, less wood. Fair trade, I think." },
+    { at: 9, s: 'Pines thin out after the next ridge. More sky, less wood. Fair trade, I think.' },
     { at: 10, s: "Halfway. Didn't think I'd say that out loud." },
     { at: 11, s: 'She\u2019s my sister. Was. Is. I still haven\u2019t picked which.' },
-    { at: 12, s: 'Found this axe in a barn. Someone left in a hurry and never came back for it.' },
-    { at: 12, s: 'Nell would have had this fire twice the height and told me off for the wood.' },
+    { at: 12, s: 'Found this axe in a ring nobody lit. Wood stacked, stones cold.' },
+    { at: 12, s: 'Nell would have had this ring twice the width and told me off for the wood.' },
     { at: 13, s: "I've started working out what I say to her. Haven't got past the first line." },
     { at: 14, s: 'Four summers. She said end of every summer. That was four ago.' },
-    { at: 14, s: "First few nights I wasn't scared of them. I was scared of finishing this alone." },
+    { at: 14, s: 'First few nights it was the size of the circle that frightened me. Not them.' },
     { at: 15, s: 'Salt on the wind now, if you stand up on the rise.' },
-    { at: 16, s: 'Everything on this road belonged to someone. I try to use it well.' },
-    { at: 17, s: "If she's not there I'll sit on the shingle a while and think about it then." },
-    { at: 18, s: "Two more. Then whatever's down there is down there." },
-    { at: 19, s: "I'd like to be able to tell her someone kept the fire with me." },
+    { at: 16, s: 'Every ring on this road belonged to someone. I try to use it well.' },
+    { at: 17, s: "If the mole is dark I'll sit on the shingle a while and think about it then." },
+    { at: 18, s: "Three left, counting tonight. Then a light neither of us has to feed." },
+    { at: 19, s: "I'd like to be able to tell her somebody held the other side of it." },
     { at: 20, s: 'Last one. Odd feeling.' },
     // ones he only says once he knows something about you
     { at: 4,  need: 'namedog',  s: 'The dog has a name now and it is entirely your fault.' },
+    { at: 4,  need: 'gotit',    s: "You had the fire worked out by the second night. Took me a season." },
     { at: 6,  need: 'stay',     s: "You said you weren't going anywhere. I've held on to that." },
     { at: 8,  need: 'adrift',   s: "Not much on, you said. There's plenty on out here. Mostly wood." },
     { at: 8,  need: 'here',     s: "You said you'd rather be here. I think about that more than I should." },
     { at: 9,  need: 'restless', s: "You said you weren't sleeping. It's a bad club to be in." },
     { at: 10, need: 'sister',   s: "You asked about her. Nobody's asked about her in a long time." },
-    { at: 14, need: 'hope',     s: "You reckon she might still be there. I've decided to agree with you." }
+    { at: 14, need: 'hope',     s: "You reckon she might still be there. I've decided to agree with you." },
+    { at: 19, need: 'itslit',   s: 'You called it the light before I dared to. I keep hearing you say it.' }
   ];
   function musing() {
     var pool = [];
@@ -1250,30 +1253,36 @@
   // you; each answer sets a tag he can lean on later. `after` is what he says
   // back, keyed by the tag.
   var TALKS = [
-    // Week one is small talk. He is not handing over his life on night two,
-    // and you would not want him to. Everything you can say back answers the
-    // thing he has just said \u2014 no stock questions, no non sequiturs.
+    // The dark is a thing, not an absence, and firelight is the only thing it
+    // cannot cross. So a fire out here is a wall, not a beacon \u2014 which is why
+    // putting it out to hide would be the last thing you ever did, and why
+    // everything that comes spends the night pressing on the edge of it.
+    // Week one is small talk. He is not handing over his life on night two.
     { n: 1, topic: 'road',
       him: ["You came back. I wasn't sure you would.",
             'Sit down. The wood can wait.',
             "I'm Wren. What should I call you?"],
       name: 1,
       after: { any: ["{you}. Good. I'll remember it.",
-                     "Stay as long as you want. I'm up till light either way."] } },
+                     "Stay as long as you want. It's light or nothing till morning."] } },
 
     { n: 2, topic: 'night',
-      him: ["You kept it lit. That's the whole job, and most people can't.",
-            'Was it cold out there?'],
-      ask: [{ t: "Freezing. I can't feel my hands.", k: 'cold',
-              r: ["Come closer to it, then. It doesn't bite."] },
-            { t: 'Not bad if you keep moving.', k: 'mover',
-              r: ["That's the trick. Keep moving, keep it lit."] },
-            { t: "I didn't really notice.", k: 'headfirst',
-              r: ['Ha. You had your hands full.'] }] },
+      him: ['You kept it lit. That\u2019s the whole job and most people cannot.',
+            "Something I should have said last night. They're not after the fire.",
+            "It's just in their way. Put it out and you wouldn't see them coming at all."],
+      ask: [{ t: "So the fire's what's stopping them.", k: 'gotit',
+              r: ['That\u2019s it. A ring of light and nothing else.',
+                  "It holds as long as it's fed."] },
+            { t: 'Then why not walk through the night?', k: 'walkit',
+              r: ["Because you'd be walking in it.",
+                  'The road is only safe between the rings, and only in daylight.'] },
+            { t: 'What happens if it does go out?', k: 'ifout',
+              r: ["I don't know. Nobody's come back to say.",
+                  "That's why we don't find out."] }] },
 
     { n: 3, topic: 'dog',
       him: ["That's my dog. Sort of.",
-            'He turned up on his own the second night and never left.',
+            'He walked into the ring one night and never left.',
             "I've never given him a name. Felt rude, somehow."],
       ask: [{ t: 'You should name him.', k: 'namedog',
               r: ["Then you pick. I'll use whatever you say and I won't argue."] },
@@ -1284,75 +1293,77 @@
 
     { n: 4, topic: 'point',
       him: ["You've probably been wondering where we're walking to.",
-            'Harrow Point. A beach, nine houses, and a bell on a post for the boats.',
-            "That's the end of the road."],
+            'Harrow Point. Nine houses, a beach, and a light out on the mole.',
+            "A proper light. Not a fire somebody has to sit up feeding \u2014 one that just burns."],
       ask: [{ t: 'How far is it?', k: 'howfar',
-              r: ['Twenty nights, near enough. More if we get a bad one.'] },
-            { t: "What's there for you?", k: 'asked_point',
-              r: ['Someone. I hope.', "I'll tell you properly. Just not tonight."] },
-            { t: 'Sounds like a good place to stop.', k: 'stopping',
-              r: ['It is.', "It's the bell I keep picturing. Don't ask me why."] }] },
+              r: ['Twenty rings. Twenty nights, if we make every one of them by dark.'] },
+            { t: "A light that doesn't need feeding?", k: 'asked_light',
+              r: ["That's the story. It hasn't gone out in ninety years.",
+                  "I'd like to stand under something I don't have to keep alive."] },
+            { t: "What's waiting for you there?", k: 'asked_point',
+              r: ['Someone. I hope.', "I'll tell you properly. Just not tonight."] }] },
 
     { n: 5, topic: 'road',
-      him: ["Five nights. You haven't missed one.",
-            "People have walked bits of this with me before. They usually stop about now."],
+      him: ["Four rings behind us, and you haven't missed one of them.",
+            'People have walked stretches of this with me before. They usually turn back about now.'],
       ask: [{ t: "I'm not going anywhere.", k: 'stay',
               r: ['Alright.', 'Alright, then.'] },
-            { t: 'Why do they stop?', k: 'why',
-              r: ["Because it's the same thing every night and I'm not much company.",
-                  "You're still sat there, though."] },
+            { t: 'Why do they turn back?', k: 'why',
+              r: ["Because there's a lit town four days behind us and it's warm.",
+                  "You're still here, though."] },
             { t: 'Did it bother you when they did?', k: 'minded',
               r: ["I told myself it didn't.",
                   "I'm less sure now I've said it out loud."] }] },
 
     { n: 6, topic: 'camp',
-      him: ["I've been splitting the wood smaller since you turned up. Burns hotter.",
-            "Small thing. But I only bothered because you're here to see it."],
+      him: ["I've been splitting the wood smaller since you turned up. Burns hotter, ring sits wider.",
+            "Small thing. But I only bothered because you're here to hold the other side of it."],
       ask: [{ t: "It's a good fire.", k: 'praise',
               r: ["It's a decent fire. I'll take good."] },
             { t: "You didn't bother before?", k: 'nobother',
-              r: ['Not really. It only had to keep me alive.',
-                  "That's a lower bar than you'd think."] },
+              r: ['Not really. It only had to cover one person.',
+                  "That's a smaller circle than you'd think."] },
             { t: 'Show me how to do it properly.', k: 'learn',
               r: ["Come here, then. It's all in the grain.",
-                  "Best thing anyone's said to me in a while, that."] }] },
+                  "Best thing anyone's said to me in a while."] }] },
 
     // ── he starts asking about you ──────────────────────────────────────
     { n: 7, topic: 'you',
       him: ['Can I ask you something normal?',
-            "What do you do, when you're not sat here?"],
+            "What do you do, when you're not sat in a ring of stones?"],
       ask: [{ t: 'Work, mostly. Too much of it.', k: 'tired',
-              r: ['Then this is a strange sort of rest.', "I'll take it if you will."] },
+              r: ['Then this is a strange kind of rest.', "I'll take it if you will."] },
             { t: "Not a lot. That's half the problem.", k: 'adrift',
               r: ['I know that one.', "The road's good for it. Gives your hands something."] },
             { t: "Honestly? I'd rather be here.", k: 'here',
               r: ['...Right.', 'Well. Good.'] }] },
 
     { n: 8, topic: 'sleep',
-      him: ['Odd question. Do you sleep alright?'],
+      him: ['Odd question, but do you sleep alright?'],
       ask: [{ t: 'Most nights, yeah.', k: 'sleeps',
               r: ['Good. Hang on to that.'] },
             { t: 'Not lately, no.', k: 'restless',
               r: ['No. Me neither.',
-                  "It's half the reason I walk. Somewhere to put the night."] },
+                  'Hard to put a night down when the night is the job.'] },
             { t: 'Why do you ask?', k: 'curious',
               r: ["Because I don't, much. Wanted to know if it was just me."] }] },
 
     { n: 9, topic: 'nell',
-      him: ['Someone used to do this bit. The fire, I mean.',
-            "She was better at it. Twice this high by now, and telling me off for the wood I picked.",
+      him: ['Someone used to hold the other side of this.',
+            'She was better at it. Ring twice this wide by now, and telling me off for the wood I picked.',
             'My sister.'],
       ask: [{ t: "What's she like?", k: 'sister',
               r: ['Loud. Kind. Impossible to argue with.', "She'd have liked you."] },
             { t: 'Where is she now?', k: 'asked_where',
-              r: ["That's what the walk is for.", "I'll tell you. Just not tonight."] },
+              r: ["Ahead of me. That's what the walk is for.",
+                  "I'll tell you. Just not tonight."] },
             { t: "You don't have to talk about her.", k: 'gentle',
               r: ['I know.', "That's probably why I can."] }] },
 
     { n: 10, topic: 'us',
-      him: ['Ten nights. Halfway.',
+      him: ['Tenth ring tonight. That is halfway.',
             "I want to say something and I'm going to do it badly, so \u2014 thank you.",
-            "It's easier with someone watching the other side."],
+            "A circle this size takes two. I'd forgotten what that was like."],
       ask: [{ t: 'You did it fine.', k: 'kindly',
               r: ['No? Good.'] },
             { t: "There's nowhere else I'd rather be.", k: 'here',
@@ -1372,90 +1383,95 @@
               r: ['...Nell.', 'Yeah. That was easier.'] }] },
 
     { n: 12, topic: 'road',
-      him: ['Found the long axe in a barn a couple of ridges back.',
-            'Kettle still on the hook. Whoever it was left in a hurry.'],
+      him: ['Found the long axe in the ring two back. Kettle still on the hook.',
+            "Somebody laid a fire there and never lit it.",
+            "You can tell. The wood was stacked and the stones were cold."],
       ask: [{ t: 'Do you think they got out?', k: 'wonder',
-              r: ["I've decided they did. Costs me nothing to decide that."] },
+              r: ["I've decided they walked on to the next one. Costs me nothing to decide that."] },
             { t: 'Does it bother you, using their things?', k: 'scruple',
               r: ["A bit. So I use them well. That's the deal I've made with myself."] },
             { t: "They'd want someone to have it.", k: 'kindly',
               r: ["That's a better way of putting it than mine."] }] },
 
     { n: 13, topic: 'nell',
-      him: ["She said she'd wait at the Point. End of every summer.",
-            'That was four summers ago.'],
+      him: ["She went ahead four summers ago to see if the Point was still lit.",
+            "She said she'd wait there. End of every summer, she said.",
+            "I've had one letter, from the third ring, and nothing since."],
       ask: [{ t: 'She might still be there.', k: 'hope',
               r: ['She might.', "You're the first person to say that out loud."] },
             { t: "And if she isn't?", k: 'honest',
-              r: ["Then I'll have walked it. That's worth something on its own.",
+              r: ["Then I'll have walked it, and I'll have seen the light for myself.",
                   "I'd rather you asked than didn't."] },
             { t: "Four summers isn't that long.", k: 'hope',
-              r: ["No. It isn't, is it.", "I'll hang on to that for a bit."] }] },
+              r: ["No. It isn't, is it.", "I'll hang on to that."] }] },
 
     { n: 14, topic: 'end',
-      him: ['You know what scared me, those first few nights? Not them.',
-            'Getting to the end of this on my own.'],
-      ask: [{ t: "You're not going to.", k: 'stay',
+      him: ["You know what scared me those first few nights? Not what's out past the stones.",
+            'Sitting up on my own with a circle only big enough for one.'],
+      ask: [{ t: "You're not doing that any more.", k: 'stay',
               r: ['No.', "No, it doesn't look like I am."] },
             { t: 'What scares you now?', k: 'afraidnow',
-              r: ['The last mile. Not the walking part.'] },
+              r: ["Getting there and finding the mole dark.",
+                  'Not the walking part.'] },
             { t: "I've been scared of that too.", k: 'mine',
               r: ["Then we'll take the last mile slowly and both of us can be scared of it."] }] },
 
     { n: 15, topic: 'us',
-      him: ['Fifteen. We might actually finish this.'],
+      him: ['Fifteenth tonight. Five after this one. We might actually finish this.'],
       ask: [{ t: 'We will.', k: 'stay',
               r: ['Right.'] },
             { t: 'One night at a time.', k: 'steady',
               r: ["That's how you do it. That's exactly how."] },
             { t: "What'll you do if we make it?", k: 'ifwe',
-              r: ['Sit down. Properly sit down.',
-                  "I haven't sat down in four years without listening for something."] }] },
+              r: ['Sleep with the light on and not be the one holding it.',
+                  "I haven't done that in four years."] }] },
 
     { n: 16, topic: 'road',
       him: ['The poker came out of a forge with no roof left on it.',
-            'Everything out here belonged to someone. I try to use it well.'],
+            'Every ring on this road belonged to someone. I try to use it well.'],
       ask: [{ t: 'You do.', k: 'praise',
               r: ["That's the aim, anyway."] },
             { t: "What'll you leave behind?", k: 'leave',
-              r: ['A ring of stones and a lot of ash.',
-                  'And whatever you make of all this, I suppose.'] },
+              r: ['A stack of dry wood in every ring we sat in.',
+                  "It's what you do. Somebody's behind us."] },
             { t: 'Where did the brand come from?', k: 'brandask',
-              r: ["My own fire, first night. It's the only thing out here that's actually mine."] }] },
+              r: ["My own fire, first night out. It's the only thing I carry that's actually mine."] }] },
 
     { n: 17, topic: 'end',
       him: ['If you had one thing waiting at the end of a long walk, what would you want it to be?'],
       ask: [{ t: 'Someone who knew me.', k: 'known',
               r: ['Yeah.', "Yeah, that's the one."] },
-            { t: 'Somewhere to stop.', k: 'rest',
+            { t: 'Somewhere I could stop watching.', k: 'rest',
               r: ["That's the honest answer.", 'I want both, which is greedy of me.'] },
             { t: "I'd want you to get yours.", k: 'forhim',
               r: ['...', "You're not making this easy."] }] },
 
     { n: 18, topic: 'point',
-      him: ["Three left. There's salt on the wind at the top of the rise.",
-            "I went up to look. Couldn't see anything. It's there, though."],
+      him: ['Three left, counting tonight. I went up the rise before sundown to look.',
+            "There's a glow on the water. South-south-west, low down.",
+            "Could be weather. I've been telling myself it isn't."],
       ask: [{ t: 'Take me up next time.', k: 'together',
               r: ["I will. Bring the dog, he likes a view he can't reach."] },
+            { t: "It's the light.", k: 'itslit',
+              r: ['...Say that again in the morning.', "I'll want to hear it twice."] },
             { t: 'What are you going to say to her?', k: 'whatsay',
               r: ["I've had the first line ready for four years.",
-                  "It's the second one that gets me."] },
-            { t: 'Nearly there.', k: 'steady',
-              r: ["Nearly. Don't say it too loud."] }] },
+                  "It's the second one that gets me."] }] },
 
     { n: 19, topic: 'us',
       him: ["If she's there, I want to tell her about you.",
             'What should I say?'],
       ask: [{ t: 'That I kept the fire.', k: 'kept',
               r: ["That'll do. That'll do nicely."] },
-            { t: "That you weren't on your own.", k: 'notalone',
+            { t: "That you weren't holding it alone.", k: 'notalone',
               r: ['Yeah.', "That's the part that matters."] },
             { t: 'Tell her whatever you want.', k: 'easy',
               r: ["Then I'll tell her the truth and let her make of it what she likes."] }] },
 
     { n: 20, topic: 'end',
-      him: ['Last one.',
-            "Whatever's down there is down there. But this part was good. I mean that."],
+      him: ['Last ring.',
+            "Tomorrow we walk in under a light neither of us has to feed.",
+            "Whatever's down there, this part was good. I mean that."],
       ask: [{ t: 'It was good for me too.', k: 'mutual',
               r: ["Then that's both of us, and it's settled.",
                   'One more night, {you}.'] },
@@ -1465,10 +1481,10 @@
   function talkFor(n) {
     for (var i = 0; i < TALKS.length; i++) if (TALKS[i].n === n) return TALKS[i];
     return { n: n, topic: 'end',
-      him: ["We're well past the twenty now.",
-            "I didn't plan for this bit. Glad of the company all the same."],
-      ask: [{ t: 'Where are we walking now?', k: 'onward',
-              r: ["Wherever it goes. I've stopped needing it to end somewhere."] },
+      him: ["We're past the Point and still lighting rings.",
+            "Turns out I like the work when it isn't the only thing keeping me here."],
+      ask: [{ t: 'Where does the road go now?', k: 'onward',
+              r: ["Wherever there are stones to fill. Somebody has to keep them dry."] },
             { t: 'Same as ever, then.', k: 'steady',
               r: ["Same as ever. Fire's still hungry."] }] };
   }
@@ -1478,65 +1494,79 @@
   // `topic` keeps what is on offer near whatever he has just been talking
   // about.
   var ASKS = [
-    { id: 'cold',   from: 2,  topic: 'night', q: 'Do you ever get used to the cold?',
-      a: ['No. You just stop mentioning it.'] },
-    { id: 'them',   from: 2,  topic: 'night', q: 'What are they, do you reckon?',
+    { id: 'them',   from: 2, until: 10, topic: 'night', q: 'What are they, do you reckon?',
       a: ["I've thought about it a lot and got nowhere.",
-          "They only come at light. That's the whole of what I know."] },
-    { id: 'dogwhere', from: 3, topic: 'dog', q: 'Where do you think he came from?',
-      a: ["Somewhere behind us. He's never looked back at it, so neither do I."] },
+          "They only turn up where it's dark, and they only stop where it isn't. That's the lot."] },
+    { id: 'whyfire', from: 2, until: 10, topic: 'night', q: 'Why do they come at the fire at all?',
+      a: ["Because it's the only thing in their way.",
+          "Put it out and they'd walk straight through where it was and you'd never know."] },
+    { id: 'cold',   from: 3, until: 12, topic: 'night', q: 'Do you ever get used to the cold?',
+      a: ['No. You just stop mentioning it.'] },
+    { id: 'dogwhere', from: 3, until: 12, topic: 'dog', q: 'Where do you think he came from?',
+      a: ['A ring behind us. He walked in out of the dark, which should not be possible.',
+          "I've decided not to think about it too hard. He's good company."] },
     { id: 'dogname', from: 5, topic: 'dog', need: 'namedog', q: 'Settled on a name for him yet?',
       a: ["I've been trying them out. He ignores all of them equally.",
           "I'll know it when I say it."] },
+    { id: 'rings',  from: 4, until: 14, topic: 'road', q: 'Who laid all these stone rings?',
+      a: ['People walking the same way, a long time before us.',
+          'A day apart the whole road. Somebody counted the daylight very carefully.'] },
+    { id: 'point',  from: 4,  topic: 'point', q: "What's Harrow Point actually like?",
+      a: ['Nine houses, a shingle beach, and the light out on the mole.',
+          'Nobody there sits up. That is the whole of why people go.'] },
     { id: 'sea',    from: 4,  topic: 'point', q: 'Have you ever seen the sea?',
       a: ['Once, when I was small. Someone held on to the back of my coat the whole time.'] },
-    { id: 'point',  from: 4,  topic: 'point', q: "What's Harrow Point actually like?",
-      a: ['Shingle, nine houses, and the bell.',
-          'Someone used to ring it every time we arrived. Drove the village mad.'] },
     { id: 'road',   from: 5,  topic: 'road', q: 'How long have you been walking?',
       a: ['Long enough that I stopped counting on purpose.'] },
-    { id: 'before', from: 6,  topic: 'road', q: 'What did you do before all this?',
+    { id: 'home',   from: 6,  topic: 'road', q: 'Where were you before the road?',
+      a: ['A lit town, east of here. It had a fire in the square and four of us on it in turns.',
+          "It went out one winter. I was not on it that night, which is a thing I think about."] },
+    { id: 'before', from: 7,  topic: 'you', q: 'What did you do, before all this?',
       a: ['I was a fair hand at nothing much.',
-          'Turns out that\u2019s decent training for keeping a fire in.'] },
-    { id: 'why',    from: 7,  topic: 'you', q: 'Why do you do this every night?',
-      a: ['Because it goes out if I don\u2019t.',
-          "And because the other option is lying in the dark thinking. I've tried that."] },
+          "Turns out that's decent training for keeping a fire in."] },
+    { id: 'why',    from: 7,  topic: 'you', q: 'Why keep walking instead of stopping somewhere lit?',
+      a: ["Because I've stopped somewhere lit. It went out.",
+          "I'd rather be the one holding it than the one waiting to find out."] },
     { id: 'sleep',  from: 8,  topic: 'sleep', need: 'restless', q: 'Do you sleep at all out here?',
       a: ["The hour after dawn. It's the only one I trust."] },
     { id: 'nell',   from: 9,  topic: 'nell', need: 'sister', q: 'Tell me more about her.',
-      a: ['She could start a fire in the rain. I never managed it.',
+      a: ['She could get a ring lit in the rain. I never managed it.',
           'She used to say the trick was to stop apologising to the wood.'] },
     { id: 'saidit', from: 11, topic: 'nell', need: 'nellname', q: "Why's it been so long since you said her name?",
-      a: ['Because saying it makes her someone who isn\u2019t here.',
+      a: ["Because saying it makes her someone who isn't stood here.",
           'It did that less tonight. So \u2014 thanks.'] },
+    { id: 'letter', from: 13, topic: 'nell', need: 'sister', q: 'What did the letter say?',
+      a: ['That the third ring was dry and the walking was easier than she thought.',
+          'And that I was to come on when I was ready. I was four years getting ready.'] },
     { id: 'me',     from: 12, topic: 'us', q: 'Do you ever wonder about me?',
       a: ["Constantly. I've decided not to pry.",
           "You tell me things at your own pace and I've come to like the pace."] },
     { id: 'best',   from: 13, topic: 'road', q: "What's been the best night out here?",
-      a: ['Honestly? The one where nothing happened and we sat through the whole of it.',
+      a: ['Honestly? The one where nothing came and we sat through the whole of it.',
           "I didn't know I was allowed a night like that."] },
     { id: 'worst',  from: 13, topic: 'night', q: 'What was the worst of it, before I came?',
-      a: ['A week of rain with nothing dry to burn.',
+      a: ['A week of rain with nothing dry to burn. Ring the size of a hearthrug.',
           'I talked to the dog a lot that week. He was very patient.'] },
     { id: 'summer', from: 14, topic: 'nell', need: 'sister', q: 'What was that last summer like?',
       a: ["Good. That's the trouble with it.",
-          "She rang the bell, we argued about nothing, and then she went and I didn't."] },
+          "We argued about nothing, and then she went on ahead and I didn't."] },
     { id: 'afraid', from: 14, topic: 'end', q: 'Is there anything out here that still frightens you?',
-      a: ['Not much on this side of the fire.', 'The last mile, maybe. Not the walking part.'] },
+      a: ['Not much on this side of the stones.', 'The last mile, maybe. Not the walking part.'] },
     { id: 'after',  from: 15, topic: 'end', need: 'stay', q: 'What happens after the Point?',
       a: ["I haven't let myself think that far.",
           "If you're still about, I'll think about it then."] },
     { id: 'stay2',  from: 16, topic: 'us', need: 'stay', q: 'Would you want me to walk the last mile with you?',
       a: ['...Yeah.',
           "I've been trying to work out how to ask that for about six nights."] },
-    { id: 'bell',   from: 17, topic: 'point', q: 'Will you ring the bell?',
-      a: ["Hadn't thought of it.", "Yeah. Alright. If we get there, I'll ring the bell."] },
+    { id: 'bell',   from: 17, topic: 'point', q: 'Is there a bell there, or did I make that up?',
+      a: ['On a post by the mole. She rang it every time we arrived, to annoy the village.',
+          "If we get there, I'll ring it once and let them all think what they like."] },
     { id: 'proud',  from: 18, topic: 'us', q: 'Are you glad you started walking?',
       a: ["I wasn't, for a long stretch of it.",
           "I am tonight, and tonight's the only one I get a vote on."] },
     { id: 'name2',  from: 19, topic: 'us', q: 'Will you remember my name after all this?',
       a: ['{you}.',
-          "I've been saying it to myself on the quiet stretches. It stuck."] }
+          "I've been saying it to myself between the rings. It stuck."] }
   ];
 
   // ── what he can get done before dark ──────────────────────────────────────
@@ -1546,9 +1576,9 @@
       max: PILE_MAX, dur: 1.9, beats: [0.42, 0.92], off: 27 },
     { id: 'kettle', x: 0, verb: 'FILL\nKETTLE', did: 'Brewed', say: 'Something hot. He walks quicker on it.',
       max: 1, dur: 1.8, beats: [0.34, 0.76], off: 29 },
-    { id: 'brand',  x: 0, verb: 'TRIM\nBRAND',  did: 'Trimmed', say: 'A cleaner edge. It reaches further.',
+    { id: 'brand',  x: 0, verb: 'TRIM\nBRAND',  did: 'Trimmed', say: 'Cleaner edge, better ember. It reaches further.',
       max: 1, dur: 1.7, beats: [0.22, 0.44, 0.66, 0.88], off: 26 },
-    { id: 'banked', x: 0, verb: 'BANK\nFIRE',   did: 'Banked', say: 'Coals raked up. It starts higher.',
+    { id: 'banked', x: 0, verb: 'BANK\nFIRE',   did: 'Banked', say: 'Coals raked up. The ring starts wider tonight.',
       max: 1, dur: 1.6, beats: [0.24, 0.54, 0.84], off: 36 },
     { id: 'dog',    x: 0, verb: 'FEED\nDOG',    did: 'Fed him', say: 'He will bark a good deal sooner now.',
       max: 1, dur: 2.3, beats: [0.2, 0.34, 0.78], off: 34 },
@@ -1575,23 +1605,24 @@
   var SPEED = 76, SWING_CD = 0.38, SWING_RANGE = 34, BITE = 11;
 
   // ── what he swings ────────────────────────────────────────────────────────
-  // One new one every five nights. Longer, quicker, and each hits more of them
-  // at once — the road answers back a little harder than the weapon each time.
+  // Fire is the only thing that touches them, so every one of these carries
+  // some. One new one every five nights: longer, quicker, and each hits more
+  // of them at once — the road answers back a little harder each time.
   var WEAPONS = [
     { at: 1,  id: 'brand',   name: 'The brand',      kind: 'brand',
-      say: 'A stick out of the fire. It has done the job so far.',
+      say: 'A lit stick out of the fire. Nothing else touches them.',
       reach: 36, cd: 0.38, hits: 1, dmg: 1, dur: 0.30, kb: 0,  trail: 0, high: 22 },
     { at: 6,  id: 'hatchet', name: 'The hatchet',    kind: 'axe',
-      say: 'Off the chopping block. It bites where the brand only pushed.',
+      say: 'Head kept in the coals between swings. It bites where the brand only pushed.',
       reach: 41, cd: 0.34, hits: 2, dmg: 1, dur: 0.28, kb: 16, trail: 0, high: 26 },
     { at: 11, id: 'longaxe', name: 'The long axe',   kind: 'axe',
-      say: 'Two hands on it. One swing clears the whole arc.',
+      say: 'Two hands, and the head glowing. One swing clears the whole arc.',
       reach: 49, cd: 0.32, hits: 3, dmg: 2, dur: 0.30, kb: 28, trail: 0, high: 32 },
     { at: 16, id: 'poker',   name: 'The iron poker', kind: 'poker',
-      say: 'Straight out of the coals. Whatever it touches keeps burning.',
+      say: 'Straight out of the coals and it stays hot. Whatever it touches keeps burning.',
       reach: 55, cd: 0.28, hits: 4, dmg: 2, dur: 0.26, kb: 24, trail: 1, high: 34 },
     { at: 21, id: 'light',   name: 'The old light',  kind: 'light',
-      say: 'A lantern on a chain. It has not gone out yet and it is not going to.',
+      say: 'A lantern on a chain. Carry the light to them instead of waiting.',
       reach: 63, cd: 0.24, hits: 6, dmg: 3, dur: 0.24, kb: 36, trail: 2, high: 38 }
   ];
   function wepFor(n) {
@@ -2903,21 +2934,21 @@
   // answer all of them. New ones arrive as the weapons do, and a little sooner.
   var BEASTS = [
     { id: 'shade',   from: 1,  hp: 1, spd: 1.00, bite: 1.0, lo: 42, hi: 96,  w: 3,
-      name: 'Shade',      of: 'It drifts. It only wants the light gone.' },
+      name: 'Shade',      of: 'Leans on the edge of the light until it finds a thin place.' },
     { id: 'crawler', from: 3,  hp: 1, spd: 1.55, bite: 0.8, lo: 8,  hi: 16,  w: 3,
-      name: 'Crawler',    of: 'Keeps low and comes quick. Swing early.' },
+      name: 'Crawler',    of: 'Comes in along the ground where the light is shallowest. Swing early.' },
     { id: 'moth',    from: 5,  hp: 1, spd: 1.10, bite: 1.0, lo: 74, hi: 130, w: 3,
-      name: 'Ashmoth',    of: 'Rides high, then folds and dives at the flame.', dive: 1 },
+      name: 'Ashmoth',    of: 'Rides up over the light and drops in through the top of it.', dive: 1 },
     { id: 'hollow',  from: 8,  hp: 2, spd: 0.78, bite: 1.5, lo: 26, hi: 58,  w: 2,
-      name: 'Hollow',     of: 'Thin and slow and takes two to put down.' },
+      name: 'Hollow',     of: 'Slow, and thick enough to take two.' },
     { id: 'frost',   from: 11, hp: 2, spd: 0.94, bite: 1.2, lo: 30, hi: 80,  w: 2,
-      name: 'Frostling',  of: 'Where it passes the fire has to work harder.', chill: 1 },
+      name: 'Frostling',  of: 'Where it passes, the fire has to work to hold its ground.', chill: 1 },
     { id: 'gnasher', from: 14, hp: 3, spd: 1.35, bite: 1.0, lo: 10, hi: 34,  w: 2,
-      name: 'Gnasher',    of: 'Three good hits. Do not let it get past you.' },
+      name: 'Gnasher',    of: 'Three good hits. Do not let it reach the stones.' },
     { id: 'quiet',   from: 17, hp: 2, spd: 0.88, bite: 1.3, lo: 34, hi: 92,  w: 2,
-      name: 'The Quiet',  of: 'You will not see it until the firelight finds it.', hidden: 1 },
+      name: 'The Quiet',  of: 'You will not see it until the light happens to land on it.', hidden: 1 },
     { id: 'thief',   from: 19, hp: 1, spd: 1.75, bite: 0,   lo: 10, hi: 26,  w: 2,
-      name: 'Ember thief', of: 'Not after the fire. After the wood you left lying.', steals: 1 }
+      name: 'Ember thief', of: 'Not interested in the fire. It is after the wood you left lying.', steals: 1 }
   ];
   function beastFor(n) {
     var pool = [], i, b;
@@ -4139,46 +4170,67 @@
     S.cam += (Math.max(0, Math.min(WORLD - W, S.x - W / 2)) - S.cam) * Math.min(1, dt * 5);
   }
 
-  function meetCard() {
-    newMeet();
-    veil.classList.add('lit');
-    var beats = [
+  var MEET = [
       { l: ['\u2026'] },
-      { l: ["You're the first thing up this road in nine days that wasn't weather."] },
-      { l: ["Don't stand out there. Come in by it.", 'Such as it is.'],
+      { l: ["You're the first thing up this road in nine days that wasn't weather.",
+            "Sun's nearly off the ridge. You won't make the next ring before dark."] },
+      { l: ["So don't stand out there. Come inside the stones.", 'Such as it is.'],
         act: function () { S.pose = null; S.dir = -1; } },
       { ask: [
+          { t: 'Inside the stones?', k: 'asked_ring',
+            r: ['As far as the light reaches. That\u2019s the whole of the inside.',
+                "It's about six feet at the minute, which is my fault."] },
           { t: 'What happened to your fire?', k: 'asked_fire',
             r: ["I let it get away from me. That's the honest answer.",
                 'Do that a few nights running and it stops being an accident.'] },
-          { t: 'Are you alright?', k: 'kind',
-            r: ["\u2026Nobody's asked me that in a while.", "I will be, in a minute."] },
-          { t: '(say nothing, and wait)', k: 'quiet',
+          { t: '(say nothing, and come in)', k: 'quiet',
             r: ["Right. You're one of those.", "That's alright. I talk enough for two."] }
         ] },
-      { l: ['Here. Watch.'],
+      { l: ['Here. Watch what it does.'],
         act: function () { meetMove(AT.fire + 28, 'feed'); } },
-      { l: ['There.'], act: function () {
+      { l: ['There. See how far it goes now?'], act: function () {
           S.fuel = 62; S.dusk = 0.5; burst(AT.fire, GY - 12, 16, 40); bell(300, 0.3, 0.06, 2000);
         } },
-      { l: ["Doesn't take much. Just takes someone being there when it dips."] },
-      { l: ["I'm walking up this road to a place called Harrow Point.",
-            'Twenty nights, near enough, if nothing goes wrong.'],
+      { l: ["The dark out here isn't the absence of anything. It's a thing, and it comes up at sundown.",
+            "It doesn't cross light. That's all. That is the entire trick.",
+            'Wood goes on, circle gets wider, and you are stood in the only room for a mile.'] },
+      { l: ["Things live out in it. They spend all night leaning on the edge looking for a thin place.",
+            "They're not after the fire. It's just in the way \u2014 so every one that reaches the stones",
+            'takes a bite out of it, and the room gets smaller.'] },
+      { ask: [
+          { t: 'Then why not put it out and hide?', k: 'asked_why',
+            r: ["Because then there'd be nothing between it and you, and you'd never see it come.",
+                "Light or nothing. There isn't a third thing."] },
+          { t: 'And if it goes out on its own?', k: 'asked_out',
+            r: ["I don't know. Nobody has come back to tell me.",
+                "Which is why we don't find out."] },
+          { t: 'How do you fight something like that?', k: 'asked_fight',
+            r: ['You take a lit stick out of the fire and you put it where they are.',
+                "Same trick. Fire's the only thing that touches them."] }
+        ] },
+      { l: ["I'm walking to a place called Harrow Point. Twenty rings of stone between here and it.",
+            "There's a light on the mole there that nobody has to sit up feeding.",
+            'One ring a day. Miss one by dark and it stops being a journey.'],
         act: function () { S.pose = null; S.dir = -1; } },
-      { l: ['Things come at the light out here. I can hold them off.',
-            "What I can't do is hold them off and keep the fire up at the same time.",
+      { l: ['I can hold them off the stones. I can keep the wood coming in.',
+            "What I can't do is both, and the fire is smaller every night I try.",
             'Not on my own. Not any more.'] },
       { ask: [
           { t: "Then I'll keep the fire.", k: 'stay',
-            r: ['\u2026Right.', 'Right. Good.'] },
-          { t: 'What comes at the light?', k: 'why',
-            r: ["You'll see one tonight. Don't let it get near the stones."] },
-          { t: 'Why twenty nights?', k: 'curious',
-            r: ["Because that's how far it is.", "I've counted it more than once."] }
+            r: ['\u2026Right.', 'Right. Good.', "Then I'll keep them off it."] },
+          { t: 'What do you need me to actually do?', k: 'asked_job',
+            r: ['Wood on the fire before it drops. Three logs at a time if you can carry them.',
+                'And swing that brand at anything that gets past me.'] },
+          { t: 'Twenty nights is a long time.', k: 'curious',
+            r: ["It is.", "Give me one and decide after."] }
         ] },
-      { l: ["Sun's nearly down. Have a look round the camp while there's light.",
+      { l: ["Sun's nearly down. Have a look round the ring while there's light.",
             'Then come and take the watch.'] }
     ];
+  function meetCard() {
+    newMeet();
+    veil.classList.add('lit');
+    var beats = MEET;
     var bi = 0, li = 0, log = null, logIn = null, act = null, armed = 0;
     function ready(ms) { return !GUARD || Date.now() - armed >= ms; }
 
@@ -4282,6 +4334,7 @@
   var CALLBACKS = [
     { need: 'namedog',  at: 6,  say: 'The dog answers to whatever I call him now. Your fault, that.' },
     { need: 'learn',    at: 8,  say: 'You split a couple last night without being asked. I noticed.' },
+    { need: 'gotit',    at: 7,  say: "You worked out what the fire is for quicker than I did." },
     { need: 'adrift',   at: 9,  say: "You said there wasn't much on. I've thought about that a fair bit." },
     { need: 'tired',    at: 9,  say: 'Still too much on, at yours?' },
     { need: 'restless', at: 11, say: "You said you weren't sleeping. Any better?" },
@@ -4290,6 +4343,7 @@
     { need: 'gentle',   at: 13, say: "You told me I didn't have to talk about her. That's why I can." },
     { need: 'hope',     at: 16, say: "You said she might still be there. I've been leaning on that." },
     { need: 'honest',   at: 16, say: "You asked what if she isn't. Glad one of us said it." },
+    { need: 'itslit',   at: 19, say: 'You said it was the light. It was still there tonight.' },
     { need: 'forhim',   at: 19, say: "You said you wanted me to get mine. I haven't forgotten." }
   ];
   function callback() {
@@ -4352,6 +4406,7 @@
       for (var a = 0; a < ASKS.length; a++) {
         var K = ASKS[a];
         if (S.n < (K.from || 1)) continue;
+        if (K.until && S.n > K.until) continue;    // learning the rules is early-game
         if (K.need && !tag(K.need)) continue;
         if (MEM.asked.indexOf(K.id) >= 0) continue;
         (K.topic && K.topic === T.topic ? here : rest).push(K);
@@ -4639,14 +4694,14 @@
     if (save.music !== false) musicOn(true);
     elA.textContent = 'TAKE\nWATCH';
     elA.classList.add('go');
-    banner('Camp', 'Chores are marked with an arrow. TAKE WATCH out on the road when you are ready.', 4200);
+    banner('Inside the stones', 'Daylight is for getting ready \u2014 jobs are marked with an arrow. TAKE WATCH when the sun is going.', 4200);
     elSnd.classList.toggle('off', muted);
   }
   var BARKS = {
     fresh: ["Careful with that one. It's new.", 'Something different tonight. Watch it.'],
-    low:   ['{you} \u2014 the fire.', "It's getting low. I can't reach it from here.",
-            "We're going to lose it."],
-    clean: ['Not one of them got near it. That was you.', 'Clean night. I saw it.'],
+    low:   ['{you} \u2014 the fire.', "Ring's shrinking. I can't reach it from here.",
+            "Much lower and it won't reach the stones."],
+    clean: ['Not one of them got through. That was you.', 'Clean night. I saw it.'],
     close: ['Behind you.', 'On your side.']
   };
   function bark(kind) {
@@ -4678,13 +4733,17 @@
     show(
       '<div class="eyebrow">' + (save.best >= NIGHTS.length ? 'The whole road, walked' : 'Night Watch') + '</div>' +
       '<h1>Keep it<em>burning</em></h1>' +
-      '<p class="lede">Twenty nights on the road. One fire between you and the dark.</p>' +
+      '<p class="lede">The dark is a thing out here, and it does not cross firelight. ' +
+        'Twenty rings of stone between the road and Harrow Point. One of you feeds it, ' +
+        'one of you keeps them off it.</p>' +
       '<div class="rules">' +
         '<p><b>◀ ▶</b> walk, <b>JUMP</b> for anything more than a step high.</p>' +
         '<p>Step over wood to pick it up — three at a time.</p>' +
-        '<p><b>Stand at the stones</b> and he feeds the fire himself, one log at a time.</p>' +
-        '<p><b>SWING</b> the brand at the shades. Let one reach the fire and it takes a bite out of it.</p>' +
-        '<p>Hold until dawn, then walk back to camp and rest.</p>' +
+        '<p><b>Stand at the stones</b> and he feeds the fire himself, one log at a time. ' +
+          'The higher it burns, the wider the ring.</p>' +
+        '<p><b>SWING</b> the lit brand at whatever comes. Let one reach the stones and it ' +
+          'takes a bite out of the fire.</p>' +
+        '<p>Hold until dawn. They go back down with the sun.</p>' +
       '</div>' +
       strip(save.night) +
       (MEM && MEM.you ? '<p class="lede">He calls you <b style="color:var(--bone)">' + fill('{you}') +
@@ -4719,11 +4778,11 @@
       var next = cfgFor(S.n + 1);
       var clean = S.bitten === 0;
       var his = clean
-        ? ['Not one of them got near. That was you.',
-           'I watched the whole of that. Not a mark on it.'][S.n % 2]
+        ? ['Not one of them got to the stones. That was you.',
+           'I watched the whole of that. Never dipped once.'][S.n % 2]
         : S.fuel < 25
           ? ['That was close. I could feel it going.',
-             'Another minute of that and we would have been sat in the dark.'][S.n % 2]
+             'Another minute and there would not have been a ring left to stand in.'][S.n % 2]
           : ['Held. Good.', 'That is another one behind us.',
              'You are getting quicker at this.'][S.n % 3];
       show(
@@ -4751,7 +4810,9 @@
       show(
         '<div class="eyebrow">The fire went out</div>' +
         '<h1>Night ' + n2 + '<em>lost</em></h1>' +
-        '<p class="lede">He sat in the cold until the sky turned grey on its own. No harm done — but the dark got its way tonight.</p>' +
+        '<p class="lede">The last of it went down to embers and the ring closed to nothing. ' +
+        'He got through the night with his back to the stones and said very little about it. ' +
+        'Nothing lost but the night — walk it again.</p>' +
         '<div class="tally">' +
           '<div><span>Held for</span><b>' + Math.round(S.cfg.len - S.left) + 's</b></div>' +
           '<div><span>Logs fed</span><b>' + S.fed + '</b></div>' +
@@ -4770,14 +4831,16 @@
     show(
       '<div class="eyebrow">Twenty nights</div>' +
       '<h1>You kept it<em>all the way</em></h1>' +
-      '<p class="lede">Every night on the road, and the fire never once went out. Put the brand down. You have earned the morning.</p>' +
+      '<p class="lede">Twenty rings, every one of them lit till morning, and the last ' +
+      'mile walked in under a light neither of you has to feed. Put the brand down.</p>' +
       '<div class="tally">' +
         '<div><span>Nights held</span><b>' + NIGHTS.length + '</b></div>' +
         '<div><span>Logs fed</span><b>' + S.fed + '</b></div>' +
         '<div><span>Driven off</span><b>' + S.driven + '</b></div>' +
       '</div>' +
       strip(NIGHTS.length + 1) +
-      '<p class="lede">The road does not end there. It just stops being counted.</p>' +
+      '<p class="lede">There are stones past the Point too, and somebody has to keep ' +
+      'them dry. The road does not end. It just stops being counted.</p>' +
       '<button class="go" id="go">Back to camp — night ' + save.night + ' ahead</button>' +
       '<div class="foot">' + BUILD + '</div>'
     );
@@ -4859,6 +4922,8 @@
     },
     setNight: function (n) { save.night = n; store(); },
     talks: function () { return TALKS; }, asks: function () { return ASKS; },
+    meet: function () { return MEET; }, barks: function () { return BARKS; },
+    chores: function () { return CHORES; },
     callbacks: function () { return CALLBACKS; }, musings: function () { return MUSINGS; },
     talk: function () { talkCard(); }, banner: banner, readTime: readTime,
     noGuard: function (v) { GUARD = v ? 0 : 1; },
