@@ -251,7 +251,7 @@
 <script>
 (function () {
   'use strict';
-  var BUILD = 'v1.8.0';
+  var BUILD = 'v1.9.0';
 
   // ── measurements ──────────────────────────────────────────────────────────
   var TILE = 16;
@@ -1163,17 +1163,17 @@
     { at: 4, s: 'Harrow Point. That is the name of it. You can hear the sea from the last mile.' },
     { at: 4, s: 'Nine houses and a bell on a post. That is the whole of it.' },
     { at: 5, s: 'Most people stop about now. You have not.' },
-    { at: 5, s: 'I do not sleep much. Hour after dawn, mostly.' },
+    { at: 8, s: 'I do not sleep much. Hour after dawn, mostly.' },
     { at: 6, s: 'Kettle takes forever on this fire. I do not mind. Gives me something to watch.' },
     { at: 6, s: 'Split it small. Small burns hot. Big burns long. You want hot when they come.' },
     { at: 7, s: 'I was a fair hand at nothing much before this.' },
-    { at: 8, s: 'Nell would have had this fire twice the height and told me off for the wood.' },
-    { at: 8, s: 'She is my sister. Was. Is. I have not settled on which.' },
+    { at: 12, s: 'Nell would have had this fire twice the height and told me off for the wood.' },
+    { at: 11, s: 'She is my sister. Was. Is. I have not settled on which.' },
     { at: 9, s: 'The pines thin out after the next ridge. More sky, less wood. Trade-off.' },
     { at: 10, s: 'Halfway. I did not think I would say that out loud.' },
     { at: 11, s: 'Found this axe in a barn. Somebody left in a hurry and did not come back for it.' },
-    { at: 12, s: 'I have started thinking about what I say to her. Have not got past the first line.' },
-    { at: 13, s: 'Four summers. She said end of every summer. That was four ago.' },
+    { at: 13, s: 'I have started thinking about what I say to her. Have not got past the first line.' },
+    { at: 14, s: 'Four summers. She said end of every summer. That was four ago.' },
     { at: 14, s: 'I was not afraid of them, first few nights. I was afraid of finishing this on my own.' },
     { at: 15, s: 'Salt on the wind now, if you stand up on the rise.' },
     { at: 16, s: 'Everything on this road belonged to somebody. I try to use it well.' },
@@ -1182,13 +1182,13 @@
     { at: 19, s: 'I would like to be able to tell her somebody kept the fire with me.' },
     { at: 20, s: 'Last one. Odd feeling.' },
     // ones he only says once he knows something about you
-    { at: 3, need: 'restless', s: 'You said you were not sleeping. It is a bad club to be in.' },
-    { at: 5, need: 'adrift',   s: 'Not much on, you said. There is plenty on out here. Mostly wood.' },
-    { at: 5, need: 'here',     s: 'You said you would rather be here. I think about that more than I should.' },
-    { at: 6, need: 'sister',   s: 'You asked about her. Nobody has asked about her in a long time.' },
-    { at: 8, need: 'stay',     s: 'You said you were not going anywhere. I have held on to that.' },
-    { at: 12, need: 'hope',    s: 'You reckon she might still be there. I have decided to agree with you.' },
-    { at: 14, need: 'namedog', s: 'The dog has a name now and it is your fault.' }
+    { at: 9, need: 'restless', s: 'You said you were not sleeping. It is a bad club to be in.' },
+    { at: 8, need: 'adrift',   s: 'Not much on, you said. There is plenty on out here. Mostly wood.' },
+    { at: 8, need: 'here',     s: 'You said you would rather be here. I think about that more than I should.' },
+    { at: 10, need: 'sister',  s: 'You asked about her. Nobody has asked about her in a long time.' },
+    { at: 6, need: 'stay',     s: 'You said you were not going anywhere. I have held on to that.' },
+    { at: 14, need: 'hope',    s: 'You reckon she might still be there. I have decided to agree with you.' },
+    { at: 4, need: 'namedog',  s: 'The dog has a name now and it is your fault.' }
   ];
   function musing() {
     var pool = [];
@@ -1223,96 +1223,217 @@
   // you; each answer sets a tag he can lean on later. `after` is what he says
   // back, keyed by the tag.
   var TALKS = [
-    { n: 1, him: ['You came. I did not think you would.',
-                  'Sit a minute. The wood can wait.',
-                  'I am Wren. What do I call you?'],
+    // ── the first week is small talk. He is not going to hand you his life
+    //    on night two, and you would not want it. ──────────────────────────
+    { n: 1, topic: 'road',
+      him: ['You came back. I did not think you would, if I am honest.',
+            'Sit down. The wood keeps.',
+            'I am Wren. What do I call you?'],
       name: 1,
-      after: { any: ['{you}. Right. I will not forget it.'] } },
+      after: { any: ['{you}. Right. I will not forget it.',
+                     'Stay as long as you like. I am not going anywhere till it is light.'] } },
 
-    { n: 2, him: ['You held it. That is the whole of the job, and most people cannot.',
-                  'Can I ask — do you sleep well?'],
-      ask: [{ t: 'Most nights, yes.', k: 'sleeps', r: ['Good. Hold on to that one.'] },
-            { t: 'Not really. Not lately.', k: 'restless', r: ['No. Nor me.', 'That is partly why I walk.'] },
-            { t: 'I would rather hear about you.', k: 'curious', r: ['Ha. Fair enough.', 'Another night, then.'] }] },
+    { n: 2, topic: 'night',
+      him: ['You held it. That is the whole of the job and most people cannot.',
+            'Nothing clever to say about that. Just \u2014 good.',
+            'Cold out there, was it?'],
+      ask: [{ t: 'Freezing. My hands are still going.', k: 'cold',
+              r: ['Get in closer, then. It does not bite.'] },
+            { t: 'Not bad once you keep moving.', k: 'mover',
+              r: ['That is the trick, more or less.', 'Keep moving, keep it lit.'] },
+            { t: 'I did not really notice.', k: 'headfirst',
+              r: ['Ha. You had your hands full. Fair enough.'] }] },
 
-    { n: 3, him: ['My sister used to do this bit. The fire, I mean. She was better at it.',
-                  'She would have had it twice this high by now and told me off for the wood I picked.'],
-      ask: [{ t: 'What was she like?', k: 'sister', r: ['Loud. Kind. Impossible to argue with.',
-                                                        'She would have liked you, I think.'] },
-            { t: 'Where is she now?', k: 'asked_where', r: ['That is the walk. I will tell you when we are further along.'] }] },
+    { n: 3, topic: 'dog',
+      him: ['The dog turned up on his own, second night of all this.',
+            'Walked in, sat down, has not explained himself since.',
+            'I have never named him. Felt presumptuous.'],
+      ask: [{ t: 'You should name him.', k: 'namedog',
+              r: ['Maybe. You pick, then.', 'I will use whatever you say and not argue about it.'] },
+            { t: 'He seems happy enough without one.', k: 'nodog',
+              r: ['That is what I thought. He has not complained.'] },
+            { t: 'So what do you call him now?', k: 'dogask',
+              r: ['Dog. Out loud. It is not my finest work.'] }] },
 
-    { n: 4, him: ['There is a place at the end of this road. Harrow Point.',
-                  'You can hear the sea from the last mile of it. That is where I am going.'] },
+    { n: 4, topic: 'point',
+      him: ['There is a place at the end of this road. Harrow Point.',
+            'Shingle beach, about nine houses, a bell on a post for the boats.',
+            'That is where I am walking. In case you were wondering what all this is in aid of.'],
+      ask: [{ t: 'How far is it?', k: 'howfar',
+              r: ['Twenty nights of this, near enough. Give or take a bad one.'] },
+            { t: 'What is waiting for you there?', k: 'asked_point',
+              r: ['Somebody, I hope.', 'I will get to that. Not tonight.'] },
+            { t: 'Sounds like a good place to stop.', k: 'stopping',
+              r: ['It is.', 'It is mostly the bell I picture, which is a strange thing to walk for.'] }] },
 
-    { n: 5, him: ['Five nights. You have not missed one.',
-                  'I have had people walk with me before. They tend to stop around now.'],
-      ask: [{ t: 'I am not going anywhere.', k: 'stay', r: ['All right.', 'All right, then.'] },
-            { t: 'Why do they stop?', k: 'why', r: ['Because it is the same thing every night and I am not much of a talker.',
-                                                    'You are still here, though.'] }] },
+    { n: 5, topic: 'road',
+      him: ['Five nights. You have not missed one.',
+            'People have walked bits of this with me before. They tend to stop about now.'],
+      ask: [{ t: 'I am not going anywhere.', k: 'stay',
+              r: ['All right.', 'All right, then.'] },
+            { t: 'Why do they stop?', k: 'why',
+              r: ['Because it is the same thing every night and I am poor company.',
+                  'You are still sat there, though.'] },
+            { t: 'Do you mind that they do?', k: 'minded',
+              r: ['I told myself I did not.', 'I am less sure sat here saying it.'] }] },
 
-    { n: 6, him: ['I split the wood differently since you came. Smaller. Burns hotter.',
-                  'Small thing. But it was your being here that made me bother.'] },
+    { n: 6, topic: 'camp',
+      him: ['I have been splitting the wood smaller since you turned up. Burns hotter.',
+            'Small thing. But it was your being here that made me bother.'],
+      ask: [{ t: 'It is a good fire.', k: 'praise',
+              r: ['It is a decent fire. I will take good.'] },
+            { t: 'You did not bother before?', k: 'nobother',
+              r: ['Not really. It only had to keep me alive.',
+                  'That is a lower bar than you would think.'] },
+            { t: 'Teach me to do it properly.', k: 'learn',
+              r: ['Right. Stand there and I will show you the grain.',
+                  'Best thing anyone has said to me in a while, that.'] }] },
 
-    { n: 7, him: ['Do you mind me asking what you do, when you are not here?'],
-      ask: [{ t: 'Work, mostly. It is a lot.', k: 'tired', r: ['Then this is a strange rest.', 'I will take it if you will.'] },
-            { t: 'Not much. That is the trouble.', k: 'adrift', r: ['I know that feeling well enough.',
-                                                                    'The road is good for it. Something to do with your hands.'] },
-            { t: 'I would rather be here.', k: 'here', r: ['...Right.', 'Well. Good.'] }] },
+    // ── now it can get a little more personal ────────────────────────────
+    { n: 7, topic: 'you',
+      him: ['Can I ask you something ordinary?',
+            'What do you do, when you are not sat here?'],
+      ask: [{ t: 'Work, mostly. It is a lot.', k: 'tired',
+              r: ['Then this is a strange sort of rest.', 'I will take it if you will.'] },
+            { t: 'Not much. That is half the trouble.', k: 'adrift',
+              r: ['I know that one well enough.',
+                  'The road is good for it. Something to do with your hands.'] },
+            { t: 'Honestly? I would rather be here.', k: 'here',
+              r: ['...Right.', 'Well. Good.'] }] },
 
-    { n: 8, him: ['Her name was Nell. My sister.',
-                  'I have not said it out loud in a long while.'],
-      ask: [{ t: 'Nell. That is a good name.', k: 'kind', r: ['It is, is it not.'] },
-            { t: 'Thank you for telling me.', k: 'kind', r: ['You made it easy. That is not nothing.'] }] },
+    { n: 8, topic: 'sleep',
+      him: ['Odd question. Do you sleep well?'],
+      ask: [{ t: 'Most nights, yes.', k: 'sleeps',
+              r: ['Good. Hold on to that one.'] },
+            { t: 'Not really. Not lately.', k: 'restless',
+              r: ['No. Nor me.', 'That is partly why I walk. It is somewhere to put the night.'] },
+            { t: 'Why do you ask?', k: 'curious',
+              r: ['Because I do not, much, and I wanted to know if it was just me.'] }] },
 
-    { n: 9, him: ['The dog turned up on night two of the whole thing. I never named him.',
-                  'Felt like it would be presumptuous.'],
-      ask: [{ t: 'You should name him.', k: 'namedog', r: ['Maybe. You pick, then. I will use whatever you say.'] },
-            { t: 'He seems fine as he is.', k: 'nodog', r: ['That is what I thought. He has not complained.'] }] },
+    { n: 9, topic: 'nell',
+      him: ['Somebody used to do this bit. The fire, I mean.',
+            'She was better at it. She would have had it twice this high by now and told me off for the wood.',
+            'My sister.'],
+      ask: [{ t: 'What was she like?', k: 'sister',
+              r: ['Loud. Kind. Impossible to argue with.',
+                  'She would have liked you, I think.'] },
+            { t: 'Where is she now?', k: 'asked_where',
+              r: ['That is the walk.', 'I will tell you when we are further along. Not out of rudeness.'] },
+            { t: 'You do not have to talk about her.', k: 'gentle',
+              r: ['I know.', 'That is probably why I can.'] }] },
 
-    { n: 10, him: ['Halfway. Ten behind us.',
-                   'I want to say something and I am going to make a hash of it, so — thank you.',
-                   'For the nights. For asking. It is easier with someone watching the other side.'] },
+    { n: 10, topic: 'us',
+      him: ['Halfway. Ten behind us.',
+            'I want to say something and I am going to make a hash of it, so \u2014 thank you.',
+            'For the nights. For asking. It is easier with someone watching the other side.'],
+      ask: [{ t: 'You did not make a hash of it.', k: 'kindly',
+              r: ['No? Good.'] },
+            { t: 'I would not want to be anywhere else.', k: 'here',
+              r: ['Then we are both where we want to be, which is rarer than it sounds.'] },
+            { t: 'Ten more, then.', k: 'steady',
+              r: ['Ten more. Right.'] }] },
 
-    { n: 11, him: ['I found the long axe in a barn two ridges back. Somebody left in a hurry.',
-                   'I keep thinking about who.'] },
+    { n: 11, topic: 'nell',
+      him: ['Her name was Nell.',
+            'Is. Was. I have not settled on which and I have had four years to.',
+            'I have not said it out loud in a long while.'],
+      ask: [{ t: 'Nell. That is a good name.', k: 'nellname',
+              r: ['It is, is it not.'] },
+            { t: 'Thank you for telling me.', k: 'nellname',
+              r: ['You made it easy. That is not nothing.'] },
+            { t: 'Say it again, then.', k: 'nellname',
+              r: ['...Nell.', 'Yes. All right. That was easier.'] }] },
 
-    { n: 12, him: ['Cold one. Is it cold where you are?'],
-      ask: [{ t: 'Warmer than here.', k: 'warm', r: ['Good. Stay there. I will do the standing about.'] },
-            { t: 'Cold enough.', k: 'cold', r: ['Then we are both at it.'] }] },
+    { n: 12, topic: 'road',
+      him: ['Found the long axe in a barn two ridges back. Somebody left in a hurry.',
+            'Kettle still on the hook. I keep thinking about who.'],
+      ask: [{ t: 'Do you think they made it?', k: 'wonder',
+              r: ['I have decided they did. It costs me nothing to decide that.'] },
+            { t: 'Does it bother you, using their things?', k: 'scruple',
+              r: ['A bit. So I use them well. That is the arrangement I have come to.'] },
+            { t: 'They would want someone to have it.', k: 'kindly',
+              r: ['That is a better way of putting it than mine.'] }] },
 
-    { n: 13, him: ['She said she would wait at the Point. End of every summer, she said.',
-                   'That was four summers ago now.'],
-      ask: [{ t: 'She might still be there.', k: 'hope', r: ['She might.', 'You are the first person to say so out loud.'] },
-            { t: 'And if she is not?', k: 'honest', r: ['Then I will have walked it. That is worth something on its own.',
-                                                        'I would rather you asked than not.'] }] },
+    { n: 13, topic: 'nell',
+      him: ['She said she would wait at the Point. End of every summer, she said.',
+            'That was four summers ago now.'],
+      ask: [{ t: 'She might still be there.', k: 'hope',
+              r: ['She might.', 'You are the first person to say that out loud.'] },
+            { t: 'And if she is not?', k: 'honest',
+              r: ['Then I will have walked it. That is worth something on its own.',
+                  'I would rather you asked than not.'] },
+            { t: 'Four summers is not that long.', k: 'hope',
+              r: ['No. It is not, is it.', 'I will hold on to that one for a bit.'] }] },
 
-    { n: 14, him: ['You know what I was afraid of, the first few nights? Not them.',
-                   'Getting to the end of the road on my own.'] },
+    { n: 14, topic: 'end',
+      him: ['You know what I was afraid of, the first few nights? Not them.',
+            'Getting to the end of the road on my own.'],
+      ask: [{ t: 'You are not going to.', k: 'stay',
+              r: ['No.', 'No, it does not look like I am.'] },
+            { t: 'What are you afraid of now?', k: 'afraidnow',
+              r: ['The last mile. Not the walking part.'] },
+            { t: 'I was afraid of that too, for my own reasons.', k: 'mine',
+              r: ['Then we will do the last mile slowly and both of us can be afraid of it.'] }] },
 
-    { n: 15, him: ['Fifteen. There is a fair chance we finish this.'],
-      ask: [{ t: 'We will.', k: 'stay', r: ['Right.'] },
-            { t: 'One night at a time.', k: 'steady', r: ['That is the way to do it. That is exactly the way.'] }] },
+    { n: 15, topic: 'us',
+      him: ['Fifteen. There is a fair chance we actually finish this.'],
+      ask: [{ t: 'We will.', k: 'stay',
+              r: ['Right.'] },
+            { t: 'One night at a time.', k: 'steady',
+              r: ['That is the way to do it. That is exactly the way.'] },
+            { t: 'What will you do if we do?', k: 'ifwe',
+              r: ['Sit down, I expect. Properly sit down.',
+                  'I have not sat down in four years without listening for something.'] }] },
 
-    { n: 16, him: ['The poker came out of a forge with the roof gone.',
-                   'Everything on this road belonged to somebody. I try to use it well.'] },
+    { n: 16, topic: 'road',
+      him: ['The poker came out of a forge with the roof gone.',
+            'Everything on this road belonged to somebody. I try to use it well.'],
+      ask: [{ t: 'You do.', k: 'praise',
+              r: ['That is the aim, anyway.'] },
+            { t: 'What will you leave behind?', k: 'leave',
+              r: ['Not much. A ring of stones and a lot of ash.',
+                  'And whatever you make of all this, I suppose.'] },
+            { t: 'Where did the brand come from?', k: 'brandask',
+              r: ['My own fire, first night. It is the only thing out here that is properly mine.'] }] },
 
-    { n: 17, him: ['If you had one thing waiting at the end of a long walk, what would you want it to be?'],
-      ask: [{ t: 'Somebody who knew me.', k: 'known', r: ['Yes.', 'Yes, that is the one.'] },
-            { t: 'Somewhere to stop.', k: 'rest', r: ['That is the honest answer. I might be after both.'] },
-            { t: 'I would want you to get yours.', k: 'forhim', r: ['...', 'You are not making this easy on me.'] }] },
+    { n: 17, topic: 'end',
+      him: ['If you had one thing waiting at the end of a long walk, what would you want it to be?'],
+      ask: [{ t: 'Somebody who knew me.', k: 'known',
+              r: ['Yes.', 'Yes, that is the one.'] },
+            { t: 'Somewhere to stop.', k: 'rest',
+              r: ['That is the honest answer.', 'I might be after both, which is greedy of me.'] },
+            { t: 'I would want you to get yours.', k: 'forhim',
+              r: ['...', 'You are not making this easy on me.'] }] },
 
-    { n: 18, him: ['Three left. I can smell salt on the wind at the top of the rise.',
-                   'I went up to look. Could not see anything. But it is there.'] },
+    { n: 18, topic: 'point',
+      him: ['Three left. I can smell salt on the wind at the top of the rise.',
+            'I went up to look. Could not see anything. But it is there.'],
+      ask: [{ t: 'Take me up next time.', k: 'together',
+              r: ['I will. Bring the dog, he likes a view he cannot reach.'] },
+            { t: 'What will you say to her?', k: 'whatsay',
+              r: ['I have got the first line. I have had the first line for four years.',
+                  'It is the second one that has me.'] },
+            { t: 'Nearly there.', k: 'steady',
+              r: ['Nearly. Do not say it too loud.'] }] },
 
-    { n: 19, him: ['If she is at the Point, I want to be able to tell her about you.',
-                   'What should I say?'],
-      ask: [{ t: 'That I kept the fire.', k: 'kept', r: ['That will do. That will do nicely.'] },
-            { t: 'That you were not alone.', k: 'notalone', r: ['Yes.', 'That is the bit that matters.'] },
-            { t: 'Tell her whatever you like.', k: 'easy', r: ['Then I will tell her the truth and let her make of it what she wants.'] }] },
+    { n: 19, topic: 'us',
+      him: ['If she is at the Point, I want to be able to tell her about you.',
+            'What should I say?'],
+      ask: [{ t: 'That I kept the fire.', k: 'kept',
+              r: ['That will do. That will do nicely.'] },
+            { t: 'That you were not on your own.', k: 'notalone',
+              r: ['Yes.', 'That is the bit that matters.'] },
+            { t: 'Tell her whatever you like.', k: 'easy',
+              r: ['Then I will tell her the truth and let her make of it what she wants.'] }] },
 
-    { n: 20, him: ['Last one. Whatever is down there is down there.',
-                   'Whatever happens tomorrow, this part was good. I mean it.',
-                   'Keep it going one more night, {you}.'] }
+    { n: 20, topic: 'end',
+      him: ['Last one. Whatever is down there is down there.',
+            'Whatever happens tomorrow, this part was good. I mean that plainly.'],
+      ask: [{ t: 'This part was good for me too.', k: 'mutual',
+              r: ['Then that is two of us and it is settled.',
+                  'Keep it going one more night, {you}.'] },
+            { t: 'Let us go and find out.', k: 'steady',
+              r: ['Right.', 'Keep it going one more night, {you}.'] }] }
   ];
   function talkFor(n) {
     for (var i = 0; i < TALKS.length; i++) if (TALKS[i].n === n) return TALKS[i];
@@ -1320,24 +1441,70 @@
                          'I did not plan for this bit. Glad of the company all the same.'] };
   }
 
-  // things you can put to him, once you have a reason to
+  // Things you can put to him. `from` is the first night it makes any sense
+  // to ask, `need` is something he has to have told you first, and `topic`
+  // keeps it near whatever he has just been talking about.
   var ASKS = [
-    { id: 'sea',   need: null,       q: 'Have you seen the sea?',
-      a: ['Once. I was small. Nell held on to the back of my coat the whole time.'] },
-    { id: 'nell',  need: 'sister',   q: 'Tell me more about Nell.',
+    { id: 'cold',   from: 2,  topic: 'night', q: 'Do you ever get used to the cold?',
+      a: ['No. You just stop mentioning it.'] },
+    { id: 'them',   from: 2,  topic: 'night', q: 'What are they, do you think?',
+      a: ['I have thought about it a great deal and got nowhere.',
+          'They only come at light. That is the whole of what I know for certain.'] },
+    { id: 'dogname', from: 4, topic: 'dog', need: 'namedog', q: 'Have you settled on a name for him yet?',
+      a: ['I have been trying them out. He ignores all of them equally.',
+          'I will know it when I say it.'] },
+    { id: 'dogwhere', from: 3, topic: 'dog', q: 'Where do you think he came from?',
+      a: ['Somewhere behind us. He has never looked back at it, so neither do I.'] },
+    { id: 'sea',    from: 4,  topic: 'point', q: 'Have you seen the sea?',
+      a: ['Once. I was small. Somebody held on to the back of my coat the whole time.'] },
+    { id: 'point',  from: 4,  topic: 'point', q: 'What is Harrow Point like?',
+      a: ['Shingle, nine houses, and the bell.',
+          'Somebody used to ring it every time we arrived. Drove the whole village mad.'] },
+    { id: 'road',   from: 5,  topic: 'road', q: 'How long have you been walking?',
+      a: ['Long enough that I stopped counting on purpose.'] },
+    { id: 'before', from: 6,  topic: 'road', q: 'What did you do before all this?',
+      a: ['I was a fair hand at nothing much.',
+          'It turns out that is decent training for keeping a fire in.'] },
+    { id: 'why',    from: 7,  topic: 'you', q: 'Why do you do this every night?',
+      a: ['Because it goes out if I do not.',
+          'And because the alternative is lying down in the dark thinking, which I have tried.'] },
+    { id: 'sleep',  from: 8,  topic: 'sleep', need: 'restless', q: 'Do you sleep at all, out here?',
+      a: ['In the hour after dawn. It is the only hour I trust.'] },
+    { id: 'nell',   from: 9,  topic: 'nell', need: 'sister', q: 'Tell me more about her.',
       a: ['She could start a fire in the rain. I have never managed it.',
           'She used to say the trick was to stop apologising to the wood.'] },
-    { id: 'dark',  need: null,       q: 'What are they, really?',
-      a: ['I have thought about it a lot and I have got nowhere.',
-          'They only come at light. That is all I know for certain.'] },
-    { id: 'you',   need: 'restless', q: 'Do you sleep, out here?',
-      a: ['In the hour after dawn. It is the only hour I trust.'] },
-    { id: 'point', need: null,       q: 'What is Harrow Point like?',
-      a: ['A shingle beach and about nine houses. A bell on a post for the boats.',
-          'Nell rang it every time we arrived. Drove the whole village mad.'] },
-    { id: 'stay',  need: 'stay',     q: 'What happens after the Point?',
+    { id: 'saidit', from: 11, topic: 'nell', need: 'nellname', q: 'Why has it been so long since you said her name?',
+      a: ['Because saying it out loud makes her somebody who is not here.',
+          'It did that less tonight. So. Thank you for that.'] },
+    { id: 'afraid', from: 14, topic: 'end', q: 'Is there anything out here that still frightens you?',
+      a: ['Not much on this side of the fire.', 'The last mile, maybe. Not the walking part.'] },
+    { id: 'after',  from: 15, topic: 'end', need: 'stay', q: 'What happens after the Point?',
       a: ['I have not let myself think that far.',
-          'If you are still about, I will think about it then.'] }
+          'If you are still about, I will think about it then.'] },
+    { id: 'me',     from: 12, topic: 'us', q: 'Do you ever wonder about me?',
+      a: ['Constantly. I have decided not to pry.',
+          'You tell me things at your own pace and I have learned to like the pace.'] },
+    { id: 'best',   from: 13, topic: 'road', q: 'What has been the best night out here?',
+      a: ['Honestly? The one where nothing happened and we sat through the whole of it.',
+          'I did not know I was allowed a night like that.'] },
+    { id: 'worst',  from: 13, topic: 'night', q: 'What was the worst of it, before I came?',
+      a: ['A week of rain with nothing dry to burn.',
+          'I talked to the dog a great deal that week. He was very patient.'] },
+    { id: 'summer', from: 14, topic: 'nell', need: 'sister', q: 'What was the last summer like?',
+      a: ['Good. That is the trouble with it.',
+          'She rang the bell, we argued about nothing, and then she went and I did not.'] },
+    { id: 'stay2',  from: 16, topic: 'us', need: 'stay', q: 'Would you want me to come the last mile?',
+      a: ['...Yes.',
+          'I have been trying to work out how to ask that for about six nights.'] },
+    { id: 'bell',   from: 17, topic: 'point', q: 'Will you ring the bell?',
+      a: ['I had not thought of it.',
+          'Yes. All right. If we get there, I will ring the bell.'] },
+    { id: 'proud',  from: 18, topic: 'us', q: 'Are you glad you started walking?',
+      a: ['I was not, for a long stretch of it.',
+          'I am tonight, which is the only night I have got a vote on.'] },
+    { id: 'name2',  from: 19, topic: 'us', q: 'Will you remember my name after all this?',
+      a: ['{you}.',
+          'I have been saying it to myself on the quiet bits of the road. It is fine. It stuck.'] }
   ];
 
   // ── what he can get done before dark ──────────────────────────────────────
@@ -2834,9 +3001,9 @@
     // and every so often he says something
     S.sayT -= dt;
     if (S.sayT <= 0) {
-      S.sayT = 9 + Math.random() * 7;
+      S.sayT = 7 + Math.random() * 6;
       var line = musing();
-      if (line) { banner(HIM.name, line, 3600); store(); }
+      if (line) { banner(HIM.name, line); S.sayT += readTime(line) / 1000; store(); }
     }
   }
 
@@ -3740,11 +3907,20 @@
   }
 
   var elBan = document.getElementById('banner'), banT = null;
+  // Nothing he says goes by in under five seconds, and the longer the line the
+  // longer it sits there \u2014 roughly the time it takes to read it, with a
+  // ceiling so a long one does not camp on the screen.
+  var READ_MIN = 5000, READ_FREE = 60, READ_PER = 58, READ_MAX = 14000;
+  function readTime(txt) {
+    var over = Math.max(0, String(txt || '').length - READ_FREE);
+    return Math.min(READ_MAX, READ_MIN + over * READ_PER);
+  }
   function banner(head, sub, hold) {
     elBan.innerHTML = '<b>' + head + '</b><span>' + sub + '</span>';
     elBan.classList.add('on');
     clearTimeout(banT);
-    banT = setTimeout(function () { elBan.classList.remove('on'); }, hold || 2600);
+    var want = Math.max(hold || 0, readTime(String(head || '') + ' ' + String(sub || '')));
+    banT = setTimeout(function () { elBan.classList.remove('on'); }, want);
   }
 
   var elA = document.getElementById('kA'), elJ = document.getElementById('kJ');
@@ -3989,14 +4165,16 @@
   }
   // a line that leans on something you already told him
   var CALLBACKS = [
-    { need: 'restless', at: 6,  say: 'You said you were not sleeping. Any better?' },
+    { need: 'namedog',  at: 6,  say: 'The dog answers to whatever I call him now. I blame you for that.' },
+    { need: 'learn',    at: 8,  say: 'You split a couple last night without being asked. I noticed.' },
     { need: 'adrift',   at: 9,  say: 'You said there was not much on. I have thought about that a fair bit.' },
     { need: 'tired',    at: 9,  say: 'Still a lot on, at yours?' },
-    { need: 'here',     at: 11, say: 'You said you would rather be here. I have kept that one.' },
+    { need: 'restless', at: 11, say: 'You said you were not sleeping. Any better?' },
+    { need: 'here',     at: 12, say: 'You said you would rather be here. I have kept hold of that one.' },
     { need: 'sister',   at: 12, say: 'You asked what she was like. I have thought of six more things since.' },
+    { need: 'gentle',   at: 13, say: 'You told me I did not have to talk about her. It is why I keep doing it.' },
     { need: 'hope',     at: 16, say: 'You said she might still be there. I have been leaning on that.' },
     { need: 'honest',   at: 16, say: 'You asked what if she is not. I am glad one of us said it.' },
-    { need: 'namedog',  at: 13, say: 'The dog answers to whatever I call him now. I blame you.' },
     { need: 'forhim',   at: 19, say: 'You said you wanted me to get mine. I have not forgotten that.' }
   ];
   function callback() {
@@ -4013,18 +4191,44 @@
 
   function talkCard() {
     var T = talkFor(S.n);
-    var lines = callback().concat(T.him);
-    var step2 = 0, said = [];
+    var said = [], lines = [], step2 = 0;
+
+    // One press of Go on, one new line. Whenever a new run of his starts \u2014
+    // the night's opening, an answer to your pick, a reply to your question \u2014
+    // the first line of it lands straight away, so the button is never asking
+    // you to press it twice for the same thing.
+    function feed(arr) {
+      lines = (arr && arr.length ? arr : ['Right.']).slice();
+      step2 = 0;
+      said.push({ t: lines[step2++] });
+    }
+    function more() { return step2 < lines.length; }
+
+    // the things you could put to him, nearest topic first
+    function openAsks() {
+      var here = [], rest = [];
+      for (var a = 0; a < ASKS.length; a++) {
+        var K = ASKS[a];
+        if (S.n < (K.from || 1)) continue;
+        if (K.need && !tag(K.need)) continue;
+        if (MEM.asked.indexOf(K.id) >= 0) continue;
+        (K.topic && K.topic === T.topic ? here : rest).push(K);
+      }
+      // whatever he is on about first; after that the most recently opened up,
+      // which is the one that fits where the two of you have got to
+      rest.sort(function (x, y) { return (y.from || 1) - (x.from || 1); });
+      return here.concat(rest).slice(0, 3);
+    }
 
     function render() {
-      var h = '<div class="eyebrow">Night ' + S.n + ' · by the fire</div>' +
+      var h = '<div class="eyebrow">Night ' + S.n + ' \u00b7 by the fire</div>' +
               '<div class="talk"><div class="who">' + HIM.name + '</div>';
       for (var i = 0; i < said.length; i++)
         h += '<p class="said' + (said[i].me ? ' me' : '') + '" style="animation-delay:' +
              Math.min(0.5, i * 0.06) + 's">' + fill(said[i].t) + '</p>';
       h += '</div>';
 
-      if (step2 < lines.length) {
+      if (more()) {                                 // he has not finished talking
         h += '<button class="go" id="go">Go on</button>';
         show(h);
         bindGo(function () { said.push({ t: lines[step2++] }); render(); });
@@ -4040,12 +4244,13 @@
           var v = (inp.value || '').replace(/[<>&]/g, '').trim().slice(0, 14);
           MEM.you = v || 'friend';
           MEM.bond += 2; store();
-          lines = (T.after && T.after.any) || ['Right.'];
-          step2 = 0; said.push({ t: MEM.you, me: 1 }); render();
+          said.push({ t: MEM.you, me: 1 });
+          feed((T.after && T.after.any) || ['Right.']);
+          render();
         });
         return;
       }
-      if (T.ask && !tag('ask' + S.n)) {             // what he wants to know
+      if (T.ask && !tag('ask' + S.n)) {             // answering what he just asked
         h += '<div class="picks">';
         for (var q = 0; q < T.ask.length; q++)
           h += '<button class="pick" data-q="' + q + '">' + fill(T.ask[q].t) + '</button>';
@@ -4054,26 +4259,19 @@
         var ps = card.querySelectorAll('.pick');
         for (var j = 0; j < ps.length; j++) ps[j].addEventListener('click', function () {
           var A = T.ask[+this.getAttribute('data-q')];
-          MEM.tags[A.k] = 1; MEM.bond += 2; store();
+          MEM.tags[A.k] = 1; MEM.tags['ask' + S.n] = 1; MEM.bond += 2; store();
           said.push({ t: A.t, me: 1 });
-          lines = A.r.slice(); step2 = 0; MEM.tags['ask' + S.n] = 1;
+          feed(A.r);
           bell(430, 0.12, 0.04, 1900);
           render();
         });
         return;
       }
-      // your turn: whatever you have earned the right to ask
-      var open2 = [];
-      for (var a = 0; a < ASKS.length; a++) {
-        var K = ASKS[a];
-        if (K.need && !tag(K.need)) continue;
-        if (MEM.asked.indexOf(K.id) >= 0) continue;
-        open2.push(K);
-      }
+      var open2 = openAsks();                       // and then your turn
       if (open2.length) {
         h += '<div class="who" style="margin-top:8px">Ask him</div><div class="picks">';
-        for (var o = 0; o < Math.min(3, open2.length); o++)
-          h += '<button class="pick" data-a="' + open2[o].id + '">' + open2[o].q + '</button>';
+        for (var o = 0; o < open2.length; o++)
+          h += '<button class="pick" data-a="' + open2[o].id + '">' + fill(open2[o].q) + '</button>';
         h += '</div>';
       }
       h += '<button class="ghost" id="stop">Leave him to it</button>' + bondPips();
@@ -4084,7 +4282,7 @@
         for (var z = 0; z < ASKS.length; z++) if (ASKS[z].id === id) K2 = ASKS[z];
         MEM.asked.push(id); MEM.bond += 1; store();
         said.push({ t: K2.q, me: 1 });
-        lines = K2.a.slice(); step2 = 0;
+        feed(K2.a);
         bell(380, 0.12, 0.04, 1800);
         render();
       });
@@ -4095,7 +4293,8 @@
         veil.classList.add('hide'); running = true; last = performance.now();
       }, 'stop');
     }
-    said.push({ t: lines[step2++] });
+
+    feed(callback().concat(T.him));
     render();
   }
 
@@ -4519,6 +4718,9 @@
       sing(a2.currentTime + 0.05, f, d, 0.28, vow);
     },
     setNight: function (n) { save.night = n; store(); },
+    talks: function () { return TALKS; }, asks: function () { return ASKS; },
+    callbacks: function () { return CALLBACKS; }, musings: function () { return MUSINGS; },
+    talk: function () { talkCard(); }, banner: banner, readTime: readTime,
     tick: function (dt) { if (S && running) step(dt); },
     begin: function (n) { startNight(n); running = true; veil.classList.add('hide'); },
     camp: function () { camp(); },
