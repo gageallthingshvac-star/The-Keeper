@@ -1,3 +1,7 @@
 
 # test harnesses that run without an output dir land here
 undefined/
+
+# stray test artefacts
+shots/
+*.spec.js

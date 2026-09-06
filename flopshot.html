@@ -1229,20 +1229,41 @@ function background(th){
     vg.addColorStop(0,'rgba(80,50,110,0.18)'); vg.addColorStop(1,'rgba(0,0,0,0)');
     g.fillStyle=vg; g.fillRect(0,0,DW,DH);
   } else if(th===3){ // hothouse, mossy stone and hanging leaves
-    g.fillStyle='#0c150a'; g.fillRect(0,0,DW,DH);
-    for(let y=-8;y<DH+60;y+=56) for(let x=-8;x<DW+60;x+=76){
-      const v=0.62+srnd()*0.30;
-      g.fillStyle=`rgb(${Math.round(30*v)},${Math.round(44*v)},${Math.round(24*v)})`;
-      rr(g,x+srnd()*3,y+srnd()*3,70,50,10); g.fill();
-      g.fillStyle='rgba(110,160,80,0.07)'; rr(g,x+4,y+3,62,14,8); g.fill();
-      g.strokeStyle='rgba(0,0,0,0.35)'; g.lineWidth=1.2; rr(g,x,y,70,50,10); g.stroke();
+    g.fillStyle='#221a10'; g.fillRect(0,0,DW,DH);
+    // old brown brickwork
+    const bh3=74, bw3=136;
+    for(let r=0,y=-14;y<DH+bh3;y+=bh3,r++){
+      const off=(r%2)*bw3*0.5;
+      for(let x=-bw3+off;x<DW+bw3;x+=bw3){
+        const v=0.78+srnd()*0.42;
+        const gr2=g.createLinearGradient(x,y,x,y+bh3-8);
+        gr2.addColorStop(0,`rgb(${Math.round(96*v)},${Math.round(76*v)},${Math.round(50*v)})`);
+        gr2.addColorStop(1,`rgb(${Math.round(58*v)},${Math.round(44*v)},${Math.round(28*v)})`);
+        g.fillStyle=gr2; rr(g,x,y,bw3-8,bh3-8,5); g.fill();
+        g.strokeStyle='rgba(0,0,0,0.5)'; g.lineWidth=1.4; rr(g,x,y,bw3-8,bh3-8,5); g.stroke();
+        g.fillStyle='rgba(255,226,170,0.06)'; g.fillRect(x+3,y+2,bw3-14,2.4);
+        for(let i=0;i<5;i++){ g.fillStyle='rgba(0,0,0,0.14)';
+          g.fillRect(x+srnd()*(bw3-16), y+srnd()*(bh3-14), 3+srnd()*7, 2+srnd()*3); }
+      }
     }
-    for(let i=0;i<52;i++){
-      const x=srnd()*DW, y=srnd()*DH*0.9, L=12+srnd()*22;
-      g.save(); g.translate(x,y); g.rotate(srnd()*TAU);
-      g.fillStyle=`rgba(${44+srnd()*40|0},${78+srnd()*50|0},${32+srnd()*26|0},0.34)`;
-      g.beginPath(); g.ellipse(0,0,L*0.3,L,0,0,TAU); g.fill();
-      g.restore();
+    // vines down the walls
+    for(let i=0;i<14;i++){
+      let x=srnd()*DW, y=-20;
+      const len=160+srnd()*380;
+      g.strokeStyle=`rgba(${52+srnd()*30|0},${96+srnd()*40|0},${38+srnd()*24|0},0.65)`;
+      g.lineWidth=2.4+srnd()*2;
+      g.beginPath(); g.moveTo(x,y);
+      const pts=[];
+      for(let k=0;k<10 && y<len;k++){ x+=(srnd()-0.5)*46; y+=len/10; g.lineTo(x,y); pts.push([x,y]); }
+      g.stroke();
+      for(const [lx,ly] of pts){
+        for(let s=0;s<2;s++){
+          g.save(); g.translate(lx+(srnd()-0.5)*16, ly+(srnd()-0.5)*10); g.rotate(srnd()*TAU);
+          g.fillStyle=`rgba(${60+srnd()*46|0},${112+srnd()*54|0},${44+srnd()*26|0},0.72)`;
+          g.beginPath(); g.ellipse(0,0,5+srnd()*5,10+srnd()*9,0,0,TAU); g.fill();
+          g.restore();
+        }
+      }
     }
   } else if(th===7){ // chalk sketches on a black board
     g.fillStyle='#050608'; g.fillRect(0,0,DW,DH);
@@ -1836,6 +1857,14 @@ const Audio_ = {
     this.clang(t+0.05, 240, 0.10, 0.30);
     this.hit(t+0.16, 0.55, 1500, 0.5, 0.10, 'bandpass', null, 500);
   },
+  squeak(v){
+    if(!this.ready||!this.on) return;
+    const t = this.now(), vol = clamp(v, 0.04, 0.30);
+    const f0 = 900 + Math.random()*900;
+    this.osc(t, f0, f0*(0.45+Math.random()*0.5), 0.13+Math.random()*0.1, vol*0.5, 'sawtooth');
+    this.osc(t+0.02, f0*1.6, f0*0.9, 0.10, vol*0.22, 'square');
+    this.hit(t, 0.07, f0*1.4, 6, vol*0.30, 'bandpass');
+  },
   splat(v){
     if(!this.ready||!this.on) return;
     const t = this.now(), vol = clamp(v, 0.05, 0.85);
@@ -2231,6 +2260,12 @@ class Level {
           b.render='ball';
           break;
         }
+        case 'ms': case 'MS': {
+          const b = this.add({x:op[1],y:op[2],w:op[3]||64,h:op[4]||64,a:A(5)*D2R,
+                              mat:'stone', fixed:k==='MS'});
+          b.render='mossrock';
+          break;
+        }
         case 'lava': {
           const b = this.add({x:op[1],y:op[2],w:op[3],h:op[4],a:A(5)*D2R,fixed:true,mat:'stone'});
           b.render='magma';
@@ -2335,6 +2370,24 @@ class Level {
                 Audio.splash();
               }
               if(sub < 0.05) b.wet = false;
+            }
+          });
+          break;
+        }
+        case 'grav': {
+          const dir = A(5)*D2R, str = op[6]!==undefined ? op[6] : 1580;
+          const e = { type:'grav', x:op[1], y:op[2], w:op[3], h:op[4], dir, str, t:0 };
+          this.ents.push(e);
+          W.fields.push((dt,bodies)=>{
+            const l=e.x-e.w/2, r=e.x+e.w/2, tp=e.y-e.h/2, bt=e.y+e.h/2;
+            // replace the world's pull with this one while inside
+            const gx2 = Math.cos(e.dir)*e.str, gy2 = Math.sin(e.dir)*e.str;
+            for(const b of bodies){
+              if(b.fixed) continue;
+              if(b.maxx<l||b.minx>r||b.maxy<tp||b.miny>bt) continue;
+              b.wake();
+              b.vx += (gx2 - W.gx*b.gscale) * dt;
+              b.vy += (gy2 - W.gy*b.gscale) * dt;
             }
           });
           break;
@@ -2492,6 +2545,8 @@ class Level {
       }
       if(speed > 130)
         Audio.thud(clamp(speed/1100, 0.05, 0.55), other && other.mat ? other.mat : 'cloth');
+      // the dolls squeak, which the reviews found creepy and so should you
+      if(speed > 210 && Math.random() < 0.5) Audio.squeak(speed/2600);
     } else if(speed > 210){
       Audio.thud(clamp(speed/1600, 0.04, 0.5), A.fixed ? B.mat : A.mat);
       if(sev > 120)
@@ -2510,6 +2565,7 @@ class Level {
   }
 
   shatter(b, hitter, nx, ny, speed){
+    if(b.mat === 'glass') Awards.bump('panes');
     FX.burst(b.x,b.y,16,{col:'#cfeeff',type:'shard',sizeMin:2,sizeMax:5,spMax:280,lifeMax:0.9});
     Audio.shatter(0.6);
     this.world.remove(b);
@@ -2549,6 +2605,7 @@ class Level {
     FX.add({x:px,y:py,vx:0,vy:0,life:0,max:0.5,size:26,col:'#ffd08a',type:'ring',rot:0,rv:0,g:0,drag:0});
     Audio.boom();
     Audio.duck(0.75, 0.9);
+    Awards.bump('kegs');
     const R = 175;
     for(const o of this.world.bodies.slice()){
       if(o.fixed) continue;
@@ -2828,6 +2885,7 @@ Level.prototype.fire = function(ang, power){
   const d = new Doll(this.world, mx, my, ang, Math.cos(ang)*speed, Math.sin(ang)*speed);
   this.dolls.push(d);
   this.used++;
+  Awards.bump('fired');
   c.recoil = 1;
   if(c.rolls && c.mount){
     const kick = (140 + power*220) * c.mount.m;
@@ -3081,6 +3139,34 @@ function drawBody(g, b, t){
       g.restore();
       break;
     }
+    case 'mossrock': {
+      g.save(); g.translate(b.x,b.y); g.rotate(b.a);
+      g.fillStyle='rgba(0,0,0,0.40)'; rr(g,-b.hw+2,-b.hh+4,w,h,7); g.fill();
+      rr(g,-b.hw,-b.hh,w,h,7); g.save(); g.clip();
+      const bg2=g.createLinearGradient(0,-b.hh,0,b.hh);
+      bg2.addColorStop(0,'#8c9a58'); bg2.addColorStop(0.5,'#67743a'); bg2.addColorStop(1,'#3f4a22');
+      g.fillStyle=bg2; g.fillRect(-b.hw,-b.hh,w,h);
+      seed(Math.round(b.x*13 + b.y*29 + w*7));
+      // knobbly lichen growth
+      const step=clamp(Math.min(w,h)*0.30,10,22);
+      for(let yy=-b.hh; yy<b.hh+step; yy+=step*0.78)
+        for(let xx=-b.hw; xx<b.hw+step; xx+=step*0.78){
+          const r2=step*(0.34+srnd()*0.26);
+          const px=xx+srnd()*6, py=yy+srnd()*6;
+          const lg=g.createRadialGradient(px-r2*0.3,py-r2*0.36,r2*0.1,px,py,r2);
+          const v=0.78+srnd()*0.5;
+          lg.addColorStop(0,`rgb(${Math.round(158*v)},${Math.round(176*v)},${Math.round(96*v)})`);
+          lg.addColorStop(0.7,`rgb(${Math.round(96*v)},${Math.round(112*v)},${Math.round(54*v)})`);
+          lg.addColorStop(1,'rgba(28,36,14,0.9)');
+          g.fillStyle=lg;
+          g.beginPath(); g.arc(px,py,r2,0,TAU); g.fill();
+        }
+      g.fillStyle='rgba(212,232,150,0.16)'; g.fillRect(-b.hw,-b.hh,w,3);
+      g.restore();
+      g.strokeStyle='#232c11'; g.lineWidth=1.8; rr(g,-b.hw,-b.hh,w,h,7); g.stroke();
+      g.restore();
+      break;
+    }
     case 'magma': {
       g.save(); g.translate(b.x,b.y); g.rotate(b.a);
       g.fillStyle='rgba(0,0,0,0.4)'; rr(g,-b.hw+2,-b.hh+3,w,h,5); g.fill();
@@ -3194,7 +3280,7 @@ function drawBody(g, b, t){
       g.fillStyle=gr; rr(g,-b.hw,-b.hh,w,h,4); g.fill();
       g.fillStyle='rgba(160,220,90,0.35)';
       for(let x=-b.hw+5;x<b.hw-2;x+=13){
-        const d = 3 + ((x*7)%5);
+        const d = 3 + Math.abs((x*7) % 5);   // x is negative on the left half
         g.beginPath(); g.arc(x, b.hh, d, 0, PI); g.fill();
       }
       g.fillStyle='rgba(200,255,140,0.22)'; rr(g,-b.hw+2,-b.hh+1.5,w-4,3.5,2); g.fill();
@@ -3274,6 +3360,34 @@ function drawWater(g,e,t,front){
     for(let x=l;x<=l+e.w;x+=6) g.lineTo(x, top + Math.sin(x*0.045 + t*2.2)*2.4 + Math.sin(x*0.11 - t*1.3)*1.1);
     g.stroke();
   }
+}
+
+function drawGrav(g,e,t){
+  g.save();
+  const l=e.x-e.w/2, tp=e.y-e.h/2;
+  g.beginPath(); rr(g,l,tp,e.w,e.h,10); g.clip();
+  const gr=g.createLinearGradient(l,tp,l,tp+e.h);
+  gr.addColorStop(0,'rgba(150,110,255,0.10)');
+  gr.addColorStop(0.5,'rgba(110,80,220,0.16)');
+  gr.addColorStop(1,'rgba(150,110,255,0.10)');
+  g.fillStyle=gr; g.fillRect(l,tp,e.w,e.h);
+  // arrows drifting the way the pull goes
+  const cs=Math.cos(e.dir), sn=Math.sin(e.dir);
+  for(let i=0;i<9;i++){
+    const p=((t*0.42 + i/9) % 1);
+    const ax = l + e.w*((i*0.37)%1);
+    const ay = tp + e.h*((i*0.61)%1);
+    const px = ax + cs*(p-0.5)*e.w*0.5, py = ay + sn*(p-0.5)*e.h*0.9;
+    g.save(); g.translate(px,py); g.rotate(e.dir);
+    g.globalAlpha = Math.sin(p*PI)*0.55;
+    g.strokeStyle='#d9c8ff'; g.lineWidth=2; g.lineCap='round';
+    g.beginPath(); g.moveTo(-9,0); g.lineTo(7,0); g.stroke();
+    g.beginPath(); g.moveTo(1,-5); g.lineTo(8,0); g.lineTo(1,5); g.stroke();
+    g.restore();
+  }
+  g.restore();
+  g.strokeStyle='rgba(186,158,255,0.35)'; g.lineWidth=1.6;
+  g.setLineDash([9,7]); rr(g,l,tp,e.w,e.h,10); g.stroke(); g.setLineDash([]);
 }
 
 function drawFan(g,e,t){
@@ -3448,6 +3562,7 @@ Level.prototype.draw = function(g, aim){
       g.restore();
     }
   }
+  for(const e of this.ents) if(e.type==='grav') drawGrav(g,e,t);
   for(const e of this.ents) if(e.type==='fan') drawFan(g,e,t);
   for(const e of this.ents) if(e.type==='water') drawWater(g,e,t,true);
 
@@ -4011,6 +4126,28 @@ const LEVELS = [
   ['bd',420,300,260,18,34], ['bd',660,470,240,18,-30],
   ['w',820,608,200,24], ['b',560,588,56,56]]},
 
+{n:'Mossbank Deep', th:3, c:[86,560,-28], sh:4, tr:[2,3], tg:[[856,556,28]], o:[
+  ['MS',470,586,66,66], ['MS',470,520,66,66], ['MS',470,454,66,66],
+  ['MS',470,388,66,66], ['MS',470,322,66,66],
+  ['MS',538,586,66,66], ['MS',538,520,66,66], ['MS',538,454,66,66],
+  ['MS',538,388,66,66], ['MS',538,322,66,66],
+  ['mo',856,604,200,28]]},
+
+{n:'Falling Up', th:2, c:[86,560,-24], sh:4, tr:[2,3], tg:[[700,180,28]], o:[
+  ['grav',600,400,220,420,-90,1250],
+  ['m',300,300,180,20],
+  ['m',700,226,190,22], ['m',860,400,20,300]]},
+
+{n:'Sideways', th:7, c:[86,560,-30], sh:5, tr:[3,4], tg:[[860,240,28]], o:[
+  ['grav',520,360,260,300,0,1300],
+  ['m',300,260,180,18],
+  ['m',860,286,180,22], ['m',764,240,20,114]]},
+
+{n:'Drive It Over', th:0, c:[300,560,-34], cm:'w', sh:5, tr:[3,4], tg:[[880,556,28]], o:[
+  ['w',560,215,22,390],
+  ['b',700,588,60,60],
+  ['w',880,604,180,28]]},
+
 {n:'The Last Page', th:7, c:[480,120,90], sh:6, tr:[3,5], tg:[[210,300,28],[790,300,28]], o:[
   ['spring',300,470,110,74,150], ['C',300,586,90,64],
   ['spring',660,470,110,74,150], ['C',660,586,90,64],
@@ -4026,7 +4163,7 @@ const WORLDS = [
   { name:'The Attic',     from:60, to:72, th:0 },
   { name:'The Gallery',   from:72, to:84, th:0 },
   { name:'The Almanac',   from:84, to:96, th:6 },
-  { name:'The Board',     from:96, to:111, th:7 }
+  { name:'The Board',     from:96, to:115, th:7 }
 ];
 
 /* =====================================================================
@@ -4065,6 +4202,83 @@ const Save = {
   totalCups(){ let n=0; for(const k in this.data.best) n += this.data.best[k].c; return n; },
   worldCups(w){ let n=0; for(let i=WORLDS[w].from;i<WORLDS[w].to;i++) n += this.cups(i); return n; },
   worldCleared(w){ for(let i=WORLDS[w].from;i<WORLDS[w].to;i++) if(!this.cleared(i)) return false; return true; }
+};
+
+/* =====================================================================
+   10b. AWARDS
+   "Win awards along the way." Each one reads the save file and says
+   whether it has been earned.
+   ===================================================================== */
+const AWARDS = [
+  { id:'first',   n:'First Blood',   d:'Paint your first mark',
+    ok:s => s.cleared >= 1 },
+  { id:'crack',   n:'Crack Shot',    d:'Complete 10 rooms using only one doll',
+    ok:s => s.oneShot >= 10 },
+  { id:'marks',   n:'Marksman',      d:'Complete 25 rooms',
+    ok:s => s.cleared >= 25 },
+  { id:'deadeye', n:'Dead Eye',      d:'Complete 60 rooms',
+    ok:s => s.cleared >= 60 },
+  { id:'cups25',  n:'Cabinet Maker', d:'Win 25 cups',
+    ok:s => s.cups >= 25 },
+  { id:'cups100', n:'Collector',     d:'Win 100 cups',
+    ok:s => s.cups >= 100 },
+  { id:'wing',    n:'Clean Sweep',   d:'Take every cup in one wing',
+    ok:s => s.perfectWing >= 1 },
+  { id:'powder',  n:'Powder Monkey', d:'Set off 15 kegs',
+    ok:s => s.kegs >= 15 },
+  { id:'glass',   n:'Glazier',       d:'Break 20 panes of glass',
+    ok:s => s.panes >= 20 },
+  { id:'long',    n:'Long Shot',     d:'Paint a mark 800 paces out',
+    ok:s => s.longest >= 800 },
+  { id:'gross',   n:'Gross',         d:'Fire 250 dolls',
+    ok:s => s.fired >= 250 },
+  { id:'keeper',  n:'The Keeper',    d:'Complete every room',
+    ok:s => s.cleared >= LEVELS.length }
+];
+
+const Awards = {
+  pending: [],
+  stats(){
+    const d = Save.data;
+    d.stats = d.stats || {};
+    const st = d.stats;
+    let cleared = 0, cups = 0, oneShot = 0;
+    for(const k in d.best){ cleared++; cups += d.best[k].c; if(d.best[k].u <= 1) oneShot++; }
+    let perfectWing = 0;
+    for(let w=0; w<WORLDS.length; w++){
+      const W = WORLDS[w];
+      let all = true;
+      for(let i=W.from;i<W.to;i++) if(Save.cups(i) < 3){ all = false; break; }
+      if(all) perfectWing++;
+    }
+    return { cleared, cups, oneShot, perfectWing,
+             kegs:st.kegs|0, panes:st.panes|0, longest:st.longest|0, fired:st.fired|0 };
+  },
+  bump(key, by){
+    const d = Save.data;
+    d.stats = d.stats || {};
+    d.stats[key] = (d.stats[key]|0) + (by === undefined ? 1 : by);
+    Save.write();
+  },
+  best(key, val){
+    const d = Save.data;
+    d.stats = d.stats || {};
+    if(val > (d.stats[key]|0)){ d.stats[key] = Math.round(val); Save.write(); }
+  },
+  earned(id){ return !!(Save.data.awards && Save.data.awards[id]); },
+  count(){ let n=0; for(const a of AWARDS) if(this.earned(a.id)) n++; return n; },
+  check(){
+    const s = this.stats();
+    Save.data.awards = Save.data.awards || {};
+    for(const a of AWARDS){
+      if(!Save.data.awards[a.id] && a.ok(s)){
+        Save.data.awards[a.id] = true;
+        this.pending.push(a);
+      }
+    }
+    if(this.pending.length) Save.write();
+    return this.pending.length;
+  }
 };
 
 /* =====================================================================
@@ -4276,6 +4490,9 @@ const Game = {
         this.slow = 0.35;
         const cups = L.cups(L.used);
         Save.record(this.levelIdx, L.used, cups);
+        const tg0 = L.targets.find(q=>q.hit) || L.targets[0];
+        if(tg0) Awards.best('longest', dist(L.cannon.x, L.cannon.y, tg0.x, tg0.y));
+        Awards.check();
         Audio.win();
         FX.flash = 0.7; FX.flashCol = '255,240,190';
         for(let i=0;i<44;i++){
@@ -4454,9 +4671,67 @@ const Game = {
       g.restore();
     }
 
-    // result cards
-    if(this.result === 'win' && this.resultT > 2.35) this.drawWin(g);
+    // result cards. A new award takes the screen first.
+    if(this.result === 'win' && this.resultT > 2.35){
+      if(Awards.pending.length) this.drawAward(g, Awards.pending[0]);
+      else this.drawWin(g);
+    }
     if(this.result === 'lose' && this.resultT > 0.5) this.drawLose(g);
+  },
+
+  /* the New Award plate: riveted iron, chains, and the doll on his podium */
+  drawAward(g, a){
+    const t = clamp((this.resultT-2.35)/0.3, 0, 1), e = easeOut(t);
+    const w = 520, h = 300, x = DW/2-w/2, y = DH/2-h/2-10;
+    g.save();
+    g.globalAlpha = e*0.62; g.fillStyle='#000'; g.fillRect(0,0,DW,DH);
+    g.globalAlpha = e;
+    // iron plate
+    g.fillStyle='rgba(0,0,0,0.5)'; rr(g,x+4,y+6,w,h,10); g.fill();
+    const pg=g.createLinearGradient(0,y,0,y+h);
+    pg.addColorStop(0,'#6a5540'); pg.addColorStop(0.5,'#4a3a2a'); pg.addColorStop(1,'#2e241a');
+    g.fillStyle=pg; rr(g,x,y,w,h,10); g.fill();
+    g.strokeStyle='#1a120a'; g.lineWidth=2.4; rr(g,x,y,w,h,10); g.stroke();
+    for(let i=0;i<7;i++){
+      rivet(g, x+16, y+22+i*((h-44)/6), 3.4, '#e8d4a8','#241a10');
+      rivet(g, x+w-16, y+22+i*((h-44)/6), 3.4, '#e8d4a8','#241a10');
+    }
+    label(g,'NEW AWARD', DW/2, y+40, 30, '#f6ead0');
+    // chains either side of the frame
+    const fy = y+118, fs = 74;
+    for(const dir of [-1,1]){
+      for(let i=0;i<4;i++){
+        const cx2 = DW/2 + dir*(fs*0.75 + 26 + i*30);
+        g.save(); g.translate(cx2, fy);
+        g.strokeStyle='#9a8a70';
+        g.lineWidth=5;
+        g.beginPath(); g.ellipse(0,0, i%2?9:13, i%2?13:9, 0,0,TAU); g.stroke();
+        g.strokeStyle='#4a3d2c'; g.lineWidth=1.6;
+        g.beginPath(); g.ellipse(0,0, i%2?9:13, i%2?13:9, 0,0,TAU); g.stroke();
+        g.restore();
+      }
+    }
+    // the framed icon
+    g.fillStyle='#c8a86a'; rr(g, DW/2-fs/2-7, fy-fs/2-7, fs+14, fs+14, 9); g.fill();
+    g.strokeStyle='#6a4f24'; g.lineWidth=2; rr(g, DW/2-fs/2-7, fy-fs/2-7, fs+14, fs+14, 9); g.stroke();
+    g.fillStyle='#f6f0e2'; rr(g, DW/2-fs/2, fy-fs/2, fs, fs, 5); g.fill();
+    g.save();
+    g.translate(DW/2, fy+10);
+    drawDollIcon(g, 0, -8, 1.5);
+    // podium
+    g.fillStyle='#b98a3e'; rr(g,-22,8,44,9,2); g.fill();
+    g.fillStyle='#8a6428'; rr(g,-16,17,32,7,2); g.fill();
+    g.strokeStyle='#5c4118'; g.lineWidth=1.2; rr(g,-22,8,44,9,2); g.stroke();
+    g.restore();
+    label(g, a.n, DW/2, y+192, 27, '#ffe9b8');
+    label(g, a.d, DW/2, y+224, 17, 'rgba(240,224,190,0.82)');
+    if(t > 0.85){
+      if(button(g, DW/2-176, y+h-58, 168, 46, 'ALL AWARDS'))
+        this.transition(()=>{ this._awardsFrom='play'; this.go('awards'); });
+      if(button(g, DW/2+8, y+h-58, 168, 46, 'CONTINUE', {accent:true}))
+        Awards.pending.shift();
+    }
+    g.restore();
   },
 
   drawWin(g){
@@ -4547,14 +4822,16 @@ Game.drawTitle = function(g){
     this.transition(()=>{ this.world = first<0?0:WORLDS.findIndex(w=>first>=w.from&&first<w.to); this.go('levels'); });
   }
   if(button(g, cx-140, 372, 280, 52, 'LEVELS')) this.transition(()=>this.go('worlds'));
-  if(button(g, cx-140, 436, 280, 52, 'SETTINGS')) this.transition(()=>this.go('settings'));
+  if(button(g, cx-260, 436, 250, 52, 'AWARDS')) this.transition(()=>this.go('awards'));
+  if(button(g, cx+10, 436, 250, 52, 'SETTINGS')) this.transition(()=>this.go('settings'));
 
   const tc = Save.totalCups();
   g.save();
   drawCup(g, cx-52, 528, 1.8, true);
   label(g, `${tc} / ${LEVELS.length*3}`, cx-24, 528, 24, '#f0dcb4', 'left');
   g.restore();
-  label(g,'a physics puzzle in one hundred and eleven rooms', DW/2, 596, 15, 'rgba(240,220,180,0.4)');
+  label(g, `${Awards.count()} / ${AWARDS.length} awards`, cx+150, 528, 17, 'rgba(240,220,180,0.55)', 'left');
+  label(g,'a physics puzzle in one hundred and fifteen rooms', DW/2, 596, 15, 'rgba(240,220,180,0.4)');
 };
 
 Game.drawWorlds = function(g){
@@ -4679,10 +4956,63 @@ Game.drawSettings = function(g){
   if(button(g, 20, DH-62, 130, 46, 'BACK')){ this._wipe=false; this.transition(()=>this.go(this.level?'levels':'title')); }
 };
 
+Game.drawAwards = function(g){
+  this.menuBG(g);
+  label(g,'AWARDS', DW/2, 52, 36, '#f5dfa8');
+  label(g, `${Awards.count()} of ${AWARDS.length} won`, DW/2, 84, 17, 'rgba(240,220,180,0.6)');
+  const cols = 3, cw = 288, ch = 84, gx = 14, gy = 12;
+  const ox = DW/2 - (cols*cw + (cols-1)*gx)/2;
+  const oy = 110;
+  const page = this._awPage || 0;
+  const per = cols*5;
+  const from = page*per, to = Math.min(AWARDS.length, from+per);
+  for(let i=from;i<to;i++){
+    const a = AWARDS[i], k = i - from;
+    const x = ox + (k%cols)*(cw+gx), y = oy + Math.floor(k/cols)*(ch+gy);
+    const got = Awards.earned(a.id);
+    g.save();
+    g.globalAlpha = got ? 1 : 0.42;
+    g.fillStyle='rgba(0,0,0,0.45)'; rr(g,x+2,y+3,cw,ch,9); g.fill();
+    const gr=g.createLinearGradient(0,y,0,y+ch);
+    if(got){ gr.addColorStop(0,'#6a5430'); gr.addColorStop(1,'#3a2c18'); }
+    else    { gr.addColorStop(0,'#3e352a'); gr.addColorStop(1,'#241e17'); }
+    g.fillStyle=gr; rr(g,x,y,cw,ch,9); g.fill();
+    g.strokeStyle= got ? 'rgba(255,220,140,0.55)' : 'rgba(200,180,140,0.2)';
+    g.lineWidth=1.8; rr(g,x,y,cw,ch,9); g.stroke();
+    // framed icon
+    g.fillStyle= got ? '#c8a86a' : '#5a5044';
+    rr(g,x+10,y+12,60,60,6); g.fill();
+    g.fillStyle= got ? '#f6f0e2' : '#3a342c';
+    rr(g,x+15,y+17,50,50,4); g.fill();
+    g.save(); g.translate(x+40,y+46);
+    if(got) drawDollIcon(g,0,-4,1.1);
+    else {
+      g.strokeStyle='rgba(230,215,180,0.55)'; g.lineWidth=3.4;
+      g.beginPath(); g.arc(0,-2,8,PI,TAU); g.stroke();
+      g.fillStyle='rgba(230,215,180,0.55)'; rr(g,-11,-2,22,17,3); g.fill();
+    }
+    g.restore();
+    label(g, a.n, x+84, y+30, 19, got?'#ffe9b8':'#b8ab92', 'left');
+    label(g, a.d, x+84, y+54, 13, got?'rgba(240,224,190,0.75)':'rgba(200,186,158,0.5)', 'left', 'normal');
+    g.restore();
+  }
+  const pages = Math.ceil(AWARDS.length/per);
+  if(pages > 1){
+    if(page > 0 && button(g, DW/2-120, DH-62, 46, 46, '<')) this._awPage = page-1;
+    if(page < pages-1 && button(g, DW/2+74, DH-62, 46, 46, '>')) this._awPage = page+1;
+    label(g, `${page+1} / ${pages}`, DW/2, DH-39, 17, 'rgba(240,220,180,0.6)');
+  }
+  if(button(g, 20, DH-62, 130, 46, 'BACK')){
+    const from2 = this._awardsFrom;
+    this._awardsFrom = null;
+    this.transition(()=> from2==='play' ? this.go('play') : this.go('title'));
+  }
+};
+
 Game.drawFinale = function(g){
   this.menuBG(g);
   label(g,'THE WORKS ARE QUIET', DW/2, 150, 44, '#f5dfa8');
-  label(g,'Every mark painted. One hundred and eleven rooms behind you.', DW/2, 208, 21, 'rgba(240,220,180,0.75)');
+  label(g,'Every mark painted. One hundred and fifteen rooms behind you.', DW/2, 208, 21, 'rgba(240,220,180,0.75)');
   const tc = Save.totalCups();
   g.save(); drawCup(g, DW/2-60, 290, 3.0, true);
   label(g, `${tc} / ${LEVELS.length*3}`, DW/2+4, 290, 34, '#f0dcb4', 'left');
@@ -4741,6 +5071,7 @@ function frame(now){
     case 'worlds':   Game.drawWorlds(ctx); break;
     case 'levels':   Game.drawLevels(ctx); break;
     case 'settings': Game.drawSettings(ctx); break;
+    case 'awards':   Game.drawAwards(ctx); break;
     case 'finale':   Game.drawFinale(ctx); break;
     case 'play':     Game.drawPlay(ctx); break;
   }
