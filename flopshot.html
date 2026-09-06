@@ -20,14 +20,16 @@
 'use strict';
 /* =====================================================================
    FLOPSHOT  —  a steam-works cannon puzzler
-   Fire cloth dolls out of a brass cannon. Paint the bullseye. Use fewer
-   dolls than the level allows and the vault gives up its cups.
+   Fire cloth dolls out of a brass cannon. Paint the bullseye. Dolls are
+   never rationed -- the counter shows the par, and coming in at or under
+   it is what the vault pays its cups for.
    Single file. No libraries. Everything below is hand rolled: the rigid
    body solver, the joints, the textures, the audio.
    ===================================================================== */
 
 /* ---------------------------------------------------------------- 0. boot */
 const DW = 960, DH = 640;                 // world is exactly one screen
+const DOLL_CAP = 12;                      // how deep the pile may get
 const cvs = document.getElementById('c');
 const ctx = cvs.getContext('2d', { alpha:false });
 let SC = 1, OX = 0, OY = 0, CW = DW, CH = DH;
@@ -1947,14 +1949,15 @@ const Audio_ = {
     this.hit(t+0.46, 0.6, 6000, 0.6, 0.10, 'highpass');
     this.clang(t+0.47, 1046.5, 0.22, 1.4);
   },
-  fail(){
+  // a cup has just slipped out of reach. Two notes down, soft enough to
+  // inform without scolding -- nothing has been lost that a retry cannot fix.
+  cupLost(){
     if(!this.ready||!this.on) return;
     const t=this.now();
-    [0,-2,-5].forEach((s,i)=>{
-      const f=294*Math.pow(2,s/12);
-      this.osc(t+i*0.14, f, f*0.94, 0.42, 0.18, 'sawtooth');
+    [0,-4].forEach((s,i)=>{
+      const f=330*Math.pow(2,s/12);
+      this.osc(t+i*0.13, f, f*0.96, 0.30, 0.075, 'triangle');
     });
-    this.hit(t+0.3,0.4,300,0.6,0.14,'lowpass',null,90);
   },
   click(){
     if(!this.ready||!this.on) return;
@@ -2171,7 +2174,11 @@ class Level {
     this.ents = [];
     this.targets = (def.tg||[]).map(t=>({ x:t[0], y:t[1], r:Math.round((t[2]||26)*TSCALE),
                                         a:(t[3]||0)*PI/180, hit:false, glow:0 }));
-    this.shots = def.sh || 3;
+    // Dolls are unlimited. `tr` is the cup ladder: at or under tr[0] pays
+    // three cups, at or under tr[1] pays two, over that pays one. The
+    // counter shows tr[0], because that is the number worth aiming at.
+    this.tr = def.tr || [1, Math.max(1, (def.sh || 3) - 1)];
+    this.par = this.tr[0];
     this.used = 0;
     this.dolls = [];
     this.buttons = {};
@@ -2835,6 +2842,27 @@ Level.prototype.update = function(dt){
     if(d.asleep()) d.settled += dt; else d.settled = 0;
   }
 
+  /* Dolls are unlimited, so the pile is not. Once it gets deep, the oldest
+     one that has been asleep a while is swept away in a puff, which keeps
+     the solver honest without ever refusing the player another shot. */
+  while(this.dolls.length > DOLL_CAP && !this.collapsed){
+    // Dolls are stored in the order they were fired, so the first that
+    // qualifies is the oldest. One at rest goes first; if the pile is deep
+    // enough that nothing ever settles, age alone is reason enough. The two
+    // most recent are always spared so a shot never vanishes under the player.
+    const hard = this.dolls.length > DOLL_CAP + 3;
+    let old = -1;
+    for(let i=0;i<this.dolls.length-2;i++){
+      const d = this.dolls[i];
+      if(d.settled > 1.4 || (hard && d.age > 2.5)){ old = i; break; }
+    }
+    if(old < 0) break;
+    const d = this.dolls[old], tp = d.parts.torso;
+    FX.burst(tp.x, tp.y, 12, {col:'#e8dcc2', spread:PI, spMin:20, spMax:110,
+                              sizeMax:5, lifeMax:0.7});
+    d.destroy(); this.dolls.splice(old,1);
+  }
+
   /* --- marks that ride a wheel move with it --- */
   for(const t of this.targets){
     if(t.oe){
@@ -2894,7 +2922,8 @@ Level.prototype.fire = function(ang, power){
     const kick = (140 + power*220) * c.mount.m;
     c.mount.applyImpulse(-Math.cos(ang)*kick, -Math.sin(ang)*kick*0.25, c.mount.x, c.mount.y);
   }
-  if(this.used === this.shots) Audio.lastDoll();
+  if(this.used === this.par) Audio.lastDoll();   // last one that still pays gold
+  else if(this.used === this.par + 1 || this.used === this.tr[1] + 1) Audio.cupLost();
   FX.smoke(mx, my, 16, ang, 1.25);
   FX.burst(mx,my,14,{col:'#ffd08a',dir:ang,spread:0.5,spMin:120,spMax:420,sizeMax:4,lifeMax:0.45});
   FX.add({x:mx,y:my,vx:0,vy:0,life:0,max:0.34,size:9,col:'#ffe0a0',type:'ring',rot:0,rv:0,g:0,drag:0});
@@ -2960,16 +2989,16 @@ Level.prototype.collapseStep = function(dt){
   }
 };
 
-Level.prototype.canFire = function(){ return this.used < this.shots && !this.done; };
+Level.prototype.canFire = function(){ return !this.done; };
 Level.prototype.busy = function(){
   for(const d of this.dolls) if(!d.asleep() && d.age < 6) return true;
   return false;
 };
 Level.prototype.cups = function(used){
-  const tr = this.def.tr || [1, Math.max(1,this.shots-1)];
-  if(used <= tr[0]) return 3;
+  const tr = this.tr;
+  if(used <= tr[0]) return 3;   // par or better
   if(used <= tr[1]) return 2;
-  return 1;
+  return 1;                     // over par still clears the room
 };
 
 /* ------------------------------------------------ 8c. level drawing */
@@ -4701,12 +4730,20 @@ const Game = {
     // land beneath MENU and restart. This is what the original does.
     const over = (t,x1,y1,x2,y2) =>
       t.x + t.r > x1 && t.x - t.r < x2 && t.y + t.r > y1 && t.y - t.r < y2;
-    let bot = false, top = false;
+    // The buttons and the counters move independently. Relocating a control
+    // the player is reaching for is worse than leaving it be, so the button
+    // row only ever moves for a mark sitting under the buttons themselves;
+    // the read-only counters move freely, because the par has to stay legible.
+    // The two always end up on opposite corners, so they cannot collide.
+    let bBot = false, bTop = false, cBot = false, cTop = false;
     for(const t of this.level.targets){
-      if(over(t, 8, 570, 196, 634)) bot = true;      // bottom left buttons
-      if(over(t, DW-190, 4, DW-8, 62)) top = true;   // top right buttons
+      if(over(t, 8, 570, 196, 634))    bBot = true;  // buttons, bottom left
+      if(over(t, DW-190, 4, DW-8, 62)) bTop = true;  // buttons, top right
+      if(over(t, 700, 558, 952, 636))  cBot = true;  // counters, bottom right
+      if(over(t, 8, 2, 296, 76))       cTop = true;  // counters, top left
     }
-    this.hudTop = bot && !top;
+    this.btnTop = bBot && !bTop;
+    this.cntTop = cBot && !cTop;
     Audio.setTune(this.world);
     Audio.setTheme(this.level.theme);
     this.go('play');
@@ -4722,7 +4759,7 @@ const Game = {
     const L = this.level, C = L.cannon;
     C.recoil = Math.max(0, C.recoil - dt*4.5);
 
-    const hudZone = this.hudTop ? (IN.y < 70 && IN.x > DW-200) : (IN.y > DH-70 && IN.x < 200);
+    const hudZone = this.btnTop ? (IN.y < 70 && IN.x > DW-200) : (IN.y > DH-70 && IN.x < 200);
     if(!this.result){
       if(IN.down && !hudZone){
         const dx = IN.x - C.x, dy = IN.y - C.y;
@@ -4739,8 +4776,6 @@ const Game = {
           L.fire(this.aimA, this.aimP);
           Save.data.seen = true; Save.write();
           this.hint = 0;
-        } else if(L.used >= L.shots){
-          this.flash('Out of dolls');
         }
       }
       if(KEY['ArrowUp'])   this.aimA -= dt*1.1;
@@ -4774,8 +4809,6 @@ const Game = {
                    col:pick(['#ffd97a','#ff8f6a','#8fd9ff','#c8ff9a','#f2e6cd']),
                    type:'chip', rot:rnd(0,TAU), rv:rnd(-8,8), g:0.22, drag:0.6 });
         }
-      } else if(L.used >= L.shots && !L.busy() && L.dolls.every(d=>d.settled > 0.7 || d.gone)){
-        this.result = 'lose'; this.resultT = 0; Audio.fail();
       }
     } else {
       this.resultT += dt;
@@ -4865,6 +4898,10 @@ const Game = {
       g.save(); g.globalAlpha = a;
       label(g, 'Drag to aim  ·  further out for more powder', DW/2, 112, 23, '#ffe9be');
       label(g, 'Release to fire', DW/2, 144, 19, 'rgba(255,233,190,0.7)');
+      // the counter is easy to misread as a ration, so say it once, up front
+      if(this.levelIdx === 0)
+        label(g, 'Dolls never run out · the counter is the par for three cups',
+              DW/2, 174, 17, 'rgba(255,233,190,0.55)');
       g.restore();
     }
 
@@ -4873,7 +4910,8 @@ const Game = {
 
   drawHUD(g){
     const L = this.level;
-    const top = this.hudTop;
+    const top = this.btnTop;      // button row and the name banner
+    const cTop = this.cntTop;     // counters
     // the room announces itself, then leaves the screen alone
     const nameA = clamp(3.0 - L.time, 0, 1) * (this.result ? 0 : 1);
     if(nameA > 0.01){
@@ -4908,15 +4946,15 @@ const Game = {
     if(rs.clicked){ Audio.click(); this.retry(); }
 
     // the counters take the opposite corner to the buttons, as the original does
-    const left = L.shots - L.used;
-    const cy = top ? 34 : DH-36;
-    const cxR = top ? 250 : DW - 20;
+    const cy = cTop ? 34 : DH-36;
+    const cxR = cTop ? 250 : DW - 20;
+    // a safety net for a room that leaves neither corner clear
     let hudA = 1;
-    const zx1 = top ? 10 : 742, zx2 = top ? 262 : 950;
-    const zy1 = top ? 0 : 560,  zy2 = top ? 74 : 640;
+    const zx1 = cTop ? 6 : 712, zx2 = cTop ? 296 : 954;
+    const zy1 = cTop ? 0 : 556, zy2 = cTop ? 78 : 640;
     for(const tg of L.targets){
       if(tg.x + tg.r > zx1 && tg.x - tg.r < zx2 && tg.y + tg.r > zy1 && tg.y - tg.r < zy2){
-        hudA = tg.hit ? 0.66 : 0.44; break;
+        hudA = tg.hit ? 0.74 : 0.56; break;
       }
     }
     this.hudA = lerp(this.hudA === undefined ? 1 : this.hudA, hudA, 0.12);
@@ -4933,9 +4971,14 @@ const Game = {
     const tot = Save.totalCups();
     num('x ' + (tot > 0 ? tot : '-'), x, '#fdf6e6');
     drawCup(g, x - 62, cy-1, 1.75, true);
-    x -= 108;
-    num('x ' + left, x, left>0 ? '#fdf6e6' : '#ffbba0');
-    drawDollIcon(g, x - 40, cy-1, 1.7);
+    // dolls used against par. Going over is allowed -- it only costs cups --
+    // so the number warms rather than turning red. The count grows without
+    // bound, so the icon is placed off the measured text, not a fixed offset.
+    x -= 96;
+    const dtxt = L.used + ' / ' + L.par;
+    num(dtxt, x, L.used > L.par ? '#ffcf9a' : '#fdf6e6');
+    g.font = "bold 31px Georgia, 'Times New Roman', serif";
+    drawDollIcon(g, x - g.measureText(dtxt).width - 24, cy-1, 1.7);
     g.restore();
 
     if(this.msgT > 0){
@@ -4949,7 +4992,6 @@ const Game = {
       if(Awards.pending.length) this.drawAward(g, Awards.pending[0]);
       else this.drawWin(g);
     }
-    if(this.result === 'lose' && this.resultT > 0.5) this.drawLose(g);
   },
 
   /* the New Award plate: riveted iron, chains, and the doll on his podium */
@@ -5038,29 +5080,14 @@ const Game = {
       drawCup(g, 0, 0, s, i < cups && pop > 0);
       g.restore();
     }
-    label(g, `Dolls used: ${L.used}`, DW/2, y+164, 20, 'rgba(240,220,180,0.85)');
+    label(g, `Dolls used: ${L.used}   \u00b7   par ${L.par}`, DW/2, y+164, 20,
+          L.used <= L.par ? 'rgba(240,220,180,0.85)' : 'rgba(255,207,154,0.9)');
     const best = Save.best(this.levelIdx);
     if(best) label(g, `Best: ${best.u}`, DW/2, y+190, 17, 'rgba(240,220,180,0.55)');
     if(t > 0.85){
       if(button(g, x+24, y+h-62, 130, 46, 'LEVELS')) this.transition(()=>this.go('levels'));
       if(button(g, x+166, y+h-62, 96, 46, 'RETRY')) this.retry();
       if(button(g, x+274, y+h-62, 122, 46, 'NEXT', {accent:true})) this.transition(()=>this.nextLevel());
-    }
-    g.restore();
-  },
-
-  drawLose(g){
-    const t = clamp((this.resultT-0.5)/0.3, 0, 1);
-    const e = easeOut(t);
-    const w = 380, h = 190, x = DW/2-w/2, y = DH/2-h/2 - 10;
-    g.save();
-    g.globalAlpha = e*0.5; g.fillStyle='#000'; g.fillRect(0,0,DW,DH); g.globalAlpha=e;
-    panel(g,x,y,w,h,16);
-    label(g,'OUT OF DOLLS', DW/2, y+50, 28, '#ffc9a8');
-    label(g,'The mark is still clean.', DW/2, y+88, 18, 'rgba(240,220,180,0.7)');
-    if(t > 0.8){
-      if(button(g, x+26, y+h-62, 150, 46, 'LEVELS')) this.transition(()=>this.go('levels'));
-      if(button(g, x+196, y+h-62, 158, 46, 'TRY AGAIN', {accent:true})) this.retry();
     }
     g.restore();
   }
