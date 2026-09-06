@@ -45,22 +45,27 @@
     { t:'slab', x:358,  y:372, w:614, h:141 },          // the big middle slab
     { t:'slab', x:355,  y:707, w:588, h:150 },          // floor
     { t:'beam', x:934,  y:707, w:24,  h:110 },          // post at the ramp foot
-    { t:'beam', x:928,  y:657, w:264, h:23, a:-21.3 }   // ramp, bottom right
+    { t:'beam', x:928,  y:657, w:264, h:23, a:-21.3 },  // ramp, bottom right
+
+    // The two pale brackets are shelves, not crates: a plank above, a plank
+    // below, an upright joining them at the far end. The planks are fixed to
+    // the frame, so each bracket reads as a tunnel with a post in its doorway.
+    { t:'post', x:350,  y:101, w:160, h:19 },           // upper bracket, top plank
+    { t:'post', x:350,  y:189, w:160, h:19 },           //   ... bottom plank
+    { t:'post', x:545,  y:258, w:157, h:23 },           // ragdoll shelf, top plank
+    { t:'post', x:545,  y:347, w:157, h:23 }            //   ... bottom plank
   ];
 
-  // loose timber — rigid bodies that can be knocked out of the way
+  // Loose timber. Each piece is short enough to go over in the slot it stands
+  // in, so it topples where it is instead of skating across the level — an
+  // upright that fills its gap exactly can only ever slide, which is what made
+  // the old brackets behave like they were on ice.
   var LOOSE = [
-    // the column stub between the mezzanine and the slab looks as structural
-    // as everything else, but nothing actually pins it in place
-    { m:0.6, style:'beam', parts:[ {x:950,y:256,w:27, h:116} ] },
-    { m:0.5, parts:[ {x:350,y:101,w:160,h:19},          // upper bracket, top bar
-                     {x:491,y:101,w:19, h:107},         //   ... right upright
-                     {x:350,y:189,w:160,h:19},          //   ... bottom bar
-                     {x:351,y:176,w:24, h:13} ] },      //   ... offcut, left end
-    { m:0.34, parts:[ {x:545,y:258,w:157,h:23},         // ragdoll shelf, top bar
-                     {x:681,y:258,w:21, h:112},         //   ... right upright
-                     {x:545,y:347,w:157,h:23},          //   ... bottom bar
-                     {x:546,y:336,w:23, h:11} ] }       //   ... offcut, left end
+    { m:3.0, style:'beam', parts:[ {x:950,y:256,w:27, h:116} ] },  // column stub
+    { m:3.4, parts:[ {x:491,y:122,w:19, h:65} ] },      // upper bracket upright
+    { m:3.4, parts:[ {x:681,y:283,w:21, h:64} ] },      // ragdoll shelf upright
+    { m:0.2, parts:[ {x:351,y:176,w:24, h:13} ] },      // offcut on the bracket
+    { m:0.2, parts:[ {x:546,y:336,w:23, h:11} ] }       // offcut on the shelf
   ];
 
   // a leaning post that hangs in front of the mezzanine — scenery only,
@@ -70,11 +75,17 @@
   var TARGET = { x:441, y:645, r:62 };
   var CANNON = { x:66, y:300, len:80 };
   var AIM0   = { x:995, y:280 };                        // where the sight rests
-  var PAR    = 2;                                       // goblets on the counter
+  // The board cannot be solved in one: the doorway post has to come down
+  // before anything can run the upper corridor. So two is the clean solve and
+  // what the goblet is worth, and the third ragdoll is the room to get it wrong.
+  var RAGDOLLS = 3;
+  var PAR      = 2;
 
   // ══ tuning ══════════════════════════════════════════════════════════════
-  var G = 1700, MUZZLE = 1050, SUB = 4, STEP = 1 / 60;
-  var DRAG = 0.9992, REST = 0.30, FRIC = 0.955, MU = 0.30;
+  // Flat enough to thread a corridor: the tunnels are ~65px tall and the run
+  // out to the shaft is 600px, so a lobbing shot simply cannot cross them.
+  var G = 1500, MUZZLE = 1400, SUB = 4, STEP = 1 / 60;
+  var DRAG = 0.9992, REST = 0.30, FRIC = 0.94, MU = 0.72;
   var RELAX = 0.28, MAXPEN = 5, ITER = 4;
   var PMASS = 0.25;                                     // one ragdoll joint
 
@@ -503,25 +514,15 @@
   // ══ the world, stepped ══════════════════════════════════════════════════
   var S = null;
 
-  function reset(asShot) {
+  function reset() {
     S = {
       bodies: [], dolls: [], puffs: [], splats: [],
       aim: { x: AIM0.x, y: AIM0.y }, ang: 0,
-      used: 0, left: PAR, flash: 0, shake: 0,
-      state: 'aim', win: 0, t: 0, hint: asShot ? 0 : 3.4
+      used: 0, left: RAGDOLLS, flash: 0, shake: 0,
+      state: 'aim', win: 0, t: 0, hint: 3.4
     };
     for (var i = 0; i < LOOSE.length; i++) S.bodies.push(makeBody(LOOSE[i]));
     aimAt(S.aim.x, S.aim.y);
-    if (asShot) {
-      // the opening frame of the screenshot: one ragdoll already spent and
-      // lying in the shelf, one left on the counter
-      var d = ragdoll(628, 322, Math.PI / 2, 0, 0, 0);
-      S.dolls.push(d); S.used = 1; S.left = PAR - 1;
-      for (i = 0; i < 260; i++) sub(STEP / SUB);
-      d.live = false;
-      for (i = 0; i < S.bodies.length; i++) { S.bodies[i].sleep = true; S.bodies[i].still = 99; }
-      S.hint = 3.4;
-    }
   }
 
   function aimAt(x, y) {
@@ -1043,7 +1044,8 @@
     if (S.state === 'won') card(ctx, S.win ? 'Bullseye' : 'Target down',
       S.win ? 'Cleared in ' + S.used + ' — goblet earned' : 'Cleared in ' + S.used + ' ragdolls');
     if (S.state === 'lost') card(ctx, 'Out of ragdolls', 'The target is still standing');
-    if (S.menu) card(ctx, 'The Chocolate Works', 'One target, ' + PAR + ' ragdolls for the goblet');
+    if (S.menu) card(ctx, 'The Chocolate Works',
+      'Knock the doorway post down, then run the corridor — ' + PAR + ' for the goblet');
     ctx.restore();
   }
 
@@ -1061,9 +1063,9 @@
     e.preventDefault();
     var w = toWorld(e);
     if (S.menu) { S.menu = false; return; }
-    if (inBtn(BTN_AGAIN, w.x, w.y)) { reset(false); return; }
+    if (inBtn(BTN_AGAIN, w.x, w.y)) { reset(); return; }
     if (inBtn(BTN_MENU, w.x, w.y)) { S.menu = true; return; }
-    if (S.state !== 'aim') { reset(false); return; }
+    if (S.state !== 'aim') { reset(); return; }
     if (S.left <= 0) return;
     dragging = true; aimAt(w.x, w.y);
     cv.setPointerCapture && cv.setPointerCapture(e.pointerId);
@@ -1083,11 +1085,11 @@
   window.addEventListener('resize', resize);
   window.addEventListener('orientationchange', function () { setTimeout(resize, 120); });
   window.addEventListener('keydown', function (e) {
-    if (e.key === 'r' || e.key === 'R') reset(false);
+    if (e.key === 'r' || e.key === 'R') reset();
   });
 
   // ══ go ══════════════════════════════════════════════════════════════════
-  reset(true);
+  reset();
   resize();
   var last = performance.now(), acc = 0;
   function frame(now) {
