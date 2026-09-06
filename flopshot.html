@@ -1088,6 +1088,23 @@ function texPine(w,h){
   });
 }
 
+/* -- a plain sawn board, no ironwork -- */
+function texBoard(w,h){
+  return tex('board', w, h, (g,w,h)=>{
+    g.fillStyle='rgba(0,0,0,0.34)'; rr(g,2,3.5,w,h,3); g.fill();
+    const gr=g.createLinearGradient(0,0,0,h);
+    gr.addColorStop(0,'#f0d59a'); gr.addColorStop(0.42,'#dcbb78');
+    gr.addColorStop(1,'#b2894a');
+    g.fillStyle=gr; rr(g,0,0,w,h,3); g.fill();
+    g.save(); rr(g,0,0,w,h,3); g.clip();
+    grain(g,w,h, Math.max(3,Math.round(h/3.4)), '#9a733c', 0.26);
+    g.fillStyle='rgba(255,248,222,0.34)'; g.fillRect(0,0,w,Math.max(1.4,h*0.14));
+    g.fillStyle='rgba(0,0,0,0.22)'; g.fillRect(0,h-Math.max(1.4,h*0.16),w,Math.max(1.4,h*0.16));
+    g.restore();
+    g.strokeStyle='#8a6229'; g.lineWidth=1.3; rr(g,0.7,0.7,w-1.4,h-1.4,3); g.stroke();
+  });
+}
+
 function texGlass(w,h){
   return tex('glass', w, h, (g,w,h)=>{
     rr(g,0,0,w,h,3); g.save(); g.clip();
@@ -1164,9 +1181,11 @@ function background(th){
     const s=88, gap=7;
     for(let y=-10;y<DH+s;y+=s) for(let x=-10;x<DW+s;x+=s){
       const gr=g.createLinearGradient(x,y,x,y+s-gap);
-      gr.addColorStop(0,'#3d2716'); gr.addColorStop(0.55,'#2e1c0e'); gr.addColorStop(1,'#1d1007');
+      gr.addColorStop(0,'#432b18'); gr.addColorStop(0.55,'#301d0f'); gr.addColorStop(1,'#1c0f06');
       g.fillStyle=gr; rr(g,x,y,s-gap,s-gap,11); g.fill();
-      g.strokeStyle='rgba(255,190,120,0.09)'; g.lineWidth=1.6;
+      g.strokeStyle='rgba(226,168,86,0.34)'; g.lineWidth=2.6;
+      rr(g,x+2.5,y+2.5,s-gap-5,s-gap-5,9); g.stroke();
+      g.strokeStyle='rgba(255,214,150,0.16)'; g.lineWidth=1.2;
       rr(g,x+1,y+1,s-gap-2,s-gap-2,10); g.stroke();
       g.fillStyle='rgba(0,0,0,0.30)'; rr(g,x+3,y+(s-gap)*0.55,s-gap-6,(s-gap)*0.42,8); g.fill();
     }
@@ -1382,8 +1401,8 @@ function background(th){
 }
 
 /* ---------------------------------------------------- 4c. set pieces */
-function drawTarget(g,x,y,r,t,hit){
-  g.save(); g.translate(x,y);
+function drawTarget(g,x,y,r,t,hit,ang){
+  g.save(); g.translate(x,y); if(ang) g.rotate(ang);
   const pulse = hit ? 1 : 1 + Math.sin(t*3.4)*0.028;
   g.scale(pulse,pulse);
   g.fillStyle='rgba(0,0,0,0.42)'; g.beginPath(); g.arc(2,4,r,0,TAU); g.fill();
@@ -1927,6 +1946,17 @@ const Audio_ = {
     this.osc(t, 780+Math.random()*260, 520, 0.13, 0.030, 'sawtooth');
     this.hit(t, 0.10, 4200, 1.4, 0.022, 'highpass');
   },
+  collapse(){
+    if(!this.ready||!this.on) return;
+    const t=this.now();
+    this.hit(t, 1.5, 420, 0.5, 0.55, 'lowpass', null, 110);
+    this.osc(t, 130, 34, 1.3, 0.32, 'triangle');
+    for(let i=0;i<16;i++){
+      const d = 0.05 + Math.random()*1.15;
+      this.hit(t+d, 0.10, 260+Math.random()*500, 2.0, 0.16, 'bandpass');
+      if(Math.random()<0.5) this.clang(t+d, 150+Math.random()*260, 0.09, 0.34);
+    }
+  },
   lastDoll(){
     if(!this.ready||!this.on) return;
     const t=this.now();
@@ -2110,7 +2140,8 @@ class Level {
     this.name = def.n;
     this.world = new World();
     this.ents = [];
-    this.targets = (def.tg||[]).map(t=>({ x:t[0], y:t[1], r:Math.round((t[2]||26)*TSCALE), hit:false, glow:0 }));
+    this.targets = (def.tg||[]).map(t=>({ x:t[0], y:t[1], r:Math.round((t[2]||26)*TSCALE),
+                                        a:(t[3]||0)*PI/180, hit:false, glow:0 }));
     this.shots = def.sh || 3;
     this.used = 0;
     this.dolls = [];
@@ -2171,6 +2202,12 @@ class Level {
           const b = this.add({x:op[1],y:op[2],w:op[3],h:op[4],a:A(5)*D2R,
                               mat:op[6]||'wood',fixed:true});
           b.render='crate';
+          break;
+        }
+        case 'bd': case 'BD': {
+          const b = this.add({x:op[1],y:op[2],w:op[3],h:op[4]||16,a:A(5)*D2R,
+                              mat:'wood', fixed:k==='bd'});
+          b.render='board';
           break;
         }
         case 'ib': {
@@ -2421,8 +2458,20 @@ class Level {
     // does not fire straight into its own mounting
     const ca0 = this.cannon.a;
     const mountY = Math.sin(ca0) > 0.45 ? this.cannon.y - 30 : this.cannon.y + 30;
-    const mount = this.add({x:this.cannon.x, y:mountY, w:46, h:58, fixed:true, mat:'metal'});
-    mount.render='plank';
+    const rolling = !!this.def.cm;                 // 'w' wheels, 'i' ice
+    const mount = this.add({
+      x:this.cannon.x, y:mountY, w:46, h:58,
+      fixed: !rolling, mat:'metal',
+      density: rolling ? 0.0026 : undefined,
+      friction: rolling ? (this.def.cm === 'i' ? 0.02 : 0.16) : undefined,
+      rest: rolling ? 0.02 : undefined,
+      angDamp: rolling ? 6 : undefined,
+      linDamp: rolling ? 0.5 : undefined
+    });
+    mount.render = rolling ? 'carriage' : 'plank';
+    this.cannon.mount = mount;
+    this.cannon.rolls = rolling;
+    this.cannon.dy = this.cannon.y - mountY;
     // settle the furniture with impacts muted, so nothing detonates or
     // shatters just from being placed a few pixels above its shelf
     for(let i=0;i<50;i++) this.world.step(1/120);
@@ -2526,6 +2575,7 @@ Level.prototype.update = function(dt){
 
   /* --- kinematic and scripted parts move before the solve --- */
   for(const e of this.ents){
+    if(e.frozen) continue;
     switch(e.type){
       case 'mov': {
         e.t += dt;
@@ -2685,6 +2735,14 @@ Level.prototype.update = function(dt){
              type:'smoke', rot:0, rv:0, g:-0.05, drag:1.1 });
   }
 
+  /* a rolling carriage carries the barrel with it, and stays upright */
+  const cn = this.cannon;
+  if(cn.rolls && cn.mount && !this.collapsed){
+    const m = cn.mount;
+    m.a = 0; m.av = 0; m.sync();
+    cn.x = m.x; cn.y = m.y + cn.dy;
+  }
+
   /* springs only travel up and down, and never tip */
   for(const e of this.ents){
     if(e.type !== 'spring') continue;
@@ -2771,6 +2829,10 @@ Level.prototype.fire = function(ang, power){
   this.dolls.push(d);
   this.used++;
   c.recoil = 1;
+  if(c.rolls && c.mount){
+    const kick = (140 + power*220) * c.mount.m;
+    c.mount.applyImpulse(-Math.cos(ang)*kick, -Math.sin(ang)*kick*0.25, c.mount.x, c.mount.y);
+  }
   if(this.used === this.shots) Audio.lastDoll();
   FX.smoke(mx, my, 16, ang, 1.25);
   FX.burst(mx,my,14,{col:'#ffd08a',dir:ang,spread:0.5,spMin:120,spMax:420,sizeMax:4,lifeMax:0.45});
@@ -2778,6 +2840,34 @@ Level.prototype.fire = function(ang, power){
   FX.kick(4.5 + power*3);
   Audio.fire(power);
   return d;
+};
+
+/* "When a doll touches that target, the level will collapse signifying
+   completion." Everything bolted down comes loose and goes over. */
+Level.prototype.collapse = function(){
+  if(this.collapsed) return;
+  this.collapsed = true;
+  for(const e of this.ents) e.frozen = true;
+  for(const b of this.world.bodies){
+    // the floor stays, so the room comes down into a heap rather than
+    // simply vanishing off the bottom of the screen
+    if(b.tag === 'wall' && b.y > DH - 40){ continue; }
+    if(!b.fixed){ b.gscale = 0.55; b.wake(); continue; }
+    b.fixed = false;
+    b.kinematic = false;
+    b.density = MAT_DENSITY[b.mat] || 0.0012;
+    b.computeMass();
+    b.linDamp = 0.10; b.angDamp = 0.16;
+    b.gscale = 0.55;                       // slow enough to watch
+    b.vx = rnd(-42,42);
+    b.vy = rnd(-30,40);
+    b.av = rnd(-1.8,1.8);
+    b.wake();
+  }
+  for(const d of this.dolls) d.each(p=>{ p.gscale = 0.55; });
+  this.world.wakeAll();
+  FX.kick(13);
+  Audio.collapse();
 };
 
 Level.prototype.canFire = function(){ return this.used < this.shots && !this.done; };
@@ -3017,6 +3107,32 @@ function drawBody(g, b, t){
       break;
     }
     case 'pine': blit(g, texPine(w,h), b.x, b.y, b.a, w, h); break;
+    case 'carriage': {
+      g.save(); g.translate(b.x,b.y); g.rotate(b.a);
+      g.fillStyle='rgba(0,0,0,0.42)'; rr(g,-b.hw+2,-b.hh+4,w,h*0.72,5); g.fill();
+      const cg=g.createLinearGradient(0,-b.hh,0,b.hh);
+      cg.addColorStop(0,'#6a5232'); cg.addColorStop(0.5,'#4a3820'); cg.addColorStop(1,'#2a1e10');
+      g.fillStyle=cg; rr(g,-b.hw,-b.hh,w,h*0.70,4); g.fill();
+      g.strokeStyle='#18110a'; g.lineWidth=1.6; rr(g,-b.hw,-b.hh,w,h*0.70,4); g.stroke();
+      for(const [bx,by] of [[-b.hw+8,-b.hh+8],[b.hw-8,-b.hh+8]]) rivet(g,bx,by,2.6,'#e8d4a8','#2a1f13');
+      // two iron wheels
+      const wr = h*0.26;
+      for(const wx of [-b.hw+wr*0.9, b.hw-wr*0.9]){
+        const wy = b.hh - wr;
+        const wg=g.createRadialGradient(wx-wr*0.3,wy-wr*0.3,wr*0.1,wx,wy,wr);
+        wg.addColorStop(0,'#8d949c'); wg.addColorStop(0.7,'#4e555d'); wg.addColorStop(1,'#2a2f35');
+        g.fillStyle=wg; g.beginPath(); g.arc(wx,wy,wr,0,TAU); g.fill();
+        g.strokeStyle='#191d22'; g.lineWidth=1.8; g.beginPath(); g.arc(wx,wy,wr,0,TAU); g.stroke();
+        g.strokeStyle='#7d858e'; g.lineWidth=1.6;
+        for(let i=0;i<4;i++){ const a2=i*PI/4 + b.x*0.035;
+          g.beginPath(); g.moveTo(wx-Math.cos(a2)*wr*0.8, wy-Math.sin(a2)*wr*0.8);
+          g.lineTo(wx+Math.cos(a2)*wr*0.8, wy+Math.sin(a2)*wr*0.8); g.stroke(); }
+        rivet(g,wx,wy,wr*0.28,'#dfe6ee','#23282e');
+      }
+      g.restore();
+      break;
+    }
+    case 'board': blit(g, texBoard(w,h), b.x, b.y, b.a, w, h); break;
     case 'iceblock': {
       g.save(); g.translate(b.x,b.y); g.rotate(b.a);
       g.fillStyle='rgba(0,0,0,0.22)'; rr(g,-b.hw+2,-b.hh+4,w,h,5); g.fill();
@@ -3307,7 +3423,7 @@ Level.prototype.draw = function(g, aim){
   // painted marks live on the world, under the objects
   g.drawImage(FX.decal, 0, 0);
 
-  for(const tg of this.targets) drawTarget(g, tg.x, tg.y, tg.r, t, tg.hit);
+  for(const tg of this.targets) drawTarget(g, tg.x, tg.y, tg.r, t, tg.hit, tg.a);
 
   for(const b of this.world.bodies){
     if(b.render==='btnbase' || b.dead) continue;
@@ -3734,10 +3850,10 @@ const LEVELS = [
   ['m',866,516,190,20], ['m',772,470,20,112]]},
 
 {n:'The Furnace Wheel', th:4, c:[86,560,-44], sh:5, tr:[3,4], tg:[[856,220,28]], o:[
-  ['rotor',430,430,40,160,4,2.4],
+  ['rotor',430,442,38,138,4,2.4],
   ['lava',300,600,180,40], ['lava',700,470,26,300],
   ['tnt',620,596,44,44],
-  ['s',856,264,190,20], ['s',764,214,20,120]]},
+  ['s',856,266,190,20]]},
 
 {n:'Rooftops', th:5, c:[86,560,-46], sh:5, tr:[3,4], tg:[[846,256,28]], o:[
   ['s',300,520,160,200], ['s',560,470,160,300], ['s',846,308,190,20],
@@ -3881,6 +3997,20 @@ const LEVELS = [
   ['ib',444,588,62,62], ['ib',444,526,62,62],
   ['m',300,260,180,18], ['m',860,600,200,40]]},
 
+{n:'On Wheels', th:0, c:[150,560,-30], cm:'w', sh:4, tr:[2,3], tg:[[880,300,28]], o:[
+  ['bd',470,420,300,18,-22],
+  ['w',880,346,180,22], ['b',600,588,60,60]]},
+
+{n:'On Ice', th:1, c:[180,560,-28], cm:'i', sh:5, tr:[3,4], tg:[[860,470,28]], o:[
+  ['i',420,600,420,26],
+  ['bd',640,392,240,18,-26],
+  ['s',860,516,190,22], ['s',764,470,20,114]]},
+
+{n:'Angled Boards', th:0, c:[86,300,10], sh:4, tr:[2,3], tg:[[820,560,30,18]], o:[
+  ['w',120,352,150,18],
+  ['bd',420,300,260,18,34], ['bd',660,470,240,18,-30],
+  ['w',820,608,200,24], ['b',560,588,56,56]]},
+
 {n:'The Last Page', th:7, c:[480,120,90], sh:6, tr:[3,5], tg:[[210,300,28],[790,300,28]], o:[
   ['spring',300,470,110,74,150], ['C',300,586,90,64],
   ['spring',660,470,110,74,150], ['C',660,586,90,64],
@@ -3896,7 +4026,7 @@ const WORLDS = [
   { name:'The Attic',     from:60, to:72, th:0 },
   { name:'The Gallery',   from:72, to:84, th:0 },
   { name:'The Almanac',   from:84, to:96, th:6 },
-  { name:'The Board',     from:96, to:108, th:7 }
+  { name:'The Board',     from:96, to:111, th:7 }
 ];
 
 /* =====================================================================
@@ -4159,7 +4289,10 @@ const Game = {
       }
     } else {
       this.resultT += dt;
-      if(this.result === 'win') this.slow = lerp(this.slow, 1, dt*1.2);
+      if(this.result === 'win'){
+        this.slow = lerp(this.slow, 1, dt*1.2);
+        if(this.resultT > 0.42) L.collapse();
+      }
     }
 
     if(this.hint > 0) this.hint -= dt;
@@ -4190,6 +4323,26 @@ const Game = {
             g.globalAlpha = 0.30 + f*0.60;
             g.fillStyle = '#ffe6b0';
             g.beginPath(); g.arc(pts[i].x, pts[i].y, r, 0, TAU); g.fill();
+          }
+          g.restore();
+        }
+        // laser sight: a straight beam from the muzzle to the first thing it meets
+        if(Save.data.laser){
+          const mx2 = C.x + Math.cos(showA)*46, my2 = C.y + Math.sin(showA)*46;
+          const fx = mx2 + Math.cos(showA)*2400, fy = my2 + Math.sin(showA)*2400;
+          const hit = L.world.raycastAny(mx2,my2,fx,fy, b=>b.fixed && !b.sensor);
+          const ex = hit ? hit.x : fx, ey = hit ? hit.y : fy;
+          g.save();
+          g.globalCompositeOperation='lighter';
+          g.strokeStyle='rgba(255,40,40,0.22)'; g.lineWidth=5;
+          g.beginPath(); g.moveTo(mx2,my2); g.lineTo(ex,ey); g.stroke();
+          g.strokeStyle='rgba(255,120,110,0.9)'; g.lineWidth=1.5;
+          g.beginPath(); g.moveTo(mx2,my2); g.lineTo(ex,ey); g.stroke();
+          if(hit){
+            g.fillStyle='rgba(255,70,60,0.85)';
+            g.beginPath(); g.arc(ex,ey,4.5,0,TAU); g.fill();
+            g.fillStyle='rgba(255,190,180,0.9)';
+            g.beginPath(); g.arc(ex,ey,1.8,0,TAU); g.fill();
           }
           g.restore();
         }
@@ -4302,13 +4455,13 @@ const Game = {
     }
 
     // result cards
-    if(this.result === 'win' && this.resultT > 0.55) this.drawWin(g);
+    if(this.result === 'win' && this.resultT > 2.35) this.drawWin(g);
     if(this.result === 'lose' && this.resultT > 0.5) this.drawLose(g);
   },
 
   drawWin(g){
     const L = this.level;
-    const t = clamp((this.resultT-0.55)/0.32, 0, 1);
+    const t = clamp((this.resultT-2.35)/0.32, 0, 1);
     const e = easeOut(t);
     const w = 420, h = 268, x = DW/2-w/2, y = DH/2-h/2 - 16;
     g.save();
@@ -4320,7 +4473,7 @@ const Game = {
     const cups = L.cups(L.used);
     for(let i=0;i<3;i++){
       const cx = DW/2 - 66 + i*66;
-      const pop = clamp((this.resultT - 0.75 - i*0.16)/0.22, 0, 1);
+      const pop = clamp((this.resultT - 2.55 - i*0.16)/0.22, 0, 1);
       g.save(); g.translate(cx, y+112);
       const s = i < cups ? 2.4*(0.6+0.4*easeOut(pop)) : 2.4;
       g.scale(1,1);
@@ -4401,7 +4554,7 @@ Game.drawTitle = function(g){
   drawCup(g, cx-52, 528, 1.8, true);
   label(g, `${tc} / ${LEVELS.length*3}`, cx-24, 528, 24, '#f0dcb4', 'left');
   g.restore();
-  label(g,'a physics puzzle in one hundred and eight rooms', DW/2, 596, 15, 'rgba(240,220,180,0.4)');
+  label(g,'a physics puzzle in one hundred and eleven rooms', DW/2, 596, 15, 'rgba(240,220,180,0.4)');
 };
 
 Game.drawWorlds = function(g){
@@ -4496,7 +4649,7 @@ Game.drawLevels = function(g){
 
 Game.drawSettings = function(g){
   this.menuBG(g);
-  const w=430,h=428,x=DW/2-w/2,y=DH/2-h/2;
+  const w=430,h=486,x=DW/2-w/2,y=DH/2-h/2;
   panel(g,x,y,w,h,16);
   label(g,'SETTINGS', DW/2, y+44, 32, '#f5dfa8');
   const row = (i,txt,val,fn)=>{
@@ -4512,14 +4665,16 @@ Game.drawSettings = function(g){
     Save.data.guide = !(Save.data.guide!==false); Save.write(); });
   row(3,'Full charge aim', !!Save.data.classic, ()=>{
     Save.data.classic = !Save.data.classic; Save.write(); });
+  row(4,'Laser sights', !!Save.data.laser, ()=>{
+    Save.data.laser = !Save.data.laser; Save.write(); });
   if(this._wipe){
-    label(g,'Erase every cup and clear all rooms?', DW/2, y+332, 16, '#ffb59a');
-    if(button(g, x+40, y+352, 150, 44, 'CANCEL')) this._wipe = false;
-    if(button(g, x+w-190, y+352, 150, 44, 'ERASE', {accent:true})){
+    label(g,'Erase every cup and clear all rooms?', DW/2, y+394, 16, '#ffb59a');
+    if(button(g, x+40, y+414, 150, 44, 'CANCEL')) this._wipe = false;
+    if(button(g, x+w-190, y+414, 150, 44, 'ERASE', {accent:true})){
       Save.data.best = {}; Save.write(); this._wipe = false;
     }
   } else {
-    if(button(g, x+30, y+344, w-60, 44, 'RESET PROGRESS')) this._wipe = true;
+    if(button(g, x+30, y+406, w-60, 44, 'RESET PROGRESS')) this._wipe = true;
   }
   if(button(g, 20, DH-62, 130, 46, 'BACK')){ this._wipe=false; this.transition(()=>this.go(this.level?'levels':'title')); }
 };
@@ -4527,7 +4682,7 @@ Game.drawSettings = function(g){
 Game.drawFinale = function(g){
   this.menuBG(g);
   label(g,'THE WORKS ARE QUIET', DW/2, 150, 44, '#f5dfa8');
-  label(g,'Every mark painted. One hundred and eight rooms behind you.', DW/2, 208, 21, 'rgba(240,220,180,0.75)');
+  label(g,'Every mark painted. One hundred and eleven rooms behind you.', DW/2, 208, 21, 'rgba(240,220,180,0.75)');
   const tc = Save.totalCups();
   g.save(); drawCup(g, DW/2-60, 290, 3.0, true);
   label(g, `${tc} / ${LEVELS.length*3}`, DW/2+4, 290, 34, '#f0dcb4', 'left');

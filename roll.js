@@ -1,0 +1,20 @@
+const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const OUT=__dirname+'/shots/';
+(async()=>{
+  const b = await chromium.launch();
+  const p = await b.newPage({viewport:{width:960,height:640}});
+  const errs=[]; p.on('pageerror',e=>errs.push(e.message));
+  await p.goto('file:///home/user/The-Keeper/flopshot.html');
+  await p.waitForTimeout(700);
+  await p.evaluate(()=>{ window.__flop.Save.data.seen=true; window.__flop.Save.write(); });
+  await p.evaluate(()=>{window.__flop.Game.startLevel(105);window.__flop.Game.fade=0;window.__flop.Game.hint=0;});
+  await p.waitForTimeout(3400);
+  const before = await p.evaluate(()=>Math.round(window.__flop.Game.level.cannon.x));
+  await p.screenshot({path:OUT+'D0-wheels.png'});
+  await p.evaluate(()=>{window.__flop.Game.level.fire(-0.5,1);});
+  await p.waitForTimeout(1400);
+  const after = await p.evaluate(()=>Math.round(window.__flop.Game.level.cannon.x));
+  await p.screenshot({path:OUT+'D1-wheels-after.png'});
+  console.log('cannon x before/after firing:', before, after, 'errors:', JSON.stringify(errs));
+  await b.close();
+})();
