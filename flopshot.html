@@ -1651,8 +1651,8 @@ class Level {
           break;
         }
         case 'g': {
-          const b = this.add({x:op[1],y:op[2],w:op[3],h:op[4],a:A(5)*D2R,mat:'glass'});
-          b.render='glass'; b.breakable = op[6]||55;
+          const b = this.add({x:op[1],y:op[2],w:op[3],h:op[4],a:A(5)*D2R,mat:'glass',fixed:true});
+          b.render='glass'; b.breakable = op[6]||110;
           break;
         }
         case 'ball': {
@@ -1831,7 +1831,7 @@ class Level {
     // shatters just from being placed a few pixels above its shelf
     for(let i=0;i<50;i++) this.world.step(1/120);
     for(const b of this.world.bodies){ if(!b.fixed){ b.vx=b.vy=b.av=0; } }
-    this.world.onContact = (A,B,imp,x,y,nx,ny)=>this.onImpact(A,B,imp,x,y,nx,ny);
+    this.world.onContact = (A,B,sev,x,y,nx,ny,speed)=>this.onImpact(A,B,sev,x,y,nx,ny,speed);
   }
 
   onImpact(A,B,sev,x,y,nx,ny,speed){
@@ -1853,17 +1853,32 @@ class Level {
         FX.burst(x,y,3,{col:'#c9b48c',type:'chip',sizeMin:1,sizeMax:2.4,spMax:120,lifeMax:0.5});
     }
     for(const b of [A,B]){
-      if(b.breakable && speed > 190 && sev > b.breakable && !b.dead) this.shatter(b);
+      if(b.breakable && speed > 190 && sev > b.breakable && !b.dead){
+        const hitter = b === A ? B : A;
+        const dir = b === A ? -1 : 1;     // normal runs A to B
+        this.shatter(b, hitter, nx*dir, ny*dir, speed);
+      }
       if(b.tnt && speed > 280 && sev > 45 && b.tnt.fuse < 0) b.tnt.fuse = 0.28;
       if(b.pop && speed > 150 && !b.dead) this.popBalloon(b);
     }
     if(dollPart && other && other.deadly) this.killDoll(dollPart.doll, x, y);
   }
 
-  shatter(b){
-    FX.burst(b.x,b.y,14,{col:'#cfeeff',type:'shard',sizeMin:2,sizeMax:5,spMax:260,lifeMax:0.9});
+  shatter(b, hitter, nx, ny, speed){
+    FX.burst(b.x,b.y,16,{col:'#cfeeff',type:'shard',sizeMin:2,sizeMax:5,spMax:280,lifeMax:0.9});
     Audio.thud(0.55,'glass');
     this.world.remove(b);
+    // the pane took the blow, so hand most of that momentum back and let
+    // whatever broke it carry on through the hole
+    if(hitter && speed){
+      const keep = 0.62 * speed;
+      const group = hitter.doll ? hitter.doll.list : [hitter];
+      for(const p of group){
+        if(p.fixed) continue;
+        p.vx += nx * keep; p.vy += ny * keep;
+        p.wake();
+      }
+    }
   }
   popBalloon(b){
     FX.burst(b.x,b.y,12,{col:'#ff8fb0',type:'chip',sizeMin:1.6,sizeMax:3.4,spMax:220,lifeMax:0.6});
@@ -1900,7 +1915,7 @@ class Level {
       o.vx += dx*n*power*f*3.2;
       o.vy += dy*n*power*f*3.2 - power*f*0.5;
       o.av += (Math.random()-0.5)*f*16;
-      if(o.breakable && f > 0.25) this.shatter(o);
+      if(o.breakable && f > 0.25) this.shatter(o, null, 0, 0, 0);
       if(o.pop) this.popBalloon(o);
       if(o.tnt && o.tnt.fuse < 0 && f > 0.2) o.tnt.fuse = 0.12 + Math.random()*0.12;
     }
@@ -2037,7 +2052,7 @@ Level.prototype.update = function(dt){
       let hit = false;
       for(const b of d.list){
         const rad = b.shape==='circle' ? b.r : Math.min(b.hw,b.hh);
-        if(dist2(b.x,b.y,t.x,t.y) < (t.r*0.86 + rad)*(t.r*0.86 + rad)){ hit = true; break; }
+        if(dist2(b.x,b.y,t.x,t.y) < (t.r*0.92 + rad)*(t.r*0.92 + rad)){ hit = true; break; }
       }
       if(hit){
         t.hit = true;
@@ -2535,9 +2550,9 @@ const LEVELS = [
   ['fan',480,300,300,220,0,1400], ['m',760,420,200,20], ['m',300,240,200,20],
   ['m',860,600,160,20]]},
 
-{n:'Glass House', th:2, c:[86,560,-24], sh:4, tr:[2,3], tg:[[862,470,26]], o:[
+{n:'Glass House', th:2, c:[86,560,-24], sh:4, tr:[2,3], tg:[[820,470,26]], o:[
   ['m',700,168,22,296], ['g',700,470,26,300],
-  ['m',862,510,200,20], ['m',400,300,200,20]]},
+  ['m',820,510,220,20], ['m',400,300,200,20]]},
 
 {n:'Elevator Shaft', th:2, c:[86,560,-52], sh:5, tr:[3,4], tg:[[790,588,26]], o:[
   ['m',680,432,22,388], ['m',900,432,22,388],
@@ -2586,7 +2601,7 @@ const LEVELS = [
   ['mo',830,510,220,20], ['mo',300,400,180,20]]},
 
 {n:'The Canopy', th:3, c:[86,560,-56], sh:4, tr:[2,3], tg:[[520,152,26]], o:[
-  ['mo',280,360,200,20], ['mo',740,360,240,20], ['mo',520,110,150,18],
+  ['mo',360,470,22,300], ['mo',740,360,240,20], ['mo',520,110,150,18],
   ['balloon',464,300,20,240]]},
 
 {n:'Split Path', th:3, c:[86,560,-40], sh:5, tr:[3,4], tg:[[280,240,24],[880,240,24]], o:[
@@ -2637,9 +2652,9 @@ const LEVELS = [
   ['s',380,459,22,318], ['s',700,459,22,318],
   ['water',540,552,300,132], ['tnt',540,468,40,40]]},
 
-{n:'Triple Mark', th:4, c:[86,560,-42], sh:6, tr:[3,5], tg:[[300,240,22],[600,180,22],[880,300,22]], o:[
-  ['s',300,280,180,20], ['s',600,220,180,20], ['s',880,340,160,20],
-  ['bump',450,470,26], ['bump',740,470,26]]},
+{n:'Triple Mark', th:4, c:[86,560,-42], sh:6, tr:[3,5], tg:[[240,504,22],[560,360,22],[860,180,22]], o:[
+  ['s',240,540,150,18], ['s',560,400,170,20], ['s',860,220,170,20],
+  ['bump',400,562,24], ['bump',700,562,24]]},
 
 {n:'Last Bridge', th:4, c:[86,560,-24], sh:5, tr:[3,4], tg:[[880,560,26]], o:[
   ['g',520,470,300,22], ['tnt',520,428,40,40], ['s',700,540,22,160],
@@ -2649,14 +2664,14 @@ const LEVELS = [
   ['mov',560,420,200,22,0,-260,4], ['saw',360,300,28,8], ['saw',760,470,28,-8],
   ['s',820,220,200,20], ['s',300,480,180,20], ['fan',660,300,160,300,-90,1500]]},
 
-{n:'The Long Shot', th:4, c:[86,560,-44], sh:6, tr:[2,4], tg:[[890,388,24]], o:[
-  ['s',300,500,22,240], ['s',480,180,22,300], ['s',660,500,22,240],
-  ['s',840,180,22,260], ['s',890,430,140,20], ['bump',560,562,24],
-  ['tnt',380,596,40,40]]},
+{n:'The Long Shot', th:4, c:[86,560,-24], sh:6, tr:[2,4], tg:[[880,410,26]], o:[
+  ['s',560,180,22,320], ['s',560,540,22,160],
+  ['s',760,545,22,150], ['s',880,450,160,20],
+  ['bump',300,562,24], ['tnt',380,596,40,40]]},
 
 /* ---------------- VI. THE ATTIC ---------------- */
-{n:'Cold Open', th:1, c:[86,560,-38], sh:4, tr:[2,3], tg:[[880,588,26]], o:[
-  ['i',420,380,340,18,14], ['s',740,470,22,300], ['s',260,240,180,20]]},
+{n:'Cold Open', th:1, c:[86,560,-38], sh:4, tr:[2,3], tg:[[892,588,28]], o:[
+  ['i',420,380,340,18,14], ['s',740,578,22,84], ['s',260,240,180,20]]},
 
 {n:'Crossfire', th:2, c:[86,560,-46], sh:5, tr:[3,4], tg:[[880,470,26]], o:[
   ['fan',420,330,170,290,0,1400], ['fan',680,330,170,290,180,1400],
@@ -2679,20 +2694,20 @@ const LEVELS = [
   ['rope',420,60,8,26], ['rope',600,60,8,26], ['saw',520,540,28,8],
   ['mo',880,510,200,20], ['mo',300,300,180,20]]},
 
-{n:'Mirror', th:0, c:[480,300,-90], sh:4, tr:[2,3], tg:[[170,588,24],[790,588,24]], o:[
-  ['w',480,480,22,300], ['w',300,420,180,20], ['w',660,420,180,20]]},
+{n:'Mirror', th:0, c:[480,300,-90], sh:4, tr:[2,3], tg:[[240,588,24],[790,588,24]], o:[
+  ['w',480,480,22,300], ['w',320,420,180,20], ['w',660,420,180,20]]},
 
-{n:'The Kiln', th:4, c:[86,560,-56], sh:5, tr:[3,4], tg:[[780,400,26]], o:[
+{n:'The Kiln', th:4, c:[86,560,-56], sh:5, tr:[3,4], tg:[[780,330,28]], o:[
   ['s',660,432,22,388], ['s',900,432,22,388],
-  ['fan',780,450,214,336,-90,2000], ['spike',780,604,180,26]]},
+  ['fan',780,450,214,336,-90,1500], ['spike',780,604,180,26]]},
 
 {n:'Deadweight', th:1, c:[86,560,-30], sh:5, tr:[3,4], tg:[[880,588,26]], o:[
   ['btn',560,596,1,60], ['B',360,590,50,50],
   ['s',700,190,22,340], ['door',700,490,22,260,1,0,0,-280], ['s',300,300,200,20]]},
 
-{n:'The Deep End', th:1, c:[86,560,-36], sh:5, tr:[3,4], tg:[[820,520,26]], o:[
+{n:'The Deep End', th:1, c:[86,560,-36], sh:5, tr:[3,4], tg:[[820,505,28]], o:[
   ['s',680,432,22,388], ['water',810,540,240,150],
-  ['b',760,478,64,26], ['b',856,478,64,26]]},
+  ['b',730,478,60,26], ['b',900,478,50,26]]},
 
 {n:'Hothouse Roof', th:3, c:[86,560,-52], sh:5, tr:[3,4], tg:[[820,152,26]], o:[
   ['g',600,250,260,22], ['mo',820,192,200,20],
@@ -2946,13 +2961,17 @@ const Game = {
         const showA = this.aiming ? this.aimA : C.a;
         const showP = this.aiming ? this.aimP : 0.75;
         if(Save.data.guide !== false){
-          const pts = L.previewArc(showA, showP, 96);
+          const pts = L.previewArc(showA, showP, 100);
           g.save();
-          for(let i=4;i<pts.length;i+=5){
+          for(let i=4;i<pts.length;i+=4){
             const f = 1 - i/pts.length;
-            g.globalAlpha = 0.16 + f*0.55;
+            const r = 3.4*(0.45+f*0.75);
+            g.globalAlpha = (0.30 + f*0.55) * 0.55;
+            g.fillStyle = '#1a1004';
+            g.beginPath(); g.arc(pts[i].x, pts[i].y+1, r+1.2, 0, TAU); g.fill();
+            g.globalAlpha = 0.30 + f*0.60;
             g.fillStyle = '#ffe6b0';
-            g.beginPath(); g.arc(pts[i].x, pts[i].y, 2.6*(0.45+f*0.7), 0, TAU); g.fill();
+            g.beginPath(); g.arc(pts[i].x, pts[i].y, r, 0, TAU); g.fill();
           }
           g.restore();
         }
@@ -3028,7 +3047,7 @@ const Game = {
     g.strokeStyle='rgba(226,190,126,0.30)'; g.lineWidth=1.4;
     rr(g, DW-236, 8, 222, 40, 10); g.stroke();
     let x = DW - 26;
-    label(g, 'x ' + L.cups(Math.min(L.shots, L.used + 1)), x, 29, 22, '#f0dcb4', 'right');
+    label(g, 'x ' + L.cups(L.done ? L.used : Math.min(L.shots, L.used + 1)), x, 29, 22, '#f0dcb4', 'right');
     drawCup(g, x - 46, 28, 1.35, true);
     x -= 92;
     label(g, 'x ' + left, x, 29, 22, left>0?'#f0dcb4':'#e07a5a', 'right');
@@ -3059,7 +3078,7 @@ const Game = {
     label(g,'MARK PAINTED', DW/2, y+44, 30, '#ffe9be');
     const cups = L.cups(L.used);
     for(let i=0;i<3;i++){
-      const cx = DW/2 - 58 + i*58;
+      const cx = DW/2 - 66 + i*66;
       const pop = clamp((this.resultT - 0.75 - i*0.16)/0.22, 0, 1);
       g.save(); g.translate(cx, y+112);
       const s = i < cups ? 2.4*(0.6+0.4*easeOut(pop)) : 2.4;
@@ -3186,7 +3205,7 @@ Game.drawLevels = function(g){
 
   const cols = 6, rows = 2, cw = 124, ch = 118, gx = 14, gy = 16;
   const ox = DW/2 - (cols*cw + (cols-1)*gx)/2;
-  const oy = 128;
+  const oy = 172;
   for(let i=W.from;i<W.to;i++){
     const k = i - W.from;
     const x = ox + (k%cols)*(cw+gx), y = oy + Math.floor(k/cols)*(ch+gy);
@@ -3206,7 +3225,7 @@ Game.drawLevels = function(g){
       label(g, String(i+1), x+cw/2, yy+34, 32, '#f5dfa8');
       label(g, LEVELS[i].n, x+cw/2, yy+62, 12, 'rgba(240,220,180,0.62)');
       const c = Save.cups(i);
-      for(let q=0;q<3;q++) drawCup(g, x+cw/2-26+q*26, yy+92, 1.15, q<c);
+      for(let q=0;q<3;q++) drawCup(g, x+cw/2-29+q*29, yy+92, 1.12, q<c);
     } else {
       g.save(); g.translate(x+cw/2, yy+ch/2-6);
       g.fillStyle='rgba(240,220,180,0.55)';
