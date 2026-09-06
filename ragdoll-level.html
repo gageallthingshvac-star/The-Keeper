@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+<title>The Chocolate Works</title>
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Chocolate Works" />
+<meta name="theme-color" content="#0a0704" />
+<style>
+  html,body{margin:0;padding:0;height:100%;background:#000;overflow:hidden;
+    -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+  #view{position:fixed;inset:0;display:block;touch-action:none}
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<script>
+(function () {
+  'use strict';
+  var BUILD = 'v1.0.0';
+
+  // ══ the level ═══════════════════════════════════════════════════════════
+  // Traced off a screenshot of the wooden/chocolate stage. Everything below
+  // is in "level pixels": the screenshot's visible play field is 1200 x 795,
+  // origin top-left, y down. The world itself runs past those edges — the
+  // ceiling slabs and the right-hand column carry on out of frame.
+  var WW = 1200, WH = 795;
+
+  // static, collidable timber. t: slab = thick riveted panel,
+  // beam = riveted strut, post = pale mill post. a = degrees, about centre.
+  var STATIC = [
+    { t:'slab', x:9,    y:-90, w:369, h:186 },          // ceiling, left panel
+    { t:'slab', x:414,  y:-90, w:507, h:186 },          // ceiling, right panel
+    { t:'post', x:387,  y:-60, w:27,  h:160 },          // post in the ceiling seam
+    { t:'beam', x:1164, y:-60, w:28,  h:900 },          // right-hand edge column
+    { t:'beam', x:-14,  y:384, w:180, h:25 },           // cannon shelf
+    { t:'beam', x:4,    y:422, w:154, h:22, a:-22 },    // strut under the shelf
+    { t:'beam', x:348,  y:210, w:628, h:23 },           // mezzanine, upper course
+    { t:'beam', x:348,  y:233, w:628, h:23 },           // mezzanine, lower course
+    { t:'beam', x:355,  y:372, w:26,  h:340 },          // left column
+    { t:'beam', x:950,  y:372, w:27,  h:141 },          // right column
+    { t:'slab', x:358,  y:372, w:614, h:141 },          // the big middle slab
+    { t:'slab', x:355,  y:707, w:588, h:150 },          // floor
+    { t:'beam', x:934,  y:707, w:24,  h:110 },          // post at the ramp foot
+    { t:'beam', x:928,  y:657, w:264, h:23, a:-21.3 }   // ramp, bottom right
+  ];
+
+  // loose timber — rigid bodies that can be knocked out of the way
+  var LOOSE = [
+    // the column stub between the mezzanine and the slab looks as structural
+    // as everything else, but nothing actually pins it in place
+    { m:0.6, style:'beam', parts:[ {x:950,y:256,w:27, h:116} ] },
+    { m:0.5, parts:[ {x:350,y:101,w:160,h:19},          // upper bracket, top bar
+                     {x:491,y:101,w:19, h:107},         //   ... right upright
+                     {x:350,y:189,w:160,h:19},          //   ... bottom bar
+                     {x:351,y:176,w:24, h:13} ] },      //   ... offcut, left end
+    { m:0.34, parts:[ {x:545,y:258,w:157,h:23},         // ragdoll shelf, top bar
+                     {x:681,y:258,w:21, h:112},         //   ... right upright
+                     {x:545,y:347,w:157,h:23},          //   ... bottom bar
+                     {x:546,y:336,w:23, h:11} ] }       //   ... offcut, left end
+  ];
+
+  // a leaning post that hangs in front of the mezzanine — scenery only,
+  // exactly as it sits in the screenshot
+  var DECOR = { x:530, y:104, w:20, h:158, a:1.8 };
+
+  var TARGET = { x:441, y:645, r:62 };
+  var CANNON = { x:66, y:300, len:80 };
+  var AIM0   = { x:995, y:280 };                        // where the sight rests
+  var PAR    = 2;                                       // goblets on the counter
+
+  // ══ tuning ══════════════════════════════════════════════════════════════
+  var G = 1700, MUZZLE = 1050, SUB = 4, STEP = 1 / 60;
+  var DRAG = 0.9992, REST = 0.30, FRIC = 0.955, MU = 0.30;
+  var RELAX = 0.28, MAXPEN = 5, ITER = 4;
+  var PMASS = 0.25;                                     // one ragdoll joint
+
+  // ══ small helpers ═══════════════════════════════════════════════════════
+  var seed = 1;
+  function rnd() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; }
+  function srnd(s) { seed = s || 1; }
+  function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+  function rad(d) { return d * Math.PI / 180; }
+
+  // ══ timber, drawn ═══════════════════════════════════════════════════════
+  // Everything is painted into a local space where the piece runs from
+  // (0,0) to (w,h); the caller has already rotated for us.
+
+  function rrect(g, x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    g.beginPath();
+    g.moveTo(x + r, y);
+    g.arcTo(x + w, y, x + w, y + h, r);
+    g.arcTo(x + w, y + h, x, y + h, r);
+    g.arcTo(x, y + h, x, y, r);
+    g.arcTo(x, y, x + w, y, r);
+    g.closePath();
+  }
+
+  function rivet(g, x, y, r) {
+    var gr = g.createRadialGradient(x - r * 0.35, y - r * 0.4, r * 0.1, x, y, r);
+    gr.addColorStop(0, '#dfcb9c'); gr.addColorStop(0.45, '#a98d51');
+    gr.addColorStop(1, '#54401c');
+    g.fillStyle = 'rgba(0,0,0,0.45)';
+    g.beginPath(); g.arc(x, y + r * 0.28, r * 1.05, 0, 6.2832); g.fill();
+    g.fillStyle = gr;
+    g.beginPath(); g.arc(x, y, r, 0, 6.2832); g.fill();
+  }
+
+  // a run of rivets down the middle of a band
+  function rivetRun(g, x0, y0, len, along, r, gap) {
+    var n = Math.max(2, Math.round(len / gap)), i, t;
+    for (i = 0; i <= n; i++) {
+      t = (i / n) * (len - r * 2.6) + r * 1.3;
+      if (along) rivet(g, x0 + t, y0, r); else rivet(g, x0, y0 + t, r);
+    }
+  }
+
+  // the metal-edged band that caps a slab
+  function band(g, x, y, w, h, horiz) {
+    var gr = horiz ? g.createLinearGradient(0, y, 0, y + h)
+                   : g.createLinearGradient(x, 0, x + w, 0);
+    gr.addColorStop(0, '#87724f'); gr.addColorStop(0.28, '#6a5940');
+    gr.addColorStop(0.72, '#4b3f2b'); gr.addColorStop(1, '#31281a');
+    g.fillStyle = gr; g.fillRect(x, y, w, h);
+    g.fillStyle = 'rgba(206,184,142,0.28)';
+    if (horiz) g.fillRect(x, y, w, 1.4); else g.fillRect(x, y, 1.4, h);
+    g.fillStyle = 'rgba(0,0,0,0.45)';
+    if (horiz) g.fillRect(x, y + h - 1.6, w, 1.6); else g.fillRect(x + w - 1.6, y, 1.6, h);
+    if (horiz) rivetRun(g, x, y + h / 2, w, 1, Math.min(4.4, h * 0.22), 46);
+    else rivetRun(g, x + w / 2, y, h, 0, Math.min(4.4, w * 0.22), 46);
+  }
+
+  // an L bracket in the corner of a panel
+  function corner(g, x, y, sx, sy) {
+    var a = 34, t = 4.5;
+    g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = t + 2;
+    g.beginPath();
+    g.moveTo(x + sx * a, y + 1); g.lineTo(x + 1, y + 1); g.lineTo(x + 1, y + sy * a);
+    g.stroke();
+    g.strokeStyle = '#8d7952'; g.lineWidth = t;
+    g.beginPath();
+    g.moveTo(x + sx * a, y); g.lineTo(x, y); g.lineTo(x, y + sy * a);
+    g.stroke();
+  }
+
+  // thick riveted panel: plank rows, banded top and bottom
+  function drawSlab(g, w, h) {
+    var bh = 21, i, j;
+    var gr = g.createLinearGradient(0, 0, 0, h);
+    gr.addColorStop(0, '#5a3d25'); gr.addColorStop(0.5, '#4a3220');
+    gr.addColorStop(1, '#3b281a');
+    g.fillStyle = gr; g.fillRect(0, 0, w, h);
+
+    var rows = Math.max(1, Math.round((h - bh * 2) / 46));
+    var rh = (h - bh * 2) / rows;
+    for (i = 0; i < rows; i++) {
+      var y = bh + i * rh;
+      var pg = g.createLinearGradient(0, y, 0, y + rh);
+      var lo = i % 2 ? '#5b3e25' : '#644528';
+      pg.addColorStop(0, lo); pg.addColorStop(0.35, '#4d3420');
+      pg.addColorStop(1, '#3c2819');
+      g.fillStyle = pg; g.fillRect(0, y, w, rh);
+      // grain
+      g.strokeStyle = 'rgba(0,0,0,0.13)'; g.lineWidth = 1;
+      for (j = 1; j < 5; j++) {
+        var gy = y + rh * j / 5;
+        g.beginPath(); g.moveTo(0, gy); g.lineTo(w, gy); g.stroke();
+      }
+      // vertical joins, staggered per row
+      var span = 152, off = (i % 2) * 76;
+      for (j = 0; ; j++) {
+        var x = off + j * span; if (x > w) break;
+        if (x <= 2) continue;
+        g.fillStyle = 'rgba(0,0,0,0.55)'; g.fillRect(x - 1, y, 2.4, rh);
+        g.fillStyle = 'rgba(170,140,100,0.15)'; g.fillRect(x + 1.4, y, 1.2, rh);
+      }
+      g.fillStyle = 'rgba(0,0,0,0.5)'; g.fillRect(0, y, w, 1.6);
+      // corner furniture on the wider rows
+      if (rh > 34 && w > 90) {
+        corner(g, 12, y + 10, 1, 1);
+        corner(g, w - 12, y + rh - 10, -1, -1);
+      }
+    }
+    band(g, 0, 0, w, bh, 1);
+    band(g, 0, h - bh, w, bh, 1);
+    if (h > 120) { band(g, 0, 0, bh * 0.9, h, 0); band(g, w - bh * 0.9, 0, bh * 0.9, h, 0); }
+  }
+
+  // riveted strut — a single course of rivets down the middle
+  function drawBeam(g, w, h) {
+    var horiz = w >= h;
+    var gr = horiz ? g.createLinearGradient(0, 0, 0, h) : g.createLinearGradient(0, 0, w, 0);
+    gr.addColorStop(0, '#8b7654'); gr.addColorStop(0.22, '#6b5b3f');
+    gr.addColorStop(0.62, '#4c4029'); gr.addColorStop(1, '#302719');
+    g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    g.fillStyle = 'rgba(208,188,148,0.34)';
+    if (horiz) g.fillRect(0, 0, w, 1.5); else g.fillRect(0, 0, 1.5, h);
+    g.fillStyle = 'rgba(0,0,0,0.5)';
+    if (horiz) g.fillRect(0, h - 1.8, w, 1.8); else g.fillRect(w - 1.8, 0, 1.8, h);
+    g.strokeStyle = 'rgba(0,0,0,0.35)'; g.lineWidth = 1; g.strokeRect(0.5, 0.5, w - 1, h - 1);
+    var r = Math.min(4.4, (horiz ? h : w) * 0.22);
+    if (horiz) rivetRun(g, 0, h / 2, w, 1, r, 46); else rivetRun(g, w / 2, 0, h, 0, r, 46);
+  }
+
+  // pale mill timber — rounded, waxed, catches the light along one edge
+  function drawPost(g, w, h) {
+    var horiz = w >= h, r = Math.min(w, h) / 2;
+    var gr = horiz ? g.createLinearGradient(0, 0, 0, h) : g.createLinearGradient(0, 0, w, 0);
+    gr.addColorStop(0, '#7a5a2c'); gr.addColorStop(0.12, '#d5b183');
+    gr.addColorStop(0.34, '#b98d55'); gr.addColorStop(0.72, '#8c6330');
+    gr.addColorStop(1, '#553a1a');
+    rrect(g, 0, 0, w, h, r); g.fillStyle = gr; g.fill();
+    g.strokeStyle = 'rgba(48,32,12,0.75)'; g.lineWidth = 1.6; g.stroke();
+    g.save(); rrect(g, 0, 0, w, h, r); g.clip();
+    g.strokeStyle = 'rgba(90,62,26,0.3)'; g.lineWidth = 1;
+    var i, n = Math.round((horiz ? w : h) / 26);
+    for (i = 1; i < n; i++) {
+      var t = (horiz ? w : h) * i / n;
+      g.beginPath();
+      if (horiz) { g.moveTo(t, h * 0.2); g.lineTo(t + 3, h * 0.85); }
+      else { g.moveTo(w * 0.2, t); g.lineTo(w * 0.85, t + 3); }
+      g.stroke();
+    }
+    g.restore();
+  }
+
+  function paint(g, b) {
+    g.save();
+    if (b.a) {
+      g.translate(b.x + b.w / 2, b.y + b.h / 2);
+      g.rotate(rad(b.a));
+      g.translate(-b.w / 2, -b.h / 2);
+    } else g.translate(b.x, b.y);
+    g.shadowColor = 'rgba(0,0,0,0.55)'; g.shadowBlur = 12; g.shadowOffsetY = 4;
+    if (b.t === 'slab') drawSlab(g, b.w, b.h);
+    else if (b.t === 'post') drawPost(g, b.w, b.h);
+    else drawBeam(g, b.w, b.h);
+    g.restore();
+  }
+
+  // ══ the wall behind everything ══════════════════════════════════════════
+  // Big soft-cornered blocks, near black, like a slab of dark chocolate.
+  function drawWall(g) {
+    g.fillStyle = '#0d0906'; g.fillRect(-40, -140, WW + 80, WH + 220);
+    var T = 114, GAPY = 11, x, y;
+    srnd(7);
+    for (y = -140; y < WH + 120; y += T) {
+      for (x = -40; x < WW + 60; x += T) {
+        var w = T - GAPY, h = T - GAPY, v = 0.82 + rnd() * 0.36;
+        var gr = g.createLinearGradient(x, y, x + w * 0.7, y + h);
+        gr.addColorStop(0, 'rgb(' + Math.round(36 * v) + ',' + Math.round(27 * v) + ',' + Math.round(16 * v) + ')');
+        gr.addColorStop(0.55, 'rgb(' + Math.round(24 * v) + ',' + Math.round(17 * v) + ',' + Math.round(10 * v) + ')');
+        gr.addColorStop(1, 'rgb(' + Math.round(14 * v) + ',' + Math.round(10 * v) + ',' + Math.round(5 * v) + ')');
+        rrect(g, x, y, w, h, 19); g.fillStyle = gr; g.fill();
+        // bevel
+        g.save(); rrect(g, x, y, w, h, 19); g.clip();
+        g.strokeStyle = 'rgba(118,92,58,0.18)'; g.lineWidth = 3;
+        g.beginPath(); g.moveTo(x + 3, y + h - 20); g.lineTo(x + 3, y + 16);
+        g.arcTo(x + 3, y + 3, x + 20, y + 3, 15); g.lineTo(x + w - 20, y + 3); g.stroke();
+        g.strokeStyle = 'rgba(0,0,0,0.55)'; g.lineWidth = 3;
+        g.beginPath(); g.moveTo(x + w - 3, y + 20); g.lineTo(x + w - 3, y + h - 16);
+        g.arcTo(x + w - 3, y + h - 3, x + w - 20, y + h - 3, 15); g.lineTo(x + 20, y + h - 3); g.stroke();
+        g.restore();
+      }
+    }
+    // one warm lamp somewhere off to the left, then the dark closes in
+    var lamp = g.createRadialGradient(300, 330, 40, 300, 330, 720);
+    lamp.addColorStop(0, 'rgba(255,196,120,0.10)'); lamp.addColorStop(1, 'rgba(255,190,110,0)');
+    g.fillStyle = lamp; g.fillRect(-40, -140, WW + 80, WH + 220);
+  }
+
+  // the lamp falls off fast in here; this goes over the timber too
+  function drawGloom(g) {
+    var vg = g.createRadialGradient(WW * 0.44, WH * 0.44, WH * 0.14, WW * 0.44, WH * 0.44, WH * 1.05);
+    vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(0.42, 'rgba(0,0,0,0.16)');
+    vg.addColorStop(0.72, 'rgba(0,0,0,0.46)'); vg.addColorStop(1, 'rgba(0,0,0,0.84)');
+    g.fillStyle = vg; g.fillRect(-40, -140, WW + 80, WH + 220);
+  }
+
+  // ══ the bullseye ════════════════════════════════════════════════════════
+  function drawTarget(g, t) {
+    var r = t.r, i;
+    var glow = g.createRadialGradient(t.x, t.y, r * 0.8, t.x, t.y, r * 1.35);
+    glow.addColorStop(0, 'rgba(146,110,96,0.11)'); glow.addColorStop(1, 'rgba(146,110,96,0)');
+    g.fillStyle = glow; g.beginPath(); g.arc(t.x, t.y, r * 1.35, 0, 6.2832); g.fill();
+    var rings = [[1.00, '#a5503f'], [0.80, '#ddccb7'], [0.66, '#ab5244'], [0.46, '#d8c6b1'], [0.33, '#9a9086']];
+    for (i = 0; i < rings.length; i++) {
+      g.fillStyle = rings[i][1];
+      g.beginPath(); g.arc(t.x, t.y, r * rings[i][0], 0, 6.2832); g.fill();
+    }
+    // hand-painted wobble and wear
+    g.save();
+    g.beginPath(); g.arc(t.x, t.y, r, 0, 6.2832); g.clip();
+    srnd(31);
+    for (i = 0; i < 900; i++) {
+      var a = rnd() * 6.2832, d = Math.sqrt(rnd()) * r, w = rnd();
+      g.fillStyle = w < 0.55 ? 'rgba(0,0,0,' + (0.04 + rnd() * 0.13).toFixed(3) + ')'
+                             : 'rgba(226,206,186,' + (0.04 + rnd() * 0.12).toFixed(3) + ')';
+      g.fillRect(t.x + Math.cos(a) * d, t.y + Math.sin(a) * d, 2.6, 2.6);
+    }
+    var sh = g.createLinearGradient(t.x - r, t.y - r, t.x + r, t.y + r);
+    sh.addColorStop(0, 'rgba(255,240,220,0.16)'); sh.addColorStop(0.5, 'rgba(0,0,0,0)');
+    sh.addColorStop(1, 'rgba(0,0,0,0.32)');
+    g.fillStyle = sh; g.fillRect(t.x - r, t.y - r, r * 2, r * 2);
+    g.restore();
+    // the paint feathers out at the rim rather than stopping dead
+    for (i = 0; i < 3; i++) {
+      g.strokeStyle = 'rgba(132,78,64,' + (0.2 - i * 0.06).toFixed(3) + ')';
+      g.lineWidth = 2.2;
+      g.beginPath(); g.arc(t.x, t.y, r + i * 2, 0, 6.2832); g.stroke();
+    }
+  }
+
+  // ══ the scene, baked once ═══════════════════════════════════════════════
+  var scene = document.createElement('canvas'), sceneScale = 0;
+  var gloom = document.createElement('canvas');
+  function buildScene(s) {
+    if (s === sceneScale) return;
+    sceneScale = s;
+    scene.width = Math.ceil(WW * s); scene.height = Math.ceil(WH * s);
+    var g = scene.getContext('2d');
+    g.setTransform(s, 0, 0, s, 0, 0);
+    drawWall(g);
+    for (var i = 0; i < STATIC.length; i++) paint(g, STATIC[i]);
+    drawTarget(g, TARGET);
+    gloom.width = scene.width; gloom.height = scene.height;
+    var gg = gloom.getContext('2d');
+    gg.setTransform(s, 0, 0, s, 0, 0);
+    drawGloom(gg);
+  }
+
+  // ══ colliders ═══════════════════════════════════════════════════════════
+  // Every static piece becomes an oriented box; everything that moves is a
+  // circle, so there is only ever one collision test to write.
+  var BOX = [];
+  (function () {
+    for (var i = 0; i < STATIC.length; i++) {
+      var b = STATIC[i], a = rad(b.a || 0);
+      BOX.push({
+        cx: b.x + b.w / 2, cy: b.y + b.h / 2,
+        hw: b.w / 2, hh: b.h / 2,
+        c: Math.cos(a), s: Math.sin(a)
+      });
+    }
+  })();
+
+  // circle vs box. returns null, or the world-space normal and depth.
+  var _hit = { nx: 0, ny: 0, d: 0 };
+  function hitBox(b, px, py, r) {
+    var dx = px - b.cx, dy = py - b.cy;
+    var lx = dx * b.c + dy * b.s, ly = -dx * b.s + dy * b.c;
+    var hw = b.hw + r, hh = b.hh + r;
+    if (lx <= -hw || lx >= hw || ly <= -hh || ly >= hh) return null;
+    var ox = hw - Math.abs(lx), oy = hh - Math.abs(ly), nx, ny;
+    if (ox < oy) { nx = lx < 0 ? -1 : 1; ny = 0; _hit.d = ox; }
+    else { nx = 0; ny = ly < 0 ? -1 : 1; _hit.d = oy; }
+    _hit.nx = nx * b.c - ny * b.s;
+    _hit.ny = nx * b.s + ny * b.c;
+    return _hit;
+  }
+
+  // ── free particles (ragdoll joints) ────────────────────────────────────
+  function pt(x, y, r) { return { x: x, y: y, px: x, py: y, r: r }; }
+
+  // vel: bounce and friction are a once-per-substep job. Run them on every
+  // relaxation pass and a joint stops dead the moment it touches anything.
+  function particleVsWorld(p, vel) {
+    for (var i = 0; i < BOX.length; i++) {
+      var h = hitBox(BOX[i], p.x, p.y, p.r);
+      if (!h) continue;
+      p.x += h.nx * h.d; p.y += h.ny * h.d;
+      if (!vel) continue;
+      var vx = p.x - p.px, vy = p.y - p.py;
+      var vn = vx * h.nx + vy * h.ny;
+      if (vn < 0) {
+        var tx = (vx - vn * h.nx) * FRIC, ty = (vy - vn * h.ny) * FRIC;
+        vn *= -REST;
+        p.px = p.x - (tx + vn * h.nx); p.py = p.y - (ty + vn * h.ny);
+      }
+    }
+  }
+
+  // ── ragdolls ───────────────────────────────────────────────────────────
+  // Eleven joints, floppy distance links, and no self-collision: exactly
+  // enough to flop convincingly and nothing more.
+  var POSE = [
+    [0, -26, 11], [0, -8, 9], [0, 14, 9],
+    [-16, 2, 6], [-27, 17, 6], [16, 2, 6], [27, 17, 6],
+    [-8, 34, 7], [-10, 55, 7], [8, 34, 7], [10, 55, 7]
+  ];
+  var LINK = [[0,1],[1,2],[1,3],[3,4],[1,5],[5,6],[2,7],[7,8],[2,9],[9,10],
+              [0,2],[2,4],[2,6],[1,7],[1,9],[8,10]];
+  var HEAD = 0;
+
+  function ragdoll(x, y, ang, vx, vy, spin) {
+    var c = Math.cos(ang), s = Math.sin(ang), pts = [], i;
+    for (i = 0; i < POSE.length; i++) {
+      var lx = POSE[i][0], ly = POSE[i][1];
+      var wx = x + lx * c - ly * s, wy = y + lx * s + ly * c;
+      var p = pt(wx, wy, POSE[i][2]);
+      var rx = wx - x, ry = wy - y;
+      p.px = wx - (vx - spin * ry) * STEP / SUB;
+      p.py = wy - (vy + spin * rx) * STEP / SUB;
+      pts.push(p);
+    }
+    var links = [];
+    for (i = 0; i < LINK.length; i++) {
+      var a = pts[LINK[i][0]], b = pts[LINK[i][1]];
+      links.push({ a: LINK[i][0], b: LINK[i][1],
+        d: Math.hypot(a.x - b.x, a.y - b.y), k: i < 10 ? 1 : 0.35 });
+    }
+    return { pts: pts, links: links, dead: 0, live: true, splat: 0 };
+  }
+
+  function solveLinks(rd) {
+    for (var i = 0; i < rd.links.length; i++) {
+      var L = rd.links[i], a = rd.pts[L.a], b = rd.pts[L.b];
+      var dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 1e-6;
+      var f = (d - L.d) / d * 0.5 * L.k;
+      dx *= f; dy *= f;
+      a.x += dx; a.y += dy; b.x -= dx; b.y -= dy;
+    }
+  }
+
+  // ── loose rigid timber ─────────────────────────────────────────────────
+  // Verlet on (centre, angle). The body's outline is sampled into circles
+  // once; each contact becomes a positional impulse about the centre.
+  function makeBody(def) {
+    var q = [], i, j, k;
+    for (i = 0; i < def.parts.length; i++) {
+      var p = def.parts[i], horiz = p.w >= p.h;
+      var r = Math.min(p.w, p.h) / 2;
+      var len = (horiz ? p.w : p.h) - r * 2;
+      var n = Math.max(1, Math.round(len / (r * 1.35)));
+      for (j = 0; j <= n; j++) {
+        var t = r + len * j / n;
+        q.push({ x: p.x + (horiz ? t : p.w / 2), y: p.y + (horiz ? p.h / 2 : t), r: r });
+      }
+    }
+    var cx = 0, cy = 0;
+    for (k = 0; k < q.length; k++) { cx += q[k].x; cy += q[k].y; }
+    cx /= q.length; cy /= q.length;
+    var I = 0, m = def.m / q.length;
+    for (k = 0; k < q.length; k++) {
+      q[k].x -= cx; q[k].y -= cy;
+      I += m * (q[k].x * q[k].x + q[k].y * q[k].y);
+    }
+    var parts = [];
+    for (i = 0; i < def.parts.length; i++) {
+      var d = def.parts[i];
+      parts.push({ x: d.x - cx, y: d.y - cy, w: d.w, h: d.h });
+    }
+    var rr = 0, style = def.style || 'post';
+    for (k = 0; k < q.length; k++) rr = Math.max(rr, Math.hypot(q[k].x, q[k].y) + q[k].r);
+    return {
+      cx: cx, cy: cy, ang: 0, pcx: cx, pcy: cy, pang: 0,
+      q: q, parts: parts, rad: rr, style: style,
+      invM: 1 / def.m, invI: 1 / I, still: 0, sleep: false
+    };
+  }
+
+  // push the body out along n by depth d at world point (wx,wy).
+  // otherInvM is 0 for the world, 1/m for a ragdoll joint. The correction is
+  // relaxed and the depth capped, so a body wedged between two struts settles
+  // instead of being flung out of the level.
+  function bodyImpulse(b, wx, wy, nx, ny, d, otherInvM, vel) {
+    if (d > MAXPEN) d = MAXPEN;
+    var rx = wx - b.cx, ry = wy - b.cy;
+    var rn = rx * ny - ry * nx;
+    var k = b.invM + rn * rn * b.invI + otherInvM;
+    var lam = d * RELAX / k;
+    b.cx += nx * lam * b.invM; b.cy += ny * lam * b.invM;
+    b.ang += rn * lam * b.invI;
+    // friction: bleed off the sliding speed at the contact
+    if (!vel) return lam;
+    var w = b.ang - b.pang;
+    var vx = (b.cx - b.pcx) - w * ry, vy = (b.cy - b.pcy) + w * rx;
+    var tx = -ny, ty = nx, vt = vx * tx + vy * ty;
+    var rt = rx * ty - ry * tx;
+    var kt = b.invM + rt * rt * b.invI + otherInvM;
+    var lt = -vt * MU / kt;
+    if (lt > lam) lt = lam; else if (lt < -lam) lt = -lam;
+    b.pcx -= tx * lt * b.invM; b.pcy -= ty * lt * b.invM;
+    b.pang -= rt * lt * b.invI;
+    return lam;
+  }
+
+  // keep a body inside sane bounds — one bad frame should not lose it
+  function bodySane(b) {
+    if (!isFinite(b.cx) || !isFinite(b.cy) || !isFinite(b.ang)) {
+      b.cx = b.pcx; b.cy = b.pcy; b.ang = b.pang; return;
+    }
+    var vx = b.cx - b.pcx, vy = b.cy - b.pcy, v = Math.hypot(vx, vy);
+    if (v > 26) { b.pcx = b.cx - vx * 26 / v; b.pcy = b.cy - vy * 26 / v; }
+    var w = b.ang - b.pang;
+    if (w > 0.22) b.pang = b.ang - 0.22; else if (w < -0.22) b.pang = b.ang + 0.22;
+  }
+
+  // ══ the world, stepped ══════════════════════════════════════════════════
+  var S = null;
+
+  function reset(asShot) {
+    S = {
+      bodies: [], dolls: [], puffs: [], splats: [],
+      aim: { x: AIM0.x, y: AIM0.y }, ang: 0,
+      used: 0, left: PAR, flash: 0, shake: 0,
+      state: 'aim', win: 0, t: 0, hint: asShot ? 0 : 3.4
+    };
+    for (var i = 0; i < LOOSE.length; i++) S.bodies.push(makeBody(LOOSE[i]));
+    aimAt(S.aim.x, S.aim.y);
+    if (asShot) {
+      // the opening frame of the screenshot: one ragdoll already spent and
+      // lying in the shelf, one left on the counter
+      var d = ragdoll(628, 322, Math.PI / 2, 0, 0, 0);
+      S.dolls.push(d); S.used = 1; S.left = PAR - 1;
+      for (i = 0; i < 260; i++) sub(STEP / SUB);
+      d.live = false;
+      for (i = 0; i < S.bodies.length; i++) { S.bodies[i].sleep = true; S.bodies[i].still = 99; }
+      S.hint = 3.4;
+    }
+  }
+
+  function aimAt(x, y) {
+    S.aim.x = x; S.aim.y = y;
+    S.ang = Math.atan2(y - CANNON.y, x - CANNON.x);
+  }
+
+  function fire() {
+    if (S.state !== 'aim' || S.left <= 0) return;
+    var c = Math.cos(S.ang), s = Math.sin(S.ang);
+    var mx = CANNON.x + c * CANNON.len, my = CANNON.y + s * CANNON.len;
+    // no random tumble: the same shot has to land the same way every time
+    S.dolls.push(ragdoll(mx, my, S.ang + Math.PI / 2, c * MUZZLE, s * MUZZLE, 0));
+    S.used++; S.left--;
+    S.flash = 1; S.shake = 7;
+    for (var i = 0; i < 9; i++) {
+      S.puffs.push({ x: mx + (Math.random() - 0.5) * 14, y: my + (Math.random() - 0.5) * 14,
+        vx: c * (60 + Math.random() * 210) + (Math.random() - 0.5) * 90,
+        vy: s * (60 + Math.random() * 210) - 40 - Math.random() * 60,
+        r: 9 + Math.random() * 16, life: 1, fade: 0.5 + Math.random() * 0.5 });
+    }
+    for (i = 0; i < S.bodies.length; i++) S.bodies[i].sleep = false;
+  }
+
+  function sub(dt) {
+    var i, j, k, b, p, rd, dt2 = dt * dt;
+
+    // integrate ragdoll joints
+    for (i = 0; i < S.dolls.length; i++) {
+      rd = S.dolls[i]; if (!rd.live) continue;
+      for (j = 0; j < rd.pts.length; j++) {
+        p = rd.pts[j];
+        var nx = p.x + (p.x - p.px) * DRAG, ny = p.y + (p.y - p.py) * DRAG + G * dt2;
+        p.px = p.x; p.py = p.y; p.x = nx; p.y = ny;
+      }
+    }
+    // integrate loose timber
+    for (i = 0; i < S.bodies.length; i++) {
+      b = S.bodies[i]; if (b.sleep) continue;
+      var ncx = b.cx + (b.cx - b.pcx) * DRAG;
+      var ncy = b.cy + (b.cy - b.pcy) * DRAG + G * dt2;
+      var na = b.ang + (b.ang - b.pang) * 0.994;
+      b.pcx = b.cx; b.pcy = b.cy; b.pang = b.ang;
+      b.cx = ncx; b.cy = ncy; b.ang = na;
+    }
+
+    for (k = 0; k < ITER; k++) {
+      for (i = 0; i < S.dolls.length; i++) if (S.dolls[i].live) solveLinks(S.dolls[i]);
+
+      // timber against the world
+      for (i = 0; i < S.bodies.length; i++) {
+        b = S.bodies[i]; if (b.sleep) continue;
+        for (j = 0; j < b.q.length; j++) {
+          var bc = Math.cos(b.ang), bs = Math.sin(b.ang), q = b.q[j];
+          var qx = b.cx + q.x * bc - q.y * bs, qy = b.cy + q.x * bs + q.y * bc;
+          for (var m = 0; m < BOX.length; m++) {
+            var h = hitBox(BOX[m], qx, qy, q.r);
+            if (h) bodyImpulse(b, qx, qy, h.nx, h.ny, h.d, 0, k === 0);
+          }
+        }
+        bodySane(b);
+      }
+      // timber against timber
+      for (i = 0; i < S.bodies.length; i++) {
+        for (j = i + 1; j < S.bodies.length; j++) {
+          var A = S.bodies[i], B = S.bodies[j];
+          if (A.sleep && B.sleep) continue;
+          if (Math.hypot(A.cx - B.cx, A.cy - B.cy) > A.rad + B.rad) continue;
+          var ac = Math.cos(A.ang), as = Math.sin(A.ang);
+          var bc2 = Math.cos(B.ang), bs2 = Math.sin(B.ang);
+          for (var ai = 0; ai < A.q.length; ai++) {
+            var qa = A.q[ai];
+            var ax = A.cx + qa.x * ac - qa.y * as, ay = A.cy + qa.x * as + qa.y * ac;
+            for (var bi = 0; bi < B.q.length; bi++) {
+              var qb = B.q[bi];
+              var bx = B.cx + qb.x * bc2 - qb.y * bs2, by = B.cy + qb.x * bs2 + qb.y * bc2;
+              var ddx = bx - ax, ddy = by - ay;
+              var dd = Math.hypot(ddx, ddy), ov = qa.r + qb.r - dd;
+              if (ov <= 0 || dd < 1e-6) continue;
+              var un = ddx / dd, vn2 = ddy / dd;
+              A.sleep = B.sleep = false;
+              bodyImpulse(A, ax, ay, -un, -vn2, ov * 0.5, B.invM, k === 0);
+              bodyImpulse(B, bx, by, un, vn2, ov * 0.5, A.invM, k === 0);
+            }
+          }
+          bodySane(A); bodySane(B);
+        }
+      }
+      // ragdolls against the world and against the timber
+      for (i = 0; i < S.dolls.length; i++) {
+        rd = S.dolls[i]; if (!rd.live) continue;
+        for (j = 0; j < rd.pts.length; j++) {
+          p = rd.pts[j];
+          particleVsWorld(p, k === 0);
+          for (var bj = 0; bj < S.bodies.length; bj++) {
+            b = S.bodies[bj];
+            if (Math.hypot(p.x - b.cx, p.y - b.cy) > b.rad + p.r) continue;
+            var cc = Math.cos(b.ang), cs = Math.sin(b.ang);
+            for (var qi = 0; qi < b.q.length; qi++) {
+              var qq = b.q[qi];
+              var wx = b.cx + qq.x * cc - qq.y * cs, wy = b.cy + qq.x * cs + qq.y * cc;
+              var dx = p.x - wx, dy = p.y - wy;
+              var d = Math.hypot(dx, dy), o = p.r + qq.r - d;
+              if (o <= 0 || d < 1e-6) continue;
+              var ux = dx / d, uy = dy / d;
+              b.sleep = false;
+              var lam = bodyImpulse(b, wx, wy, -ux, -uy, o, 1 / PMASS, k === 0);
+              p.x += ux * lam / PMASS; p.y += uy * lam / PMASS;
+              cc = Math.cos(b.ang); cs = Math.sin(b.ang);
+            }
+            bodySane(b);
+          }
+        }
+      }
+    }
+
+    // let settled timber go quiet so it does not shiver
+    for (i = 0; i < S.bodies.length; i++) {
+      b = S.bodies[i]; if (b.sleep) continue;
+      var mv = Math.hypot(b.cx - b.pcx, b.cy - b.pcy) + Math.abs(b.ang - b.pang) * 30;
+      if (mv < 0.05) { if (++b.still > 26) { b.sleep = true; b.pcx = b.cx; b.pcy = b.cy; b.pang = b.ang; } }
+      else b.still = 0;
+    }
+  }
+
+  function step(dt) {
+    var i, j, rd, p;
+    S.t += dt;
+    if (S.hint > 0) S.hint -= dt;
+    S.flash = Math.max(0, S.flash - dt * 6);
+    S.shake *= 0.86;
+    for (i = 0; i < SUB; i++) sub(dt / SUB);
+
+    for (i = 0; i < S.puffs.length; i++) {
+      p = S.puffs[i];
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      p.vx *= 0.965; p.vy = p.vy * 0.965 - 26 * dt;
+      p.r += 26 * dt; p.life -= p.fade * dt;
+      if (p.life <= 0) S.puffs.splice(i--, 1);
+    }
+
+    for (i = 0; i < S.dolls.length; i++) {
+      rd = S.dolls[i]; if (!rd.live) continue;
+      var hit = false, cx = 0, cy = 0;
+      for (j = 0; j < rd.pts.length; j++) {
+        p = rd.pts[j]; cx += p.x; cy += p.y;
+        if (Math.hypot(p.x - TARGET.x, p.y - TARGET.y) < TARGET.r * 0.94) hit = true;
+      }
+      cx /= rd.pts.length; cy /= rd.pts.length;
+      if (hit && S.state === 'aim') {
+        rd.live = false;
+        splat(cx, cy);
+        S.shake = 12;
+        S.state = 'won'; S.win = S.used <= PAR ? 1 : 0;
+      } else if (cx < -260 || cx > WW + 320 || cy > WH + 300 || cy < -900) {
+        rd.live = false; rd.dead = 1;
+      }
+    }
+
+    if (S.state === 'aim' && S.left <= 0) {
+      var moving = false;
+      for (i = 0; i < S.dolls.length; i++) {
+        rd = S.dolls[i]; if (!rd.live) continue;
+        for (j = 0; j < rd.pts.length; j++)
+          if (Math.hypot(rd.pts[j].x - rd.pts[j].px, rd.pts[j].y - rd.pts[j].py) > 0.35) { moving = true; break; }
+        if (moving) break;
+      }
+      if (!moving) { S.settle = (S.settle || 0) + dt; if (S.settle > 1.1) S.state = 'lost'; }
+      else S.settle = 0;
+    }
+  }
+
+  function splat(x, y) {
+    var i, n = 26;
+    srnd(Math.round(x * 7 + y * 13) || 5);
+    var blobs = [];
+    for (i = 0; i < n; i++) {
+      var a = rnd() * 6.2832, d = Math.pow(rnd(), 0.6) * TARGET.r * 1.05;
+      blobs.push({ x: TARGET.x + Math.cos(a) * d, y: TARGET.y + Math.sin(a) * d,
+        r: 4 + rnd() * 15 });
+    }
+    S.splats.push({ blobs: blobs });
+  }
+
+  // ══ things that move, drawn ═════════════════════════════════════════════
+  function limb(g, a, b, w, fill) {
+    var dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy);
+    g.save();
+    g.translate(a.x, a.y); g.rotate(Math.atan2(dy, dx));
+    rrect(g, -w / 2, -w / 2, len + w, w, w / 2);
+    g.fillStyle = fill; g.fill();
+    g.strokeStyle = 'rgba(56,44,32,0.85)'; g.lineWidth = 1.6; g.stroke();
+    g.restore();
+  }
+
+  function drawDoll(g, rd) {
+    var P = rd.pts, bone = '#e2d7c4', dark = '#c9bca5';
+    g.save();
+    g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 7; g.shadowOffsetY = 3;
+    limb(g, P[2], P[9], 11, dark); limb(g, P[9], P[10], 10, dark);   // far leg
+    limb(g, P[1], P[5], 9, dark);  limb(g, P[5], P[6], 8, dark);     // far arm
+    limb(g, P[1], P[2], 17, bone);                                   // trunk
+    limb(g, P[2], P[7], 11, bone); limb(g, P[7], P[8], 10, bone);    // near leg
+    limb(g, P[1], P[3], 9, bone);  limb(g, P[3], P[4], 8, bone);     // near arm
+    var h = P[0];
+    g.beginPath(); g.arc(h.x, h.y, h.r, 0, 6.2832);
+    g.fillStyle = bone; g.fill();
+    g.strokeStyle = 'rgba(56,44,32,0.85)'; g.lineWidth = 1.6; g.stroke();
+    g.restore();
+    // a face, roughly toward the trunk's far side
+    var fa = Math.atan2(h.y - P[1].y, h.x - P[1].x);
+    var ex = Math.cos(fa + 1.35) * h.r * 0.42, ey = Math.sin(fa + 1.35) * h.r * 0.42;
+    var fx = Math.cos(fa) * h.r * 0.30, fy = Math.sin(fa) * h.r * 0.30;
+    g.fillStyle = '#3a2f24';
+    g.beginPath(); g.arc(h.x + fx + ex, h.y + fy + ey, 1.9, 0, 6.2832); g.fill();
+    g.beginPath(); g.arc(h.x + fx - ex, h.y + fy - ey, 1.9, 0, 6.2832); g.fill();
+  }
+
+  function drawLoose(g, b) {
+    g.save();
+    g.translate(b.cx, b.cy); g.rotate(b.ang);
+    g.shadowColor = 'rgba(0,0,0,0.55)'; g.shadowBlur = 12; g.shadowOffsetY = 4;
+    for (var i = 0; i < b.parts.length; i++) {
+      var p = b.parts[i];
+      g.save(); g.translate(p.x, p.y);
+      if (b.style === 'beam') drawBeam(g, p.w, p.h); else drawPost(g, p.w, p.h);
+      g.restore();
+    }
+    g.restore();
+  }
+
+  function drawCannon(g) {
+    var c = Math.cos(S.ang), s2 = Math.sin(S.ang), x = CANNON.x, y = CANNON.y, i;
+
+    // the boiler never quite stops smouldering
+    for (i = 0; i < 7; i++) {
+      var t = (S.t * 0.26 + i * 0.143) % 1;
+      var px = x - 22 - t * 16 + Math.sin(t * 4.6 + i) * 13, py = y - 36 - t * 104;
+      var pr = 9 + t * 27;
+      var sg = g.createRadialGradient(px, py, 1, px, py, pr);
+      sg.addColorStop(0, 'rgba(206,200,196,' + (0.26 * (1 - t)).toFixed(3) + ')');
+      sg.addColorStop(1, 'rgba(190,184,180,0)');
+      g.fillStyle = sg; g.beginPath(); g.arc(px, py, pr, 0, 6.2832); g.fill();
+    }
+
+    // the heap of pale spoil the carriage is bedded into
+    g.save();
+    g.fillStyle = 'rgba(0,0,0,0.5)';
+    g.beginPath(); g.ellipse(70, 388, 62, 9, 0, 0, 6.2832); g.fill();
+    srnd(19);
+    for (i = 0; i < 13; i++) {
+      var mx = 16 + i * 9, mr = 5 + rnd() * 7;
+      g.fillStyle = i % 2 ? '#a89e8a' : '#bcb29e';
+      g.beginPath(); g.arc(mx, 384 - mr * 0.35, mr, Math.PI, 0);
+      g.lineTo(mx + mr, 387); g.lineTo(mx - mr, 387); g.closePath(); g.fill();
+    }
+    g.fillStyle = 'rgba(96,84,68,0.55)'; g.fillRect(14, 383, 112, 4);
+    g.restore();
+
+    // carriage: iron cheeks and a stubby maroon boiler drum
+    var pg2 = g.createLinearGradient(58, 0, 106, 0);
+    pg2.addColorStop(0, '#392c22'); pg2.addColorStop(0.35, '#4b3b2c');
+    pg2.addColorStop(1, '#1d1610');
+    g.fillStyle = pg2;
+    g.beginPath(); g.moveTo(58, 380); g.lineTo(106, 380); g.lineTo(99, 322);
+    g.lineTo(65, 322); g.closePath(); g.fill();
+    g.save();
+    g.translate(0, 0);
+    var dg = g.createLinearGradient(0, 306, 0, 340);
+    dg.addColorStop(0, '#8e4433'); dg.addColorStop(0.4, '#61281c');
+    dg.addColorStop(1, '#33150f');
+    rrect(g, 52, 306, 66, 34, 5); g.fillStyle = dg; g.fill();
+    g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 2; g.stroke();
+    g.fillStyle = '#d8cdb6';
+    rrect(g, 44, 302, 13, 42, 4); g.fill();
+    rrect(g, 113, 302, 13, 42, 4); g.fill();
+    g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 1.6;
+    rrect(g, 44, 302, 13, 42, 4); g.stroke();
+    rrect(g, 113, 302, 13, 42, 4); g.stroke();
+    g.restore();
+
+    // barrel, swinging with the sight
+    g.save();
+    g.translate(x, y); g.rotate(S.ang);
+    g.shadowColor = 'rgba(0,0,0,0.65)'; g.shadowBlur = 12; g.shadowOffsetY = 5;
+    var bg = g.createLinearGradient(0, -23, 0, 23);
+    bg.addColorStop(0, '#6f6659'); bg.addColorStop(0.2, '#ded5c5');
+    bg.addColorStop(0.5, '#bdb29c'); bg.addColorStop(0.78, '#7b7263');
+    bg.addColorStop(1, '#403a30');
+    rrect(g, -42, -23, 116, 46, 10); g.fillStyle = bg; g.fill();
+    g.shadowBlur = 0;
+    g.strokeStyle = 'rgba(40,32,22,0.5)'; g.lineWidth = 1.6;
+    rrect(g, -42, -23, 116, 46, 10); g.stroke();
+    g.fillStyle = 'rgba(255,248,232,0.4)'; rrect(g, -28, -18, 84, 7, 3); g.fill();
+    g.fillStyle = '#6f6152'; g.fillRect(50, -25, 8, 50);
+    g.fillStyle = 'rgba(58,48,38,0.55)'; g.fillRect(14, -24, 6, 48);
+    g.fillStyle = 'rgba(58,48,38,0.35)'; g.fillRect(-6, -24, 4, 48);
+    g.fillStyle = '#1b1510'; rrect(g, 64, -20, 10, 40, 5); g.fill();
+    var brg = g.createLinearGradient(-42, 0, -14, 0);
+    brg.addColorStop(0, '#3d1811'); brg.addColorStop(1, '#7d3423');
+    rrect(g, -42, -21, 28, 42, 9); g.fillStyle = brg; g.fill();
+    g.restore();
+
+    // the great red wheel
+    g.save();
+    g.translate(x - 32, y + 2);
+    g.shadowColor = 'rgba(0,0,0,0.6)'; g.shadowBlur = 10; g.shadowOffsetY = 4;
+    var wg = g.createRadialGradient(-7, -9, 3, 0, 0, 27);
+    wg.addColorStop(0, '#6f3624'); wg.addColorStop(0.7, '#471e12'); wg.addColorStop(1, '#210e08');
+    g.fillStyle = wg; g.beginPath(); g.arc(0, 0, 27, 0, 6.2832); g.fill();
+    g.shadowBlur = 0;
+    g.strokeStyle = '#6c3722'; g.lineWidth = 4;
+    g.beginPath(); g.arc(0, 0, 22, 0, 6.2832); g.stroke();
+    g.strokeStyle = '#2b120a'; g.lineWidth = 4;
+    for (i = 0; i < 6; i++) {
+      var a = i * Math.PI / 3 + S.t * 0.16;
+      g.beginPath(); g.moveTo(0, 0); g.lineTo(Math.cos(a) * 22, Math.sin(a) * 22); g.stroke();
+    }
+    g.fillStyle = '#a98a67'; g.beginPath(); g.arc(0, 0, 6.5, 0, 6.2832); g.fill();
+    g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 2; g.stroke();
+    g.restore();
+
+    if (S.flash > 0) {
+      var mx2 = x + c * CANNON.len, my2 = y + s2 * CANNON.len;
+      var fg = g.createRadialGradient(mx2, my2, 2, mx2, my2, 70 * S.flash);
+      fg.addColorStop(0, 'rgba(255,238,186,' + (0.92 * S.flash).toFixed(3) + ')');
+      fg.addColorStop(1, 'rgba(255,160,60,0)');
+      g.fillStyle = fg; g.beginPath(); g.arc(mx2, my2, 70 * S.flash, 0, 6.2832); g.fill();
+    }
+  }
+
+  function drawSight(g) {
+    var x = S.aim.x, y = S.aim.y, R = 52, A = 93, T = 9;
+    g.save();
+    g.globalAlpha = 0.8;
+    g.strokeStyle = 'rgba(232,232,236,0.9)'; g.lineWidth = 3;
+    g.beginPath(); g.arc(x, y, R, 0, 6.2832); g.stroke();
+    g.fillStyle = 'rgba(206,206,212,0.85)';
+    g.fillRect(x - A, y - T / 2, A * 2, T);
+    g.fillRect(x - T / 2, y - A, T, A * 2);
+    g.restore();
+  }
+
+  // ══ the furniture along the bottom ══════════════════════════════════════
+  var BTN_MENU = { x: 24, y: 723, w: 168, h: 59 };
+  var BTN_AGAIN = { x: 240, y: 723, w: 76, h: 59 };
+
+  function plate(g, b, down) {
+    g.save();
+    rrect(g, b.x, b.y, b.w, b.h, 13);
+    g.fillStyle = down ? 'rgba(70,58,44,0.85)' : 'rgba(22,17,12,0.62)';
+    g.fill();
+    g.lineWidth = 4; g.strokeStyle = 'rgba(18,14,10,0.9)'; g.stroke();
+    g.lineWidth = 2.6; g.strokeStyle = '#e9e4da'; g.stroke();
+    g.restore();
+  }
+
+  function hudDoll(g, x, y, s) {          // x,y = feet centre
+    g.save(); g.translate(x, y); g.scale(s, s);
+    g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 7; g.lineCap = 'round';
+    g.fillStyle = '#c39b6e';
+    g.beginPath(); g.moveTo(-5, 0); g.lineTo(-3, -18); g.moveTo(5, 0); g.lineTo(3, -18);
+    g.moveTo(0, -18); g.lineTo(0, -38); g.moveTo(0, -32); g.lineTo(-10, -22);
+    g.moveTo(0, -32); g.lineTo(10, -24); g.stroke();
+    g.strokeStyle = '#c39b6e'; g.lineWidth = 5; g.stroke();
+    g.fillStyle = '#e6d3b4'; g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 2.2;
+    g.beginPath(); g.arc(0, -46, 9, 0, 6.2832); g.fill(); g.stroke();
+    g.restore();
+  }
+
+  function hudCup(g, x, y, s) {            // x,y = base centre
+    g.save(); g.translate(x, y); g.scale(s, s);
+    var gr = g.createLinearGradient(-16, -52, 16, 0);
+    gr.addColorStop(0, '#f4d493'); gr.addColorStop(0.5, '#d2a054'); gr.addColorStop(1, '#8a6222');
+    g.fillStyle = gr; g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 2.4;
+    g.beginPath();
+    g.moveTo(-19, -52); g.quadraticCurveTo(-17, -22, -5, -16);
+    g.lineTo(-5, -6); g.lineTo(-15, -6); g.lineTo(-15, 0); g.lineTo(15, 0);
+    g.lineTo(15, -6); g.lineTo(5, -6); g.lineTo(5, -16);
+    g.quadraticCurveTo(17, -22, 19, -52); g.closePath();
+    g.fill(); g.stroke();
+    g.fillStyle = 'rgba(255,245,214,0.55)';
+    g.beginPath(); g.ellipse(-9, -40, 3.4, 10, 0.2, 0, 6.2832); g.fill();
+    g.restore();
+  }
+
+  function tally(g, txt, x, y) {
+    g.font = 'bold 46px Georgia, "Times New Roman", serif';
+    g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+    g.lineWidth = 6; g.strokeStyle = 'rgba(0,0,0,0.75)'; g.strokeText(txt, x, y);
+    g.fillStyle = '#fff'; g.fillText(txt, x, y);
+  }
+
+  function drawHud(g) {
+    plate(g, BTN_MENU, false);
+    g.font = 'bold 34px "Helvetica Neue", Helvetica, Arial, sans-serif';
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.lineWidth = 6; g.strokeStyle = 'rgba(0,0,0,0.75)';
+    g.strokeText('MENU', BTN_MENU.x + BTN_MENU.w / 2, BTN_MENU.y + BTN_MENU.h / 2 + 1);
+    g.fillStyle = '#fff';
+    g.fillText('MENU', BTN_MENU.x + BTN_MENU.w / 2, BTN_MENU.y + BTN_MENU.h / 2 + 1);
+
+    plate(g, BTN_AGAIN, false);
+    g.save();
+    g.translate(BTN_AGAIN.x + BTN_AGAIN.w / 2, BTN_AGAIN.y + BTN_AGAIN.h / 2);
+    g.lineWidth = 6.5; g.strokeStyle = 'rgba(0,0,0,0.75)'; g.lineCap = 'butt';
+    g.beginPath(); g.arc(0, 2, 15, 2.5, 0.9); g.stroke();
+    g.strokeStyle = '#fff'; g.lineWidth = 5; g.beginPath(); g.arc(0, 2, 15, 2.5, 0.9); g.stroke();
+    g.fillStyle = '#fff';
+    g.beginPath(); g.moveTo(6, -18); g.lineTo(22, -11); g.lineTo(7, -1); g.closePath();
+    g.strokeStyle = 'rgba(0,0,0,0.75)'; g.lineWidth = 3; g.stroke(); g.fill();
+    g.restore();
+
+    hudDoll(g, 846, 778, 1.0); tally(g, 'x ' + S.left, 872, 772);
+    hudCup(g, 995, 778, 1.0);  tally(g, 'x ' + PAR, 1032, 772);
+  }
+
+  function drawSplats(g) {
+    for (var i = 0; i < S.splats.length; i++) {
+      var b = S.splats[i].blobs, j;
+      g.save();
+      g.beginPath(); g.arc(TARGET.x, TARGET.y, TARGET.r * 1.1, 0, 6.2832); g.clip();
+      g.fillStyle = '#9c1d16';
+      for (j = 0; j < b.length; j++) {
+        g.beginPath(); g.arc(b[j].x, b[j].y, b[j].r, 0, 6.2832); g.fill();
+      }
+      g.fillStyle = 'rgba(60,8,6,0.45)';
+      for (j = 0; j < b.length; j += 3) {
+        g.beginPath(); g.arc(b[j].x + 2, b[j].y + 3, b[j].r * 0.6, 0, 6.2832); g.fill();
+      }
+      g.restore();
+    }
+  }
+
+  function card(g, title, line) {
+    g.save();
+    g.fillStyle = 'rgba(6,4,3,0.6)'; g.fillRect(0, 0, WW, WH);
+    var w = 620, h = 210, x = (WW - w) / 2, y = 250;
+    rrect(g, x, y, w, h, 18);
+    g.fillStyle = 'rgba(24,17,11,0.94)'; g.fill();
+    g.lineWidth = 3; g.strokeStyle = '#d8ceb8'; g.stroke();
+    g.textAlign = 'center';
+    g.fillStyle = '#f2e7d2';
+    g.font = 'bold 52px Georgia, serif'; g.textBaseline = 'alphabetic';
+    g.fillText(title, WW / 2, y + 80);
+    g.font = '26px "Helvetica Neue", Helvetica, Arial, sans-serif';
+    g.fillStyle = '#b7a894';
+    g.fillText(line, WW / 2, y + 128);
+    g.font = '22px "Helvetica Neue", Helvetica, Arial, sans-serif';
+    g.fillStyle = '#8e806e';
+    g.fillText('tap anywhere to load another', WW / 2, y + 172);
+    g.restore();
+  }
+
+  // ══ frame ═══════════════════════════════════════════════════════════════
+  var cv = document.getElementById('view'), ctx = cv.getContext('2d');
+  var cw = 0, ch = 0, scale = 1, ox = 0, oy = 0, dpr = 1;
+
+  function resize() {
+    dpr = Math.min(2.5, window.devicePixelRatio || 1);
+    cw = window.innerWidth; ch = window.innerHeight;
+    cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr);
+    cv.style.width = cw + 'px'; cv.style.height = ch + 'px';
+    scale = Math.min(cw / WW, ch / WH);
+    ox = (cw - WW * scale) / 2; oy = (ch - WH * scale) / 2;
+    buildScene(clamp(Math.round(scale * dpr * 4) / 4, 1, 2.5));
+  }
+
+  function draw() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cw, ch);
+    ctx.save();
+    ctx.translate(ox, oy); ctx.scale(scale, scale);
+    ctx.beginPath(); ctx.rect(0, 0, WW, WH); ctx.clip();
+    if (S.shake > 0.3) ctx.translate((Math.random() - 0.5) * S.shake, (Math.random() - 0.5) * S.shake);
+
+    ctx.drawImage(scene, 0, 0, WW, WH);
+    drawSplats(ctx);
+    var i;
+    for (i = 0; i < S.bodies.length; i++) if (S.bodies[i].style === 'beam') drawLoose(ctx, S.bodies[i]);
+    for (i = 0; i < S.bodies.length; i++) if (S.bodies[i].style !== 'beam') drawLoose(ctx, S.bodies[i]);
+    paint(ctx, { t: 'post', x: DECOR.x, y: DECOR.y, w: DECOR.w, h: DECOR.h, a: DECOR.a });
+    for (i = 0; i < S.dolls.length; i++) if (!S.dolls[i].dead) drawDoll(ctx, S.dolls[i]);
+    drawCannon(ctx);
+    for (i = 0; i < S.puffs.length; i++) {
+      var p = S.puffs[i], pg = ctx.createRadialGradient(p.x, p.y, 1, p.x, p.y, p.r);
+      pg.addColorStop(0, 'rgba(214,208,200,' + (0.46 * p.life).toFixed(3) + ')');
+      pg.addColorStop(0.6, 'rgba(196,190,182,' + (0.26 * p.life).toFixed(3) + ')');
+      pg.addColorStop(1, 'rgba(186,180,172,0)');
+      ctx.fillStyle = pg;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.2832); ctx.fill();
+    }
+    ctx.drawImage(gloom, 0, 0, WW, WH);
+    if (S.state === 'aim') drawSight(ctx);
+    drawHud(ctx);
+
+    if (S.hint > 0 && S.state === 'aim') {
+      ctx.save();
+      ctx.globalAlpha = clamp(S.hint, 0, 1) * 0.85;
+      ctx.textAlign = 'center';
+      ctx.font = '26px "Helvetica Neue", Helvetica, Arial, sans-serif';
+      ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+      ctx.strokeText('drag to aim — let go to fire', WW / 2, 92);
+      ctx.fillStyle = '#efe4d0';
+      ctx.fillText('drag to aim — let go to fire', WW / 2, 92);
+      ctx.restore();
+    }
+    if (S.state === 'won') card(ctx, S.win ? 'Bullseye' : 'Target down',
+      S.win ? 'Cleared in ' + S.used + ' — goblet earned' : 'Cleared in ' + S.used + ' ragdolls');
+    if (S.state === 'lost') card(ctx, 'Out of ragdolls', 'The target is still standing');
+    if (S.menu) card(ctx, 'The Chocolate Works', 'One target, ' + PAR + ' ragdolls for the goblet');
+    ctx.restore();
+  }
+
+  // ══ input ═══════════════════════════════════════════════════════════════
+  function inBtn(b, x, y) { return x > b.x && x < b.x + b.w && y > b.y && y < b.y + b.h; }
+  function toWorld(e) {
+    var r = cv.getBoundingClientRect();
+    return { x: (e.clientX - r.left - ox) / scale, y: (e.clientY - r.top - oy) / scale };
+  }
+
+  var dragging = false;
+  cv.addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    var w = toWorld(e);
+    if (S.menu) { S.menu = false; return; }
+    if (inBtn(BTN_AGAIN, w.x, w.y)) { reset(false); return; }
+    if (inBtn(BTN_MENU, w.x, w.y)) { S.menu = true; return; }
+    if (S.state !== 'aim') { reset(false); return; }
+    if (S.left <= 0) return;
+    dragging = true; aimAt(w.x, w.y);
+    cv.setPointerCapture && cv.setPointerCapture(e.pointerId);
+  });
+  cv.addEventListener('pointermove', function (e) {
+    if (!dragging) return;
+    e.preventDefault();
+    var w = toWorld(e); aimAt(w.x, w.y);
+  });
+  function release(e) {
+    if (!dragging) return;
+    dragging = false;
+    var w = toWorld(e); aimAt(w.x, w.y); fire();
+  }
+  cv.addEventListener('pointerup', release);
+  cv.addEventListener('pointercancel', function () { dragging = false; });
+  window.addEventListener('resize', resize);
+  window.addEventListener('orientationchange', function () { setTimeout(resize, 120); });
+  window.addEventListener('keydown', function (e) {
+    if (e.key === 'r' || e.key === 'R') reset(false);
+  });
+
+  // ══ go ══════════════════════════════════════════════════════════════════
+  reset(true);
+  resize();
+  var last = performance.now(), acc = 0;
+  function frame(now) {
+    var dt = Math.min(0.25, (now - last) / 1000); last = now;
+    acc += dt;
+    var guard = 0;
+    while (acc >= STEP && guard++ < 5) { step(STEP); acc -= STEP; }
+    draw();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  window.__RB = {
+    get s() { return S; }, build: BUILD, reset: reset,
+    world: { W: WW, H: WH }, statics: STATIC, loose: LOOSE, target: TARGET,
+    shoot: function (x, y) { aimAt(x, y); fire(); },
+    tick: function (n) { for (var i = 0; i < (n || 1); i++) step(STEP); }
+  };
+})();
+</script>
+</body>
+</html>
