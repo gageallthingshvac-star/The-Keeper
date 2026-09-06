@@ -978,15 +978,24 @@
 
   // ══ frame ═══════════════════════════════════════════════════════════════
   var cv = document.getElementById('view'), ctx = cv.getContext('2d');
-  var cw = 0, ch = 0, scale = 1, ox = 0, oy = 0, dpr = 1;
+  var cw = 0, ch = 0, scale = 1, ox = 0, oy = 0, dpr = 1, turned = false;
 
   function resize() {
     dpr = Math.min(2.5, window.devicePixelRatio || 1);
     cw = window.innerWidth; ch = window.innerHeight;
     cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr);
     cv.style.width = cw + 'px'; cv.style.height = ch + 'px';
-    scale = Math.min(cw / WW, ch / WH);
-    ox = (cw - WW * scale) / 2; oy = (ch - WH * scale) / 2;
+    // the level is a landscape picture. On a phone held upright — or one with
+    // rotation locked — fitting it straight would leave a letterboxed sliver,
+    // so turn the whole world a quarter and fill the screen instead.
+    turned = ch > cw;
+    if (turned) {
+      scale = Math.min(cw / WH, ch / WW);
+      ox = (cw - WH * scale) / 2; oy = (ch - WW * scale) / 2;
+    } else {
+      scale = Math.min(cw / WW, ch / WH);
+      ox = (cw - WW * scale) / 2; oy = (ch - WH * scale) / 2;
+    }
     buildScene(clamp(Math.round(scale * dpr * 4) / 4, 1, 2.5));
   }
 
@@ -994,7 +1003,9 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cw, ch);
     ctx.save();
-    ctx.translate(ox, oy); ctx.scale(scale, scale);
+    ctx.translate(ox, oy);
+    if (turned) { ctx.translate(WH * scale, 0); ctx.rotate(Math.PI / 2); }
+    ctx.scale(scale, scale);
     ctx.beginPath(); ctx.rect(0, 0, WW, WH); ctx.clip();
     if (S.shake > 0.3) ctx.translate((Math.random() - 0.5) * S.shake, (Math.random() - 0.5) * S.shake);
 
@@ -1040,7 +1051,9 @@
   function inBtn(b, x, y) { return x > b.x && x < b.x + b.w && y > b.y && y < b.y + b.h; }
   function toWorld(e) {
     var r = cv.getBoundingClientRect();
-    return { x: (e.clientX - r.left - ox) / scale, y: (e.clientY - r.top - oy) / scale };
+    var sx = e.clientX - r.left - ox, sy = e.clientY - r.top - oy;
+    if (turned) return { x: sy / scale, y: WH - sx / scale };
+    return { x: sx / scale, y: sy / scale };
   }
 
   var dragging = false;
