@@ -2811,6 +2811,8 @@ Level.prototype.update = function(dt){
     this.wakeNear(p, 10);
   }
 
+  this.collapseStep(dt);
+
   /* --- post step bookkeeping --- */
   for(let i=this.dolls.length-1;i>=0;i--){
     const d = this.dolls[i];
@@ -2820,7 +2822,8 @@ Level.prototype.update = function(dt){
     for(const b of d.list){
       if(b.x > -260 && b.x < DW+260 && b.y < DH+320 && b.y > -700){ out = false; break; }
     }
-    if(out){ d.destroy(); this.dolls.splice(i,1); continue; }
+    if(out && !this.collapsed){ d.destroy(); this.dolls.splice(i,1); continue; }
+    if(out) continue;
     const tp = d.parts.torso;
     const spd2 = Math.hypot(tp.vx, tp.vy);
     if(spd2 > 620 && Math.random() < dt*34){
@@ -2905,27 +2908,56 @@ Level.prototype.fire = function(ang, power){
 Level.prototype.collapse = function(){
   if(this.collapsed) return;
   this.collapsed = true;
+  this.collapseT = 0;
   for(const e of this.ents) e.frozen = true;
+  // every joint lets go, so contraptions come apart rather than swinging
+  this.world.joints.length = 0;
+  this.floorBody = null;
   for(const b of this.world.bodies){
-    // the floor stays, so the room comes down into a heap rather than
-    // simply vanishing off the bottom of the screen
-    if(b.tag === 'wall' && b.y > DH - 40){ continue; }
-    if(!b.fixed){ b.gscale = 0.55; b.wake(); continue; }
+    if(b.tag === 'wall' && b.y > DH - 40){ this.floorBody = b; continue; }
+    if(!b.fixed){ b.gscale = 0.6; b.canSleep = false; b.wake(); continue; }
     b.fixed = false;
     b.kinematic = false;
     b.density = MAT_DENSITY[b.mat] || 0.0012;
     b.computeMass();
-    b.linDamp = 0.10; b.angDamp = 0.16;
-    b.gscale = 0.55;                       // slow enough to watch
-    b.vx = rnd(-42,42);
-    b.vy = rnd(-30,40);
-    b.av = rnd(-1.8,1.8);
+    b.linDamp = 0.08; b.angDamp = 0.12;
+    b.gscale = 0.6;
+    b.canSleep = false;
+    // a shove and a twist: everything loses its footing at once
+    b.vx = rnd(-46,46);
+    b.vy = rnd(-40,26);
+    b.av = rnd(-2.2,2.2);
     b.wake();
   }
-  for(const d of this.dolls) d.each(p=>{ p.gscale = 0.55; });
+  for(const d of this.dolls) d.each(p=>{ p.gscale = 0.6; p.canSleep = false; });
   this.world.wakeAll();
-  FX.kick(13);
+  FX.kick(15);
   Audio.collapse();
+};
+
+/* a beat later the floor goes too and the whole room falls away */
+Level.prototype.collapseStep = function(dt){
+  if(!this.collapsed) return;
+  this.collapseT += dt;
+  if(this.floorBody && this.collapseT > 0.95){
+    const f = this.floorBody;
+    this.floorBody = null;
+    f.fixed = false; f.canSleep = false;
+    f.density = MAT_DENSITY[f.mat] || 0.0012;
+    f.computeMass();
+    f.gscale = 0.75; f.linDamp = 0.05; f.angDamp = 0.08;
+    f.av = rnd(-0.5,0.5);
+    f.wake();
+    for(const b of this.world.bodies){ b.gscale = 0.85; b.wake(); }
+    FX.kick(9);
+    Audio.thud(0.5,'wood');
+  }
+  // dust rising off the wreck while it goes
+  if(this.collapseT < 2.2 && Math.random() < dt*26){
+    FX.add({ x:rnd(0,DW), y:rnd(DH*0.55,DH), vx:rnd(-30,30), vy:-rnd(10,60),
+             life:0, max:rnd(0.8,1.8), size:rnd(6,16), col:'#a8977c',
+             type:'smoke', rot:0, rv:0, g:-0.04, drag:1.4 });
+  }
 };
 
 Level.prototype.canFire = function(){ return this.used < this.shots && !this.done; };
@@ -4152,18 +4184,249 @@ const LEVELS = [
   ['spring',300,470,110,74,150], ['C',300,586,90,64],
   ['spring',660,470,110,74,150], ['C',660,586,90,64],
   ['m',210,348,170,20], ['m',790,348,170,20],
-  ['ib',480,588,60,60]]}
+  ['ib',480,588,60,60]]},
+
+/* ---- the rest of the rooms: fifty more, ending in the bonus set ---- */
+{n:'Tin Whistle', th:0, c:[86,560,-30], sh:4, tr:[2,3], tg:[[860,392,28]], o:[
+  ['w',360,470,20,300], ['w',600,300,20,300],
+  ['w',860,440,190,22], ['b',480,588,58,58]]},
+
+{n:'Solder Joint', th:0, c:[86,560,-26], sh:4, tr:[2,3], tg:[[880,556,28]], o:[
+  ['b',520,588,60,60], ['b',520,528,60,60], ['b',582,588,60,60],
+  ['w',700,240,20,420], ['w',880,604,180,28]]},
+
+{n:'Nickel Plate', th:1, c:[86,560,-32], sh:4, tr:[2,3], tg:[[866,470,28]], o:[
+  ['water',500,560,320,120], ['s',300,280,200,20],
+  ['s',866,516,190,22], ['s',770,470,20,114]]},
+
+{n:'Cold Rolled', th:1, c:[86,560,-28], sh:5, tr:[3,4], tg:[[878,552,28]], o:[
+  ['ib',560,588,60,60], ['ib',560,528,60,60], ['ib',622,588,60,60],
+  ['s',360,300,200,20], ['s',878,604,180,28]]},
+
+{n:'Brass Tacks', th:2, c:[86,560,-34], sh:5, tr:[3,4], tg:[[872,300,28]], o:[
+  ['rotor',450,420,32,116,3,2.6],
+  ['m',872,346,180,22], ['m',300,260,180,20]]},
+
+{n:'Escapement', th:2, c:[86,560,-30], sh:5, tr:[3,4], tg:[[880,556,28]], o:[
+  ['btn',330,596,1,60], ['m',620,190,22,340], ['door',620,490,22,260,1,0,0,-280],
+  ['mov',760,300,140,20,0,180,3.4], ['m',880,604,180,28]]},
+
+{n:'Verdigris', th:3, c:[86,560,-28], sh:4, tr:[2,3], tg:[[866,556,28]], o:[
+  ['MS',520,586,64,64], ['MS',520,522,64,64], ['MS',584,586,64,64],
+  ['mo',330,300,200,20], ['mo',866,604,190,28]]},
+
+{n:'Patina', th:3, c:[86,560,-40], sh:4, tr:[2,3], tg:[[856,300,28]], o:[
+  ['balloon',430,400,24,190], ['balloon',600,340,24,250],
+  ['mo',856,346,180,22], ['mo',300,260,180,20]]},
+
+{n:'Bell Metal', th:4, c:[86,560,-28], sh:5, tr:[3,4], tg:[[878,552,28]], o:[
+  ['tnt',540,596,44,44], ['lava',680,500,64,240],
+  ['s',330,280,200,20], ['s',878,604,180,28]]},
+
+{n:'Slag', th:4, c:[86,560,-36], sh:5, tr:[3,4], tg:[[862,392,28]], o:[
+  ['spike',480,604,200,26], ['lava',680,470,64,300],
+  ['s',862,440,190,22], ['s',300,260,180,20]]},
+
+{n:'Wrought', th:0, c:[86,560,-32], sh:5, tr:[3,4], tg:[[884,556,28]], o:[
+  ['w',330,190,20,340], ['w',330,556,20,124],
+  ['w',600,150,20,260], ['w',600,500,20,236],
+  ['w',884,604,170,28]]},
+
+{n:'Cast Iron', th:0, c:[86,560,-24], sh:5, tr:[3,4], tg:[[872,470,28]], o:[
+  ['B',560,584,58,58], ['B',560,526,58,58], ['B',618,584,58,58],
+  ['w',720,214,20,348],
+  ['w',872,516,190,22]]},
+
+{n:'Galvanise', th:1, c:[86,560,-30], sh:5, tr:[3,4], tg:[[780,300,28]], o:[
+  ['s',380,530,20,180], ['s',620,110,20,180],
+  ['ib',500,588,60,60],
+  ['s',780,346,180,22]]},
+
+{n:'Quench', th:1, c:[86,560,-34], sh:5, tr:[3,4], tg:[[858,470,28]], o:[
+  ['water',560,566,300,108], ['ib',420,470,58,58],
+  ['s',300,270,200,20], ['s',858,516,190,22], ['s',764,470,20,114]]},
+
+{n:'Ratchet', th:2, c:[86,560,-38], sh:5, tr:[3,4], tg:[[876,240,28]], o:[
+  ['rotor',400,360,30,104,2,3.0], ['rotor',640,440,30,104,2,-3.0],
+  ['m',876,286,180,22], ['m',300,560,180,20]]},
+
+{n:'Mainspring', th:2, c:[86,560,-26], sh:5, tr:[3,4], tg:[[860,300,28]], o:[
+  ['spring',480,480,116,80,150], ['C',480,600,96,60],
+  ['m',700,260,20,380],
+  ['m',860,346,180,22]]},
+
+{n:'Bramblewick', th:3, c:[86,560,-34], sh:5, tr:[3,4], tg:[[864,470,28]], o:[
+  ['rope',430,60,8,26], ['rope',600,60,8,26],
+  ['MS',540,588,60,60],
+  ['mo',864,516,190,22], ['mo',770,470,20,114]]},
+
+{n:'Greenhouse Floor', th:3, c:[86,300,8], sh:4, tr:[2,3], tg:[[840,560,28]], o:[
+  ['mo',120,352,150,18], ['mo',460,300,20,300], ['mo',680,470,20,300],
+  ['mo',840,608,200,24]]},
+
+{n:'Cinder', th:4, c:[86,560,-30], sh:5, tr:[3,4], tg:[[874,392,28]], o:[
+  ['lava',420,600,180,40], ['lava',660,500,60,240],
+  ['tnt',540,596,44,44],
+  ['s',874,440,180,22]]},
+
+{n:'Bloom', th:4, c:[86,560,-42], sh:5, tr:[3,4], tg:[[820,180,28]], o:[
+  ['fan',520,360,180,340,-90,1500],
+  ['lava',700,520,60,200],
+  ['s',820,226,190,22], ['s',300,470,180,20]]},
+
+{n:'Anvil', th:0, c:[86,560,-28], sh:5, tr:[3,4], tg:[[886,556,28]], o:[
+  ['B',480,584,60,60], ['B',480,524,60,60], ['B',480,464,60,60],
+  ['w',660,220,20,400], ['w',886,604,160,28]]},
+
+{n:'Bellows', th:0, c:[86,560,-36], sh:5, tr:[3,4], tg:[[856,240,28]], o:[
+  ['fan',460,380,170,320,-90,1500], ['w',680,300,20,300],
+  ['w',856,286,190,22], ['b',560,588,58,58]]},
+
+{n:'Tempering', th:1, c:[86,560,-32], sh:5, tr:[3,4], tg:[[872,392,28]], o:[
+  ['ib',420,588,60,60], ['water',640,566,220,108],
+  ['s',300,260,200,20], ['s',872,440,180,22], ['s',780,394,20,114]]},
+
+{n:'The Flue', th:1, c:[86,560,-52], sh:5, tr:[3,4], tg:[[790,556,28]], o:[
+  ['s',680,430,22,390], ['s',900,430,22,390],
+  ['s',870,240,120,18], ['ib',790,588,60,60]]},
+
+{n:'Gearbox', th:2, c:[86,560,-32], sh:5, tr:[3,4], tg:[[880,470,28]], o:[
+  ['rotor',380,300,28,96,3,2.8], ['blade',620,470,22,92,1,3.2],
+  ['m',880,516,180,22], ['m',788,470,20,114]]},
+
+{n:'Governor', th:2, c:[86,560,-40], sh:5, tr:[3,4], tg:[], o:[
+  ['m',420,470,20,300],
+  ['wheel',720,320,80,30,12,1.4,22],
+  ['b',720,588,60,60]]},
+
+{n:'Chlorophyll', th:3, c:[86,560,-30], sh:5, tr:[3,4], tg:[[870,392,28]], o:[
+  ['MS',480,586,64,64], ['MS',480,522,64,64],
+  ['goo',640,470,180,20],
+  ['mo',870,440,180,22], ['mo',300,260,180,20]]},
+
+{n:'Trellis', th:3, c:[86,560,-38], sh:5, tr:[3,4], tg:[[860,352,28]], o:[
+  ['mo',360,175,20,330], ['mo',360,540,20,160],
+  ['mo',560,140,20,260], ['mo',560,505,20,230],
+  ['mo',720,125,20,230], ['mo',720,490,20,260],
+  ['mo',860,400,180,22]]},
+
+{n:'Crucible Floor', th:4, c:[86,560,-26], sh:5, tr:[3,4], tg:[[880,552,28]], o:[
+  ['lava',380,600,160,40], ['lava',600,600,160,40],
+  ['tnt',490,596,44,44], ['tnt',700,596,44,44],
+  ['s',880,604,160,28]]},
+
+{n:'Dross', th:4, c:[86,560,-38], sh:5, tr:[3,4], tg:[[864,300,28]], o:[
+  ['saw',420,500,28,8], ['saw',620,400,28,-8],
+  ['s',864,346,180,22], ['s',300,240,180,20]]},
+
+{n:'Filings', th:0, c:[86,560,-30], sh:5, tr:[3,4], tg:[[886,470,28]], o:[
+  ['b',400,588,48,48], ['b',452,588,48,48], ['b',426,540,48,48],
+  ['b',600,588,48,48], ['b',652,588,48,48], ['b',626,540,48,48],
+  ['w',886,516,160,22], ['w',796,470,20,114]]},
+
+{n:'Rivet Line', th:0, c:[86,560,-34], sh:5, tr:[3,4], tg:[[870,384,28]], o:[
+  ['w',300,190,20,340], ['w',300,560,20,124],
+  ['w',540,150,20,260], ['w',540,500,20,236],
+  ['w',760,190,20,340], ['w',760,560,20,124],
+  ['w',870,430,170,22]]},
+
+{n:'Sheet Ice', th:1, c:[86,560,-24], sh:5, tr:[3,4], tg:[[884,552,28]], o:[
+  ['i',480,604,360,26], ['ib',380,570,58,58],
+  ['s',700,240,20,400], ['s',884,604,160,28]]},
+
+{n:'The Sluice', th:1, c:[86,560,-36], sh:5, tr:[3,4], tg:[[300,240,28]], o:[
+  ['portal',860,470,300,120,0,0,28],
+  ['water',700,566,320,108],
+  ['s',300,286,190,22], ['s',560,470,20,300]]},
+
+{n:'Flywheel', th:2, c:[86,560,-34], sh:6, tr:[3,5], tg:[], o:[
+  ['m',400,500,20,240],
+  ['wheel',740,300,86,32,12,-1.2,22],
+  ['b',740,588,60,60]]},
+
+{n:'Regulator', th:2, c:[86,560,-28], sh:6, tr:[3,5], tg:[[880,240,28]], o:[
+  ['spring',420,490,116,80,150], ['C',420,606,96,60],
+  ['spring',640,430,116,80,150], ['C',640,546,96,120],
+  ['m',880,286,170,22]]},
+
+{n:'Canopy Floor', th:3, c:[86,560,-44], sh:5, tr:[3,4], tg:[[520,180,28]], o:[
+  ['mo',340,420,200,20], ['mo',720,420,220,20],
+  ['mo',520,132,160,18],
+  ['balloon',460,340,22,220]]},
+
+{n:'Rootbound', th:3, c:[86,560,-30], sh:5, tr:[3,4], tg:[[876,556,28]], o:[
+  ['rope',420,60,9,26,22,'stone'], ['MS',600,588,60,60], ['MS',600,528,60,60],
+  ['mo',876,604,170,28], ['mo',300,280,180,20]]},
+
+{n:'Tap Hole', th:4, c:[86,560,-32], sh:6, tr:[3,5], tg:[[868,470,28]], o:[
+  ['lava',430,500,60,240], ['lava',650,500,60,240],
+  ['tnt',540,596,44,44], ['saw',540,420,26,9],
+  ['s',868,516,180,22], ['s',776,470,20,114]]},
+
+{n:'Ladle', th:4, c:[86,560,-46], sh:6, tr:[3,5], tg:[[790,300,28]], o:[
+  ['s',660,432,22,388], ['s',900,432,22,388],
+  ['fan',780,450,214,336,-90,1500],
+  ['lava',780,604,180,32]]},
+
+{n:'Cold Chisel', th:0, c:[86,560,-26], sh:6, tr:[3,5], tg:[[884,392,28]], o:[
+  ['g',600,470,26,300], ['w',600,168,22,296],
+  ['w',884,440,160,22], ['b',420,588,58,58]]},
+
+{n:'Bench Vice', th:0, c:[86,560,-34], sh:6, tr:[3,5], tg:[[864,240,28]], o:[
+  ['mov',520,220,200,24,0,260,3.2],
+  ['w',360,470,20,300], ['w',700,470,20,300],
+  ['w',864,286,180,22]]},
+
+{n:'Hard Water', th:1, c:[86,560,-30], sh:6, tr:[3,5], tg:[[878,392,28]], o:[
+  ['water',450,566,260,108], ['ib',660,470,58,58], ['ib',660,412,58,58],
+  ['s',300,250,180,20], ['s',878,440,170,22]]},
+
+{n:'The Vault', th:1, c:[86,560,-28], sh:6, tr:[3,5], tg:[[880,470,28]], o:[
+  ['g',700,470,26,300], ['s',700,168,22,296],
+  ['B',520,584,58,58], ['B',520,526,58,58],
+  ['s',880,516,170,22], ['s',790,470,20,114]]},
+
+{n:'Timepiece', th:2, c:[86,560,-36], sh:6, tr:[3,5], tg:[[874,300,28]], o:[
+  ['rotor',380,340,28,96,3,2.6], ['rotor',600,440,28,96,3,-2.6],
+  ['blade',740,220,22,84,1,3.4],
+  ['m',874,346,170,22]]},
+
+{n:'Overwound', th:2, c:[86,560,-24], sh:6, tr:[3,5], tg:[[872,556,28]], o:[
+  ['spring',520,500,120,80,150], ['C',520,608,96,60],
+  ['m',680,200,22,380], ['m',680,560,22,120],
+  ['m',872,604,170,28]]},
+
+{n:'Deep Green', th:3, c:[86,560,-40], sh:6, tr:[3,5], tg:[[856,180,28]], o:[
+  ['MS',420,586,64,64], ['MS',420,522,64,64], ['MS',420,458,64,64],
+  ['mo',620,300,20,300], ['mo',856,226,180,22]]},
+
+{n:'Nettle', th:3, c:[86,560,-32], sh:6, tr:[3,5], tg:[[882,470,28]], o:[
+  ['saw',430,500,26,8], ['goo',600,540,200,20],
+  ['rope',540,60,7,24],
+  ['mo',882,516,160,22], ['mo',792,470,20,114]]},
+
+{n:'Runout', th:4, c:[86,560,-34], sh:6, tr:[3,5], tg:[[868,240,28]], o:[
+  ['lava',420,600,180,40], ['lava',640,470,60,300],
+  ['tnt',500,596,44,44],
+  ['s',868,286,180,22], ['s',300,240,180,20]]},
+
+{n:'The Pour', th:4, c:[86,560,-40], sh:6, tr:[3,5], tg:[[878,392,28]], o:[
+  ['rotor',450,400,34,120,4,2.4],
+  ['lava',680,520,60,200], ['spike',560,604,160,26],
+  ['s',878,440,160,22]]}
 ];
 const WORLDS = [
-  { name:'The Workshop',  from:0,  to:12, th:0 },
-  { name:'The Cellars',   from:12, to:24, th:1 },
-  { name:'The Clockworks',from:24, to:36, th:2 },
-  { name:'The Hothouse',  from:36, to:48, th:3 },
-  { name:'The Furnace',   from:48, to:60, th:4 },
-  { name:'The Attic',     from:60, to:72, th:0 },
-  { name:'The Gallery',   from:72, to:84, th:0 },
-  { name:'The Almanac',   from:84, to:96, th:6 },
-  { name:'The Board',     from:96, to:115, th:7 }
+  { name:'Tin',      from:0,   to:15,  th:0 },
+  { name:'Nickel',   from:15,  to:30,  th:1 },
+  { name:'Brass',    from:30,  to:45,  th:2 },
+  { name:'Copper',   from:45,  to:60,  th:3 },
+  { name:'Bronze',   from:60,  to:75,  th:4 },
+  { name:'Iron',     from:75,  to:90,  th:0 },
+  { name:'Steel',    from:90,  to:105, th:2 },
+  { name:'Silver',   from:105, to:120, th:6 },
+  { name:'Gold',     from:120, to:135, th:7 },
+  { name:'Platinum', from:135, to:150, th:4 },
+  { name:'Bonus',    from:150, to:165, th:5 }
 ];
 
 /* =====================================================================
@@ -4235,6 +4498,12 @@ const AWARDS = [
   { id:'keeper',  n:'The Keeper',    d:'Complete every room',
     ok:s => s.cleared >= LEVELS.length }
 ];
+// "achievements are gained each time an entire room is completed"
+for(let w=0; w<WORLDS.length; w++){
+  const nm = WORLDS[w].name;
+  AWARDS.push({ id:'room'+w, n:nm + ' Cleared', d:'Complete every room in ' + nm,
+                ok:(s,i=w)=>s.rooms[i] });
+}
 
 const Awards = {
   pending: [],
@@ -4251,7 +4520,11 @@ const Awards = {
       for(let i=W.from;i<W.to;i++) if(Save.cups(i) < 3){ all = false; break; }
       if(all) perfectWing++;
     }
-    return { cleared, cups, oneShot, perfectWing,
+    const rooms = WORLDS.map(W=>{
+      for(let i=W.from;i<W.to;i++) if(!Save.cleared(i)) return false;
+      return true;
+    });
+    return { cleared, cups, oneShot, perfectWing, rooms,
              kegs:st.kegs|0, panes:st.panes|0, longest:st.longest|0, fired:st.fired|0 };
   },
   bump(key, by){
@@ -4700,14 +4973,24 @@ const Game = {
     // chains either side of the frame
     const fy = y+118, fs = 74;
     for(const dir of [-1,1]){
-      for(let i=0;i<4;i++){
-        const cx2 = DW/2 + dir*(fs*0.75 + 26 + i*30);
+      for(let i=0;i<5;i++){
+        const cx2 = DW/2 + dir*(fs*0.72 + 24 + i*26);
+        const flat = i % 2 === 1;
         g.save(); g.translate(cx2, fy);
-        g.strokeStyle='#9a8a70';
-        g.lineWidth=5;
-        g.beginPath(); g.ellipse(0,0, i%2?9:13, i%2?13:9, 0,0,TAU); g.stroke();
-        g.strokeStyle='#4a3d2c'; g.lineWidth=1.6;
-        g.beginPath(); g.ellipse(0,0, i%2?9:13, i%2?13:9, 0,0,TAU); g.stroke();
+        const rx = flat ? 9 : 15, ry = flat ? 15 : 9;
+        // shadow, body, then a highlight along the top of the link
+        g.strokeStyle='rgba(0,0,0,0.45)'; g.lineWidth=9;
+        g.beginPath(); g.ellipse(1.5,2, rx, ry, 0,0,TAU); g.stroke();
+        const lg2 = g.createLinearGradient(0,-ry,0,ry);
+        lg2.addColorStop(0,'#cdbb9a'); lg2.addColorStop(0.45,'#8e7d63');
+        lg2.addColorStop(1,'#4c4032');
+        g.strokeStyle=lg2; g.lineWidth=8;
+        g.beginPath(); g.ellipse(0,0, rx, ry, 0,0,TAU); g.stroke();
+        g.strokeStyle='rgba(255,240,210,0.45)'; g.lineWidth=2;
+        g.beginPath(); g.ellipse(-0.8,-1.2, rx, ry, 0,-0.2,PI*0.9); g.stroke();
+        g.strokeStyle='#2e2519'; g.lineWidth=1.2;
+        g.beginPath(); g.ellipse(0,0, rx+3.6, ry+3.6, 0,0,TAU); g.stroke();
+        g.beginPath(); g.ellipse(0,0, Math.max(1,rx-3.6), Math.max(1,ry-3.6), 0,0,TAU); g.stroke();
         g.restore();
       }
     }
@@ -4831,38 +5114,38 @@ Game.drawTitle = function(g){
   label(g, `${tc} / ${LEVELS.length*3}`, cx-24, 528, 24, '#f0dcb4', 'left');
   g.restore();
   label(g, `${Awards.count()} / ${AWARDS.length} awards`, cx+150, 528, 17, 'rgba(240,220,180,0.55)', 'left');
-  label(g,'a physics puzzle in one hundred and fifteen rooms', DW/2, 596, 15, 'rgba(240,220,180,0.4)');
+  label(g,'a physics puzzle in one hundred and sixty-five rooms', DW/2, 596, 15, 'rgba(240,220,180,0.4)');
 };
 
 Game.drawWorlds = function(g){
   this.menuBG(g);
-  label(g,'CHOOSE A WING', DW/2, 62, 36, '#f5dfa8');
-  const COLS = 5;
+  label(g,'CHOOSE A ROOM', DW/2, 54, 34, '#f5dfa8');
+  const COLS = 6;
   for(let i=0;i<WORLDS.length;i++){
     const W = WORLDS[i];
-    const w = 166, h = 214, gap = 16;
+    const w = 140, h = 200, gap = 12;
     const row = Math.floor(i/COLS), col = i % COLS;
     const nThis = Math.min(COLS, WORLDS.length - row*COLS);
     const x = DW/2 - (nThis*(w+gap)-gap)/2 + col*(w+gap);
-    const y = 96 + row*(h+22);
+    const y = 104 + row*(h+22);
     const open = i===0 || Save.cleared(WORLDS[i-1].to-1) || Save.cleared(W.from);
     const st = uiHit(x,y,w,h);
     g.save();
     g.globalAlpha = open ? 1 : 0.4;
     panel(g,x,y,w,h,14, st.over?1:0.9);
     g.save();
-    g.beginPath(); rr(g,x+10,y+10,w-20,100,9); g.clip();
-    g.drawImage(background(W.th), x+10-176, y+10-196, DW*0.74, DH*0.74);
+    g.beginPath(); rr(g,x+9,y+9,w-18,88,8); g.clip();
+    g.drawImage(background(W.th), x+9-190, y+9-206, DW*0.78, DH*0.78);
     g.restore();
-    g.strokeStyle='rgba(0,0,0,0.6)'; g.lineWidth=2; rr(g,x+10,y+10,w-20,100,9); g.stroke();
-    label(g, W.name.replace('The ',''), x+w/2, y+130, 18, '#f5dfa8');
-    label(g, `${W.from+1}–${W.to}`, x+w/2, y+152, 13, 'rgba(240,220,180,0.55)');
+    g.strokeStyle='rgba(0,0,0,0.6)'; g.lineWidth=2; rr(g,x+9,y+9,w-18,88,8); g.stroke();
+    label(g, W.name, x+w/2, y+118, 18, '#f5dfa8');
+    label(g, `${W.from+1}–${W.to}`, x+w/2, y+140, 13, 'rgba(240,220,180,0.55)');
     const cups = Save.worldCups(i), max = (W.to-W.from)*3;
-    drawCup(g, x+w/2-34, y+180, 1.25, cups>0);
-    label(g, `${cups}/${max}`, x+w/2-17, y+180, 16, '#f0dcb4', 'left');
+    drawCup(g, x+w/2-33, y+168, 1.2, cups>0);
+    label(g, `${cups}/${max}`, x+w/2-16, y+168, 15, '#f0dcb4', 'left');
     if(!open){
       g.fillStyle='rgba(255,180,150,0.8)';
-      g.save(); g.translate(x+w-24, y+24);
+      g.save(); g.translate(x+w-22, y+22);
       rr(g,-9,-1,18,15,3); g.fill();
       g.strokeStyle='rgba(255,180,150,0.8)'; g.lineWidth=3;
       g.beginPath(); g.arc(0,-1,6,PI,TAU); g.stroke();
@@ -5012,7 +5295,7 @@ Game.drawAwards = function(g){
 Game.drawFinale = function(g){
   this.menuBG(g);
   label(g,'THE WORKS ARE QUIET', DW/2, 150, 44, '#f5dfa8');
-  label(g,'Every mark painted. One hundred and fifteen rooms behind you.', DW/2, 208, 21, 'rgba(240,220,180,0.75)');
+  label(g,'Every mark painted. One hundred and sixty-five rooms behind you.', DW/2, 208, 21, 'rgba(240,220,180,0.75)');
   const tc = Save.totalCups();
   g.save(); drawCup(g, DW/2-60, 290, 3.0, true);
   label(g, `${tc} / ${LEVELS.length*3}`, DW/2+4, 290, 34, '#f0dcb4', 'left');
