@@ -1767,6 +1767,34 @@ const Audio_ = {
     this.clang(t, 620, 0.10, 0.14);
   },
   tick(){ if(!this.ready||!this.on) return; this.hit(this.now(),0.028,1700,4,0.07,'bandpass'); },
+  gear(sp){
+    if(!this.ready||!this.on) return;
+    const t=this.now(), v=clamp(sp*0.028, 0.02, 0.10);
+    this.clang(t, 120 + Math.random()*70, v, 0.34);
+    this.hit(t, 0.06, 700, 2.2, v*0.7, 'bandpass');
+  },
+  hum(){
+    if(!this.ready||!this.on) return;
+    const t=this.now();
+    this.osc(t, 780+Math.random()*260, 520, 0.13, 0.030, 'sawtooth');
+    this.hit(t, 0.10, 4200, 1.4, 0.022, 'highpass');
+  },
+  lastDoll(){
+    if(!this.ready||!this.on) return;
+    const t=this.now();
+    this.osc(t, 440, 330, 0.30, 0.13, 'triangle');
+    this.osc(t+0.14, 330, 262, 0.34, 0.11, 'triangle');
+  },
+  duck(amount, secs){
+    if(!this.ready) return;
+    const g=this.musicG.gain, t=this.now();
+    try{
+      g.cancelScheduledValues(t);
+      g.setValueAtTime(g.value, t);
+      g.linearRampToValueAtTime(g.value*(1-amount), t+0.04);
+      g.linearRampToValueAtTime(g.value, t+0.04+secs);
+    }catch(e){}
+  },
 
   /* ---- ambience: a slow wash plus the odd noise from the room ---- */
   buildAmbience(){
@@ -2261,6 +2289,7 @@ class Level {
     FX.smoke(px,py,16,-PI/2,1.8);
     FX.add({x:px,y:py,vx:0,vy:0,life:0,max:0.5,size:26,col:'#ffd08a',type:'ring',rot:0,rv:0,g:0,drag:0});
     Audio.boom();
+    Audio.duck(0.75, 0.9);
     const R = 175;
     for(const o of this.world.bodies.slice()){
       if(o.fixed) continue;
@@ -2299,7 +2328,11 @@ Level.prototype.update = function(dt){
         break;
       }
       case 'rotor': {
+        const prevA = e.a;
         e.a += e.spd * dt;
+        // a clank each half turn, so the room sounds mechanical
+        if(Math.floor(prevA/PI) !== Math.floor(e.a/PI)) Audio.gear(Math.abs(e.spd));
+        if(e.arms.length && e.arms[0].deadly && Math.random() < dt*3.5) Audio.hum();
         e.hub.a = e.a; e.hub.av = e.spd; e.hub.sync();
         for(const b of e.arms){
           const ang = e.a + b.armPhase;
@@ -2428,6 +2461,13 @@ Level.prototype.update = function(dt){
       if(b.x > -260 && b.x < DW+260 && b.y < DH+320 && b.y > -700){ out = false; break; }
     }
     if(out){ d.destroy(); this.dolls.splice(i,1); continue; }
+    const tp = d.parts.torso;
+    const spd2 = Math.hypot(tp.vx, tp.vy);
+    if(spd2 > 620 && Math.random() < dt*34){
+      FX.add({ x:tp.x + rnd(-5,5), y:tp.y + rnd(-5,5), vx:tp.vx*0.05, vy:tp.vy*0.05,
+               life:0, max:0.26, size:rnd(2.4,4.6), col:'#efe6d2', type:'smoke',
+               rot:0, rv:0, g:0, drag:3.2 });
+    }
     // a doll that comes to rest stops mattering
     if(d.asleep()) d.settled += dt; else d.settled = 0;
   }
@@ -2478,7 +2518,8 @@ Level.prototype.fire = function(ang, power){
   this.dolls.push(d);
   this.used++;
   c.recoil = 1;
-  FX.smoke(mx, my, 12, ang, 1.1);
+  if(this.used === this.shots) Audio.lastDoll();
+  FX.smoke(mx, my, 16, ang, 1.25);
   FX.burst(mx,my,14,{col:'#ffd08a',dir:ang,spread:0.5,spMin:120,spMax:420,sizeMax:4,lifeMax:0.45});
   FX.add({x:mx,y:my,vx:0,vy:0,life:0,max:0.34,size:9,col:'#ffe0a0',type:'ring',rot:0,rv:0,g:0,drag:0});
   FX.kick(4.5 + power*3);
@@ -2962,30 +3003,37 @@ const LEVELS = [
   ['w',520,300,440,22]]},
 
 {n:'Three Steps', th:0, c:[86,560,-40], sh:3, tr:[1,2], tg:[[840,300,26]], o:[
-  ['w',380,540,180,20], ['w',580,440,180,20], ['w',790,340,240,20]]},
+  ['w',380,540,180,20], ['w',580,440,180,20], ['w',790,340,240,20],
+  ['b',336,506,48,48], ['b',536,406,48,48]]},
 
 {n:'The Shelf', th:0, c:[86,560,-46], sh:3, tr:[1,2], tg:[[848,368,26]], o:[
-  ['w',800,400,280,20], ['w',560,250,300,20]]},
+  ['w',800,400,280,20], ['w',560,250,300,20],
+  ['b',742,366,48,48], ['b',742,318,48,48]]},
 
 {n:'Crate Stack', th:0, c:[86,560,-24], sh:4, tr:[2,3], tg:[[880,588,26]], o:[
   ['b',700,584,46,46], ['b',700,538,46,46], ['b',700,492,46,46],
   ['b',748,584,46,46], ['b',748,538,46,46]]},
 
 {n:'Seesaw', th:0, c:[86,560,-30], sh:3, tr:[1,2], tg:[[880,432,26]], o:[
-  ['see',560,470,240,14], ['w',830,470,190,20], ['b',470,430,40,40]]},
+  ['see',560,470,240,14], ['w',830,470,190,20], ['b',470,430,40,40],
+  ['b',630,436,44,44]]},
 
 {n:'The Slot', th:0, c:[86,560,-26], sh:4, tr:[2,3], tg:[[870,588,26]], o:[
-  ['w',520,180,22,300], ['w',520,560,22,120], ['w',700,360,22,290]]},
+  ['w',520,180,22,300], ['w',520,560,22,120], ['w',700,360,22,290],
+  ['rotor',610,300,24,74,2,-3.0]]},
 
 {n:'Drop Box', th:0, c:[86,470,-14], sh:3, tr:[1,2], tg:[[820,560,26]], o:[
-  ['w',86,510,140,20], ['w',660,470,22,320], ['w',760,300,220,20], ['w',680,608,180,20]]},
+  ['w',86,510,140,20], ['w',660,470,22,320], ['w',760,300,220,20], ['w',680,608,180,20],
+  ['b',826,592,48,48]]},
 
 {n:'Pinball', th:0, c:[86,560,-52], sh:4, tr:[2,3], tg:[[886,588,24]], o:[
   ['bump',420,300,26], ['bump',560,420,26], ['bump',680,250,26],
-  ['w',300,200,22,300], ['w',780,430,180,20]]},
+  ['w',300,200,22,300], ['w',780,430,180,20],
+  ['b',180,592,48,48], ['b',180,544,48,48]]},
 
 {n:'The Chimney', th:0, c:[86,560,-58], sh:4, tr:[2,3], tg:[[772,588,26]], o:[
-  ['w',690,432,22,388], ['w',890,432,22,388], ['w',862,238,120,18]]},
+  ['w',690,432,22,388], ['w',890,432,22,388], ['w',862,238,120,18],
+  ['b',840,592,48,48], ['b',840,544,48,48]]},
 
 {n:'Heavy Ball', th:0, c:[86,560,-36], sh:4, tr:[2,3], tg:[[500,588,26]], o:[
   ['w',760,420,300,20], ['ball',760,392,26,'stone'], ['w',620,540,22,140],
@@ -2997,10 +3045,12 @@ const LEVELS = [
 
 /* ---------------- II. THE CELLARS ---------------- */
 {n:'Cellar Steps', th:1, c:[86,560,-34], sh:3, tr:[1,2], tg:[[860,410,26]], o:[
-  ['s',330,560,150,20], ['s',560,480,150,20], ['s',800,442,240,20]]},
+  ['s',330,560,150,20], ['s',560,480,150,20], ['s',800,442,240,20],
+  ['b',292,526,48,48], ['b',530,446,48,48]]},
 
 {n:'Wet Floor', th:1, c:[86,560,-30], sh:3, tr:[1,2], tg:[[880,470,26]], o:[
-  ['water',560,570,420,96], ['s',830,500,200,20], ['s',350,600,22,36]]},
+  ['water',560,570,420,96], ['s',830,500,200,20], ['s',350,600,22,36],
+  ['b',470,520,54,32]]},
 
 {n:'Spike Alley', th:1, c:[86,560,-40], sh:4, tr:[2,3], tg:[[880,420,26]], o:[
   ['spike',430,600,180,26], ['spike',680,600,180,26], ['s',840,452,220,20],
@@ -3010,33 +3060,40 @@ const LEVELS = [
   ['pend',520,120,18,240], ['s',640,420,180,20], ['s',300,300,200,20]]},
 
 {n:'Ice Slide', th:1, c:[86,560,-42], sh:3, tr:[1,2], tg:[[890,510,24]], o:[
-  ['i',480,380,420,18,14], ['s',760,470,22,120], ['s',860,545,180,20]]},
+  ['i',480,380,420,18,14], ['s',760,470,22,120], ['s',860,545,180,20],
+  ['b',862,510,48,48]]},
 
 {n:'Deep Well', th:1, c:[86,470,-16], sh:4, tr:[2,3], tg:[[800,588,26]], o:[
   ['w',86,510,140,20], ['s',690,400,22,440], ['s',900,400,22,440],
-  ['water',795,540,188,150]]},
+  ['water',795,540,188,150],
+  ['blade',795,296,20,70,1,3.4]]},
 
 {n:'Two Marks', th:1, c:[86,560,-44], sh:4, tr:[2,3], tg:[[286,246,24],[880,468,24]], o:[
   ['s',286,286,200,20], ['s',880,508,200,20], ['s',580,500,22,240]]},
 
 {n:'Stone Teeth', th:1, c:[86,560,-30], sh:4, tr:[2,3], tg:[[880,588,26]], o:[
   ['s',380,180,22,290], ['s',480,600,22,290], ['s',600,180,22,290],
-  ['s',700,600,22,290], ['s',800,180,22,290]]},
+  ['s',700,600,22,290], ['s',800,180,22,290],
+  ['b',336,592,48,48], ['b',336,544,48,48],
+  ['pend',480,40,16,176]]},
 
 {n:'The Moat', th:1, c:[86,560,-38], sh:3, tr:[1,2], tg:[[878,478,26]], o:[
   ['water',540,570,380,96], ['s',830,510,200,20], ['s',330,470,22,280],
-  ['b',600,540,44,44]]},
+  ['b',600,540,44,44],
+  ['b',470,522,56,32], ['b',640,522,56,32]]},
 
 {n:'Hanging Weight', th:1, c:[86,560,-40], sh:4, tr:[2,3], tg:[[860,588,26]], o:[
   ['rope',520,60,7,26,20,'stone'], ['s',700,420,200,20], ['s',300,340,180,20]]},
 
 {n:'Cracked Vault', th:1, c:[86,560,-26], sh:4, tr:[2,3], tg:[[870,540,26]], o:[
   ['g',700,470,26,300], ['s',780,470,22,300], ['s',830,580,180,20],
-  ['s',430,300,240,20]]},
+  ['s',430,300,240,20],
+  ['mov',520,300,120,18,0,180,3]]},
 
 {n:'The Long Drop', th:1, c:[86,180,10,-90,90], sh:4, tr:[2,3], tg:[[860,588,26]], o:[
   ['w',86,230,150,20], ['s',420,300,300,20], ['s',680,440,300,20],
-  ['s',300,470,22,120]]},
+  ['s',300,470,22,120],
+  ['s',420,266,48,48], ['s',680,406,48,48]]},
 
 /* ---------------- III. THE CLOCKWORKS ---------------- */
 {n:'First Switch', th:2, c:[86,560,-30], sh:4, tr:[2,3], tg:[[880,588,26]], o:[
@@ -3062,7 +3119,8 @@ const LEVELS = [
 
 {n:'Crosswind', th:2, c:[86,560,-46], sh:4, tr:[2,3], tg:[[880,560,24]], o:[
   ['fan',480,300,300,220,0,1400], ['m',760,420,200,20], ['m',300,240,200,20],
-  ['m',860,600,160,20]]},
+  ['m',860,600,160,20],
+  ['blade',300,470,22,92,1,3.2]]},
 
 {n:'Glass House', th:2, c:[86,560,-24], sh:4, tr:[2,3], tg:[[820,470,26]], o:[
   ['m',700,168,22,296], ['g',700,470,26,300],
@@ -3092,7 +3150,8 @@ const LEVELS = [
   ['mo',860,340,180,20], ['mo',300,300,180,20]]},
 
 {n:'Sticky Landing', th:3, c:[86,560,-40], sh:4, tr:[2,3], tg:[[880,392,26]], o:[
-  ['goo',560,430,260,20], ['mo',850,432,200,20], ['mo',330,300,220,20]]},
+  ['goo',560,430,260,20], ['mo',850,432,200,20], ['mo',330,300,220,20],
+  ['b',470,384,44,44], ['b',622,384,44,44]]},
 
 {n:'Vine Swing', th:3, c:[86,560,-38], sh:4, tr:[2,3], tg:[[880,540,26]], o:[
   ['rope',480,60,8,26], ['mo',700,400,200,20], ['mo',860,580,180,20],
@@ -3100,15 +3159,18 @@ const LEVELS = [
 
 {n:'Sawmill', th:3, c:[86,560,-30], sh:5, tr:[3,4], tg:[[880,588,26]], o:[
   ['saw',420,540,30,7], ['saw',640,540,30,-7], ['mo',530,420,240,20],
-  ['mo',300,260,200,20]]},
+  ['mo',300,260,200,20],
+  ['rotor',530,318,26,84,2,3.0]]},
 
 {n:'Overgrown', th:3, c:[86,560,-42], sh:4, tr:[2,3], tg:[[840,240,26]], o:[
   ['mo',300,480,22,280], ['mo',480,300,22,280], ['mo',660,480,22,280],
-  ['mo',840,280,200,20], ['b',560,560,44,44]]},
+  ['mo',840,280,200,20], ['b',560,560,44,44],
+  ['b',608,560,44,44], ['b',608,516,44,44]]},
 
 {n:'Bounce Garden', th:3, c:[86,560,-50], sh:4, tr:[2,3], tg:[[890,300,24]], o:[
   ['rub',400,470,160,20], ['rub',640,360,160,20], ['bump',520,220,26],
-  ['mo',870,340,180,20]]},
+  ['mo',870,340,180,20],
+  ['b',400,436,44,44], ['b',640,326,44,44]]},
 
 {n:'Tangle', th:3, c:[86,560,-36], sh:5, tr:[3,4], tg:[[860,470,26]], o:[
   ['rope',380,60,7,24], ['rope',560,60,7,24], ['rope',720,60,7,24],
@@ -3136,7 +3198,8 @@ const LEVELS = [
 
 /* ---------------- V. THE FURNACE ---------------- */
 {n:'Powder Keg', th:4, c:[86,560,-30], sh:4, tr:[2,3], tg:[[880,588,26]], o:[
-  ['tnt',600,596,40,40], ['s',700,470,22,300], ['s',480,300,240,20]]},
+  ['tnt',600,596,40,40], ['s',700,470,22,300], ['s',480,300,240,20],
+  ['b',520,592,48,48], ['b',676,592,48,48]]},
 
 {n:'Chain Reaction', th:4, c:[86,560,-34], sh:4, tr:[2,3], tg:[[880,470,26]], o:[
   ['tnt',420,596,40,40], ['tnt',560,596,40,40], ['tnt',700,596,40,40],
@@ -3148,7 +3211,8 @@ const LEVELS = [
 
 {n:'Foundry Floor', th:4, c:[86,560,-44], sh:5, tr:[3,4], tg:[[860,300,26]], o:[
   ['spike',400,600,200,26], ['spike',660,600,200,26],
-  ['s',540,420,200,20], ['s',860,340,180,20], ['s',300,260,180,20]]},
+  ['s',540,420,200,20], ['s',860,340,180,20], ['s',300,260,180,20],
+  ['b',540,384,44,44], ['b',584,384,44,44]]},
 
 {n:'Ember Shaft', th:4, c:[86,560,-58], sh:5, tr:[3,4], tg:[[780,330,26]], o:[
   ['s',660,432,22,388], ['s',900,432,22,388],
@@ -3176,7 +3240,8 @@ const LEVELS = [
 
 {n:'Furnace Heart', th:4, c:[86,560,-50], sh:6, tr:[3,5], tg:[[820,180,24]], o:[
   ['mov',560,420,200,22,0,-260,4], ['saw',360,300,28,8], ['saw',760,470,28,-8],
-  ['s',820,220,200,20], ['s',300,480,180,20], ['fan',660,300,160,300,-90,1500]]},
+  ['s',820,220,200,20], ['s',300,480,180,20], ['fan',660,300,160,300,-90,1500],
+  ['rotor',540,178,28,94,3,2.4]]},
 
 {n:'The Long Shot', th:4, c:[86,560,-24], sh:6, tr:[2,4], tg:[[880,410,26]], o:[
   ['s',560,180,22,320], ['s',560,540,22,160],
@@ -3189,7 +3254,8 @@ const LEVELS = [
 
 {n:'Crossfire', th:2, c:[86,560,-46], sh:5, tr:[3,4], tg:[[880,470,26]], o:[
   ['fan',420,330,170,290,0,1400], ['fan',680,330,170,290,180,1400],
-  ['m',880,510,200,20], ['m',300,220,180,20]]},
+  ['m',880,510,200,20], ['m',300,220,180,20],
+  ['b',300,178,48,48]]},
 
 {n:'Swingtime', th:2, c:[86,560,-34], sh:5, tr:[3,4], tg:[[886,588,26]], o:[
   ['pend',480,60,18,280], ['btn',300,596,1,60],
@@ -3206,7 +3272,8 @@ const LEVELS = [
 
 {n:'Bramble', th:3, c:[86,560,-40], sh:5, tr:[3,4], tg:[[880,470,26]], o:[
   ['rope',420,60,8,26], ['rope',600,60,8,26], ['saw',520,540,28,8],
-  ['mo',880,510,200,20], ['mo',300,300,180,20]]},
+  ['mo',880,510,200,20], ['mo',300,300,180,20],
+  ['rotor',520,300,26,80,2,2.8]]},
 
 {n:'Mirror', th:0, c:[480,300,-90], sh:4, tr:[2,3], tg:[[240,588,24],[790,588,24]], o:[
   ['w',480,480,22,300], ['w',320,420,180,20], ['w',660,420,180,20]]},
@@ -3525,7 +3592,7 @@ const Game = {
         if(d > 26){
           let a = Math.atan2(dy,dx);
           this.aimA = a;
-          this.aimP = clamp((d - 40)/260, 0.12, 1);
+          this.aimP = Save.data.classic ? 1 : clamp((d - 30)/230, 0.25, 1);
           this.aiming = true;
         }
       } else if(this.aiming){
@@ -3615,16 +3682,16 @@ const Game = {
       }
       if(this.aiming){
         const x = IN.x, y = IN.y;
-        g.save();
-        g.strokeStyle='rgba(255,240,200,0.85)'; g.lineWidth=2;
-        g.beginPath(); g.arc(x,y,17,0,TAU); g.stroke();
-        g.globalAlpha=0.55;
-        g.beginPath();
-        g.moveTo(x-27,y); g.lineTo(x-8,y); g.moveTo(x+8,y); g.lineTo(x+27,y);
-        g.moveTo(x,y-27); g.lineTo(x,y-8); g.moveTo(x,y+8); g.lineTo(x,y+27);
-        g.stroke();
-        g.globalAlpha=1;
-        g.fillStyle='rgba(255,240,200,0.9)'; g.beginPath(); g.arc(x,y,2.2,0,TAU); g.fill();
+        g.save(); g.lineCap='butt';
+        const cross = ()=>{
+          g.beginPath(); g.arc(x,y,21,0,TAU); g.stroke();
+          g.beginPath();
+          g.moveTo(x-58,y); g.lineTo(x-27,y); g.moveTo(x+27,y); g.lineTo(x+58,y);
+          g.moveTo(x,y-58); g.lineTo(x,y-27); g.moveTo(x,y+27); g.lineTo(x,y+58);
+          g.stroke();
+        };
+        g.strokeStyle='rgba(20,14,6,0.45)'; g.lineWidth=4.5; cross();
+        g.strokeStyle='rgba(240,238,230,0.92)'; g.lineWidth=2.2; cross();
         g.restore();
       }
     }
@@ -3677,7 +3744,7 @@ const Game = {
     let hudA = 1;
     for(const tg of L.targets){
       if(tg.x + tg.r > 742 && tg.x - tg.r < 950 && tg.y + tg.r > 560 && tg.y - tg.r < 640){
-        hudA = tg.hit ? 0.62 : 0.34; break;
+        hudA = tg.hit ? 0.66 : 0.44; break;
       }
     }
     for(const d of L.dolls){
@@ -3904,7 +3971,7 @@ Game.drawLevels = function(g){
 
 Game.drawSettings = function(g){
   this.menuBG(g);
-  const w=420,h=380,x=DW/2-w/2,y=DH/2-h/2;
+  const w=430,h=428,x=DW/2-w/2,y=DH/2-h/2;
   panel(g,x,y,w,h,16);
   label(g,'SETTINGS', DW/2, y+44, 32, '#f5dfa8');
   const row = (i,txt,val,fn)=>{
@@ -3918,14 +3985,16 @@ Game.drawSettings = function(g){
     Save.data.music = !(Save.data.music!==false); Audio.musicOn = Save.data.music; Save.write(); });
   row(2,'Aim guide', Save.data.guide!==false, ()=>{
     Save.data.guide = !(Save.data.guide!==false); Save.write(); });
+  row(3,'Full charge aim', !!Save.data.classic, ()=>{
+    Save.data.classic = !Save.data.classic; Save.write(); });
   if(this._wipe){
-    label(g,'Erase every cup and clear all rooms?', DW/2, y+284, 16, '#ffb59a');
-    if(button(g, x+40, y+306, 150, 44, 'CANCEL')) this._wipe = false;
-    if(button(g, x+w-190, y+306, 150, 44, 'ERASE', {accent:true})){
+    label(g,'Erase every cup and clear all rooms?', DW/2, y+332, 16, '#ffb59a');
+    if(button(g, x+40, y+352, 150, 44, 'CANCEL')) this._wipe = false;
+    if(button(g, x+w-190, y+352, 150, 44, 'ERASE', {accent:true})){
       Save.data.best = {}; Save.write(); this._wipe = false;
     }
   } else {
-    if(button(g, x+30, y+282, w-60, 44, 'RESET PROGRESS')) this._wipe = true;
+    if(button(g, x+30, y+344, w-60, 44, 'RESET PROGRESS')) this._wipe = true;
   }
   if(button(g, 20, DH-62, 130, 46, 'BACK')){ this._wipe=false; this.transition(()=>this.go(this.level?'levels':'title')); }
 };
