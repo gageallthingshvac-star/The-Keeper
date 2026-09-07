@@ -337,6 +337,7 @@
     <b>[ ]</b><span>Brush size</span>
     <b>L</b><span>Lantern</span>
     <b>X</b><span>Drop a bomb at the cursor</span>
+    <b>N</b><span>Call in a nuke — anywhere on screen</span>
     <b>C</b><span>Spawn a critter</span>
     <b>R</b><span>Respawn at the surface</span>
     <b>P</b><span>Pause the physics</span>
@@ -358,7 +359,8 @@
     · Bury <b style="color:#C4362A">TNT</b> under a lake.<br>
     · Set gravity to zero, then flick sand into the sky.<br>
     · Plant <b style="color:#C8AA46">seeds</b> on grass and turn the day up fast.<br>
-    · Drop <b style="color:#96E63C">acid</b> on anything but steel.
+    · Drop <b style="color:#96E63C">acid</b> on anything but steel.<br>
+    · Bury a <b style="color:#C4B234">nuke</b>, light it, and run. Sand fuses to glass in the crater.
   </div>
   <div class="actions"><div class="btn go" id="closeHelp" style="flex:1 1 100%">Got it</div></div>
 </div></div>
@@ -398,7 +400,8 @@ let simFrame = 0;
 /* --------------------------------------------------------- materials */
 const AIR=0, STONE=1, DIRT=2, GRASS=3, SAND=4, GRAVEL=5, WATER=6, LAVA=7, OIL=8,
       ACID=9, WOOD=10, LEAF=11, PLANT=12, SEED=13, FIRE=14, SMOKE=15, STEAM=16,
-      ICE=17, SNOW=18, GLASS=19, STEEL=20, TNT=21, LAMP=22, GOLD=23, COAL=24, BEDROCK=25;
+      ICE=17, SNOW=18, GLASS=19, STEEL=20, TNT=21, LAMP=22, GOLD=23, COAL=24, BEDROCK=25,
+      NUKE=26, ARMED=27;
 
 const SOLID=0, POWDER=1, LIQUID=2, GAS=3;
 
@@ -430,11 +433,13 @@ const MAT = [
   {n:'Gold',   c:[226,182, 58], v:16, k:SOLID,  d:9,   f:0,    l:.1},
   {n:'Coal',   c:[ 68, 66, 72], v:26, k:SOLID,  d:9,   f:.35,  l:0},
   {n:'Bedrock',c:[ 40, 38, 44], v:10, k:SOLID,  d:99,  f:0,    l:0},
+  {n:'Nuke',   c:[196,178, 52], v:38, k:SOLID,  d:9,   f:0,    l:.14},
+  {n:'Armed',  c:[255, 90, 60], v:12, k:SOLID,  d:9,   f:0,    l:1},
 ];
 
 // what the player's body stands on
 const COLLIDES = new Uint8Array(MAT.length);
-[STONE,DIRT,GRASS,SAND,GRAVEL,WOOD,ICE,GLASS,STEEL,TNT,LAMP,GOLD,COAL,BEDROCK,SNOW].forEach(m=>COLLIDES[m]=1);
+[STONE,DIRT,GRASS,SAND,GRAVEL,WOOD,ICE,GLASS,STEEL,TNT,LAMP,GOLD,COAL,BEDROCK,SNOW,NUKE,ARMED].forEach(m=>COLLIDES[m]=1);
 // acid eats these; steel, glass and bedrock survive
 const ACIDPROOF = new Uint8Array(MAT.length);
 [STEEL,GLASS,BEDROCK,ACID].forEach(m=>ACIDPROOF[m]=1);
@@ -448,7 +453,7 @@ const isPowder = m => MAT[m].k === POWDER;
 const isSolid  = m => MAT[m].k === SOLID;
 
 // materials the player can paint with, in dock order
-const PALETTE = [DIRT,GRASS,STONE,SAND,GRAVEL,WATER,LAVA,OIL,ACID,WOOD,LEAF,SEED,FIRE,ICE,SNOW,GLASS,STEEL,TNT,LAMP,GOLD,COAL];
+const PALETTE = [DIRT,GRASS,STONE,SAND,GRAVEL,WATER,LAVA,OIL,ACID,WOOD,LEAF,SEED,FIRE,ICE,SNOW,GLASS,STEEL,TNT,NUKE,LAMP,GOLD,COAL];
 
 /* ------------------------------------------------------------- helpers */
 const clamp = (v,a,b) => v < a ? a : v > b ? b : v;
@@ -702,6 +707,8 @@ function cell(x, y){
     case SMOKE: case STEAM: { gas(x, y, i, m); return; }
     case ICE:     { meltCheck(x, y, i, WATER); return; }
     case TNT:     { if (nearHeat(x, y)) explode(x + 0.5, y + 0.5, 11, 1); return; }
+    case NUKE:    { if (nearHeat(x, y)) arm(x, y, 90); return; }
+    case ARMED:   { countdown(x, y, i); return; }
     case PLANT:   { growPlant(x, y, i); return; }
     case DIRT:    { // grass creeps back over bare dirt in the light
       if (Math.random() < 0.006 && at(x, y - 1) === AIR && y <= colTop[x] + 1) setCell(x, y, GRASS);
@@ -835,6 +842,7 @@ function fire(x, y, i){
     if (t === AIR) continue;
     if (t === WATER || t === STEAM){ setCell(x, y, STEAM, 26); return; }
     if (t === TNT){ explode(nx + 0.5, ny + 0.5, 11, 1); return; }
+    if (t === NUKE){ arm(nx, ny, 90); continue; }
     if (MAT[t].f > 0){
       fuel++;
       if (Math.random() < MAT[t].f * 0.16)
@@ -883,6 +891,118 @@ function growPlant(x, y, i){
   }
 }
 
+/* --------------------------------------------------------------- nukes */
+function arm(x, y, fuse){
+  if (at(x, y) !== NUKE) return;
+  setCell(x, y, ARMED, fuse);
+  sfx('arm');
+}
+function countdown(x, y, i){
+  const t = dat[i] - 1;
+  if (t <= 1){ setCell(x, y, AIR); nuke(x + 0.5, y + 0.5); return; }
+  dat[i] = t;
+  if ((t & 7) === 0){
+    spark(x + 0.5, y, (Math.random() - .5) * 3, -2 - Math.random() * 3, '#FFE9A0', 0.4, 1);
+    if ((t & 31) === 0) sfx('arm');
+  }
+  wake(x, y);
+}
+
+/* One big one. Vaporised core, glassed sand, a ring of fire, a stem of smoke
+   that climbs into a cap — and every other warhead in range joins in. */
+function nuke(cx, cy){
+  const R = 44, R2 = R * R;
+  const x0 = Math.max(0, Math.floor(cx - R)), x1 = Math.min(W - 1, Math.ceil(cx + R));
+  const y0 = Math.max(0, Math.floor(cy - R)), y1 = Math.min(H - 1, Math.ceil(cy + R));
+  for (let y = y0; y <= y1; y++){
+    for (let x = x0; x <= x1; x++){
+      const dx = x + 0.5 - cx, dy = y + 0.5 - cy;
+      const d2 = dx * dx + dy * dy;
+      if (d2 > R2) continue;
+      const m = grid[x + y * W];
+      if (m === BEDROCK) continue;
+      if (m === NUKE || m === ARMED){
+        // anything in the same stack is swallowed by this blast; the far ones light their own fuse
+        if (d2 < 64) setCell(x, y, AIR);
+        else if (m === NUKE) arm(x, y, 24 + (Math.random() * 60 | 0));
+        continue;
+      }
+      const t = Math.sqrt(d2) / R;
+      if (t < 0.34){                                   // nothing survives the core
+        setCell(x, y, AIR);
+      } else if (t < 0.5){                             // fireball: sand fuses to glass
+        if (m === SAND) setCell(x, y, Math.random() < 0.55 ? GLASS : AIR);
+        else setCell(x, y, Math.random() < 0.14 ? FIRE : AIR, 44);
+      } else if (t < 0.72){                            // blast wave
+        if (m === AIR) continue;
+        if (m === WATER) setCell(x, y, STEAM, 70);
+        else if (m === SAND && Math.random() < 0.3) setCell(x, y, GLASS);
+        else if (Math.random() < 1.05 - t) setCell(x, y, AIR);
+        else if (MAT[m].f > 0 && Math.random() < 0.5) setCell(x, y, FIRE, 70 + (Math.random() * 60 | 0));
+      } else {                                         // scorch
+        if (m === GRASS) setCell(x, y, DIRT);
+        else if (m === LEAF || m === PLANT) setCell(x, y, Math.random() < 0.45 ? FIRE : AIR, 44);
+        else if (m === SNOW || m === ICE) setCell(x, y, WATER);
+        else if (m === WATER){ if (Math.random() < 0.08) setCell(x, y, STEAM, 44); }
+        else if (m !== AIR && Math.random() < (0.95 - t) * 0.55) setCell(x, y, AIR);
+      }
+    }
+  }
+
+  // the crater smoulders
+  for (let k = 0; k < 90; k++){
+    const a = Math.random() * Math.PI * 2, rr = Math.random() * R * 0.42;
+    const x = Math.floor(cx + Math.cos(a) * rr), y = Math.floor(cy + Math.sin(a) * rr);
+    if (inB(x, y) && grid[x + y * W] === AIR) setCell(x, y, SMOKE, 60 + (Math.random() * 70 | 0));
+  }
+
+  // the cloud itself is drawn, not simulated: gas rises far too eagerly to hold
+  // a stem and a cap
+  const ash = ['#C6C0B6', '#A39C93', '#847D75', '#DAD4CA'];
+  for (let k = 0; k < 74; k++){                       // stem
+    const a = (Math.random() - 0.5) * 5;
+    puff(cx + a, cy - Math.random() * 4, a * 0.5, -(7 + Math.random() * 11),
+         ash[k & 3], 5.5 + Math.random() * 4, 2.4 + Math.random() * 2);
+  }
+  for (let k = 0; k < 98; k++){                       // cap
+    const a = (Math.random() - 0.5) * 6;
+    puff(cx + a, cy - Math.random() * 3, (Math.random() - 0.5) * 23, -(20 + Math.random() * 13),
+         ash[k & 3], 6.5 + Math.random() * 5, 3 + Math.random() * 3);
+  }
+  for (let k = 0; k < 52; k++){                       // the skirt rolling out along the ground
+    const d = (Math.random() < 0.5 ? -1 : 1) * (5 + Math.random() * 26);
+    puff(cx + d * 0.2, cy - Math.random() * 2, d * 1.5, -(1 + Math.random() * 4),
+         k < 14 ? (k & 1 ? '#FFB454' : '#FF8038') : ash[k & 3],
+         4 + Math.random() * 3, 3 + Math.random() * 3);
+  }
+
+  for (let k = 0; k < 110; k++){
+    const a = Math.random() * Math.PI * 2, sp = 12 + Math.random() * 70;
+    spark(cx, cy, Math.cos(a) * sp, Math.sin(a) * sp - 12,
+          Math.random() < 0.35 ? '#FFF3C4' : Math.random() < 0.5 ? '#FFC24F' : '#FF6B3D',
+          0.7 + Math.random() * 1.3, 3);
+  }
+  if (shocks.length < 6) shocks.push({ x: cx, y: cy, r: 1, life: 1 });
+  flash = 1;
+  shake = 48;
+  sfx('nuke');
+
+  const dp = Math.hypot(player.x - cx, player.y - cy) || 1;
+  if (dp < R * 1.7){
+    const f = (1 - dp / (R * 1.7));
+    player.vx += ((player.x - cx) / dp) * f * 90;
+    player.vy += ((player.y - cy) / dp) * f * 90 - 14;
+    if (!godMode) hurt(260 * f);
+  }
+  for (let n = critters.length - 1; n >= 0; n--){
+    const e = critters[n];
+    const de = Math.hypot(e.x - cx, e.y - cy) || 1;
+    if (de < R * 0.8){ critters.splice(n, 1); continue; }
+    if (de < R * 2){ const f = (1 - de / (R * 2)) * 70; e.vx += ((e.x - cx) / de) * f; e.vy += ((e.y - cy) / de) * f - 10; }
+  }
+  toast('☢  Well. That happened.');
+}
+
 /* ---------------------------------------------------------- explosions */
 function explode(cx, cy, r, power){
   const r2 = r * r;
@@ -896,6 +1016,8 @@ function explode(cx, cy, r, power){
       if (BLASTPROOF[m]) continue;
       const t = Math.sqrt(d2) / r;
       if (m === TNT && t > 0.2){ setCell(x, y, FIRE, 8 + (Math.random() * 8 | 0)); continue; }
+      if (m === NUKE){ arm(x, y, 30 + (Math.random() * 50 | 0)); continue; }
+      if (m === ARMED) continue;
       if (t < 0.55 || Math.random() > t * 0.9){
         setCell(x, y, Math.random() < 0.10 * power ? FIRE : AIR, 40);
       }
@@ -1184,15 +1306,38 @@ function populate(){
    PARTICLES
    ======================================================================= */
 const parts = [];
+const shocks = [];
+let flash = 0;
 function spark(x, y, vx, vy, color, life, size){
   if (parts.length > 700) return;
   parts.push({ x, y, vx, vy, c: color, l: life, L: life, s: size || 1 });
+}
+/* a puff climbs, swells and drifts with the wind instead of falling */
+function puff(x, y, vx, vy, color, life, size){
+  if (parts.length > 1150) return;
+  parts.push({ x, y, vx, vy, c: color, l: life, L: life, s: size || 1, b: 1 });
+}
+function updateShocks(dt){
+  flash = Math.max(0, flash - dt * 1.15);
+  for (let i = shocks.length - 1; i >= 0; i--){
+    const s = shocks[i];
+    s.r += dt * 105;
+    s.life -= dt * 0.85;
+    if (s.life <= 0) shocks.splice(i, 1);
+  }
 }
 function updateParts(dt){
   for (let i = parts.length - 1; i >= 0; i--){
     const p = parts[i];
     p.l -= dt;
     if (p.l <= 0){ parts.splice(i, 1); continue; }
+    if (p.b){
+      p.vy += (-2.4 - p.vy) * Math.min(1, dt * 1.1);
+      p.vx += (wind * 4 - p.vx) * Math.min(1, dt * 0.7);
+      p.s += dt * 0.5;
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      continue;
+    }
     p.vy += 30 * gravityMul * dt;
     p.vx *= (1 - dt * 1.4);
     p.x += p.vx * dt; p.y += p.vy * dt;
@@ -1306,7 +1451,7 @@ for (let m = 0; m < MAT.length; m++){
 }
 const LIGHT_R = new Float32Array(MAT.length);
 LIGHT_R[LAVA] = 8; LIGHT_R[FIRE] = 7.5; LIGHT_R[LAMP] = 13; LIGHT_R[ACID] = 4.5;
-LIGHT_R[GOLD] = 2.6; LIGHT_R[TNT] = 2.2;
+LIGHT_R[GOLD] = 2.6; LIGHT_R[TNT] = 2.2; LIGHT_R[NUKE] = 2.4; LIGHT_R[ARMED] = 10;
 
 function resize(){
   dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -1361,6 +1506,15 @@ const NOFF = new Float32Array(VARS);
 }
 function buildPalette(m, phase){
   const c = MAT[m].c, v = MAT[m].v, base = m * VARS;
+  if (m === ARMED){                                  // a warhead counting down blinks as one block
+    const b = 0.5 + 0.5 * Math.sin(phase);
+    const r = lerp(214, 255, b), g = lerp(46, 236, b), bl = lerp(36, 206, b);
+    for (let i = 0; i < VARS; i++){
+      const n = NOFF[i] * 8;
+      PAL32[base + i] = pack(r + n, g + n, bl + n);
+    }
+    return;
+  }
   for (let i = 0; i < VARS; i++){
     let n = NOFF[i] * v;
     if (phase) n += Math.sin(i * 1.7 + phase) * (m === LAVA ? 9 : m === FIRE ? 26 : 7);
@@ -1417,6 +1571,7 @@ function drawWorld(){
   buildPalette(WATER, tNow * 2.2);
   buildPalette(LAVA, tNow * 1.1);
   buildPalette(FIRE, tNow * 9);
+  buildPalette(ARMED, tNow * 15);
 
   const rock32 = pack(26, 24, 28);
 
@@ -1538,10 +1693,16 @@ function render(){
 
   /* --- sun, moon and stars ride on top --- */
   drawSky();
+  drawShocks();
 
   /* --- overlays --- */
   drawCursor();
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (flash > 0.004){
+    const f = flash * flash;
+    ctx.fillStyle = `rgba(255,${Math.round(236 - 40 * (1 - flash))},${Math.round(198 - 90 * (1 - flash))},${f * 0.92})`;
+    ctx.fillRect(0, 0, cssW, cssH);
+  }
   if (player.hurtFlash > 0.01){
     ctx.fillStyle = `rgba(255,50,40,${player.hurtFlash * 0.30})`;
     ctx.fillRect(0, 0, cssW, cssH);
@@ -1629,6 +1790,22 @@ function drawSky(){
   ctx.globalCompositeOperation = 'source-over';
 }
 
+function drawShocks(){
+  for (const s of shocks){
+    const p = tileToScreen(s.x, s.y);
+    const a = clamp(s.life, 0, 1);
+    ctx.globalAlpha = a * a * 0.85;
+    ctx.strokeStyle = '#FFE7B0';
+    ctx.lineWidth = Math.max(1.5, scale * 0.5 * a);
+    ctx.beginPath(); ctx.arc(p.sx, p.sy, s.r * scale, 0, 7); ctx.stroke();
+    ctx.globalAlpha = a * a * 0.35;
+    ctx.strokeStyle = '#FF9B4A';
+    ctx.lineWidth = Math.max(1, scale * 0.22 * a);
+    ctx.beginPath(); ctx.arc(p.sx, p.sy, s.r * scale * 0.82, 0, 7); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+}
+
 function drawWeather(){
   if (weather === 0 || drops.length === 0) return;
   if (weather === 1){
@@ -1654,8 +1831,8 @@ function drawWeather(){
 function drawParticles(){
   for (const p of parts){
     const s = tileToScreen(p.x, p.y);
-    const a = clamp(p.l / p.L, 0, 1);
-    ctx.globalAlpha = a;
+    const f = clamp(p.l / p.L, 0, 1);
+    ctx.globalAlpha = p.b ? Math.min(0.82, f * 2.1) : f;
     ctx.fillStyle = p.c;
     const sz = Math.max(1.5, p.s * scale * 0.35);
     ctx.fillRect(s.sx - sz / 2, s.sy - sz / 2, sz, sz);
@@ -1745,6 +1922,7 @@ let curMat = DIRT;
 let tool = 'paint';             // paint | erase | pick | critter | bomb
 let brushSize = 3;              // radius in tiles
 let critterType = 'slime';
+let bombMode = 'bomb';          // the bomb button toggles between a charge and a warhead
 let infiniteReach = false;
 const REACH = 14;               // tiles, when reach is limited
 
@@ -1797,7 +1975,8 @@ function applyBrush(x, y, mode){
 }
 let reachNagged = 0;
 function useTool(x, y, alt){
-  if (!reachOK(x, y) && tool !== 'pick'){
+  const calledIn = tool === 'bomb' && bombMode === 'nuke';   // a nuke is called in, not thrown
+  if (!reachOK(x, y) && tool !== 'pick' && !calledIn){
     if (tNow - reachNagged > 3){
       reachNagged = tNow;
       toast('Too far to reach — switch on Infinite reach in ☰');
@@ -1811,8 +1990,8 @@ function useTool(x, y, alt){
   }
   if (tool === 'critter'){ if (reachOK(x, y)) spawnCritter(critterType, x + .5, y + .5); return; }
   if (tool === 'bomb'){
-    if (!reachOK(x, y)) return;
-    explode(x + .5, y + .5, 6 + brushSize * 1.2, 1);
+    if (bombMode === 'nuke') nuke(x + .5, y + .5);
+    else explode(x + .5, y + .5, 6 + brushSize * 1.2, 1);
     return;
   }
   applyBrush(x, y, (tool === 'erase') !== !!alt ? 'erase' : 'paint');
@@ -1945,6 +2124,7 @@ window.addEventListener('keydown', e => {
     case 'KeyT': setWeather((weather + 1) % 3); break;
     case 'KeyC': if (pointer.valid) spawnCritter(critterType, pointer.tile.x + .5, pointer.tile.y + .5); break;
     case 'KeyX': if (pointer.valid) explode(pointer.tile.x + .5, pointer.tile.y + .5, 9, 1); break;
+    case 'KeyN': if (pointer.valid) nuke(pointer.tile.x + .5, pointer.tile.y + .5); break;
     case 'KeyQ': cycleMat(-1); break;
     case 'KeyE': cycleMat(1); break;
     case 'KeyG': setTool(tool === 'erase' ? 'paint' : 'erase'); break;
@@ -1994,6 +2174,8 @@ function sfx(kind){
     case 'dig':   f0 = 240 + Math.random() * 60; f1 = 90;  dur = 0.07; type = 'sawtooth'; vol = 0.07; break;
     case 'boom':  f0 = 150; f1 = 28;  dur = 0.55; type = 'sawtooth'; vol = 0.5; break;
     case 'hurt':  f0 = 300; f1 = 90;  dur = 0.22; type = 'square'; vol = 0.2; break;
+    case 'arm':   f0 = 880; f1 = 880; dur = 0.06; type = 'square'; vol = 0.10; break;
+    case 'nuke':  f0 = 120; f1 = 15;  dur = 2.6;  type = 'sawtooth'; vol = 0.6; break;
     case 'ui':    f0 = 520; f1 = 700; dur = 0.05; type = 'sine'; vol = 0.09; break;
   }
   o.type = type;
@@ -2002,6 +2184,20 @@ function sfx(kind){
   g.gain.setValueAtTime(vol, now);
   g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
   o.start(now); o.stop(now + dur + 0.02);
+
+  if (kind === 'nuke'){                        // a long rolling rumble under the boom
+    const len = Math.floor(AC.sampleRate * 2.4);
+    const buf = AC.createBuffer(1, len, AC.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.1);
+    const src = AC.createBufferSource(); src.buffer = buf;
+    const lp = AC.createBiquadFilter(); lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(1100, now);
+    lp.frequency.exponentialRampToValueAtTime(70, now + 2.3);
+    const ng = AC.createGain(); ng.gain.value = 0.55;
+    src.connect(lp); lp.connect(ng); ng.connect(master);
+    src.start(now);
+  }
 }
 
 /* =======================================================================
@@ -2027,7 +2223,7 @@ const TOOLS = [
   { id:'erase',   ico:'⛏',  t:'Dig' },
   { id:'pick',    ico:'💧', t:'Eyedropper' },
   { id:'critter', ico:'🐣', t:'Spawn a critter' },
-  { id:'bomb',    ico:'💥', t:'Bomb' },
+  { id:'bomb',    ico:'💥', t:'Bomb — tap again for a nuke' },
 ];
 TOOLS.forEach(T => {
   const b = document.createElement('div');
@@ -2037,6 +2233,11 @@ TOOLS.forEach(T => {
     if (T.id === 'critter' && tool === 'critter'){
       critterType = CRIT_KEYS[(CRIT_KEYS.indexOf(critterType) + 1) % CRIT_KEYS.length];
       toast('Spawning: ' + critterType);
+    }
+    if (T.id === 'bomb' && tool === 'bomb'){
+      bombMode = bombMode === 'bomb' ? 'nuke' : 'bomb';
+      b.innerHTML = `<span class="ico">${bombMode === 'nuke' ? '☢️' : '💥'}</span>`;
+      toast(bombMode === 'nuke' ? 'Warhead ready — it reaches anywhere on screen' : 'Back to plain bombs');
     }
     setTool(T.id);
   });
@@ -2300,6 +2501,7 @@ function frame(ts){
   for (let s = 0; s < sub; s++) updatePlayer(dt / sub);
   updateCritters(dt);
   updateParts(dt);
+  updateShocks(dt);
   updateMeteors(dt);
   updateWeather(dt);
 
