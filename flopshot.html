@@ -927,11 +927,11 @@ function texPlank(w,h,mat){
     g.strokeStyle = P.line; g.lineWidth = 1.4;
     rr(g,0.7,0.7,w-1.4,h-1.4,Math.min(3.5,h*0.28)); g.stroke();
     // rivets
-    const rr_ = clamp(Math.min(w,h)*0.14, 1.5, 3.1);
+    const rr_ = clamp(Math.min(w,h)*0.19, 1.8, 4.3);
     const inset = Math.max(3.5, rr_*2.0);
     if(horiz){
       const span = w - inset*2;
-      const cnt = clamp(Math.round(span/46)+2, 2, 14);
+      const cnt = clamp(Math.round(span/52)+2, 2, 14);
       for(let i=0;i<cnt;i++){
         const x = inset + span*(cnt===1?0.5:i/(cnt-1));
         if(h > 15){ rivet(g,x,inset,rr_,P.riv1,P.riv2); rivet(g,x,h-inset,rr_,P.riv1,P.riv2); }
@@ -939,7 +939,7 @@ function texPlank(w,h,mat){
       }
     } else {
       const span = h - inset*2;
-      const cnt = clamp(Math.round(span/46)+2, 2, 14);
+      const cnt = clamp(Math.round(span/52)+2, 2, 14);
       for(let i=0;i<cnt;i++){
         const y = inset + span*(cnt===1?0.5:i/(cnt-1));
         if(w > 15){ rivet(g,inset,y,rr_,P.riv1,P.riv2); rivet(g,w-inset,y,rr_,P.riv1,P.riv2); }
@@ -1207,43 +1207,51 @@ const THEMES = [
   { name:'The Almanac',plank:'wood',  block:'wood',  fog:'#170f06', tint:'rgba(255,214,140,0.05)' },
   { name:'The Board',  plank:'brass', block:'metal', fog:'#04070c', tint:'rgba(120,190,255,0.05)' }
 ];
+/* The wall the original builds nearly every interior room on: big padded
+   panels, dark and low in contrast so the woodwork in front of them reads.
+   Roughly six across the screen -- much larger, and much quieter, than a
+   brick course. Each theme supplies its own palette. */
+const PANEL_PAL = {
+  0: { gap:'#150c05', hi:'#3f2715', mid:'#2b1a0d', lo:'#190e06',
+       edge:'rgba(126,84,44,0.26)', shade:'rgba(0,0,0,0.34)' },
+  1: { gap:'#0a0e13', hi:'#2c343f', mid:'#1f252d', lo:'#141920',
+       edge:'rgba(104,124,148,0.22)', shade:'rgba(0,0,0,0.36)' },
+  2: { gap:'#0d0912', hi:'#332443', mid:'#241931', lo:'#160f1f',
+       edge:'rgba(128,98,164,0.20)', shade:'rgba(0,0,0,0.36)' },
+  3: { gap:'#090a04', hi:'#272814', mid:'#1a1b0e', lo:'#101106',
+       edge:'rgba(104,116,58,0.18)', shade:'rgba(0,0,0,0.38)' },
+  4: { gap:'#150603', hi:'#42190e', mid:'#2e110a', lo:'#1c0905',
+       edge:'rgba(154,68,36,0.24)', shade:'rgba(0,0,0,0.36)' },
+  6: { gap:'#160d05', hi:'#402d16', mid:'#2d200f', lo:'#1b1308',
+       edge:'rgba(144,104,52,0.22)', shade:'rgba(0,0,0,0.34)' }
+};
+function panelWall(g, th){
+  const P = PANEL_PAL[th] || PANEL_PAL[0];
+  g.fillStyle = P.gap; g.fillRect(0,0,DW,DH);
+  const s = 152, gap = 13, r = 15, w = s-gap;
+  for(let y=-26; y<DH+s; y+=s) for(let x=-34; x<DW+s; x+=s){
+    const gr = g.createLinearGradient(x,y,x,y+w);
+    gr.addColorStop(0,P.hi); gr.addColorStop(0.52,P.mid); gr.addColorStop(1,P.lo);
+    g.fillStyle = gr; rr(g,x,y,w,w,r); g.fill();
+    g.strokeStyle = P.edge; g.lineWidth = 2;
+    rr(g,x+1.2,y+1.2,w-2.4,w-2.4,r-1); g.stroke();
+    const sg = g.createLinearGradient(0,y+w*0.44,0,y+w);
+    sg.addColorStop(0,'rgba(0,0,0,0)'); sg.addColorStop(1,P.shade);
+    g.fillStyle = sg; rr(g,x,y,w,w,r); g.fill();
+  }
+}
+
 const BGC = new Map();
 function background(th){
   if(BGC.has(th)) return BGC.get(th);
   const c = mkcv(DW,DH), g = c.getContext('2d');
   seed(4001 + th*977);
   if(th===0){        // padded leather blocks, warm workshop dark
-    g.fillStyle='#221408'; g.fillRect(0,0,DW,DH);
-    const s=88, gap=7;
-    for(let y=-10;y<DH+s;y+=s) for(let x=-10;x<DW+s;x+=s){
-      const gr=g.createLinearGradient(x,y,x,y+s-gap);
-      gr.addColorStop(0,'#432b18'); gr.addColorStop(0.55,'#301d0f'); gr.addColorStop(1,'#1c0f06');
-      g.fillStyle=gr; rr(g,x,y,s-gap,s-gap,11); g.fill();
-      g.strokeStyle='rgba(226,168,86,0.34)'; g.lineWidth=2.6;
-      rr(g,x+2.5,y+2.5,s-gap-5,s-gap-5,9); g.stroke();
-      g.strokeStyle='rgba(255,214,150,0.16)'; g.lineWidth=1.2;
-      rr(g,x+1,y+1,s-gap-2,s-gap-2,10); g.stroke();
-      g.fillStyle='rgba(0,0,0,0.30)'; rr(g,x+3,y+(s-gap)*0.55,s-gap-6,(s-gap)*0.42,8); g.fill();
-    }
-  } else if(th===1){ // cut stone cellar
-    g.fillStyle='#161c24'; g.fillRect(0,0,DW,DH);
-    const bh=52, bw=104;
-    for(let r=0,y=-8;y<DH+bh;y+=bh,r++){
-      const off = (r%2)*bw*0.5;
-      for(let x=-bw+off;x<DW+bw;x+=bw){
-        const v = 0.82+srnd()*0.28;
-        const gr=g.createLinearGradient(x,y,x,y+bh-5);
-        gr.addColorStop(0,`rgb(${Math.round(58*v)},${Math.round(66*v)},${Math.round(78*v)})`);
-        gr.addColorStop(1,`rgb(${Math.round(34*v)},${Math.round(40*v)},${Math.round(49*v)})`);
-        g.fillStyle=gr; rr(g,x,y,bw-6,bh-6,4); g.fill();
-        g.strokeStyle='rgba(0,0,0,0.45)'; g.lineWidth=1.2; rr(g,x,y,bw-6,bh-6,4); g.stroke();
-        g.fillStyle='rgba(255,255,255,0.06)'; g.fillRect(x+2,y+1.5,bw-10,2);
-        for(let i=0;i<6;i++){ g.fillStyle='rgba(0,0,0,0.14)';
-          g.fillRect(x+srnd()*(bw-12), y+srnd()*(bh-10), 2+srnd()*4, 1.5+srnd()*2); }
-      }
-    }
-  } else if(th===2){ // clockworks, dark plum with brass gears turning behind
-    g.fillStyle='#171021'; g.fillRect(0,0,DW,DH);
+    panelWall(g,0);
+  } else if(th===1){ // cellars: the same panels, cold and slate grey
+    panelWall(g,1);
+  } else if(th===2){ // clockworks, panels with brass gears turning behind
+    panelWall(g,2);
     for(let i=0;i<16;i++){
       const x=srnd()*DW, y=srnd()*DH, R=26+srnd()*74, teeth=Math.round(R/6)+6;
       g.save(); g.translate(x,y); g.rotate(srnd()*TAU);
@@ -1264,24 +1272,8 @@ function background(th){
     const vg=g.createRadialGradient(DW/2,DH/2,80,DW/2,DH/2,DW*0.7);
     vg.addColorStop(0,'rgba(80,50,110,0.18)'); vg.addColorStop(1,'rgba(0,0,0,0)');
     g.fillStyle=vg; g.fillRect(0,0,DW,DH);
-  } else if(th===3){ // hothouse, mossy stone and hanging leaves
-    g.fillStyle='#221a10'; g.fillRect(0,0,DW,DH);
-    // old brown brickwork
-    const bh3=74, bw3=136;
-    for(let r=0,y=-14;y<DH+bh3;y+=bh3,r++){
-      const off=(r%2)*bw3*0.5;
-      for(let x=-bw3+off;x<DW+bw3;x+=bw3){
-        const v=0.78+srnd()*0.42;
-        const gr2=g.createLinearGradient(x,y,x,y+bh3-8);
-        gr2.addColorStop(0,`rgb(${Math.round(96*v)},${Math.round(76*v)},${Math.round(50*v)})`);
-        gr2.addColorStop(1,`rgb(${Math.round(58*v)},${Math.round(44*v)},${Math.round(28*v)})`);
-        g.fillStyle=gr2; rr(g,x,y,bw3-8,bh3-8,5); g.fill();
-        g.strokeStyle='rgba(0,0,0,0.5)'; g.lineWidth=1.4; rr(g,x,y,bw3-8,bh3-8,5); g.stroke();
-        g.fillStyle='rgba(255,226,170,0.06)'; g.fillRect(x+3,y+2,bw3-14,2.4);
-        for(let i=0;i<5;i++){ g.fillStyle='rgba(0,0,0,0.14)';
-          g.fillRect(x+srnd()*(bw3-16), y+srnd()*(bh3-14), 3+srnd()*7, 2+srnd()*3); }
-      }
-    }
+  } else if(th===3){ // hothouse: panels gone green, and the vines over them
+    panelWall(g,3);
     // vines down the walls
     for(let i=0;i<14;i++){
       let x=srnd()*DW, y=-20;
@@ -1420,31 +1412,8 @@ function background(th){
       for(let y=DH-h2;y<DH;y+=14) g.fillRect(x,y,86,1.4);
       g.fillStyle='rgba(120,140,155,0.30)';
     }
-  } else {           // furnace, basalt with an ember glow at the floor
-    g.fillStyle='#140803'; g.fillRect(0,0,DW,DH);
-    const bh2=64;
-    for(let r=0,y=-10;y<DH+bh2;y+=bh2,r++){
-      const off=(r%2)*58;
-      for(let x=-120+off;x<DW+120;x+=116){
-        const v=0.7+srnd()*0.5;
-        const w=110+srnd()*8, h=bh2-8;
-        const gr=g.createLinearGradient(x,y,x,y+h);
-        gr.addColorStop(0,`rgb(${Math.round(52*v)},${Math.round(30*v)},${Math.round(22*v)})`);
-        gr.addColorStop(1,`rgb(${Math.round(26*v)},${Math.round(14*v)},${Math.round(10*v)})`);
-        g.fillStyle=gr; rr(g,x,y,w,h,7); g.fill();
-        g.strokeStyle='rgba(0,0,0,0.55)'; g.lineWidth=1.6; rr(g,x,y,w,h,7); g.stroke();
-        g.fillStyle='rgba(255,140,60,0.05)'; g.fillRect(x+3,y+2,w-6,2.4);
-        if(srnd()<0.30){
-          g.strokeStyle=`rgba(255,${90+srnd()*70|0},30,${0.10+srnd()*0.16})`;
-          g.lineWidth=1.4+srnd()*1.6;
-          g.beginPath();
-          let cx=x+8+srnd()*(w-20), cy=y+4;
-          g.moveTo(cx,cy);
-          for(let s=0;s<4;s++){ cx+=(srnd()-0.5)*22; cy+=h/4; g.lineTo(cx,cy); }
-          g.stroke();
-        }
-      }
-    }
+  } else {           // furnace: panels scorched red, embers at the floor
+    panelWall(g,4);
     const gg=g.createLinearGradient(0,DH*0.55,0,DH);
     gg.addColorStop(0,'rgba(255,90,20,0)'); gg.addColorStop(1,'rgba(255,110,30,0.30)');
     g.fillStyle=gg; g.fillRect(0,DH*0.55,DW,DH*0.45);
@@ -1485,13 +1454,22 @@ function drawTarget(g,x,y,r,t,hit,ang){
 
 function drawCannon(g,x,y,ang,recoil,charge,t){
   g.save(); g.translate(x,y);
-  // the mount it is bolted to
-  g.fillStyle='rgba(0,0,0,0.45)'; rr(g,-25,6,50,44,5); g.fill();
-  const mg = g.createLinearGradient(-22,0,22,0);
-  mg.addColorStop(0,'#3a2c1c'); mg.addColorStop(0.45,'#5c4830'); mg.addColorStop(1,'#2a1f13');
-  g.fillStyle=mg; rr(g,-21,2,42,42,4); g.fill();
-  g.strokeStyle='#1a120a'; g.lineWidth=1.6; rr(g,-21,2,42,42,4); g.stroke();
-  for(const [bx,by] of [[-14,10],[14,10],[-14,34],[14,34]]) rivet(g,bx,by,2.6,'#e8d4a8','#2a1f13');
+  // The carriage. Kept low and wide: a tall mount disappeared behind the
+  // button row, which left the barrel looking as though it floated.
+  g.fillStyle='rgba(0,0,0,0.45)'; rr(g,-27,5,54,26,5); g.fill();
+  const mg = g.createLinearGradient(-24,0,24,0);
+  mg.addColorStop(0,'#33261a'); mg.addColorStop(0.45,'#584428'); mg.addColorStop(1,'#241a10');
+  g.fillStyle=mg; rr(g,-23,2,46,24,4); g.fill();
+  g.strokeStyle='#160f07'; g.lineWidth=1.6; rr(g,-23,2,46,24,4); g.stroke();
+  // the pale cradle the trunnion rests in
+  const cg = g.createLinearGradient(0,-6,0,10);
+  cg.addColorStop(0,'#efe3c8'); cg.addColorStop(0.55,'#c3b191'); cg.addColorStop(1,'#7d6c4e');
+  g.fillStyle=cg;
+  g.beginPath();
+  g.moveTo(-19,6); g.quadraticCurveTo(-15,-8,0,-8);
+  g.quadraticCurveTo(15,-8,19,6); g.closePath(); g.fill();
+  g.strokeStyle='#4a3f2b'; g.lineWidth=1.5; g.stroke();
+  for(const [bx,by] of [[-16,17],[16,17],[0,20]]) rivet(g,bx,by,2.5,'#e8d4a8','#241a10');
 
   g.save(); g.rotate(ang);
   if(Math.cos(ang) < 0) g.scale(1,-1);          // aiming left, still right way up
@@ -1499,16 +1477,23 @@ function drawCannon(g,x,y,ang,recoil,charge,t){
   g.translate(-rb,0);
   g.scale(1.55, 1.55);
 
-  // breech block and the copper flywheel behind it
-  g.save(); g.translate(-14,0);
-  const fg = g.createRadialGradient(-3,-3,2,0,0,15);
-  fg.addColorStop(0,'#d89a62'); fg.addColorStop(0.6,'#a05f2c'); fg.addColorStop(1,'#5e3312');
-  g.fillStyle=fg; g.beginPath(); g.arc(0,0,15,0,TAU); g.fill();
-  g.strokeStyle='#3d200a'; g.lineWidth=1.6; g.beginPath(); g.arc(0,0,15,0,TAU); g.stroke();
-  g.strokeStyle='#7a441c'; g.lineWidth=2.2;
-  for(let i=0;i<6;i++){ const a2=i*PI/3 - ang*1.4;
-    g.beginPath(); g.moveTo(0,0); g.lineTo(Math.cos(a2)*12,Math.sin(a2)*12); g.stroke(); }
-  g.fillStyle='#c8b28a'; g.beginPath(); g.arc(0,0,4.4,0,TAU); g.fill();
+  // The breech, and the copper hood curving back over it. The hood used to
+  // be a full disc centred on the breech, which the barrel then covered
+  // almost entirely; drawn as an arc standing proud of the block it reads
+  // at any angle, the way the original's does.
+  g.save(); g.translate(-15,0);
+  const fg = g.createRadialGradient(-4,-4,2,0,0,15);
+  fg.addColorStop(0,'#6b5334'); fg.addColorStop(0.6,'#43331f'); fg.addColorStop(1,'#241a0f');
+  g.fillStyle=fg; g.beginPath(); g.arc(0,0,14,0,TAU); g.fill();
+  g.strokeStyle='#150e06'; g.lineWidth=1.6; g.beginPath(); g.arc(0,0,14,0,TAU); g.stroke();
+  const hg = g.createLinearGradient(-18,-14,4,6);
+  hg.addColorStop(0,'#e9a866'); hg.addColorStop(0.45,'#b06f31'); hg.addColorStop(1,'#5f3512');
+  g.strokeStyle=hg; g.lineWidth=7; g.lineCap='round';
+  g.beginPath(); g.arc(0,0,17.5,PI*0.62, PI*1.62); g.stroke();
+  g.strokeStyle='rgba(255,214,158,0.5)'; g.lineWidth=1.8;
+  g.beginPath(); g.arc(0,0,20,PI*0.66, PI*1.58); g.stroke();
+  g.fillStyle='#c8b28a'; g.beginPath(); g.arc(0,0,4.2,0,TAU); g.fill();
+  g.fillStyle='#5c4a2c'; g.beginPath(); g.arc(0,0,2,0,TAU); g.fill();
   g.restore();
 
   // the pale boiler barrel
@@ -2865,15 +2850,15 @@ Level.prototype.update = function(dt){
 
   /* the boiler is always working */
   this.stackT = (this.stackT || 0) + dt;
-  if(this.stackT > 0.20){
+  if(this.stackT > 0.13){
     this.stackT = 0;
     const c = this.cannon;
     const fl = Math.cos(c.a) < 0 ? -1 : 1;
     const sx = c.x - 6*Math.cos(c.a) + fl*16*Math.sin(c.a);
     const sy = c.y - 6*Math.sin(c.a) - fl*16*Math.cos(c.a);
-    FX.add({ x:sx+rnd(-2,2), y:sy-14, vx:rnd(-9,9), vy:-rnd(16,34),
-             life:0, max:rnd(1.1,2.0), size:rnd(3,6), col:'#e8e0d0',
-             type:'smoke', rot:0, rv:0, g:-0.05, drag:1.1 });
+    FX.add({ x:sx+rnd(-1.5,1.5), y:sy-14, vx:rnd(-6,6), vy:-rnd(22,42),
+             life:0, max:rnd(0.9,1.6), size:rnd(2,3.6), col:'#f6f2e8',
+             type:'smoke', rot:0, rv:0, g:-0.06, drag:1.0 });
   }
 
   /* a rolling carriage carries the barrel with it, and stays upright */
@@ -4783,13 +4768,16 @@ function button(g,x,y,w,h,text,opt={}){
   g.globalAlpha = dis ? 0.45 : 1;
   g.fillStyle='rgba(0,0,0,0.45)'; rr(g,x+2,y+4,w,h,9); g.fill();
   const gr=g.createLinearGradient(0,y,0,y+h);
-  if(opt.accent){ gr.addColorStop(0, on?'#ffd681':'#e8b95d'); gr.addColorStop(1, on?'#c98a26':'#a86f1c'); }
+  if(opt.plate){ gr.addColorStop(0, on?'#3a352f':'#1e1b17'); gr.addColorStop(1, on?'#211e1a':'#0d0b09'); }
+  else if(opt.accent){ gr.addColorStop(0, on?'#ffd681':'#e8b95d'); gr.addColorStop(1, on?'#c98a26':'#a86f1c'); }
   else { gr.addColorStop(0, on?'#7a5c37':'#5e452a'); gr.addColorStop(1, on?'#4a3520':'#372615'); }
   g.fillStyle=gr; rr(g,x,y+(on?2:0),w,h,9); g.fill();
-  g.strokeStyle = opt.accent ? 'rgba(255,236,190,0.8)' : 'rgba(226,190,126,0.5)';
-  g.lineWidth=1.8; rr(g,x+1,y+1+(on?2:0),w-2,h-2,8); g.stroke();
+  g.strokeStyle = opt.plate  ? 'rgba(238,238,236,0.92)'
+                : opt.accent ? 'rgba(255,236,190,0.8)' : 'rgba(226,190,126,0.5)';
+  g.lineWidth = opt.plate ? 2.4 : 1.8;
+  rr(g,x+1.4,y+1.4+(on?2:0),w-2.8,h-2.8,8); g.stroke();
   label(g, text, x+w/2, y+h/2+(on?2:0)+1, opt.size||21,
-        opt.accent ? '#2a1a08' : '#f0dcb4', 'center', 'bold', !opt.accent);
+        opt.plate ? '#ffffff' : opt.accent ? '#2a1a08' : '#f0dcb4', 'center', 'bold', !opt.accent);
   g.restore();
   if(st.clicked && !dis) Audio.click();
   return st.clicked && !dis;
@@ -5091,18 +5079,19 @@ const Game = {
     const by = top ? 12 : DH-58;                       // button row
     const mx = top ? DW-122 : 14;                      // MENU x
     const rx = top ? DW-182 : 134;                     // restart x
-    if(button(g, mx, by, 108, 44, 'MENU')) this.transition(()=>this.go('levels'));
+    if(button(g, mx, by, 108, 44, 'MENU', {plate:true})) this.transition(()=>this.go('levels'));
     const rs = uiHit(rx, by, 52, 44);
     g.save();
     g.fillStyle='rgba(0,0,0,0.45)'; rr(g,rx+2,by+4,52,44,9); g.fill();
     const gr=g.createLinearGradient(0,by,0,by+44);
-    gr.addColorStop(0, rs.over?'#7a5c37':'#5e452a'); gr.addColorStop(1, rs.over?'#4a3520':'#372615');
+    gr.addColorStop(0, rs.over?'#3a352f':'#1e1b17'); gr.addColorStop(1, rs.over?'#211e1a':'#0d0b09');
     g.fillStyle=gr; rr(g,rx,by+(rs.over?2:0),52,44,9); g.fill();
-    g.strokeStyle='rgba(226,190,126,0.5)'; g.lineWidth=1.8; rr(g,rx+1,by+1+(rs.over?2:0),50,42,8); g.stroke();
+    g.strokeStyle='rgba(238,238,236,0.92)'; g.lineWidth=2.4;
+    rr(g,rx+1.4,by+1.4+(rs.over?2:0),49.2,41.2,8); g.stroke();
     g.translate(rx+26, by+22+(rs.over?2:0));
-    g.strokeStyle='#f0dcb4'; g.lineWidth=3; g.lineCap='round';
+    g.strokeStyle='#ffffff'; g.lineWidth=3; g.lineCap='round';
     g.beginPath(); g.arc(0,0,11,0.7,TAU-0.5); g.stroke();
-    g.fillStyle='#f0dcb4';
+    g.fillStyle='#ffffff';
     g.beginPath(); g.moveTo(9,-10); g.lineTo(14,1); g.lineTo(3,0.5); g.closePath(); g.fill();
     g.restore();
     if(rs.clicked){ Audio.click(); this.retry(); }
@@ -5137,8 +5126,9 @@ const Game = {
     // so the number warms rather than turning red. The count grows without
     // bound, so the icon is placed off the measured text, not a fixed offset.
     x -= 96;
-    const dtxt = L.used + ' / ' + L.par;
-    num(dtxt, x, L.used > L.par ? '#ffcf9a' : '#fdf6e6');
+    const left = Math.max(0, L.par - L.used);
+    const dtxt = 'x ' + left;
+    num(dtxt, x, left > 0 ? '#fdf6e6' : '#ffcf9a');
     g.font = "bold 31px Georgia, 'Times New Roman', serif";
     drawDollIcon(g, x - g.measureText(dtxt).width - 24, cy-1, 1.7);
     g.restore();
