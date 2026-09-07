@@ -58,10 +58,11 @@
   // is standing on, so shoving it clear drops the board out of the top corridor.
   var LOOSE = [
     { i:'stub',  m:3.0, style:'beam', parts:[ {x:950,y:256,w:27, h:116} ] },
-    { i:'top',   m:2.2, parts:[ {x:350,y:101,w:160,h:19},   // top crate, lid
-                                {x:491,y:101,w:19, h:107},  //   ... back
-                                {x:350,y:189,w:160,h:19},   //   ... floor
-                                {x:351,y:176,w:24, h:13} ] },
+    // the top crate is shod and rides a planed beam: it is the one that runs
+    { i:'top',   m:0.5, mu:0.03, parts:[ {x:350,y:101,w:160,h:19},   // top crate, lid
+                                    {x:491,y:101,w:19, h:107},  //   ... back
+                                    {x:350,y:189,w:160,h:19},   //   ... floor
+                                    {x:351,y:176,w:24, h:13} ] },
     { i:'low',   m:2.2, parts:[ {x:538,y:258,w:164,h:23},   // bottom crate, lid
                                 {x:681,y:258,w:21, h:112},  //   ... back
                                 {x:538,y:347,w:164,h:23},   //   ... floor
@@ -83,7 +84,7 @@
   // Flat enough to thread a corridor: the tunnels are ~65px tall and the run
   // out to the shaft is 600px, so a lobbing shot simply cannot cross them.
   var G = 1500, MUZZLE = 1400, SUB = 4, STEP = 1 / 60;
-  var DRAG = 0.9992, REST = 0.30, FRIC = 0.94, MU = 0.72;
+  var DRAG = 0.9992, REST = 0.40, FRIC = 0.978, MU = 0.72;
   var RELAX = 0.28, MAXPEN = 5, ITER = 4;
   var PMASS = 0.25;                                     // one ragdoll joint
 
@@ -468,7 +469,8 @@
     return {
       cx: cx, cy: cy, ang: 0, pcx: cx, pcy: cy, pang: 0,
       q: q, parts: parts, rad: rr, style: style,
-      invM: 1 / def.m, invI: 1 / I, still: 0, sleep: false
+      invM: 1 / def.m, invI: 1 / I, mu: def.mu === undefined ? 1 : def.mu,
+      still: 0, sleep: false
     };
   }
 
@@ -491,7 +493,7 @@
     var tx = -ny, ty = nx, vt = vx * tx + vy * ty;
     var rt = rx * ty - ry * tx;
     var kt = b.invM + rt * rt * b.invI + otherInvM;
-    var lt = -vt * MU / kt;
+    var lt = -vt * MU * b.mu / kt;
     if (lt > lam) lt = lam; else if (lt < -lam) lt = -lam;
     b.pcx -= tx * lt * b.invM; b.pcy -= ty * lt * b.invM;
     b.pang -= rt * lt * b.invI;
@@ -1052,7 +1054,7 @@
       S.win ? 'Cleared in ' + S.used + ' — goblet earned' : 'Cleared in ' + S.used + ' ragdolls');
     if (S.state === 'lost') card(ctx, 'Out of ragdolls', 'The target is still standing');
     if (S.menu) card(ctx, 'The Chocolate Works',
-      'Knock the doorway post down, then run the corridor — ' + PAR + ' for the goblet');
+      'Shove the low crate out, drop the board, then ride the top crate off the end');
     ctx.restore();
   }
 
