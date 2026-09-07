@@ -511,6 +511,11 @@ class Joint {
     this.lo = opt.lo; this.hi = opt.hi;
     this.refA = opt.ref !== undefined ? opt.ref : (B.a - A.a);
     this.limImp = 0;
+    // How hard a limit stop may push back, as rad/s of angular authority.
+    // Without a cap a limb that has run out of travel is a rigid strut, and
+    // a doll landing on an outstretched arm stands on it. Capped, the stop
+    // gives way under the weight of a body and the limb folds under it.
+    this.limW = opt.limW || 0;
     this.motor = opt.motor || 0;      // target relative angular velocity
     this.maxMotor = opt.maxMotor || 0;
     this.motorImp = 0;
@@ -556,12 +561,13 @@ class Joint {
     this.kAng = (A.iI + B.iI) > 0 ? 1/(A.iI + B.iI) : 0;
     this.limState = 0;
     if(this.lo !== undefined){
-      const ang = (B.a - A.a) - this.refA;
+      const ang = wrapPi((B.a - A.a) - this.refA);
       this.angErr = 0;
       if(ang < this.lo){ this.limState = 1; this.angErr = ang - this.lo; }
       else if(ang > this.hi){ this.limState = -1; this.angErr = ang - this.hi; }
       if(this.limState){
         this.angBias = clamp(-0.25/dt * this.angErr, -14, 14);
+        this.limCap = this.limW ? this.kAng * this.limW : 0;
         const imp = this.limImp;
         if(!A.fixed) A.av -= imp*A.iI;
         if(!B.fixed) B.av += imp*B.iI;
@@ -586,12 +592,13 @@ class Joint {
       const old = this.limImp;
       if(this.limState > 0) this.limImp = Math.max(0, old + imp);
       else                  this.limImp = Math.min(0, old + imp);
+      if(this.limCap) this.limImp = clamp(this.limImp, -this.limCap, this.limCap);
       imp = this.limImp - old;
       if(!A.fixed) A.av -= imp*A.iI;
       if(!B.fixed) B.av += imp*B.iI;
     }
     if(this.stiff && this.kAng){
-      const ang = (B.a - A.a) - this.refA;
+      const ang = wrapPi((B.a - A.a) - this.refA);
       const dw = B.av - A.av;
       const imp = this.kAng * (-ang*this.stiff*dt*60 - dw*0.06) * 0.5;
       if(!A.fixed) A.av -= imp*A.iI;
@@ -862,6 +869,12 @@ function tex(key, w, h, draw){
   TEXC.set(k, c);
   return c;
 }
+/* Body angles accumulate; they are never wrapped. A limb that spins a whole
+   turn in flight therefore reads as 400 degrees from rest, which put it
+   permanently outside its own stops -- the joint then had no limits at all
+   for the rest of its life. Comparisons against a limit use the wrapped
+   angle so a limb that has been round once is still just where it looks. */
+function wrapPi(a){ a = (a + PI) % TAU; if(a < 0) a += TAU; return a - PI; }
 function hashStr(s){ let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; }
 
 function shade(g,x,y,w,h,c1,c2){
@@ -1540,6 +1553,10 @@ function drawCannon(g,x,y,ang,recoil,charge,t){
    Nine bodies, eight joints. Parts never collide with each other, which
    keeps it cheap and stops the shoulders from buzzing.
    ===================================================================== */
+// How much a doll's joint stops may resist, in rad/s of authority. Low
+// enough that a limb landing first folds under the body rather than holding
+// it up on a stiff arm, high enough that limbs still stop where limbs stop.
+const DOLL_LIMW = 5.0;
 const DS = 1.14;                              // doll scale
 const TSCALE = 1.58;                          // marks are painted big
 let GROUP = 100;
@@ -1556,16 +1573,22 @@ const DOLL_PLAN = [
   { k:'legUR', shape:'box',    w:6,  h:14,  x:3.6,   y:20   },
   { k:'legLR', shape:'box',    w:5.5,h:14,  x:3.6,   y:34   }
 ];
+/* [A, B, anchor x, anchor y, low stop, high stop, restoring stiffness]
+   The stiffness is what pulls a limb back toward its rest angle. Held high
+   the doll flies like a posed figure; at these values the joints mostly
+   just stop the limb going somewhere a limb cannot, and the rest is left
+   to momentum. The stops are wider to match -- a shoulder that runs out of
+   travel halfway through a tumble reads as stiff however low the spring. */
 const DOLL_JOINTS = [
-  ['torso','head',  0,   -12,  -0.75, 0.75, 0.55],
-  ['torso','armUL', -7.4,-10.5,-2.30, 1.05, 0.16],
-  ['armUL','armLL', -10.4,1.2, -0.10, 2.55, 0.20],
-  ['torso','armUR', 7.4, -10.5,-1.05, 2.30, 0.16],
-  ['armUR','armLR', 10.4, 1.2, -2.55, 0.10, 0.20],
-  ['torso','legUL', -3.6, 13,  -1.45, 1.15, 0.24],
-  ['legUL','legLL', -3.6, 27,  -2.30, 0.06, 0.26],
-  ['torso','legUR',  3.6, 13,  -1.15, 1.45, 0.24],
-  ['legUR','legLR',  3.6, 27,  -2.30, 0.06, 0.26]
+  ['torso','head',  0,   -12,  -0.95, 0.95, 0.24],
+  ['torso','armUL', -7.4,-10.5,-2.80, 1.45, 0.045],
+  ['armUL','armLL', -10.4,1.2, -0.16, 2.90, 0.055],
+  ['torso','armUR', 7.4, -10.5,-1.45, 2.80, 0.045],
+  ['armUR','armLR', 10.4, 1.2, -2.90, 0.16, 0.055],
+  ['torso','legUL', -3.6, 13,  -1.85, 1.55, 0.075],
+  ['legUL','legLL', -3.6, 27,  -2.70, 0.10, 0.085],
+  ['torso','legUR',  3.6, 13,  -1.55, 1.85, 0.075],
+  ['legUR','legLR',  3.6, 27,  -2.70, 0.10, 0.085]
 ];
 
 class Doll {
@@ -1589,7 +1612,7 @@ class Doll {
         shape: p.shape==='circle' ? 'circle' : 'box',
         x:wx, y:wy, a:ang,
         r: p.r ? p.r*DS : 0, w: p.w?p.w*DS:0, h: p.h?p.h*DS:0,
-        mat:'cloth', group:this.group, linDamp:0.16, angDamp:0.9,
+        mat:'cloth', group:this.group, linDamp:0.16, angDamp:0.42,
         friction:0.62, rest:0.03, bullet:true
       });
       b.vx = vx; b.vy = vy;
@@ -1604,7 +1627,7 @@ class Doll {
       const A=this.parts[a], B=this.parts[bk];
       const wx = x + (jx*DS)*ca - (jy*DS)*sa;
       const wy = y + (jx*DS)*sa + (jy*DS)*ca;
-      const j = new Joint(A,B,wx,wy,{ lo, hi, stiff:st, ref:0 });
+      const j = new Joint(A,B,wx,wy,{ lo, hi, stiff:st, ref:0, limW:DOLL_LIMW });
       world.addJoint(j);
       this.joints.push(j);
     }
@@ -3877,7 +3900,7 @@ const LEVELS = [
   ['b',630,436,44,44]]},
 
 {n:'The Slot', th:0, c:[86,560,-26], sh:4, tr:[2,3], tg:[[870,588,26]], o:[
-  ['w',520,180,22,300], ['w',520,560,22,120], ['w',700,360,22,290],
+  ['w',520,170,22,280], ['w',520,570,22,100], ['w',700,350,22,270],
   ['rotor',610,300,24,74,2,-3.0]]},
 
 {n:'Drop Box', th:0, c:[86,470,-14], sh:3, tr:[1,2], tg:[[820,560,26]], o:[
@@ -4231,9 +4254,8 @@ const LEVELS = [
 {n:"The Keeper's Gallery", th:0, c:[86,560,-38], sh:6, tr:[3,5], tg:[[880,300,28]], o:[
   ['rotor',330,440,34,120,2,2.8],
   ['b',560,584,60,60], ['b',560,524,60,60], ['b',560,464,60,60],
-  ['blade',700,300,24,132,1,-3.2],
-  ['g',790,470,26,300],
-  ['w',880,344,160,20], ['w',800,300,20,110],
+  ['blade',710,470,24,90,1,-3.2],
+  ['w',880,344,160,20], ['w',800,344,20,22],
   ['tnt',480,596,44,44]]},
 
 /* ---------------- VIII. THE ALMANAC ----------------
@@ -4305,7 +4327,7 @@ const LEVELS = [
   ['p',380,584,64,64], ['p',380,520,64,64],
   ['ib',540,588,58,58],
   ['P',300,260,180,22],
-  ['wheel',720,320,84,32,12,-1.2,22],
+  ['wheel',720,320,84,32,12,-1.2,28],
   ['P',720,600,220,40]]},
 
 /* ---------------- IX. THE BOARD ----------------
@@ -4387,9 +4409,9 @@ const LEVELS = [
   ['mo',856,604,200,28]]},
 
 {n:'Falling Up', th:2, c:[86,560,-24], sh:4, tr:[2,3], tg:[[700,180,28]], o:[
-  ['grav',600,400,220,420,-90,1250],
+  ['grav',620,400,260,420,-90,1250],
   ['m',300,300,180,20],
-  ['m',700,226,190,22], ['m',860,400,20,300]]},
+  ['m',730,226,130,22], ['m',860,400,20,300]]},
 
 {n:'Sideways', th:7, c:[86,560,-30], sh:5, tr:[3,4], tg:[[860,240,28]], o:[
   ['grav',520,360,260,300,0,1300],
@@ -4561,8 +4583,8 @@ const LEVELS = [
   ['s',300,286,190,22], ['s',560,470,20,300]]},
 
 {n:'Flywheel', th:2, c:[86,560,-34], sh:6, tr:[3,5], tg:[], o:[
-  ['m',400,500,20,240],
-  ['wheel',740,300,86,32,12,-1.2,22],
+  ['m',400,530,20,180],
+  ['wheel',740,300,86,32,8,-0.9,28],
   ['b',740,588,60,60]]},
 
 {n:'Regulator', th:2, c:[86,560,-28], sh:6, tr:[3,5], tg:[[880,240,28]], o:[
