@@ -1,0 +1,666 @@
+<title>MTE-422 Converter</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --paper:#E8EDEF; --sheet:#FAFBFB; --panel:#F1F4F5;
+  --ink:#0D1418; --ink-2:#4C5D66; --ink-3:#7D8E97;
+  --rule:#AFC0C7; --rule-soft:#D3DCE0;
+  --pwr:#A8401C; --diff:#0C6F7E; --logic:#8A6110;
+  --ok:#2E6B4F; --warn:#8A5A12;
+  --shadow:0 1px 0 rgba(13,20,24,.06), 0 12px 28px -20px rgba(13,20,24,.5);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0A0F12; --sheet:#121A1D; --panel:#161F23;
+    --ink:#DCE6EA; --ink-2:#93A6AF; --ink-3:#66787F;
+    --rule:#2B383E; --rule-soft:#1E282C;
+    --pwr:#E5875F; --diff:#4FBFC7; --logic:#D6A84E;
+    --ok:#63B98C; --warn:#D2A052;
+    --shadow:0 1px 0 rgba(0,0,0,.4), 0 14px 30px -22px #000;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0A0F12; --sheet:#121A1D; --panel:#161F23;
+  --ink:#DCE6EA; --ink-2:#93A6AF; --ink-3:#66787F;
+  --rule:#2B383E; --rule-soft:#1E282C;
+  --pwr:#E5875F; --diff:#4FBFC7; --logic:#D6A84E;
+  --ok:#63B98C; --warn:#D2A052;
+  --shadow:0 1px 0 rgba(0,0,0,.4), 0 14px 30px -22px #000;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  font-size:15px; line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1180px; margin:0 auto; padding:48px 24px 96px; display:flex; flex-direction:column; gap:44px}
+
+/* ---------- masthead ---------- */
+.masthead{display:flex; flex-direction:column; gap:14px; border-bottom:2px solid var(--ink); padding-bottom:20px}
+.eyebrow{
+  font-family:"IBM Plex Mono",monospace; font-size:12px; letter-spacing:.18em; text-transform:uppercase;
+  color:var(--ink-2); display:flex; flex-wrap:wrap; gap:8px 18px;
+}
+.eyebrow b{color:var(--diff); font-weight:600}
+h1{
+  font-family:"Archivo Narrow",Arial Narrow,sans-serif; font-weight:700;
+  font-size:clamp(40px,7vw,68px); line-height:.94; letter-spacing:-.01em; margin:0;
+  text-wrap:balance; text-transform:uppercase;
+}
+.deck{font-size:17px; color:var(--ink-2); max-width:64ch; margin:0}
+
+/* ---------- spec strip ---------- */
+.specs{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(168px,1fr));
+  border-top:1px solid var(--rule); border-left:1px solid var(--rule);
+}
+.specs div{border-right:1px solid var(--rule); border-bottom:1px solid var(--rule); padding:12px 14px}
+.specs dt{
+  font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--ink-3); margin:0 0 4px;
+}
+.specs dd{margin:0; font-family:"Archivo Narrow",sans-serif; font-size:19px; font-weight:600; line-height:1.25}
+.specs dd span{display:block; font-family:"IBM Plex Sans",sans-serif; font-size:13px; font-weight:400; color:var(--ink-2)}
+
+/* ---------- sheet ---------- */
+.sheet{background:var(--sheet); border:2px solid var(--ink); box-shadow:var(--shadow)}
+.sheet-scroll{overflow-x:auto; padding:14px 14px 4px}
+.sheet svg{display:block; min-width:900px; width:100%; height:auto}
+.titleblock{
+  border-top:2px solid var(--ink); display:grid;
+  grid-template-columns:2fr repeat(3,1fr);
+}
+.titleblock div{padding:10px 14px; border-left:1px solid var(--rule)}
+.titleblock div:first-child{border-left:0}
+.titleblock dt{
+  font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--ink-3); margin:0 0 3px;
+}
+.titleblock dd{margin:0; font-family:"Archivo Narrow",sans-serif; font-weight:600; font-size:17px; text-transform:uppercase; letter-spacing:.02em}
+
+figure{margin:0}
+figcaption{font-size:13.5px; color:var(--ink-2); padding:12px 2px 0; max-width:78ch}
+
+/* ---------- sections ---------- */
+section{display:flex; flex-direction:column; gap:18px}
+h2{
+  font-family:"Archivo Narrow",sans-serif; text-transform:uppercase; letter-spacing:.06em;
+  font-size:15px; font-weight:700; margin:0; padding-bottom:8px;
+  border-bottom:1px solid var(--ink); display:flex; justify-content:space-between; align-items:baseline; gap:16px;
+}
+h2 em{font-style:normal; font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.12em; color:var(--ink-3); font-weight:400}
+h3{font-family:"Archivo Narrow",sans-serif; text-transform:uppercase; letter-spacing:.08em; font-size:13px; margin:0 0 8px; color:var(--ink-2)}
+
+.cols{display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:28px}
+
+table{border-collapse:collapse; width:100%; font-size:13.5px}
+.tscroll{overflow-x:auto}
+th,td{text-align:left; padding:7px 10px; border-bottom:1px solid var(--rule-soft); vertical-align:top}
+thead th{
+  font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.13em; text-transform:uppercase;
+  color:var(--ink-3); border-bottom:1px solid var(--rule); font-weight:500; white-space:nowrap;
+}
+tbody tr:last-child td{border-bottom:0}
+td.mono,th.mono,.mono{font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums}
+td.num{font-family:"IBM Plex Mono",monospace; color:var(--ink-2); width:1%; white-space:nowrap}
+.pill{
+  display:inline-block; font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.08em;
+  text-transform:uppercase; padding:2px 7px; border:1px solid currentColor; border-radius:2px; white-space:nowrap;
+}
+.pill.fit{color:var(--ok)} .pill.open{color:var(--ink-3)}
+.sig-p{color:var(--pwr)} .sig-d{color:var(--diff)} .sig-l{color:var(--logic)}
+
+ol.notes{margin:0; padding:0; list-style:none; counter-reset:n; display:flex; flex-direction:column; gap:14px}
+ol.notes li{counter-increment:n; display:grid; grid-template-columns:36px 1fr; gap:12px; max-width:80ch}
+ol.notes li::before{
+  content:counter(n,decimal-leading-zero); font-family:"IBM Plex Mono",monospace; font-size:12px;
+  color:var(--diff); padding-top:3px; letter-spacing:.05em;
+}
+ol.notes strong{font-weight:600}
+code{font-family:"IBM Plex Mono",monospace; font-size:.92em; background:var(--panel); padding:1px 5px; border-radius:2px}
+
+.callout{border-left:3px solid var(--warn); background:var(--panel); padding:12px 16px; font-size:14px; color:var(--ink-2)}
+.callout b{color:var(--ink)}
+footer{border-top:1px solid var(--rule); padding-top:16px; font-size:12.5px; color:var(--ink-3); display:flex; flex-direction:column; gap:6px}
+footer a{color:var(--ink-2)}
+a:focus-visible,summary:focus-visible{outline:2px solid var(--diff); outline-offset:2px}
+
+/* ---------- schematic ink ---------- */
+.sch text{font-family:"IBM Plex Mono",monospace; fill:var(--ink)}
+.w{fill:none; stroke:var(--ink); stroke-width:2; stroke-linecap:square}
+.w-p{fill:none; stroke:var(--pwr); stroke-width:2.4; stroke-linecap:square}
+.w-d{fill:none; stroke:var(--diff); stroke-width:2.4; stroke-linecap:square}
+.w-l{fill:none; stroke:var(--logic); stroke-width:2.4; stroke-linecap:square}
+.sym{fill:var(--sheet); stroke:var(--ink); stroke-width:2}
+.sym-p{fill:var(--sheet); stroke:var(--pwr); stroke-width:2}
+.sym-d{fill:var(--sheet); stroke:var(--diff); stroke-width:2}
+.sym-l{fill:var(--sheet); stroke:var(--logic); stroke-width:2}
+.ic{fill:var(--panel); stroke:var(--ink); stroke-width:2.5}
+.dot{fill:var(--ink)} .dot-p{fill:var(--pwr)} .dot-d{fill:var(--diff)} .dot-l{fill:var(--logic)}
+.t-ref{font-size:16px; font-weight:600}
+.t-val{font-size:13px; fill:var(--ink-2)}
+.t-pin{font-size:12px; fill:var(--ink-3)}
+.t-name{font-size:14px; font-weight:500}
+.t-net{font-size:13px; font-weight:500}
+.t-blk{font-family:"Archivo Narrow",sans-serif; font-size:16px; font-weight:700; letter-spacing:.12em; fill:var(--ink-2)}
+.t-ic{font-size:20px; font-weight:600}
+.p-net{fill:var(--pwr)} .d-net{fill:var(--diff)} .l-net{fill:var(--logic)}
+.zone{fill:none; stroke:var(--rule); stroke-width:1.5; stroke-dasharray:7 6}
+@media (prefers-reduced-motion:no-preference){ a{transition:color .15s ease} }
+</style>
+
+<div class="wrap">
+
+<header class="masthead">
+  <div class="eyebrow"><span>Schematic &mdash; drawing 422-01</span><span>Rev A</span><span><b>Full duplex &middot; 4-wire</b></span></div>
+  <h1>MTE-422 Converter</h1>
+  <p class="deck">A 5&nbsp;V TTL/UART to RS-422 differential converter built around two MAX485-family transceivers, with a 5-position MTE header on the logic side and a 6-position MTE header on the field side.</p>
+</header>
+
+<dl class="specs">
+  <div><dt>Logic side</dt><dd>5&nbsp;V TTL<span>UART, idle high (mark)</span></dd></div>
+  <div><dt>Field side</dt><dd>RS-422<span>TIA/EIA-422-B, 4-wire</span></dd></div>
+  <div><dt>Data rate</dt><dd>2.5&nbsp;Mbps<span>max, device limited</span></dd></div>
+  <div><dt>Supply</dt><dd>5&nbsp;V &plusmn;5%<span>60&nbsp;mA worst case</span></dd></div>
+  <div><dt>Isolation</dt><dd>None<span>common ground required</span></dd></div>
+  <div><dt>Connectors</dt><dd>MTE 2.54<span>J1 5-pos &middot; J2 6-pos</span></dd></div>
+</dl>
+
+<figure class="sheet">
+ <div class="sheet-scroll">
+  <svg class="sch" viewBox="0 0 1720 1280" role="img" aria-label="Schematic of a full-duplex TTL to RS-422 converter: a 5-position MTE header carries 5 V, ground, TXD, TXEN and RXD into two MAX485 transceivers, one wired as a driver and one as a receiver, whose differential pairs leave through a 6-position MTE header with jumper-selectable 120 ohm termination, fail-safe bias and transient protection.">
+
+   <!-- ============ POWER INPUT RAIL ============ -->
+   <path class="w-p" d="M210,530 H280 V110 H330"/>
+   <rect class="sym" x="330" y="99" width="60" height="22"/>
+   <path class="w-p" d="M390,110 H760"/>
+   <text class="t-val" x="360" y="90" text-anchor="middle">F1</text>
+   <text class="t-val" x="360" y="142" text-anchor="middle">0.2A PTC</text>
+   <path class="w-p" d="M760,98 V122"/>
+   <text class="t-net p-net" x="760" y="88" text-anchor="middle">+5V</text>
+   <text class="t-blk" x="60" y="462">TTL / LOGIC SIDE</text>
+
+   <!-- D1 reverse-polarity clamp -->
+   <circle class="dot-p" cx="450" cy="110" r="4.5"/>
+   <path class="w-p" d="M450,110 V150"/>
+   <path class="w" d="M432,150 H468"/>
+   <polygon class="sym" points="436,186 464,186 450,152"/>
+   <path class="w" d="M450,186 V214 M450,214 v18 M435,232 h30 M441,238 h18 M446,244 h8"/>
+   <text class="t-val" x="478" y="168">D1</text>
+   <text class="t-val" x="478" y="186">SS14</text>
+
+   <!-- C1 bulk -->
+   <circle class="dot-p" cx="540" cy="110" r="4.5"/>
+   <path class="w-p" d="M540,110 V152"/>
+   <path class="w" d="M516,152 H564 M516,164 H564"/>
+   <path class="w" d="M540,164 V214 M540,214 v18 M525,232 h30 M531,238 h18 M536,244 h8"/>
+   <text class="t-val" x="572" y="152">C1</text>
+   <text class="t-val" x="572" y="170">10u</text>
+
+   <!-- D2 supply TVS -->
+   <circle class="dot-p" cx="620" cy="110" r="4.5"/>
+   <path class="w-p" d="M620,110 V142"/>
+   <polygon class="sym" points="606,142 634,142 620,170"/>
+   <path class="w" d="M602,176 L602,170 L638,170 L638,164"/>
+   <polygon class="sym" points="606,198 634,198 620,170"/>
+   <path class="w" d="M620,198 V214 M620,214 v18 M605,232 h30 M611,238 h18 M616,244 h8"/>
+   <text class="t-val" x="646" y="152">D2</text>
+   <text class="t-val" x="646" y="170">SMAJ5.0A</text>
+
+   <!-- R1 + LED1 power indicator -->
+   <circle class="dot-p" cx="700" cy="110" r="4.5"/>
+   <path class="w-p" d="M700,110 V140"/>
+   <rect class="sym" x="689" y="140" width="22" height="56"/>
+   <path class="w" d="M700,196 V220"/>
+   <polygon class="sym" points="686,220 714,220 700,246"/>
+   <path class="w" d="M684,246 H716 M700,246 V270 M700,270 v18 M685,288 h30 M691,294 h18 M696,300 h8"/>
+   <path class="w" d="M718,222 l12,-10 M721,233 l12,-10" stroke-width="1.5"/>
+   <text class="t-val" x="722" y="160">R1</text>
+   <text class="t-val" x="722" y="178">2k2</text>
+   <text class="t-val" x="740" y="246">LED1</text>
+
+   <!-- ============ J1 : 5-POS MTE, TTL SIDE ============ -->
+   <rect class="sym" x="60" y="500" width="150" height="260"/>
+   <path d="M60,555 H210 M60,605 H210 M60,655 H210 M60,705 H210" stroke="var(--rule)" stroke-width="1.5" fill="none"/>
+   <text class="t-ref" x="60" y="488">J1</text>
+   <text class="t-val" x="94" y="488">MTE 5-POS</text>
+   <text class="t-pin" x="78" y="535">1</text><text class="t-name p-net" x="104" y="535">+5V</text>
+   <text class="t-pin" x="78" y="585">2</text><text class="t-name" x="104" y="585">GND</text>
+   <text class="t-pin" x="78" y="635">3</text><text class="t-name l-net" x="104" y="635">TXD</text>
+   <text class="t-pin" x="78" y="685">4</text><text class="t-name l-net" x="104" y="685">TXEN</text>
+   <text class="t-pin" x="78" y="735">5</text><text class="t-name l-net" x="104" y="735">RXD</text>
+
+   <path class="w" d="M210,580 H250 M250,580 v18 M235,598 h30 M241,604 h18 M246,610 h8"/>
+
+   <!-- TXD -> U1 DI, with R2 pull-up and R4 series -->
+   <path class="w-l" d="M210,630 H500"/>
+   <rect class="sym" x="500" y="619" width="56" height="22"/>
+   <path class="w-l" d="M556,630 H630 V490 H800"/>
+   <circle class="dot-l" cx="350" cy="630" r="4.5"/>
+   <path class="w-l" d="M350,630 V604"/>
+   <rect class="sym" x="339" y="548" width="22" height="56"/>
+   <path class="w-p" d="M350,548 V530 M336,530 H364"/>
+   <text class="t-net p-net" x="350" y="520" text-anchor="middle">+5V</text>
+   <text class="t-val" x="370" y="568">R2</text>
+   <text class="t-val" x="370" y="586">10k</text>
+   <text class="t-val" x="528" y="610" text-anchor="middle">R4</text>
+   <text class="t-val" x="528" y="662" text-anchor="middle">100R</text>
+
+   <!-- TXEN -> U1 DE, with R3 pull-up -->
+   <path class="w-l" d="M210,680 H700 V550 H800"/>
+   <circle class="dot-l" cx="670" cy="680" r="4.5"/>
+   <path class="w-l" d="M670,680 V616"/>
+   <rect class="sym" x="659" y="560" width="22" height="56"/>
+   <path class="w-p" d="M670,560 V542 M656,542 H684"/>
+   <text class="t-net p-net" x="670" y="532" text-anchor="middle">+5V</text>
+   <text class="t-val" x="690" y="580">R3</text>
+   <text class="t-val" x="690" y="598">10k</text>
+
+   <!-- RXD <- U2 RO, with R8 series -->
+   <path class="w-l" d="M210,730 H730 V752"/>
+   <rect class="sym" x="719" y="752" width="22" height="56"/>
+   <path class="w-l" d="M730,808 V830 H800"/>
+   <text class="t-val" x="750" y="784">R8</text>
+   <text class="t-val" x="750" y="802">100R</text>
+
+   <!-- ============ U1 : DRIVER ============ -->
+   <rect class="ic" x="800" y="340" width="210" height="250"/>
+   <text class="t-ic" x="905" y="452" text-anchor="middle">U1</text>
+   <text class="t-val" x="905" y="474" text-anchor="middle">MAX485E</text>
+   <text class="t-val" x="905" y="498" text-anchor="middle" letter-spacing="0.16em">DRIVER</text>
+   <text class="t-pin" x="812" y="375">2</text><text class="t-name" x="834" y="375">RE</text>
+   <path class="w" d="M834,362 H855" stroke-width="1.6"/>
+   <text class="t-pin" x="812" y="435">1</text><text class="t-name" x="834" y="435">RO</text>
+   <text class="t-pin" x="812" y="495">4</text><text class="t-name" x="834" y="495">DI</text>
+   <text class="t-pin" x="812" y="555">3</text><text class="t-name" x="834" y="555">DE</text>
+   <text class="t-pin" x="998" y="435" text-anchor="end">6</text><text class="t-name" x="976" y="435" text-anchor="end">A</text>
+   <text class="t-pin" x="998" y="495" text-anchor="end">7</text><text class="t-name" x="976" y="495" text-anchor="end">B</text>
+   <text class="t-pin" x="916" y="332">8</text><text class="t-name" x="905" y="366" text-anchor="middle">VCC</text>
+   <text class="t-pin" x="916" y="608">5</text><text class="t-name" x="905" y="574" text-anchor="middle">GND</text>
+
+   <path class="w-p" d="M905,340 V260 M891,260 H919"/>
+   <text class="t-net p-net" x="905" y="250" text-anchor="middle">+5V</text>
+   <circle class="dot-p" cx="905" cy="290" r="4.5"/>
+   <path class="w-p" d="M905,290 H1080 V310"/>
+   <path class="w" d="M1056,310 H1104 M1056,322 H1104"/>
+   <path class="w" d="M1080,322 V340 M1080,340 v18 M1065,358 h30 M1071,364 h18 M1076,370 h8"/>
+   <text class="t-val" x="1114" y="316">C2</text>
+   <text class="t-val" x="1114" y="334">100n</text>
+   <path class="w" d="M905,590 V640 M905,640 v18 M890,658 h30 M896,664 h18 M901,670 h8"/>
+
+   <path class="w-p" d="M800,375 H770 V330 M756,330 H784"/>
+   <text class="t-net p-net" x="770" y="320" text-anchor="middle">+5V</text>
+   <path class="w" d="M800,430 H768"/>
+   <circle class="sym" cx="762" cy="430" r="6"/>
+   <text class="t-val" x="746" y="434" text-anchor="end">NC</text>
+
+   <!-- U1 differential outputs -->
+   <path class="w-d" d="M1010,430 H1050"/>
+   <rect class="sym" x="1050" y="419" width="56" height="22"/>
+   <path class="w-d" d="M1106,430 H1480"/>
+   <text class="t-val" x="1078" y="410" text-anchor="middle">R6 10R</text>
+   <path class="w-d" d="M1010,490 H1050"/>
+   <rect class="sym" x="1050" y="479" width="56" height="22"/>
+   <path class="w-d" d="M1106,490 H1150 V540 H1480"/>
+   <text class="t-val" x="1078" y="470" text-anchor="middle">R7 10R</text>
+   <text class="t-net d-net" x="1250" y="420" text-anchor="middle">TX+</text>
+   <text class="t-net d-net" x="1250" y="530" text-anchor="middle">TX&#8722;</text>
+
+   <!-- ============ U2 : RECEIVER ============ -->
+   <rect class="ic" x="800" y="800" width="210" height="250"/>
+   <text class="t-ic" x="905" y="912" text-anchor="middle">U2</text>
+   <text class="t-val" x="905" y="934" text-anchor="middle">MAX485E</text>
+   <text class="t-val" x="905" y="958" text-anchor="middle" letter-spacing="0.16em">RECEIVER</text>
+   <text class="t-pin" x="812" y="835">1</text><text class="t-name" x="834" y="835">RO</text>
+   <text class="t-pin" x="812" y="895">2</text><text class="t-name" x="834" y="895">RE</text>
+   <path class="w" d="M834,882 H855" stroke-width="1.6"/>
+   <text class="t-pin" x="812" y="955">4</text><text class="t-name" x="834" y="955">DI</text>
+   <text class="t-pin" x="812" y="1015">3</text><text class="t-name" x="834" y="1015">DE</text>
+   <text class="t-pin" x="998" y="895" text-anchor="end">6</text><text class="t-name" x="976" y="895" text-anchor="end">A</text>
+   <text class="t-pin" x="998" y="955" text-anchor="end">7</text><text class="t-name" x="976" y="955" text-anchor="end">B</text>
+   <text class="t-pin" x="916" y="792">8</text><text class="t-name" x="905" y="826" text-anchor="middle">VCC</text>
+   <text class="t-pin" x="916" y="1068">5</text><text class="t-name" x="905" y="1034" text-anchor="middle">GND</text>
+
+   <path class="w-p" d="M905,800 V720 M891,720 H919"/>
+   <text class="t-net p-net" x="905" y="710" text-anchor="middle">+5V</text>
+   <circle class="dot-p" cx="905" cy="755" r="4.5"/>
+   <path class="w-p" d="M905,755 H1140 V772"/>
+   <path class="w" d="M1116,772 H1164 M1116,784 H1164"/>
+   <path class="w" d="M1140,784 V800 M1140,800 v18 M1125,818 h30 M1131,824 h18 M1136,830 h8"/>
+   <text class="t-val" x="1110" y="778" text-anchor="end">C3</text>
+   <text class="t-val" x="1110" y="796" text-anchor="end">100n</text>
+   <path class="w" d="M905,1050 V1110 M905,1110 v18 M890,1128 h30 M896,1134 h18 M901,1140 h8"/>
+   <path class="w" d="M800,890 H750 M800,950 H750 M800,1010 H750 M750,890 V1050 M750,1050 v18 M735,1068 h30 M741,1074 h18 M746,1080 h8"/>
+   <circle class="dot" cx="750" cy="890" r="4.5"/>
+   <circle class="dot" cx="750" cy="950" r="4.5"/>
+   <circle class="dot" cx="750" cy="1010" r="4.5"/>
+
+   <!-- U2 differential inputs -->
+   <path class="w-d" d="M1010,890 H1180 V650 H1270"/>
+   <rect class="sym" x="1270" y="639" width="56" height="22"/>
+   <path class="w-d" d="M1326,650 H1480"/>
+   <text class="t-val" x="1298" y="630" text-anchor="middle">R11 10R</text>
+   <path class="w-d" d="M1010,950 H1250 V760 H1270"/>
+   <rect class="sym" x="1270" y="749" width="56" height="22"/>
+   <path class="w-d" d="M1326,760 H1480"/>
+   <text class="t-val" x="1290" y="740" text-anchor="middle">R12 10R</text>
+   <text class="t-net d-net" x="1194" y="706">RX+</text>
+   <text class="t-net d-net" x="1264" y="816">RX&#8722;</text>
+
+   <!-- fail-safe bias -->
+   <circle class="dot-d" cx="1050" cy="890" r="4.5"/>
+   <path class="w-d" d="M1050,890 V866"/>
+   <rect class="sym" x="1039" y="810" width="22" height="56"/>
+   <path class="w-p" d="M1050,810 V792 M1036,792 H1064"/>
+   <text class="t-net p-net" x="1050" y="782" text-anchor="middle">+5V</text>
+   <text class="t-val" x="1070" y="834">RB1</text>
+   <text class="t-val" x="1070" y="852">1k</text>
+   <circle class="dot-d" cx="1050" cy="950" r="4.5"/>
+   <path class="w-d" d="M1050,950 V974"/>
+   <rect class="sym" x="1039" y="974" width="22" height="56"/>
+   <path class="w" d="M1050,1030 V1050 M1050,1050 v18 M1035,1068 h30 M1041,1074 h18 M1046,1080 h8"/>
+   <text class="t-val" x="1070" y="998">RB2</text>
+   <text class="t-val" x="1070" y="1016">1k</text>
+
+   <!-- ============ TERMINATION : TX PAIR ============ -->
+   <circle class="dot-d" cx="1390" cy="430" r="4.5"/>
+   <path class="w-d" d="M1390,430 V444"/>
+   <rect class="sym" x="1379" y="444" width="22" height="36"/>
+   <path class="w" d="M1390,480 V492"/>
+   <rect class="sym" x="1379" y="492" width="22" height="26"/>
+   <circle class="dot" cx="1390" cy="499" r="3"/><circle class="dot" cx="1390" cy="511" r="3"/>
+   <path class="w-d" d="M1390,518 V540"/>
+   <circle class="dot-d" cx="1390" cy="540" r="4.5"/>
+   <text class="t-val" x="1370" y="460" text-anchor="end">RT1</text>
+   <text class="t-val" x="1370" y="478" text-anchor="end">120R</text>
+   <text class="t-val" x="1370" y="512" text-anchor="end">JP1</text>
+
+   <!-- ============ TERMINATION : RX PAIR ============ -->
+   <circle class="dot-d" cx="1390" cy="650" r="4.5"/>
+   <path class="w-d" d="M1390,650 V664"/>
+   <rect class="sym" x="1379" y="664" width="22" height="36"/>
+   <path class="w" d="M1390,700 V712"/>
+   <rect class="sym" x="1379" y="712" width="22" height="26"/>
+   <circle class="dot" cx="1390" cy="719" r="3"/><circle class="dot" cx="1390" cy="731" r="3"/>
+   <path class="w-d" d="M1390,738 V760"/>
+   <circle class="dot-d" cx="1390" cy="760" r="4.5"/>
+   <text class="t-val" x="1370" y="680" text-anchor="end">RT2</text>
+   <text class="t-val" x="1370" y="698" text-anchor="end">120R</text>
+   <text class="t-val" x="1370" y="732" text-anchor="end">JP2</text>
+
+   <!-- ============ LINE TVS D3..D6 ============ -->
+   <circle class="dot-d" cx="1445" cy="430" r="4.5"/>
+   <path class="w-d" d="M1445,430 V440"/>
+   <polygon class="sym" points="1431,440 1459,440 1445,462"/>
+   <path class="w" d="M1428,468 L1428,462 L1462,462 L1462,456"/>
+   <polygon class="sym" points="1431,484 1459,484 1445,462"/>
+   <path class="w" d="M1445,484 V494 M1445,494 v14 M1432,508 h26 M1437,514 h16 M1442,520 h6"/>
+   <text class="t-val" x="1424" y="474" text-anchor="end">D3</text>
+
+   <circle class="dot-d" cx="1445" cy="540" r="4.5"/>
+   <path class="w-d" d="M1445,540 V550"/>
+   <polygon class="sym" points="1431,550 1459,550 1445,572"/>
+   <path class="w" d="M1428,578 L1428,572 L1462,572 L1462,566"/>
+   <polygon class="sym" points="1431,594 1459,594 1445,572"/>
+   <path class="w" d="M1445,594 V604 M1445,604 v14 M1432,618 h26 M1437,624 h16 M1442,630 h6"/>
+   <text class="t-val" x="1424" y="584" text-anchor="end">D4</text>
+
+   <circle class="dot-d" cx="1445" cy="650" r="4.5"/>
+   <path class="w-d" d="M1445,650 V660"/>
+   <polygon class="sym" points="1431,660 1459,660 1445,682"/>
+   <path class="w" d="M1428,688 L1428,682 L1462,682 L1462,676"/>
+   <polygon class="sym" points="1431,704 1459,704 1445,682"/>
+   <path class="w" d="M1445,704 V714 M1445,714 v14 M1432,728 h26 M1437,734 h16 M1442,740 h6"/>
+   <text class="t-val" x="1424" y="694" text-anchor="end">D5</text>
+
+   <circle class="dot-d" cx="1445" cy="760" r="4.5"/>
+   <path class="w-d" d="M1445,760 V770"/>
+   <polygon class="sym" points="1431,770 1459,770 1445,792"/>
+   <path class="w" d="M1428,798 L1428,792 L1462,792 L1462,786"/>
+   <polygon class="sym" points="1431,814 1459,814 1445,792"/>
+   <path class="w" d="M1445,814 V824 M1445,824 v14 M1432,838 h26 M1437,844 h16 M1442,850 h6"/>
+   <text class="t-val" x="1424" y="804" text-anchor="end">D6</text>
+
+   <!-- ============ SIGNAL GROUND RETURN ============ -->
+   <path class="w" d="M1480,870 H1400 V1100 H1310"/>
+   <rect class="sym" x="1254" y="1089" width="56" height="22"/>
+   <path class="w" d="M1254,1100 H1210 M1210,1100 v18 M1195,1118 h30 M1201,1124 h18 M1206,1130 h8"/>
+   <circle class="dot" cx="1330" cy="1100" r="4.5"/>
+   <path class="w" d="M1330,1100 V1060 H1294"/>
+   <rect class="sym" x="1270" y="1048" width="24" height="24"/>
+   <circle class="dot" cx="1276" cy="1060" r="3"/><circle class="dot" cx="1288" cy="1060" r="3"/>
+   <path class="w" d="M1270,1060 H1234 V1100"/>
+   <circle class="dot" cx="1234" cy="1100" r="4.5"/>
+   <text class="t-val" x="1282" y="1140" text-anchor="middle">R9  100R 1/2W</text>
+   <text class="t-val" x="1282" y="1040" text-anchor="middle">JP3</text>
+
+   <!-- ============ CABLE SHIELD ============ -->
+   <path class="w" d="M1480,980 H1440 V1170 H1362"/>
+   <circle class="dot" cx="1362" cy="1170" r="4.5"/>
+   <path class="w" d="M1362,1170 H1352 M1352,1156 V1184 M1340,1156 V1184 M1340,1170 H1270"/>
+   <circle class="dot" cx="1270" cy="1170" r="4.5"/>
+   <path class="w" d="M1362,1170 V1218 H1348"/>
+   <rect class="sym" x="1292" y="1207" width="56" height="22"/>
+   <path class="w" d="M1292,1218 H1270 V1170"/>
+   <text class="t-val" x="1346" y="1148" text-anchor="middle">C4  1n 2kV</text>
+   <text class="t-val" x="1320" y="1248" text-anchor="middle">R10  1M</text>
+   <path class="w" d="M1270,1170 H1240 V1186 M1224,1186 H1256 M1230,1186 l-7,10 M1240,1186 l-7,10 M1250,1186 l-7,10"/>
+   <text class="t-val" x="1224" y="1216" text-anchor="end">CHASSIS</text>
+
+   <!-- ============ J2 : 6-POS MTE, RS-422 SIDE ============ -->
+   <rect class="sym" x="1480" y="390" width="150" height="630"/>
+   <path d="M1480,485 H1630 M1480,595 H1630 M1480,705 H1630 M1480,815 H1630 M1480,925 H1630" stroke="var(--rule)" stroke-width="1.5" fill="none"/>
+   <text class="t-blk" x="1630" y="356" text-anchor="end">RS-422 FIELD SIDE</text>
+   <text class="t-ref" x="1630" y="378" text-anchor="end">J2</text>
+   <text class="t-val" x="1594" y="378" text-anchor="end">MTE 6-POS</text>
+   <text class="t-pin" x="1612" y="435" text-anchor="end">1</text><text class="t-name d-net" x="1586" y="435" text-anchor="end">TX+</text>
+   <text class="t-pin" x="1612" y="545" text-anchor="end">2</text><text class="t-name d-net" x="1586" y="545" text-anchor="end">TX&#8722;</text>
+   <text class="t-pin" x="1612" y="655" text-anchor="end">3</text><text class="t-name d-net" x="1586" y="655" text-anchor="end">RX+</text>
+   <text class="t-pin" x="1612" y="765" text-anchor="end">4</text><text class="t-name d-net" x="1586" y="765" text-anchor="end">RX&#8722;</text>
+   <text class="t-pin" x="1612" y="875" text-anchor="end">5</text><text class="t-name" x="1586" y="875" text-anchor="end">SG</text>
+   <text class="t-pin" x="1612" y="985" text-anchor="end">6</text><text class="t-name" x="1586" y="985" text-anchor="end">SHLD</text>
+
+   <!-- ============ LEGEND ============ -->
+   <text class="t-blk" x="60" y="1120">LEGEND</text>
+   <circle class="dot" cx="72" cy="1158" r="4.5"/>
+   <text class="t-val" x="92" y="1163">junction &mdash; wires connected</text>
+   <path class="w" d="M330,1146 V1170 M312,1158 H348"/>
+   <text class="t-val" x="366" y="1163">crossing &mdash; not connected</text>
+   <path class="w-p" d="M60,1196 H92"/><text class="t-val" x="104" y="1201">+5V</text>
+   <path class="w-l" d="M180,1196 H212"/><text class="t-val" x="224" y="1201">TTL / logic</text>
+   <path class="w-d" d="M330,1196 H362"/><text class="t-val" x="374" y="1201">RS-422 differential</text>
+   <text class="t-val" x="60" y="1236">Nets are also joined by name: +5V, GND. Resistance in ohms, capacitance in farads unless stated.</text>
+  </svg>
+ </div>
+ <dl class="titleblock">
+   <div><dt>Drawing</dt><dd>MTE-422 &mdash; TTL to RS-422 converter</dd></div>
+   <div><dt>Number</dt><dd>422-01</dd></div>
+   <div><dt>Rev</dt><dd>A</dd></div>
+   <div><dt>Sheet</dt><dd>1 of 1</dd></div>
+ </dl>
+ <figcaption>Full-duplex signal path: U1 drives the TX pair from TTL TXD and is gated by TXEN; U2 receives the RX pair and returns TTL RXD. RB1/RB2 hold the receive pair in the mark state when the cable is open, so RXD idles high with nothing connected.</figcaption>
+</figure>
+
+<section>
+<h2>Where it sits <em>Cable &amp; termination</em></h2>
+<figure>
+ <div class="sheet" style="padding:18px 14px 6px"><div class="sheet-scroll" style="padding:0">
+  <svg class="sch" viewBox="0 0 1300 400" role="img" aria-label="System diagram: a host controller connects by a 5-position MTE lead to the converter, which drives two shielded twisted pairs and a signal ground through a 6-position MTE header to a remote RS-422 device; the transmit pair is terminated at the far end and the receive pair is terminated on the converter.">
+   <defs>
+     <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+       <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+     </marker>
+   </defs>
+
+   <rect class="sym" x="40" y="140" width="220" height="140"/>
+   <text class="t-name" x="150" y="200" text-anchor="middle">HOST CONTROLLER</text>
+   <text class="t-val" x="150" y="226" text-anchor="middle">5 V TTL UART</text>
+
+   <path class="w-l" d="M260,210 H420"/>
+   <text class="t-val" x="340" y="196" text-anchor="middle">5-POS MTE</text>
+   <text class="t-val" x="340" y="240" text-anchor="middle">+5V &middot; GND</text>
+   <text class="t-val" x="340" y="258" text-anchor="middle">TXD &middot; TXEN &middot; RXD</text>
+
+   <rect class="ic" x="420" y="100" width="280" height="220"/>
+   <text class="t-name" x="560" y="192" text-anchor="middle">MTE-422 CONVERTER</text>
+   <text class="t-val" x="560" y="218" text-anchor="middle">U1 driver &middot; U2 receiver</text>
+   <text class="t-val" x="560" y="240" text-anchor="middle">JP2 fitted &middot; JP1 open</text>
+   <text class="t-val" x="706" y="92">6-POS MTE</text>
+
+   <rect class="zone" x="706" y="132" width="308" height="176" rx="6"/>
+
+   <path class="w-d" d="M700,170 H720"/>
+   <path class="w-d" d="M720,170 Q730,156 740,170 T760,170 T780,170 T800,170 T820,170 T840,170 T860,170 T880,170 T900,170 T920,170 T940,170 T960,170 T980,170 T1000,170"/>
+   <path class="w-d" d="M720,170 Q730,184 740,170 T760,170 T780,170 T800,170 T820,170 T840,170 T860,170 T880,170 T900,170 T920,170 T940,170 T960,170 T980,170 T1000,170"/>
+   <path class="w-d" d="M1000,170 H1020"/>
+
+   <path class="w-d" d="M700,250 H720"/>
+   <path class="w-d" d="M720,250 Q730,236 740,250 T760,250 T780,250 T800,250 T820,250 T840,250 T860,250 T880,250 T900,250 T920,250 T940,250 T960,250 T980,250 T1000,250"/>
+   <path class="w-d" d="M720,250 Q730,264 740,250 T760,250 T780,250 T800,250 T820,250 T840,250 T860,250 T880,250 T900,250 T920,250 T940,250 T960,250 T980,250 T1000,250"/>
+   <path class="w-d" d="M1000,250 H1020"/>
+
+   <path class="w" d="M700,292 H1000 V280"/>
+   <text class="t-val" x="860" y="150" text-anchor="middle">TX pair &mdash; 120R at the far end</text>
+   <text class="t-val" x="860" y="228" text-anchor="middle">RX pair &mdash; 120R here (RT2)</text>
+   <text class="t-val" x="860" y="286" text-anchor="middle">SG &mdash; signal ground return</text>
+   <text class="t-val" x="860" y="332" text-anchor="middle">overall shield, bonded at one end only</text>
+
+   <g color="var(--diff)"><path d="M770,196 H840" stroke="currentColor" stroke-width="2.4" fill="none" marker-end="url(#ah)"/></g>
+   <g color="var(--diff)"><path d="M950,276 H880" stroke="currentColor" stroke-width="2.4" fill="none" marker-end="url(#ah)"/></g>
+
+   <rect class="sym" x="1020" y="140" width="240" height="140"/>
+   <text class="t-name" x="1140" y="200" text-anchor="middle">FIELD DEVICE</text>
+   <text class="t-val" x="1140" y="226" text-anchor="middle">RS-422, 4-wire</text>
+  </svg>
+ </div></div>
+ <figcaption>Each pair is terminated once, at the end that listens: the field device terminates the pair this board drives, and RT2 terminates the pair this board receives. SG carries the return current that keeps both ends inside the receivers&rsquo; &plusmn;7 V common-mode window.</figcaption>
+</figure>
+</section>
+
+<section>
+<h2>Connector pinouts <em>TE AMPMODU MTE, 2.54 mm</em></h2>
+<div class="cols">
+ <div>
+  <h3>J1 &mdash; 5-position, logic side</h3>
+  <div class="tscroll"><table>
+   <thead><tr><th>Pin</th><th>Signal</th><th>Dir</th><th>Function</th></tr></thead>
+   <tbody>
+    <tr><td class="num">1</td><td class="mono sig-p">+5V</td><td class="mono">in</td><td>Supply, 5.0 V &plusmn;5%. 60 mA worst case.</td></tr>
+    <tr><td class="num">2</td><td class="mono">GND</td><td class="mono">&mdash;</td><td>Common 0 V. Must be common with the host.</td></tr>
+    <tr><td class="num">3</td><td class="mono sig-l">TXD</td><td class="mono">in</td><td>TTL serial from the host. Idle high = mark.</td></tr>
+    <tr><td class="num">4</td><td class="mono sig-l">TXEN</td><td class="mono">in</td><td>Driver enable, active high. Pulled up by R3 &mdash; leave open for a permanently enabled driver.</td></tr>
+    <tr><td class="num">5</td><td class="mono sig-l">RXD</td><td class="mono">out</td><td>TTL serial to the host. Idles high when the line is open.</td></tr>
+   </tbody>
+  </table></div>
+ </div>
+ <div>
+  <h3>J2 &mdash; 6-position, field side</h3>
+  <div class="tscroll"><table>
+   <thead><tr><th>Pin</th><th>Signal</th><th>Dir</th><th>Function</th></tr></thead>
+   <tbody>
+    <tr><td class="num">1</td><td class="mono sig-d">TX+</td><td class="mono">out</td><td>Driver A output, non-inverting. Pair 1 with pin 2.</td></tr>
+    <tr><td class="num">2</td><td class="mono sig-d">TX&minus;</td><td class="mono">out</td><td>Driver B output, inverting.</td></tr>
+    <tr><td class="num">3</td><td class="mono sig-d">RX+</td><td class="mono">in</td><td>Receiver A input, non-inverting. Pair 2 with pin 4.</td></tr>
+    <tr><td class="num">4</td><td class="mono sig-d">RX&minus;</td><td class="mono">in</td><td>Receiver B input, inverting.</td></tr>
+    <tr><td class="num">5</td><td class="mono">SG</td><td class="mono">&mdash;</td><td>Signal ground return through R9, 100 &Omega; &frac12; W. JP3 bypasses it for a hard bond.</td></tr>
+    <tr><td class="num">6</td><td class="mono">SHLD</td><td class="mono">&mdash;</td><td>Cable shield / drain. AC-bonded to GND by C4 &#8741; R10.</td></tr>
+   </tbody>
+  </table></div>
+ </div>
+</div>
+</section>
+
+<section>
+<h2>Options &amp; behaviour <em>Jumpers and logic</em></h2>
+<div class="cols">
+ <div>
+  <h3>Jumper settings</h3>
+  <div class="tscroll"><table>
+   <thead><tr><th>Ref</th><th>Function</th><th>Default</th><th>Fit when</th></tr></thead>
+   <tbody>
+    <tr><td class="mono">JP1</td><td>120 &Omega; across the TX pair</td><td><span class="pill open">Open</span></td><td>This board sits at a physical end of a shared TX bus. Normally the far-end receiver terminates instead.</td></tr>
+    <tr><td class="mono">JP2</td><td>120 &Omega; across the RX pair</td><td><span class="pill fit">Fitted</span></td><td>Always, unless this board is a mid-span tap on a multi-drop pair.</td></tr>
+    <tr><td class="mono">JP3</td><td>Shorts R9, bonding SG directly to GND</td><td><span class="pill open">Open</span></td><td>Both ends already share a solid ground and you want zero return impedance.</td></tr>
+   </tbody>
+  </table></div>
+ </div>
+ <div>
+  <h3>Driver and receiver states</h3>
+  <div class="tscroll"><table>
+   <thead><tr><th>TXEN</th><th>TXD</th><th>TX+</th><th>TX&minus;</th><th>Line</th></tr></thead>
+   <tbody>
+    <tr><td class="mono">H</td><td class="mono">H</td><td class="mono">H</td><td class="mono">L</td><td>Mark / idle</td></tr>
+    <tr><td class="mono">H</td><td class="mono">L</td><td class="mono">L</td><td class="mono">H</td><td>Space</td></tr>
+    <tr><td class="mono">L</td><td class="mono">X</td><td class="mono">Z</td><td class="mono">Z</td><td>Driver off, pair released</td></tr>
+   </tbody>
+  </table></div>
+  <div class="tscroll" style="margin-top:14px"><table>
+   <thead><tr><th>RX+ &minus; RX&minus;</th><th>RXD</th><th>Condition</th></tr></thead>
+   <tbody>
+    <tr><td class="mono">&ge; +200 mV</td><td class="mono">H</td><td>Mark</td></tr>
+    <tr><td class="mono">&le; &minus;200 mV</td><td class="mono">L</td><td>Space</td></tr>
+    <tr><td class="mono">&asymp; +283 mV</td><td class="mono">H</td><td>Cable open or all drivers idle &mdash; held by RB1/RB2</td></tr>
+   </tbody>
+  </table></div>
+ </div>
+</div>
+</section>
+
+<section>
+<h2>Bill of materials <em>Rev A &middot; 24 line items</em></h2>
+<div class="tscroll"><table>
+ <thead><tr><th>Ref</th><th>Value</th><th>Device / part</th><th>Package</th><th>Notes</th></tr></thead>
+ <tbody>
+  <tr><td class="mono">U1, U2</td><td class="mono">&mdash;</td><td>MAX485ECPA+ (or MAX485ECSA+, SN75176B, SP485EEN)</td><td>DIP-8 / SOIC-8</td><td>5 V RS-485/RS-422 transceiver, 2.5 Mbps. U1 wired as driver, U2 as receiver.</td></tr>
+  <tr><td class="mono">J1</td><td class="mono">5-pos</td><td>TE AMPMODU MTE header, 640456-5</td><td>2.54 mm THT</td><td>Vertical, friction lock. Mark pin 1 with a square pad.</td></tr>
+  <tr><td class="mono">J2</td><td class="mono">6-pos</td><td>TE AMPMODU MTE header, 640456-6</td><td>2.54 mm THT</td><td>Same series, six circuits.</td></tr>
+  <tr><td class="mono">F1</td><td class="mono">0.20 A</td><td>PTC resettable fuse, MF-MSMF020</td><td>1812</td><td>Trips on a reversed or shorted supply.</td></tr>
+  <tr><td class="mono">D1</td><td class="mono">40 V 1 A</td><td>SS14 Schottky</td><td>SMA</td><td>Cathode to +5V. Clamps a reversed supply and trips F1.</td></tr>
+  <tr><td class="mono">D2</td><td class="mono">5.0 V</td><td>SMAJ5.0A TVS, unidirectional</td><td>SMA</td><td>Supply transient clamp.</td></tr>
+  <tr><td class="mono">D3&ndash;D6</td><td class="mono">6.5 V</td><td>SMBJ6.5CA TVS, bidirectional</td><td>SMB</td><td>One per RS-422 line, mounted hard against J2.</td></tr>
+  <tr><td class="mono">C1</td><td class="mono">10 &micro;F</td><td>X7R, 25 V</td><td>1206</td><td>Bulk at the supply entry.</td></tr>
+  <tr><td class="mono">C2, C3</td><td class="mono">100 nF</td><td>X7R, 50 V</td><td>0805</td><td>Within 5 mm of each VCC pin.</td></tr>
+  <tr><td class="mono">C4</td><td class="mono">1 nF</td><td>Y-rated, 2 kV</td><td>1206</td><td>Shield AC bond. Replace with a 0 &Omega; link to hard-bond the shield.</td></tr>
+  <tr><td class="mono">LED1</td><td class="mono">green</td><td>Indicator LED, 2 mA typ.</td><td>0805</td><td>Power on.</td></tr>
+  <tr><td class="mono">R1</td><td class="mono">2.2 k&Omega;</td><td>1%, 1/8 W</td><td>0805</td><td>LED1 series.</td></tr>
+  <tr><td class="mono">R2, R3</td><td class="mono">10 k&Omega;</td><td>1%, 1/8 W</td><td>0805</td><td>Pull-ups on TXD and TXEN &mdash; both idle safe if the host is absent.</td></tr>
+  <tr><td class="mono">R4, R8</td><td class="mono">100 &Omega;</td><td>1%, 1/8 W</td><td>0805</td><td>Series damping on the TTL lines.</td></tr>
+  <tr><td class="mono">R6, R7, R11, R12</td><td class="mono">10 &Omega;</td><td>1%, 1/4 W</td><td>1206</td><td>Pulse limiting between the transceivers and the TVS diodes.</td></tr>
+  <tr><td class="mono">R9</td><td class="mono">100 &Omega;</td><td>1%, 1/2 W</td><td>1210</td><td>Signal-ground return; limits ground-loop current.</td></tr>
+  <tr><td class="mono">R10</td><td class="mono">1 M&Omega;</td><td>1%, 1/8 W</td><td>0805</td><td>Bleeds static off the shield.</td></tr>
+  <tr><td class="mono">RB1, RB2</td><td class="mono">1 k&Omega;</td><td>1%, 1/8 W</td><td>0805</td><td>Fail-safe bias. See note 05.</td></tr>
+  <tr><td class="mono">RT1, RT2</td><td class="mono">120 &Omega;</td><td>1%, 1/4 W</td><td>1206</td><td>Line termination, matched to the cable.</td></tr>
+  <tr><td class="mono">JP1&ndash;JP3</td><td class="mono">2-pos</td><td>2.54 mm header + shunt</td><td>THT</td><td>See the jumper table.</td></tr>
+ </tbody>
+</table></div>
+</section>
+
+<section>
+<h2>Notes</h2>
+<ol class="notes">
+ <li><strong>Levels.</strong> J1 is 5 V TTL/CMOS UART, idle high. It is not RS-232 &mdash; do not wire it to a PC serial port without an RS-232 transceiver in between.</li>
+ <li><strong>Nets by name.</strong> +5V and GND are joined by name across the sheet. Wires that cross without a junction dot are not connected.</li>
+ <li><strong>Supply.</strong> 5.0 V &plusmn;5% at J1-1, about 12 mA idle and 60 mA with the driver loaded into a terminated pair. Reversing the supply forward-biases D1, which trips F1 rather than the transceivers.</li>
+ <li><strong>Driver enable.</strong> R3 holds TXEN high, so leaving J1-4 open gives a permanently enabled driver &mdash; the normal case for point-to-point RS-422. Drive it low to release the pair when several boards share one transmit bus, and turn the driver off only after the last stop bit has cleared.</li>
+ <li><strong>Fail-safe bias.</strong> With RT2 fitted, RB1/RB2 hold about 283 mV across the receive pair when the cable is open or every driver is idle &mdash; above the &plusmn;200 mV receiver threshold, so RXD idles high instead of chattering. If the receive pair ends up terminated at <em>both</em> ends (60 &Omega; effective), change RB1/RB2 to 560 &Omega; to keep roughly 254 mV.</li>
+ <li><strong>Termination.</strong> Terminate each pair once, at the listening end, with 120 &Omega; matched to the cable. Fitting a second termination halves the differential swing and costs you noise margin.</li>
+ <li><strong>Ground and shield.</strong> RS-422 needs a third conductor: SG keeps both ends within the receivers&rsquo; &plusmn;7 V common-mode range. R9 lets it do that without becoming a ground loop. Bond the shield at one end of the run only &mdash; bonding both ends turns the shield into a current path.</li>
+ <li><strong>Cable.</strong> Two shielded twisted pairs, 100&ndash;120 &Omega;, 24&ndash;22 AWG (Belden 9729 or 8723 class). Keep TX+/TX&minus; on one pair and RX+/RX&minus; on the other; splitting a differential signal across two pairs destroys the common-mode rejection this circuit is built on.</li>
+ <li><strong>Distance.</strong> Roughly 1200 m at 100 kbps, 120 m at 1 Mbps. RS-422 allows one driver and up to ten receivers per pair.</li>
+ <li><strong>3.3 V hosts.</strong> Substitute MAX3485 for U1 and U2 and supply 3.3 V &mdash; same pinout, same layout. Do not feed a 5 V RO output straight into a 3.3 V input.</li>
+ <li><strong>Isolation.</strong> This design is non-isolated and assumes both ends share a ground. For separately powered equipment, long outdoor runs, or anything near line-voltage switching, use an isolated transceiver (ADM2582E, ISO3082) with an isolated DC-DC instead.</li>
+ <li><strong>Layout.</strong> Route each pair as a parallel, equal-length couple over an unbroken ground pour; keep D3&ndash;D6 and their ground vias within a few millimetres of J2, and the decoupling caps within 5 mm of the VCC pins.</li>
+</ol>
+</section>
+
+<div class="callout"><b>Before you build it:</b> this is a paper design &mdash; it has not been fabricated or simulated. Check U1/U2 pin numbers against the datasheet for the exact package you buy, and confirm the MTE header and mating-housing part numbers against the current TE catalogue, since the series carries different numbers for vertical, right-angle, and plating variants.</div>
+
+<footer>
+ <div>MTE-422 Converter &middot; drawing 422-01 rev A &middot; drawn 7 September 2026</div>
+ <div>Device data from the Maxim/Analog Devices MAX481&ndash;MAX491 datasheet; connector data from the TE Connectivity AMPMODU MTE series.</div>
+</footer>
+
+</div>
