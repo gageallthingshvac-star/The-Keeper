@@ -38,39 +38,37 @@
     { t:'beam', x:1164, y:-60, w:28,  h:900 },          // right-hand edge column
     { t:'beam', x:-14,  y:384, w:180, h:25 },           // cannon shelf
     { t:'beam', x:4,    y:422, w:154, h:22, a:-22 },    // strut under the shelf
-    { t:'beam', x:348,  y:210, w:628, h:23 },           // mezzanine, upper course
-    { t:'beam', x:348,  y:233, w:628, h:23 },           // mezzanine, lower course
+    // The mezzanine is slotted at x 526-554: that is how the tall board in
+    // the picture gets to cross it, and it is the shaft the board drops down.
+    { t:'beam', x:348,  y:210, w:190, h:23 },           // mezzanine, upper course
+    { t:'beam', x:578,  y:210, w:398, h:23 },
+    { t:'beam', x:348,  y:233, w:190, h:23 },           // mezzanine, lower course
+    { t:'beam', x:578,  y:233, w:398, h:23 },
     { t:'beam', x:355,  y:372, w:26,  h:340 },          // left column
     { t:'beam', x:950,  y:372, w:27,  h:141 },          // right column
     { t:'slab', x:358,  y:372, w:614, h:141 },          // the big middle slab
     { t:'slab', x:355,  y:707, w:588, h:150 },          // floor
     { t:'beam', x:934,  y:707, w:24,  h:110 },          // post at the ramp foot
-    { t:'beam', x:928,  y:657, w:264, h:23, a:-21.3 },  // ramp, bottom right
-
-    // The two pale brackets are shelves, not crates: a plank above, a plank
-    // below, an upright joining them at the far end. The planks are fixed to
-    // the frame, so each bracket reads as a tunnel with a post in its doorway.
-    { t:'post', x:350,  y:101, w:160, h:19 },           // upper bracket, top plank
-    { t:'post', x:350,  y:189, w:160, h:19 },           //   ... bottom plank
-    { t:'post', x:545,  y:258, w:157, h:23 },           // ragdoll shelf, top plank
-    { t:'post', x:545,  y:347, w:157, h:23 }            //   ... bottom plank
+    { t:'beam', x:928,  y:657, w:264, h:23, a:-21.3 }   // ramp, bottom right
   ];
 
-  // Loose timber. Each piece is short enough to go over in the slot it stands
-  // in, so it topples where it is instead of skating across the level — an
-  // upright that fills its gap exactly can only ever slide, which is what made
-  // the old brackets behave like they were on ice.
+  // Loose timber. The two crates are one piece each — planks fixed together —
+  // and each fills its slot, so a hit shoves it along its shelf rather than
+  // tipping it. That is the mechanism: the bottom crate is what the tall board
+  // is standing on, so shoving it clear drops the board out of the top corridor.
   var LOOSE = [
-    { m:3.0, style:'beam', parts:[ {x:950,y:256,w:27, h:116} ] },  // column stub
-    { m:3.4, parts:[ {x:491,y:122,w:19, h:65} ] },      // upper bracket upright
-    { m:3.4, parts:[ {x:681,y:283,w:21, h:64} ] },      // ragdoll shelf upright
-    { m:0.2, parts:[ {x:351,y:176,w:24, h:13} ] },      // offcut on the bracket
-    { m:0.2, parts:[ {x:546,y:336,w:23, h:11} ] }       // offcut on the shelf
+    { i:'stub',  m:3.0, style:'beam', parts:[ {x:950,y:256,w:27, h:116} ] },
+    { i:'top',   m:2.2, parts:[ {x:350,y:101,w:160,h:19},   // top crate, lid
+                                {x:491,y:101,w:19, h:107},  //   ... back
+                                {x:350,y:189,w:160,h:19},   //   ... floor
+                                {x:351,y:176,w:24, h:13} ] },
+    { i:'low',   m:2.2, parts:[ {x:538,y:258,w:164,h:23},   // bottom crate, lid
+                                {x:681,y:258,w:21, h:112},  //   ... back
+                                {x:538,y:347,w:164,h:23},   //   ... floor
+                                {x:539,y:336,w:23, h:11} ] },
+    // stands in the mezzanine slot, its foot on the bottom crate's lid
+    { i:'board', m:1.1, parts:[ {x:548,y:100,w:20, h:158} ] }
   ];
-
-  // a leaning post that hangs in front of the mezzanine — scenery only,
-  // exactly as it sits in the screenshot
-  var DECOR = { x:530, y:104, w:20, h:158, a:1.8 };
 
   var TARGET = { x:441, y:645, r:62 };
   var CANNON = { x:66, y:300, len:80 };
@@ -547,6 +545,16 @@
     for (i = 0; i < S.bodies.length; i++) S.bodies[i].sleep = false;
   }
 
+  // Anything that disturbs one piece disturbs the lot. A body only knows it
+  // has lost its footing on the step it tries to fall, so a sleeping board
+  // whose crate slides away has to be woken by the crate, not by contact.
+  function wakeAll() {
+    for (var i = 0; i < S.bodies.length; i++) {
+      var b = S.bodies[i];
+      if (b.sleep) { b.sleep = false; b.still = 0; }
+    }
+  }
+
   function sub(dt) {
     var i, j, k, b, p, rd, dt2 = dt * dt;
 
@@ -603,7 +611,7 @@
               var dd = Math.hypot(ddx, ddy), ov = qa.r + qb.r - dd;
               if (ov <= 0 || dd < 1e-6) continue;
               var un = ddx / dd, vn2 = ddy / dd;
-              A.sleep = B.sleep = false;
+              wakeAll();
               bodyImpulse(A, ax, ay, -un, -vn2, ov * 0.5, B.invM, k === 0);
               bodyImpulse(B, bx, by, un, vn2, ov * 0.5, A.invM, k === 0);
             }
@@ -628,7 +636,7 @@
               var d = Math.hypot(dx, dy), o = p.r + qq.r - d;
               if (o <= 0 || d < 1e-6) continue;
               var ux = dx / d, uy = dy / d;
-              b.sleep = false;
+              wakeAll();
               var lam = bodyImpulse(b, wx, wy, -ux, -uy, o, 1 / PMASS, k === 0);
               p.x += ux * lam / PMASS; p.y += uy * lam / PMASS;
               cc = Math.cos(b.ang); cs = Math.sin(b.ang);
@@ -1015,7 +1023,6 @@
     var i;
     for (i = 0; i < S.bodies.length; i++) if (S.bodies[i].style === 'beam') drawLoose(ctx, S.bodies[i]);
     for (i = 0; i < S.bodies.length; i++) if (S.bodies[i].style !== 'beam') drawLoose(ctx, S.bodies[i]);
-    paint(ctx, { t: 'post', x: DECOR.x, y: DECOR.y, w: DECOR.w, h: DECOR.h, a: DECOR.a });
     for (i = 0; i < S.dolls.length; i++) if (!S.dolls[i].dead) drawDoll(ctx, S.dolls[i]);
     drawCannon(ctx);
     for (i = 0; i < S.puffs.length; i++) {
