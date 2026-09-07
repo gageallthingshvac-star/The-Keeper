@@ -30,6 +30,8 @@
 /* ---------------------------------------------------------------- 0. boot */
 const DW = 960, DH = 640;                 // world is exactly one screen
 const DOLL_CAP = 12;                      // how deep the pile may get
+const JOINT_SLOP = 0.4;                   // joint error left uncorrected, px
+const JOINT_MAXBIAS = 1200;               // fastest a joint may heal, px/s
 const cvs = document.getElementById('c');
 const ctx = cvs.getContext('2d', { alpha:false });
 let SC = 1, OX = 0, OY = 0, CW = DW, CH = DH;
@@ -152,6 +154,7 @@ class Body {
     this.angDamp = o.angDamp  !== undefined ? o.angDamp  : 0.20;
     this.gscale  = o.gscale   !== undefined ? o.gscale   : 1;
     this.group   = o.group || 0;               // matching non-zero groups never collide
+    this.nocol   = null;                       // ids this body is jointed to
     this.mat     = o.mat || 'wood';
     this.tag     = o.tag || null;
     this.ent     = null;                        // owning game entity
@@ -532,10 +535,18 @@ class Joint {
     if(Math.abs(det) < 1e-12) det = 1e-12;
     this.m11 =  k22/det; this.m12 = -k12/det; this.m22 = k11/det;
 
+    // Baumgarte, bounded -- as the angle limit below and DistJoint both are.
+    // Unbounded it is a runaway: a joint pulled apart asks for a correction
+    // speed proportional to the error, overshoots, and asks for more next
+    // step. On a long heavy pendulum that oscillation reaches the velocity
+    // clamp within a frame. The slop lets a settled joint stop fidgeting.
     const cx = pb.x-pa.x, cy = pb.y-pa.y;
-    const bf = 0.2/dt;
-    this.bx2 = -bf*cx; this.by2 = -bf*cy;
-    this.cerr = Math.hypot(cx,cy);
+    const cl = Math.hypot(cx,cy);
+    this.cerr = cl;
+    if(cl > JOINT_SLOP){
+      const f = Math.min((0.2/dt) * (cl - JOINT_SLOP), JOINT_MAXBIAS) / cl;
+      this.bx2 = -f*cx; this.by2 = -f*cy;
+    } else { this.bx2 = 0; this.by2 = 0; }
 
     // warm start
     if(!A.fixed){ A.vx -= this.px*A.im; A.vy -= this.py*A.im; A.av -= (r1x*this.py - r1y*this.px)*A.iI; }
@@ -662,13 +673,26 @@ class World {
       if(this.joints[k].A===b || this.joints[k].B===b) this.joints.splice(k,1);
     for(const [key,a] of this.arbs) if(a.A===b || a.B===b) this.arbs.delete(key);
   }
-  addJoint(j){ this.joints.push(j); return j; }
+  addJoint(j){
+    this.joints.push(j);
+    // A joint holds two bodies together AT a point, so they overlap there by
+    // design. Letting the contact solver also shove them apart sets the two
+    // against each other, and the loser is whichever converges slower -- this
+    // is what detonated pendulums (plank overlapping its own pivot) and ropes
+    // (every link overlapping its neighbour).
+    if(j.A && j.B){
+      (j.A.nocol || (j.A.nocol = new Set())).add(j.B.id);
+      (j.B.nocol || (j.B.nocol = new Set())).add(j.A.id);
+    }
+    return j;
+  }
   clear(){ this.bodies.length=0; this.joints.length=0; this.arbs.clear(); this.fields.length=0; }
 
   canCollide(A,B){
     if(A.fixed && B.fixed) return false;
     if(!A.awake && !B.awake) return false;
     if(A.group && A.group === B.group) return false;
+    if(A.nocol && A.nocol.has(B.id)) return false;
     if(A.maxx < B.minx || B.maxx < A.minx || A.maxy < B.miny || B.maxy < A.miny) return false;
     return true;
   }
@@ -721,9 +745,15 @@ class World {
     /* ---- solve */
     for(const [,a] of this.arbs) a.prestep(dt);
     for(const j of this.joints) j.prestep(dt);
+    // Joints are swept in alternating directions. A chain solved end-to-end
+    // the same way every iteration propagates correction from one end only,
+    // so a heavy weight on a light rope never converges and the links thrash;
+    // reversing every other pass carries it both ways for the same cost.
+    const J = this.joints, nj = J.length;
     for(let it=0; it<this.iter; it++){
       for(const [,a] of this.arbs) a.solve();
-      for(const j of this.joints) j.solve(dt);
+      if(it & 1){ for(let k=nj-1;k>=0;k--) J[k].solve(dt); }
+      else      { for(let k=0;k<nj;k++)    J[k].solve(dt); }
     }
 
     /* ---- integrate position */
@@ -930,8 +960,12 @@ const PLANK_PAL = {
 
 /* -- crates and blocks that move: four facets meeting at the middle,
       a metal frame, and a fat bolt proud of every corner -- */
-function texCrate(w,h,mat){
-  return tex('cr2_'+mat, w, h, (g,w,h)=>{
+// `v` is a variant index. Boxes of one size used to share a single cached
+// texture, so a stack of five crates was the same crate drawn five times and
+// read as wallpaper. A handful of variants, chosen per body and stable for
+// its lifetime, breaks that up for the cost of a few more cached canvases.
+function texCrate(w,h,mat,v){
+  return tex('cr2_'+mat+'_'+(v||0), w, h, (g,w,h)=>{
     const P = CRATE_PAL[mat] || CRATE_PAL.wood;
     g.fillStyle='rgba(0,0,0,0.38)'; rr(g,2.5,4,w,h,3); g.fill();
     const fr = clamp(Math.min(w,h)*0.13, 3, 8);      // frame thickness
@@ -1647,10 +1681,19 @@ function drawDoll(g, d, alpha){
 const PERF = {
   sub:4, iter:9, avg:16.7,
   sample(ms){
-    this.avg += (Math.min(ms,120) - this.avg) * 0.05;
+    // A stall is not sustained load. Coming back to a backgrounded tab, a
+    // collection pause, the first frame after a level builds -- each hands
+    // this a frame time of hundreds of milliseconds. Folding those in used
+    // to drop the solver to its coarsest tier and leave it there, quietly
+    // making every room harder to beat than it was designed to be, with no
+    // sign to the player that anything had changed. Sustained load still
+    // steps the quality down; a hiccup no longer counts as evidence.
+    if(ms > 100 || ms <= 0) return;
+    this.avg += (ms - this.avg) * 0.05;
     if(this.avg > 30)      { this.sub = 2; this.iter = 7; }
-    else if(this.avg > 21) { this.sub = 3; this.iter = 8; }
-    else if(this.avg < 17) { this.sub = 4; this.iter = 9; }
+    else if(this.avg > 22) { this.sub = 3; this.iter = 8; }
+    else if(this.avg < 18) { this.sub = 4; this.iter = 9; }
+    // between 18 and 22 the current tier stands, so it cannot oscillate
   }
 };
 
@@ -2457,20 +2500,22 @@ class Level {
         }
         case 'rope': {
           const n = op[3]||6, seg = op[4]||16, wdt = 5;
+          const grp = ++GROUP;              // one group per rope, so it cannot
           let prev = this.add({x:op[1],y:op[2],w:8,h:8,fixed:true,mat:'metal'});
           prev.render='pivot';
           let py = op[2];
           const links = [];
           for(let i=0;i<n;i++){
             const b = this.add({x:op[1], y:py+seg/2, w:wdt, h:seg, mat:'wood',
-                                density:0.0008, group:0, angDamp:0.5, linDamp:0.25});
+                                density:0.0035, group:grp, angDamp:0.5, linDamp:0.25});
             b.render='link';
             W.addJoint(new Joint(prev,b,op[1],py,{}));
             links.push(b);
             prev = b; py += seg;
           }
           if(op[5]){  // a weight on the end
-            const wb = this.add({shape:'circle',x:op[1],y:py+op[5],r:op[5],mat:op[6]||'stone'});
+            const wb = this.add({shape:'circle',x:op[1],y:py+op[5],r:op[5],mat:op[6]||'stone',
+                                 group:grp});
             wb.render='ball';
             W.addJoint(new Joint(prev,wb,op[1],py,{}));
           }
@@ -2633,11 +2678,17 @@ class Level {
 }
 
 /* ------------------------------------------------ 8b. level runtime */
-Level.prototype.update = function(dt){
-  this.time += dt;
-  const W = this.world;
+/* Driven parts move here, and this runs once per physics SUBSTEP.
 
-  /* --- kinematic and scripted parts move before the solve --- */
+   Doing it once per frame instead was the cause of the moving-object
+   glitching: the part was teleported its whole frame's travel in a single
+   jump before the first substep, so anything resting on it went from
+   touching to deeply overlapped with no step in between and got flung clear
+   -- while the velocity handed to the solver described a full frame of
+   travel that the following substeps never actually performed, pumping
+   energy into every contact the part held. Moving in step with the solver
+   costs a few more assignments a frame and makes both problems go away. */
+Level.prototype.stepDrive = function(dt){
   for(const e of this.ents){
     if(e.frozen) continue;
     switch(e.type){
@@ -2652,11 +2703,7 @@ Level.prototype.update = function(dt){
         break;
       }
       case 'rotor': {
-        const prevA = e.a;
         e.a += e.spd * dt;
-        // a clank each half turn, so the room sounds mechanical
-        if(Math.floor(prevA/PI) !== Math.floor(e.a/PI)) Audio.gear(Math.abs(e.spd));
-        if(e.arms.length && e.arms[0].deadly && Math.random() < dt*3.5) Audio.hum();
         e.hub.a = e.a; e.hub.av = e.spd; e.hub.sync();
         for(const b of e.arms){
           const ang = e.a + b.armPhase;
@@ -2672,9 +2719,7 @@ Level.prototype.update = function(dt){
         break;
       }
       case 'wheel': {
-        const prevW = e.a;
         e.a += e.spd * dt;
-        if(Math.floor(prevW/(PI/3)) !== Math.floor(e.a/(PI/3))) Audio.gear(Math.abs(e.spd)*2.2);
         const place = (b, tangent)=>{
           const ang = e.a + b.phase;
           const nx = e.cx + Math.cos(ang)*b.orbitR, ny = e.cy + Math.sin(ang)*b.orbitR;
@@ -2692,9 +2737,14 @@ Level.prototype.update = function(dt){
         p.wake();
         const comp = p.y - e.y0;                 // positive when pushed down
         p.vy -= (e.k * comp + 5.0 * p.vy) * dt;  // stiff, lightly damped
+        // a piston: it travels on one axis, never tips, and stops at its ends
+        p.x = e.x0; p.vx = 0; p.a = 0; p.av = 0;
+        if(p.y > e.y0 + e.travel){ p.y = e.y0 + e.travel; if(p.vy > 0) p.vy = 0; }
+        if(p.y < e.y0 - e.travel*1.6){ p.y = e.y0 - e.travel*1.6; if(p.vy < 0) p.vy = 0; }
+        p.sync();
+        this.wakeNear(p, 10);
         break;
       }
-      case 'beam': { e.t += dt; break; }
       case 'saw': {
         e.t += dt;
         e.b.av = e.b.spin;
@@ -2719,6 +2769,33 @@ Level.prototype.update = function(dt){
         if(Math.abs(e.b.vx)+Math.abs(e.b.vy) > 1) this.wakeNear(e.b, 14);
         break;
       }
+    }
+  }
+};
+
+Level.prototype.update = function(dt){
+  this.time += dt;
+  const W = this.world;
+
+  /* --- scripted logic, sound and effects, once per frame --- */
+  for(const e of this.ents){
+    if(e.frozen) continue;
+    switch(e.type){
+      case 'rotor': {
+        // the angle advanced across the substeps; clank once each half turn
+        if(e.aPrev === undefined) e.aPrev = e.a;
+        if(Math.floor(e.aPrev/PI) !== Math.floor(e.a/PI)) Audio.gear(Math.abs(e.spd));
+        e.aPrev = e.a;
+        if(e.arms.length && e.arms[0].deadly && Math.random() < dt*3.5) Audio.hum();
+        break;
+      }
+      case 'wheel': {
+        if(e.aPrev === undefined) e.aPrev = e.a;
+        if(Math.floor(e.aPrev/(PI/3)) !== Math.floor(e.a/(PI/3))) Audio.gear(Math.abs(e.spd)*2.2);
+        e.aPrev = e.a;
+        break;
+      }
+      case 'beam': { e.t += dt; break; }
       case 'btn': {
         let on = false;
         const l = e.x - e.w/2, r = e.x + e.w/2, top = e.y - 16, bot = e.y + 8;
@@ -2784,7 +2861,7 @@ Level.prototype.update = function(dt){
   /* --- physics, sub stepped so fast dolls cannot tunnel through planks --- */
   const SUB = PERF.sub, sdt = dt/SUB;
   W.iter = PERF.iter;
-  for(let i=0;i<SUB;i++) W.step(sdt);
+  for(let i=0;i<SUB;i++){ this.stepDrive(sdt); W.step(sdt); }
 
   /* the boiler is always working */
   this.stackT = (this.stackT || 0) + dt;
@@ -2805,17 +2882,6 @@ Level.prototype.update = function(dt){
     const m = cn.mount;
     m.a = 0; m.av = 0; m.sync();
     cn.x = m.x; cn.y = m.y + cn.dy;
-  }
-
-  /* springs only travel up and down, and never tip */
-  for(const e of this.ents){
-    if(e.type !== 'spring') continue;
-    const p = e.plate;
-    p.x = e.x0; p.vx = 0; p.a = 0; p.av = 0;
-    if(p.y > e.y0 + e.travel){ p.y = e.y0 + e.travel; if(p.vy > 0) p.vy = 0; }
-    if(p.y < e.y0 - e.travel*1.6){ p.y = e.y0 - e.travel*1.6; if(p.vy < 0) p.vy = 0; }
-    p.sync();
-    this.wakeNear(p, 10);
   }
 
   this.collapseStep(dt);
@@ -3027,7 +3093,7 @@ function drawBody(g, b, t){
       }
       break;
     }
-    case 'crate': blit(g, texCrate(w,h,b.mat), b.x, b.y, b.a, w, h); break;
+    case 'crate': blit(g, texCrate(w,h,b.mat,b.id&3), b.x, b.y, b.a, w, h); break;
     case 'glass': blit(g, texGlass(w,h), b.x, b.y, b.a, w, h); break;
     case 'tnt':   blit(g, texTNT(w,h),   b.x, b.y, b.a, w, h); break;
     case 'ball':  blit(g, texMetalBall(b.r,b.mat), b.x, b.y, b.a, b.r*2, b.r*2); break;
@@ -3044,14 +3110,27 @@ function drawBody(g, b, t){
       break;
     }
     case 'bumper': {
-      g.save(); g.translate(b.x,b.y);
-      g.fillStyle='rgba(0,0,0,0.35)'; g.beginPath(); g.arc(2,3,b.r,0,TAU); g.fill();
-      const gr=g.createRadialGradient(-b.r*0.3,-b.r*0.35,b.r*0.1,0,0,b.r);
-      gr.addColorStop(0,'#8a6f79'); gr.addColorStop(0.7,'#42333a'); gr.addColorStop(1,'#221a1e');
-      g.fillStyle=gr; g.beginPath(); g.arc(0,0,b.r,0,TAU); g.fill();
-      g.strokeStyle='rgba(255,180,200,0.4)'; g.lineWidth=2.4;
-      g.beginPath(); g.arc(0,0,b.r*0.62,0,TAU); g.stroke();
-      g.strokeStyle='#171114'; g.lineWidth=1.6; g.beginPath(); g.arc(0,0,b.r-0.8,0,TAU); g.stroke();
+      // A bumper kicks back whatever touches it, so it should not read as a
+      // stone set into the wall. Brass collar, rubber cap, and a slow breath
+      // so the eye files it with the things that do something.
+      const pl = 1 + 0.045*Math.sin(t*3.1 + b.x*0.02);
+      g.save(); g.translate(b.x,b.y); g.scale(pl,pl);
+      g.fillStyle='rgba(0,0,0,0.38)'; g.beginPath(); g.arc(2,3.5,b.r,0,TAU); g.fill();
+      const col=g.createLinearGradient(0,-b.r,0,b.r);
+      col.addColorStop(0,'#e2c078'); col.addColorStop(0.5,'#9c7736'); col.addColorStop(1,'#5c441c');
+      g.fillStyle=col; g.beginPath(); g.arc(0,0,b.r,0,TAU); g.fill();
+      g.strokeStyle='#382810'; g.lineWidth=1.6; g.beginPath(); g.arc(0,0,b.r-0.8,0,TAU); g.stroke();
+      const cap=g.createRadialGradient(-b.r*0.30,-b.r*0.36,b.r*0.08,0,0,b.r*0.78);
+      cap.addColorStop(0,'#ff9d84'); cap.addColorStop(0.45,'#dd4a33'); cap.addColorStop(1,'#8c1e15');
+      g.fillStyle=cap; g.beginPath(); g.arc(0,0,b.r*0.78,0,TAU); g.fill();
+      g.strokeStyle='rgba(58,10,6,0.75)'; g.lineWidth=1.5;
+      g.beginPath(); g.arc(0,0,b.r*0.78,0,TAU); g.stroke();
+      g.fillStyle='rgba(255,234,222,0.48)';
+      g.beginPath(); g.ellipse(-b.r*0.26,-b.r*0.32,b.r*0.26,b.r*0.17,-0.6,0,TAU); g.fill();
+      for(let i=0;i<6;i++){
+        const a2 = i*TAU/6 + 0.4;
+        rivet(g, Math.cos(a2)*b.r*0.89, Math.sin(a2)*b.r*0.89, 1.9, '#f2e0bc', '#382810');
+      }
       g.restore();
       break;
     }
@@ -3395,31 +3474,63 @@ function drawBody(g, b, t){
 }
 
 function drawWater(g,e,t,front){
-  const l=e.x-e.w/2, top=e.y-e.h/2;
+  // Water is a region, not a tank: nothing stops a doll entering from the
+  // side. Drawn as a flat rectangle it read as a blue box pasted on the
+  // wall, so the vertical edges fade out instead of ending on a hard line,
+  // and the body carries depth rather than four straight stripes.
+  const l=e.x-e.w/2, top=e.y-e.h/2, r=l+e.w, bot=top+e.h;
+  const fade = Math.min(26, e.w*0.22), STR = 7;
   g.save();
   g.beginPath(); g.rect(l, top, e.w, e.h); g.clip();
   if(!front){
-    const gr=g.createLinearGradient(0,top,0,top+e.h);
-    gr.addColorStop(0,'rgba(70,150,200,0.44)');
-    gr.addColorStop(1,'rgba(20,70,120,0.66)');
-    g.fillStyle=gr; g.fillRect(l,top,e.w,e.h);
+    const gr=g.createLinearGradient(0,top,0,bot);
+    gr.addColorStop(0,   'rgba(84,164,212,0.40)');
+    gr.addColorStop(0.45,'rgba(44,112,170,0.56)');
+    gr.addColorStop(1,   'rgba(14,56,104,0.70)');
+    g.fillStyle=gr;
+    g.fillRect(l+fade, top, Math.max(0, e.w-fade*2), e.h);
+    for(let i=0;i<STR;i++){                       // soften both open edges
+      const a = (i+0.5)/STR, sw = fade/STR;
+      g.globalAlpha = a;
+      g.fillRect(l + fade - (i+1)*sw, top, sw, e.h);
+      g.fillRect(r - fade + i*sw,     top, sw, e.h);
+    }
+    g.globalAlpha = 1;
   } else {
-    g.fillStyle='rgba(140,220,255,0.10)'; g.fillRect(l,top,e.w,e.h);
-    g.strokeStyle='rgba(190,240,255,0.30)'; g.lineWidth=1;
+    g.fillStyle='rgba(150,224,255,0.09)'; g.fillRect(l,top,e.w,e.h);
+    // caustics: bands that drift and fade with depth, not fixed stripes
     for(let i=0;i<4;i++){
-      const y = top + 14 + i*Math.max(12,e.h/5);
-      if(y > top+e.h) break;
+      const dpt = (i+1)/5;
+      const y = top + 12 + dpt*e.h*0.82 + Math.sin(t*0.5 + i*1.7)*4;
+      if(y > bot) break;
+      g.strokeStyle = 'rgba(198,242,255,' + (0.26*(1-dpt*0.7)).toFixed(3) + ')';
+      g.lineWidth = 1 + (1-dpt)*1.2;
       g.beginPath();
-      for(let x=l;x<l+e.w;x+=8) g.lineTo(x, y + Math.sin(x*0.05 + t*1.6 + i)*2.2);
+      for(let x=l;x<=r;x+=8) g.lineTo(x, y + Math.sin(x*0.05 + t*1.6 + i)*2.4);
       g.stroke();
+    }
+    for(let i=0;i<6;i++){                          // a slow string of bubbles
+      const sd = ((i*83)%17)/17;
+      const bx = l + (0.12 + sd*0.76)*e.w;
+      const by = bot - ((t*(16+sd*20) + sd*e.h) % e.h);
+      const rr2 = 1.4 + sd*2.2;
+      g.fillStyle = 'rgba(224,248,255,' + (0.30*(0.4+0.6*(by-top)/e.h)).toFixed(3) + ')';
+      g.beginPath(); g.arc(bx, by, rr2, 0, TAU); g.fill();
     }
   }
   g.restore();
   if(!front){
-    g.strokeStyle='rgba(200,245,255,0.62)'; g.lineWidth=2;
+    // the meniscus, brightest where the water is thickest
+    g.save();
+    g.strokeStyle='rgba(206,247,255,0.66)'; g.lineWidth=2; g.lineCap='round';
     g.beginPath();
-    for(let x=l;x<=l+e.w;x+=6) g.lineTo(x, top + Math.sin(x*0.045 + t*2.2)*2.4 + Math.sin(x*0.11 - t*1.3)*1.1);
+    for(let x=l;x<=r;x+=6) g.lineTo(x, top + Math.sin(x*0.045 + t*2.2)*2.4 + Math.sin(x*0.11 - t*1.3)*1.1);
     g.stroke();
+    g.strokeStyle='rgba(255,255,255,0.22)'; g.lineWidth=1;
+    g.beginPath();
+    for(let x=l;x<=r;x+=6) g.lineTo(x, top - 1.4 + Math.sin(x*0.045 + t*2.2)*2.4 + Math.sin(x*0.11 - t*1.3)*1.1);
+    g.stroke();
+    g.restore();
   }
 }
 
@@ -3452,23 +3563,54 @@ function drawGrav(g,e,t){
 }
 
 function drawFan(g,e,t){
+  // Seven hairlines and a dotted outline read as almost nothing, and a
+  // draught strong enough to hold a doll up should be plain to see. The
+  // region now carries a gradient the air arrives through, streaks spread
+  // across the width rather than filed along one line, and chevrons that
+  // say which way it blows.
+  const cs = Math.cos(e.dir), sn = Math.sin(e.dir);
+  const along  = Math.abs(cs)*e.w + Math.abs(sn)*e.h;   // depth of the throw
+  const across = Math.abs(sn)*e.w + Math.abs(cs)*e.h;   // width of the mouth
+  const ox = -sn, oy = cs;
   g.save();
   g.beginPath(); g.rect(e.x-e.w/2, e.y-e.h/2, e.w, e.h); g.clip();
-  const n = 7;
-  for(let i=0;i<n;i++){
-    const p = ((t*0.55 + i/n) % 1);
-    const px = e.x - e.w/2 + (Math.cos(e.dir)*p + 0.5)*e.w;
-    const py = e.y - e.h/2 + (Math.sin(e.dir)*p + 0.5)*e.h;
-    const al = Math.sin(p*PI)*0.30;
-    g.strokeStyle = `rgba(220,240,255,${al})`;
-    g.lineWidth = 2;
+
+  const grd = g.createLinearGradient(e.x - cs*along/2, e.y - sn*along/2,
+                                     e.x + cs*along/2, e.y + sn*along/2);
+  grd.addColorStop(0,    'rgba(200,231,255,0.17)');
+  grd.addColorStop(0.55, 'rgba(200,231,255,0.075)');
+  grd.addColorStop(1,    'rgba(200,231,255,0)');
+  g.fillStyle = grd; g.fillRect(e.x-e.w/2, e.y-e.h/2, e.w, e.h);
+
+  g.lineCap = 'round';
+  for(let i=0;i<22;i++){
+    const sd = ((i*97) % 31) / 31;
+    const p  = ((t*(0.40 + sd*0.55) + i/22) % 1);
+    const off = (sd - 0.5) * across * 0.92;
+    const px = e.x + cs*(p-0.5)*along + ox*off;
+    const py = e.y + sn*(p-0.5)*along + oy*off;
+    const len = 12 + sd*26;
+    const al = Math.sin(p*PI) * (0.18 + sd*0.28);
+    g.strokeStyle = 'rgba(228,245,255,' + al.toFixed(3) + ')';
+    g.lineWidth = 1 + sd*1.5;
+    g.beginPath(); g.moveTo(px,py); g.lineTo(px+cs*len, py+sn*len); g.stroke();
+  }
+  // direction chevrons, drifting with the flow
+  for(let i=0;i<3;i++){
+    const p = ((t*0.30 + i/3) % 1);
+    const px = e.x + cs*(p-0.5)*along, py = e.y + sn*(p-0.5)*along;
+    const al = Math.sin(p*PI)*0.22;
+    g.strokeStyle = 'rgba(232,247,255,' + al.toFixed(3) + ')';
+    g.lineWidth = 2.2;
+    const wg = Math.min(16, across*0.22), dp = 9;
     g.beginPath();
-    g.moveTo(px,py);
-    g.lineTo(px + Math.cos(e.dir)*16, py + Math.sin(e.dir)*16);
+    g.moveTo(px + ox*wg - cs*dp, py + oy*wg - sn*dp);
+    g.lineTo(px, py);
+    g.lineTo(px - ox*wg - cs*dp, py - oy*wg - sn*dp);
     g.stroke();
   }
   g.restore();
-  g.strokeStyle='rgba(190,225,255,0.16)'; g.lineWidth=1.4;
+  g.strokeStyle='rgba(190,225,255,0.20)'; g.lineWidth=1.4;
   g.setLineDash([6,6]); g.strokeRect(e.x-e.w/2, e.y-e.h/2, e.w, e.h); g.setLineDash([]);
   // the blower housing at the back of the region
   const hx = e.x - Math.cos(e.dir)*e.w/2, hy = e.y - Math.sin(e.dir)*e.h/2;
@@ -3591,6 +3733,27 @@ Level.prototype.draw = function(g, aim){
         if(i===0) g.moveTo(xx,yy); else g.lineTo(xx,yy);
       }
       g.stroke();
+    }
+    g.restore();
+  }
+
+  // A mover slides between two points; without the track the player can only
+  // learn where it goes by watching it get there. The rail sits under
+  // everything, so the plank reads as running in it rather than over it.
+  for(const e of this.ents){
+    if(e.type !== 'mov' || (!e.dx && !e.dy)) continue;
+    const ax = e.x0, ay = e.y0, bx = e.x0 + e.dx, by = e.y0 + e.dy;
+    const wid = Math.min(e.b.hw, e.b.hh) * 0.8 + 2;
+    g.save();
+    g.lineCap = 'round';
+    g.strokeStyle = 'rgba(0,0,0,0.28)'; g.lineWidth = wid*2;
+    g.beginPath(); g.moveTo(ax,ay); g.lineTo(bx,by); g.stroke();
+    g.strokeStyle = 'rgba(146,160,176,0.26)'; g.lineWidth = Math.max(1.2, wid*0.5);
+    g.beginPath(); g.moveTo(ax,ay); g.lineTo(bx,by); g.stroke();
+    for(const [sx,sy] of [[ax,ay],[bx,by]]){          // end stops
+      g.fillStyle = 'rgba(120,133,148,0.55)';
+      g.beginPath(); g.arc(sx, sy, wid*0.75, 0, TAU); g.fill();
+      rivet(g, sx, sy, 2.2, '#cfd8e2', '#2c3138');
     }
     g.restore();
   }
@@ -3725,8 +3888,7 @@ const LEVELS = [
   ['pend',520,120,18,240], ['s',640,420,180,20], ['s',300,300,200,20]]},
 
 {n:'Ice Slide', th:1, c:[86,560,-42], sh:3, tr:[1,2], tg:[[890,510,24]], o:[
-  ['i',480,380,420,18,14], ['s',760,470,22,120], ['s',860,545,180,20],
-  ['b',862,510,48,48]]},
+  ['i',480,380,420,18,14], ['s',600,500,22,120], ['s',860,545,180,20]]},
 
 {n:'Deep Well', th:1, c:[86,470,-16], sh:4, tr:[2,3], tg:[[800,588,26]], o:[
   ['w',86,510,140,20], ['s',690,400,22,440], ['s',900,400,22,440],
@@ -3855,7 +4017,7 @@ const LEVELS = [
 
 {n:'Saw and Switch', th:3, c:[86,560,-34], sh:5, tr:[3,4], tg:[[880,470,26]], o:[
   ['btn',400,596,1,60], ['mo',660,190,22,340], ['door',660,490,22,260,1,0,0,-280],
-  ['saw',480,470,28,8], ['mo',840,510,200,20]]},
+  ['saw',480,545,28,8], ['mo',840,510,200,20]]},
 
 {n:'Greenhouse Roof', th:3, c:[86,560,-60], sh:5, tr:[3,4], tg:[[820,110,24]], o:[
   ['g',620,240,240,22], ['g',860,240,180,22], ['mo',500,380,240,20],
@@ -4354,9 +4516,9 @@ const LEVELS = [
   ['w',886,516,160,22], ['w',796,470,20,114]]},
 
 {n:'Rivet Line', th:0, c:[86,560,-34], sh:5, tr:[3,4], tg:[[870,384,28]], o:[
-  ['w',300,190,20,340], ['w',300,560,20,124],
-  ['w',540,150,20,260], ['w',540,500,20,236],
-  ['w',760,190,20,340], ['w',760,560,20,124],
+  ['w',300,197,20,355], ['w',300,553,20,137],
+  ['w',540,161,20,283], ['w',540,515,20,205],
+  ['w',760,162,20,284], ['w',760,517,20,206],
   ['w',870,430,170,22]]},
 
 {n:'Sheet Ice', th:1, c:[86,560,-24], sh:5, tr:[3,4], tg:[[884,552,28]], o:[
@@ -5407,7 +5569,7 @@ function frame(now){
 requestAnimationFrame(frame);
 
 /* a small hook so the level set can be checked from outside the game */
-window.__flop = { Game, LEVELS, Level, Doll, World, Save, FX, THEMES };
+window.__flop = { Game, LEVELS, Level, Doll, World, Save, FX, THEMES, PERF };
 </script>
 </body>
 </html>
