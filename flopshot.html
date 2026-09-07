@@ -1816,7 +1816,16 @@ const Audio_ = {
       this.comp.ratio.value = 5; this.comp.attack.value = 0.004; this.comp.release.value = 0.19;
       this.master = ac.createGain(); this.master.gain.value = 0.92;
       this.comp.connect(this.master); this.master.connect(ac.destination);
-      this.sfxG  = ac.createGain(); this.sfxG.gain.value  = 0.95; this.sfxG.connect(this.comp);
+      // Effects run through a gentle tone stage. Raw noise bursts reaching
+      // the output with all their top end is what makes a synthesised game
+      // tiring to listen to; rolling off above 7k and below 90Hz keeps the
+      // hits present without the glare.
+      this.sfxTone = ac.createBiquadFilter();
+      this.sfxTone.type = 'lowpass'; this.sfxTone.frequency.value = 7200; this.sfxTone.Q.value = 0.4;
+      this.sfxLo = ac.createBiquadFilter();
+      this.sfxLo.type = 'highpass'; this.sfxLo.frequency.value = 90; this.sfxLo.Q.value = 0.5;
+      this.sfxG  = ac.createGain(); this.sfxG.gain.value  = 0.95;
+      this.sfxG.connect(this.sfxLo); this.sfxLo.connect(this.sfxTone); this.sfxTone.connect(this.comp);
       this.musicG= ac.createGain(); this.musicG.gain.value= 0.0;  this.musicG.connect(this.comp);
       this.ambG  = ac.createGain(); this.ambG.gain.value  = 0.0;  this.ambG.connect(this.comp);
       this.ready = true;
@@ -1867,6 +1876,31 @@ const Audio_ = {
     o.connect(g); g.connect(dest || this.sfxG);
     o.start(t); o.stop(t+dur+0.05);
   },
+  /* Impacts land on a pentatonic scale instead of wherever the random
+     number fell. A room full of tumbling wood then reads as a phrase
+     rather than a clatter, which is most of what makes a physics game
+     pleasant to listen to for more than a minute. */
+  PENTA: null,
+  snap(f){
+    if(!this.PENTA){
+      const out = [];
+      for(let o=-2;o<=3;o++) for(const st of [0,2,4,7,9]) out.push(261.63*Math.pow(2,o+st/12));
+      this.PENTA = out.sort((a,b)=>a-b);
+    }
+    const P = this.PENTA;
+    let best = P[0], bd = Math.abs(f-P[0]);
+    for(let i=1;i<P.length;i++){ const d = Math.abs(f-P[i]); if(d<bd){ bd=d; best=P[i]; } }
+    return best;
+  },
+  /* Nothing may retrigger faster than the ear wants it. A doll coming apart
+     down a staircase used to fire a dozen of the same hit inside a frame. */
+  gate(key, ms){
+    const t = this.now()*1000;
+    if(!this._g) this._g = {};
+    if(this._g[key] !== undefined && t - this._g[key] < ms) return false;
+    this._g[key] = t; return true;
+  },
+
   /* a struck metal partial stack */
   clang(t, base, vol, dur){
     const parts = [1, 2.76, 5.40, 8.93];
@@ -1880,64 +1914,73 @@ const Audio_ = {
     if(!this.ready||!this.on) return;
     const t = this.now();
     // steam release, then the shot, then the breech
-    this.hit(t, 0.34, 2600, 0.7, 0.16, 'highpass');
-    this.hit(t+0.01, 0.42, 420 + power*160, 0.6, 0.85, 'lowpass', null, 90);
-    this.osc(t+0.01, 190 + power*70, 38, 0.40, 0.55, 'triangle');
+    this.hit(t, 0.30, 1900, 0.7, 0.10, 'bandpass');
+    this.hit(t+0.01, 0.42, 420 + power*160, 0.6, 0.66, 'lowpass', null, 90);
+    this.osc(t+0.01, 190 + power*70, 38, 0.40, 0.44, 'triangle');
     this.osc(t+0.01, 92, 30, 0.52, 0.42, 'sine');
     this.clang(t+0.05, 240, 0.10, 0.30);
-    this.hit(t+0.16, 0.55, 1500, 0.5, 0.10, 'bandpass', null, 500);
+    this.hit(t+0.16, 0.50, 1100, 0.5, 0.07, 'lowpass', null, 400);
   },
   squeak(v){
     if(!this.ready||!this.on) return;
-    const t = this.now(), vol = clamp(v, 0.04, 0.30);
-    const f0 = 900 + Math.random()*900;
-    this.osc(t, f0, f0*(0.45+Math.random()*0.5), 0.13+Math.random()*0.1, vol*0.5, 'sawtooth');
-    this.osc(t+0.02, f0*1.6, f0*0.9, 0.10, vol*0.22, 'square');
-    this.hit(t, 0.07, f0*1.4, 6, vol*0.30, 'bandpass');
+    if(!this.gate('sq', 135)) return;
+    // A sawtooth falling from 1.8kHz is a rodent, and grating by the tenth
+    // time. A triangle bending gently upward reads as the same cloth doll
+    // taking a knock, and stays likeable.
+    const t = this.now(), vol = clamp(v, 0.05, 0.30);
+    const f0 = this.snap(400 + Math.random()*360);
+    this.osc(t, f0, f0*1.48, 0.12, vol*0.90, 'triangle');
+    this.osc(t+0.012, f0*2, f0*2.5, 0.075, vol*0.26, 'sine');
   },
   splat(v){
     if(!this.ready||!this.on) return;
-    const t = this.now(), vol = clamp(v, 0.05, 0.85);
-    this.hit(t, 0.11, 900, 1.1, vol*0.55, 'lowpass', null, 180);
-    this.hit(t+0.01, 0.16, 2400, 0.8, vol*0.20, 'highpass', null, 900);
-    this.osc(t, 160, 60, 0.12, vol*0.28, 'triangle');
+    if(!this.gate('sp', 40)) return;
+    const t = this.now(), vol = clamp(v, 0.05, 0.7);
+    this.hit(t, 0.09, 640, 1.0, vol*0.58, 'lowpass', null, 150);
+    const f = this.snap(120 + Math.random()*90);
+    this.osc(t, f, f*0.6, 0.14, vol*0.46, 'sine');
   },
   thud(v, mat){
     if(!this.ready||!this.on) return;
+    if(!this.gate('t'+mat, 36)) return;
     const t = this.now(), vol = clamp(v, 0.03, 0.8);
+    const pk = (lo,hi)=>this.snap(lo + Math.random()*(hi-lo));
     if(mat==='stone'){
-      this.hit(t,0.10,520+Math.random()*260,2.4,vol*0.55,'bandpass');
-      this.osc(t,150,80,0.10,vol*0.32,'triangle');
+      const f = pk(118,196);
+      this.osc(t, f, f*0.72, 0.17, vol*0.74, 'sine');
+      this.osc(t, f*2, f*1.5, 0.09, vol*0.28, 'triangle');
+      this.hit(t, 0.06, 820, 1.0, vol*0.26, 'lowpass');
     } else if(mat==='metal' || mat==='brass'){
-      this.clang(t, 340+Math.random()*180, vol*0.5, 0.42);
-      this.hit(t,0.07,3200,1.6,vol*0.22,'highpass');
+      this.clang(t, pk(300,470), vol*0.70, 0.52);
+      this.hit(t, 0.05, 2200, 1.1, vol*0.16, 'bandpass');
     } else if(mat==='glass'){
       this.shatter(vol);
     } else if(mat==='cloth'){
       this.splat(vol*0.9);
     } else if(mat==='ice'){
-      this.hit(t,0.09,2600,2.0,vol*0.35,'bandpass');
-      this.osc(t,900,560,0.10,vol*0.18,'sine');
+      const f = pk(660,1100);
+      this.osc(t, f, f*0.84, 0.13, vol*0.40, 'sine');
+      this.osc(t, f*1.5, f*1.3, 0.08, vol*0.18, 'triangle');
     } else {                       // wood, the sound of this whole game
-      const f = 180 + Math.random()*120;
-      this.osc(t, f, f*0.55, 0.13, vol*0.42, 'triangle');
-      this.osc(t, f*2.4, f*1.5, 0.08, vol*0.18, 'sine');
-      this.hit(t, 0.08, 1400+Math.random()*700, 1.8, vol*0.30, 'bandpass');
+      const f = pk(150,310);
+      this.osc(t, f, f*0.64, 0.18, vol*0.74, 'triangle');
+      this.osc(t, f*2, f*1.45, 0.10, vol*0.26, 'sine');
+      this.hit(t, 0.05, 1000, 1.1, vol*0.24, 'lowpass');
     }
   },
   shatter(v){
     if(!this.ready||!this.on) return;
     const t = this.now(), vol = clamp(v||0.5,0.1,0.8);
-    this.hit(t, 0.30, 5200, 0.8, vol*0.45, 'highpass');
-    for(let i=0;i<7;i++){
-      const f = 1600 + Math.random()*4200;
-      this.osc(t + Math.random()*0.12, f, f*0.75, 0.10+Math.random()*0.14, vol*0.10, 'sine');
+    this.hit(t, 0.22, 4000, 0.8, vol*0.42, 'highpass');
+    for(let i=0;i<6;i++){                 // shards land on the scale too
+      const f = this.snap(1300 + Math.random()*2400);
+      this.osc(t + Math.random()*0.10, f, f*0.88, 0.11+Math.random()*0.13, vol*0.13, 'sine');
     }
   },
   boom(){
     if(!this.ready||!this.on) return;
     const t=this.now();
-    this.hit(t,0.70,300,0.5,0.9,'lowpass',null,55);
+    this.hit(t,0.70,300,0.5,0.74,'lowpass',null,55);
     this.hit(t,0.36,1800,0.7,0.34,'bandpass',null,400);
     this.osc(t,110,24,0.72,0.62,'sawtooth');
     this.osc(t,62,20,0.9,0.5,'sine');
@@ -1974,8 +2017,9 @@ const Audio_ = {
       this.osc(t+i*0.078, f*1.5, f*1.5, 0.34, 0.07, 'sine');
       this.osc(t+i*0.078, f*0.5, f*0.5, 0.5, 0.10, 'sine');
     });
-    this.hit(t+0.46, 0.6, 6000, 0.6, 0.10, 'highpass');
-    this.clang(t+0.47, 1046.5, 0.22, 1.4);
+    this.hit(t+0.46, 0.5, 3200, 0.6, 0.05, 'bandpass');
+    this.clang(t+0.47, 1046.5, 0.20, 1.6);
+    this.clang(t+0.52, 1568.0, 0.10, 1.3);
   },
   // a cup has just slipped out of reach. Two notes down, soft enough to
   // inform without scolding -- nothing has been lost that a retry cannot fix.
@@ -1990,21 +2034,22 @@ const Audio_ = {
   click(){
     if(!this.ready||!this.on) return;
     const t=this.now();
-    this.hit(t,0.04,2600,3,0.20,'bandpass');
-    this.clang(t, 620, 0.10, 0.14);
+    this.hit(t,0.03,1500,2,0.12,'lowpass');
+    this.clang(t, 784, 0.15, 0.17);
   },
   tick(){ if(!this.ready||!this.on) return; this.hit(this.now(),0.028,1700,4,0.07,'bandpass'); },
   gear(sp){
     if(!this.ready||!this.on) return;
-    const t=this.now(), v=clamp(sp*0.028, 0.02, 0.10);
-    this.clang(t, 120 + Math.random()*70, v, 0.34);
-    this.hit(t, 0.06, 700, 2.2, v*0.7, 'bandpass');
+    if(!this.gate('gr', 90)) return;
+    const t=this.now(), v=clamp(sp*0.024, 0.015, 0.075);
+    this.clang(t, this.snap(118 + Math.random()*60), v, 0.38);
+    this.hit(t, 0.05, 560, 1.6, v*0.5, 'lowpass');
   },
   hum(){
     if(!this.ready||!this.on) return;
     const t=this.now();
-    this.osc(t, 780+Math.random()*260, 520, 0.13, 0.030, 'sawtooth');
-    this.hit(t, 0.10, 4200, 1.4, 0.022, 'highpass');
+    this.osc(t, this.snap(620+Math.random()*220), 480, 0.16, 0.024, 'triangle');
+    this.hit(t, 0.09, 2600, 1.2, 0.014, 'bandpass');
   },
   collapse(){
     if(!this.ready||!this.on) return;
@@ -5559,7 +5604,7 @@ function frame(now){
 requestAnimationFrame(frame);
 
 /* a small hook so the level set can be checked from outside the game */
-window.__flop = { Game, LEVELS, Level, Doll, World, Save, FX, THEMES, PERF };
+window.__flop = { Game, LEVELS, Level, Doll, World, Save, FX, THEMES, PERF, Audio };
 </script>
 </body>
 </html>
