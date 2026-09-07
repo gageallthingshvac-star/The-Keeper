@@ -154,6 +154,7 @@ class Body {
     this.fixed   = !!o.fixed;
     this.sensor  = !!o.sensor;
     this.friction= o.friction !== undefined ? o.friction : 0.5;
+    this.fric    = o.fric;                     // explicit override, beats the material
     this.rest    = o.rest     !== undefined ? o.rest     : 0.04;
     this.linDamp = o.linDamp  !== undefined ? o.linDamp  : 0.10;
     this.angDamp = o.angDamp  !== undefined ? o.angDamp  : 0.20;
@@ -404,7 +405,9 @@ class Arbiter {
     this.A=A; this.B=B;
     this.nx=m.nx; this.ny=m.ny;
     this.contacts=m.contacts;
-    this.friction = Math.sqrt((MAT_FRICTION[A.mat]??A.friction) * (MAT_FRICTION[B.mat]??B.friction));
+    const fA = A.fric !== undefined ? A.fric : (MAT_FRICTION[A.mat]??A.friction);
+    const fB = B.fric !== undefined ? B.fric : (MAT_FRICTION[B.mat]??B.friction);
+    this.friction = Math.sqrt(fA * fB);
     this.rest = Math.max(A.rest, B.rest);
     this.touch = true;
     this.stamp = 0;
@@ -2307,10 +2310,14 @@ class Level {
     const wallMat = T.plank;
     const walls = this.def.walls === undefined ? 'lrtb' : this.def.walls;
     const th = 22;
-    if(walls.includes('b')) this.add({x:DW/2, y:DH-th/2, w:DW, h:th, fixed:true, mat:wallMat, tag:'wall'});
-    if(walls.includes('t')) this.add({x:DW/2, y:th/2,     w:DW, h:th, fixed:true, mat:wallMat, tag:'wall'});
-    if(walls.includes('l')) this.add({x:th/2, y:DH/2,     w:th, h:DH, fixed:true, mat:wallMat, tag:'wall'});
-    if(walls.includes('r')) this.add({x:DW-th/2, y:DH/2,  w:th, h:DH, fixed:true, mat:wallMat, tag:'wall'});
+    // A doll that hits the side of the room should slide down it rather than
+    // stick where it landed, and the same off the ceiling. The floor slides
+    // too, but less: it is where a doll is meant to come to rest.
+    const SIDE_FRIC = 0.10, FLOOR_FRIC = 0.22;
+    if(walls.includes('b')) this.add({x:DW/2, y:DH-th/2, w:DW, h:th, fixed:true, mat:wallMat, tag:'wall', fric:FLOOR_FRIC});
+    if(walls.includes('t')) this.add({x:DW/2, y:th/2,     w:DW, h:th, fixed:true, mat:wallMat, tag:'wall', fric:SIDE_FRIC});
+    if(walls.includes('l')) this.add({x:th/2, y:DH/2,     w:th, h:DH, fixed:true, mat:wallMat, tag:'wall', fric:SIDE_FRIC});
+    if(walls.includes('r')) this.add({x:DW-th/2, y:DH/2,  w:th, h:DH, fixed:true, mat:wallMat, tag:'wall', fric:SIDE_FRIC});
 
     for(const op of (this.def.o||[])){
       const k = op[0];
@@ -3095,6 +3102,14 @@ Level.prototype.collapse = function(){
     b.wake();
   }
   for(const d of this.dolls) d.each(p=>{ p.gscale = 0.6; p.canSleep = false; });
+  // The cannon and the marks are drawn, not simulated, so nothing in the
+  // world moves them and they used to sit there while the room fell away
+  // around them. They get their own fall: the same shove and twist, and the
+  // same gravity, applied to the coordinates they are drawn at.
+  const fall = o => { o.fvx = rnd(-70,70); o.fvy = rnd(-90,-20);
+                      o.fav = rnd(-2.6,2.6); o.frot = 0; o.fdx = 0; o.fdy = 0; };
+  fall(this.cannon);
+  for(const tg of this.targets) fall(tg);
   this.world.wakeAll();
   FX.kick(15);
   Audio.collapse();
@@ -3117,6 +3132,17 @@ Level.prototype.collapseStep = function(dt){
     FX.kick(9);
     Audio.thud(0.5,'wood');
   }
+  // the cannon and the marks fall on the same clock as the wreckage
+  const G = this.collapseT > 0.95 ? 0.85 : 0.6;
+  const drop = o => {
+    if(o.fvx === undefined) return;
+    o.fvy += 1580 * G * dt;
+    o.fdx += o.fvx * dt; o.fdy += o.fvy * dt;
+    o.frot += o.fav * dt;
+  };
+  drop(this.cannon);
+  for(const tg of this.targets) drop(tg);
+
   // dust rising off the wreck while it goes
   if(this.collapseT < 2.2 && Math.random() < dt*26){
     FX.add({ x:rnd(0,DW), y:rnd(DH*0.55,DH), vx:rnd(-30,30), vy:-rnd(10,60),
@@ -3831,7 +3857,9 @@ Level.prototype.draw = function(g, aim){
   // painted marks live on the world, under the objects
   g.drawImage(FX.decal, 0, 0);
 
-  for(const tg of this.targets) drawTarget(g, tg.x, tg.y, tg.r, t, tg.hit, tg.a);
+  for(const tg of this.targets)
+    drawTarget(g, tg.x + (tg.fdx||0), tg.y + (tg.fdy||0), tg.r, t, tg.hit,
+               tg.a + (tg.frot||0));
 
   for(const b of this.world.bodies){
     if(b.render==='btnbase' || b.dead) continue;
@@ -3860,7 +3888,17 @@ Level.prototype.draw = function(g, aim){
   for(const e of this.ents) if(e.type==='fan') drawFan(g,e,t);
   for(const e of this.ents) if(e.type==='water') drawWater(g,e,t,true);
 
-  drawCannon(g, this.cannon.x, this.cannon.y, this.cannon.a, this.cannon.recoil, this.cannon.charge, t);
+  const cn2 = this.cannon;
+  if(cn2.frot){                       // tumbling with the rest of the room
+    g.save();
+    g.translate(cn2.x + cn2.fdx, cn2.y + cn2.fdy);
+    g.rotate(cn2.frot);
+    g.translate(-cn2.x, -cn2.y);
+    drawCannon(g, cn2.x, cn2.y, cn2.a, cn2.recoil, cn2.charge, t);
+    g.restore();
+  } else {
+    drawCannon(g, cn2.x, cn2.y, cn2.a, cn2.recoil, cn2.charge, t);
+  }
 
   FX.draw(g);
 
