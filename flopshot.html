@@ -33,7 +33,7 @@ const DW = 960, DH = 640;                 // world is exactly one screen
 // every trajectory exactly where it was -- the same arc, the same landing,
 // simply taken a little more slowly -- which is what separates this from
 // weakening the cannon, and is why no room needed re-tuning for it.
-const SPEED = 0.86;
+const SPEED = 0.65;
 const DOLL_CAP = 12;                      // how deep the pile may get
 const JOINT_SLOP = 0.4;                   // joint error left uncorrected, px
 const JOINT_MAXBIAS = 1200;               // fastest a joint may heal, px/s
@@ -2305,6 +2305,20 @@ class Level {
 
   add(o){ const b = new Body(o); this.world.add(b); return b; }
 
+  /* the last three shots leave a sight behind them, oldest fading first */
+  addSight(x, y){
+    if(!this.sights) this.sights = [];
+    this.sights.push({ x, y, t:0 });
+    if(this.sights.length > 3) this.sights.shift();
+  }
+
+  addMarkBody(t){
+    if(t.body) return;
+    t.body = this.add({ shape:'circle', x:t.x, y:t.y, r:t.r*0.92,
+                        fixed:true, mat:'wood', tag:'mark' });
+    t.body.render = 'none';           // the mark is drawn by drawTarget
+  }
+
   build(){
     const L = this, W = this.world, T = THEMES[this.theme];
     const wallMat = T.plank;
@@ -2318,6 +2332,11 @@ class Level {
     if(walls.includes('t')) this.add({x:DW/2, y:th/2,     w:DW, h:th, fixed:true, mat:wallMat, tag:'wall', fric:SIDE_FRIC});
     if(walls.includes('l')) this.add({x:th/2, y:DH/2,     w:th, h:DH, fixed:true, mat:wallMat, tag:'wall', fric:SIDE_FRIC});
     if(walls.includes('r')) this.add({x:DW-th/2, y:DH/2,  w:th, h:DH, fixed:true, mat:wallMat, tag:'wall', fric:SIDE_FRIC});
+
+    // A mark is a painted board bolted to the room, so it stops a doll
+    // rather than letting it through. The body matches the radius the hit
+    // check uses, so contact and scoring agree.
+    for(const t of this.targets) this.addMarkBody(t);
 
     for(const op of (this.def.o||[])){
       const k = op[0];
@@ -2456,8 +2475,11 @@ class Level {
           const e = { type:'wheel', cx:op[1], cy:op[2], R, hl, segs, handles, spd, a:0 };
           this.ents.push(e);
           if(op[7]){
-            this.targets.push({ x:op[1], y:op[2]+R+hl*0.5, r:Math.round((op[7]===true?22:op[7])*TSCALE),
-                                hit:false, glow:0, oe:e, orad:R + hl*0.55, ophase:PI/2 });
+            const wt = { x:op[1], y:op[2]+R+hl*0.5, r:Math.round((op[7]===true?22:op[7])*TSCALE),
+                         hit:false, glow:0, oe:e, orad:R + hl*0.55, ophase:PI/2 };
+            this.targets.push(wt);
+            this.addMarkBody(wt);
+            wt.body.kinematic = true;
           }
           break;
         }
@@ -2717,6 +2739,9 @@ class Level {
   }
   killDoll(d, x, y){
     if(!d || d.gone) return;
+    // however a shot ends -- settled, off the edge, or on a saw -- it leaves
+    // a sight behind, since where it came apart is exactly the useful hint
+    if(d.markShot){ d.markShot = false; this.addSight(x||d.x, y||d.y); }
     FX.splat(x||d.x, y||d.y, 13, 'rgba(176,44,36,0.85)');
     FX.burst(x||d.x, y||d.y, 16, {col:'#b02c24',type:'drop',spMax:300,sizeMin:1.5,sizeMax:3.6,lifeMax:0.8});
     Audio.thud(0.6,'cloth');
@@ -2766,6 +2791,18 @@ class Level {
    energy into every contact the part held. Moving in step with the solver
    costs a few more assignments a frame and makes both problems go away. */
 Level.prototype.stepDrive = function(dt){
+  // a mark riding a wheel is a moving solid, so it travels with the solver
+  for(const t of this.targets){
+    if(!t.oe || t.frot !== undefined) continue;
+    const nx = t.oe.cx + Math.cos(t.oe.a + t.ophase) * t.orad;
+    const ny = t.oe.cy + Math.sin(t.oe.a + t.ophase) * t.orad;
+    if(t.body){
+      t.body.vx = (nx - t.body.x)/dt; t.body.vy = (ny - t.body.y)/dt;
+      t.body.x = nx; t.body.y = ny; t.body.sync();
+      this.wakeNear(t.body, 12);
+    }
+    t.x = nx; t.y = ny;
+  }
   for(const e of this.ents){
     if(e.frozen) continue;
     switch(e.type){
@@ -2961,6 +2998,8 @@ Level.prototype.update = function(dt){
     cn.x = m.x; cn.y = m.y + cn.dy;
   }
 
+  if(this.sights) for(const q of this.sights) q.t += dt;
+
   this.collapseStep(dt);
 
   /* --- post step bookkeeping --- */
@@ -2972,7 +3011,10 @@ Level.prototype.update = function(dt){
     for(const b of d.list){
       if(b.x > -260 && b.x < DW+260 && b.y < DH+320 && b.y > -700){ out = false; break; }
     }
-    if(out && !this.collapsed){ d.destroy(); this.dolls.splice(i,1); continue; }
+    if(out && !this.collapsed){
+      if(d.markShot) this.addSight(d.parts.torso.x, d.parts.torso.y);
+      d.destroy(); this.dolls.splice(i,1); continue;
+    }
     if(out) continue;
     const tp = d.parts.torso;
     const spd2 = Math.hypot(tp.vx, tp.vy);
@@ -2983,6 +3025,10 @@ Level.prototype.update = function(dt){
     }
     // a doll that comes to rest stops mattering
     if(d.asleep()) d.settled += dt; else d.settled = 0;
+    if(d.markShot && d.settled > 0.35){
+      d.markShot = false;
+      this.addSight(d.parts.torso.x, d.parts.torso.y);
+    }
   }
 
   /* Dolls are unlimited, so the pile is not. Once it gets deep, the oldest
@@ -3006,17 +3052,27 @@ Level.prototype.update = function(dt){
     d.destroy(); this.dolls.splice(old,1);
   }
 
-  /* --- marks that ride a wheel move with it --- */
-  for(const t of this.targets){
-    if(t.oe){
-      t.x = t.oe.cx + Math.cos(t.oe.a + t.ophase) * t.orad;
-      t.y = t.oe.cy + Math.sin(t.oe.a + t.ophase) * t.orad;
-    }
-  }
-
   /* --- target checks --- */
   for(const t of this.targets){
     if(t.hit){ t.glow = Math.min(1, t.glow + dt*3); continue; }
+    // Touching the board counts. Now that a mark is solid a doll is stopped
+    // at its face, which can sit just outside the proximity radius below --
+    // the shot plainly hit the thing and would not have scored.
+    let hit = false;
+    if(t.body){
+      for(const [,a] of W.arbs){
+        if((a.A === t.body && a.B.doll) || (a.B === t.body && a.A.doll)){ hit = true; break; }
+      }
+      if(hit){
+        t.hit = true;
+        FX.splat(t.x + rnd(-6,6), t.y + rnd(-6,6), t.r*0.42, 'rgba(176,44,36,0.75)');
+        FX.burst(t.x,t.y,26,{col:'#ffe9a8',spMax:340,sizeMin:2,sizeMax:5,lifeMax:0.9});
+        FX.add({x:t.x,y:t.y,vx:0,vy:0,life:0,max:0.6,size:t.r,col:'#fff0c0',type:'ring',rot:0,rv:0,g:0,drag:0});
+        FX.kick(7);
+        Audio.ding(this.targets.filter(q=>q.hit).length-1);
+        continue;
+      }
+    }
     for(const d of this.dolls){
       let hit = false;
       for(const b of d.list){
@@ -3059,6 +3115,10 @@ Level.prototype.fire = function(ang, power){
   const d = new Doll(this.world, mx, my, ang, Math.cos(ang)*speed, Math.sin(ang)*speed);
   this.dolls.push(d);
   this.used++;
+  // Where the last shots went, marked. The dotted arc used to do the aiming
+  // for the player before the shot; this tells them afterwards where it
+  // actually ended up, which is a hint they earned rather than a solution.
+  d.markShot = true;
   Awards.bump('fired');
   c.recoil = 1;
   if(c.rolls && c.mount){
@@ -3106,6 +3166,7 @@ Level.prototype.collapse = function(){
   // world moves them and they used to sit there while the room fell away
   // around them. They get their own fall: the same shove and twist, and the
   // same gravity, applied to the coordinates they are drawn at.
+  for(const t of this.targets){ if(t.body){ this.world.remove(t.body); t.body = null; } }
   const fall = o => { o.fvx = rnd(-70,70); o.fvy = rnd(-90,-20);
                       o.fav = rnd(-2.6,2.6); o.frot = 0; o.fdx = 0; o.fdy = 0; };
   fall(this.cannon);
@@ -3857,6 +3918,30 @@ Level.prototype.draw = function(g, aim){
   // painted marks live on the world, under the objects
   g.drawImage(FX.decal, 0, 0);
 
+  // sights left by earlier shots: big, plain, and fading out over ten seconds
+  if(this.sights) for(let i=0;i<this.sights.length;i++){
+    const q = this.sights[i];
+    const age = clamp(1 - q.t/10, 0, 1);
+    const fresh = (i + 1) / this.sights.length;
+    const a = age * (0.20 + 0.42*fresh);
+    if(a < 0.02) continue;
+    const R = 30, arm = 46;
+    g.save();
+    g.globalAlpha = a;
+    g.lineCap = 'butt';
+    for(const [col, lw] of [['rgba(12,8,4,0.9)', 5.5], ['rgba(232,238,244,0.95)', 2.6]]){
+      g.strokeStyle = col; g.lineWidth = lw;
+      g.beginPath(); g.arc(q.x, q.y, R, 0, TAU); g.stroke();
+      g.beginPath();
+      g.moveTo(q.x - arm, q.y); g.lineTo(q.x - R*0.42, q.y);
+      g.moveTo(q.x + R*0.42, q.y); g.lineTo(q.x + arm, q.y);
+      g.moveTo(q.x, q.y - arm); g.lineTo(q.x, q.y - R*0.42);
+      g.moveTo(q.x, q.y + R*0.42); g.lineTo(q.x, q.y + arm);
+      g.stroke();
+    }
+    g.restore();
+  }
+
   for(const tg of this.targets)
     drawTarget(g, tg.x + (tg.fdx||0), tg.y + (tg.fdy||0), tg.r, t, tg.hit,
                tg.a + (tg.frot||0));
@@ -3936,16 +4021,20 @@ const LEVELS = [
   ['w',86,230,150,20], ['s',420,300,300,20], ['s',680,440,300,20],
   ['s',300,470,22,120],
   ['s',420,266,48,48], ['s',680,406,48,48]]},
-{n:'Open Sights', th:0, c:[86,560,-32], sh:3, tr:[1,2], tg:[[828,588,28]], o:[]},
+{n:'Open Sights', th:0, c:[86,560,-32], sh:3, tr:[1,2], tg:[[828,588,28]], o:[
+  ['w',528,72,22,100]]},
 {n:'Low Beam', th:0, c:[86,560,-18], sh:3, tr:[1,2], tg:[[856,588,26]], o:[
   ['w',520,300,440,22]]},
 {n:'Wet Floor', th:1, c:[86,560,-30], sh:3, tr:[1,2], tg:[[880,470,26]], o:[
+  ['w',642,55,22,190],
   ['water',560,570,420,96], ['s',830,500,200,20], ['s',350,600,22,36],
   ['b',470,520,54,32]]},
 {n:'Seesaw', th:0, c:[86,560,-30], sh:3, tr:[1,2], tg:[[880,432,26]], o:[
+  ['w',656,60,22,190],
   ['see',560,470,240,14], ['w',830,470,190,20], ['b',470,430,40,40],
   ['b',630,436,44,44]]},
 {n:'Cellar Steps', th:1, c:[86,560,-34], sh:3, tr:[1,2], tg:[[860,410,26]], o:[
+  ['w',676,69,22,190],
   ['s',330,560,150,20], ['s',560,480,150,20], ['s',800,442,240,20],
   ['b',292,526,48,48], ['b',530,446,48,48]]},
 {n:'Blue Fire', th:0, c:[86,286,4], sh:3, tr:[1,2], tg:[[854,452,28]], o:[
@@ -3959,12 +4048,14 @@ const LEVELS = [
   ['w',86,510,140,20], ['w',660,470,22,320], ['w',760,300,220,20], ['w',680,608,180,20],
   ['b',826,592,48,48]]},
 {n:'Three Steps', th:0, c:[86,560,-40], sh:3, tr:[1,2], tg:[[840,300,26]], o:[
+  ['w',497,63,22,190],
   ['w',380,540,180,20], ['w',580,440,180,20], ['w',790,340,240,20],
   ['b',336,506,48,48], ['b',536,406,48,48]]},
 {n:'The Shelf', th:0, c:[86,560,-46], sh:3, tr:[1,2], tg:[[848,368,26]], o:[
   ['w',800,400,280,20], ['w',560,250,300,20],
   ['b',742,366,48,48], ['b',742,318,48,48]]},
 {n:'Crate Stack', th:0, c:[86,560,-24], sh:4, tr:[2,3], tg:[[880,588,26]], o:[
+  ['w',491,72,22,100],
   ['b',700,584,46,46], ['b',700,538,46,46], ['b',700,492,46,46],
   ['b',748,584,46,46], ['b',748,538,46,46]]},
 {n:'Angled Boards', th:0, c:[86,300,10], sh:4, tr:[2,3], tg:[[820,560,30,18]], o:[
@@ -3982,16 +4073,19 @@ const LEVELS = [
   ['w',297,402,21,476], ['w',796,288,19,246],
   ['w',616,600,656,80], ['w',874,530,190,20,-25]]},
 {n:'Heavy Ball', th:0, c:[86,560,-36], sh:4, tr:[2,3], tg:[[500,588,26]], o:[
+  ['w',294,60,22,190],
   ['w',760,420,300,20], ['ball',760,392,26,'stone'], ['w',620,540,22,140],
   ['w',330,470,22,280]]},
 {n:'On Wheels', th:0, c:[150,560,-30], cm:'w', sh:4, tr:[2,3], tg:[[880,300,28]], o:[
   ['bd',470,420,300,18,-22],
   ['w',880,346,180,22], ['b',600,588,60,60]]},
 {n:'Wormhole', th:2, c:[86,560,-26], sh:3, tr:[1,2], tg:[[860,300,26]], o:[
+  ['w',292,66,22,190],
   ['portal',420,470,780,240,0,0,30], ['m',600,300,22,340], ['m',860,340,180,20]]},
 {n:'Ice Slide', th:1, c:[86,560,-42], sh:3, tr:[1,2], tg:[[890,510,24]], o:[
   ['i',480,380,420,18,14], ['s',600,500,22,120], ['s',860,545,180,20]]},
 {n:'The Moat', th:1, c:[86,560,-38], sh:3, tr:[1,2], tg:[[878,478,26]], o:[
+  ['w',473,62,22,79],
   ['water',540,570,380,96], ['s',830,510,200,20], ['s',330,470,22,280],
   ['b',600,540,44,44],
   ['b',470,522,56,32], ['b',640,522,56,32]]},
@@ -4004,14 +4098,17 @@ const LEVELS = [
   ['m',860,600,160,20],
   ['blade',300,470,22,92,1,3.2]]},
 {n:'Spike Alley', th:1, c:[86,560,-40], sh:4, tr:[2,3], tg:[[880,420,26]], o:[
+  ['w',642,55,22,190],
   ['spike',430,600,180,26], ['spike',680,600,180,26], ['s',840,452,220,20],
   ['s',560,320,240,20]]},
 {n:'Stone Teeth', th:1, c:[86,560,-30], sh:4, tr:[2,3], tg:[[880,588,26]], o:[
+  ['w',577,503,22,230],
   ['s',380,180,22,290], ['s',480,600,22,290], ['s',600,180,22,290],
   ['s',700,600,22,290], ['s',800,180,22,290],
   ['b',336,592,48,48], ['b',336,544,48,48],
   ['pend',480,40,16,176]]},
 {n:'Updraft', th:2, c:[86,560,-14], sh:4, tr:[2,3], tg:[[820,180,26]], o:[
+  ['w',453,104,22,190],
   ['fan',600,400,180,420,-90,2100], ['m',820,220,200,20], ['m',420,430,200,20]]},
 {n:'The Lift', th:2, c:[86,560,-34], sh:4, tr:[2,3], tg:[[860,270,24]], o:[
   ['mov',520,470,150,20,0,-260,4], ['m',860,310,180,20], ['m',330,562,180,20]]},
@@ -4040,6 +4137,7 @@ const LEVELS = [
   ['w',86,350,150,20], ['rope',560,120,9,26,22,'stone'],
   ['mo',700,440,240,20], ['mo',350,470,200,20]]},
 {n:'Greenhouse Floor', th:3, c:[86,300,8], sh:4, tr:[2,3], tg:[[840,560,28]], o:[
+  ['w',534,70,22,100],
   ['mo',120,352,150,18], ['mo',460,300,20,300], ['mo',680,470,20,300],
   ['mo',840,608,200,24]]},
 {n:'Glass House', th:2, c:[86,560,-24], sh:4, tr:[2,3], tg:[[820,470,26]], o:[
@@ -4049,6 +4147,7 @@ const LEVELS = [
   ['rope',480,60,8,26], ['mo',700,400,200,20], ['mo',860,580,180,20],
   ['mo',300,440,180,20]]},
 {n:'Mossbank', th:3, c:[86,560,-30], sh:4, tr:[2,3], tg:[[858,560,28]], o:[
+  ['w',577,503,22,230],
   ['mo',560,600,26,40], ['b',560,556,80,80,0], ['b',560,476,80,80,0],
   ['b',644,556,80,80,0], ['b',644,476,80,80,0],
   ['mo',300,340,200,20], ['mo',858,608,200,24], ['mo',764,556,20,124]]},
@@ -4059,10 +4158,12 @@ const LEVELS = [
   ['MS',538,388,66,66], ['MS',538,322,66,66],
   ['mo',856,604,200,28]]},
 {n:'Bounce Garden', th:3, c:[86,560,-50], sh:4, tr:[2,3], tg:[[890,300,24]], o:[
+  ['w',505,59,22,190],
   ['rub',400,470,160,20], ['rub',640,360,160,20], ['bump',520,220,26],
   ['mo',870,340,180,20],
   ['b',400,436,44,44], ['b',640,326,44,44]]},
 {n:'The Canopy', th:3, c:[86,560,-56], sh:4, tr:[2,3], tg:[[520,152,26]], o:[
+  ['w',275,136,22,228],
   ['mo',360,470,22,300], ['mo',740,360,240,20], ['mo',520,110,150,18],
   ['balloon',464,300,20,240]]},
 {n:'Portal Loop', th:2, c:[86,560,-20], sh:4, tr:[2,3], tg:[[500,180,26]], o:[
@@ -4079,6 +4180,7 @@ const LEVELS = [
   ['m',880,510,200,20], ['m',300,220,180,20],
   ['b',300,178,48,48]]},
 {n:'Regulator', th:2, c:[86,560,-28], sh:6, tr:[3,5], tg:[[880,240,28]], o:[
+  ['w',468,80,22,190],
   ['spring',420,490,116,80,150], ['C',420,606,96,60],
   ['spring',640,430,116,80,150], ['C',640,546,96,120],
   ['m',880,286,170,22]]},
@@ -4086,6 +4188,7 @@ const LEVELS = [
   ['btn',430,596,1,60], ['m',660,288,22,536], ['door',660,588,22,66,1,0,0,-76],
   ['m',430,330,220,20]]},
 {n:'The Press', th:2, c:[86,560,-30], sh:5, tr:[3,4], tg:[[860,588,26]], o:[
+  ['w',683,72,22,190],
   ['mov',620,200,220,26,0,300,3], ['m',480,470,22,300], ['m',760,470,22,300],
   ['m',760,300,22,120]]},
 {n:'Verdigris', th:3, c:[86,560,-28], sh:4, tr:[2,3], tg:[[866,556,28]], o:[
@@ -4100,12 +4203,15 @@ const LEVELS = [
   ['tnt',490,596,44,44], ['tnt',700,596,44,44],
   ['s',880,604,160,28]]},
 {n:'Balloon Room', th:3, c:[86,560,-34], sh:4, tr:[2,3], tg:[[860,300,26]], o:[
+  ['w',486,492,22,252],
   ['balloon',420,420,20,160], ['balloon',560,338,20,250], ['balloon',680,462,20,140],
   ['mo',860,340,180,20], ['mo',300,300,180,20]]},
 {n:'Powder Keg', th:4, c:[86,560,-30], sh:4, tr:[2,3], tg:[[880,588,26]], o:[
+  ['w',491,72,22,100],
   ['tnt',600,596,40,40], ['s',700,470,22,300], ['s',480,300,240,20],
   ['b',520,592,48,48], ['b',676,592,48,48]]},
 {n:'Cinder', th:4, c:[86,560,-30], sh:5, tr:[3,4], tg:[[874,392,28]], o:[
+  ['w',669,66,22,190],
   ['lava',420,600,180,40], ['lava',660,500,60,240],
   ['tnt',540,596,44,44],
   ['s',874,440,180,22]]},
@@ -4116,10 +4222,12 @@ const LEVELS = [
   ['g',520,470,300,22], ['tnt',520,428,40,40], ['s',700,540,22,160],
   ['s',860,600,180,20], ['s',330,300,220,20]]},
 {n:'Chlorophyll', th:3, c:[86,560,-30], sh:5, tr:[3,4], tg:[[870,392,28]], o:[
+  ['w',549,141,22,237],
   ['MS',480,586,64,64], ['MS',480,522,64,64],
   ['goo',640,470,180,20],
   ['mo',870,440,180,22], ['mo',300,260,180,20]]},
 {n:'Tap Hole', th:4, c:[86,560,-32], sh:6, tr:[3,5], tg:[[868,470,28]], o:[
+  ['w',460,75,22,105],
   ['lava',430,500,60,240], ['lava',650,500,60,240],
   ['tnt',540,596,44,44], ['saw',540,420,26,9],
   ['s',868,516,180,22], ['s',776,470,20,114]]},
@@ -4136,6 +4244,7 @@ const LEVELS = [
   ['saw',420,500,28,8], ['saw',620,400,28,-8],
   ['s',864,346,180,22], ['s',300,240,180,20]]},
 {n:'Runout', th:4, c:[86,560,-34], sh:6, tr:[3,5], tg:[[868,240,28]], o:[
+  ['w',643,103,22,161],
   ['lava',420,600,180,40], ['lava',640,470,60,300],
   ['tnt',500,596,44,44],
   ['s',868,286,180,22], ['s',300,240,180,20]]},
@@ -4154,6 +4263,7 @@ const LEVELS = [
   ['portal',860,470,300,120,0,0,28], ['water',760,560,340,110],
   ['s',300,240,200,20], ['s',600,470,22,300]]},
 {n:'The Slot', th:0, c:[86,560,-26], sh:4, tr:[2,3], tg:[[870,588,26]], o:[
+  ['w',463,556,22,125],
   ['w',520,170,22,280], ['w',520,570,22,100], ['w',700,350,22,270],
   ['rotor',610,300,24,74,2,-3.0]]},
 {n:'Tin Whistle', th:0, c:[86,560,-30], sh:4, tr:[2,3], tg:[[860,392,28]], o:[
@@ -4201,9 +4311,9 @@ const LEVELS = [
   ['b',330,392,58,58], ['b',640,296,58,58],
   ['s',856,440,200,20], ['s',760,400,20,100],
   ['balloon',480,330,24,190]]},
-{n:'Pressed Type', th:6, c:[120,240,12], sh:4, tr:[2,3], tg:[[600,452,22],[684,452,22]], o:[
+{n:'Pressed Type', th:6, c:[120,240,12], sh:4, tr:[2,3], tg:[[600,360,22],[700,452,22]], o:[
   ['P',120,300,160,26],
-  ['P',642,232,150,120], ['P',642,352,150,120],
+  ['P',642,232,150,120],
   ['P',642,560,170,130]]},
 {n:'Cold Store', th:0, c:[70,372,-6], sh:4, tr:[2,3], tg:[[640,552,28]], o:[
   ['C',70,448,72,72], ['C',70,558,110,148],
@@ -4525,7 +4635,7 @@ const LEVELS = [
 {n:'Anvil', th:0, c:[86,560,-28], sh:5, tr:[3,4], tg:[[886,556,28]], o:[
   ['B',480,584,60,60], ['B',480,524,60,60], ['B',480,464,60,60],
   ['w',660,220,20,400], ['w',886,604,160,28]]},
-{n:'The Flue', th:1, c:[86,560,-52], sh:5, tr:[3,4], tg:[[790,556,28]], o:[
+{n:'The Flue', th:1, c:[86,560,-52], sh:5, tr:[3,4], tg:[[790,486,28]], o:[
   ['s',680,430,22,390], ['s',900,430,22,390],
   ['s',870,240,120,18], ['ib',790,588,60,60]]},
 {n:'Ladle', th:4, c:[86,560,-46], sh:6, tr:[3,5], tg:[[790,300,28]], o:[
@@ -4926,24 +5036,6 @@ const Game = {
       if(this.aiming || this.hint > 0){
         const showA = this.aiming ? this.aimA : C.a;
         const showP = this.aiming ? this.aimP : 0.75;
-        if(Save.data.guide !== false){
-          // Just the first stretch out of the barrel. A full arc drawn to
-          // the wall does the aiming for the player; a short lead says which
-          // way and how hard and leaves the rest of the shot to them.
-          const pts = L.previewArc(showA, showP, 26);
-          g.save();
-          for(let i=3;i<pts.length;i+=4){
-            const f = 1 - i/pts.length;          // fades out rather than stopping
-            const r = 3.2*(0.40+f*0.70);
-            g.globalAlpha = (0.26 + f*0.46) * 0.55;
-            g.fillStyle = '#1a1004';
-            g.beginPath(); g.arc(pts[i].x, pts[i].y+1, r+1.2, 0, TAU); g.fill();
-            g.globalAlpha = 0.22 + f*0.52;
-            g.fillStyle = '#ffe6b0';
-            g.beginPath(); g.arc(pts[i].x, pts[i].y, r, 0, TAU); g.fill();
-          }
-          g.restore();
-        }
         // laser sight: a straight beam from the muzzle to the first thing it meets
         if(Save.data.laser){
           const mx2 = C.x + Math.cos(showA)*46, my2 = C.y + Math.sin(showA)*46;
@@ -4975,15 +5067,17 @@ const Game = {
       if(this.aiming){
         const x = IN.x, y = IN.y;
         g.save(); g.lineCap='butt';
+        // bigger than it was: with the dotted arc gone this is the only
+        // thing on screen saying where the shot is pointed
         const cross = ()=>{
-          g.beginPath(); g.arc(x,y,21,0,TAU); g.stroke();
+          g.beginPath(); g.arc(x,y,31,0,TAU); g.stroke();
           g.beginPath();
-          g.moveTo(x-58,y); g.lineTo(x-27,y); g.moveTo(x+27,y); g.lineTo(x+58,y);
-          g.moveTo(x,y-58); g.lineTo(x,y-27); g.moveTo(x,y+27); g.lineTo(x,y+58);
+          g.moveTo(x-86,y); g.lineTo(x-40,y); g.moveTo(x+40,y); g.lineTo(x+86,y);
+          g.moveTo(x,y-86); g.lineTo(x,y-40); g.moveTo(x,y+40); g.lineTo(x,y+86);
           g.stroke();
         };
-        g.strokeStyle='rgba(20,14,6,0.45)'; g.lineWidth=4.5; cross();
-        g.strokeStyle='rgba(240,238,230,0.92)'; g.lineWidth=2.2; cross();
+        g.strokeStyle='rgba(20,14,6,0.50)'; g.lineWidth=6.5; cross();
+        g.strokeStyle='rgba(240,238,230,0.94)'; g.lineWidth=3.0; cross();
         g.restore();
       }
     }
