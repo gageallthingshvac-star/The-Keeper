@@ -853,7 +853,8 @@ const THREATS = [
   }},
 { id: "cluster", min: 26, w: 6, make(s){
     const links = 4, span = 108;
-    const parts = [];
+    // the bar between the links is a real collider, not just a drawn line
+    const parts = [{ x1: -span / 2, y1: 0, x2: span / 2, y2: 0, r: 4.5 }];
     for (let i = 0; i < links; i++){
       const off = -span / 2 + i * (span / (links - 1));
       parts.push({ x1: off, y1: 0, x2: off, y2: 0, r: 12 });
@@ -1007,7 +1008,7 @@ function spawnFormation(rng, d, tier){
   const gx = clamp(VW / 2 + (rng() - 0.5) * 150, 26, VW - 26);
   for (let i = 0; i < 4; i++){
     G.picks.push({ x: gx + (rng() - 0.5) * 18, y: s.y - 210 - i * 26,
-                   kind: "gem", t: rng() * TAU, dead: false, vy: s.fall });
+                   kind: "gem", r: 11, t: rng() * TAU, dead: false, vy: s.fall });
     G.gemsPlaced++;
   }
   G.genCount++;
@@ -1073,7 +1074,7 @@ function spawnWave(){
   if (G.genCount % 7 === 5 && rng() < 0.8){
     const kind = PW_KINDS[(rng() * PW_KINDS.length) | 0];
     G.picks.push({ x: clamp(40 + rng() * (VW - 80), 30, VW - 30), y: G.cam.y - 80,
-                   kind, t: 0, dead: false, vy: def.fall * 0.4 + 8 });
+                   kind, r: 15, t: 0, dead: false, vy: def.fall * 0.4 + 8 });
   }
 
   const gapBase = endless ? Math.max(46, 128 - G.climbed / 54) : lerp(def.gapStart, def.gapEnd, t);
@@ -1116,20 +1117,39 @@ function shieldLen(){
    Where you put it, and how fast you are already moving when contact
    happens, is the entire game. */
 const SHIELD_R = 74;
-const SHG = { cx: 0, cy: 0, a0: 0, half: 0, pts: [{x:0,y:0},{x:0,y:0},{x:0,y:0},{x:0,y:0}] };
+const mkPose = () => ({ cx: 0, cy: 0, a0: 0, half: 0,
+                        pts: [{x:0,y:0},{x:0,y:0},{x:0,y:0},{x:0,y:0}] });
+const SHG = mkPose();
+function shieldGeomAt(x, y, ang, len, out){
+  const nx = Math.sin(ang), ny = -Math.cos(ang);        // "up" out of the dome
+  out.cx = x - nx * SHIELD_R;
+  out.cy = y - ny * SHIELD_R;
+  out.half = len / SHIELD_R;
+  out.a0 = Math.atan2(y - out.cy, x - out.cx);
+  for (let i = 0; i <= 3; i++){
+    const a = out.a0 - out.half + (out.half * 2) * i / 3;
+    out.pts[i].x = out.cx + Math.cos(a) * SHIELD_R;
+    out.pts[i].y = out.cy + Math.sin(a) * SHIELD_R;
+  }
+  return out;
+}
 function shieldGeom(){
   const sh = G.sh;
-  const nx = Math.sin(sh.ang), ny = -Math.cos(sh.ang);   // "up" out of the dome
-  SHG.cx = sh.x - nx * SHIELD_R;
-  SHG.cy = sh.y - ny * SHIELD_R;
-  SHG.half = sh.len / SHIELD_R;
-  SHG.a0 = Math.atan2(sh.y - SHG.cy, sh.x - SHG.cx);
-  for (let i = 0; i <= 3; i++){
-    const a = SHG.a0 - SHG.half + (SHG.half * 2) * i / 3;
-    SHG.pts[i].x = SHG.cx + Math.cos(a) * SHIELD_R;
-    SHG.pts[i].y = SHG.cy + Math.sin(a) * SHIELD_R;
+  return shieldGeomAt(sh.x, sh.y, sh.ang, sh.len, SHG);
+}
+/* A shield whipped across the screen must not step over a rock between two
+   frames. Rather than quietly fattening its hitbox — which would make it hit
+   things it visibly misses — it is tested at its true size along the path it
+   actually travelled. */
+const POSES = [mkPose(), mkPose(), mkPose(), mkPose(), mkPose()];
+let poseN = 1;
+function buildPoses(sh, px, py, pang){
+  const dist = Math.hypot(sh.x - px, sh.y - py);
+  poseN = clamp(Math.ceil(dist / 10), 1, POSES.length);
+  for (let i = 0; i < poseN; i++){
+    const t = poseN === 1 ? 1 : i / (poseN - 1);
+    shieldGeomAt(lerp(px, sh.x, t), lerp(py, sh.y, t), lerp(pang, sh.ang, t), sh.len, POSES[i]);
   }
-  return SHG;
 }
 // a slow crosswind so arrivals never fall in perfectly straight lines
 function windAt(y){
@@ -1251,6 +1271,8 @@ function step(dt){
   sh.ang += (sh.tang - sh.ang) * Math.min(1, dt * 11);
   sh.len = shieldLen();
   const shg = shieldGeom();
+  buildPoses(sh, prevX, prevY, sh.pang === undefined ? sh.ang : sh.pang);
+  sh.pang = sh.ang;
 
   // --- send in the next arrivals
   if (playing) spawnCheck();
@@ -1272,37 +1294,37 @@ function step(dt){
     for (let j = i + 1; j < LIVE.length; j++)
       solidPair(LIVE[i], LIVE[j]);
 
-  // a shield whipped across the screen must not pass through anything: thicken
-  // it by how far it travelled this frame
-  const sweep = Math.min(20, Math.hypot(sh.x - prevX, sh.y - prevY) * 0.5);
   for (let i = 0; i < LIVE.length; i++){
     const o = LIVE[i];
     for (let j = 0; j < o.wp.length; j++){
       const w = o.wp[j];
       // --- the shield turns it away
       if (playing || G.state === "clear"){
-        const trueMin = sh.r + w.r;         // where the two surfaces actually meet
-        const testMin = trueMin + sweep;    // widened only so a fast sweep cannot skip past
+        const trueMin = sh.r + w.r;         // exactly where the drawn edges meet
         let d = 1e9;
-        for (let k = 0; k < 3; k++){
-          const dd = segSegDist(shg.pts[k].x, shg.pts[k].y, shg.pts[k + 1].x, shg.pts[k + 1].y,
-                                w.x1, w.y1, w.x2, w.y2, _sdTmp);
-          if (dd < d){ d = dd; _sd.ax = _sdTmp.ax; _sd.ay = _sdTmp.ay; _sd.bx = _sdTmp.bx; _sd.by = _sdTmp.by; }
+        for (let pi = 0; pi < poseN; pi++){
+          const g = POSES[pi];
+          let dp = 1e9;
+          for (let k = 0; k < 3; k++){
+            const dd = segSegDist(g.pts[k].x, g.pts[k].y, g.pts[k + 1].x, g.pts[k + 1].y,
+                                  w.x1, w.y1, w.x2, w.y2, _sdTmp);
+            if (dd < dp){ dp = dd; _sd.ax = _sdTmp.ax; _sd.ay = _sdTmp.ay; _sd.bx = _sdTmp.bx; _sd.by = _sdTmp.by; }
+          }
+          d = dp;
+          if (d < trueMin) break;           // earliest point on the sweep that touched
         }
-        if (d < testMin){
+        if (d < trueMin){
           let nx = _sd.bx - _sd.ax, ny = _sd.by - _sd.ay;
           let nl = Math.hypot(nx, ny);
           if (nl < 1e-4){ nx = 0; ny = -1; nl = 1; }
           nx /= nl; ny /= nl;
-          const pen = Math.max(0, trueMin - d);
+          const pen = trueMin - d;
           const inv = 1 / o.mass;
           o.x += nx * pen * inv * 1.1;
           o.y += ny * pen * inv * 1.1;
-          // a fast sweep hits far harder than a parked shield, and a shove
-          // landed from the far edge of the sweep lands softer
+          // a fast sweep hits far harder than a parked shield does
           const rel = sh.vx * nx + sh.vy * ny;
-          const closeness = clamp(1 - Math.max(0, d - trueMin) / (sweep + 6), 0, 1);
-          const imp = (Math.max(0, rel) * 0.5 + pen * 10 + 30) * closeness;
+          const imp = Math.max(0, rel) * 0.5 + pen * 10 + 30;
           o.vx += nx * imp * inv;
           o.vy += ny * imp * inv;
           o.home = 0;                       // knocked off its lock
@@ -1334,7 +1356,7 @@ function step(dt){
       // --- or it reaches the balloon
       if (playing && b.alive){
         const bd = ptSegDist(b.x, b.y, w.x1, w.y1, w.x2, w.y2) - w.r;
-        if (bd < b.r * 0.84){
+        if (bd < b.r){
           const nx = (b.x - _cp.x), ny = (b.y - _cp.y);
           const nl = Math.hypot(nx, ny) || 1;
           takeHit(o, nx / nl, ny / nl);
@@ -1367,7 +1389,7 @@ function step(dt){
       const dx = sh.x - p.x, dy = sh.y - p.y, dd = Math.hypot(dx, dy) || 1;
       p.x += dx / dd * 420 * sdt; p.y += dy / dd * 420 * sdt;
     }
-    if (playing && near < sh.r + 13){
+    if (playing && near < sh.r + (p.r || 11)){
       p.dead = true;
       if (p.kind === "gem"){
         G.gems++; G.bonus += 12;
@@ -1652,13 +1674,49 @@ function drawLand(bm){
 }
 
 /* --------------------------------------------------------- foreground */
+/* Every drawn shape stops exactly at its collider radius: the outline is laid
+   *inside* r, never around it, so what you see is what you can hit. */
 function capsule(x1, y1, x2, y2, r, col){
   ctx.strokeStyle = col;
-  ctx.lineWidth = r * 2;
+  ctx.lineWidth = Math.max(0.5, r * 2);
   ctx.beginPath();
   ctx.moveTo(x1, y1);
   ctx.lineTo(x2, y2);
   ctx.stroke();
+}
+// solid body with a hard edge, both contained within radius r
+function capsuleSolid(x1, y1, x2, y2, r, fill, edge, edgeW){
+  capsule(x1, y1, x2, y2, r, edge);
+  if (r > edgeW) capsule(x1, y1, x2, y2, r - edgeW, fill);
+}
+// traces the capsule's true boundary, inset so the stroke's outer edge lands
+// exactly on r rather than straddling it
+function capsuleOutline(x1, y1, x2, y2, r, col, lw){
+  const rr = Math.max(0.4, r - lw / 2);
+  const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy);
+  ctx.strokeStyle = col;
+  ctx.lineWidth = lw;
+  ctx.beginPath();
+  if (L > 1e-6){
+    const a = Math.atan2(dy, dx);
+    const nx = -dy / L * rr, ny = dx / L * rr;      // left-hand normal
+    ctx.moveTo(x1 + nx, y1 + ny);
+    ctx.lineTo(x2 + nx, y2 + ny);
+    ctx.arc(x2, y2, rr, a + Math.PI / 2, a + Math.PI * 1.5);   // round the far cap
+    ctx.lineTo(x1 - nx, y1 - ny);
+    ctx.arc(x1, y1, rr, a + Math.PI * 1.5, a + Math.PI * 2.5); // and back round the near one
+  } else {
+    ctx.arc(x1, y1, rr, 0, TAU);
+  }
+  ctx.closePath();
+  ctx.stroke();
+}
+// a band lying just inside the radius, for warnings and hit flashes. Stroking
+// the centre line would paint a stripe down the middle instead, so this lays
+// the colour at full width and punches the body back in over it.
+function capsuleRing(x1, y1, x2, y2, r, col, w, inner){
+  capsule(x1, y1, x2, y2, r, col);
+  if (r > w) capsule(x1, y1, x2, y2, r - w, inner);
 }
 function drawObstacles(){
   const ink = inkNow();
@@ -1666,9 +1724,18 @@ function drawObstacles(){
   for (const o of G.obst){
     if (o.y + o.rad < top || o.y - o.rad > bot) continue;
     const heavy = o.mass >= 3.2;
-    // anything still on course gets a red edge and a line drawn to where it
-    // is going. The balloon cannot move, so what is aimed at it is the only
-    // information that matters.
+    const edgeW = heavy ? 4 : 3;
+
+    // shadow, offset so it never reads as part of the shape
+    ctx.globalAlpha = 0.1;
+    for (const w of o.wp) capsule(w.x1, w.y1 + 4, w.x2, w.y2 + 4, w.r, "#0a1030");
+    ctx.globalAlpha = 1;
+
+    // the body: solid white, hard dark edge, both inside the collider
+    for (const w of o.wp) capsuleSolid(w.x1, w.y1, w.x2, w.y2, w.r, "#ffffff", ink, edgeW);
+
+    // still on course: a red band inside the same radius, and a line to where
+    // it is going
     let onCourse = 0;
     if (G.state === "play"){
       const dy = G.bal.y - o.y;
@@ -1679,7 +1746,10 @@ function drawObstacles(){
       }
     }
     if (onCourse){
-      ctx.globalAlpha = 0.16 + onCourse * 0.34;
+      ctx.globalAlpha = 0.25 + onCourse * 0.6;
+      for (const w of o.wp)
+        capsuleRing(w.x1, w.y1, w.x2, w.y2, w.r, "#ef5f6b", Math.min(edgeW * 1.8, w.r), "#ffffff");
+      ctx.globalAlpha = 0.14 + onCourse * 0.3;
       ctx.strokeStyle = "#ef5f6b";
       ctx.lineWidth = 1.6;
       ctx.setLineDash([5, 7]);
@@ -1688,69 +1758,61 @@ function drawObstacles(){
       ctx.lineTo(G.bal.x, G.bal.y);
       ctx.stroke();
       ctx.setLineDash([]);
-      ctx.globalAlpha = 0.2 + onCourse * 0.45;
-      for (const w of o.wp) capsule(w.x1, w.y1, w.x2, w.y2, w.r + 3.5, "#ef5f6b");
       ctx.globalAlpha = 1;
     }
-    // shadow
-    ctx.globalAlpha = 0.13;
-    for (const w of o.wp) capsule(w.x1, w.y1 + 5, w.x2, w.y2 + 5, w.r, "#0a1030");
-    ctx.globalAlpha = 1;
-    // flash halo when the shield connects
+    // struck this instant: the edge lights up, still inside the radius
     if (o.flash > 0.01){
-      ctx.globalAlpha = o.flash * 0.5;
-      for (const w of o.wp) capsule(w.x1, w.y1, w.x2, w.y2, w.r + 4, "#ffffff");
+      ctx.globalAlpha = o.flash * 0.85;
+      for (const w of o.wp)
+        capsuleRing(w.x1, w.y1, w.x2, w.y2, w.r, "#ffd166", Math.min(edgeW * 1.8, w.r), "#ffffff");
       ctx.globalAlpha = 1;
     }
-    const body = heavy ? mix2(ink, "rgb(255,255,255)", 0.14) : ink;
-    for (const w of o.wp) capsule(w.x1, w.y1, w.x2, w.y2, w.r, body);
-    // inner light
-    ctx.globalAlpha = 0.16;
-    for (const w of o.wp) capsule(w.x1, w.y1 - w.r * 0.34, w.x2, w.y2 - w.r * 0.34, w.r * 0.34, "#ffffff");
-    ctx.globalAlpha = 1;
-    // rivets mark the heavy ones: they need a running start to move
+    // a thin dark edge goes back on last, so a warning or a flash never eats
+    // the outline that tells you where the thing actually ends
+    if (onCourse || o.flash > 0.01){
+      ctx.globalAlpha = 0.55;
+      for (const w of o.wp) capsuleOutline(w.x1, w.y1, w.x2, w.y2, w.r, ink, 1.6);
+      ctx.globalAlpha = 1;
+    }
+
+    // heavy pieces carry rivets, so you can see what will not move for you
     if (heavy){
-      ctx.fillStyle = "rgba(255,255,255,.34)";
+      ctx.fillStyle = ink;
       for (const w of o.wp){
-        const steps = Math.max(1, Math.floor(Math.hypot(w.x2 - w.x1, w.y2 - w.y1) / 34));
+        const len = Math.hypot(w.x2 - w.x1, w.y2 - w.y1);
+        const steps = Math.max(1, Math.floor(len / 34));
         for (let i = 0; i <= steps; i++){
           const t = steps ? i / steps : 0.5;
           ctx.beginPath();
-          ctx.arc(lerp(w.x1, w.x2, t), lerp(w.y1, w.y2, t), 1.9, 0, TAU);
+          ctx.arc(lerp(w.x1, w.x2, t), lerp(w.y1, w.y2, t), Math.min(2.4, w.r * 0.28), 0, TAU);
           ctx.fill();
         }
       }
     }
-    // per-style ornaments
-    if (o.style === "hub" || o.style === "pivot"){
-      ctx.fillStyle = body;
-      ctx.beginPath(); ctx.arc(o.x, o.y, 11, 0, TAU); ctx.fill();
-      ctx.fillStyle = "rgba(255,255,255,.75)";
-      ctx.beginPath(); ctx.arc(o.x, o.y, 4, 0, TAU); ctx.fill();
+
+    // per-style detail, all of it inside the collider
+    if (o.style === "hub"){
+      const hr = o.wp[0].r;                       // exactly the arm's own radius
+      ctx.fillStyle = ink;
+      ctx.beginPath(); ctx.arc(o.x, o.y, hr, 0, TAU); ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath(); ctx.arc(o.x, o.y, hr * 0.42, 0, TAU); ctx.fill();
     } else if (o.style === "saw"){
-      const w = o.wp[0];
-      const teeth = 10, R = w.r;
-      ctx.fillStyle = body;
+      // teeth cut inward from the rim: the tips sit exactly on the collider
+      const w = o.wp[0], R = w.r, teeth = 9;
+      ctx.fillStyle = ink;
       ctx.beginPath();
       for (let i = 0; i < teeth * 2; i++){
         const a = o.ang + i / (teeth * 2) * TAU;
-        const rr = i % 2 ? R + 6 : R;
+        const rr = i % 2 ? R : R - Math.min(7, R * 0.34);
         const px = o.x + Math.cos(a) * rr, py = o.y + Math.sin(a) * rr;
         i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
       }
       ctx.closePath(); ctx.fill();
-      ctx.fillStyle = "rgba(255,255,255,.28)";
-      ctx.beginPath(); ctx.arc(o.x, o.y, R * 0.42, 0, TAU); ctx.fill();
-    } else if (o.style === "orb"){
-      ctx.fillStyle = "rgba(255,255,255,.22)";
-      const w = o.wp[0];
-      ctx.beginPath(); ctx.arc(w.x1 - w.r * 0.3, w.y1 - w.r * 0.34, w.r * 0.34, 0, TAU); ctx.fill();
-    } else if (o.style === "chain"){
-      const first = o.wp[0], last = o.wp[o.wp.length - 1];
-      ctx.globalAlpha = 0.85;
-      capsule(first.x1, first.y1, last.x1, last.y1, 3.5, body);
-      ctx.globalAlpha = 1;
-      for (const w of o.wp) capsule(w.x1, w.y1, w.x2, w.y2, w.r, body);
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath(); ctx.arc(o.x, o.y, R * 0.5, 0, TAU); ctx.fill();
+      ctx.strokeStyle = ink; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(o.x, o.y, R * 0.5, 0, TAU); ctx.stroke();
     }
   }
 }
@@ -1758,48 +1820,44 @@ function drawPickups(){
   for (const p of G.picks){
     if (p.dead) continue;
     if (p.y < G.cam.y - 60 || p.y > G.cam.y + VH + 60) continue;
+    const R = p.r || 11;
     const bobY = Math.sin(p.t * 2.4) * 3;
+    ctx.save();
+    ctx.translate(p.x, p.y + bobY);
     if (p.kind === "gem"){
-      const s = 8;
-      ctx.save();
-      ctx.translate(p.x, p.y + bobY);
-      ctx.rotate(Math.sin(p.t * 1.6) * 0.25);
-      ctx.fillStyle = "rgba(124,92,255,.28)";
-      ctx.beginPath(); ctx.arc(0, 0, s * 1.7, 0, TAU); ctx.fill();
-      ctx.fillStyle = "#7c5cff";
+      ctx.rotate(Math.sin(p.t * 1.6) * 0.2);
+      // the diamond's points sit exactly on the pick-up radius
       ctx.beginPath();
-      ctx.moveTo(0, -s * 1.25); ctx.lineTo(s, -s * 0.15); ctx.lineTo(0, s * 1.25); ctx.lineTo(-s, -s * 0.15);
-      ctx.closePath(); ctx.fill();
-      ctx.fillStyle = "rgba(255,255,255,.6)";
+      ctx.moveTo(0, -R); ctx.lineTo(R * 0.72, 0); ctx.lineTo(0, R); ctx.lineTo(-R * 0.72, 0);
+      ctx.closePath();
+      ctx.fillStyle = "#7c5cff"; ctx.fill();
+      ctx.strokeStyle = "#2f3475"; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,.55)";
       ctx.beginPath();
-      ctx.moveTo(0, -s * 1.25); ctx.lineTo(s * 0.42, -s * 0.15); ctx.lineTo(0, s * 0.2); ctx.lineTo(-s * 0.42, -s * 0.15);
+      ctx.moveTo(0, -R * 0.72); ctx.lineTo(R * 0.34, 0); ctx.lineTo(0, R * 0.3); ctx.lineTo(-R * 0.34, 0);
       ctx.closePath(); ctx.fill();
-      ctx.restore();
     } else {
       const col = { bubble: "#7ad7f0", slow: "#9d8cff", magnet: "#ef8fa8", wide: "#ffd166" }[p.kind];
-      ctx.save();
-      ctx.translate(p.x, p.y + bobY);
-      ctx.globalAlpha = 0.3;
-      ctx.fillStyle = col;
-      ctx.beginPath(); ctx.arc(0, 0, 22 + Math.sin(p.t * 3) * 2, 0, TAU); ctx.fill();
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = col;
-      ctx.beginPath(); ctx.arc(0, 0, 14, 0, TAU); ctx.fill();
-      ctx.strokeStyle = "#ffffff"; ctx.fillStyle = "#ffffff"; ctx.lineWidth = 2.4;
+      ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU);
+      ctx.fillStyle = col; ctx.fill();
+      ctx.strokeStyle = "#2f3475"; ctx.lineWidth = 2.4; ctx.stroke();
+      ctx.strokeStyle = "#ffffff"; ctx.fillStyle = "#ffffff"; ctx.lineWidth = 2.2;
       if (p.kind === "bubble"){
-        ctx.beginPath(); ctx.arc(0, 0, 7, 0, TAU); ctx.stroke();
+        ctx.beginPath(); ctx.arc(0, 0, R * 0.46, 0, TAU); ctx.stroke();
       } else if (p.kind === "slow"){
-        ctx.beginPath(); ctx.arc(0, 0, 7, 0, TAU); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(0, -4); ctx.lineTo(0, 0); ctx.lineTo(4, 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(0, 0, R * 0.46, 0, TAU); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, -R * 0.3); ctx.lineTo(0, 0); ctx.lineTo(R * 0.28, R * 0.14); ctx.stroke();
       } else if (p.kind === "magnet"){
-        ctx.beginPath(); ctx.arc(0, 1, 6, Math.PI, 0); ctx.stroke();
-        ctx.fillRect(-8, 1, 4, 6); ctx.fillRect(4, 1, 4, 6);
+        ctx.beginPath(); ctx.arc(0, R * 0.08, R * 0.4, Math.PI, 0); ctx.stroke();
+        ctx.fillRect(-R * 0.55, R * 0.08, R * 0.28, R * 0.42);
+        ctx.fillRect(R * 0.27, R * 0.08, R * 0.28, R * 0.42);
       } else {
-        ctx.beginPath(); ctx.moveTo(-8, 0); ctx.lineTo(8, 0); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(-8, -4); ctx.lineTo(-8, 4); ctx.moveTo(8, -4); ctx.lineTo(8, 4); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-R * 0.55, 0); ctx.lineTo(R * 0.55, 0); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-R * 0.55, -R * 0.3); ctx.lineTo(-R * 0.55, R * 0.3);
+        ctx.moveTo(R * 0.55, -R * 0.3); ctx.lineTo(R * 0.55, R * 0.3); ctx.stroke();
       }
-      ctx.restore();
     }
+    ctx.restore();
   }
 }
 function drawParticles(){
@@ -1837,25 +1895,23 @@ function drawParticles(){
 }
 const FONT = '"Nunito",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
 
+/* The balloon is judged as a circle of radius r, so nothing about it is drawn
+   past that line — the knot tucks inside and only the thread hangs below. */
 function drawBalloon(x, y, r, skin, phase, alpha){
   ctx.save();
   ctx.translate(x, y);
   ctx.globalAlpha = alpha === undefined ? 1 : alpha;
-  const sway = Math.sin(phase * 1.6) * 0.06;
-  ctx.rotate(sway);
-  // string
-  ctx.strokeStyle = "rgba(255,255,255,.85)";
-  ctx.lineWidth = 1.6;
+  ctx.rotate(Math.sin(phase * 1.6) * 0.05);
+  // thread (decoration only — it cannot be hit)
+  ctx.strokeStyle = "rgba(255,255,255,.7)";
+  ctx.lineWidth = 1.4;
   ctx.beginPath();
-  ctx.moveTo(0, r * 1.15);
-  ctx.quadraticCurveTo(Math.sin(phase * 2.2) * 8, r * 2.1, Math.sin(phase * 1.4) * 6, r * 3.1);
+  ctx.moveTo(0, r * 0.97);
+  ctx.quadraticCurveTo(Math.sin(phase * 2.2) * 7, r * 1.7, Math.sin(phase * 1.4) * 5, r * 2.4);
   ctx.stroke();
-  // body
+  // body: an ellipse whose extreme point sits exactly on r
   ctx.beginPath();
-  ctx.moveTo(0, -r * 1.12);
-  ctx.bezierCurveTo(r * 1.15, -r * 1.06, r * 1.1, r * 0.42, 0, r * 1.16);
-  ctx.bezierCurveTo(-r * 1.1, r * 0.42, -r * 1.15, -r * 1.06, 0, -r * 1.12);
-  ctx.closePath();
+  ctx.ellipse(0, 0, r * 0.93, r, 0, 0, TAU);
   if (skin.pat === "grad"){
     const g = ctx.createLinearGradient(0, -r, 0, r);
     g.addColorStop(0, skin.accent); g.addColorStop(1, skin.body);
@@ -1866,44 +1922,58 @@ function drawBalloon(x, y, r, skin, phase, alpha){
   ctx.clip();
   if (skin.pat === "stripe"){
     ctx.fillStyle = skin.accent;
-    for (let i = -2; i <= 2; i++) ctx.fillRect(i * r * 0.56 - r * 0.13, -r * 1.4, r * 0.26, r * 3);
+    for (let i = -2; i <= 2; i++) ctx.fillRect(i * r * 0.5 - r * 0.11, -r * 1.2, r * 0.22, r * 2.4);
   } else if (skin.pat === "dot"){
     ctx.fillStyle = skin.accent;
     for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++){
-      ctx.beginPath(); ctx.arc(i * r * 0.62, j * r * 0.62 + (i % 2 ? r * 0.2 : 0), r * 0.16, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.arc(i * r * 0.55, j * r * 0.55, r * 0.15, 0, TAU); ctx.fill();
     }
   } else if (skin.pat === "star"){
     ctx.fillStyle = skin.accent;
     for (let i = 0; i < 7; i++){
-      const sx = (hash2(i, 3) - 0.5) * r * 2, sy = (hash2(i, 9) - 0.5) * r * 2.2;
-      ctx.beginPath(); ctx.arc(sx, sy, 1.4 + hash2(i, 4) * 1.2, 0, TAU); ctx.fill();
+      ctx.beginPath();
+      ctx.arc((hash2(i, 3) - 0.5) * r * 1.6, (hash2(i, 9) - 0.5) * r * 1.8,
+              1.2 + hash2(i, 4) * 1.1, 0, TAU);
+      ctx.fill();
     }
   }
-  ctx.restore();
-  // highlight + knot
-  ctx.fillStyle = "rgba(255,255,255,.34)";
-  ctx.beginPath(); ctx.ellipse(-r * 0.36, -r * 0.4, r * 0.24, r * 0.4, -0.4, 0, TAU); ctx.fill();
+  // knot, tucked inside the line
   ctx.fillStyle = skin.pat === "grad" ? skin.body : skin.accent;
   ctx.beginPath();
-  ctx.moveTo(-r * 0.16, r * 1.1); ctx.lineTo(r * 0.16, r * 1.1); ctx.lineTo(0, r * 1.34);
+  ctx.moveTo(-r * 0.15, r * 0.78); ctx.lineTo(r * 0.15, r * 0.78); ctx.lineTo(0, r * 0.99);
   ctx.closePath(); ctx.fill();
+  ctx.restore();
+  // hard edge on the inside of r, so its true size is unmistakable
+  ctx.strokeStyle = "rgba(124,92,255,.85)";
+  ctx.lineWidth = 2.4;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, r * 0.93 - 1.2, r - 1.2, 0, 0, TAU);
+  ctx.stroke();
+  ctx.fillStyle = "rgba(255,255,255,.3)";
+  ctx.beginPath(); ctx.ellipse(-r * 0.32, -r * 0.34, r * 0.2, r * 0.34, -0.4, 0, TAU); ctx.fill();
   ctx.restore();
 }
 function drawShield(){
-  const sh = G.sh, g = shieldGeom();
-  const a1 = g.a0 - g.half, a2 = g.a0 + g.half;
-  const arc = (r, col, alpha) => {
+  const sh = G.sh;
+  const arcAt = (g, r, col, alpha) => {
     ctx.globalAlpha = alpha;
     ctx.strokeStyle = col;
-    ctx.lineWidth = r * 2;
+    ctx.lineWidth = Math.max(0.5, r * 2);
     ctx.beginPath();
-    ctx.arc(g.cx, g.cy, SHIELD_R, a1, a2);
+    ctx.arc(g.cx, g.cy, SHIELD_R, g.a0 - g.half, g.a0 + g.half);
     ctx.stroke();
     ctx.globalAlpha = 1;
   };
-  arc(sh.r + 7, "#ffffff", 0.22);
-  arc(sh.r, "#ffffff", 1);
-  arc(sh.r * 0.38, G.pw.wide > 0 ? "#ffd166" : "#cfe9f5", 0.55);
+  // where it swept this frame is where it could hit, so show that too
+  if (poseN > 1){
+    for (let i = 0; i < poseN - 1; i++){
+      arcAt(POSES[i], sh.r, "#ffffff", 0.1 + 0.12 * (i / poseN));
+    }
+  }
+  const g = shieldGeom();
+  const edge = G.pw.wide > 0 ? "#ffb02e" : "#7c5cff";
+  arcAt(g, sh.r, edge, 1);                 // hard edge, exactly the collider
+  arcAt(g, sh.r - 2.6, "#ffffff", 1);      // solid white core, inside it
 }
 function drawFinish(){
   if (G.def.endless){
@@ -1962,11 +2032,9 @@ function render(){
     if (G.bal.alive){
       const skin = SKIN_BY_ID(save.skin);
       if (G.pw.bubble > 0){
-        ctx.strokeStyle = "rgba(160,230,255,.85)";
-        ctx.lineWidth = 2.5;
-        ctx.beginPath(); ctx.arc(G.bal.x, G.bal.y, G.bal.r + 9 + Math.sin(G.T * 4) * 1.5, 0, TAU); ctx.stroke();
-        ctx.fillStyle = "rgba(160,230,255,.16)";
-        ctx.beginPath(); ctx.arc(G.bal.x, G.bal.y, G.bal.r + 9, 0, TAU); ctx.fill();
+        ctx.strokeStyle = "rgba(120,215,240,.9)";
+        ctx.lineWidth = 3 + Math.sin(G.T * 4) * 0.6;
+        ctx.beginPath(); ctx.arc(G.bal.x, G.bal.y, G.bal.r - 1.5, 0, TAU); ctx.stroke();
       }
       const blink = G.bal.inv > 0 && Math.floor(G.T * 14) % 2 === 0 ? 0.4 : 1;
       drawBalloon(G.bal.x, G.bal.y, G.bal.r, skin, G.bal.bob, blink);
