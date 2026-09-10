@@ -891,7 +891,8 @@ const G = {
   mode: "level", def: levelDef(1), rng: mulberry32(1),
   obst: [], picks: [], parts: [],
   bal: { x: VW / 2, y: 0, vx: 0, r: 13, bob: 0, alive: true, inv: 0 },
-  sh:  { sx: VW / 2, sy: 0, x: VW / 2, y: 0, px: VW / 2, py: 0, vx: 0, vy: 0, ang: 0, tang: 0, len: 34, r: 7 },
+  sh:  { sx: VW / 2, sy: 0, tsx: VW / 2, tsy: 0, x: VW / 2, y: 0,
+         vx: 0, vy: 0, ang: 0, tang: 0, pang: 0, len: 34, r: 7 },
   cam: { y: 0, shake: 0, shx: 0, shy: 0 },
   pw:  { bubble: 0, slow: 0, magnet: 0, wide: 0 },
   T: 0, timeScale: 1, slowT: 0,
@@ -1094,8 +1095,9 @@ function startRun(mode, n){
   G.obst.length = 0; G.picks.length = 0; G.parts.length = 0;
   G.bal.x = VW / 2; G.bal.y = 0; G.bal.vx = 0; G.bal.alive = true; G.bal.inv = 0; G.bal.bob = 0;
   G.cam.y = -VH * 0.66; G.cam.shake = 0;
-  G.sh.sx = VW / 2; G.sh.sy = VH * 0.78; G.sh.px = VW / 2; G.sh.py = G.cam.y + G.sh.sy;
-  G.sh.vx = 0; G.sh.vy = 0; G.sh.ang = 0; G.sh.tang = 0;
+  G.sh.sx = VW / 2; G.sh.sy = VH * 0.62;
+  G.sh.tsx = G.sh.sx; G.sh.tsy = G.sh.sy;
+  G.sh.vx = 0; G.sh.vy = 0; G.sh.ang = 0; G.sh.tang = 0; G.sh.pang = 0;
   G.pw.bubble = save.opts.assist ? 1 : 0; G.pw.slow = 0; G.pw.magnet = 0; G.pw.wide = 0;
   G.T = 0; G.timeScale = 1; G.slowT = 0;
   G.score = 0; G.bonus = 0; G.gems = 0; G.hits = 0; G.combo = 0; G.comboT = 0; G.energy = 0; G.lastBump = -1;
@@ -1141,11 +1143,14 @@ function shieldGeom(){
    frames. Rather than quietly fattening its hitbox — which would make it hit
    things it visibly misses — it is tested at its true size along the path it
    actually travelled. */
-const POSES = [mkPose(), mkPose(), mkPose(), mkPose(), mkPose()];
+const SHIELD_STEP_MAX = 56;          // furthest the shield travels in one frame
+const POSE_SPACING = 7;              // and the gap between swept samples
+const POSES = [];
+for (let i = 0; i < Math.ceil(SHIELD_STEP_MAX / POSE_SPACING) + 2; i++) POSES.push(mkPose());
 let poseN = 1;
 function buildPoses(sh, px, py, pang){
   const dist = Math.hypot(sh.x - px, sh.y - py);
-  poseN = clamp(Math.ceil(dist / 10), 1, POSES.length);
+  poseN = clamp(Math.ceil(dist / POSE_SPACING) + 1, 1, POSES.length);
   for (let i = 0; i < poseN; i++){
     const t = poseN === 1 ? 1 : i / (poseN - 1);
     shieldGeomAt(lerp(px, sh.x, t), lerp(py, sh.y, t), lerp(pang, sh.ang, t), sh.len, POSES[i]);
@@ -1259,10 +1264,18 @@ function step(dt){
     cam.shy = (Math.random() - 0.5) * cam.shake;
   } else { cam.shx = cam.shy = 0; }
 
-  // --- shield follows the finger in *screen* space
+  // --- the shield chases where your thumb has pushed it, in screen space.
+  // The step is bounded so it can never travel further in one frame than the
+  // swept collision test below covers — that is what stops a hard flick
+  // passing clean through something.
   const prevX = sh.x, prevY = sh.y;
-  sh.sy = clamp(sh.sy, 30, VH - 24);
-  sh.sx = clamp(sh.sx, 6, VW - 6);
+  sh.tsx = clamp(sh.tsx, 6, VW - 6);
+  sh.tsy = clamp(sh.tsy, 30, VH - 24);
+  const wantX = sh.tsx - sh.sx, wantY = sh.tsy - sh.sy;
+  const wantD = Math.hypot(wantX, wantY);
+  const maxStep = SHIELD_STEP_MAX;
+  if (wantD > maxStep){ sh.sx += wantX / wantD * maxStep; sh.sy += wantY / wantD * maxStep; }
+  else { sh.sx = sh.tsx; sh.sy = sh.tsy; }
   sh.x = sh.sx;
   sh.y = cam.y + sh.sy;
   sh.vx = dt > 0 ? clamp((sh.x - prevX) / dt, -2400, 2400) : 0;
@@ -2053,8 +2066,8 @@ function render(){
     ctx.fillStyle = "#ffffff";
     ctx.font = "800 14px " + FONT;
     ctx.textAlign = "center";
-    ctx.fillText("Drag the shield anywhere on screen", VW / 2, VH * 0.80);
-    ctx.fillText("The balloon cannot dodge — block for it", VW / 2, VH * 0.80 + 20);
+    ctx.fillText("Drag anywhere: the shield moves with your thumb,", VW / 2, VH * 0.80);
+    ctx.fillText("not to it. The balloon cannot dodge — block for it.", VW / 2, VH * 0.80 + 20);
     ctx.globalAlpha = 1;
   }
 }
@@ -2086,33 +2099,43 @@ requestAnimationFrame(frame);
 
 /* -------------------------------------------------------------- input */
 const rectOf = () => cv.getBoundingClientRect();
-function toVirtual(clientX, clientY, touch){
+/* Relative control. Putting a thumb down does not summon the shield — it stays
+   exactly where you left it, and from then on it travels the same distance
+   your thumb does. Lift, reposition, carry on: the shield does not move while
+   nothing is touching it. */
+const drag = { id: null, lastX: 0, lastY: 0 };
+function toUnits(dxPx, dyPx){
   const r = rectOf();
-  return {
-    x: clamp((clientX - r.left) / r.width * VW, 0, VW),
-    y: clamp((clientY - r.top) / r.height * VH - (touch ? 30 : 0), 0, VH)
-  };
-}
-let activeId = null;
-function pointerTo(e, touch){
-  const v = toVirtual(e.clientX, e.clientY, touch);
-  G.sh.sx = v.x; G.sh.sy = v.y;
+  return { x: dxPx / r.width * VW, y: dyPx / r.height * VH };
 }
 cv.addEventListener("pointerdown", e => {
   Audio2.unlock();
   if (G.state !== "play") return;
-  activeId = e.pointerId;
+  drag.id = e.pointerId;
+  drag.lastX = e.clientX;
+  drag.lastY = e.clientY;
   try { cv.setPointerCapture(e.pointerId); } catch (err){}
-  pointerTo(e, e.pointerType !== "mouse");
   e.preventDefault();
 }, { passive: false });
 cv.addEventListener("pointermove", e => {
-  if (G.state !== "play") return;
-  if (e.pointerType === "mouse"){ pointerTo(e, false); return; }
-  if (activeId === e.pointerId) pointerTo(e, true);
+  if (G.state !== "play" || drag.id !== e.pointerId) return;
+  const d = toUnits(e.clientX - drag.lastX, e.clientY - drag.lastY);
+  drag.lastX = e.clientX;
+  drag.lastY = e.clientY;
+  G.sh.tsx = clamp(G.sh.tsx + d.x, 6, VW - 6);
+  G.sh.tsy = clamp(G.sh.tsy + d.y, 30, VH - 24);
+  e.preventDefault();
 }, { passive: false });
-cv.addEventListener("pointerup", e => { if (activeId === e.pointerId) activeId = null; });
-cv.addEventListener("pointercancel", () => { activeId = null; });
+function endDrag(e){
+  if (drag.id === e.pointerId){
+    drag.id = null;
+    // whatever the shield has not caught up with yet is dropped, so it never
+    // drifts on after your thumb has stopped
+    G.sh.tsx = G.sh.sx; G.sh.tsy = G.sh.sy;
+  }
+}
+cv.addEventListener("pointerup", endDrag);
+cv.addEventListener("pointercancel", endDrag);
 document.addEventListener("touchmove", e => { if (G.state === "play") e.preventDefault(); }, { passive: false });
 
 const keys = Object.create(null);
@@ -2137,10 +2160,10 @@ window.addEventListener("keyup", e => { keys[e.key.toLowerCase()] = false; });
   requestAnimationFrame(keyLoop);
   if (G.state !== "play") return;
   const sp = 7.5;
-  if (keys.arrowleft || keys.a) G.sh.sx -= sp;
-  if (keys.arrowright || keys.d) G.sh.sx += sp;
-  if (keys.arrowup || keys.w) G.sh.sy -= sp;
-  if (keys.arrowdown || keys.s) G.sh.sy += sp;
+  if (keys.arrowleft || keys.a) G.sh.tsx -= sp;
+  if (keys.arrowright || keys.d) G.sh.tsx += sp;
+  if (keys.arrowup || keys.w) G.sh.tsy -= sp;
+  if (keys.arrowdown || keys.s) G.sh.tsy += sp;
 })();
 
 document.addEventListener("visibilitychange", () => {
