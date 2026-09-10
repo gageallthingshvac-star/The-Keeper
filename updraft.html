@@ -234,6 +234,54 @@
   .skin small{position:absolute;bottom:5px;left:0;right:0;font-size:9px;color:var(--ink-soft)}
   .skin svg{width:56%;height:56%}
 
+  .stage-chip{
+    position:absolute;top:calc(104px + var(--safe-t));left:0;right:0;text-align:center;
+    font-size:12px;letter-spacing:1.6px;text-transform:uppercase;
+    color:rgba(255,255,255,.92);text-shadow:0 1px 2px rgba(24,40,70,.35);
+  }
+  .stage-banner{
+    position:absolute;top:38%;left:0;right:0;text-align:center;
+    opacity:0;transform:translateY(8px);transition:opacity .3s ease, transform .3s ease;
+    pointer-events:none;
+  }
+  .stage-banner.on{opacity:1;transform:none}
+  .stage-banner b{
+    display:block;font-size:13px;letter-spacing:3.4px;text-transform:uppercase;
+    color:rgba(255,255,255,.85);
+  }
+  .stage-banner span{
+    display:block;font-size:clamp(28px,9vw,40px);color:#fff;letter-spacing:-.5px;
+    text-shadow:0 3px 0 rgba(47,52,117,.2);
+  }
+  .bar-wrap{
+    position:absolute;left:50%;transform:translateX(-50%);
+    bottom:calc(18px + var(--safe-b));display:flex;flex-direction:column;align-items:center;gap:6px;
+  }
+  .bar-wrap .bar{position:static;transform:none}
+  .bar-label{font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:rgba(255,255,255,.9)}
+  .brief{
+    background:var(--panel);border-radius:26px;box-shadow:var(--shadow);
+    padding:22px 20px;width:min(400px,90vw);display:flex;flex-direction:column;gap:11px;
+    max-height:88vh;
+    animation:pop .22s ease both;
+  }
+  .brief-eyebrow{margin:0;font-size:12px;letter-spacing:2.4px;text-transform:uppercase;color:var(--ink-soft)}
+  .brief-title{margin:0;font-size:clamp(24px,7vw,32px);line-height:1.05;letter-spacing:-.5px}
+  .brief-body{margin:0;font-size:14px;line-height:1.5;color:var(--ink-soft);font-weight:800}
+  .brief-body b{color:var(--ink)}
+  .brief-stages{display:flex;flex-direction:column;gap:6px;margin:2px 0 4px;
+    max-height:34vh;overflow-y:auto;overscroll-behavior:contain}
+  .brief-stage{
+    display:flex;align-items:center;gap:10px;font-size:13px;
+    background:rgba(255,255,255,.5);border-radius:12px;padding:8px 12px;
+  }
+  .brief-stage i{
+    width:22px;height:22px;flex:0 0 22px;border-radius:50%;
+    background:#fff;border:2.5px solid var(--ink);display:grid;place-items:center;
+  }
+  .brief-stage i svg{width:14px;height:14px;stroke:var(--ink);fill:none;stroke-width:2.2}
+  .brief-stage b{font-weight:900}
+  .brief-stage span{margin-left:auto;color:var(--ink-soft);font-size:11px;letter-spacing:1.2px}
   .toast{
     position:absolute;left:50%;top:22%;transform:translateX(-50%);
     background:rgba(47,52,117,.9);color:#fff;padding:10px 18px;border-radius:99px;
@@ -267,7 +315,12 @@
     </div>
     <div id="scoreBig">0</div>
     <div id="comboTag"></div>
-    <div class="bar"><i id="progFill"></i></div>
+    <div id="stageChip" class="stage-chip">Stage 1 of 4 · Drifters</div>
+    <div id="stageBanner" class="stage-banner"><b></b><span></span></div>
+    <div class="bar-wrap">
+      <div class="bar-label"><span id="progPct">0%</span> to the top</div>
+      <div class="bar"><i id="progFill"></i></div>
+    </div>
     <button id="burstBtn" aria-label="Burst">
       <svg viewBox="0 0 24 24"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg>
     </button>
@@ -334,6 +387,9 @@
   <!-- ================= PAUSE ================= -->
   <div class="screen veil" id="scr-pause">
     <h2 class="title" style="font-size:clamp(28px,9vw,44px)">Paused</h2>
+    <p class="hint">The balloon climbs on its own and cannot dodge.
+       Drag anywhere to move the shield and knock away anything aimed at it.
+       Sweep the shield over gems to collect them.</p>
     <div class="row" style="flex-direction:column">
       <button class="btn primary wide" id="resumeBtn">Resume</button>
       <button class="btn wide" id="restartBtn">Restart</button>
@@ -376,6 +432,19 @@
       <button class="btn primary wide" id="nextBtn">Next level</button>
       <button class="btn wide" id="replayBtn">Replay</button>
       <button class="btn ghost wide" id="clearLevels">Levels</button>
+    </div>
+  </div>
+
+  <div class="screen" id="scr-brief">
+    <div class="brief">
+      <p class="brief-eyebrow" id="briefLevel">Level 1 · Meadow</p>
+      <h2 class="brief-title">Keep the balloon rising</h2>
+      <p class="brief-body">
+        It climbs on its own and it cannot dodge. Everything falling is aimed at
+        it — <b>drag anywhere</b> to move your shield across and knock them away.
+      </p>
+      <div class="brief-stages" id="briefStages"></div>
+      <button class="btn primary wide" id="briefGo">Begin</button>
     </div>
   </div>
 
@@ -661,9 +730,8 @@ function levelDef(n){                        // n is 1-based
     n, biome: bi, gauntlet,
     seed: n * 9176 + 31,
     lengthU: (170 + n * 7) * 8,
-    speed: 52 + d * 26 + (gauntlet ? 3 : 0),
     gapStart: 46 - d * 10,                    // climb units between arrivals
-    gapEnd: 36 - d * 8 - (gauntlet ? 3 : 0),
+    gapEnd: 44 - d * 5 - (gauntlet ? 3 : 0),
     aimStart: 0.82 + d * 0.16,                // how sharply threats converge
     aimEnd: 0.94 + d * 0.12,
     fall: 8 + d * 44,                         // the push they start with; gravity adds the rest
@@ -673,7 +741,7 @@ function levelDef(n){                        // n is 1-based
 }
 function endlessDef(){
   return { n: 0, biome: 0, gauntlet: false, seed: (Math.random() * 1e9) | 0, lengthU: Infinity,
-           speed: 52, gapStart: 46, gapEnd: 46, aimStart: 0.86, aimEnd: 0.86, fall: 8,
+           gapStart: 46, gapEnd: 46, aimStart: 0.86, aimEnd: 0.86, fall: 8,
            diff: 0, gemRate: 0.24, endless: true };
 }
 
@@ -909,6 +977,7 @@ const G = {
   T: 0, timeScale: 1, slowT: 0,
   score: 0, bonus: 0, gems: 0, hits: 0, combo: 0, comboT: 0, energy: 0, lastBump: -1, lastClack: -1,
   climbed: 0, startY: 0, genCount: 0, gemsPlaced: 0, nextSpawn: 40, blocks: 0, formations: 0,
+  stages: null, stageIdx: -1,
   state: "menu", overT: 0, lastKind: "", hintT: 0, lastHitBy: "", usedRevive: false, bankedGems: 0, failCounted: false
 };
 
@@ -925,6 +994,61 @@ function burstParts(x, y, n, col, spd, type){
   }
 }
 
+/* ----------------------------------------------------------- the stages */
+/* A level is not one long shuffle of everything. It runs through a handful of
+   named stages, each with its own cast and its own marking, so the sky tells
+   you what it is doing and you can learn each one on its own terms.        */
+const STAGES = [
+  { id: "drift",   name: "Drifters",  min: 0,  look: "plain",   threats: ["drifter"] },
+  { id: "stones",  name: "Stones",    min: 0,  look: "ring",    threats: ["rock", "drifter"] },
+  { id: "swarm",   name: "Swarm",     min: 2,  look: "dots",    threats: ["swarm"] },
+  { id: "spin",    name: "Spinners",  min: 4,  look: "slash",   threats: ["spinner"] },
+  { id: "bars",    name: "Barriers",  min: 6,  look: "band",    threats: ["barrier"] },
+  { id: "ruins",   name: "Ruins",     min: 7,  look: "brick",   forms: true },
+  { id: "hunt",    name: "Hunters",   min: 10, look: "cross",   threats: ["homer"] },
+  { id: "heavy",   name: "Heavies",   min: 14, look: "hollow",  threats: ["heavy", "rock"] },
+  { id: "split",   name: "Splitters", min: 18, look: "chevron", threats: ["splitter"] },
+  { id: "mill",    name: "Sawmill",   min: 22, look: "slash",   threats: ["saw"] },
+  { id: "chain",   name: "Clusters",  min: 26, look: "dots",    threats: ["cluster"] },
+  { id: "slabs",   name: "Slabs",     min: 30, look: "band",    threats: ["slab", "barrier"] },
+  { id: "pincer",  name: "Pincers",   min: 34, look: "cross",   threats: ["pair", "homer"] },
+  { id: "storm",   name: "Storm",     min: 38, look: "hollow",  threats: ["drifter", "rock", "saw", "homer"] }
+];
+// which stages this level runs, in order, and where each one starts
+function buildStages(def){
+  const rng = mulberry32(def.seed ^ 0x5f3a);
+  const tier = def.endless ? 99 : def.n;
+  const pool = STAGES.filter(s => s.min <= tier);
+  const want = def.endless ? 6 : clamp(3 + Math.floor(def.n / 11), 3, 6);
+  // always open on something calm, then work up through what this level knows
+  const picked = [pool[0]];
+  const rest = pool.slice(1);
+  for (let i = rest.length - 1; i > 0; i--){          // shuffle, seeded
+    const j = (rng() * (i + 1)) | 0;
+    const t = rest[i]; rest[i] = rest[j]; rest[j] = t;
+  }
+  for (const s of rest){
+    if (picked.length >= want) break;
+    picked.push(s);
+  }
+  picked.sort((a, b) => a.min - b.min);
+  const span = def.endless ? 1100 : def.lengthU / picked.length;
+  return picked.map((s, i) => ({ stage: s, from: i * span, to: (i + 1) * span }));
+}
+function stageAt(climbed){
+  const list = G.stages;
+  if (!list || !list.length) return null;
+  if (G.def.endless){
+    const span = 1100;
+    const i = Math.floor(climbed / span) % list.length;
+    return { idx: i, of: list.length, stage: list[i].stage, loop: Math.floor(climbed / (span * list.length)) };
+  }
+  for (let i = 0; i < list.length; i++){
+    if (climbed < list[i].to || i === list.length - 1) return { idx: i, of: list.length, stage: list[i].stage, loop: 0 };
+  }
+  return { idx: 0, of: list.length, stage: list[0].stage, loop: 0 };
+}
+
 /* ------------------------------------------------------ sky puzzles */
 /* Between the aimed traffic, structures hang in the sky on the balloon's line.
    They are not thrown at you — they simply sit there, and the balloon is going
@@ -937,6 +1061,7 @@ function fpiece(s, x, y, parts, opt){
   o.vx = 0;
   o.form = 1;
   o.pid = s.id;
+  o.look = s.look || "brick";
   G.obst.push(o);
   return o;
 }
@@ -1012,7 +1137,9 @@ const FORMATIONS = [
 function spawnFormation(rng, d, tier){
   const pool = FORMATIONS.filter(f => f.min <= tier);
   const f = pool[(rng() * pool.length) | 0];
-  const s = { id: f.id, rng, d, y: G.cam.y - 110, fall: 20 + d * 28 };
+  const here = stageAt(G.climbed);
+  const s = { id: f.id, rng, d, y: G.cam.y - 110, fall: 20 + d * 28,
+              look: here ? here.stage.look : "brick" };
   f.build(s);
   G.formations++;
   if (G.formations <= 2) UI.flash("Clear the way");
@@ -1040,15 +1167,19 @@ function spawnWave(){
   const d = clamp(endless ? clamp(G.climbed / 7000, 0, 1) : def.diff * 0.72 + t * 0.28, 0, 1);
   const tier = tierNow();
   const opening = G.genCount < 2;
+  const here = stageAt(G.climbed);
 
-  // every so often, a structure instead of a volley
-  if (!opening && tier >= 3 && G.genCount % 13 === 7){
+  // a stage of ruins sends structures instead of volleys
+  if (here && here.stage.forms && !opening){
     spawnFormation(rng, d, tier);
     return;
   }
 
-  const pool = THREATS.filter(k => k.min <= tier && k.id !== G.lastKind && !(opening && k.min > 0));
-  const list = pool.length ? pool : THREATS.filter(k => k.min <= tier);
+  const allow = here && here.stage.threats ? here.stage.threats : null;
+  const pool = THREATS.filter(k => (allow ? allow.indexOf(k.id) >= 0 : k.min <= tier) &&
+                                   k.id !== G.lastKind && !(opening && k.min > 2));
+  const list = pool.length ? pool
+             : THREATS.filter(k => allow ? allow.indexOf(k.id) >= 0 : k.min <= tier);
   let total = 0;
   for (const k of list) total += k.w;
   let pick = rng() * total, chosen = list[list.length - 1];
@@ -1057,11 +1188,12 @@ function spawnWave(){
 
   // how many arrive at once, and how hard they are aimed
   const aimBase = lerp(def.aimStart, def.aimEnd, t);
-  const shots = 1 + (rng() < d * 0.7 ? 1 : 0) + (d > 0.78 && rng() < (d - 0.78) * 1.5 ? 1 : 0);
+  const shots = 1 + (rng() < d * 0.5 ? 1 : 0);
+  let bodies = 0;                       // a swarm is one wave but five arrivals
   for (let i = 0; i < shots; i++){
     // roughly half of what falls is passing traffic: it comes down the flanks,
     // stays wide, and is only your problem if you knock it into your own line
-    const stray = !opening && rng() < 0.55 + (1 - d) * 0.25;
+    const stray = !opening && rng() < 0.6 + (1 - d) * 0.2;
     const s = {
       rng, d,
       x: stray ? (rng() < 0.5 ? 16 + rng() * 74 : VW - 90 + rng() * 74)
@@ -1072,7 +1204,9 @@ function spawnWave(){
       fall: def.fall * (0.85 + rng() * 0.35) * (opening ? 0.8 : 1)
     };
     const made = chosen.make(s);
-    for (const o of made){ o.pid = chosen.id; G.obst.push(o); }
+    const look = here ? here.stage.look : "plain";
+    for (const o of made){ o.pid = chosen.id; o.look = look; G.obst.push(o); }
+    bodies += made.length;
   }
 
   // gems and power-ups drift down off to one side: leaving the balloon to
@@ -1095,7 +1229,10 @@ function spawnWave(){
   }
 
   const gapBase = endless ? Math.max(22, 46 - G.climbed / 260) : lerp(def.gapStart, def.gapEnd, t);
-  G.nextSpawn = G.climbed + gapBase * (0.85 + rng() * 0.3) * (opening ? 1.5 : 1);
+  // space the next wave by how much this one actually put in the sky: a swarm
+  // is one wave but five arrivals
+  const crowd = 1 + Math.max(0, bodies - 1) * 0.42;
+  G.nextSpawn = G.climbed + gapBase * (0.85 + rng() * 0.3) * (opening ? 1.5 : 1) * crowd;
 }
 function spawnCheck(){
   if (!G.def.endless && G.climbed > G.def.lengthU - 140) return;   // clear run to the line
@@ -1119,10 +1256,18 @@ function startRun(mode, n){
   G.score = 0; G.bonus = 0; G.gems = 0; G.hits = 0; G.combo = 0; G.comboT = 0; G.energy = 0; G.lastBump = -1;
   G.climbed = 0; G.startY = 0; G.genCount = 0; G.gemsPlaced = 0; G.nextSpawn = 40; G.formations = 0;
   G.lastKind = ""; G.overT = 0; G.blocks = 0;
+  G.stages = buildStages(G.def); G.stageIdx = -1;
   G.usedRevive = false; G.bankedGems = 0; G.failCounted = false;
-  G.state = "play";
+  G.state = "brief";
   UI.enterGame();
+  UI.brief();
   Audio2.unlock();
+}
+function beginRun(){
+  if (G.state !== "brief") return;
+  G.state = "play";
+  G.stageIdx = -1;
+  UI.show(null);
 }
 function goalY(){ return G.startY - G.def.lengthU; }
 
@@ -1242,9 +1387,12 @@ function takeHit(o, nx, ny){
 }
 /* ---------------------------------------------------------- simulation */
 const LIVE = [];                     // threats inside the view this frame
+/* The climb is the one fixed thing in the game. Every level, every biome,
+   endless included, rises at exactly this rate — difficulty lives in what
+   comes down at you, never in how fast the floor moves. */
+const RISE = 58;
 function riseSpeed(){
-  const base = G.mode === "endless" ? Math.min(104, 56 + G.climbed / 210) : G.def.speed;
-  return base * (save.opts.assist ? 0.84 : 1);
+  return RISE * (save.opts.assist ? 0.84 : 1);
 }
 function step(dt){
   const playing = G.state === "play";
@@ -1271,9 +1419,9 @@ function step(dt){
     b.y += 40 * dt;                      // the wreck drifts down a little
   }
 
-  // --- camera
-  const camTarget = b.y - VH * 0.66;
-  cam.y += (camTarget - cam.y) * Math.min(1, dt * 12);
+  // --- camera: locked to the balloon rather than easing toward it, so a
+  // constant climb reads as a constant scroll
+  cam.y = b.y - VH * 0.66;
   if (cam.shake > 0){
     cam.shake = Math.max(0, cam.shake - dt * 26);
     cam.shx = (Math.random() - 0.5) * cam.shake;
@@ -1460,6 +1608,15 @@ function step(dt){
     if (p.type === "shard"){ p.vy += 320 * dt; p.vx *= 0.99; }
     else if (p.type === "ring"){ p.vx *= 0.9; p.vy *= 0.9; }
     else { p.vy += 90 * dt; p.vx *= 0.97; p.vy *= 0.98; }
+  }
+
+  // --- which stage are we in
+  if (playing){
+    const here = stageAt(G.climbed);
+    if (here && here.idx !== G.stageIdx){
+      G.stageIdx = here.idx;
+      UI.stage(here);
+    }
   }
 
   // --- score & progress
@@ -1845,6 +2002,64 @@ function drawObstacles(){
       }
     }
 
+    // the stage's marking, drawn inside the body so it changes nothing about
+    // where the thing can be hit
+    if (o.look && o.look !== "plain"){
+      const w = o.wp[0];
+      const R = w.r;
+      const cx = (w.x1 + w.x2) / 2, cy = (w.y1 + w.y2) / 2;
+      const inner = Math.max(1.5, R - edgeW - 1.5);
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(o.ang);
+      ctx.strokeStyle = ink; ctx.fillStyle = ink;
+      ctx.lineWidth = Math.max(1.6, R * 0.16);
+      const half = Math.hypot(w.x2 - w.x1, w.y2 - w.y1) / 2;
+      if (o.look === "ring"){
+        ctx.beginPath(); ctx.arc(0, 0, inner * 0.55, 0, TAU); ctx.stroke();
+      } else if (o.look === "dots"){
+        for (let i = -1; i <= 1; i++){
+          ctx.beginPath();
+          ctx.arc(i * inner * 0.5, i === 0 ? -inner * 0.05 : inner * 0.28, Math.max(1.4, inner * 0.16), 0, TAU);
+          ctx.fill();
+        }
+      } else if (o.look === "slash"){
+        ctx.beginPath();
+        ctx.moveTo(-inner * 0.5 - half * 0.5, inner * 0.5);
+        ctx.lineTo(inner * 0.5 + half * 0.5, -inner * 0.5);
+        ctx.stroke();
+      } else if (o.look === "cross"){
+        ctx.beginPath();
+        ctx.moveTo(-inner * 0.55, 0); ctx.lineTo(inner * 0.55, 0);
+        ctx.moveTo(0, -inner * 0.55); ctx.lineTo(0, inner * 0.55);
+        ctx.stroke();
+      } else if (o.look === "chevron"){
+        ctx.beginPath();
+        ctx.moveTo(-inner * 0.5, inner * 0.18);
+        ctx.lineTo(0, -inner * 0.42);
+        ctx.lineTo(inner * 0.5, inner * 0.18);
+        ctx.stroke();
+      } else if (o.look === "hollow"){
+        ctx.beginPath(); ctx.arc(0, 0, inner * 0.44, 0, TAU); ctx.fill();
+      } else if (o.look === "band"){
+        const L = half + inner * 0.4;
+        ctx.lineWidth = Math.max(1.6, inner * 0.3);
+        ctx.beginPath();
+        ctx.moveTo(-L * 0.7, -inner * 0.34); ctx.lineTo(L * 0.7, -inner * 0.34);
+        ctx.moveTo(-L * 0.7, inner * 0.34); ctx.lineTo(L * 0.7, inner * 0.34);
+        ctx.stroke();
+      } else if (o.look === "brick"){
+        const L = half + inner * 0.4;
+        ctx.lineWidth = Math.max(1.4, inner * 0.22);
+        ctx.beginPath();
+        ctx.moveTo(-L * 0.6, 0); ctx.lineTo(L * 0.6, 0);
+        ctx.moveTo(-L * 0.2, -inner * 0.5); ctx.lineTo(-L * 0.2, inner * 0.5);
+        ctx.moveTo(L * 0.2, -inner * 0.5); ctx.lineTo(L * 0.2, inner * 0.5);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
     // per-style detail, all of it inside the collider
     if (o.style === "hub"){
       const hr = o.wp[0].r;                       // exactly the arm's own radius
@@ -2106,10 +2321,9 @@ function render(){
   if (G.state === "play" && G.hintT > 0){
     ctx.globalAlpha = clamp(G.hintT, 0, 1) * 0.9;
     ctx.fillStyle = "#ffffff";
-    ctx.font = "800 14px " + FONT;
+    ctx.font = "800 13px " + FONT;
     ctx.textAlign = "center";
-    ctx.fillText("Drag anywhere: the shield moves with your thumb,", VW / 2, VH * 0.80);
-    ctx.fillText("not to it. The balloon cannot dodge — block for it.", VW / 2, VH * 0.80 + 20);
+    ctx.fillText("Drag anywhere — the shield follows your thumb", VW / 2, VH * 0.80);
     ctx.globalAlpha = 1;
   }
 }
@@ -2125,6 +2339,8 @@ function frame(now){
   if (G.state === "play" || G.state === "dead" || G.state === "clear"){
     if (G.hintT > 0) G.hintT -= dt;
     step(dt);
+  } else if (G.state === "brief"){
+    G.T += dt;
   } else if (G.state === "menu"){
     G.T += dt;
     G.cam.y = -0.66 * VH + Math.sin(G.T * 0.4) * 7;
@@ -2191,7 +2407,8 @@ window.addEventListener("keydown", e => {
   }
   if (k === "r" && (G.state === "play" || G.state === "pause")) UI.restart();
   if (k === "enter" || k === " "){
-    if (G.state === "menu" && $("scr-title").classList.contains("on")) UI.quickPlay();
+    if (G.state === "brief") beginRun();
+    else if (G.state === "menu" && $("scr-title").classList.contains("on")) UI.quickPlay();
     else if (G.state === "dead" && UI.overShown) UI.restart();
     else if (G.state === "clear" && UI.overShown) $("nextBtn").click();
   }
@@ -2215,13 +2432,28 @@ window.addEventListener("blur", () => { if (G.state === "play") UI.pause(); });
 
 /* ------------------------------------------------------------------ UI */
 const $ = id => document.getElementById(id);
-const SCREENS = ["scr-title", "scr-levels", "scr-settings", "scr-skins", "scr-pause", "scr-over", "scr-clear"];
+// the same marking the pieces wear, drawn small for the level brief
+function stageGlyph(look){
+  const s = {
+    plain:   "",
+    ring:    "<circle cx='7' cy='7' r='4'/>",
+    dots:    "<circle cx='3' cy='8' r='1.4' fill='currentColor' stroke='none'/><circle cx='7' cy='6' r='1.4' fill='currentColor' stroke='none'/><circle cx='11' cy='8' r='1.4' fill='currentColor' stroke='none'/>",
+    slash:   "<path d='M2 12 L12 2'/>",
+    cross:   "<path d='M2 7 H12 M7 2 V12'/>",
+    chevron: "<path d='M2 9 L7 4 L12 9'/>",
+    hollow:  "<circle cx='7' cy='7' r='3.4' fill='currentColor' stroke='none'/>",
+    band:    "<path d='M2 5 H12 M2 9 H12'/>",
+    brick:   "<path d='M1 7 H13 M5 2 V12 M9 2 V12'/>"
+  }[look] || "";
+  return "<svg viewBox='0 0 14 14' style='color:var(--ink)'>" + s + "</svg>";
+}
+const SCREENS = ["scr-title", "scr-levels", "scr-settings", "scr-skins", "scr-pause", "scr-over", "scr-clear", "scr-brief"];
 const UI = {
   overShown: false,
   _score: -1, _gems: -1, _prog: -1, _energy: -1, _pw: "", _combo: -1, _lvl: "",
   show(name){
     for (const id of SCREENS) $(id).classList.toggle("on", id === name);
-    $("hud").classList.toggle("on", name === null || name === "scr-pause");
+    $("hud").classList.toggle("on", name === null || name === "scr-pause" || name === "scr-brief");
   },
   toastT: 0,
   flash(msg){
@@ -2237,6 +2469,37 @@ const UI = {
     const c = $("comboTag");
     if (n >= 2){ c.textContent = "×" + n + " blocked"; c.classList.add("on"); }
     else c.classList.remove("on");
+  },
+  stage(here){
+    const chip = $("stageChip");
+    chip.textContent = "Stage " + (here.idx + 1) + " of " + here.of + " · " + here.stage.name;
+    const b = $("stageBanner");
+    b.querySelector("b").textContent = "Stage " + (here.idx + 1);
+    b.querySelector("span").textContent = here.stage.name;
+    b.classList.add("on");
+    clearTimeout(this.stageT);
+    this.stageT = setTimeout(() => b.classList.remove("on"), 1500);
+    if (here.idx > 0) Audio2.SFX.ui();
+  },
+  brief(){
+    const def = G.def;
+    $("briefLevel").textContent = def.endless
+      ? "Endless climb"
+      : "Level " + def.n + " · " + BIOMES[def.biome].name;
+    const host = $("briefStages");
+    host.innerHTML = "";
+    const first = stageAt(0);
+    if (first) $("stageChip").textContent =
+      "Stage 1 of " + G.stages.length + " · " + first.stage.name;
+    this.tick();
+    G.stages.forEach((s, i) => {
+      const row = document.createElement("div");
+      row.className = "brief-stage";
+      row.innerHTML = "<i>" + stageGlyph(s.stage.look) + "</i><b>" + s.stage.name +
+                      "</b><span>Stage " + (i + 1) + "</span>";
+      host.appendChild(row);
+    });
+    this.show("scr-brief");
   },
   enterGame(){
     this.overShown = false;
@@ -2256,8 +2519,13 @@ const UI = {
       ? "Endless · " + biomeNow().a.name
       : "Level " + G.def.n + " · " + BIOMES[G.def.biome].name;
     if (lvlText !== this._lvl){ this._lvl = lvlText; $("lvlChip").textContent = lvlText; }
-    const pr = Math.round(progressNow() * 100);
-    if (pr !== this._prog){ this._prog = pr; $("progFill").style.width = pr + "%"; }
+    const pr = G.def.endless ? Math.round(progressNow() * 100)
+                             : Math.round(clamp(G.climbed / G.def.lengthU, 0, 1) * 100);
+    if (pr !== this._prog){
+      this._prog = pr;
+      $("progFill").style.width = pr + "%";
+      $("progPct").textContent = pr + "%";
+    }
     const en = Math.round(G.energy);
     if (en !== this._energy){
       this._energy = en;
@@ -2536,6 +2804,7 @@ $("nextBtn").addEventListener("click", () => {
   else { UI.flash("That was the last one. Endless awaits."); enterMenu(); }
 });
 $("burstBtn").addEventListener("click", e => { e.preventDefault(); doBurst(); });
+$("briefGo").addEventListener("click", () => beginRun());
 let wipeArmed = false;
 $("wipeBtn").addEventListener("click", () => {
   if (!wipeArmed){
