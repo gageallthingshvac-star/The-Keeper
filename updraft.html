@@ -895,7 +895,7 @@ const G = {
   pw:  { bubble: 0, slow: 0, magnet: 0, wide: 0 },
   T: 0, timeScale: 1, slowT: 0,
   score: 0, bonus: 0, gems: 0, hits: 0, combo: 0, comboT: 0, energy: 0, lastBump: -1,
-  climbed: 0, startY: 0, genCount: 0, gemsPlaced: 0, nextSpawn: 40, blocks: 0,
+  climbed: 0, startY: 0, genCount: 0, gemsPlaced: 0, nextSpawn: 40, blocks: 0, formations: 0,
   state: "menu", overT: 0, lastKind: "", hintT: 0, lastHitBy: "", usedRevive: false, bankedGems: 0, failCounted: false
 };
 
@@ -912,6 +912,108 @@ function burstParts(x, y, n, col, spd, type){
   }
 }
 
+/* ------------------------------------------------------ sky puzzles */
+/* Between the aimed traffic, structures hang in the sky on the balloon's line.
+   They are not thrown at you — they simply sit there, and the balloon is going
+   to arrive whether or not you have opened a way through. Because everything
+   is solid, shoving one piece moves the pieces it rests against, which is
+   where the puzzle lives: find the piece worth hitting.                     */
+function fpiece(s, x, y, parts, opt){
+  const o = mkObst(x, y, parts, opt);
+  o.vy = s.fall;
+  o.vx = 0;
+  o.form = 1;
+  o.pid = s.id;
+  G.obst.push(o);
+  return o;
+}
+const FORMATIONS = [
+{ id: "curtain", min: 3, build(s){
+    // a row across the whole sky with one hole, and the hole is never where
+    // you need it: shove the row along until it is
+    const holeW = 74 - s.d * 12;
+    const holeX = VW / 2 + (s.rng() < 0.5 ? -1 : 1) * (74 + s.rng() * 46);
+    const w = 46;
+    for (let x = 12; x < VW - 12; x += w + 5){
+      const cx = x + w / 2;
+      if (Math.abs(cx - holeX) < holeW / 2 + w / 2) continue;
+      fpiece(s, cx, s.y, bar(w - 20, 10), { mass: 1.15, style: "wall", worth: 9 });
+    }
+  }},
+{ id: "column", min: 6, build(s){
+    // four stones stacked down the centre line, arriving one after another
+    for (let i = 0; i < 4; i++){
+      fpiece(s, VW / 2 + (s.rng() - 0.5) * 14, s.y - i * 40, dot(17),
+             { mass: 0.85, style: "orb", worth: 7 });
+    }
+  }},
+{ id: "arch", min: 9, build(s){
+    // heavy legs you will not move, and a light span you can
+    for (const side of [-1, 1]){
+      fpiece(s, VW / 2 + side * 96, s.y - 34, [{ x1: 0, y1: -46, x2: 0, y2: 46, r: 11 }],
+             { mass: 6, style: "wall", worth: 18 });
+    }
+    fpiece(s, VW / 2, s.y - 92, bar(150, 10), { mass: 1.1, style: "wall", worth: 12 });
+  }},
+{ id: "cage", min: 12, build(s){
+    // a heavy core you cannot reach until the light bars around it are gone
+    fpiece(s, VW / 2, s.y - 44, dot(24), { mass: 6.5, style: "orb", worth: 20 });
+    fpiece(s, VW / 2, s.y - 96, bar(96, 9), { mass: 0.8, style: "wall", worth: 7 });
+    fpiece(s, VW / 2, s.y + 10, bar(96, 9), { mass: 0.8, style: "wall", worth: 7 });
+    for (const side of [-1, 1]){
+      fpiece(s, VW / 2 + side * 52, s.y - 44, [{ x1: 0, y1: -34, x2: 0, y2: 34, r: 9 }],
+             { mass: 0.8, style: "wall", worth: 7 });
+    }
+  }},
+{ id: "brick", min: 16, build(s){
+    // two staggered courses: no single gap lines up, so you make one
+    for (let row = 0; row < 2; row++){
+      const off = row ? 40 : 0;
+      for (let x = -20; x < VW + 20; x += 80){
+        fpiece(s, x + off, s.y - row * 46, bar(52, 10),
+               { mass: 1.05 + s.d * 0.5, style: "wall", worth: 8 });
+      }
+    }
+  }},
+{ id: "ring", min: 20, build(s){
+    // a wheel of stones the balloon has to pass clean through
+    const n = 9, R = 74;
+    for (let i = 0; i < n; i++){
+      const a = i / n * TAU;
+      fpiece(s, VW / 2 + Math.cos(a) * R, s.y - 46 + Math.sin(a) * R, dot(13),
+             { mass: 0.75, style: "orb", worth: 6 });
+    }
+  }},
+{ id: "vice", min: 26, build(s){
+    // two slabs closing on the centre line with rubble wedged between them
+    for (const side of [-1, 1]){
+      fpiece(s, VW / 2 + side * 118, s.y - 40, [{ x1: 0, y1: -58, x2: 0, y2: 58, r: 12 }],
+             { mass: 7, style: "wall", worth: 22 });
+    }
+    for (let i = 0; i < 5; i++){
+      fpiece(s, VW / 2 + (i - 2) * 30, s.y - 40 + (i % 2 ? 18 : -18), dot(13),
+             { mass: 0.9, style: "orb", worth: 6 });
+    }
+  }}
+];
+function spawnFormation(rng, d, tier){
+  const pool = FORMATIONS.filter(f => f.min <= tier);
+  const f = pool[(rng() * pool.length) | 0];
+  const s = { id: f.id, rng, d, y: G.cam.y - 110, fall: 20 + d * 28 };
+  f.build(s);
+  G.formations++;
+  if (G.formations <= 2) UI.flash("Clear the way");
+  // gems ride above it, so the reward comes after the work
+  const gx = clamp(VW / 2 + (rng() - 0.5) * 150, 26, VW - 26);
+  for (let i = 0; i < 4; i++){
+    G.picks.push({ x: gx + (rng() - 0.5) * 18, y: s.y - 210 - i * 26,
+                   kind: "gem", t: rng() * TAU, dead: false, vy: s.fall });
+    G.gemsPlaced++;
+  }
+  G.genCount++;
+  G.nextSpawn = G.climbed + 250 + 150 * (1 - d);     // room to actually work on it
+}
+
 /* ------------------------------------------------------ the arrivals */
 /* Spawning is keyed to climbed distance, not wall-clock, so a level plays out
    the same way every time you attempt it.                                  */
@@ -925,6 +1027,12 @@ function spawnWave(){
   const d = clamp(endless ? clamp(G.climbed / 7000, 0, 1) : def.diff * 0.72 + t * 0.28, 0, 1);
   const tier = tierNow();
   const opening = G.genCount < 2;
+
+  // every so often, a structure instead of a volley
+  if (!opening && tier >= 3 && G.genCount % 5 === 4){
+    spawnFormation(rng, d, tier);
+    return;
+  }
 
   const pool = THREATS.filter(k => k.min <= tier && k.id !== G.lastKind && !(opening && k.min > 0));
   const list = pool.length ? pool : THREATS.filter(k => k.min <= tier);
@@ -990,7 +1098,7 @@ function startRun(mode, n){
   G.pw.bubble = save.opts.assist ? 1 : 0; G.pw.slow = 0; G.pw.magnet = 0; G.pw.wide = 0;
   G.T = 0; G.timeScale = 1; G.slowT = 0;
   G.score = 0; G.bonus = 0; G.gems = 0; G.hits = 0; G.combo = 0; G.comboT = 0; G.energy = 0; G.lastBump = -1;
-  G.climbed = 0; G.startY = 0; G.genCount = 0; G.gemsPlaced = 0; G.nextSpawn = 40;
+  G.climbed = 0; G.startY = 0; G.genCount = 0; G.gemsPlaced = 0; G.nextSpawn = 40; G.formations = 0;
   G.lastKind = ""; G.overT = 0; G.blocks = 0;
   G.usedRevive = false; G.bankedGems = 0; G.failCounted = false;
   G.state = "play";
