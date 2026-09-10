@@ -3947,7 +3947,12 @@ Level.prototype.draw = function(g, aim){
                tg.a + (tg.frot||0));
 
   for(const b of this.world.bodies){
-    if(b.render==='btnbase' || b.dead) continue;
+    // 'none' means the body is there to be collided with, not looked at --
+    // the mark's board is drawn by drawTarget. Without this it fell through
+    // to the default case and a plain brown ball was painted over every
+    // bullseye in the game, so a mark only looked like a mark once the room
+    // collapsed and took the body away.
+    if(b.render==='btnbase' || b.render==='none' || b.dead) continue;
     drawBody(g, b, t);
   }
   for(const e of this.ents){
