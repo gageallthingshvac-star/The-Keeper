@@ -634,13 +634,13 @@ function rgba(h, a){
 /* -------------------------------------------------------------- biomes */
 // sky: [horizon, mid, ceiling] — the ceiling colour takes over as you climb
 const BIOMES = [
-  { name: "Meadow",  sky: ["#bfe7f2", "#7ec8e3", "#4a9fd4"], land: ["#a9c7cf", "#8fd6b4", "#5cc49a"], ink: "#2f3475", cloud: "#ffffff", sun: "#fff4c8", stars: 0 },
+  { name: "Meadow",  sky: ["#a9dcec", "#6fbedd", "#3f93cc"], land: ["#a9c7cf", "#8fd6b4", "#5cc49a"], ink: "#2f3475", cloud: "#f2fbff", sun: "#fff4c8", stars: 0 },
   { name: "Dunes",   sky: ["#ffe3b8", "#ffc98a", "#f2955e"], land: ["#e7b98a", "#e8a76a", "#d98b52"], ink: "#5a3a52", cloud: "#fff3e2", sun: "#fff0b8", stars: 0 },
-  { name: "Reef",    sky: ["#c9f2ee", "#7fd9d2", "#2fa8ae"], land: ["#8ed3cf", "#59bfbd", "#2e9c9f"], ink: "#1f4a60", cloud: "#eafffd", sun: "#e6fff7", stars: 0 },
-  { name: "Pines",   sky: ["#d6ecdf", "#96c9b8", "#4e8f92"], land: ["#8fb0a6", "#5f8f7c", "#3d6b5c"], ink: "#26343a", cloud: "#f2fbf6", sun: "#fdf6d8", stars: 0 },
+  { name: "Reef",    sky: ["#a8e6e0", "#6bcfc8", "#2b9ca2"], land: ["#8ed3cf", "#59bfbd", "#2e9c9f"], ink: "#1f4a60", cloud: "#eafffd", sun: "#e6fff7", stars: 0 },
+  { name: "Pines",   sky: ["#bfdccd", "#89bfad", "#478487"], land: ["#8fb0a6", "#5f8f7c", "#3d6b5c"], ink: "#26343a", cloud: "#f2fbf6", sun: "#fdf6d8", stars: 0 },
   { name: "Canyon",  sky: ["#ffd9c2", "#f4a58c", "#c96a72"], land: ["#d99a86", "#c0705f", "#9c4f4a"], ink: "#4b2334", cloud: "#ffeade", sun: "#ffe0a3", stars: 0 },
   { name: "Dusk",    sky: ["#ffc48f", "#c98bb4", "#6a5aa8"], land: ["#9a7cb0", "#6f5a95", "#4b3d76"], ink: "#2b1f4d", cloud: "#ffd9e6", sun: "#ffcf8a", stars: 1 },
-  { name: "Frost",   sky: ["#eaf6ff", "#c2e2f5", "#7fb2dd"], land: ["#d6e9f2", "#b6d6e8", "#8fbdd6"], ink: "#33507a", cloud: "#ffffff", sun: "#f4fbff", stars: 0 },
+  { name: "Frost",   sky: ["#cfe6f7", "#a8cfec", "#6fa3d4"], land: ["#c2dced", "#a3c8de", "#7fadc9"], ink: "#26406b", cloud: "#e8f4ff", sun: "#f4fbff", stars: 0 },
   { name: "Night",   sky: ["#4a5a9a", "#2b3570", "#141a3c"], land: ["#3b4577", "#2b3462", "#1e2549"], ink: "#0d1130", cloud: "#8f9ad6", sun: "#f6f4e2", stars: 1 },
   { name: "Aurora",  sky: ["#1f5f6b", "#173f60", "#0d1a3a"], land: ["#1c4a55", "#153944", "#0f2a35"], ink: "#07131f", cloud: "#7ff0d0", sun: "#d8fff2", stars: 1 }
 ];
@@ -662,18 +662,18 @@ function levelDef(n){                        // n is 1-based
     seed: n * 9176 + 31,
     lengthU: (170 + n * 7) * 8,
     speed: 52 + d * 26 + (gauntlet ? 3 : 0),
-    gapStart: 128 - d * 52,                   // climb units between arrivals
-    gapEnd: 92 - d * 48 - (gauntlet ? 8 : 0),
+    gapStart: 146 - d * 56,                   // climb units between arrivals
+    gapEnd: 108 - d * 50 - (gauntlet ? 8 : 0),
     aimStart: 0.82 + d * 0.16,                // how sharply threats converge
     aimEnd: 0.94 + d * 0.12,
-    fall: 18 + d * 54,                        // the push they start with; gravity adds the rest
+    fall: 8 + d * 44,                         // the push they start with; gravity adds the rest
     diff: d,
     gemRate: 0.6
   };
 }
 function endlessDef(){
   return { n: 0, biome: 0, gauntlet: false, seed: (Math.random() * 1e9) | 0, lengthU: Infinity,
-           speed: 52, gapStart: 128, gapEnd: 128, aimStart: 0.86, aimEnd: 0.86, fall: 18,
+           speed: 52, gapStart: 146, gapEnd: 146, aimStart: 0.86, aimEnd: 0.86, fall: 8,
            diff: 0, gemRate: 0.65, endless: true };
 }
 
@@ -700,10 +700,11 @@ function mkObst(x, y, parts, opt){
   o.rad = r;
   return o;
 }
-/* Everything up here falls at about a sixth of what you would expect. Batted
-   away, a rock hangs, arcs, and drifts back down — you get time to watch what
-   you did, and time to regret it. */
-const GRAV = 48;
+/* Everything up here falls at about a sixth of what you would expect: enough
+   to draw a proper arc, light enough to watch it happen. Swat a rock and it
+   climbs, slows, turns over and comes back down — you get time to admire the
+   shot, and time to regret it. */
+const GRAV = 78;
 function rebuildParts(o){
   const c = Math.cos(o.ang), s = Math.sin(o.ang);
   for (let i = 0; i < o.parts.length; i++){
@@ -734,6 +735,12 @@ function updThreat(o, dt, target){
   o.x += o.vx * dt;
   o.y += o.vy * dt;
   o.ang += o.spin * dt;
+  o.spin = clamp(o.spin, -9, 9);
+  // ricochet off the sides of the sky, so a hard swat sends something bouncing
+  // back into play instead of quietly deleting it
+  const edge = o.rad;
+  if (o.x < edge && o.vx < 0){ o.x = edge; o.vx = -o.vx * 0.55; o.spin += o.vy * 0.004; o.flash = Math.max(o.flash, 0.5); }
+  else if (o.x > VW - edge && o.vx > 0){ o.x = VW - edge; o.vx = -o.vx * 0.55; o.spin -= o.vy * 0.004; o.flash = Math.max(o.flash, 0.5); }
   if (o.flash > 0) o.flash = Math.max(0, o.flash - dt * 3.4);
   rebuildParts(o);
 }
@@ -767,6 +774,10 @@ function solidPair(a, b){
     const j = -(1 + 0.42) * vn / it;
     a.vx -= nx * j * ia; a.vy -= ny * j * ia;
     b.vx += nx * j * ib; b.vy += ny * j * ib;
+    // each takes a turn out of the exchange
+    a.spin -= j * 0.0012 * ia * ((_pair.ax - a.x) * ny - (_pair.ay - a.y) * nx) / Math.max(12, a.rad);
+    b.spin += j * 0.0012 * ib * ((_pair.bx - b.x) * ny - (_pair.by - b.y) * nx) / Math.max(12, b.rad);
+    if (-vn > 120 && G.T - (G.lastClack || -1) > 0.11){ G.lastClack = G.T; Audio2.SFX.bump(); }
     if (-vn > 90 && Math.random() < 0.4)
       pAdd((a.x + b.x) / 2, (a.y + b.y) / 2, 0, -30, 0.25, 2.5, "#ffffff", "dot");
   }
@@ -896,7 +907,7 @@ const G = {
   cam: { y: 0, shake: 0, shx: 0, shy: 0 },
   pw:  { bubble: 0, slow: 0, magnet: 0, wide: 0 },
   T: 0, timeScale: 1, slowT: 0,
-  score: 0, bonus: 0, gems: 0, hits: 0, combo: 0, comboT: 0, energy: 0, lastBump: -1,
+  score: 0, bonus: 0, gems: 0, hits: 0, combo: 0, comboT: 0, energy: 0, lastBump: -1, lastClack: -1,
   climbed: 0, startY: 0, genCount: 0, gemsPlaced: 0, nextSpawn: 40, blocks: 0, formations: 0,
   state: "menu", overT: 0, lastKind: "", hintT: 0, lastHitBy: "", usedRevive: false, bankedGems: 0, failCounted: false
 };
@@ -1046,7 +1057,7 @@ function spawnWave(){
 
   // how many arrive at once, and how hard they are aimed
   const aimBase = lerp(def.aimStart, def.aimEnd, t);
-  const shots = 1 + (rng() < d * 0.85 ? 1 : 0) + (d > 0.7 && rng() < (d - 0.7) * 1.6 ? 1 : 0);
+  const shots = 1 + (rng() < d * 0.7 ? 1 : 0) + (d > 0.78 && rng() < (d - 0.78) * 1.5 ? 1 : 0);
   for (let i = 0; i < shots; i++){
     const s = {
       rng, d,
@@ -1078,7 +1089,7 @@ function spawnWave(){
                    kind, r: 15, t: 0, dead: false, vy: def.fall * 0.4 + 8 });
   }
 
-  const gapBase = endless ? Math.max(46, 128 - G.climbed / 54) : lerp(def.gapStart, def.gapEnd, t);
+  const gapBase = endless ? Math.max(52, 146 - G.climbed / 50) : lerp(def.gapStart, def.gapEnd, t);
   G.nextSpawn = G.climbed + gapBase * (0.85 + rng() * 0.3) * (opening ? 1.5 : 1);
 }
 function spawnCheck(){
@@ -1340,6 +1351,17 @@ function step(dt){
           const imp = Math.max(0, rel) * 0.5 + pen * 10 + 30;
           o.vx += nx * imp * inv;
           o.vy += ny * imp * inv;
+          // A push straight down the normal cannot turn a ball — every bit of
+          // spin in the world comes from the shield dragging across its face.
+          // This is also what makes a sideways swipe carry: it cuts.
+          const tx = -ny, ty = nx;
+          const relT = sh.vx * tx + sh.vy * ty;
+          o.vx += tx * relT * 0.22 * inv;
+          o.vy += ty * relT * 0.22 * inv;
+          o.spin += relT * 0.02 * inv / Math.max(12, o.rad);
+          // and an off-centre hit on something long turns it as well
+          const rx = _sd.bx - o.x, ry = _sd.by - o.y;
+          o.spin += (rx * ny - ry * nx) * imp * 0.0016 * inv / Math.max(12, o.rad);
           o.home = 0;                       // knocked off its lock
           const sp = Math.hypot(o.vx, o.vy);
           if (sp > 380){ o.vx *= 380 / sp; o.vy *= 380 / sp; }
@@ -1587,11 +1609,11 @@ function drawBackdrop(){
   }
 
   // clouds (two parallax bands)
-  const cloudCol = bcol(b => b.cloud);
-  drawCloudBand(0.42, 260, 0.30, cloudCol, 1);
-  drawCloudBand(0.66, 210, 0.5, cloudCol, 2);
+  const cloudCol = mix2(bcol(b => b.cloud), bot, 0.42);   // never pure white
+  drawCloudBand(0.42, 260, 0.20, cloudCol, 1);
+  drawCloudBand(0.66, 210, 0.30, cloudCol, 2);
 
-  drawCloudBand(0.86, 300, 0.4, cloudCol, 3);
+  drawCloudBand(0.86, 300, 0.26, cloudCol, 3);
   // land, only near the start of a climb
   drawLand(bm);
 }
@@ -1731,17 +1753,23 @@ function capsuleRing(x1, y1, x2, y2, r, col, w, inner){
   capsule(x1, y1, x2, y2, r, col);
   if (r > w) capsule(x1, y1, x2, y2, r - w, inner);
 }
+// the edge can never eat more than half of the smallest part it is drawn on
+function w0edge(o){
+  let r = 99;
+  for (const w of o.wp) r = Math.min(r, w.r);
+  return Math.max(2, r * 0.5);
+}
 function drawObstacles(){
   const ink = inkNow();
   const top = G.cam.y - 120, bot = G.cam.y + VH + 140;
   for (const o of G.obst){
     if (o.y + o.rad < top || o.y - o.rad > bot) continue;
     const heavy = o.mass >= 3.2;
-    const edgeW = heavy ? 4 : 3;
+    const edgeW = Math.min(w0edge(o), heavy ? 6 : 4.5);
 
-    // shadow, offset so it never reads as part of the shape
-    ctx.globalAlpha = 0.1;
-    for (const w of o.wp) capsule(w.x1, w.y1 + 4, w.x2, w.y2 + 4, w.r, "#0a1030");
+    // a shadow with enough weight to lift the body off a pale sky
+    ctx.globalAlpha = 0.2;
+    for (const w of o.wp) capsule(w.x1 + 1, w.y1 + 5, w.x2 + 1, w.y2 + 5, w.r, "#0a1030");
     ctx.globalAlpha = 1;
 
     // the body: solid white, hard dark edge, both inside the collider
