@@ -502,6 +502,10 @@ const Audio2 = (() => {
   }
   function tone(freq, dur, type, vol, slideTo, delay){
     if (!save.opts.sfx || !ensure()) return;
+    // a bad number here throws inside the audio graph and takes the frame with
+    // it, so clamp at the door
+    freq = clamp(Number.isFinite(freq) ? freq : 440, 20, 12000);
+    if (slideTo != null) slideTo = clamp(Number.isFinite(slideTo) ? slideTo : freq, 20, 12000);
     const t0 = ctx.currentTime + (delay || 0);
     const o = ctx.createOscillator(), g = ctx.createGain();
     o.type = type || "sine";
@@ -644,43 +648,50 @@ const LEVELS_PER_BIOME = 5;
 const TOTAL_LEVELS = BIOMES.length * LEVELS_PER_BIOME; // 45
 
 /* -------------------------------------------------------- level tuning */
+/* The balloon does not dodge. It rises dead centre and everything in the sky
+   converges on it; the only thing that decides whether it lives is where you
+   put the shield. So a level is tuned by how fast threats arrive, how
+   accurately they are aimed, and how heavy they are to swat away.          */
 function levelDef(n){                        // n is 1-based
   const bi = Math.min(BIOMES.length - 1, Math.floor((n - 1) / LEVELS_PER_BIOME));
-  const inBiome = (n - 1) % LEVELS_PER_BIOME; // 0..4
+  const inBiome = (n - 1) % LEVELS_PER_BIOME;
   const d = (n - 1) / (TOTAL_LEVELS - 1);     // 0..1 overall difficulty
   const gauntlet = inBiome === LEVELS_PER_BIOME - 1;
   return {
     n, biome: bi, gauntlet,
     seed: n * 9176 + 31,
-    lengthU: (180 + n * 8) * 8,
-    speed: 55 + d * 30 + (gauntlet ? 3 : 0),
-    gapStart: 236 - d * 58,
-    gapEnd: 194 - d * 58 - (gauntlet ? 10 : 0),
-    wind: 4 + d * 17 + (gauntlet ? 4 : 0),
+    lengthU: (170 + n * 7) * 8,
+    speed: 52 + d * 26 + (gauntlet ? 3 : 0),
+    gapStart: 150 - d * 58,                   // climb units between arrivals
+    gapEnd: 112 - d * 56 - (gauntlet ? 8 : 0),
+    aimStart: 0.82 + d * 0.16,                // how sharply threats converge
+    aimEnd: 0.94 + d * 0.12,
+    fall: 70 + d * 92,                        // how fast they close on you
     diff: d,
-    gemRate: 0.85
+    gemRate: 0.6
   };
 }
 function endlessDef(){
   return { n: 0, biome: 0, gauntlet: false, seed: (Math.random() * 1e9) | 0, lengthU: Infinity,
-           speed: 56, gapStart: 230, gapEnd: 230, wind: 8, diff: 0, gemRate: 0.9, endless: true };
+           speed: 52, gapStart: 150, gapEnd: 150, aimStart: 0.86, aimEnd: 0.86, fall: 70,
+           diff: 0, gemRate: 0.65, endless: true };
 }
 
 /* ------------------------------------------------------------ entities */
-function mkObst(bx, by, parts, opt){
+function mkObst(x, y, parts, opt){
   opt = opt || {};
   const o = {
-    bx, by, x: bx, y: by,
-    ax: bx, ay: by,
-    ang: opt.ang || 0, aang: opt.ang || 0,
+    x, y,
     vx: 0, vy: 0,
+    ang: opt.ang || 0, spin: opt.spin || 0,
+    home: opt.home || 0,                     // >0 steers toward the balloon
     parts,
     wp: parts.map(() => ({ x1: 0, y1: 0, x2: 0, y2: 0, r: 0 })),
     mass: opt.mass === undefined ? 2 : opt.mass,
-    mot: opt.mot || "static",
-    amp: opt.amp || 0, freq: opt.freq || 0, ph: opt.ph || 0, spin: opt.spin || 0,
     style: opt.style || "solid",
-    nm: false, flash: 0, rad: 0
+    split: opt.split || 0,                   // children spawned when blocked
+    worth: opt.worth || 5,                   // score for swatting it away
+    blocked: false, flash: 0, rad: 0, pid: ""
   };
   let r = 0;
   for (const p of parts){
@@ -689,30 +700,20 @@ function mkObst(bx, by, parts, opt){
   o.rad = r;
   return o;
 }
-function updObst(o, T, dt){
-  switch (o.mot){
-    case "slide":  o.ax = o.bx + Math.sin(T * o.freq + o.ph) * o.amp; break;
-    case "bob":    o.ay = o.by + Math.sin(T * o.freq + o.ph) * o.amp; break;
-    case "orbit":  o.ax = o.bx + Math.cos(T * o.freq + o.ph) * o.amp;
-                   o.ay = o.by + Math.sin(T * o.freq + o.ph) * o.amp * 0.55; break;
-    case "swing":  o.aang = (o.ph || 0) + Math.sin(T * o.freq) * o.amp; break;
-    case "spin":   o.aang = (o.ph || 0) + T * o.spin; break;
-    case "slidespin":
-      o.ax = o.bx + Math.sin(T * o.freq + o.ph) * o.amp;
-      o.aang = T * o.spin; break;
+function updThreat(o, dt, target){
+  // homing threats bend their existing speed toward the balloon
+  if (o.home > 0 && target){
+    const dx = target.x - o.x, dy = target.y - o.y;
+    const d = Math.hypot(dx, dy) || 1;
+    const sp = Math.hypot(o.vx, o.vy) || 1;
+    const k = Math.min(1, o.home * dt);
+    o.vx += (dx / d * sp - o.vx) * k;
+    o.vy += (dy / d * sp - o.vy) * k;
   }
-  if (o.mass > 0){
-    o.vx += (o.ax - o.x) * 24 * dt;
-    o.vy += (o.ay - o.y) * 24 * dt;
-    const damp = Math.exp(-dt * 3.6);
-    o.vx *= damp; o.vy *= damp;
-    o.x += o.vx * dt; o.y += o.vy * dt;
-    const dx = o.x - o.ax, dy = o.y - o.ay, d = Math.hypot(dx, dy);
-    if (d > 92){ o.x = o.ax + dx / d * 92; o.y = o.ay + dy / d * 92; o.vx *= 0.35; o.vy *= 0.35; }
-  } else { o.x = o.ax; o.y = o.ay; }
-  o.ang = o.aang;
+  o.x += o.vx * dt;
+  o.y += o.vy * dt;
+  o.ang += o.spin * dt;
   if (o.flash > 0) o.flash = Math.max(0, o.flash - dt * 3.4);
-  // world-space parts
   const c = Math.cos(o.ang), s = Math.sin(o.ang);
   for (let i = 0; i < o.parts.length; i++){
     const p = o.parts[i], w = o.wp[i];
@@ -724,202 +725,110 @@ function updObst(o, T, dt){
 const bar = (len, r) => [{ x1: -len / 2, y1: 0, x2: len / 2, y2: 0, r: r || 9 }];
 const dot = r => [{ x1: 0, y1: 0, x2: 0, y2: 0, r: r }];
 
-/* -------------------------------------------------------- the patterns */
-/* Every builder gets a context: place obstacles with g.push(), mark the safe
-   lane with g.safe(x) so gems and power-ups land somewhere survivable.      */
-const PATTERNS = [
-{ id: "bar", min: 0, w: 10, build(g){
-    const lane = g.lane();
-    const len = 140 + g.rng() * 100 * (0.5 + g.d);
-    const left = lane > VW / 2;                       // bar sits away from the lane
-    const x = left ? lane - len / 2 - 48 : lane + len / 2 + 48;
-    const slide = g.tier >= 4 && g.rng() < 0.45;
-    g.push(mkObst(x, g.y, bar(len, 9), {
-      mass: 2.4, mot: slide ? "slide" : "static",
-      amp: slide ? 20 + g.d * 34 : 0, freq: 0.7 + g.rng() * 0.6, ph: g.rng() * TAU
-    }));
-    g.safe(lane);
+/* --------------------------------------------------------- the threats */
+/* Each one is launched from above the view and aimed at the balloon. `aim` is
+   the fraction of the sideways distance it closes before it arrives: 1 is dead
+   on, less than 1 drifts past on one side, more than 1 crosses over. Nothing
+   is on rails — once you hit it, it goes where you sent it.                */
+
+// give a threat the velocity that carries it at the balloon
+function launch(o, aim, fall){
+  const b = G.bal;
+  const drop = Math.max(60, b.y - o.y);
+  const t = drop / (riseSpeed() + fall);
+  o.vy = fall;
+  o.vx = ((VW / 2 - o.x) / t) * aim;
+}
+const THREATS = [
+{ id: "drifter", min: 0, w: 11, make(s){
+    const o = mkObst(s.x, s.y, dot(15 + s.rng() * 7), { mass: 0.9, style: "orb", worth: 5 });
+    launch(o, s.aim, s.fall * (0.8 + s.rng() * 0.3));
+    return [o];
   }},
-{ id: "gate", min: 0, w: 9, build(g){
-    const gapW = 132 - g.d * 46;
-    const gx = g.lane();
-    const amp = g.tier >= 5 ? 18 + g.d * 40 : 0;
-    const ph = g.rng() * TAU, fr = 0.6 + g.rng() * 0.5;
-    const leftLen = Math.max(24, gx - gapW / 2);
-    const rightLen = Math.max(24, VW - (gx + gapW / 2));
-    g.push(mkObst(leftLen / 2 - 6, g.y, bar(leftLen, 9), { mass: 3, mot: "slide", amp, freq: fr, ph }));
-    g.push(mkObst(VW - rightLen / 2 + 6, g.y, bar(rightLen, 9), { mass: 3, mot: "slide", amp, freq: fr, ph }));
-    g.safe(gx);
+{ id: "rock", min: 0, w: 9, make(s){
+    const o = mkObst(s.x, s.y, dot(20 + s.rng() * 8), { mass: 2.1, style: "orb", worth: 7,
+      spin: (s.rng() - 0.5) * 1.2 });
+    launch(o, s.aim, s.fall * (0.7 + s.rng() * 0.25));
+    return [o];
   }},
-{ id: "spinner", min: 4, w: 9, build(g){
-    const lane = g.lane(1.2);
-    const arms = g.rng() < 0.35 ? 3 : 2;
-    const len = 88 + g.rng() * 54 + g.d * 36;
-    const parts = [];
-    for (let i = 0; i < arms; i++){
-      const a = i * Math.PI / arms;
-      parts.push({ x1: -Math.cos(a) * len / 2, y1: -Math.sin(a) * len / 2,
-                   x2:  Math.cos(a) * len / 2, y2:  Math.sin(a) * len / 2, r: 8 });
-    }
-    // keep the hub clear of the lane by at least its own reach
-    const side = lane < VW / 2 ? 1 : -1;
-    const x = clamp(lane + side * (len / 2 + 48), 60, VW - 60);
-    g.push(mkObst(x, g.y, parts, {
-      mass: 4.2, mot: "spin", spin: (g.rng() < 0.5 ? -1 : 1) * (0.45 + g.rng() * 0.45 + g.d * 0.45),
-      ph: g.rng() * TAU, style: "hub"
-    }));
-    g.safe(clamp(x - side * (len / 2 + 44), 30, VW - 30));
-  }},
-{ id: "pendulum", min: 7, w: 8, build(g){
-    const lane = g.lane(1.2);
-    const count = g.d > 0.5 && g.rng() < 0.5 ? 2 : 1;
-    const len = 92 + g.rng() * 44;
-    if (count === 1){
-      const side = lane < VW / 2 ? 1 : -1;
-      const px = clamp(lane + side * 108, 70, VW - 70);
-      g.push(mkObst(px, g.y, [{ x1: 0, y1: 0, x2: 0, y2: len, r: 8 }], {
-        mass: 3.4, mot: "swing", amp: 0.55 + g.rng() * 0.4, freq: 1 + g.rng() * 0.45, ph: 0, style: "pivot"
-      }));
-    } else {
-      for (const px of [VW * 0.2, VW * 0.8]){
-        g.push(mkObst(px, g.y, [{ x1: 0, y1: 0, x2: 0, y2: len, r: 8 }], {
-          mass: 3.4, mot: "swing", amp: 0.5 + g.rng() * 0.35, freq: 1 + g.rng() * 0.4, ph: 0, style: "pivot"
-        }));
-      }
-    }
-    g.safe(count === 1 ? lane : VW / 2);
-  }},
-{ id: "sliders", min: 3, w: 8, build(g){
-    const count = 2 + (g.d > 0.55 ? 1 : 0);
-    for (let i = 0; i < count; i++){
-      const y = g.y - i * 56;
-      const x = VW * (i % 2 ? 0.7 : 0.3);
-      g.push(mkObst(x, y, bar(50 + g.rng() * 30, 11), {
-        mass: 1.3, mot: "slide", amp: 40 + g.d * 52, freq: 0.6 + g.rng() * 0.5, ph: i * 2.1
-      }));
-    }
-    g.take(count * 56);
-    g.safe(g.lane(0.8));
-  }},
-{ id: "funnel", min: 10, w: 7, build(g){
-    const gapW = 104 - g.d * 26;
-    const cx = g.lane();
-    const slant = 0.45 + g.rng() * 0.28;
-    g.push(mkObst(cx - gapW / 2 - 62, g.y, bar(150, 9), { mass: 3, ang: slant }));
-    g.push(mkObst(cx + gapW / 2 + 62, g.y, bar(150, 9), { mass: 3, ang: -slant }));
-    g.safe(cx);
-  }},
-{ id: "saw", min: 13, w: 8, build(g){
-    const lane = g.lane(1.1);
-    const n = g.d > 0.6 ? 2 : 1;
+{ id: "swarm", min: 2, w: 8, make(s){
+    const n = 3 + (s.rng() * 3 | 0);
+    const out = [];
     for (let i = 0; i < n; i++){
-      const side = (i % 2 === 0) === (lane < VW / 2) ? 1 : -1;
-      const x = clamp(lane + side * (92 + i * 20), 50, VW - 50);
-      g.push(mkObst(x, g.y - i * 48, dot(20 + g.rng() * 7), {
-        mass: 3.2, mot: "slidespin", amp: 34 + g.d * 46, freq: 0.6 + g.rng() * 0.5,
-        ph: g.rng() * TAU, spin: 2.4, style: "saw"
-      }));
+      const o = mkObst(clamp(s.x + (i - n / 2) * 30, 10, VW - 10), s.y - i * 26,
+                       dot(9 + s.rng() * 4), { mass: 0.5, style: "orb", worth: 3 });
+      launch(o, s.aim * (0.7 + s.rng() * 0.6), s.fall * (0.9 + s.rng() * 0.4));
+      out.push(o);
     }
-    g.take(n * 48);
-    g.safe(lane);
+    return out;
   }},
-{ id: "pillars", min: 16, w: 6, build(g){
-    const h = 140 + g.rng() * 70;
-    const lane = g.lane();
-    const lanes = 2 + (g.d > 0.65 ? 1 : 0);
-    // build walls either side of the lane, spaced so a corridor always exists
-    const slots = [];
-    for (let i = 0; i < lanes; i++){
-      const side = i % 2 === 0 ? 1 : -1;
-      const step = 78 + Math.floor(i / 2) * 96;
-      slots.push(clamp(lane + side * step, 16, VW - 16));
-    }
-    for (const sx of slots){
-      g.push(mkObst(sx, g.y - h / 2, [{ x1: 0, y1: -h / 2, x2: 0, y2: h / 2, r: 9 }], { mass: 0, style: "wall" }));
-    }
-    g.take(h + 40);
-    g.safe(lane);
+{ id: "spinner", min: 4, w: 9, make(s){
+    const len = 84 + s.rng() * 52 + s.d * 40;
+    const o = mkObst(s.x, s.y, bar(len, 8), { mass: 2.6, style: "hub", worth: 9,
+      spin: (s.rng() < 0.5 ? -1 : 1) * (0.9 + s.rng() * 0.8 + s.d * 0.6) });
+    launch(o, s.aim, s.fall * (0.7 + s.rng() * 0.3));
+    return [o];
   }},
-{ id: "orbs", min: 2, w: 7, build(g){
-    const lane = g.lane(0.9);
-    const n = 3 + (g.rng() * 2 | 0);
-    for (let i = 0; i < n; i++){
-      let x = 40 + g.rng() * (VW - 80);
-      if (Math.abs(x - lane) < 52) x += (x < lane ? -52 : 52);   // leave the lane breathable
-      g.push(mkObst(clamp(x, 26, VW - 26), g.y - g.rng() * 90, dot(14 + g.rng() * 8), {
-        mass: 0.75, mot: "orbit", amp: 14 + g.rng() * 22, freq: 0.45 + g.rng() * 0.5,
-        ph: g.rng() * TAU, style: "orb"
-      }));
-    }
-    g.take(100);
-    g.safe(lane);
+{ id: "barrier", min: 6, w: 8, make(s){
+    // wide and aimed straight down the middle: shove it aside or it takes you
+    const len = 130 + s.d * 90;
+    const o = mkObst(VW / 2 + (s.rng() - 0.5) * 60, s.y, bar(len, 11),
+                     { mass: 3.4 + s.d * 1.4, style: "wall", worth: 14 });
+    launch(o, 1, s.fall * 0.6);
+    return [o];
   }},
-{ id: "zig", min: 19, w: 7, build(g){
-    const rows = 2 + (g.d > 0.55 ? 1 : 0);
-    let endSide = 0;
-    for (let i = 0; i < rows; i++){
-      const fromLeft = i % 2 === 0;
-      const len = 184 + g.d * 54;
-      const x = fromLeft ? len / 2 - 34 : VW - len / 2 + 34;
-      g.push(mkObst(x, g.y - i * 78, bar(len, 9), { mass: 2.6, ang: fromLeft ? 0.22 : -0.22 }));
-      endSide = fromLeft ? 1 : -1;
-    }
-    g.take(rows * 78);
-    g.safe(endSide > 0 ? VW - 42 : 42);
+{ id: "homer", min: 10, w: 8, make(s){
+    const o = mkObst(s.x, s.y, dot(13), { mass: 0.8, style: "orb", worth: 11,
+      home: 0.5 + s.d * 0.7 });
+    launch(o, 0.6, s.fall * (0.85 + s.rng() * 0.3));
+    return [o];
   }},
-{ id: "comb", min: 22, w: 6, build(g){
-    const lane = g.lane(1.2);
-    const fromLeft = lane > VW / 2;
-    const teeth = 3 + (g.rng() * 2 | 0);
-    const spineLen = teeth * 46;
-    const reach = clamp(Math.abs(fromLeft ? lane - 0 : VW - lane) - 62, 44, 108);
-    const parts = [{ x1: 0, y1: -spineLen / 2, x2: 0, y2: spineLen / 2, r: 8 }];
-    const dir = fromLeft ? 1 : -1;
-    for (let i = 0; i < teeth; i++){
-      const ty = -spineLen / 2 + 23 + i * 46;
-      parts.push({ x1: 0, y1: ty, x2: dir * reach, y2: ty, r: 7 });
-    }
-    g.push(mkObst(fromLeft ? -4 : VW + 4, g.y - spineLen / 2, parts, { mass: 0, style: "wall" }));
-    g.take(spineLen + 24);
-    g.safe(fromLeft ? VW - 46 : 46);
+{ id: "heavy", min: 14, w: 7, make(s){
+    const o = mkObst(s.x, s.y, dot(28 + s.rng() * 7), { mass: 5.2 + s.d * 2, style: "orb", worth: 16 });
+    launch(o, s.aim, s.fall * 0.55);
+    return [o];
   }},
-{ id: "chain", min: 26, w: 6, build(g){
-    const lane = g.lane(1.2);
-    const links = 4, span = 120;
+{ id: "splitter", min: 18, w: 7, make(s){
+    const o = mkObst(s.x, s.y, dot(21), { mass: 1.8, style: "chain", worth: 8, split: 2,
+      spin: (s.rng() - 0.5) * 1.6 });
+    launch(o, s.aim, s.fall * (0.75 + s.rng() * 0.25));
+    return [o];
+  }},
+{ id: "saw", min: 22, w: 7, make(s){
+    const o = mkObst(s.x, s.y, dot(18), { mass: 1.6, style: "saw", worth: 12, spin: 7 });
+    launch(o, s.aim * 1.05, s.fall * (1.3 + s.rng() * 0.4));
+    return [o];
+  }},
+{ id: "cluster", min: 26, w: 6, make(s){
+    const links = 4, span = 108;
     const parts = [];
-    for (let i = 0; i < links; i++) parts.push({ x1: -span / 2 + i * (span / (links - 1)), y1: 0,
-                                                 x2: -span / 2 + i * (span / (links - 1)), y2: 0, r: 12 });
-    const side = lane < VW / 2 ? 1 : -1;
-    const x = clamp(lane + side * (span / 2 + 52), 70, VW - 70);
-    g.push(mkObst(x, g.y, parts, {
-      mass: 3.6, mot: "spin", spin: (g.rng() < 0.5 ? -1 : 1) * (0.6 + g.d * 0.5), ph: g.rng() * TAU, style: "chain"
-    }));
-    g.safe(clamp(x - side * (span / 2 + 50), 30, VW - 30));
-  }},
-{ id: "wall", min: 30, w: 7, build(g){
-    const holeW = 116 - g.d * 30;
-    const hx = g.lane();
-    const amp = 14 + g.d * 34, ph = g.rng() * TAU, fr = 0.45 + g.rng() * 0.35;
-    const lLen = Math.max(20, hx - holeW / 2 + 10);
-    const rLen = Math.max(20, VW - hx - holeW / 2 + 10);
-    g.push(mkObst(lLen / 2 - 10, g.y, [{ x1: -lLen / 2, y1: 0, x2: lLen / 2, y2: 0, r: 13 }],
-                  { mass: 0, mot: "slide", amp, freq: fr, ph, style: "wall" }));
-    g.push(mkObst(VW - rLen / 2 + 10, g.y, [{ x1: -rLen / 2, y1: 0, x2: rLen / 2, y2: 0, r: 13 }],
-                  { mass: 0, mot: "slide", amp, freq: fr, ph, style: "wall" }));
-    g.safe(hx);
-  }},
-{ id: "pinwheel", min: 34, w: 6, build(g){
-    const len = 140 + g.d * 60;
-    const parts = [];
-    for (let i = 0; i < 2; i++){
-      const a = i * Math.PI / 2;
-      parts.push({ x1: 0, y1: 0, x2: Math.cos(a) * len / 2, y2: Math.sin(a) * len / 2, r: 8 });
-      parts.push({ x1: 0, y1: 0, x2: -Math.cos(a) * len / 2, y2: -Math.sin(a) * len / 2, r: 8 });
+    for (let i = 0; i < links; i++){
+      const off = -span / 2 + i * (span / (links - 1));
+      parts.push({ x1: off, y1: 0, x2: off, y2: 0, r: 12 });
     }
-    g.push(mkObst(VW / 2, g.y, parts, { mass: 0, mot: "spin",
-      spin: (g.rng() < 0.5 ? -1 : 1) * (0.7 + g.d * 0.6), style: "hub" }));
-    const edge = g.prefer < VW / 2 ? 32 : VW - 32;
-    g.safe(edge);
+    const o = mkObst(s.x, s.y, parts, { mass: 3.2, style: "chain", worth: 15,
+      spin: (s.rng() < 0.5 ? -1 : 1) * (1 + s.d * 0.8) });
+    launch(o, s.aim, s.fall * 0.7);
+    return [o];
+  }},
+{ id: "slab", min: 30, w: 6, make(s){
+    // the wall: too heavy to bat aside late, so start pushing early
+    const len = 190 + s.d * 90;
+    const o = mkObst(VW / 2 + (s.rng() - 0.5) * 40, s.y, bar(len, 14),
+                     { mass: 6.5 + s.d * 2.5, style: "wall", worth: 22 });
+    launch(o, 1, s.fall * 0.45);
+    return [o];
+  }},
+{ id: "pair", min: 34, w: 6, make(s){
+    // two heavies converging from both sides at once
+    const out = [];
+    for (const side of [-1, 1]){
+      const o = mkObst(VW / 2 + side * (VW / 2 - 24), s.y - (side > 0 ? 20 : 0),
+                       dot(19), { mass: 2.4, style: "orb", worth: 10 });
+      launch(o, 1, s.fall * (0.8 + s.rng() * 0.2));
+      out.push(o);
+    }
+    return out;
   }}
 ];
 
@@ -934,8 +843,7 @@ const G = {
   pw:  { bubble: 0, slow: 0, magnet: 0, wide: 0 },
   T: 0, timeScale: 1, slowT: 0,
   score: 0, bonus: 0, gems: 0, hits: 0, combo: 0, comboT: 0, energy: 0, lastBump: -1,
-  climbed: 0, startY: 0, genY: 0, genDone: false, genCount: 0, gemsPlaced: 0,
-  lastSafe: VW / 2, lastGap: 300,
+  climbed: 0, startY: 0, genCount: 0, gemsPlaced: 0, nextSpawn: 40, blocks: 0,
   state: "menu", overT: 0, lastKind: "", hintT: 0, lastHitBy: "", usedRevive: false, bankedGems: 0, failCounted: false
 };
 
@@ -952,69 +860,69 @@ function burstParts(x, y, n, col, spd, type){
   }
 }
 
-/* -------------------------------------------------- level generation */
+/* ------------------------------------------------------ the arrivals */
+/* Spawning is keyed to climbed distance, not wall-clock, so a level plays out
+   the same way every time you attempt it.                                  */
 function tierNow(){
-  return G.mode === "endless" ? 1 + G.climbed / 200 : G.def.n;
+  return G.mode === "endless" ? 1 + G.climbed / 190 : G.def.n;
 }
-function placePattern(){
-  const rng = G.rng;
+function spawnWave(){
+  const rng = G.rng, def = G.def;
   const endless = G.mode === "endless";
-  const t = endless ? clamp(G.climbed / 5200, 0, 1) : clamp((-G.genY) / G.def.lengthU, 0, 1);
-  let d = clamp(endless ? clamp(G.climbed / 7000, 0, 1) : G.def.diff * 0.72 + t * 0.28, 0, 1);
+  const t = endless ? clamp(G.climbed / 5200, 0, 1) : clamp(G.climbed / def.lengthU, 0, 1);
+  const d = clamp(endless ? clamp(G.climbed / 7000, 0, 1) : def.diff * 0.72 + t * 0.28, 0, 1);
   const tier = tierNow();
-  // the first couple of screens of any run are deliberately gentle
   const opening = G.genCount < 2;
-  if (opening) d *= 0.35;
 
-  const pool = PATTERNS.filter(p => p.min <= tier && p.id !== G.lastKind && !(opening && p.min > 2));
-  const list = pool.length ? pool : PATTERNS.filter(p => p.min <= tier);
+  const pool = THREATS.filter(k => k.min <= tier && k.id !== G.lastKind && !(opening && k.min > 0));
+  const list = pool.length ? pool : THREATS.filter(k => k.min <= tier);
   let total = 0;
-  for (const p of list) total += p.w;
+  for (const k of list) total += k.w;
   let pick = rng() * total, chosen = list[list.length - 1];
-  for (const p of list){ pick -= p.w; if (pick <= 0){ chosen = p; break; } }
+  for (const k of list){ pick -= k.w; if (pick <= 0){ chosen = k; break; } }
   G.lastKind = chosen.id;
 
-  // how far sideways the balloon can travel before the next pattern arrives
-  const reach = clamp(G.lastGap * 0.9, 110, VW - 70);
-  let extra = 0, safeX = G.lastSafe;
-  const g = {
-    rng, y: G.genY, d, tier, prefer: G.lastSafe,
-    lane: spread => clamp(G.lastSafe + (rng() - 0.5) * reach * (spread || 1) * (opening ? 0.5 : 1), 34, VW - 34),
-    push: o => G.obst.push(o),
-    take: n => { extra += n; },
-    safe: x => { safeX = clamp(x, 26, VW - 26); }
-  };
-  const before = G.obst.length;
-  chosen.build(g);
-  for (let i = before; i < G.obst.length; i++) G.obst[i].pid = chosen.id;
-  G.lastSafe = safeX;
+  // how many arrive at once, and how hard they are aimed
+  const aimBase = lerp(def.aimStart, def.aimEnd, t);
+  const shots = 1 + (d > 0.45 && rng() < d * 0.55 ? 1 : 0);
+  for (let i = 0; i < shots; i++){
+    const s = {
+      rng, d,
+      x: clamp(30 + rng() * (VW - 60), 20, VW - 20),
+      y: G.cam.y - 40 - rng() * 90 - i * 60,
+      aim: clamp(aimBase * (0.86 + rng() * 0.28) * (opening ? 0.85 : 1), 0.3, 1.2),
+      fall: def.fall * (0.85 + rng() * 0.35) * (opening ? 0.8 : 1)
+    };
+    const made = chosen.make(s);
+    for (const o of made){ o.pid = chosen.id; G.obst.push(o); }
+  }
 
-  // gems ride the safe lane; power-ups show up every so often
-  if (rng() < G.def.gemRate){
+  // gems and power-ups drift down off to one side: leaving the balloon to
+  // grab them is the whole risk
+  G.genCount++;
+  if (rng() < def.gemRate){
+    const side = rng() < 0.5 ? -1 : 1;
+    const gx = clamp(VW / 2 + side * (70 + rng() * 90), 24, VW - 24);
     const n = 3 + (rng() * 2 | 0);
     for (let i = 0; i < n; i++){
-      G.picks.push({ x: clamp(safeX + (rng() - 0.5) * 24, 20, VW - 20), y: g.y + 26 - i * 24,
-                     kind: "gem", t: rng() * TAU, dead: false, vx: 0, vy: 0 });
+      G.picks.push({ x: gx + (rng() - 0.5) * 20, y: G.cam.y - 60 - i * 26,
+                     kind: "gem", t: rng() * TAU, dead: false, vy: def.fall * 0.5 + 10 });
       G.gemsPlaced++;
     }
   }
-  G.genCount++;
-  if (G.genCount % 6 === 4 && rng() < 0.75){
+  if (G.genCount % 7 === 5 && rng() < 0.8){
     const kind = PW_KINDS[(rng() * PW_KINDS.length) | 0];
-    G.picks.push({ x: safeX, y: g.y - extra - 40, kind, t: 0, dead: false, vx: 0, vy: 0 });
+    G.picks.push({ x: clamp(40 + rng() * (VW - 80), 30, VW - 30), y: G.cam.y - 80,
+                   kind, t: 0, dead: false, vy: def.fall * 0.4 + 8 });
   }
 
-  const gapBase = endless ? Math.max(126, 236 - G.climbed / 44) : lerp(G.def.gapStart, G.def.gapEnd, t);
-  const gap = gapBase * (0.9 + rng() * 0.28) * (opening ? 1.35 : 1);
-  G.lastGap = gap;
-  G.genY -= extra + gap;
+  const gapBase = endless ? Math.max(56, 150 - G.climbed / 52) : lerp(def.gapStart, def.gapEnd, t);
+  G.nextSpawn = G.climbed + gapBase * (0.85 + rng() * 0.3) * (opening ? 1.5 : 1);
 }
-function ensureGen(untilY){
+function spawnCheck(){
+  if (!G.def.endless && G.climbed > G.def.lengthU - 140) return;   // clear run to the line
   let guard = 0;
-  while (G.genY > untilY && guard++ < 40){
-    if (!G.def.endless && G.genY <= -G.def.lengthU + 150){ G.genDone = true; break; }
-    placePattern();
-  }
+  while (G.climbed >= G.nextSpawn && guard++ < 6) spawnWave();
 }
 
 /* ------------------------------------------------------------ run mgmt */
@@ -1030,10 +938,9 @@ function startRun(mode, n){
   G.pw.bubble = save.opts.assist ? 1 : 0; G.pw.slow = 0; G.pw.magnet = 0; G.pw.wide = 0;
   G.T = 0; G.timeScale = 1; G.slowT = 0;
   G.score = 0; G.bonus = 0; G.gems = 0; G.hits = 0; G.combo = 0; G.comboT = 0; G.energy = 0; G.lastBump = -1;
-  G.climbed = 0; G.startY = 0; G.genY = -300; G.genDone = false; G.genCount = 0; G.gemsPlaced = 0;
-  G.lastKind = ""; G.overT = 0; G.lastSafe = VW / 2; G.lastGap = 300;
+  G.climbed = 0; G.startY = 0; G.genCount = 0; G.gemsPlaced = 0; G.nextSpawn = 40;
+  G.lastKind = ""; G.overT = 0; G.blocks = 0;
   G.usedRevive = false; G.bankedGems = 0; G.failCounted = false;
-  ensureGen(G.cam.y - VH * 1.4);
   G.state = "play";
   UI.enterGame();
   Audio2.unlock();
@@ -1044,9 +951,10 @@ function goalY(){ return G.startY - G.def.lengthU; }
 function shieldLen(){
   return (save.opts.assist ? 42 : 34) * (G.pw.wide > 0 ? 1.5 : 1);
 }
-/* The shield is a shallow dome, not a flat bar. That single choice is what
-   makes the balloon steerable: rest it off-centre and it slides down the
-   slope, exactly the way a ball behaves on a curved surface. */
+/* The shield is a shallow dome, not a flat bar, so a threat that lands off
+   its centre skids down the slope and away instead of stopping dead on it.
+   Where you put it, and how fast you are already moving when contact
+   happens, is the entire game. */
 const SHIELD_R = 74;
 const SHG = { cx: 0, cy: 0, a0: 0, half: 0, pts: [{x:0,y:0},{x:0,y:0},{x:0,y:0},{x:0,y:0}] };
 function shieldGeom(){
@@ -1063,26 +971,29 @@ function shieldGeom(){
   }
   return SHG;
 }
+// a slow crosswind so arrivals never fall in perfectly straight lines
 function windAt(y){
-  const w = G.def.wind;
-  return (Math.sin(y * 0.0032) + Math.sin(y * 0.0017 + 2.3) * 0.6 + Math.sin(y * 0.0071 + 1.1) * 0.25) * w;
+  return Math.sin(y * 0.0032) * 9 + Math.sin(y * 0.0017 + 2.3) * 5;
 }
 function doBurst(){
   if (G.state !== "play" || G.energy < 100) return;
   G.energy = 0;
   const b = G.bal;
   for (const o of G.obst){
-    if (o.mass <= 0) continue;
     const dx = o.x - b.x, dy = o.y - b.y;
     const d = Math.hypot(dx, dy);
-    if (d > 210 || d < 0.001) continue;
-    const f = (1 - d / 210) * 520 / o.mass;
+    if (d > 230 || d < 0.001) continue;
+    const f = (1 - d / 230) * 620 / o.mass;
     o.vx += dx / d * f; o.vy += dy / d * f;
+    o.home = 0;                                  // the shockwave breaks their lock
     o.flash = 1;
+    if (!o.blocked){ o.blocked = true; G.blocks++; G.bonus += Math.round(o.worth * 0.5); }
   }
   for (const p of G.picks){
-    const dx = p.x - b.x, dy = p.y - b.y;
-    if (Math.hypot(dx, dy) < 230) { p.pull = 1; }
+    if (p.dead) continue;
+    const dx = G.sh.x - p.x, dy = G.sh.y - p.y;
+    const d = Math.hypot(dx, dy);
+    if (d < 260 && d > 1){ p.x += dx * 0.75; p.y += dy * 0.75; }
   }
   G.slowT = Math.max(G.slowT, 0.7);
   G.cam.shake = Math.max(G.cam.shake, save.opts.calm ? 3 : 9);
@@ -1128,15 +1039,6 @@ function takeHit(o, nx, ny){
     popBalloon();
   }
 }
-function addCombo(x, y){
-  G.combo++; G.comboT = 2.4;
-  G.bonus += 4 + G.combo * 2;
-  G.energy = Math.min(100, G.energy + 11);
-  pAdd(x, y, 0, -40, 0.7, 10, "#ffffff", "text");
-  if (G.combo % 3 === 0) Audio2.SFX.gem(G.combo);
-  UI.combo(G.combo);
-}
-
 /* ---------------------------------------------------------- simulation */
 function riseSpeed(){
   const base = G.mode === "endless" ? Math.min(104, 56 + G.climbed / 210) : G.def.speed;
@@ -1154,15 +1056,13 @@ function step(dt){
 
   const b = G.bal, sh = G.sh, cam = G.cam;
 
-  // --- balloon
+  // --- the balloon. It holds the centre line and climbs; it does not dodge,
+  // it does not steer, and nothing you do moves it. That is the premise.
   if (alive){
     b.y -= riseSpeed() * sdt * (G.state === "clear" ? 2.6 : 1);
-    b.vx += windAt(b.y) * 4 * sdt;
-    b.vx *= Math.exp(-sdt * 2.1);
-    b.x += b.vx * sdt;
+    b.x = VW / 2;
+    b.vx = 0;
     b.bob += sdt;
-    if (b.x < b.r + 6){ b.x = b.r + 6; b.vx = Math.abs(b.vx) * 0.45 + 8; }
-    if (b.x > VW - b.r - 6){ b.x = VW - b.r - 6; b.vx = -Math.abs(b.vx) * 0.45 - 8; }
     if (b.inv > 0) b.inv -= dt;
     G.climbed = Math.max(G.climbed, G.startY - b.y);
   } else if (G.state === "dead"){
@@ -1180,8 +1080,8 @@ function step(dt){
 
   // --- shield follows the finger in *screen* space
   const prevX = sh.x, prevY = sh.y;
-  sh.sy = clamp(sh.sy, 40, VH - 30);
-  sh.sx = clamp(sh.sx, 10, VW - 10);
+  sh.sy = clamp(sh.sy, 30, VH - 24);
+  sh.sx = clamp(sh.sx, 6, VW - 6);
   sh.x = sh.sx;
   sh.y = cam.y + sh.sy;
   sh.vx = dt > 0 ? clamp((sh.x - prevX) / dt, -2400, 2400) : 0;
@@ -1191,45 +1091,21 @@ function step(dt){
   sh.len = shieldLen();
   const shg = shieldGeom();
 
-  // --- the balloon rides the outside of the dome. Off-centre means it slides,
-  // which is how you steer. The dome is solid from above only, so the shield can
-  // never pin the balloon down.
-  if (alive && b.alive){
-    const dx = b.x - shg.cx, dy = b.y - shg.cy;
-    const D = Math.hypot(dx, dy) || 1;
-    const surf = SHIELD_R + sh.r + b.r;
-    let da = Math.atan2(dy, dx) - shg.a0;
-    while (da > Math.PI) da -= TAU;
-    while (da < -Math.PI) da += TAU;
-    if (D < surf && D > SHIELD_R * 0.5 && Math.abs(da) < shg.half + 0.3){
-      const nx = dx / D, ny = dy / D;
-      const pen = surf - D;
-      // Lateral only: the dome slides the balloon sideways but can neither lift
-      // it (free altitude) nor hold it down. Balanced on the apex it simply
-      // rides along with you, which is the whole feel of the thing.
-      b.x += nx * pen * 0.55;
-      const rel = sh.vx * nx + sh.vy * ny;
-      b.vx += nx * (pen * 3.4 + Math.max(0, rel) * 0.3);
-      b.vx = clamp(b.vx, -235, 235);
-      if ((Math.abs(sh.vx) > 260 || Math.abs(b.vx) > 120) && Math.random() < 0.25)
-        pAdd(b.x - nx * b.r, b.y - ny * b.r, -nx * 40, -ny * 40, 0.25, 2, "#ffffff", "dot");
-    }
-  }
+  // --- send in the next arrivals
+  if (playing) spawnCheck();
 
-  // --- world generation ahead of the camera
-  if (!G.genDone) ensureGen(cam.y - VH * 1.3);
-
-  // --- obstacles, deflection, danger
-  const top = cam.y - 200, bot = cam.y + VH + 220;
+  // --- threats: fly, get swatted, or reach the balloon
+  const top = cam.y - 320, bot = cam.y + VH + 200;
   let bumpSound = false;
+  const spawned = [];
   for (let i = 0; i < G.obst.length; i++){
     const o = G.obst[i];
-    if (o.y < top - o.rad || o.y > bot + o.rad) continue;
-    updObst(o, G.T, sdt);
-    let minBalDist = 1e9;
+    if (o.y > bot + o.rad || o.y < top - o.rad) continue;
+    o.vx += windAt(o.y) * 0.06 * sdt;
+    updThreat(o, sdt, playing ? b : null);
     for (let j = 0; j < o.wp.length; j++){
       const w = o.wp[j];
-      // shield deflects
+      // --- the shield turns it away
       if (playing || G.state === "clear"){
         const minD = sh.r + w.r;
         let d = 1e9;
@@ -1244,57 +1120,75 @@ function step(dt){
           if (nl < 1e-4){ nx = 0; ny = -1; nl = 1; }
           nx /= nl; ny /= nl;
           const pen = minD - d;
-          if (o.mass > 0){
-            const inv = 1 / o.mass;
-            o.x += nx * pen * inv * 0.85;
-            o.y += ny * pen * inv * 0.85;
-            const rel = sh.vx * nx + sh.vy * ny;
-            const imp = Math.max(0, rel) * 0.5 + pen * 26;
-            o.vx += nx * imp * inv;
-            o.vy += ny * imp * inv;
+          const inv = 1 / o.mass;
+          o.x += nx * pen * inv * 1.1;
+          o.y += ny * pen * inv * 1.1;
+          // a fast sweep hits far harder than a parked shield
+          const rel = sh.vx * nx + sh.vy * ny;
+          const imp = Math.max(0, rel) * 0.85 + pen * 46 + 40;
+          o.vx += nx * imp * inv;
+          o.vy += ny * imp * inv;
+          o.home = 0;                       // knocked off its lock
+          const sp = Math.hypot(o.vx, o.vy);
+          if (sp > 900){ o.vx *= 900 / sp; o.vy *= 900 / sp; }
+          if (!o.blocked && playing){
+            o.blocked = true;
+            blockScored(o, _sd.ax, _sd.ay);
+            if (o.split){
+              for (let c = 0; c < o.split; c++){
+                const child = mkObst(o.x, o.y, dot(12), { mass: 0.7, style: "orb", worth: 5 });
+                const a = Math.atan2(o.vy, o.vx) + (c ? 0.9 : -0.9);
+                const csp = Math.max(120, Math.hypot(o.vx, o.vy) * 0.7);
+                child.vx = Math.cos(a) * csp; child.vy = Math.sin(a) * csp;
+                child.pid = o.pid + "-bit";
+                child.blocked = true;
+                spawned.push(child);
+              }
+              o.split = 0;
+            }
           }
           if (o.flash < 0.45){
             bumpSound = true;
-            pAdd(_sd.ax, _sd.ay, nx * 60 + (Math.random() - 0.5) * 60, ny * 60 - 40, 0.3, 3, "#ffffff", "dot");
+            pAdd(_sd.ax, _sd.ay, nx * 70 + (Math.random() - 0.5) * 70, ny * 70 - 30, 0.3, 3, "#ffffff", "dot");
           }
           o.flash = 1;
         }
       }
-      // balloon danger
-      if (playing){
+      // --- or it reaches the balloon
+      if (playing && b.alive){
         const bd = ptSegDist(b.x, b.y, w.x1, w.y1, w.x2, w.y2) - w.r;
-        if (bd < minBalDist) minBalDist = bd;
         if (bd < b.r * 0.84){
           const nx = (b.x - _cp.x), ny = (b.y - _cp.y);
           const nl = Math.hypot(nx, ny) || 1;
           takeHit(o, nx / nl, ny / nl);
-          if (!G.bal.alive) break;
+          if (!b.alive) break;
         }
       }
     }
-    if (playing && !o.nm && minBalDist >= b.r * 0.84 && minBalDist < b.r + 12 && o.y > b.y - 40){
-      o.nm = true;
-      addCombo(b.x, b.y - 24);
-    }
-    if (!G.bal.alive) break;
+    if (!b.alive) break;
   }
-  if (bumpSound && G.T - (G.lastBump || -1) > 0.09){ G.lastBump = G.T; Audio2.SFX.bump(); }
+  for (const c of spawned) G.obst.push(c);
+  if (bumpSound && G.T - (G.lastBump || -1) > 0.07){ G.lastBump = G.T; Audio2.SFX.bump(); }
 
-  // --- pickups
+  // --- pickups: the shield sweeps these up, so going for them means
+  // leaving the balloon unguarded for a moment
   const magnetOn = G.pw.magnet > 0;
   for (let i = 0; i < G.picks.length; i++){
     const p = G.picks[i];
     if (p.dead) continue;
-    if (p.y < top || p.y > bot) continue;
     p.t += sdt;
-    const dx = b.x - p.x, dy = b.y - p.y;
-    const d = Math.hypot(dx, dy);
-    if ((magnetOn && d < 130) || p.pull){
-      const f = (magnetOn ? 520 : 900) * sdt / Math.max(24, d);
-      p.x += dx * f; p.y += dy * f;
-      if (d < 12) p.pull = 0;
+    p.y += (p.vy || 0) * sdt;
+    if (p.y < top || p.y > bot) continue;
+    let near = 1e9;
+    for (let k = 0; k < 3; k++){
+      const dd = ptSegDist(p.x, p.y, shg.pts[k].x, shg.pts[k].y, shg.pts[k + 1].x, shg.pts[k + 1].y);
+      if (dd < near) near = dd;
     }
-    if (playing && d < b.r + 13){
+    if (magnetOn && near < 150){
+      const dx = sh.x - p.x, dy = sh.y - p.y, dd = Math.hypot(dx, dy) || 1;
+      p.x += dx / dd * 420 * sdt; p.y += dy / dd * 420 * sdt;
+    }
+    if (playing && near < sh.r + 13){
       p.dead = true;
       if (p.kind === "gem"){
         G.gems++; G.bonus += 12;
@@ -1342,11 +1236,37 @@ function step(dt){
     if (G.overT > 1.25 && !UI.overShown) UI.showClear();
   }
 
-  // --- cull what is far below
-  while (G.obst.length && G.obst[0].y > cam.y + VH + 420) G.obst.shift();
-  while (G.picks.length && (G.picks[0].dead || G.picks[0].y > cam.y + VH + 420)) G.picks.shift();
+  // --- cull anything that has left the picture
+  // once something is safely past the balloon it stops being part of the
+  // picture; keeping it would just crowd the screen you are reading
+  for (let i = G.obst.length - 1; i >= 0; i--){
+    const o = G.obst[i];
+    if (o.y > b.y + 230 || o.y < cam.y - VH * 2.2 ||
+        o.x < -240 || o.x > VW + 240) G.obst.splice(i, 1);
+  }
+  if (G.obst.length > 80){
+    for (let i = 0; i < G.obst.length && G.obst.length > 80; i++){
+      if (G.obst[i].blocked){ G.obst.splice(i, 1); i--; }
+    }
+  }
+  for (let i = G.picks.length - 1; i >= 0; i--){
+    const p = G.picks[i];
+    if (p.dead || p.y > cam.y + VH + 260) G.picks.splice(i, 1);
+  }
 
   UI.tick();
+}
+/* Swatting something away is the point, so it is what pays. Consecutive
+   blocks build a streak; the streak is the multiplier. */
+function blockScored(o, x, y){
+  G.blocks++;
+  G.combo++; G.comboT = 3.2;
+  const mult = 1 + Math.min(9, G.combo - 1) * 0.25;
+  G.bonus += Math.round(o.worth * mult);
+  G.energy = Math.min(100, G.energy + 5 + o.worth * 0.35);
+  burstParts(x, y, o.worth > 12 ? 9 : 5, "#ffffff", 140, "dot");
+  if (G.combo >= 3 && G.combo % 3 === 0) Audio2.SFX.gem(clamp(G.combo % 8, 0, 7));
+  UI.combo(G.combo);
 }
 function finishLevel(){
   G.state = "clear";
@@ -1566,7 +1486,33 @@ function drawObstacles(){
   const top = G.cam.y - 120, bot = G.cam.y + VH + 140;
   for (const o of G.obst){
     if (o.y + o.rad < top || o.y - o.rad > bot) continue;
-    const immovable = o.mass <= 0;
+    const heavy = o.mass >= 3.2;
+    // anything still on course gets a red edge and a line drawn to where it
+    // is going. The balloon cannot move, so what is aimed at it is the only
+    // information that matters.
+    let onCourse = 0;
+    if (G.state === "play"){
+      const dy = G.bal.y - o.y;
+      if (dy > 0 && dy < 460){
+        const tt = dy / Math.max(40, riseSpeed() + Math.max(0, o.vy));
+        const landX = o.x + o.vx * tt;
+        if (Math.abs(landX - G.bal.x) < 34 + o.rad) onCourse = clamp(1 - dy / 460, 0.15, 1);
+      }
+    }
+    if (onCourse){
+      ctx.globalAlpha = 0.16 + onCourse * 0.34;
+      ctx.strokeStyle = "#ef5f6b";
+      ctx.lineWidth = 1.6;
+      ctx.setLineDash([5, 7]);
+      ctx.beginPath();
+      ctx.moveTo(o.x, o.y);
+      ctx.lineTo(G.bal.x, G.bal.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 0.2 + onCourse * 0.45;
+      for (const w of o.wp) capsule(w.x1, w.y1, w.x2, w.y2, w.r + 3.5, "#ef5f6b");
+      ctx.globalAlpha = 1;
+    }
     // shadow
     ctx.globalAlpha = 0.13;
     for (const w of o.wp) capsule(w.x1, w.y1 + 5, w.x2, w.y2 + 5, w.r, "#0a1030");
@@ -1577,14 +1523,14 @@ function drawObstacles(){
       for (const w of o.wp) capsule(w.x1, w.y1, w.x2, w.y2, w.r + 4, "#ffffff");
       ctx.globalAlpha = 1;
     }
-    const body = immovable ? mix2(ink, "rgb(255,255,255)", 0.14) : ink;
+    const body = heavy ? mix2(ink, "rgb(255,255,255)", 0.14) : ink;
     for (const w of o.wp) capsule(w.x1, w.y1, w.x2, w.y2, w.r, body);
     // inner light
     ctx.globalAlpha = 0.16;
     for (const w of o.wp) capsule(w.x1, w.y1 - w.r * 0.34, w.x2, w.y2 - w.r * 0.34, w.r * 0.34, "#ffffff");
     ctx.globalAlpha = 1;
-    // immovable pieces get rivets so you learn not to fight them
-    if (immovable){
+    // rivets mark the heavy ones: they need a running start to move
+    if (heavy){
       ctx.fillStyle = "rgba(255,255,255,.34)";
       for (const w of o.wp){
         const steps = Math.max(1, Math.floor(Math.hypot(w.x2 - w.x1, w.y2 - w.y1) / 34));
@@ -1860,8 +1806,8 @@ function render(){
     ctx.fillStyle = "#ffffff";
     ctx.font = "800 14px " + FONT;
     ctx.textAlign = "center";
-    ctx.fillText("Drag anywhere to move the shield", VW / 2, VH * 0.80);
-    ctx.fillText("Keep the balloon clear of the dark shapes", VW / 2, VH * 0.80 + 20);
+    ctx.fillText("Drag the shield anywhere on screen", VW / 2, VH * 0.80);
+    ctx.fillText("The balloon cannot dodge — block for it", VW / 2, VH * 0.80 + 20);
     ctx.globalAlpha = 1;
   }
 }
@@ -1977,7 +1923,7 @@ const UI = {
     if (n === this._combo) return;
     this._combo = n;
     const c = $("comboTag");
-    if (n >= 2){ c.textContent = "×" + n + " close calls"; c.classList.add("on"); }
+    if (n >= 2){ c.textContent = "×" + n + " blocked"; c.classList.add("on"); }
     else c.classList.remove("on");
   },
   enterGame(){
@@ -2116,7 +2062,7 @@ function secondWind(){
     const dx = o.x - b.x, dy = o.y - b.y;
     const d = Math.hypot(dx, dy);
     if (d > 200) continue;
-    if (o.mass <= 0 || d < 60){ G.obst.splice(i, 1); continue; }
+    if (d < 90){ G.obst.splice(i, 1); continue; }
     const f = 620 / o.mass;
     o.vx += dx / (d || 1) * f;
     o.vy += dy / (d || 1) * f;
