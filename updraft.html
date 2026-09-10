@@ -662,19 +662,19 @@ function levelDef(n){                        // n is 1-based
     seed: n * 9176 + 31,
     lengthU: (170 + n * 7) * 8,
     speed: 52 + d * 26 + (gauntlet ? 3 : 0),
-    gapStart: 146 - d * 56,                   // climb units between arrivals
-    gapEnd: 108 - d * 50 - (gauntlet ? 8 : 0),
+    gapStart: 46 - d * 10,                    // climb units between arrivals
+    gapEnd: 36 - d * 8 - (gauntlet ? 3 : 0),
     aimStart: 0.82 + d * 0.16,                // how sharply threats converge
     aimEnd: 0.94 + d * 0.12,
     fall: 8 + d * 44,                         // the push they start with; gravity adds the rest
     diff: d,
-    gemRate: 0.6
+    gemRate: 0.22
   };
 }
 function endlessDef(){
   return { n: 0, biome: 0, gauntlet: false, seed: (Math.random() * 1e9) | 0, lengthU: Infinity,
-           speed: 52, gapStart: 146, gapEnd: 146, aimStart: 0.86, aimEnd: 0.86, fall: 8,
-           diff: 0, gemRate: 0.65, endless: true };
+           speed: 52, gapStart: 46, gapEnd: 46, aimStart: 0.86, aimEnd: 0.86, fall: 8,
+           diff: 0, gemRate: 0.24, endless: true };
 }
 
 /* ------------------------------------------------------------ entities */
@@ -739,8 +739,8 @@ function updThreat(o, dt, target){
   // ricochet off the sides of the sky, so a hard swat sends something bouncing
   // back into play instead of quietly deleting it
   const edge = o.rad;
-  if (o.x < edge && o.vx < 0){ o.x = edge; o.vx = -o.vx * 0.55; o.spin += o.vy * 0.004; o.flash = Math.max(o.flash, 0.5); }
-  else if (o.x > VW - edge && o.vx > 0){ o.x = VW - edge; o.vx = -o.vx * 0.55; o.spin -= o.vy * 0.004; o.flash = Math.max(o.flash, 0.5); }
+  if (o.x < edge && o.vx < 0){ o.x = edge; o.vx = -o.vx * 0.4; o.spin += o.vy * 0.004; o.flash = Math.max(o.flash, 0.5); }
+  else if (o.x > VW - edge && o.vx > 0){ o.x = VW - edge; o.vx = -o.vx * 0.4; o.spin -= o.vy * 0.004; o.flash = Math.max(o.flash, 0.5); }
   if (o.flash > 0) o.flash = Math.max(0, o.flash - dt * 3.4);
   rebuildParts(o);
 }
@@ -771,7 +771,7 @@ function solidPair(a, b){
   b.x += nx * pen * (ib / it) * 0.85; b.y += ny * pen * (ib / it) * 0.85;
   const vn = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
   if (vn < 0){
-    const j = -(1 + 0.42) * vn / it;
+    const j = -(1 + 0.28) * vn / it;
     a.vx -= nx * j * ia; a.vy -= ny * j * ia;
     b.vx += nx * j * ib; b.vy += ny * j * ib;
     // each takes a turn out of the exchange
@@ -1042,7 +1042,7 @@ function spawnWave(){
   const opening = G.genCount < 2;
 
   // every so often, a structure instead of a volley
-  if (!opening && tier >= 3 && G.genCount % 5 === 4){
+  if (!opening && tier >= 3 && G.genCount % 13 === 7){
     spawnFormation(rng, d, tier);
     return;
   }
@@ -1059,11 +1059,16 @@ function spawnWave(){
   const aimBase = lerp(def.aimStart, def.aimEnd, t);
   const shots = 1 + (rng() < d * 0.7 ? 1 : 0) + (d > 0.78 && rng() < (d - 0.78) * 1.5 ? 1 : 0);
   for (let i = 0; i < shots; i++){
+    // roughly half of what falls is passing traffic: it comes down the flanks,
+    // stays wide, and is only your problem if you knock it into your own line
+    const stray = !opening && rng() < 0.55 + (1 - d) * 0.25;
     const s = {
       rng, d,
-      x: clamp(30 + rng() * (VW - 60), 20, VW - 20),
+      x: stray ? (rng() < 0.5 ? 16 + rng() * 74 : VW - 90 + rng() * 74)
+               : clamp(40 + rng() * (VW - 80), 24, VW - 24),
       y: G.cam.y - 40 - rng() * 90 - i * 60,
-      aim: clamp(aimBase * (0.86 + rng() * 0.28) * (opening ? 0.85 : 1), 0.3, 1.2),
+      aim: stray ? 0.04 + rng() * 0.26
+                 : clamp(aimBase * (0.86 + rng() * 0.28) * (opening ? 0.85 : 1), 0.3, 1.2),
       fall: def.fall * (0.85 + rng() * 0.35) * (opening ? 0.8 : 1)
     };
     const made = chosen.make(s);
@@ -1083,13 +1088,13 @@ function spawnWave(){
       G.gemsPlaced++;
     }
   }
-  if (G.genCount % 7 === 5 && rng() < 0.8){
+  if (G.genCount % 18 === 9 && rng() < 0.85){
     const kind = PW_KINDS[(rng() * PW_KINDS.length) | 0];
     G.picks.push({ x: clamp(40 + rng() * (VW - 80), 30, VW - 30), y: G.cam.y - 80,
                    kind, r: 15, t: 0, dead: false, vy: def.fall * 0.4 + 8 });
   }
 
-  const gapBase = endless ? Math.max(52, 146 - G.climbed / 50) : lerp(def.gapStart, def.gapEnd, t);
+  const gapBase = endless ? Math.max(22, 46 - G.climbed / 260) : lerp(def.gapStart, def.gapEnd, t);
   G.nextSpawn = G.climbed + gapBase * (0.85 + rng() * 0.3) * (opening ? 1.5 : 1);
 }
 function spawnCheck(){
@@ -1712,6 +1717,16 @@ function drawLand(bm){
 /* Every drawn shape stops exactly at its collider radius: the outline is laid
    *inside* r, never around it, so what you see is what you can hit. */
 function capsule(x1, y1, x2, y2, r, col){
+  // A ball is a capsule of zero length. WebKit will not paint a zero-length
+  // stroke even with round caps — Chromium will — so on iOS every round thing
+  // in the game came out as bare outline with no body. Draw those as discs.
+  if (Math.abs(x2 - x1) < 1e-3 && Math.abs(y2 - y1) < 1e-3){
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.arc(x1, y1, Math.max(0.25, r), 0, TAU);
+    ctx.fill();
+    return;
+  }
   ctx.strokeStyle = col;
   ctx.lineWidth = Math.max(0.5, r * 2);
   ctx.beginPath();
@@ -1783,13 +1798,13 @@ function drawObstacles(){
       if (dy > 0 && dy < 520){
         const tt = timeToBalloon(o);
         const landX = o.x + o.vx * tt;
-        if (Math.abs(landX - G.bal.x) < 34 + o.rad) onCourse = clamp(1 - dy / 520, 0.15, 1);
+        if (Math.abs(landX - G.bal.x) < 44 + o.rad) onCourse = clamp(1 - dy / 520, 0.15, 1);
       }
     }
     if (onCourse){
-      ctx.globalAlpha = 0.25 + onCourse * 0.6;
+      const warn = mix("#2f3475", "#ef5f6b", 0.35 + onCourse * 0.65);
       for (const w of o.wp)
-        capsuleRing(w.x1, w.y1, w.x2, w.y2, w.r, "#ef5f6b", Math.min(edgeW * 1.8, w.r), "#ffffff");
+        capsuleRing(w.x1, w.y1, w.x2, w.y2, w.r, warn, Math.min(edgeW * 1.6, w.r * 0.6), "#ffffff");
       ctx.globalAlpha = 0.14 + onCourse * 0.3;
       ctx.strokeStyle = "#ef5f6b";
       ctx.lineWidth = 1.6;
@@ -1803,10 +1818,9 @@ function drawObstacles(){
     }
     // struck this instant: the edge lights up, still inside the radius
     if (o.flash > 0.01){
-      ctx.globalAlpha = o.flash * 0.85;
+      const hot = mix("#ffd166", "#ff8a3d", o.flash);
       for (const w of o.wp)
-        capsuleRing(w.x1, w.y1, w.x2, w.y2, w.r, "#ffd166", Math.min(edgeW * 1.8, w.r), "#ffffff");
-      ctx.globalAlpha = 1;
+        capsuleRing(w.x1, w.y1, w.x2, w.y2, w.r, hot, Math.min(edgeW * 1.6, w.r * 0.6), "#ffffff");
     }
     // a thin dark edge goes back on last, so a warning or a flash never eats
     // the outline that tells you where the thing actually ends
