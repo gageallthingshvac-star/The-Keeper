@@ -75,7 +75,7 @@
     line-height:.95;
     margin:0;
     letter-spacing:-1.5px;
-    text-shadow:0 6px 0 rgba(47,52,117,.10);
+    text-shadow:0 3px 0 rgba(47,52,117,.07);
   }
   .sub{font-size:15px;color:var(--ink-soft);margin:0;font-weight:800}
   .big-num{font-size:clamp(46px,16vw,86px);line-height:1;margin:0;color:#fff;text-shadow:0 4px 0 rgba(47,52,117,.18)}
@@ -352,6 +352,9 @@
       <div class="stat"><b id="overFar">0%</b><span>Climbed</span></div>
     </div>
     <div class="row" style="flex-direction:column">
+      <button class="btn wide" id="reviveBtn" style="background:#ffd166;display:none">
+        Second wind · free
+      </button>
       <button class="btn primary wide" id="againBtn">Try again</button>
       <button class="btn ghost wide" id="overLevels">Levels</button>
       <button class="btn ghost wide" id="overMenu">Main menu</button>
@@ -409,7 +412,6 @@ function hash2(x, y){
   h = (h ^ h >>> 13) * 1274126177;
   return ((h ^ h >>> 16) >>> 0) / 4294967296;
 }
-const easeOut = t => 1 - Math.pow(1 - t, 3);
 
 /* ---- distance helpers: every collider in this game is a capsule ------- */
 // squared distance from point to segment, plus the closest point
@@ -934,7 +936,7 @@ const G = {
   score: 0, bonus: 0, gems: 0, hits: 0, combo: 0, comboT: 0, energy: 0, lastBump: -1,
   climbed: 0, startY: 0, genY: 0, genDone: false, genCount: 0, gemsPlaced: 0,
   lastSafe: VW / 2, lastGap: 300,
-  state: "menu", overT: 0, lastKind: "", pointer: false, deathY: 0
+  state: "menu", overT: 0, lastKind: "", hintT: 0, lastHitBy: "", usedRevive: false, bankedGems: 0, failCounted: false
 };
 
 /* -------------------------------------------------------- particles */
@@ -1030,6 +1032,7 @@ function startRun(mode, n){
   G.score = 0; G.bonus = 0; G.gems = 0; G.hits = 0; G.combo = 0; G.comboT = 0; G.energy = 0; G.lastBump = -1;
   G.climbed = 0; G.startY = 0; G.genY = -300; G.genDone = false; G.genCount = 0; G.gemsPlaced = 0;
   G.lastKind = ""; G.overT = 0; G.lastSafe = VW / 2; G.lastGap = 300;
+  G.usedRevive = false; G.bankedGems = 0; G.failCounted = false;
   ensureGen(G.cam.y - VH * 1.4);
   G.state = "play";
   UI.enterGame();
@@ -1103,7 +1106,6 @@ function popBalloon(){
   G.bal.alive = false;
   G.state = "dead";
   G.overT = 0;
-  G.deathY = G.bal.y;
   burstParts(G.bal.x, G.bal.y, 26, SKIN_BY_ID(save.skin).body, 260, "shard");
   burstParts(G.bal.x, G.bal.y, 12, "#ffffff", 160, "dot");
   G.cam.shake = save.opts.calm ? 4 : 14;
@@ -1390,7 +1392,8 @@ function biomeNow(){
 }
 function bcol(pick){
   const bm = biomeNow();
-  return bm.t > 0 ? mix(pick(bm.a), pick(bm.b), bm.t) : pick(bm.a);
+  // always returns an rgb() string, so blends of blends stay parseable
+  return mix(pick(bm.a), pick(bm.b), bm.t);
 }
 function skyPair(){
   const p = progressNow();
@@ -2058,8 +2061,10 @@ const UI = {
     $("overFar").textContent = G.def.endless ? (Math.floor(G.climbed / 8) + " m") : pct + "%";
     $("overWhy").textContent = G.def.endless ? "Endless run" : "Level " + G.def.n + " · " + BIOMES[G.def.biome].name;
     $("overLevels").style.display = G.def.endless ? "none" : "";
+    $("reviveBtn").style.display = canRevive() ? "" : "none";
     // a few tries in and the next level opens up anyway — nobody gets stuck
-    if (!G.def.endless){
+    if (!G.def.endless && !G.failCounted){
+      G.failCounted = true;
       save.fails = save.fails || {};
       save.fails[G.def.n] = (save.fails[G.def.n] || 0) + 1;
       if (save.fails[G.def.n] >= 4 && save.unlocked === G.def.n && G.def.n < TOTAL_LEVELS){
@@ -2094,8 +2099,46 @@ const UI = {
     this.show("scr-clear");
   }
 };
+/* One free second wind per run. The genre traditionally sells this for an ad
+   break; here you just get it, once, and only after you have earned some
+   height. */
+function canRevive(){
+  if (G.usedRevive || G.state !== "dead" || !UI.overShown) return false;
+  return G.def.endless ? G.climbed > 700 : G.climbed / G.def.lengthU > 0.4;
+}
+function secondWind(){
+  if (!canRevive()) return;
+  G.usedRevive = true;
+  const b = G.bal;
+  // sweep the wreck site clear so you do not respawn into a spinning bar
+  for (let i = G.obst.length - 1; i >= 0; i--){
+    const o = G.obst[i];
+    const dx = o.x - b.x, dy = o.y - b.y;
+    const d = Math.hypot(dx, dy);
+    if (d > 200) continue;
+    if (o.mass <= 0 || d < 60){ G.obst.splice(i, 1); continue; }
+    const f = 620 / o.mass;
+    o.vx += dx / (d || 1) * f;
+    o.vy += dy / (d || 1) * f;
+    o.flash = 1;
+  }
+  b.alive = true; b.vx = 0; b.inv = 2.4;
+  G.pw.bubble = 1;
+  G.combo = 0; G.comboT = 0;
+  G.state = "play";
+  G.overT = 0;
+  UI.overShown = false;
+  UI.show(null);
+  burstParts(b.x, b.y, 22, "#ffd166", 220, "dot");
+  Audio2.SFX.power(); buzz(20);
+  UI.flash("Second wind — one per run");
+}
+
 function bankRun(){
-  save.gems = (save.gems || 0) + G.gems;
+  // a run can end twice (death, second wind, death again) — bank only the delta
+  const fresh = Math.max(0, G.gems - (G.bankedGems || 0));
+  G.bankedGems = G.gems;
+  save.gems = (save.gems || 0) + fresh;
   save.best = Math.max(save.best || 0, G.score);
   if (G.def.endless){
     save.endlessBest = Math.max(save.endlessBest || 0, G.score);
@@ -2224,6 +2267,7 @@ $("resumeBtn").addEventListener("click", () => UI.resume());
 $("restartBtn").addEventListener("click", () => UI.restart());
 $("quitBtn").addEventListener("click", () => UI.menu());
 $("againBtn").addEventListener("click", () => UI.restart());
+$("reviveBtn").addEventListener("click", () => secondWind());
 $("overLevels").addEventListener("click", () => { buildLevelGrid(); UI.show("scr-levels"); });
 $("overMenu").addEventListener("click", () => UI.menu());
 $("replayBtn").addEventListener("click", () => UI.restart());
