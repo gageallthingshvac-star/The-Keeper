@@ -152,7 +152,7 @@
     letter-spacing:-1px;
   }
   #comboTag{
-    position:absolute;top:calc(126px + var(--safe-t));left:0;right:0;text-align:center;
+    position:absolute;top:calc(136px + var(--safe-t));left:0;right:0;text-align:center;
     font-size:15px;color:#fff;opacity:0;transition:opacity .18s ease;
   }
   #comboTag.on{opacity:1}
@@ -237,7 +237,7 @@
   .skin svg{width:56%;height:56%}
 
   .stage-chip{
-    position:absolute;top:calc(104px + var(--safe-t));left:0;right:0;text-align:center;
+    position:absolute;top:calc(112px + var(--safe-t));left:0;right:0;text-align:center;
     font-size:12px;letter-spacing:1.6px;text-transform:uppercase;
     color:rgba(255,255,255,.92);text-shadow:0 1px 2px rgba(24,40,70,.35);
   }
@@ -962,66 +962,66 @@ const PHASES = [
     ev:[[0.30,"TOWER CLEAR"],[0.66,"ROLL AND PITCH PROGRAMME"]] },
 
   { id:"ascent", name:"Ascent",              sub:"S-IC · FIVE F-1 ENGINES",
-    kind:"air",   span:1500,  tech:0.02,  met:[15,162],        alt:[2.3,67],       vel:[520,2756],
+    kind:"air",   span:1750,  tech:0.02,  met:[15,162],        alt:[2.3,67],       vel:[520,2756],
     sky:["#96cbee","#2f77c8","#08163f"], ink:"#0a1a40", star:0.30,
     bar:"through the ascent",
     ev:[[0.18,"PITCH PROGRAMME"],[0.46,"MAX Q · 13.8 km"],[0.86,"S-IC CUTOFF"]] },
 
   { id:"stage2", name:"Staging",             sub:"S-II · FIVE J-2 ENGINES",
-    kind:"air",   span:1250,  tech:0.05,  met:[162,709],       alt:[67,186],       vel:[2756,7793],
+    kind:"air",   span:1500,  tech:0.05,  met:[162,709],       alt:[67,186],       vel:[2756,7793],
     sky:["#2f68ad","#0d1f52","#02040e"], ink:"#010614", star:0.80,
     bar:"through staging",
     ev:[[0.05,"S-IC SEPARATION · 67 km"],[0.22,"S-II IGNITION"],[0.50,"TOWER JETTISON"],[0.88,"S-II CUTOFF"]] },
 
   { id:"eorbit", name:"Earth Parking Orbit", sub:"185 km · ONE REVOLUTION",
-    kind:"orbit", span:2200,  tech:0.09,  met:[709,9856],      alt:[186,186],      vel:[7793,7793], body:"earth",
+    kind:"orbit", span:2400,  tech:0.09,  met:[709,9856],      alt:[186,186],      vel:[7793,7793], body:"earth",
     sky:["#06102c","#030814","#000004"], ink:"#00030c", star:1,
     bar:"of one orbit of Earth",
     ev:[[0.06,"ORBITAL INSERTION"],[0.52,"SYSTEMS GO FOR TLI"],[0.94,"TRANSLUNAR INJECTION"]] },
 
   { id:"tli",    name:"Translunar Coast",    sub:"S-IVB · 385,000 km",
-    kind:"void",  span:1500,  tech:0.14,  met:[9856,272990],   alt:[186,385000],   vel:[10838,1400],
+    kind:"void",  span:1800,  tech:0.14,  met:[9856,272990],   alt:[186,385000],   vel:[10838,1400],
     sky:["#04091c","#01030b","#000002"], ink:"#000208", star:1,
     bar:"of the coast to the Moon",
     ev:[[0.14,"CSM TRANSPOSITION"],[0.55,"EAGLE EXTRACTED"],[0.90,"LUNAR SPHERE OF INFLUENCE"]] },
 
   { id:"morbit", name:"Lunar Orbit",         sub:"MARE TRANQUILLITATIS · ONE REVOLUTION",
-    kind:"orbit", span:2200,  tech:0.20,  met:[272990,288400], alt:[110,110],      vel:[1600,1600], body:"moon",
+    kind:"orbit", span:2600,  tech:0.20,  met:[272990,288400], alt:[110,110],      vel:[1600,1600], body:"moon",
     sky:["#05070f","#020308","#000001"], ink:"#000105", star:1,
     ev:[[0.08,"LUNAR ORBIT INSERTION"],[0.50,"TRANQUILLITY BASE BELOW"],[0.94,"BURN FOR MARS"]] },
 
   { id:"marorb", name:"Mars Orbit",          sub:"225 MILLION km · ONE REVOLUTION",
-    kind:"orbit", span:2400,  tech:0.32,  met:[288400,2.1e7],  alt:[400,400],      vel:[3400,3400], body:"mars",
+    kind:"orbit", span:2900,  tech:0.32,  met:[288400,2.1e7],  alt:[400,400],      vel:[3400,3400], body:"mars",
     sky:["#140a10","#070409","#010002"], ink:"#050108", star:1,
     ev:[[0.08,"AEROCAPTURE COMPLETE"],[0.48,"OLYMPUS MONS BELOW"],[0.94,"OUTBOUND"]] },
 
   { id:"juporb", name:"Jupiter Orbit",       sub:"778 MILLION km · ONE REVOLUTION",
-    kind:"orbit", span:2600,  tech:0.45,  met:[2.1e7,7.4e7],   alt:[4200,4200],    vel:[25100,25100], body:"jupiter",
+    kind:"orbit", span:3300,  tech:0.45,  met:[2.1e7,7.4e7],   alt:[4200,4200],    vel:[25100,25100], body:"jupiter",
     sky:["#100c08","#070502","#010100"], ink:"#050300", star:1,
     ev:[[0.08,"RADIATION BELT TRANSIT"],[0.46,"GREAT RED SPOT BELOW"],[0.94,"OUTBOUND"]] },
 
   { id:"saturb", name:"Saturn Orbit",        sub:"1.4 BILLION km · ONE REVOLUTION",
-    kind:"orbit", span:2600,  tech:0.58,  met:[7.4e7,1.6e8],   alt:[3600,3600],    vel:[18100,18100], body:"saturn",
+    kind:"orbit", span:3500,  tech:0.58,  met:[7.4e7,1.6e8],   alt:[3600,3600],    vel:[18100,18100], body:"saturn",
     sky:["#0d0c10","#050407","#010102"], ink:"#030208", star:1,
     ev:[[0.08,"RING PLANE CROSSING"],[0.50,"CASSINI DIVISION"],[0.94,"OUTBOUND"]] },
 
   { id:"ururb",  name:"Uranus Orbit",        sub:"2.9 BILLION km · ONE REVOLUTION",
-    kind:"orbit", span:2400,  tech:0.70,  met:[1.6e8,3.1e8],   alt:[2700,2700],    vel:[12400,12400], body:"uranus",
+    kind:"orbit", span:3600,  tech:0.70,  met:[1.6e8,3.1e8],   alt:[2700,2700],    vel:[12400,12400], body:"uranus",
     sky:["#06101a","#030810","#000203"], ink:"#00060c", star:1,
     ev:[[0.08,"POLE-ON APPROACH"],[0.50,"98° AXIAL TILT"],[0.94,"OUTBOUND"]] },
 
   { id:"neporb", name:"Neptune Orbit",       sub:"4.5 BILLION km · ONE REVOLUTION",
-    kind:"orbit", span:2400,  tech:0.81,  met:[3.1e8,5.2e8],   alt:[2600,2600],    vel:[13300,13300], body:"neptune",
+    kind:"orbit", span:3800,  tech:0.81,  met:[3.1e8,5.2e8],   alt:[2600,2600],    vel:[13300,13300], body:"neptune",
     sky:["#050a1e","#020510","#000104"], ink:"#000208", star:1,
     ev:[[0.08,"SUPERSONIC WINDS"],[0.50,"GREAT DARK SPOT BELOW"],[0.94,"OUTBOUND"]] },
 
   { id:"pluorb", name:"Pluto Orbit",         sub:"5.9 BILLION km · ONE REVOLUTION",
-    kind:"orbit", span:2300,  tech:0.90,  met:[5.2e8,8.4e8],   alt:[900,900],      vel:[880,880], body:"pluto",
+    kind:"orbit", span:4000,  tech:0.90,  met:[5.2e8,8.4e8],   alt:[900,900],      vel:[880,880], body:"pluto",
     sky:["#080610","#040309","#000002"], ink:"#020106", star:1,
     ev:[[0.08,"KUIPER BELT ENTRY"],[0.50,"SPUTNIK PLANITIA BELOW"],[0.94,"HELIOPAUSE AHEAD"]] },
 
   { id:"deep",   name:"Interstellar",        sub:"BEYOND THE HELIOSPHERE",
-    kind:"void",  span:2600,  tech:1,  met:[8.4e8,2.4e9],   alt:[2.3e10,9e10],  vel:[17000,61000],
+    kind:"void",  span:4600,  tech:1,  met:[8.4e8,2.4e9],   alt:[2.3e10,9e10],  vel:[17000,61000],
     sky:["#0a0620","#050312","#000002"], ink:"#020010", star:1,
     bar:"further out than anyone",
     ev:[[0.10,"HELIOPAUSE CROSSED"],[0.50,"NO SIGNAL"],[0.90,"STILL CLIMBING"]] }
@@ -1064,6 +1064,13 @@ function missionAt(climbed){
   return _mis;
 }
 function missionNow(){ return missionAt(G.climbed); }
+/* How hard it is here. Tied to how far down the flight plan you are rather
+   than to raw distance, so it rises with the journey instead of topping out
+   halfway to the Moon, and the laps past the last phase carry on past 1. */
+function missionDiff(){
+  const m = missionNow(), n = PHASES.length;
+  return (m.i + m.t + m.lap * n) / (n * 1.2);
+}
 /* ---- the readouts. Mission elapsed time runs on the real flight plan, so
    the numbers beside the callouts are the numbers Apollo 11 flew: max q at
    T+01:23, S-IC cutoff at T+02:41, insertion at T+11:49, lunar orbit at
@@ -1692,6 +1699,324 @@ const DESIGNS = [
   }}
 ];
 
+/* ------------------------------------------- what the mission flies through
+
+   Levels hang pictures in the sky. The mission cannot: a heart in low Earth
+   orbit is a joke the second time you see it. So the mission has its own
+   cast, and it is the real one — the ice that sheds off a cryogenic tank on
+   the way up, the hardware a staging event leaves behind, and then rock.
+
+   Everything here is a rigid body made of capsules, same as the rest of the
+   game, so a rock tumbles as one piece and a solar array snaps round its own
+   centre. Size, weight and count all read `g.d`, the difficulty at the point
+   the thing is placed, so the same design is a nuisance early and a wall
+   late.                                                                    */
+
+// an irregular lump. Lobes round a centre, so it is convex enough to slide
+// off the shield but lumpy enough to look quarried rather than drawn
+function rockParts(rng, R){
+  const parts = [];
+  const n = 5 + ((rng() * 3) | 0);
+  for (let i = 0; i < n; i++){
+    const a = i / n * TAU + (rng() - 0.5) * 0.7;
+    const d = R * (0.14 + rng() * 0.30);
+    const r = R * (0.40 + rng() * 0.24);
+    parts.push({ x1: Math.cos(a) * d, y1: Math.sin(a) * d,
+                 x2: Math.cos(a) * d * 0.25, y2: Math.sin(a) * d * 0.25, r });
+  }
+  return parts;
+}
+/* Weight goes up with size, but nothing like as fast as volume would have
+   it: a rock scaled by r-cubed reaches a mass the shield simply cannot argue
+   with, and an obstacle you cannot move is not an obstacle, it is a wall with
+   a countdown. The ceiling here is a shade above the heaviest thing anywhere
+   else in the game, so a boulder is the worst news you can get and still
+   something you can shift if you swing properly. */
+const ROCK_MASS_MAX = 4.6;
+const ROCK_MIN = 9;                    // below this it is a speck, not a rock
+function rock(g, x, y, R0, massPer, opt){
+  const R = Math.max(ROCK_MIN, R0);
+  return piece(g, x, y, rockParts(g.rng, R),
+    Object.assign({ mass: clamp(massPer * (0.5 + R / 30), 0.35, ROCK_MASS_MAX), style: "orb",
+                    worth: Math.round(4 + R / 3),
+                    ang: g.rng() * TAU, spin: (g.rng() - 0.5) * 0.5 }, opt || {}));
+}
+// a dead satellite: bus, two arrays, a boom and a dish
+function satParts(rng, S){
+  const w = S * (0.9 + rng() * 0.5);
+  return [
+    { x1: -S * 0.30, y1: 0, x2: S * 0.30, y2: 0, r: S * 0.52 },      // the bus
+    { x1: -S * 0.55, y1: 0, x2: -w * 2.1, y2: -S * 0.1, r: S * 0.30 }, // port array
+    { x1: S * 0.55, y1: 0, x2: w * 2.1, y2: S * 0.1, r: S * 0.30 },  // starboard
+    { x1: 0, y1: -S * 0.5, x2: 0, y2: -S * 1.5, r: S * 0.14 },       // the boom
+    { x1: 0, y1: -S * 1.5, x2: 0, y2: -S * 1.8, r: S * 0.44 }        // the dish
+  ];
+}
+/* The ship cannot dodge. That makes the strip of sky directly above it the
+   only thing that matters, and it means an arrangement is not allowed to put
+   a wall there however dense it is elsewhere: a debris field that happens to
+   be solid across the middle is not difficulty, it is a coin toss you lose.
+
+   So every mission arrangement goes through here before it is handed over.
+   Whatever stands in the ship's line gets counted, and the excess — heaviest
+   first, because that is what you would least like to meet — is walked out to
+   one side. What is left is then pulled apart vertically so it arrives one
+   piece at a time instead of as a single wall. The budget widens the further
+   out you are, so late debris really is worse; it just never stops being
+   something a good sweep can open. */
+const LANE = 42;                       // the ship's half-width plus its reach
+function clearLine(fresh, raw){
+  // raw runs past 1 on the laps, which is where the last of the pressure
+  // comes from once there is nothing further out to fly to
+  const d = Math.min(1.7, raw);
+  const budget = 2.4 + d * 6.0;        // mass allowed to stand in the line
+  const maxN = 3 + Math.round(d * 4);  // and how many pieces it may be
+  const inLane = () => fresh.filter(o => Math.abs(o.x - VW / 2) < LANE + o.rad * 0.7);
+  let lane = inLane().sort((a, b) => b.mass - a.mass);
+  let mass = lane.reduce((a, o) => a + o.mass, 0);
+  for (const o of lane){
+    if (mass <= budget && lane.length <= maxN) break;
+    const side = o.x < VW / 2 ? -1 : 1;
+    o.x = clamp(VW / 2 + side * (LANE + o.rad + 8), 16, VW - 16);
+    rebuildParts(o);
+    mass -= o.mass;
+    lane = lane.filter(q => q !== o);
+  }
+  /* What is still in the line gets room between one piece and the next, so
+     clearing it is a sequence of sweeps rather than one impossible one. The
+     ship climbs toward smaller y, so the piece with the largest y arrives
+     first: walk them in that order and push each one further away, never
+     nearer, or the fix hands you the wall it was meant to prevent. */
+  const left = inLane().sort((a, b) => b.y - a.y);
+  // the gap between arrivals closes as the journey goes on: at the pad you get
+  // a second and a half to deal with each piece, out past Pluto barely one
+  const GAPV = Math.max(50, 86 - d * 30);
+  for (let i = 1; i < left.length; i++){
+    const cap = left[i - 1].y - GAPV;
+    if (left[i].y > cap){ left[i].y = cap; rebuildParts(left[i]); }
+  }
+}
+const MDESIGNS = [
+  /* --- inside the atmosphere ---------------------------------------- */
+  { id: "iceshed", name: "Ice shed", span: 250, build(g){
+      // ice coming off the tanks. Light, plentiful, and it drifts apart
+      const n = 10 + Math.round(g.d * 9);
+      for (let i = 0; i < n; i++){
+        const x = 26 + g.rng() * (VW - 52);
+        const y = g.y - 40 - g.rng() * 300;
+        rock(g, x, y, 9 + g.rng() * 8, 0.5);
+      }
+    }},
+  { id: "gulls", name: "Gull line", span: 210, build(g){
+      // a line of birds off the Banana River, strung across the climb
+      const n = 6 + Math.round(g.d * 5);
+      const tilt = (g.rng() - 0.5) * 0.5;
+      for (let i = 0; i < n; i++){
+        const t = i / (n - 1) - 0.5;
+        const x = VW / 2 + t * (VW - 70);
+        const y = g.y - 110 + t * 120 * tilt + Math.abs(t) * 40;
+        piece(g, x, y, [{ x1: -16, y1: 5, x2: 0, y2: -4, r: 7 },
+                        { x1: 0, y1: -4, x2: 16, y2: 5, r: 7 }],
+              { mass: 0.5, style: "orb", worth: 6 });
+      }
+    }},
+  { id: "hail", name: "Hail cell", span: 230, build(g){
+      const n = 14 + Math.round(g.d * 12);
+      const cx = VW / 2 + (g.rng() - 0.5) * 120;
+      for (let i = 0; i < n; i++){
+        const a = g.rng() * TAU, d = Math.sqrt(g.rng()) * (70 + g.d * 50);
+        rock(g, cx + Math.cos(a) * d, g.y - 120 + Math.sin(a) * d * 0.7,
+             7 + g.rng() * 6, 0.4);
+      }
+    }},
+
+  /* --- what staging leaves behind ----------------------------------- */
+  { id: "interstage", name: "Interstage", span: 300, build(g){
+      // the ring that separates two stages, falling away in pieces
+      const cx = VW / 2 + (g.rng() - 0.5) * 90, cy = g.y - 130;
+      const R = 74 + g.d * 24;
+      const gap = g.rng() * TAU, open = 1.0;
+      for (let i = 0; i < 10; i++){
+        const a0 = gap + open + (TAU - open) * (i / 10);
+        const a1 = gap + open + (TAU - open) * ((i + 0.85) / 10);
+        piece(g, cx + Math.cos((a0 + a1) / 2) * R, cy + Math.sin((a0 + a1) / 2) * R * 0.62,
+              [{ x1: (Math.cos(a0) - Math.cos(a1)) * R * 0.5,
+                 y1: (Math.sin(a0) - Math.sin(a1)) * R * 0.31,
+                 x2: (Math.cos(a1) - Math.cos(a0)) * R * 0.5,
+                 y2: (Math.sin(a1) - Math.sin(a0)) * R * 0.31, r: 9 }],
+              { mass: 1.4 + g.d * 1.4, style: "wall", worth: 10 });
+      }
+      // and the bolts that held it together, which do go through the middle
+      for (let i = 0; i < 3 + Math.round(g.d * 4); i++)
+        rock(g, cx + (g.rng() - 0.5) * 120, cy - 70 - g.rng() * 260, 8 + g.rng() * 7, 0.5);
+    }},
+  { id: "spent", name: "Spent stage", span: 330, build(g){
+      // a burnt-out booster, end over end. Heavy: you move it or you go round
+      const x = VW / 2 + (g.rng() - 0.5) * 120;
+      piece(g, x, g.y - 150,
+            [{ x1: 0, y1: -52, x2: 0, y2: 34, r: 14 },
+             { x1: 0, y1: 34, x2: 0, y2: 52, r: 9 },
+             { x1: -16, y1: 30, x2: 16, y2: 30, r: 5 }],
+            { mass: 3.0 + g.d * 2.4, style: "wall", worth: 26,
+              ang: (g.rng() - 0.5) * 1.4, spin: (g.rng() - 0.5) * 0.5 });
+      for (let i = 0; i < 4 + Math.round(g.d * 5); i++)
+        rock(g, 30 + g.rng() * (VW - 60), g.y - 40 - g.rng() * 250, 8 + g.rng() * 7, 0.5);
+    }},
+  { id: "tower", name: "Escape tower", span: 300, build(g){
+      const x = VW / 2 + (g.rng() - 0.5) * 130;
+      piece(g, x, g.y - 140,
+            [{ x1: 0, y1: -56, x2: 0, y2: 10, r: 6 },
+             { x1: 0, y1: 10, x2: 0, y2: 48, r: 15 },
+             { x1: -20, y1: -34, x2: 20, y2: -34, r: 5 }],
+            { mass: 2.0 + g.d * 1.6, style: "wall", worth: 20,
+              ang: (g.rng() - 0.5) * 2, spin: (g.rng() - 0.5) * 0.7 });
+    }},
+
+  /* --- orbital debris ------------------------------------------------ */
+  { id: "satellite", name: "Dead satellite", span: 320, build(g){
+      const S = 15 + g.d * 7;
+      piece(g, VW / 2 + (g.rng() - 0.5) * 130, g.y - 140, satParts(g.rng, S),
+            { mass: 2.2 + g.d * 2.0, style: "wall", worth: 30,
+              ang: (g.rng() - 0.5) * 1.2, spin: (g.rng() - 0.5) * 0.4 });
+      for (let i = 0; i < 8 + Math.round(g.d * 8); i++)
+        rock(g, 26 + g.rng() * (VW - 52), g.y - 30 - g.rng() * 400, 8 + g.rng() * 9, 0.45);
+    }},
+  { id: "array", name: "Torn array", span: 300, build(g){
+      // a solar wing, snapped off and still turning
+      const n = 2 + (g.rng() * 2 | 0);
+      for (let i = 0; i < n; i++){
+        const len = 42 + g.d * 24;
+        piece(g, 44 + g.rng() * (VW - 88), g.y - 60 - i * 104 - g.rng() * 60,
+              [{ x1: -len, y1: 0, x2: len, y2: 0, r: 8 },
+               { x1: -len * 0.5, y1: -9, x2: len * 0.5, y2: -9, r: 3 }],
+              { mass: 1.3 + g.d * 1.2, style: "wall", worth: 16,
+                ang: (g.rng() - 0.5) * 2.4, spin: (g.rng() - 0.5) * 0.6 });
+      }
+      for (let i = 0; i < 7 + Math.round(g.d * 8); i++)
+        rock(g, 24 + g.rng() * (VW - 48), g.y - 30 - g.rng() * 440, 8 + g.rng() * 9, 0.45);
+    }},
+  { id: "bolts", name: "Bolt cloud", span: 240, build(g){
+      // the small stuff, which is the stuff that actually kills spacecraft
+      const n = 20 + Math.round(g.d * 18);
+      for (let i = 0; i < n; i++){
+        const x = 20 + g.rng() * (VW - 40), y = g.y - 30 - g.rng() * 360;
+        piece(g, x, y, [{ x1: -6, y1: 0, x2: 6, y2: 0, r: 8 }],
+              { mass: 0.45, style: "orb", worth: 5,
+                ang: g.rng() * TAU, spin: (g.rng() - 0.5) * 1.4 });
+      }
+    }},
+  { id: "truss", name: "Derelict truss", span: 360, build(g){
+      const cx = VW / 2 + (g.rng() - 0.5) * 70, cy = g.y - 160;
+      const L = 82 + g.d * 40;
+      piece(g, cx, cy, [{ x1: -L, y1: 0, x2: L, y2: 0, r: 9 },
+                        { x1: -L * 0.6, y1: -26, x2: L * 0.6, y2: -26, r: 6 },
+                        { x1: -L * 0.6, y1: -26, x2: -L * 0.2, y2: 0, r: 4 },
+                        { x1: L * 0.6, y1: -26, x2: L * 0.2, y2: 0, r: 4 }],
+            // the heaviest thing in the game, and the last word in most runs,
+            // but still light enough that a proper swing moves it
+            { mass: 3.0 + g.d * 1.8, style: "wall", worth: 34,
+              ang: (g.rng() - 0.5) * 0.8, spin: (g.rng() - 0.5) * 0.25 });
+      for (let i = 0; i < 9 + Math.round(g.d * 9); i++)
+        rock(g, 26 + g.rng() * (VW - 52), g.y - 30 - g.rng() * 440, 9 + g.rng() * 11, 0.55);
+    }},
+
+  /* --- rock ---------------------------------------------------------- */
+  { id: "asteroid", name: "Asteroid", span: 330, build(g){
+      // one big one, and the gravel that travels with it
+      const R = 34 + g.d * 26;
+      rock(g, VW / 2 + (g.rng() - 0.5) * 120, g.y - 150, R, 1.5);
+      const n = 15 + Math.round(g.d * 14);
+      for (let i = 0; i < n; i++)
+        rock(g, 24 + g.rng() * (VW - 48), g.y - 30 - g.rng() * 440, 10 + g.rng() * 15, 0.6);
+    }},
+  { id: "field", name: "Rock field", span: 340, build(g){
+      const n = 14 + Math.round(g.d * 13);
+      for (let i = 0; i < n; i++){
+        const R = 10 + g.rng() * (14 + g.d * 22);
+        rock(g, 24 + g.rng() * (VW - 48), g.y - 30 - g.rng() * 440, R, 0.8);
+      }
+    }},
+  { id: "belt", name: "Belt crossing", span: 320, build(g){
+      // a band with one way through it, and the gap is not where you are
+      const cy = g.y - 150;
+      const gapX = VW / 2 + (g.rng() < 0.5 ? -1 : 1) * (72 + g.rng() * 56);
+      const half = 56 - g.d * 18;
+      for (let rank = 0; rank < 2; rank++){
+        for (let x = 16 + rank * 17; x < VW - 8; x += 34 - g.d * 8){
+          if (Math.abs(x - gapX) < half) continue;
+          const R = 13 + g.rng() * (8 + g.d * 12);
+          rock(g, x, cy - rank * 96 + (g.rng() - 0.5) * 50, R, 1.1);
+        }
+      }
+    }},
+  { id: "ringice", name: "Ring ice", span: 300, build(g){
+      // flat shards all lying in the same plane, because they are a ring
+      const gapX = VW / 2 + (g.rng() < 0.5 ? -1 : 1) * (78 + g.rng() * 46);
+      for (let row = 0; row < 2 + Math.round(g.d * 2); row++){
+        const cy = g.y - 80 - row * 74;
+        for (let x = 14; x < VW - 6; x += 46 - g.d * 10){
+          if (Math.abs(x - gapX) < 62 - g.d * 16) continue;
+          const len = 13 + g.rng() * (10 + g.d * 12);
+          piece(g, x + (g.rng() - 0.5) * 12, cy + (g.rng() - 0.5) * 16,
+                [{ x1: -len, y1: 0, x2: len, y2: 0, r: 7 }],
+                { mass: 1.0 + g.d * 1.1, style: "wall", worth: 12,
+                  ang: (g.rng() - 0.5) * 0.35 });
+        }
+      }
+    }},
+  { id: "boulder", name: "Boulder", span: 340, build(g){
+      // one that will not move for you, and a way round it
+      const R = 46 + g.d * 30;
+      rock(g, VW / 2 + (g.rng() - 0.5) * 96, g.y - 160, R, 3.2, { worth: 44 });
+      for (let i = 0; i < 13 + Math.round(g.d * 11); i++)
+        rock(g, 24 + g.rng() * (VW - 48), g.y - 30 - g.rng() * 440, 9 + g.rng() * 13, 0.6);
+    }},
+  { id: "shower", name: "Meteor shower", span: 300, build(g){
+      // a dense diagonal streak, the way a swarm actually crosses a track
+      const n = 16 + Math.round(g.d * 15);
+      const dir = g.rng() < 0.5 ? -1 : 1;
+      for (let i = 0; i < n; i++){
+        const t = g.rng();
+        const x = VW / 2 + dir * (t - 0.5) * (VW + 60) + (g.rng() - 0.5) * 40;
+        const y = g.y - 40 - t * 380 - g.rng() * 60;
+        rock(g, clamp(x, 18, VW - 18), y, 8 + g.rng() * (7 + g.d * 9), 0.55);
+      }
+    }}
+];
+
+for (const d of MDESIGNS) DESIGNS.push(d);
+
+
+/* The mission's own stages, one to a phase. They do not shuffle and they do
+   not wrap: what is coming at you at Neptune is what Neptune has, and the
+   only way back to ice shed is to start again. Past the last phase the laps
+   draw on the whole late pool at once, which is the only escalation left
+   once there is nowhere further out to go. */
+const MISSION_STAGES = [
+  { id:"mi-ice",   name:"Ice and Gulls",     look:"plain",   designs:["iceshed","gulls"] },
+  { id:"mi-air",   name:"Airframe Debris",   look:"slash",   designs:["hail","iceshed","gulls"] },
+  { id:"mi-stage", name:"Staging Debris",    look:"brick",   designs:["interstage","tower","spent"] },
+  { id:"mi-orb",   name:"Orbital Junk",      look:"brick",   designs:["bolts","array","satellite"] },
+  { id:"mi-micro", name:"Micrometeoroids",   look:"dots",    designs:["shower","bolts","field"] },
+  { id:"mi-ejec",  name:"Lunar Ejecta",      look:"dots",    designs:["field","asteroid","shower"] },
+  { id:"mi-pho",   name:"Phobos Gravel",     look:"dots",    designs:["belt","asteroid","field"] },
+  { id:"mi-belt",  name:"The Main Belt",     look:"hollow",  designs:["boulder","belt","asteroid"] },
+  { id:"mi-ring",  name:"Ring Ice",          look:"band",    designs:["ringice","belt","field"] },
+  { id:"mi-shep",  name:"Shepherd Rock",     look:"band",    designs:["ringice","boulder","belt"] },
+  { id:"mi-kuip",  name:"Kuiper Fragments",  look:"hollow",  designs:["field","shower","boulder"] },
+  { id:"mi-froz",  name:"Frozen Field",      look:"hollow",  designs:["belt","boulder","ringice"] },
+  { id:"mi-inter", name:"Interstellar Wrack",look:"cross",   designs:["truss","boulder","satellite","belt"] }
+];
+// everything worth meeting again. On a second pass a phase keeps its own
+// name and marking — you are still at Saturn — but the whole late cast turns
+// up in it as well, which is the only escalation left once there is nowhere
+// further out to go.
+const MISSION_LATE = ["boulder", "belt", "truss", "ringice", "asteroid", "satellite", "shower", "field"];
+const _lapStages = MISSION_STAGES.map(st => ({
+  id: st.id + "-lap", name: st.name, look: st.look,
+  designs: st.designs.concat(MISSION_LATE.filter(d => st.designs.indexOf(d) < 0))
+}));
+
 /* ----------------------------------------------------------- the stages */
 /* A level is not one long shuffle of everything. It runs through a handful of
    named stages, each with its own cast and its own marking, so the sky tells
@@ -1731,6 +2056,15 @@ function buildStages(def){
   return picked.map((s, i) => ({ stage: s, from: i * span, to: (i + 1) * span }));
 }
 function stageAt(climbed){
+  if (isMission()){
+    // one stage to a phase, straight through, no wrap. The index it reports
+    // keeps counting across laps so nothing downstream thinks it went back.
+    const m = missionAt(climbed);
+    const i = Math.min(MISSION_STAGES.length - 1, m.i);
+    const st = m.lap > 0 ? _lapStages[i] : MISSION_STAGES[i];
+    return { idx: m.i + m.lap * PHASES.length, of: PHASES.length,
+             stage: st, loop: m.lap, phase: m };
+  }
   const list = G.stages;
   if (!list || !list.length) return null;
   if (G.def.endless){
@@ -1753,8 +2087,13 @@ function tierNow(){
 function spawnWave(){
   const rng = G.rng, def = G.def;
   const endless = G.mode === "endless";
-  const t = endless ? clamp(G.climbed / 5200, 0, 1) : clamp(G.climbed / def.lengthU, 0, 1);
-  const d = clamp(endless ? clamp(G.climbed / 7000, 0, 1) : def.diff * 0.72 + t * 0.28, 0, 1);
+  const raw = isMission() ? missionDiff()
+            : endless ? clamp(G.climbed / 7000, 0, 1)
+            : def.diff * 0.72 + clamp(G.climbed / def.lengthU, 0, 1) * 0.28;
+  const t = isMission() ? clamp(raw, 0, 1)
+          : endless ? clamp(G.climbed / 5200, 0, 1) : clamp(G.climbed / def.lengthU, 0, 1);
+  const d = clamp(raw, 0, 1);
+  const over = Math.max(0, raw - 1);          // laps past the end of the plan
   const here = stageAt(G.climbed);
   const names = here ? here.stage.designs : ["field"];
   let pick = names[(rng() * names.length) | 0];
@@ -1771,6 +2110,7 @@ function spawnWave(){
     push: o => { G.obst.push(o); fresh.push(o); }
   };
   design.build(g);
+  if (isMission()) clearLine(fresh, raw);
 
   // nothing is built inside anything else
   for (let it = 0; it < 4; it++)
@@ -1778,6 +2118,11 @@ function spawnWave(){
       for (let j = i + 1; j < fresh.length; j++)
         solidPair(fresh[i], fresh[j], false);
 
+  /* How tall the thing ended up. clearLine can push pieces further out than
+     the design nominally reaches, and spacing the next wave off the nominal
+     figure is how two arrangements end up inside one another. */
+  let reach = design.span;
+  for (const o of fresh) reach = Math.max(reach, g.y - (o.y - o.rad));
   G.genCount++;
   // gems hang in the arrangement, off to one side of the line you must clear
   if (rng() < def.gemRate){
@@ -1791,14 +2136,18 @@ function spawnWave(){
   }
   if (G.genCount % 7 === 4 && rng() < 0.85){
     const kind = PW_KINDS[(rng() * PW_KINDS.length) | 0];
-    G.picks.push({ x: clamp(46 + rng() * (VW - 92), 30, VW - 30), y: g.y - design.span - 30,
+    G.picks.push({ x: clamp(46 + rng() * (VW - 92), 30, VW - 30), y: g.y - reach - 30,
                    kind, r: 15, t: 0, dead: false, vy: 0 });
   }
 
   // room between arrangements: enough to see one coming and get to work
-  const space = endless ? Math.max(160, 380 - G.climbed / 70)
-                        : lerp(420 - d * 120, 340 - d * 130, t);
-  G.nextSpawn = G.climbed + design.span + space * (0.9 + rng() * 0.25);
+  // Room between arrangements. It closes steadily with the journey rather
+  // than with distance, and the laps close it further, to a floor that still
+  // leaves one clean sweep between one thing and the next.
+  const space = isMission() ? Math.max(120, lerp(330, 136, d) * (1 - Math.min(0.24, over * 0.13)))
+              : endless ? Math.max(160, 380 - G.climbed / 70)
+              : lerp(420 - d * 120, 340 - d * 130, t);
+  G.nextSpawn = G.climbed + reach + space * (0.9 + rng() * 0.25);
 }
 function spawnCheck(){
   if (!G.def.endless && G.climbed > G.def.lengthU - 140) return;   // clear run to the line
@@ -2090,6 +2439,20 @@ function step(dt){
     const o = G.obst[i];
     if (o.y > bot + o.rad || o.y < top - o.rad) continue;
     o.vx += windAt(o.y) * 0.06 * sdt;
+    /* Something you have already turned away should not simply arc back down
+       the same line and take you out while you are busy with the next one.
+       A ship climbing through a debris field pushes what it has hit out of
+       its own path, and lighter material goes furthest — so a swatted piece
+       drifts clear at a rate set by its weight. Gravel leaves in a second; a
+       boulder barely notices and will be back, which is the point of it. */
+    if (o.blocked && Math.abs(o.x - VW / 2) < 140 && o.y < b.y &&
+        Math.hypot(o.vx, o.vy + riseSpeed()) > 70){
+      // only what is already travelling: a piece lying still on the shield is
+      // resting, and nudging that sideways every frame is how a dead-quiet
+      // contact turns back into a buzzing one
+      const side = o.x < VW / 2 ? -1 : 1;
+      o.vx += side * (46 / Math.max(0.5, o.mass)) * sdt;
+    }
     updThreat(o, sdt, playing ? b : null);
     LIVE.push(o);
   }
@@ -2704,55 +3067,80 @@ function drawPadFire(m){
   ctx.globalAlpha = 1;
   ctx.restore();
 }
-/* ---- Florida, from higher and higher up ---- */
+/* ---- Florida, from higher and higher up ------------------------------
+   One shape, from two kilometres to a hundred and eighty-six. It starts as a
+   coastline with a cloud deck on it and ends as the curve of the planet with
+   the airglow sitting on the edge, and it never leaves the bottom of the
+   frame on the way — the gap where the ground used to disappear and the
+   Earth had not yet arrived was the one place in the climb that looked like
+   nothing at all. */
 function drawCoast(m){
   const alt = G.climbed;
-  const f = clamp((alt - 520) / 2400, 0, 1);         // how far the ground has gone
-  const y = VH * 0.66 + 150 + f * VH * 0.9 - (1 - f) * 0;
-  const sc = 1 - f * 0.55;
-  if (y > VH + 420) return;
+  const f = clamp((alt - 500) / 3100, 0, 1);          // how far the ground has gone
+  // the horizon settles rather than falling off the screen
+  const y = VH * 0.66 + 140 + f * (VH * 0.30);
+  const sc = 1 - f * 0.5;
+  if (y > VH + 460) return;
   ctx.save();
   ctx.translate(VW / 2, y);
   // the curve of the planet, opening up as the air thins
-  const bulge = 40 + f * 300;
-  ctx.fillStyle = "#16314f";
+  const bulge = 44 + f * 330;
+  const limb = (xx) => 40 - bulge * (1 - (xx / VW) * (xx / VW));
+  ctx.fillStyle = mix("#16314f", "#1b4d86", f);
   ctx.beginPath();
-  ctx.moveTo(-VW, 40);
-  ctx.quadraticCurveTo(0, 40 - bulge, VW, 40);
-  ctx.lineTo(VW, VH); ctx.lineTo(-VW, VH); ctx.closePath(); ctx.fill();
-  // the Atlantic is on the right of the Cape; the land and the lagoons left
-  ctx.fillStyle = "#2f4a3a";
-  ctx.beginPath();
-  ctx.moveTo(-VW, 52);
-  ctx.quadraticCurveTo(-VW * 0.3, 44 - bulge * 0.7, VW * 0.08, 56 - bulge * 0.42);
-  ctx.quadraticCurveTo(VW * 0.02, 96, -VW * 0.22, 128);
-  ctx.lineTo(-VW, 150); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = "#24455c";                          // the Banana River
-  ctx.beginPath();
-  ctx.moveTo(-VW * 0.34, 60 - bulge * 0.5);
-  ctx.quadraticCurveTo(-VW * 0.26, 96, -VW * 0.4, 132);
-  ctx.lineTo(-VW * 0.52, 126);
-  ctx.quadraticCurveTo(-VW * 0.4, 94, -VW * 0.46, 62 - bulge * 0.5);
-  ctx.closePath(); ctx.fill();
-  // the cloud deck, which from up here is a flat white floor
-  ctx.globalAlpha = 0.5 * (1 - f * 0.6);
-  ctx.fillStyle = "#ffffff";
-  for (let i = 0; i < 9; i++){
-    const hx = hash2(i, 41), hy = hash2(i, 77);
+  ctx.moveTo(-VW * 1.2, 40);
+  ctx.quadraticCurveTo(0, 40 - bulge, VW * 1.2, 40);
+  ctx.lineTo(VW * 1.2, VH); ctx.lineTo(-VW * 1.2, VH); ctx.closePath(); ctx.fill();
+  // the Cape itself, which keeps its shape for as long as you can still see it
+  const landA = 1 - f * 0.75;
+  if (landA > 0.03){
+    ctx.globalAlpha = landA;
+    ctx.fillStyle = "#2f4a3a";
     ctx.beginPath();
-    ctx.ellipse((hx - 0.5) * VW * 1.6, 62 + hy * 90 - bulge * 0.3 * (1 - hy),
-                34 * sc * (0.6 + hy), 7 * sc, 0, 0, TAU);
+    ctx.moveTo(-VW, 52);
+    ctx.quadraticCurveTo(-VW * 0.3, 44 - bulge * 0.7, VW * 0.08, 56 - bulge * 0.42);
+    ctx.quadraticCurveTo(VW * 0.02, 96, -VW * 0.22, 128);
+    ctx.lineTo(-VW, 150); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#24455c";                          // the Banana River
+    ctx.beginPath();
+    ctx.moveTo(-VW * 0.34, 60 - bulge * 0.5);
+    ctx.quadraticCurveTo(-VW * 0.26, 96, -VW * 0.4, 132);
+    ctx.lineTo(-VW * 0.52, 126);
+    ctx.quadraticCurveTo(-VW * 0.4, 94, -VW * 0.46, 62 - bulge * 0.5);
+    ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  // the cloud deck, which from up here is a flat white floor and stays one
+  ctx.globalAlpha = 0.46 * (1 - f * 0.35);
+  ctx.fillStyle = "#ffffff";
+  for (let i = 0; i < 14; i++){
+    const hx = hash2(i, 41), hy = hash2(i, 77);
+    const px = (hx - 0.5) * VW * 1.9;
+    ctx.beginPath();
+    ctx.ellipse(px, 66 + hy * 110 - bulge * 0.34 * (1 - hy),
+                36 * sc * (0.5 + hy), 7 * sc, 0, 0, TAU);
     ctx.fill();
   }
   ctx.globalAlpha = 1;
-  // the airglow line that separates air from vacuum
-  ctx.strokeStyle = "rgba(120,196,255," + (0.25 + f * 0.5).toFixed(2) + ")";
-  ctx.lineWidth = 2 + f * 3;
+  // the airglow line that separates air from vacuum, brighter the thinner it gets
+  const ag = ctx.createLinearGradient(0, 40 - bulge - 34, 0, 40 - bulge + 26);
+  ag.addColorStop(0, "rgba(110,190,255,0)");
+  ag.addColorStop(0.55, "rgba(140,210,255," + (0.30 + f * 0.5).toFixed(2) + ")");
+  ag.addColorStop(1, "rgba(110,190,255,0)");
+  ctx.save();
   ctx.beginPath();
-  ctx.moveTo(-VW, 40); ctx.quadraticCurveTo(0, 40 - bulge, VW, 40); ctx.stroke();
+  ctx.moveTo(-VW * 1.2, 40);
+  ctx.quadraticCurveTo(0, 40 - bulge, VW * 1.2, 40);
+  ctx.lineTo(VW * 1.2, 40 - bulge - 60); ctx.lineTo(-VW * 1.2, 40 - bulge - 60);
+  ctx.closePath();
+  ctx.strokeStyle = "rgba(150,214,255," + (0.35 + f * 0.5).toFixed(2) + ")";
+  ctx.lineWidth = 2 + f * 4;
+  ctx.beginPath();
+  ctx.moveTo(-VW * 1.2, 40); ctx.quadraticCurveTo(0, 40 - bulge, VW * 1.2, 40);
+  ctx.stroke();
+  ctx.restore();
   ctx.restore();
 }
-
 /* ---- a world, and one lap of it ---- */
 function drawWorld(m, pl){
   if (!pl) return;
@@ -2974,6 +3362,15 @@ function drawMissionBackdrop(){
   else if (k === "void") drawVoid(m);
   if (k === "pad"){ drawPadClouds(m); drawPad(m); drawPadFire(m); }
   else if (k === "air") drawCoast(m);
+  // a soft vignette. A lit planet filling the lower half is the brightest
+  // thing on screen, and white debris has to stay the second brightest.
+  if (k === "orbit" || k === "air"){
+    const v = ctx.createLinearGradient(0, VH * 0.52, 0, VH);
+    v.addColorStop(0, "rgba(2,5,14,0)");
+    v.addColorStop(1, "rgba(2,5,14,.34)");
+    ctx.fillStyle = v;
+    ctx.fillRect(0, VH * 0.52, VW, VH * 0.48);
+  }
 }
 
 function drawCloudBand(f, spacing, alpha, col, salt){
@@ -3364,8 +3761,8 @@ function drawShip(x, y, r, tech, phase, alpha){
   ctx.rotate(shake + Math.sin(phase * 1.1) * 0.012 * T);
 
   const W = r * 0.33;                                  // core half-width
-  const hullA = mix("#f2f4f8", "#171a2e", T);          // aluminium → something else
-  const hullB = mix("#c9ced9", "#0b0e1c", T);
+  const hullA = mix("#f2f4f8", "#39456e", T);          // aluminium → something else
+  const hullB = mix("#c9ced9", "#1b2340", T);
   const trim  = mix("#1b1f31", "#5de0ff", T);
   const nose = -r, tail = r * 0.78;
 
@@ -3408,6 +3805,21 @@ function drawShip(x, y, r, tech, phase, alpha){
     ctx.lineTo(sgn * W, tail);
     ctx.closePath(); ctx.fill();
   }
+
+  /* A contrast halo, drawn first and underneath. Late on the hull is dark
+     navy and the sky is black; over Jupiter it is dark navy on bright tan.
+     Either way the ship is thirteen units wide on a four-hundred-unit screen
+     and it is the one thing on it you cannot afford to lose track of, so it
+     gets a soft ring that is dark where the ship is pale and pale where the
+     ship is dark. */
+  ctx.save();
+  ctx.globalAlpha = (alpha === undefined ? 1 : alpha) * 0.5;
+  const halo = ctx.createRadialGradient(0, 0, r * 0.55, 0, 0, r * 1.85);
+  halo.addColorStop(0, T < 0.5 ? "rgba(6,12,30,.55)" : "rgba(150,235,255,.42)");
+  halo.addColorStop(1, T < 0.5 ? "rgba(6,12,30,0)" : "rgba(120,210,255,0)");
+  ctx.fillStyle = halo;
+  ctx.beginPath(); ctx.arc(0, 0, r * 1.85, 0, TAU); ctx.fill();
+  ctx.restore();
 
   // ---- body -----------------------------------------------------------
   const bg = ctx.createLinearGradient(-W, 0, W, 0);
@@ -3866,6 +4278,8 @@ const UI = {
       : "PHASE " + (m.i + 1) + " OF " + PHASES.length;
     b.querySelector("span").textContent = m.ph.name;
     b.classList.add("on");
+    const st = stageAt(G.climbed);
+    if (st && !first) this.callout("HAZARD · " + st.stage.name.toUpperCase());
     clearTimeout(this.stageT);
     this.stageT = setTimeout(() => b.classList.remove("on"), 2200);
     if (!first) Audio2.SFX.ui();
