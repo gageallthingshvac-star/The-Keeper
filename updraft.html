@@ -1771,16 +1771,24 @@ function clearLine(fresh, raw){
   // comes from once there is nothing further out to fly to
   const d = Math.min(1.7, raw);
   const budget = 2.4 + d * 6.0;        // mass allowed to stand in the line
-  const maxN = 3 + Math.round(d * 4);  // and how many pieces it may be
+  const maxCost = 4.2 + d * 5.4;       // and how much of the line it may cover
+  /* A piece's cost is not one. Since the shapes stopped being balls, a plate
+     three times the ship's width standing in the line is a different problem
+     from a pebble, and counting them the same is how a debris field turns
+     back into a coin toss. Cost grows with reach, so one long spar eats the
+     budget two pebbles would. */
+  const cost = o => 1 + o.rad / LANE;
   const inLane = () => fresh.filter(o => Math.abs(o.x - VW / 2) < LANE + o.rad * 0.7);
-  let lane = inLane().sort((a, b) => b.mass - a.mass);
+  let lane = inLane().sort((a, b) => (b.mass * cost(b)) - (a.mass * cost(a)));
   let mass = lane.reduce((a, o) => a + o.mass, 0);
+  let load = lane.reduce((a, o) => a + cost(o), 0);
   for (const o of lane){
-    if (mass <= budget && lane.length <= maxN) break;
+    if (mass <= budget && load <= maxCost) break;
     const side = o.x < VW / 2 ? -1 : 1;
     o.x = clamp(VW / 2 + side * (LANE + o.rad + 8), 16, VW - 16);
     rebuildParts(o);
     mass -= o.mass;
+    load -= cost(o);
     lane = lane.filter(q => q !== o);
   }
   /* What is still in the line gets room between one piece and the next, so
@@ -1797,6 +1805,125 @@ function clearLine(fresh, raw){
     if (left[i].y > cap){ left[i].y = cap; rebuildParts(left[i]); }
   }
 }
+/* ------------------------------------------------------- the shape stock
+
+   Everything in this game collides as capsules, and a capsule with its two
+   ends in the same place is a ball. That is where the sky came from and it
+   is why it all used to look the same. But a capsule is a line with a width,
+   and lines with widths make anything: lay three of them side by side and
+   you have a block, lay them end to end round a triangle and you have a
+   triangle, make one long and thin and it is a pole, long and fat and it is
+   a rod. None of it needs a new collider — what you can hit is still exactly
+   what you can see.
+
+   So each phase now draws its debris from its own list of these. Ring ice is
+   flat plates lying in one plane; the Belt is blocks and jagged shards; the
+   staging debris is rods and poles off a rocket; the Kuiper belt is
+   triangles and splinters. The silhouette of a phase is now its own.      */
+function shBall(R, rng){
+  const n = 1 + (rng() < 0.4 ? 1 : 0);
+  const out = [{ x1: 0, y1: 0, x2: 0, y2: 0, r: R }];
+  if (n > 1) out.push({ x1: R * 0.5, y1: R * 0.3, x2: R * 0.5, y2: R * 0.3, r: R * 0.62 });
+  return out;
+}
+function shRod(R, rng){                     // thick: short and heavy-looking
+  const L = R * (1.15 + rng() * 0.95);
+  return [{ x1: -L, y1: 0, x2: L, y2: 0, r: R * (0.78 + rng() * 0.3) }];
+}
+function shPole(R, rng){                    // thin: a boom, an antenna, a spar
+  const L = R * (2.0 + rng() * 1.7);
+  const t = R * (0.24 + rng() * 0.16);
+  const out = [{ x1: -L, y1: 0, x2: L, y2: 0, r: t }];
+  if (rng() < 0.5) out.push({ x1: -L * 0.2, y1: -t * 2.4, x2: L * 0.2, y2: -t * 2.4, r: t * 1.1 });
+  return out;
+}
+function shBlock(R, rng){
+  /* A slab, built out of parallel runs that overlap by a third. They have to
+     overlap: laid edge to edge you get a comb, and a comb is not a block.
+     What the overlap leaves behind is a rib line down each seam, which is
+     what a real panel looks like anyway. */
+  const w = R * (0.75 + rng() * 0.75), h = R * (0.5 + rng() * 0.6);
+  const rows = clamp(Math.round(h / (R * 0.30)), 2, 4);
+  const t = h / (rows * 0.72);
+  const out = [];
+  for (let i = 0; i < rows; i++){
+    const y = -h + t + (2 * h - 2 * t) * (rows === 1 ? 0.5 : i / (rows - 1));
+    out.push({ x1: -w + t * 0.6, y1: y, x2: w - t * 0.6, y2: y, r: t });
+  }
+  return out;
+}
+function shPlate(R, rng){                   // flat and wide, like ring ice
+  const w = R * (1.15 + rng() * 1.15), t = R * (0.28 + rng() * 0.16);
+  return [{ x1: -w, y1: 0, x2: w, y2: 0, r: t },
+          { x1: -w * 0.62, y1: -t * 1.5, x2: w * 0.62, y2: -t * 1.5, r: t * 0.8 }];
+}
+function shTri(R, rng){                     // three edges, rounded at the corners
+  const S = R * (0.92 + rng() * 0.38), t = R * (0.3 + rng() * 0.16);
+  const a0 = rng() * TAU;
+  const p = i => [Math.cos(a0 + i * TAU / 3) * S, Math.sin(a0 + i * TAU / 3) * S];
+  const A = p(0), B = p(1), C = p(2);
+  return [{ x1: A[0], y1: A[1], x2: B[0], y2: B[1], r: t },
+          { x1: B[0], y1: B[1], x2: C[0], y2: C[1], r: t },
+          { x1: C[0], y1: C[1], x2: A[0], y2: A[1], r: t },
+          { x1: 0, y1: 0, x2: 0, y2: 0, r: t * 1.2 }];
+}
+function shShard(R, rng){                   // a splinter: tapered, off-centre
+  const L = R * (1.2 + rng() * 1.1);
+  return [{ x1: -L, y1: 0, x2: L * 0.2, y2: 0, r: R * 0.28 },
+          { x1: L * 0.2, y1: 0, x2: L, y2: R * (rng() - 0.5) * 0.5, r: R * 0.6 }];
+}
+function shCross(R, rng){                   // bent wreckage, two spars welded
+  const L = R * (1.1 + rng() * 0.9), t = R * (0.26 + rng() * 0.14);
+  const a = rng() * 1.2 + 0.5;
+  return [{ x1: -L, y1: 0, x2: L, y2: 0, r: t },
+          { x1: -Math.cos(a) * L * 0.8, y1: -Math.sin(a) * L * 0.8,
+            x2: Math.cos(a) * L * 0.8, y2: Math.sin(a) * L * 0.8, r: t * 0.9 }];
+}
+function shHoop(R, rng){                    // a ring frame, blown off something
+  const out = [];
+  const n = 6, S = R * 1.15, t = R * 0.26;
+  for (let i = 0; i < n; i++){
+    const a0 = i / n * TAU, a1 = (i + 0.9) / n * TAU;
+    out.push({ x1: Math.cos(a0) * S, y1: Math.sin(a0) * S,
+               x2: Math.cos(a1) * S, y2: Math.sin(a1) * S, r: t });
+  }
+  return out;
+}
+const SHAPES = { ball: shBall, rod: shRod, pole: shPole, block: shBlock,
+                 plate: shPlate, tri: shTri, shard: shShard, cross: shCross,
+                 hoop: shHoop, rock: null };   // rock keeps its own lumpy build
+
+/* One piece of whatever this phase is made of. Size, weight and spin all
+   follow from the shape as much as from the difficulty: a pole is light and
+   spins fast, a block is heavy and barely turns. */
+function debrisPiece(g, x, y, R, kind, massPer){
+  if (kind === "rock" || !SHAPES[kind]) return rock(g, x, y, R, massPer);
+  const parts = SHAPES[kind](Math.max(7, R), g.rng);
+  const heft = { ball:1.0, rod:1.25, pole:0.55, block:1.5, plate:0.8,
+                 tri:0.85, shard:0.7, cross:0.7, hoop:0.8 }[kind] || 1;
+  const twirl = { pole:1.5, shard:1.3, cross:1.2, plate:0.9, block:0.4, rod:0.5 }[kind] || 0.8;
+  const look = { plate:"ice", block:"hull", pole:"hull", rod:"hull",
+                 cross:"foil", hoop:"hull", tri:"crater", shard:"crater", ball:"crater" }[kind];
+  return piece(g, x, y, parts, {
+    mass: clamp(massPer * heft * (0.5 + R / 30), 0.35, ROCK_MASS_MAX),
+    style: "orb", worth: Math.round(5 + R / 3), look: g.look === "ice" && look === "crater" ? "ice" : look,
+    ang: g.rng() * TAU, spin: (g.rng() - 0.5) * twirl
+  });
+}
+/* A scatter of this phase's own stock. Every companion field in every design
+   goes through here, so a wave picks up the character of where it is without
+   any design having to know where it is. */
+function debris(g, n, opt){
+  opt = opt || {};
+  const kinds = g.shapes && g.shapes.length ? g.shapes : ["rock"];
+  const lo = opt.lo || 9, hi = opt.hi || 17, deep = opt.deep || 400;
+  for (let i = 0; i < n; i++){
+    const kind = kinds[(g.rng() * kinds.length) | 0];
+    const R = lo + g.rng() * (hi - lo) * (0.7 + g.d * 0.6);
+    debrisPiece(g, 22 + g.rng() * (VW - 44), g.y - 26 - g.rng() * deep, R, kind, opt.mass || 0.6);
+  }
+}
+
 const MDESIGNS = [
   /* --- inside the atmosphere ---------------------------------------- */
   { id: "iceshed", name: "Ice shed", span: 250, build(g){
@@ -1879,8 +2006,7 @@ const MDESIGNS = [
       piece(g, VW / 2 + (g.rng() - 0.5) * 130, g.y - 140, satParts(g.rng, S),
             { mass: 2.2 + g.d * 2.0, style: "wall", worth: 30, look: "panel",
               ang: (g.rng() - 0.5) * 1.2, spin: (g.rng() - 0.5) * 0.4 });
-      for (let i = 0; i < 5 + Math.round(g.d * 5); i++)
-        rock(g, 26 + g.rng() * (VW - 52), g.y - 30 - g.rng() * 400, 8 + g.rng() * 9, 0.45);
+      debris(g, 5 + Math.round(g.d * 5), { lo: 8, hi: 17, deep: 400, mass: 0.45 });
     }},
   { id: "array", name: "Torn array", span: 300, build(g){
       // a solar wing, snapped off and still turning
@@ -1893,8 +2019,7 @@ const MDESIGNS = [
               { mass: 1.3 + g.d * 1.2, style: "wall", worth: 16, look: "panel",
                 ang: (g.rng() - 0.5) * 2.4, spin: (g.rng() - 0.5) * 0.6 });
       }
-      for (let i = 0; i < 4 + Math.round(g.d * 5); i++)
-        rock(g, 24 + g.rng() * (VW - 48), g.y - 30 - g.rng() * 440, 8 + g.rng() * 9, 0.45);
+      debris(g, 4 + Math.round(g.d * 5), { lo: 8, hi: 17, deep: 440, mass: 0.45 });
     }},
   { id: "bolts", name: "Bolt cloud", span: 240, build(g){
       // the small stuff, which is the stuff that actually kills spacecraft
@@ -1917,8 +2042,7 @@ const MDESIGNS = [
             // but still light enough that a proper swing moves it
             { mass: 3.0 + g.d * 1.8, style: "wall", worth: 34, look: "foil",
               ang: (g.rng() - 0.5) * 0.8, spin: (g.rng() - 0.5) * 0.25 });
-      for (let i = 0; i < 10 + Math.round(g.d * 9); i++)
-        rock(g, 26 + g.rng() * (VW - 52), g.y - 30 - g.rng() * 440, 9 + g.rng() * 11, 0.55);
+      debris(g, 10 + Math.round(g.d * 9), { lo: 9, hi: 20, deep: 440, mass: 0.55 });
     }},
 
   /* --- the hardware ---------------------------------------------------
@@ -1943,8 +2067,7 @@ const MDESIGNS = [
         ...legs
       ], { mass: 2.2 + g.d * 1.5, style: "wall", worth: 32, look: "foil",
            ang: (g.rng() - 0.5) * 1.6, spin: (g.rng() - 0.5) * 0.35 });
-      for (let i = 0; i < 4 + Math.round(g.d * 4); i++)
-        rock(g, 24 + g.rng() * (VW - 48), g.y - 30 - g.rng() * 400, 9 + g.rng() * 10, 0.5);
+      debris(g, 4 + Math.round(g.d * 4), { lo: 9, hi: 19, deep: 400, mass: 0.5 });
     }},
   { id: "rover", name: "Rover", span: 320, build(g){
       const S = 18 + g.d * 7;
@@ -1958,8 +2081,7 @@ const MDESIGNS = [
         { x1: S * 0.3, y1: -S * 0.5, x2: S * 1.5, y2: -S * 0.75, r: S * 0.16 }    // antenna
       ], { mass: 1.9 + g.d * 1.3, style: "wall", worth: 28, look: "hull",
            ang: (g.rng() - 0.5) * 2, spin: (g.rng() - 0.5) * 0.5 });
-      for (let i = 0; i < 5 + Math.round(g.d * 5); i++)
-        rock(g, 24 + g.rng() * (VW - 48), g.y - 30 - g.rng() * 400, 9 + g.rng() * 11, 0.55);
+      debris(g, 5 + Math.round(g.d * 5), { lo: 9, hi: 20, deep: 400, mass: 0.55 });
     }},
   { id: "capsule", name: "Crew capsule", span: 300, build(g){
       const S = 20 + g.d * 8;
@@ -1969,8 +2091,7 @@ const MDESIGNS = [
         { x1: 0, y1: -S * 1.1, x2: 0, y2: -S * 1.5, r: S * 0.12 }                 // docking probe
       ], { mass: 2.4 + g.d * 1.4, style: "wall", worth: 30, look: "hull",
            ang: (g.rng() - 0.5) * 1.8, spin: (g.rng() - 0.5) * 0.4 });
-      for (let i = 0; i < 4 + Math.round(g.d * 5); i++)
-        rock(g, 24 + g.rng() * (VW - 48), g.y - 30 - g.rng() * 400, 9 + g.rng() * 10, 0.5);
+      debris(g, 4 + Math.round(g.d * 5), { lo: 9, hi: 19, deep: 400, mass: 0.5 });
     }},
   { id: "probe", name: "Deep-space probe", span: 340, build(g){
       const S = 19 + g.d * 8;
@@ -1984,8 +2105,7 @@ const MDESIGNS = [
         { x1: 0, y1: -S * 0.15, x2: 0, y2: -S * 0.62, r: S * 0.13 }               // the feed horn
       ], { mass: 2.0 + g.d * 1.4, style: "wall", worth: 34, look: "foil",
            ang: (g.rng() - 0.5) * 1.5, spin: (g.rng() - 0.5) * 0.3 });
-      for (let i = 0; i < 5 + Math.round(g.d * 5); i++)
-        rock(g, 24 + g.rng() * (VW - 48), g.y - 30 - g.rng() * 400, 9 + g.rng() * 11, 0.55);
+      debris(g, 5 + Math.round(g.d * 5), { lo: 9, hi: 20, deep: 400, mass: 0.55 });
     }},
   { id: "telescope", name: "Observatory", span: 340, build(g){
       const S = 18 + g.d * 7;
@@ -1996,8 +2116,7 @@ const MDESIGNS = [
         { x1: S * 0.8, y1: 0, x2: S * 2.6, y2: 0, r: S * 0.34 }                   // starboard wing
       ], { mass: 2.6 + g.d * 1.6, style: "wall", worth: 36, look: "panel",
            ang: (g.rng() - 0.5) * 1.4, spin: (g.rng() - 0.5) * 0.3 });
-      for (let i = 0; i < 4 + Math.round(g.d * 5); i++)
-        rock(g, 24 + g.rng() * (VW - 48), g.y - 30 - g.rng() * 400, 9 + g.rng() * 10, 0.5);
+      debris(g, 4 + Math.round(g.d * 5), { lo: 9, hi: 19, deep: 400, mass: 0.5 });
     }},
   { id: "module", name: "Station module", span: 350, build(g){
       const S = 19 + g.d * 7;
@@ -2009,8 +2128,7 @@ const MDESIGNS = [
         { x1: -S * 0.4, y1: -S * 2.0, x2: S * 1.4, y2: -S * 2.2, r: S * 0.3 }
       ], { mass: 3.0 + g.d * 1.7, style: "wall", worth: 38, look: "hull",
            ang: (g.rng() - 0.5) * 1.1, spin: (g.rng() - 0.5) * 0.22 });
-      for (let i = 0; i < 5 + Math.round(g.d * 6); i++)
-        rock(g, 24 + g.rng() * (VW - 48), g.y - 30 - g.rng() * 420, 9 + g.rng() * 12, 0.55);
+      debris(g, 5 + Math.round(g.d * 6), { lo: 9, hi: 21, deep: 420, mass: 0.55 });
     }},
   { id: "tank", name: "Propellant tank", span: 300, build(g){
       // spheres, which is what a pressure vessel is, and there are always
@@ -2024,8 +2142,7 @@ const MDESIGNS = [
         ], { mass: 1.6 + g.d * 1.3, style: "wall", worth: 20, look: "hull",
              ang: g.rng() * TAU, spin: (g.rng() - 0.5) * 0.5 });
       }
-      for (let i = 0; i < 4 + Math.round(g.d * 4); i++)
-        rock(g, 24 + g.rng() * (VW - 48), g.y - 30 - g.rng() * 400, 9 + g.rng() * 9, 0.5);
+      debris(g, 4 + Math.round(g.d * 4), { lo: 9, hi: 18, deep: 400, mass: 0.5 });
     }},
   { id: "cubesat", name: "Cubesat swarm", span: 300, build(g){
       // little boxes, deployed together and still flying in formation
@@ -2056,8 +2173,7 @@ const MDESIGNS = [
         ], { mass: 1.5 + g.d * 1.2, style: "wall", worth: 22, look: "panel",
              ang: (g.rng() - 0.5) * 2.2, spin: (g.rng() - 0.5) * 0.55 });
       }
-      for (let i = 0; i < 4 + Math.round(g.d * 4); i++)
-        rock(g, 24 + g.rng() * (VW - 48), g.y - 30 - g.rng() * 380, 9 + g.rng() * 9, 0.5);
+      debris(g, 4 + Math.round(g.d * 4), { lo: 9, hi: 18, deep: 380, mass: 0.5 });
     }},
 
   /* --- rock ---------------------------------------------------------- */
@@ -2065,27 +2181,23 @@ const MDESIGNS = [
       // one big one, and the gravel that travels with it
       const R = 34 + g.d * 26;
       rock(g, VW / 2 + (g.rng() - 0.5) * 120, g.y - 150, R, 1.5);
-      const n = 15 + Math.round(g.d * 14);
-      for (let i = 0; i < n; i++)
-        rock(g, 24 + g.rng() * (VW - 48), g.y - 30 - g.rng() * 440, 10 + g.rng() * 15, 0.6);
+      debris(g, 15 + Math.round(g.d * 14), { lo: 10, hi: 25, deep: 440, mass: 0.6 });
     }},
-  { id: "field", name: "Rock field", span: 340, build(g){
-      const n = 14 + Math.round(g.d * 13);
-      for (let i = 0; i < n; i++){
-        const R = 10 + g.rng() * (14 + g.d * 22);
-        rock(g, 24 + g.rng() * (VW - 48), g.y - 30 - g.rng() * 440, R, 0.8);
-      }
+  { id: "field", name: "Debris field", span: 340, build(g){
+      debris(g, 16 + Math.round(g.d * 14), { lo: 10, hi: 28, deep: 440, mass: 0.8 });
     }},
   { id: "belt", name: "Belt crossing", span: 320, build(g){
       // a band with one way through it, and the gap is not where you are
       const cy = g.y - 150;
       const gapX = VW / 2 + (g.rng() < 0.5 ? -1 : 1) * (72 + g.rng() * 56);
       const half = 56 - g.d * 18;
+      const kinds = g.shapes && g.shapes.length ? g.shapes : ["rock"];
       for (let rank = 0; rank < 2; rank++){
         for (let x = 16 + rank * 17; x < VW - 8; x += 34 - g.d * 8){
           if (Math.abs(x - gapX) < half) continue;
           const R = 13 + g.rng() * (8 + g.d * 12);
-          rock(g, x, cy - rank * 96 + (g.rng() - 0.5) * 50, R, 1.1);
+          debrisPiece(g, x, cy - rank * 96 + (g.rng() - 0.5) * 50, R,
+                      kinds[(g.rng() * kinds.length) | 0], 1.1);
         }
       }
     }},
@@ -2108,18 +2220,19 @@ const MDESIGNS = [
       // one that will not move for you, and a way round it
       const R = 46 + g.d * 30;
       rock(g, VW / 2 + (g.rng() - 0.5) * 96, g.y - 160, R, 3.2, { worth: 44 });
-      for (let i = 0; i < 14 + Math.round(g.d * 11); i++)
-        rock(g, 24 + g.rng() * (VW - 48), g.y - 30 - g.rng() * 440, 9 + g.rng() * 13, 0.6);
+      debris(g, 14 + Math.round(g.d * 11), { lo: 9, hi: 22, deep: 440, mass: 0.6 });
     }},
   { id: "shower", name: "Meteor shower", span: 300, build(g){
       // a dense diagonal streak, the way a swarm actually crosses a track
-      const n = 16 + Math.round(g.d * 15);
+      const n = 18 + Math.round(g.d * 16);
       const dir = g.rng() < 0.5 ? -1 : 1;
+      const kinds = g.shapes && g.shapes.length ? g.shapes : ["rock"];
       for (let i = 0; i < n; i++){
         const t = g.rng();
         const x = VW / 2 + dir * (t - 0.5) * (VW + 60) + (g.rng() - 0.5) * 40;
         const y = g.y - 40 - t * 380 - g.rng() * 60;
-        rock(g, clamp(x, 18, VW - 18), y, 8 + g.rng() * (7 + g.d * 9), 0.55);
+        debrisPiece(g, clamp(x, 18, VW - 18), y, 9 + g.rng() * (8 + g.d * 10),
+                    kinds[(g.rng() * kinds.length) | 0], 0.55);
       }
     }}
 ];
@@ -2133,19 +2246,32 @@ for (const d of MDESIGNS) DESIGNS.push(d);
    draw on the whole late pool at once, which is the only escalation left
    once there is nowhere further out to go. */
 const MISSION_STAGES = [
-  { id:"mi-ice",   name:"Ice and Gulls",     look:"ice",     designs:["iceshed","gulls"] },
-  { id:"mi-air",   name:"Airframe Debris",   look:"ice",     designs:["hail","iceshed","gulls"] },
-  { id:"mi-stage", name:"Staging Debris",    look:"hull",    designs:["interstage","tower","spent"] },
-  { id:"mi-orb",   name:"Orbital Junk",      look:"panel",   designs:["cubesat","array","satellite"] },
-  { id:"mi-micro", name:"Micrometeoroids",   look:"crater",  designs:["shower","tank","capsule"] },
-  { id:"mi-ejec",  name:"Lunar Ejecta",      look:"crater",  designs:["field","lander","asteroid"] },
-  { id:"mi-pho",   name:"Phobos Gravel",     look:"crater",  designs:["belt","rover","asteroid"] },
-  { id:"mi-belt",  name:"The Main Belt",     look:"crater",  designs:["boulder","belt","asteroid"] },
-  { id:"mi-ring",  name:"Ring Ice",          look:"ice",     designs:["ringice","dish","belt"] },
-  { id:"mi-shep",  name:"Shepherd Rock",     look:"ice",     designs:["ringice","boulder","belt"] },
-  { id:"mi-kuip",  name:"Kuiper Fragments",  look:"crater",  designs:["field","probe","shower"] },
-  { id:"mi-froz",  name:"Frozen Field",      look:"ice",     designs:["belt","boulder","ringice"] },
-  { id:"mi-inter", name:"Interstellar Wrack",look:"foil",    designs:["truss","module","telescope","probe"] }
+  { id:"mi-ice",   name:"Ice and Gulls",     look:"ice",    shapes:["plate","shard","ball"],
+    designs:["iceshed","gulls"] },
+  { id:"mi-air",   name:"Airframe Debris",   look:"ice",    shapes:["plate","block","shard","ball"],
+    designs:["hail","iceshed","gulls"] },
+  { id:"mi-stage", name:"Staging Debris",    look:"hull",   shapes:["rod","pole","hoop","block"],
+    designs:["interstage","tower","spent"] },
+  { id:"mi-orb",   name:"Orbital Junk",      look:"panel",  shapes:["plate","block","pole","cross"],
+    designs:["cubesat","array","satellite"] },
+  { id:"mi-micro", name:"Micrometeoroids",   look:"crater", shapes:["ball","shard","rock"],
+    designs:["shower","tank","capsule"] },
+  { id:"mi-ejec",  name:"Lunar Ejecta",      look:"crater", shapes:["rock","block","tri","ball"],
+    designs:["field","lander","asteroid"] },
+  { id:"mi-pho",   name:"Phobos Gravel",     look:"crater", shapes:["tri","rock","shard"],
+    designs:["belt","rover","asteroid"] },
+  { id:"mi-belt",  name:"The Main Belt",     look:"crater", shapes:["rock","block","rod","tri"],
+    designs:["boulder","belt","asteroid"] },
+  { id:"mi-ring",  name:"Ring Ice",          look:"ice",    shapes:["plate","plate","shard"],
+    designs:["ringice","dish","belt"] },
+  { id:"mi-shep",  name:"Shepherd Rock",     look:"ice",    shapes:["plate","rock","block"],
+    designs:["ringice","boulder","belt"] },
+  { id:"mi-kuip",  name:"Kuiper Fragments",  look:"crater", shapes:["tri","shard","pole","ball"],
+    designs:["field","probe","shower"] },
+  { id:"mi-froz",  name:"Frozen Field",      look:"ice",    shapes:["block","plate","tri"],
+    designs:["belt","boulder","ringice"] },
+  { id:"mi-inter", name:"Interstellar Wrack",look:"foil",   shapes:["cross","pole","hoop","block","shard","tri"],
+    designs:["truss","module","telescope","probe"] }
 ];
 // everything worth meeting again. On a second pass a phase keeps its own
 // name and marking — you are still at Saturn — but the whole late cast turns
@@ -2155,6 +2281,7 @@ const MISSION_LATE = ["boulder", "belt", "truss", "ringice", "asteroid", "module
                       "shower", "field", "telescope", "probe", "dish"];
 const _lapStages = MISSION_STAGES.map(st => ({
   id: st.id + "-lap", name: st.name, look: st.look,
+  shapes: st.shapes.concat(["cross", "hoop", "block"]),
   designs: st.designs.concat(MISSION_LATE.filter(d => st.designs.indexOf(d) < 0))
 }));
 
@@ -2248,6 +2375,7 @@ function spawnWave(){
     id: design.id, rng, d,
     y: G.cam.y - 120,
     look: here ? here.stage.look : "plain",
+    shapes: (here && here.stage.shapes) || ["rock"],
     push: o => { G.obst.push(o); fresh.push(o); }
   };
   design.build(g);
@@ -3704,8 +3832,12 @@ function drawObstacles(){
     for (const w of o.wp) capsule(w.x1 + 1, w.y1 + 5, w.x2 + 1, w.y2 + 5, w.r, "#0a1030");
     ctx.globalAlpha = 1;
 
-    // the body: solid white, hard dark edge, both inside the collider
-    for (const w of o.wp) capsuleSolid(w.x1, w.y1, w.x2, w.y2, w.r, "#ffffff", ink, edgeW);
+    /* Body first, every piece of it, and only then the edges. A block is
+       several overlapping runs, and edging each one as it lands draws seams
+       through the middle of a thing that is supposed to be solid. */
+    ctx.fillStyle = "#ffffff";
+    for (const w of o.wp) capsule(w.x1, w.y1, w.x2, w.y2, w.r, "#ffffff");
+    for (const w of o.wp) capsuleRing(w.x1, w.y1, w.x2, w.y2, w.r, ink, edgeW, "#ffffff");
 
     // struck this instant: the edge lights up, still inside the radius
     if (o.flash > 0.01){
@@ -4012,160 +4144,235 @@ const FONT = '"Nunito",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
    past that line — the knot tucks inside and only the thread hangs below. */
 /* ------------------------------------------------------------- the ship
 
-   One drawing, parameterised by how far down the journey it is. At tech 0
-   it is AS-506 as it stood on 39A: escape tower, command module, three
-   stages, four fins, the black roll pattern the trackers used to read its
-   rate, and the flag. Everything after that is the same vehicle being
-   talked out of its own history — the stages fuse, the fins sweep back and
-   shrink, the aluminium goes dark, the F-1s stop being engines and start
-   being a ring that glows — and because it is one drawing rather than a
-   set of them, there is no frame where it swaps.
+   Thirteen vehicles, one to a phase, and the first six of them are the ones
+   Apollo 11 actually flew. You leave 39A on the full stack with the escape
+   tower on the nose; the first stage goes at staging and the tower with it;
+   what reaches orbit is the third stage and the spacecraft; the lunar module
+   comes out on the way to the Moon and is left there. After that it stops
+   being history and the ship keeps being rebuilt for wherever it is going —
+   solar wings for the inner system, radiators for Jupiter's radiation belt,
+   a drive ring past Saturn, and by the heliopause something that does not
+   appear to have engines at all.
 
-   It is drawn inside the same radius the balloon had, so nothing about what
-   can hit it has changed. */
+   It is still one drawing. Every field below is a number, the change at a
+   phase boundary is a blend between the old numbers and the new ones over
+   about a second, and the flash and the callout are what make it read as an
+   upgrade rather than a glitch. And it is still drawn inside the same radius
+   the balloon had, so nothing about what can hit it has moved.             */
+const SHIPS = [
+  // name                    les  fins  taper roll wings rad ring glow hull plume len  nose
+  { n:"Saturn V · AS-506",   les:1, fin:1.00, tap:1.00, roll:1.0, wing:0,   rad:0, ring:0, glow:0,    hull:0.00, plume:0.00, len:1.00, nose:1.00, vane:0 },
+  { n:"S-IC · first stage",  les:1, fin:0.92, tap:0.94, roll:1.0, wing:0,   rad:0, ring:0, glow:0,    hull:0.02, plume:0.02, len:1.00, nose:1.00, vane:0 },
+  { n:"S-II · second stage", les:0, fin:0.22, tap:0.80, roll:0.7, wing:0,   rad:0, ring:0, glow:0,    hull:0.06, plume:0.08, len:0.88, nose:0.92, vane:0 },
+  { n:"S-IVB and spacecraft",les:0, fin:0.06, tap:0.62, roll:0.4, wing:0,   rad:0, ring:0, glow:0,    hull:0.10, plume:0.16, len:0.80, nose:0.80, vane:0 },
+  { n:"CSM and Eagle",       les:0, fin:0.00, tap:0.46, roll:0.2, wing:0,   rad:0.2, ring:0, glow:0.05,hull:0.16, plume:0.26, len:0.74, nose:0.66, vane:0 },
+  { n:"Columbia · CSM",      les:0, fin:0.00, tap:0.34, roll:0.1, wing:0,   rad:0.3, ring:0, glow:0.1, hull:0.24, plume:0.36, len:0.68, nose:0.56, vane:0 },
+  { n:"Interplanetary stack",les:0, fin:0.00, tap:0.26, roll:0,   wing:0.5, rad:0.4, ring:0, glow:0.2, hull:0.34, plume:0.46, len:0.72, nose:0.50, vane:0 },
+  { n:"Radiation-hardened",  les:0, fin:0.00, tap:0.22, roll:0,   wing:0.7, rad:0.8, ring:0, glow:0.32,hull:0.46, plume:0.56, len:0.76, nose:0.46, vane:0 },
+  { n:"Ring-drive cruiser",  les:0, fin:0.00, tap:0.18, roll:0,   wing:0.8, rad:0.9, ring:0.5,glow:0.46,hull:0.58, plume:0.66, len:0.80, nose:0.42, vane:0 },
+  { n:"Deep cruiser",        les:0, fin:0.00, tap:0.14, roll:0,   wing:0.25,rad:1.0, ring:0.7,glow:0.60,hull:0.70, plume:0.74, len:0.90, nose:0.38, vane:0 },
+  { n:"Shielded cruiser",    les:0, fin:0.00, tap:0.10, roll:0,   wing:0.5, rad:0.6, ring:0.85,glow:0.74,hull:0.80, plume:0.82, len:0.86, nose:0.34, vane:0.7 },
+  { n:"Twin-ring cruiser",   les:0, fin:0.00, tap:0.07, roll:0,   wing:0.1, rad:0.3, ring:1.0,glow:0.88,hull:0.90, plume:0.90, len:0.94, nose:0.30, vane:0.4 },
+  { n:"Heliopause vessel",   les:0, fin:0.00, tap:0.04, roll:0,   wing:0,   rad:0,   ring:1.0,glow:1.00,hull:1.00, plume:1.00, len:0.99, nose:0.26, vane:1 }
+];
+const _spec = {};
+function shipSpec(){
+  if (!isMission()) return SHIPS[0];
+  const m = missionNow();
+  const i = Math.min(SHIPS.length - 1, m.i);
+  const cur = m.lap > 0 ? SHIPS[SHIPS.length - 1] : SHIPS[i];
+  const prev = i > 0 && m.lap === 0 ? SHIPS[i - 1] : cur;
+  // the refit takes about a second of climb rather than happening between
+  // two frames, so you see it happen
+  const k = clamp(_mis.into / 70, 0, 1);
+  for (const key in cur) _spec[key] = (typeof cur[key] === "number") ? lerp(prev[key], cur[key], k) : cur[key];
+  _spec.n = cur.n;
+  return _spec;
+}
 function drawShip(x, y, r, tech, phase, alpha){
+  const S = shipSpec();
   const T = clamp(tech, 0, 1);
+  const A = alpha === undefined ? 1 : alpha;
   const lift = riseFactor();
   ctx.save();
   ctx.translate(x, y);
-  ctx.globalAlpha = alpha === undefined ? 1 : alpha;
-  // held down it shudders; flying it hangs dead straight; late on it banks
+  ctx.globalAlpha = A;
   const shake = (G.launchT > LAUNCH_IGNITE && lift < 1 && !save.opts.calm)
     ? (Math.random() - 0.5) * 0.05 * (1 - lift) : 0;
   ctx.rotate(shake + Math.sin(phase * 1.1) * 0.012 * T);
 
-  const W = r * 0.33;                                  // core half-width
-  const hullA = mix("#f2f4f8", "#39456e", T);          // aluminium → something else
-  const hullB = mix("#c9ced9", "#1b2340", T);
-  const trim  = mix("#1b1f31", "#5de0ff", T);
-  const nose = -r, tail = r * 0.78;
+  const W = r * 0.33;
+  const hullA = mix("#f2f4f8", "#39456e", S.hull);
+  const hullB = mix("#c9ced9", "#1b2340", S.hull);
+  const trim  = mix("#1b1f31", "#5de0ff", S.hull);
+  const nose = -r * (0.62 + 0.38 * S.len), tail = r * 0.78;
 
-  // ---- plume ----------------------------------------------------------
+  // a contrast halo, dark under a pale ship and pale under a dark one
+  ctx.save();
+  ctx.globalAlpha = A * 0.5;
+  const halo = ctx.createRadialGradient(0, 0, r * 0.55, 0, 0, r * 1.85);
+  halo.addColorStop(0, S.hull < 0.5 ? "rgba(6,12,30,.55)" : "rgba(150,235,255,.42)");
+  halo.addColorStop(1, S.hull < 0.5 ? "rgba(6,12,30,0)" : "rgba(120,210,255,0)");
+  ctx.fillStyle = halo;
+  ctx.beginPath(); ctx.arc(0, 0, r * 1.85, 0, TAU); ctx.fill();
+  ctx.restore();
+
+  // ---- plume -----------------------------------------------------------
   const air = isMission() && (missionNow().ph.kind === "pad" || missionNow().ph.kind === "air");
-  const thrust = G.state === "play" || G.state === "clear" ? Math.max(lift, G.launchT > LAUNCH_IGNITE ? 0.55 : 0) : 0;
+  const thrust = G.state === "play" || G.state === "clear"
+    ? Math.max(lift, G.launchT > LAUNCH_IGNITE ? 0.55 : 0) : 0;
   if (thrust > 0.02){
+    const P = S.plume;
     const len = r * (air ? 2.5 : 1.5) * (0.55 + thrust * 0.75) * (0.9 + Math.sin(G.T * 31) * 0.1);
-    const hot  = mix("#fff3c4", "#ffffff", T);
-    const cool = T < 0.5 ? mix("#ff8a3a", "#4fa8ff", T * 2) : mix("#4fa8ff", "#b07cff", (T - 0.5) * 2);
+    const hot  = mix("#fff3c4", "#ffffff", P);
+    const cool = P < 0.5 ? mix("#ff8a3a", "#4fa8ff", P * 2) : mix("#4fa8ff", "#b07cff", (P - 0.5) * 2);
     const g = ctx.createLinearGradient(0, tail, 0, tail + len);
-    g.addColorStop(0, hot);
-    g.addColorStop(0.35, cool);
+    g.addColorStop(0, hot); g.addColorStop(0.35, cool);
     g.addColorStop(1, "rgba(255,255,255,0)");
-    ctx.globalAlpha = (alpha === undefined ? 1 : alpha) * (air ? 0.9 : 0.75);
+    ctx.globalAlpha = A * (air ? 0.9 : 0.75);
     ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.moveTo(-W * (1.05 - T * 0.35), tail);
-    ctx.quadraticCurveTo(0, tail + len * 1.15, W * (1.05 - T * 0.35), tail);
+    ctx.moveTo(-W * (1.05 - P * 0.35), tail);
+    ctx.quadraticCurveTo(0, tail + len * 1.15, W * (1.05 - P * 0.35), tail);
     ctx.closePath(); ctx.fill();
-    // the bright core of it
-    ctx.globalAlpha = (alpha === undefined ? 1 : alpha) * 0.9;
+    ctx.globalAlpha = A * 0.9;
     ctx.fillStyle = hot;
     ctx.beginPath();
     ctx.moveTo(-W * 0.44, tail);
     ctx.quadraticCurveTo(0, tail + len * 0.5, W * 0.44, tail);
     ctx.closePath(); ctx.fill();
-    ctx.globalAlpha = alpha === undefined ? 1 : alpha;
+    ctx.globalAlpha = A;
   }
 
-  // ---- fins / strakes -------------------------------------------------
-  // four on the S-IC, swept back and shrinking into strakes as it modernises
-  const finS = 1 - T * 0.62, finSweep = lerp(0.62, 1.5, T);
-  ctx.fillStyle = mix("#dfe3ea", "#232742", T);
-  for (const sgn of [-1, 1]){
-    ctx.beginPath();
-    ctx.moveTo(sgn * W, r * 0.18);
-    ctx.lineTo(sgn * (W + r * 0.52 * finS), r * (0.62 + 0.2 * finSweep));
-    ctx.lineTo(sgn * (W + r * 0.10 * finS), tail);
-    ctx.lineTo(sgn * W, tail);
-    ctx.closePath(); ctx.fill();
+  // ---- solar wings, when it has any -------------------------------------
+  if (S.wing > 0.02){
+    ctx.globalAlpha = A * 0.95;
+    ctx.fillStyle = mix("#2c3f6e", "#16305c", S.hull);
+    ctx.strokeStyle = trim; ctx.lineWidth = 0.7;
+    for (const sg of [-1, 1]){
+      const x0 = sg * W * 0.9, x1 = sg * W * (1 + 2.6 * S.wing);
+      ctx.beginPath();
+      ctx.moveTo(x0, -r * 0.16); ctx.lineTo(x1, -r * 0.10);
+      ctx.lineTo(x1, r * 0.10);  ctx.lineTo(x0, r * 0.16);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+    ctx.globalAlpha = A;
+  }
+  // ---- radiator fins ----------------------------------------------------
+  if (S.rad > 0.02){
+    ctx.globalAlpha = A * 0.8;
+    ctx.strokeStyle = mix("#9aa3b8", "#7cf0ff", S.hull);
+    ctx.lineWidth = 1;
+    for (const sg of [-1, 1]){
+      for (let i = 0; i < 3; i++){
+        const yy = r * (0.18 + i * 0.17);
+        ctx.beginPath();
+        ctx.moveTo(sg * W * 0.8, yy);
+        ctx.lineTo(sg * W * (0.8 + 1.5 * S.rad), yy + r * 0.05);
+        ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = A;
   }
 
-  /* A contrast halo, drawn first and underneath. Late on the hull is dark
-     navy and the sky is black; over Jupiter it is dark navy on bright tan.
-     Either way the ship is thirteen units wide on a four-hundred-unit screen
-     and it is the one thing on it you cannot afford to lose track of, so it
-     gets a soft ring that is dark where the ship is pale and pale where the
-     ship is dark. */
-  ctx.save();
-  ctx.globalAlpha = (alpha === undefined ? 1 : alpha) * 0.5;
-  const halo = ctx.createRadialGradient(0, 0, r * 0.55, 0, 0, r * 1.85);
-  halo.addColorStop(0, T < 0.5 ? "rgba(6,12,30,.55)" : "rgba(150,235,255,.42)");
-  halo.addColorStop(1, T < 0.5 ? "rgba(6,12,30,0)" : "rgba(120,210,255,0)");
-  ctx.fillStyle = halo;
-  ctx.beginPath(); ctx.arc(0, 0, r * 1.85, 0, TAU); ctx.fill();
-  ctx.restore();
+  // ---- fins -------------------------------------------------------------
+  if (S.fin > 0.02){
+    ctx.fillStyle = mix("#dfe3ea", "#232742", S.hull);
+    for (const sgn of [-1, 1]){
+      ctx.beginPath();
+      ctx.moveTo(sgn * W, r * 0.18);
+      ctx.lineTo(sgn * (W + r * 0.52 * S.fin), r * 0.76);
+      ctx.lineTo(sgn * (W + r * 0.10 * S.fin), tail);
+      ctx.lineTo(sgn * W, tail);
+      ctx.closePath(); ctx.fill();
+    }
+  }
 
-  // ---- body -----------------------------------------------------------
+  // ---- body -------------------------------------------------------------
   const bg = ctx.createLinearGradient(-W, 0, W, 0);
   bg.addColorStop(0, hullB); bg.addColorStop(0.42, hullA); bg.addColorStop(1, hullB);
   ctx.fillStyle = bg;
+  const tp = S.tap, bodyH = tail - nose;
   ctx.beginPath();
-  ctx.moveTo(0, nose);                                   // the point
-  ctx.lineTo(W * lerp(0.42, 0.30, T), nose + r * 0.30);
-  ctx.lineTo(W * lerp(0.62, 0.55, T), nose + r * 0.52);  // the command module
-  ctx.lineTo(W * lerp(0.80, 0.74, T), nose + r * 0.72);  // third stage
-  ctx.lineTo(W, nose + r * 0.98);                        // second stage
+  ctx.moveTo(0, nose);
+  ctx.lineTo(W * lerp(0.30, 0.42, tp) * S.nose, nose + bodyH * 0.13);
+  ctx.lineTo(W * lerp(0.55, 0.62, tp), nose + bodyH * 0.26);
+  ctx.lineTo(W * lerp(0.74, 0.80, tp), nose + bodyH * 0.38);
+  ctx.lineTo(W, nose + bodyH * 0.52);
   ctx.lineTo(W, tail);
   ctx.lineTo(-W, tail);
-  ctx.lineTo(-W, nose + r * 0.98);
-  ctx.lineTo(-W * lerp(0.80, 0.74, T), nose + r * 0.72);
-  ctx.lineTo(-W * lerp(0.62, 0.55, T), nose + r * 0.52);
-  ctx.lineTo(-W * lerp(0.42, 0.30, T), nose + r * 0.30);
+  ctx.lineTo(-W, nose + bodyH * 0.52);
+  ctx.lineTo(-W * lerp(0.74, 0.80, tp), nose + bodyH * 0.38);
+  ctx.lineTo(-W * lerp(0.55, 0.62, tp), nose + bodyH * 0.26);
+  ctx.lineTo(-W * lerp(0.30, 0.42, tp) * S.nose, nose + bodyH * 0.13);
   ctx.closePath();
   ctx.fill();
 
-  // ---- the roll pattern ----------------------------------------------
-  // AS-506 wore black on white so the tracking cameras could read its roll
-  // rate; it fades as the hull stops being painted metal
+  // ---- the roll pattern the tracking cameras read ----------------------
   ctx.save();
   ctx.clip();
-  const rollA = (1 - T) * 0.92;
-  if (rollA > 0.02){
-    ctx.globalAlpha = rollA;
+  if (S.roll > 0.02){
+    ctx.globalAlpha = A * S.roll * 0.92;
     ctx.fillStyle = "#1a1c26";
-    ctx.fillRect(-W, nose + r * 0.98, W * 2, r * 0.13);      // interstage band
-    ctx.fillRect(-W, r * 0.10, W * 2, r * 0.1);              // S-IC band
-    ctx.fillRect(-W, tail - r * 0.12, W * 2, r * 0.12);      // the skirt
-    ctx.fillRect(-W, nose + r * 0.62, W * 0.55, r * 0.1);    // the quarter marks
+    ctx.fillRect(-W, nose + bodyH * 0.52, W * 2, bodyH * 0.07);
+    ctx.fillRect(-W, r * 0.10, W * 2, r * 0.10);
+    ctx.fillRect(-W, tail - r * 0.12, W * 2, r * 0.12);
+    ctx.fillRect(-W, nose + bodyH * 0.32, W * 0.55, bodyH * 0.055);
     ctx.fillRect(W * 0.2, r * 0.42, W * 0.8, r * 0.1);
     ctx.fillRect(-W, r * 0.42, W * 0.5, r * 0.1);
-    // the flag, and USA down the side, both of them one pixel wide up here
-    ctx.globalAlpha = rollA * 0.85;
+    ctx.globalAlpha = A * S.roll * 0.8;
     ctx.fillStyle = "#b6202e"; ctx.fillRect(-W * 0.62, r * 0.62, W * 0.5, r * 0.055);
     ctx.fillStyle = "#1b3a8c"; ctx.fillRect(-W * 0.62, r * 0.62, W * 0.2, r * 0.055);
   }
-  // ---- and what replaces it ------------------------------------------
-  if (T > 0.25){
-    ctx.globalAlpha = clamp((T - 0.25) / 0.5, 0, 1) * 0.9;
+  if (S.hull > 0.2){
+    ctx.globalAlpha = A * clamp((S.hull - 0.2) / 0.5, 0, 1) * 0.9;
     ctx.strokeStyle = trim; ctx.lineWidth = 0.9;
     ctx.beginPath();
-    ctx.moveTo(-W * 0.55, nose + r * 0.55); ctx.lineTo(-W * 0.55, tail - r * 0.1);
-    ctx.moveTo(W * 0.55, nose + r * 0.55); ctx.lineTo(W * 0.55, tail - r * 0.1);
+    ctx.moveTo(-W * 0.55, nose + bodyH * 0.4); ctx.lineTo(-W * 0.55, tail - r * 0.1);
+    ctx.moveTo(W * 0.55, nose + bodyH * 0.4); ctx.lineTo(W * 0.55, tail - r * 0.1);
     ctx.stroke();
     ctx.fillStyle = trim;
-    ctx.globalAlpha = clamp((T - 0.4) / 0.4, 0, 1) * 0.8;
+    ctx.globalAlpha = A * clamp((S.hull - 0.35) / 0.4, 0, 1) * 0.8;
     ctx.fillRect(-W * 0.9, r * 0.02, W * 1.8, r * 0.06);
   }
-  ctx.globalAlpha = alpha === undefined ? 1 : alpha;
+  ctx.globalAlpha = A;
   ctx.restore();
 
-  // ---- the outline, laid inside r so its true size stays honest -------
-  ctx.strokeStyle = T < 0.45 ? "rgba(40,46,80,.9)" : "rgba(93,224,255,.95)";
+  // ---- the outline, inside r so its true size stays honest --------------
+  ctx.strokeStyle = S.glow < 0.35 ? "rgba(40,46,80,.9)" : "rgba(93,224,255,.95)";
   ctx.lineWidth = 1.5;
   ctx.stroke();
-  if (T > 0.45 && save.opts.glow && !save.opts.calm){   // and it starts to glow
+  if (S.glow > 0.3 && save.opts.glow && !save.opts.calm){
     ctx.save();
-    ctx.globalAlpha = (alpha === undefined ? 1 : alpha) * (T - 0.45) / 0.55 * 0.8;
+    ctx.globalAlpha = A * S.glow * 0.8;
     ctx.shadowColor = "#5de0ff"; ctx.shadowBlur = 9;
     ctx.strokeStyle = "rgba(150,235,255,.9)"; ctx.lineWidth = 1;
     ctx.stroke();
     ctx.restore();
   }
 
-  // ---- launch escape tower, gone by the time the air is ---------------
-  const lesA = clamp(1 - T / 0.09, 0, 1);
-  if (lesA > 0.01){
-    ctx.globalAlpha = (alpha === undefined ? 1 : alpha) * lesA;
+  // ---- the deflector vane, once there is something worth deflecting -----
+  if (S.vane > 0.02){
+    ctx.globalAlpha = A * Math.min(1, S.vane * 1.3);
+    ctx.strokeStyle = "#7cf0ff"; ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(0, nose + r * 0.34, r * 0.46 * (0.7 + S.vane * 0.5), Math.PI * 1.18, Math.PI * 1.82);
+    ctx.stroke();
+    ctx.globalAlpha = A * S.vane * 0.3;
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    ctx.globalAlpha = A * S.vane * 0.8;
+    ctx.lineWidth = 0.9;
+    ctx.beginPath();
+    ctx.moveTo(-W * 0.5, nose + r * 0.30); ctx.lineTo(-W * 0.24, nose + r * 0.52);
+    ctx.moveTo(W * 0.5, nose + r * 0.30);  ctx.lineTo(W * 0.24, nose + r * 0.52);
+    ctx.stroke();
+    ctx.globalAlpha = A;
+  }
+
+  // ---- launch escape tower ----------------------------------------------
+  if (S.les > 0.01){
+    ctx.globalAlpha = A * S.les;
     ctx.strokeStyle = "#c8ccd6"; ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(0, nose); ctx.lineTo(0, nose - r * 0.30);
@@ -4174,23 +4381,25 @@ function drawShip(x, y, r, tech, phase, alpha){
     ctx.stroke();
     ctx.fillStyle = "#d8232f";
     ctx.fillRect(-W * 0.13, nose - r * 0.32, W * 0.26, r * 0.12);
-    ctx.globalAlpha = alpha === undefined ? 1 : alpha;
+    ctx.globalAlpha = A;
   }
 
-  // ---- the drive ring that turns up once engines are beneath it -------
-  if (T > 0.55){
-    const a = (T - 0.55) / 0.45;
-    ctx.globalAlpha = (alpha === undefined ? 1 : alpha) * a;
+  // ---- drive rings -------------------------------------------------------
+  if (S.ring > 0.02){
+    ctx.globalAlpha = A * Math.min(1, S.ring * 1.4);
     ctx.strokeStyle = "#7cf0ff"; ctx.lineWidth = 1.3;
     ctx.beginPath(); ctx.ellipse(0, tail - r * 0.02, W * 1.5, W * 0.42, 0, 0, TAU); ctx.stroke();
-    ctx.globalAlpha = (alpha === undefined ? 1 : alpha) * a * 0.35;
+    if (S.ring > 0.75){
+      ctx.beginPath(); ctx.ellipse(0, tail - r * 0.34, W * 1.2, W * 0.32, 0, 0, TAU); ctx.stroke();
+    }
+    ctx.globalAlpha = A * S.ring * 0.35;
     ctx.beginPath(); ctx.ellipse(0, tail - r * 0.02, W * 2.1, W * 0.6, 0, 0, TAU); ctx.stroke();
-    ctx.globalAlpha = alpha === undefined ? 1 : alpha;
+    ctx.globalAlpha = A;
   }
 
-  // ---- one lit window, because someone is in there --------------------
-  ctx.fillStyle = T < 0.45 ? "rgba(120,190,255,.9)" : "#bff6ff";
-  ctx.beginPath(); ctx.arc(0, nose + r * 0.42, Math.max(0.8, W * 0.2), 0, TAU); ctx.fill();
+  // ---- one lit window, because somebody is in there ---------------------
+  ctx.fillStyle = S.hull < 0.45 ? "rgba(120,190,255,.9)" : "#bff6ff";
+  ctx.beginPath(); ctx.arc(0, nose + bodyH * 0.22, Math.max(0.8, W * 0.2), 0, TAU); ctx.fill();
   ctx.restore();
 }
 
@@ -4554,6 +4763,13 @@ const UI = {
     b.classList.add("on");
     const st = stageAt(G.climbed);
     if (st && !first) this.callout("HAZARD · " + st.stage.name.toUpperCase());
+    // the vehicle is rebuilt for wherever it is going next, and says so
+    if (!first && m.lap === 0 && m.i < SHIPS.length){
+      clearTimeout(this.refitT);
+      this.refitT = setTimeout(() => this.callout("VEHICLE · " + SHIPS[m.i].n.toUpperCase()), 1700);
+      burstParts(G.bal.x, G.bal.y, save.opts.calm ? 6 : 16, "#bff6ff", 190, "dot");
+      Audio2.SFX.power();
+    }
     clearTimeout(this.stageT);
     this.stageT = setTimeout(() => b.classList.remove("on"), 2200);
     if (!first) Audio2.SFX.ui();
