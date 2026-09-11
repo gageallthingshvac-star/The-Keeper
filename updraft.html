@@ -938,14 +938,14 @@ const BIOMES = [
    is also its duration: 58 units is one second.                          */
 
 const PLANETS = {
-  earth:   { name:"EARTH",   rf:0.46, col:"#2f6fc4", col2:"#12294f", land:"#41874f", cloud:1, ring:0, moons:0, day:"#7cc0ee" },
-  moon:    { name:"MOON",    rf:0.4, col:"#b9b6ae", col2:"#5d5b55", land:"#9b988f", cloud:0, ring:0, moons:0, day:"#e2dfd6" },
-  mars:    { name:"MARS",    rf:0.36, col:"#c1552f", col2:"#4d2014", land:"#e08a54", cloud:0, ring:0, moons:2, day:"#ee9a63" },
-  jupiter: { name:"JUPITER", rf:0.6, col:"#cfa878", col2:"#553f2a", land:"#f2e0c4", cloud:0, ring:0, moons:4, day:"#f7e8cc", bands:1, spot:1 },
-  saturn:  { name:"SATURN",  rf:0.42, col:"#d8c493", col2:"#5e5236", land:"#f4ebcd", cloud:0, ring:1, moons:2, day:"#f8f0d4", bands:1 },
-  uranus:  { name:"URANUS",  rf:0.38, col:"#8fd0d8", col2:"#2c5a64", land:"#c6f0f4", cloud:0, ring:1, moons:1, day:"#d8f8fb", tilt:1 },
-  neptune: { name:"NEPTUNE", rf:0.37, col:"#3f5fc8", col2:"#141f52", land:"#7f9bf0", cloud:0, ring:0, moons:1, day:"#9ab4f8", spot:1 },
-  pluto:   { name:"PLUTO",   rf:0.24, col:"#c9b49c", col2:"#4f463c", land:"#f5ecdd", cloud:0, ring:0, moons:1, day:"#eee2d0" }
+  earth:   { name:"EARTH",   rf:0.46, side:0.3, col:"#2f6fc4", col2:"#12294f", land:"#41874f", cloud:1, ring:0, moons:0, day:"#7cc0ee" },
+  moon:    { name:"MOON",    rf:0.4, side:-0.42, col:"#b9b6ae", col2:"#5d5b55", land:"#9b988f", cloud:0, ring:0, moons:0, day:"#e2dfd6" },
+  mars:    { name:"MARS",    rf:0.36, side:0.46, col:"#c1552f", col2:"#4d2014", land:"#e08a54", cloud:0, ring:0, moons:2, day:"#ee9a63" },
+  jupiter: { name:"JUPITER", rf:0.6, side:-0.52, col:"#cfa878", col2:"#553f2a", land:"#f2e0c4", cloud:0, ring:0, moons:4, day:"#f7e8cc", bands:1, spot:1 },
+  saturn:  { name:"SATURN",  rf:0.42, side:0.5, col:"#d8c493", col2:"#5e5236", land:"#f4ebcd", cloud:0, ring:1, moons:2, day:"#f8f0d4", bands:1 },
+  uranus:  { name:"URANUS",  rf:0.38, side:-0.46, col:"#8fd0d8", col2:"#2c5a64", land:"#c6f0f4", cloud:0, ring:1, moons:1, day:"#d8f8fb", tilt:1 },
+  neptune: { name:"NEPTUNE", rf:0.37, side:0.44, col:"#3f5fc8", col2:"#141f52", land:"#7f9bf0", cloud:0, ring:0, moons:1, day:"#9ab4f8", spot:1 },
+  pluto:   { name:"PLUTO",   rf:0.24, side:-0.38, col:"#c9b49c", col2:"#4f463c", land:"#f5ecdd", cloud:0, ring:0, moons:1, day:"#eee2d0" }
 };
 
 /* Each phase: what the sky is made of, and what is in it.
@@ -1166,6 +1166,7 @@ function mkObst(x, y, parts, opt){
     split: opt.split || 0,                   // children spawned when blocked
     worth: opt.worth || 5,                   // score for swatting it away
     blocked: false, flash: 0, rad: 0, pid: "",
+    seed: Math.abs(((x * 131) ^ (y * 977) ^ (parts.length * 7919)) | 0) % 4093,
     asleep: false, look: "plain"
   };
   let r = 0;
@@ -1492,7 +1493,7 @@ function piece(g, x, y, parts, opt){
   const o = mkObst(clamp(x, -40, VW + 40), y, parts, opt || {});
   o.asleep = true;
   o.vx = 0; o.vy = 0;
-  o.look = g.look;
+  o.look = (opt && opt.look) || g.look;
   o.pid = g.id;
   g.push(o);
   return o;
@@ -1737,7 +1738,7 @@ const ROCK_MIN = 9;                    // below this it is a speck, not a rock
 function rock(g, x, y, R0, massPer, opt){
   const R = Math.max(ROCK_MIN, R0);
   return piece(g, x, y, rockParts(g.rng, R),
-    Object.assign({ mass: clamp(massPer * (0.5 + R / 30), 0.35, ROCK_MASS_MAX), style: "orb",
+    Object.assign({ mass: clamp(massPer * (0.5 + R / 30), 0.35, ROCK_MASS_MAX), style: "orb", look: "crater",
                     worth: Math.round(4 + R / 3),
                     ang: g.rng() * TAU, spin: (g.rng() - 0.5) * 0.5 }, opt || {}));
 }
@@ -1817,7 +1818,7 @@ const MDESIGNS = [
         const y = g.y - 110 + t * 120 * tilt + Math.abs(t) * 40;
         piece(g, x, y, [{ x1: -16, y1: 5, x2: 0, y2: -4, r: 7 },
                         { x1: 0, y1: -4, x2: 16, y2: 5, r: 7 }],
-              { mass: 0.5, style: "orb", worth: 6 });
+              { mass: 0.5, style: "orb", worth: 6, look: "plain" });
       }
     }},
   { id: "hail", name: "Hail cell", span: 230, build(g){
@@ -1844,7 +1845,7 @@ const MDESIGNS = [
                  y1: (Math.sin(a0) - Math.sin(a1)) * R * 0.31,
                  x2: (Math.cos(a1) - Math.cos(a0)) * R * 0.5,
                  y2: (Math.sin(a1) - Math.sin(a0)) * R * 0.31, r: 9 }],
-              { mass: 1.4 + g.d * 1.4, style: "wall", worth: 10 });
+              { mass: 1.4 + g.d * 1.4, style: "wall", worth: 10, look: "hull" });
       }
       // and the bolts that held it together, which do go through the middle
       for (let i = 0; i < 3 + Math.round(g.d * 4); i++)
@@ -1857,7 +1858,7 @@ const MDESIGNS = [
             [{ x1: 0, y1: -52, x2: 0, y2: 34, r: 14 },
              { x1: 0, y1: 34, x2: 0, y2: 52, r: 9 },
              { x1: -16, y1: 30, x2: 16, y2: 30, r: 5 }],
-            { mass: 3.0 + g.d * 2.4, style: "wall", worth: 26,
+            { mass: 3.0 + g.d * 2.4, style: "wall", worth: 26, look: "hull",
               ang: (g.rng() - 0.5) * 1.4, spin: (g.rng() - 0.5) * 0.5 });
       for (let i = 0; i < 4 + Math.round(g.d * 5); i++)
         rock(g, 30 + g.rng() * (VW - 60), g.y - 40 - g.rng() * 250, 8 + g.rng() * 7, 0.5);
@@ -1868,17 +1869,17 @@ const MDESIGNS = [
             [{ x1: 0, y1: -56, x2: 0, y2: 10, r: 6 },
              { x1: 0, y1: 10, x2: 0, y2: 48, r: 15 },
              { x1: -20, y1: -34, x2: 20, y2: -34, r: 5 }],
-            { mass: 2.0 + g.d * 1.6, style: "wall", worth: 20,
+            { mass: 2.0 + g.d * 1.6, style: "wall", worth: 20, look: "hull",
               ang: (g.rng() - 0.5) * 2, spin: (g.rng() - 0.5) * 0.7 });
     }},
 
   /* --- orbital debris ------------------------------------------------ */
   { id: "satellite", name: "Dead satellite", span: 320, build(g){
-      const S = 15 + g.d * 7;
+      const S = 21 + g.d * 9;
       piece(g, VW / 2 + (g.rng() - 0.5) * 130, g.y - 140, satParts(g.rng, S),
-            { mass: 2.2 + g.d * 2.0, style: "wall", worth: 30,
+            { mass: 2.2 + g.d * 2.0, style: "wall", worth: 30, look: "panel",
               ang: (g.rng() - 0.5) * 1.2, spin: (g.rng() - 0.5) * 0.4 });
-      for (let i = 0; i < 8 + Math.round(g.d * 8); i++)
+      for (let i = 0; i < 5 + Math.round(g.d * 5); i++)
         rock(g, 26 + g.rng() * (VW - 52), g.y - 30 - g.rng() * 400, 8 + g.rng() * 9, 0.45);
     }},
   { id: "array", name: "Torn array", span: 300, build(g){
@@ -1887,12 +1888,12 @@ const MDESIGNS = [
       for (let i = 0; i < n; i++){
         const len = 42 + g.d * 24;
         piece(g, 44 + g.rng() * (VW - 88), g.y - 60 - i * 104 - g.rng() * 60,
-              [{ x1: -len, y1: 0, x2: len, y2: 0, r: 8 },
-               { x1: -len * 0.5, y1: -9, x2: len * 0.5, y2: -9, r: 3 }],
-              { mass: 1.3 + g.d * 1.2, style: "wall", worth: 16,
+              [{ x1: -len, y1: 0, x2: len, y2: 0, r: 12 },
+               { x1: -len * 0.45, y1: -13, x2: len * 0.45, y2: -13, r: 4 }],
+              { mass: 1.3 + g.d * 1.2, style: "wall", worth: 16, look: "panel",
                 ang: (g.rng() - 0.5) * 2.4, spin: (g.rng() - 0.5) * 0.6 });
       }
-      for (let i = 0; i < 7 + Math.round(g.d * 8); i++)
+      for (let i = 0; i < 4 + Math.round(g.d * 5); i++)
         rock(g, 24 + g.rng() * (VW - 48), g.y - 30 - g.rng() * 440, 8 + g.rng() * 9, 0.45);
     }},
   { id: "bolts", name: "Bolt cloud", span: 240, build(g){
@@ -1901,7 +1902,7 @@ const MDESIGNS = [
       for (let i = 0; i < n; i++){
         const x = 20 + g.rng() * (VW - 40), y = g.y - 30 - g.rng() * 360;
         piece(g, x, y, [{ x1: -6, y1: 0, x2: 6, y2: 0, r: 8 }],
-              { mass: 0.45, style: "orb", worth: 5,
+              { mass: 0.45, style: "orb", worth: 5, look: "hull",
                 ang: g.rng() * TAU, spin: (g.rng() - 0.5) * 1.4 });
       }
     }},
@@ -1914,10 +1915,149 @@ const MDESIGNS = [
                         { x1: L * 0.6, y1: -26, x2: L * 0.2, y2: 0, r: 4 }],
             // the heaviest thing in the game, and the last word in most runs,
             // but still light enough that a proper swing moves it
-            { mass: 3.0 + g.d * 1.8, style: "wall", worth: 34,
+            { mass: 3.0 + g.d * 1.8, style: "wall", worth: 34, look: "foil",
               ang: (g.rng() - 0.5) * 0.8, spin: (g.rng() - 0.5) * 0.25 });
-      for (let i = 0; i < 9 + Math.round(g.d * 9); i++)
+      for (let i = 0; i < 10 + Math.round(g.d * 9); i++)
         rock(g, 26 + g.rng() * (VW - 52), g.y - 30 - g.rng() * 440, 9 + g.rng() * 11, 0.55);
+    }},
+
+  /* --- the hardware ---------------------------------------------------
+     Things people have actually built and sent up, at the places they were
+     sent to: a lunar module round the Moon, a rover at Mars, a deep-space
+     probe out past Neptune, and a telescope and a station module in the
+     wreck at the end. Each is a single rigid body of capsules, so it
+     tumbles as one object, and each carries its own surface marking —
+     panelled, plated, foil-wrapped — rather than whatever the wave it
+     arrived in happened to be wearing. */
+  { id: "lander", name: "Lunar module", span: 340, build(g){
+      const S = 20 + g.d * 8;
+      const legs = [];
+      for (const sx of [-1, 1]){
+        legs.push({ x1: sx * S * 0.6, y1: S * 0.35, x2: sx * S * 1.55, y2: S * 1.5, r: S * 0.16 });
+        legs.push({ x1: sx * S * 1.55, y1: S * 1.5, x2: sx * S * 1.9, y2: S * 1.5, r: S * 0.22 });
+      }
+      piece(g, VW / 2 + (g.rng() - 0.5) * 130, g.y - 150, [
+        { x1: -S * 0.66, y1: S * 0.1, x2: S * 0.66, y2: S * 0.1, r: S * 0.78 },   // descent stage
+        { x1: -S * 0.42, y1: -S * 0.9, x2: S * 0.42, y2: -S * 0.9, r: S * 0.62 }, // ascent stage
+        { x1: 0, y1: -S * 1.5, x2: 0, y2: -S * 1.9, r: S * 0.16 },                // rendezvous radar
+        ...legs
+      ], { mass: 2.2 + g.d * 1.5, style: "wall", worth: 32, look: "foil",
+           ang: (g.rng() - 0.5) * 1.6, spin: (g.rng() - 0.5) * 0.35 });
+      for (let i = 0; i < 4 + Math.round(g.d * 4); i++)
+        rock(g, 24 + g.rng() * (VW - 48), g.y - 30 - g.rng() * 400, 9 + g.rng() * 10, 0.5);
+    }},
+  { id: "rover", name: "Rover", span: 320, build(g){
+      const S = 18 + g.d * 7;
+      piece(g, VW / 2 + (g.rng() - 0.5) * 140, g.y - 140, [
+        { x1: -S * 1.1, y1: 0, x2: S * 1.1, y2: 0, r: S * 0.52 },                 // chassis
+        { x1: -S * 1.25, y1: S * 0.55, x2: -S * 1.25, y2: S * 0.55, r: S * 0.42 },// wheels
+        { x1: 0, y1: S * 0.62, x2: 0, y2: S * 0.62, r: S * 0.42 },
+        { x1: S * 1.25, y1: S * 0.55, x2: S * 1.25, y2: S * 0.55, r: S * 0.42 },
+        { x1: -S * 0.5, y1: -S * 0.5, x2: -S * 0.5, y2: -S * 1.3, r: S * 0.14 },  // mast
+        { x1: -S * 0.5, y1: -S * 1.4, x2: S * 0.1, y2: -S * 1.4, r: S * 0.2 },    // camera head
+        { x1: S * 0.3, y1: -S * 0.5, x2: S * 1.5, y2: -S * 0.75, r: S * 0.16 }    // antenna
+      ], { mass: 1.9 + g.d * 1.3, style: "wall", worth: 28, look: "hull",
+           ang: (g.rng() - 0.5) * 2, spin: (g.rng() - 0.5) * 0.5 });
+      for (let i = 0; i < 5 + Math.round(g.d * 5); i++)
+        rock(g, 24 + g.rng() * (VW - 48), g.y - 30 - g.rng() * 400, 9 + g.rng() * 11, 0.55);
+    }},
+  { id: "capsule", name: "Crew capsule", span: 300, build(g){
+      const S = 20 + g.d * 8;
+      piece(g, VW / 2 + (g.rng() - 0.5) * 130, g.y - 140, [
+        { x1: 0, y1: -S * 0.9, x2: 0, y2: S * 0.5, r: S * 0.5 },                  // the cone
+        { x1: -S * 0.8, y1: S * 0.62, x2: S * 0.8, y2: S * 0.62, r: S * 0.3 },    // heat shield
+        { x1: 0, y1: -S * 1.1, x2: 0, y2: -S * 1.5, r: S * 0.12 }                 // docking probe
+      ], { mass: 2.4 + g.d * 1.4, style: "wall", worth: 30, look: "hull",
+           ang: (g.rng() - 0.5) * 1.8, spin: (g.rng() - 0.5) * 0.4 });
+      for (let i = 0; i < 4 + Math.round(g.d * 5); i++)
+        rock(g, 24 + g.rng() * (VW - 48), g.y - 30 - g.rng() * 400, 9 + g.rng() * 10, 0.5);
+    }},
+  { id: "probe", name: "Deep-space probe", span: 340, build(g){
+      const S = 19 + g.d * 8;
+      piece(g, VW / 2 + (g.rng() - 0.5) * 120, g.y - 150, [
+        { x1: -S * 0.95, y1: -S * 0.34, x2: -S * 0.4, y2: S * 0.1, r: S * 0.4 },  // the dish,
+        { x1: -S * 0.4, y1: S * 0.1, x2: S * 0.4, y2: S * 0.1, r: S * 0.44 },     // in three
+        { x1: S * 0.4, y1: S * 0.1, x2: S * 0.95, y2: -S * 0.34, r: S * 0.4 },    // curved pieces
+        { x1: -S * 0.3, y1: S * 0.7, x2: S * 0.3, y2: S * 0.7, r: S * 0.42 },     // the bus
+        { x1: S * 0.4, y1: S * 0.85, x2: S * 2.3, y2: S * 1.3, r: S * 0.2 },      // the RTG boom
+        { x1: -S * 0.4, y1: S * 0.85, x2: -S * 2.6, y2: S * 0.6, r: S * 0.12 },   // magnetometer
+        { x1: 0, y1: -S * 0.15, x2: 0, y2: -S * 0.62, r: S * 0.13 }               // the feed horn
+      ], { mass: 2.0 + g.d * 1.4, style: "wall", worth: 34, look: "foil",
+           ang: (g.rng() - 0.5) * 1.5, spin: (g.rng() - 0.5) * 0.3 });
+      for (let i = 0; i < 5 + Math.round(g.d * 5); i++)
+        rock(g, 24 + g.rng() * (VW - 48), g.y - 30 - g.rng() * 400, 9 + g.rng() * 11, 0.55);
+    }},
+  { id: "telescope", name: "Observatory", span: 340, build(g){
+      const S = 18 + g.d * 7;
+      piece(g, VW / 2 + (g.rng() - 0.5) * 120, g.y - 150, [
+        { x1: 0, y1: -S * 1.5, x2: 0, y2: S * 1.2, r: S * 0.62 },                 // the tube
+        { x1: 0, y1: -S * 1.7, x2: 0, y2: -S * 1.5, r: S * 0.72 },                // the aperture
+        { x1: -S * 0.8, y1: 0, x2: -S * 2.6, y2: 0, r: S * 0.34 },                // port wing
+        { x1: S * 0.8, y1: 0, x2: S * 2.6, y2: 0, r: S * 0.34 }                   // starboard wing
+      ], { mass: 2.6 + g.d * 1.6, style: "wall", worth: 36, look: "panel",
+           ang: (g.rng() - 0.5) * 1.4, spin: (g.rng() - 0.5) * 0.3 });
+      for (let i = 0; i < 4 + Math.round(g.d * 5); i++)
+        rock(g, 24 + g.rng() * (VW - 48), g.y - 30 - g.rng() * 400, 9 + g.rng() * 10, 0.5);
+    }},
+  { id: "module", name: "Station module", span: 350, build(g){
+      const S = 19 + g.d * 7;
+      piece(g, VW / 2 + (g.rng() - 0.5) * 110, g.y - 155, [
+        { x1: -S * 1.7, y1: 0, x2: S * 1.7, y2: 0, r: S * 0.72 },                 // the can
+        { x1: -S * 2.0, y1: 0, x2: -S * 1.8, y2: 0, r: S * 0.5 },                 // docking rings
+        { x1: S * 1.8, y1: 0, x2: S * 2.0, y2: 0, r: S * 0.5 },
+        { x1: -S * 0.4, y1: -S * 0.8, x2: -S * 0.4, y2: -S * 2.0, r: S * 0.22 },  // the truss stub
+        { x1: -S * 0.4, y1: -S * 2.0, x2: S * 1.4, y2: -S * 2.2, r: S * 0.3 }
+      ], { mass: 3.0 + g.d * 1.7, style: "wall", worth: 38, look: "hull",
+           ang: (g.rng() - 0.5) * 1.1, spin: (g.rng() - 0.5) * 0.22 });
+      for (let i = 0; i < 5 + Math.round(g.d * 6); i++)
+        rock(g, 24 + g.rng() * (VW - 48), g.y - 30 - g.rng() * 420, 9 + g.rng() * 12, 0.55);
+    }},
+  { id: "tank", name: "Propellant tank", span: 300, build(g){
+      // spheres, which is what a pressure vessel is, and there are always
+      // several of them because they came off the same stage
+      const n = 2 + (g.rng() * 2 | 0);
+      for (let i = 0; i < n; i++){
+        const S = 18 + g.d * 9;
+        piece(g, 44 + g.rng() * (VW - 88), g.y - 60 - i * 120 - g.rng() * 70, [
+          { x1: 0, y1: 0, x2: 0, y2: 0, r: S },
+          { x1: 0, y1: S * 0.9, x2: 0, y2: S * 1.5, r: S * 0.16 }
+        ], { mass: 1.6 + g.d * 1.3, style: "wall", worth: 20, look: "hull",
+             ang: g.rng() * TAU, spin: (g.rng() - 0.5) * 0.5 });
+      }
+      for (let i = 0; i < 4 + Math.round(g.d * 4); i++)
+        rock(g, 24 + g.rng() * (VW - 48), g.y - 30 - g.rng() * 400, 9 + g.rng() * 9, 0.5);
+    }},
+  { id: "cubesat", name: "Cubesat swarm", span: 300, build(g){
+      // little boxes, deployed together and still flying in formation
+      const n = 7 + Math.round(g.d * 8);
+      const lean = (g.rng() - 0.5) * 0.9;
+      for (let i = 0; i < n; i++){
+        const S = 8 + g.rng() * 4;
+        const t = i / Math.max(1, n - 1) - 0.5;
+        piece(g, clamp(VW / 2 + t * (VW - 60) + (g.rng() - 0.5) * 30, 18, VW - 18),
+              g.y - 120 + t * 210 * lean - g.rng() * 180, [
+          { x1: -S * 0.5, y1: 0, x2: S * 0.5, y2: 0, r: S * 0.7 },
+          { x1: -S * 1.6, y1: 0, x2: -S * 0.8, y2: 0, r: S * 0.3 },
+          { x1: S * 0.8, y1: 0, x2: S * 1.6, y2: 0, r: S * 0.3 }
+        ], { mass: 0.8 + g.d * 0.5, style: "wall", worth: 12, look: "panel",
+             ang: g.rng() * TAU, spin: (g.rng() - 0.5) * 1.1 });
+      }
+    }},
+  { id: "dish", name: "Antenna dish", span: 310, build(g){
+      const n = 2 + (g.rng() * 2 | 0);
+      for (let i = 0; i < n; i++){
+        const S = 21 + g.d * 10;
+        piece(g, 50 + g.rng() * (VW - 100), g.y - 70 - i * 130 - g.rng() * 70, [
+          { x1: -S * 0.95, y1: -S * 0.30, x2: -S * 0.42, y2: S * 0.12, r: S * 0.36 },
+          { x1: -S * 0.42, y1: S * 0.12, x2: S * 0.42, y2: S * 0.12, r: S * 0.40 },
+          { x1: S * 0.42, y1: S * 0.12, x2: S * 0.95, y2: -S * 0.30, r: S * 0.36 },
+          { x1: 0, y1: -S * 0.1, x2: 0, y2: -S * 0.85, r: S * 0.13 },
+          { x1: -S * 0.26, y1: -S * 0.92, x2: S * 0.26, y2: -S * 0.92, r: S * 0.17 }
+        ], { mass: 1.5 + g.d * 1.2, style: "wall", worth: 22, look: "panel",
+             ang: (g.rng() - 0.5) * 2.2, spin: (g.rng() - 0.5) * 0.55 });
+      }
+      for (let i = 0; i < 4 + Math.round(g.d * 4); i++)
+        rock(g, 24 + g.rng() * (VW - 48), g.y - 30 - g.rng() * 380, 9 + g.rng() * 9, 0.5);
     }},
 
   /* --- rock ---------------------------------------------------------- */
@@ -1959,7 +2099,7 @@ const MDESIGNS = [
           const len = 13 + g.rng() * (10 + g.d * 12);
           piece(g, x + (g.rng() - 0.5) * 12, cy + (g.rng() - 0.5) * 16,
                 [{ x1: -len, y1: 0, x2: len, y2: 0, r: 7 }],
-                { mass: 1.0 + g.d * 1.1, style: "wall", worth: 12,
+                { mass: 1.0 + g.d * 1.1, style: "wall", worth: 12, look: "ice",
                   ang: (g.rng() - 0.5) * 0.35 });
         }
       }
@@ -1968,7 +2108,7 @@ const MDESIGNS = [
       // one that will not move for you, and a way round it
       const R = 46 + g.d * 30;
       rock(g, VW / 2 + (g.rng() - 0.5) * 96, g.y - 160, R, 3.2, { worth: 44 });
-      for (let i = 0; i < 13 + Math.round(g.d * 11); i++)
+      for (let i = 0; i < 14 + Math.round(g.d * 11); i++)
         rock(g, 24 + g.rng() * (VW - 48), g.y - 30 - g.rng() * 440, 9 + g.rng() * 13, 0.6);
     }},
   { id: "shower", name: "Meteor shower", span: 300, build(g){
@@ -1993,25 +2133,26 @@ for (const d of MDESIGNS) DESIGNS.push(d);
    draw on the whole late pool at once, which is the only escalation left
    once there is nowhere further out to go. */
 const MISSION_STAGES = [
-  { id:"mi-ice",   name:"Ice and Gulls",     look:"plain",   designs:["iceshed","gulls"] },
-  { id:"mi-air",   name:"Airframe Debris",   look:"slash",   designs:["hail","iceshed","gulls"] },
-  { id:"mi-stage", name:"Staging Debris",    look:"brick",   designs:["interstage","tower","spent"] },
-  { id:"mi-orb",   name:"Orbital Junk",      look:"brick",   designs:["bolts","array","satellite"] },
-  { id:"mi-micro", name:"Micrometeoroids",   look:"dots",    designs:["shower","bolts","field"] },
-  { id:"mi-ejec",  name:"Lunar Ejecta",      look:"dots",    designs:["field","asteroid","shower"] },
-  { id:"mi-pho",   name:"Phobos Gravel",     look:"dots",    designs:["belt","asteroid","field"] },
-  { id:"mi-belt",  name:"The Main Belt",     look:"hollow",  designs:["boulder","belt","asteroid"] },
-  { id:"mi-ring",  name:"Ring Ice",          look:"band",    designs:["ringice","belt","field"] },
-  { id:"mi-shep",  name:"Shepherd Rock",     look:"band",    designs:["ringice","boulder","belt"] },
-  { id:"mi-kuip",  name:"Kuiper Fragments",  look:"hollow",  designs:["field","shower","boulder"] },
-  { id:"mi-froz",  name:"Frozen Field",      look:"hollow",  designs:["belt","boulder","ringice"] },
-  { id:"mi-inter", name:"Interstellar Wrack",look:"cross",   designs:["truss","boulder","satellite","belt"] }
+  { id:"mi-ice",   name:"Ice and Gulls",     look:"ice",     designs:["iceshed","gulls"] },
+  { id:"mi-air",   name:"Airframe Debris",   look:"ice",     designs:["hail","iceshed","gulls"] },
+  { id:"mi-stage", name:"Staging Debris",    look:"hull",    designs:["interstage","tower","spent"] },
+  { id:"mi-orb",   name:"Orbital Junk",      look:"panel",   designs:["cubesat","array","satellite"] },
+  { id:"mi-micro", name:"Micrometeoroids",   look:"crater",  designs:["shower","tank","capsule"] },
+  { id:"mi-ejec",  name:"Lunar Ejecta",      look:"crater",  designs:["field","lander","asteroid"] },
+  { id:"mi-pho",   name:"Phobos Gravel",     look:"crater",  designs:["belt","rover","asteroid"] },
+  { id:"mi-belt",  name:"The Main Belt",     look:"crater",  designs:["boulder","belt","asteroid"] },
+  { id:"mi-ring",  name:"Ring Ice",          look:"ice",     designs:["ringice","dish","belt"] },
+  { id:"mi-shep",  name:"Shepherd Rock",     look:"ice",     designs:["ringice","boulder","belt"] },
+  { id:"mi-kuip",  name:"Kuiper Fragments",  look:"crater",  designs:["field","probe","shower"] },
+  { id:"mi-froz",  name:"Frozen Field",      look:"ice",     designs:["belt","boulder","ringice"] },
+  { id:"mi-inter", name:"Interstellar Wrack",look:"foil",    designs:["truss","module","telescope","probe"] }
 ];
 // everything worth meeting again. On a second pass a phase keeps its own
 // name and marking — you are still at Saturn — but the whole late cast turns
 // up in it as well, which is the only escalation left once there is nowhere
 // further out to go.
-const MISSION_LATE = ["boulder", "belt", "truss", "ringice", "asteroid", "satellite", "shower", "field"];
+const MISSION_LATE = ["boulder", "belt", "truss", "ringice", "asteroid", "module",
+                      "shower", "field", "telescope", "probe", "dish"];
 const _lapStages = MISSION_STAGES.map(st => ({
   id: st.id + "-lap", name: st.name, look: st.look,
   designs: st.designs.concat(MISSION_LATE.filter(d => st.designs.indexOf(d) < 0))
@@ -3142,13 +3283,27 @@ function drawCoast(m){
   ctx.restore();
 }
 /* ---- a world, and one lap of it ---- */
+let _worldTop = 1e9;                    // where the visible world reaches this frame
 function drawWorld(m, pl){
+  _worldTop = 1e9;
   if (!pl) return;
   const t = m.t;                               // 0..1 of exactly one orbit
   const spin = t * TAU;
   // the world sits below, centred, close enough to fill the lower sky
-  const cx = VW / 2, r = pl.rf * VW;
-  const cy = VH * 0.74 + r * 0.40;           // enough of the ball in frame to read as one
+  /* The pass. A world is not a backdrop bolted to the bottom of the screen:
+     you arrive on it, you go round it once, and you leave. So it comes up
+     over the horizon ahead — the top of the frame, which is where the ship is
+     going — swells to closest approach halfway through the phase, and goes
+     down and behind as the orbit carries you off it. One phase, one pass, and
+     the progress bar underneath is the same number. Each world passes on its
+     own side so no two in a row sit the same way. */
+  const r = pl.rf * VW * (0.76 + 0.24 * Math.sin(Math.PI * t));
+  const cx = VW / 2 + (pl.side || 0) * VW;
+  // it is already just showing when the phase begins and still just showing
+  // when it ends, so no phase opens or closes on an empty sky
+  const cy = lerp(-r * 0.88, VH + r * 0.88, t);
+  if (cy - r > VH + 40 || cy + r < -40) return;
+  _worldTop = cy - r;
   ctx.save();
   if (pl.ring) drawRings(cx, cy, r, pl, spin, true);   // the half that passes behind
   // the lit crescent: the sun is up and to the right, so the terminator runs
@@ -3362,14 +3517,24 @@ function drawMissionBackdrop(){
   else if (k === "void") drawVoid(m);
   if (k === "pad"){ drawPadClouds(m); drawPad(m); drawPadFire(m); }
   else if (k === "air") drawCoast(m);
-  // a soft vignette. A lit planet filling the lower half is the brightest
-  // thing on screen, and white debris has to stay the second brightest.
+  /* A lit world is the brightest thing on the screen and white debris has to
+     stay the second brightest. The bottom of the frame always gets a vignette;
+     the top only gets one while a world is actually up there covering the
+     ground the debris falls through, and it lifts again as the world goes by. */
   if (k === "orbit" || k === "air"){
     const v = ctx.createLinearGradient(0, VH * 0.52, 0, VH);
     v.addColorStop(0, "rgba(2,5,14,0)");
     v.addColorStop(1, "rgba(2,5,14,.34)");
     ctx.fillStyle = v;
     ctx.fillRect(0, VH * 0.52, VW, VH * 0.48);
+    if (k === "orbit" && _worldTop < VH * 0.55){
+      const cover = clamp((VH * 0.55 - _worldTop) / (VH * 0.55), 0, 1);
+      const u = ctx.createLinearGradient(0, 0, 0, VH * 0.62);
+      u.addColorStop(0, "rgba(3,7,18," + (0.30 * cover).toFixed(3) + ")");
+      u.addColorStop(1, "rgba(3,7,18,0)");
+      ctx.fillStyle = u;
+      ctx.fillRect(0, 0, VW, VH * 0.62);
+    }
   }
 }
 
@@ -3571,9 +3736,117 @@ function drawObstacles(){
       }
     }
 
+    /* The mission's markings. These run over every capsule of a body rather
+       than just the first, because what they are describing is a surface: a
+       rock is pitted all over, a hull is plated all over. All of it is laid
+       inside the collider, like everything else drawn in this game, so the
+       shape you can hit is still exactly the shape you can see. */
+    if (o.look === "crater" || o.look === "ice" || o.look === "panel" ||
+        o.look === "hull" || o.look === "foil"){
+      ctx.save();
+      ctx.strokeStyle = ink; ctx.fillStyle = ink;
+      const sd = o.seed;
+      for (let wi = 0; wi < o.wp.length; wi++){
+        const w = o.wp[wi];
+        const R = w.r, inner = Math.max(1.2, R - edgeW - 1.2);
+        if (inner < 2.2) continue;
+        const mx = (w.x1 + w.x2) / 2, my = (w.y1 + w.y2) / 2;
+        const len = Math.hypot(w.x2 - w.x1, w.y2 - w.y1);
+        const ang = len > 0.01 ? Math.atan2(w.y2 - w.y1, w.x2 - w.x1) : o.ang;
+        ctx.save();
+        ctx.translate(mx, my);
+        ctx.rotate(ang);
+        const half = len / 2;
+
+        if (o.look === "crater"){
+          // impact pitting: a ring with a shadowed floor, the way a crater
+          // reads at a distance. Small ones, plenty of them, never on the rim
+          const n = 2 + ((sd + wi * 3) % 3);
+          for (let i = 0; i < n; i++){
+            const px = (hash2(sd + wi * 7 + i, 3) - 0.5) * (half * 1.6 + inner * 0.9);
+            const py = (hash2(sd + wi * 5 + i, 11) - 0.5) * inner * 1.15;
+            const cr = inner * (0.19 + hash2(sd + i, 17) * 0.19);
+            if (Math.hypot(Math.max(0, Math.abs(px) - half), py) + cr > inner * 0.94) continue;
+            ctx.globalAlpha = 0.34;
+            ctx.beginPath(); ctx.ellipse(px, py, cr, cr * 0.82, 0, 0, TAU); ctx.fill();
+            ctx.globalAlpha = 0.75;
+            ctx.lineWidth = Math.max(0.7, cr * 0.30);
+            ctx.beginPath(); ctx.ellipse(px, py, cr * 0.9, cr * 0.72, 0, 0, TAU); ctx.stroke();
+          }
+          ctx.globalAlpha = 1;
+
+        } else if (o.look === "ice"){
+          // frozen: straight facet lines, no curves anywhere on it
+          ctx.globalAlpha = 0.6;
+          ctx.lineWidth = Math.max(0.8, inner * 0.16);
+          const n = 2 + ((sd + wi) % 2);
+          for (let i = 0; i < n; i++){
+            const t0 = (hash2(sd + wi * 9 + i, 7) - 0.5) * 1.7;
+            ctx.beginPath();
+            ctx.moveTo(-half * 0.8 + t0 * inner, -inner * 0.72);
+            ctx.lineTo(half * 0.25 + t0 * inner, inner * 0.72);
+            ctx.stroke();
+          }
+          ctx.globalAlpha = 1;
+
+        } else if (o.look === "panel"){
+          // a solar array is a grid of cells and you can count them
+          ctx.globalAlpha = 0.75;
+          ctx.lineWidth = Math.max(1.1, inner * 0.17);
+          const cells = clamp(Math.round(len / Math.max(6, inner * 1.9)), 2, 8);
+          for (let i = 1; i < cells; i++){
+            const x = -half + (len * i) / cells;
+            ctx.beginPath(); ctx.moveTo(x, -inner * 0.86); ctx.lineTo(x, inner * 0.86); ctx.stroke();
+          }
+          ctx.beginPath();
+          ctx.moveTo(-half - inner * 0.3, 0); ctx.lineTo(half + inner * 0.3, 0); ctx.stroke();
+          ctx.globalAlpha = 1;
+
+        } else if (o.look === "hull"){
+          // plating seams across it, and one hatch with a window in it
+          ctx.globalAlpha = 0.62;
+          ctx.lineWidth = Math.max(1.0, inner * 0.16);
+          const bands = clamp(Math.round(len / Math.max(8, inner * 2.2)), 1, 6);
+          for (let i = 1; i <= bands; i++){
+            const x = -half + (len * i) / (bands + 1);
+            ctx.beginPath(); ctx.moveTo(x, -inner * 0.9); ctx.lineTo(x, inner * 0.9); ctx.stroke();
+          }
+          if (inner > 5){
+            ctx.globalAlpha = 0.8;
+            ctx.lineWidth = Math.max(0.8, inner * 0.16);
+            const hx = -half + len * 0.5;
+            ctx.beginPath(); ctx.arc(hx, 0, inner * 0.42, 0, TAU); ctx.stroke();
+            ctx.globalAlpha = 0.5;
+            ctx.beginPath(); ctx.arc(hx, 0, inner * 0.17, 0, TAU); ctx.fill();
+          }
+          ctx.globalAlpha = 1;
+
+        } else if (o.look === "foil"){
+          // multi-layer insulation: crumpled, irregular, never straight
+          ctx.globalAlpha = 0.62;
+          ctx.lineWidth = Math.max(1.0, inner * 0.17);
+          const n = 2 + ((sd + wi) % 3);
+          ctx.beginPath();
+          for (let i = 0; i < n; i++){
+            const x0 = -half + (len + inner) * (i / n) - inner * 0.4;
+            ctx.moveTo(x0, -inner * 0.8);
+            ctx.lineTo(x0 + inner * 0.42, -inner * 0.1);
+            ctx.lineTo(x0 - inner * 0.22, inner * 0.34);
+            ctx.lineTo(x0 + inner * 0.3, inner * 0.86);
+          }
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+        ctx.restore();
+      }
+      ctx.restore();
+    }
+
     // the stage's marking, drawn inside the body so it changes nothing about
     // where the thing can be hit
     if (o.look && o.look !== "plain"){
+      if (o.look === "crater" || o.look === "ice" || o.look === "panel" ||
+          o.look === "hull" || o.look === "foil"){ /* drawn above */ } else {
       const w = o.wp[0];
       const R = w.r;
       const cx = (w.x1 + w.x2) / 2, cy = (w.y1 + w.y2) / 2;
@@ -3627,6 +3900,7 @@ function drawObstacles(){
         ctx.stroke();
       }
       ctx.restore();
+      }
     }
 
     // per-style detail, all of it inside the collider
