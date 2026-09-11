@@ -803,7 +803,12 @@ function updThreat(o, dt, target){
   o.x += o.vx * dt;
   o.y += o.vy * dt;
   o.ang += o.spin * dt;
-  o.spin = clamp(o.spin, -9, 9);
+  // A long bar that tumbles freely can end up lying across another one, and a
+  // pair of crossed capsules is the one case this solver cannot cleanly push
+  // apart. Long pieces turn slowly and shed it; small ones spin as they like.
+  const spinCap = o.rad > 58 ? 1.3 : 9;
+  o.spin = clamp(o.spin, -spinCap, spinCap);
+  if (o.rad > 58) o.spin *= Math.exp(-dt * 0.9);
   // ricochet off the sides of the sky, so a hard swat sends something bouncing
   // back into play instead of quietly deleting it
   const edge = o.rad;
@@ -816,7 +821,9 @@ function updThreat(o, dt, target){
 /* Solid means solid: two rocks meeting in mid-air shove each other, and a
    heavy one bulldozes through a swarm instead of gliding past it. */
 const _pair = { ax: 0, ay: 0, bx: 0, by: 0 };
-function solidPair(a, b){
+const SOLVER_ITERS = 4;        // enough passes that a stack settles in one frame
+const SLOP = 0.25;             // a hair of tolerance, so resting bodies do not buzz
+function solidPair(a, b, withImpulse){
   const dx = b.x - a.x, dy = b.y - a.y;
   const rr = a.rad + b.rad;
   if (dx * dx + dy * dy > rr * rr) return;
@@ -829,16 +836,23 @@ function solidPair(a, b){
       if (d < best){ best = d; nx = _pair.bx - _pair.ax; ny = _pair.by - _pair.ay; }
     }
   }
-  if (best >= 0) return;
+  if (best >= -SLOP) return;
   let nl = Math.hypot(nx, ny);
-  if (nl < 1e-4){ nx = dx; ny = dy; nl = Math.hypot(nx, ny) || 1; }
+  if (nl < 1e-4){ nx = dx; ny = dy; nl = Math.hypot(nx, ny); }
+  if (nl < 1e-4){
+    // Two bodies exactly on top of each other have no direction to separate
+    // along, and without this they stay welded together for the rest of the
+    // run — the solver would push them apart by zero, forever.
+    nx = 1; ny = 0; nl = 1;
+  }
   nx /= nl; ny /= nl;
   const ia = 1 / a.mass, ib = 1 / b.mass, it = ia + ib;
-  const pen = -best;
-  a.x -= nx * pen * (ia / it) * 0.85; a.y -= ny * pen * (ia / it) * 0.85;
-  b.x += nx * pen * (ib / it) * 0.85; b.y += ny * pen * (ib / it) * 0.85;
+  // separate completely: solid means solid, so nothing sits inside anything
+  const pen = -best - SLOP;
+  a.x -= nx * pen * (ia / it); a.y -= ny * pen * (ia / it);
+  b.x += nx * pen * (ib / it); b.y += ny * pen * (ib / it);
   const vn = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
-  if (vn < 0){
+  if (withImpulse && vn < 0){
     const j = -(1 + 0.28) * vn / it;
     a.vx -= nx * j * ia; a.vy -= ny * j * ia;
     b.vx += nx * j * ib; b.vy += ny * j * ib;
@@ -849,9 +863,36 @@ function solidPair(a, b){
     if (-vn > 90 && Math.random() < 0.4)
       pAdd((a.x + b.x) / 2, (a.y + b.y) / 2, 0, -30, 0.25, 2.5, "#ffffff", "dot");
   }
-  a.flash = Math.max(a.flash, 0.45);
-  b.flash = Math.max(b.flash, 0.45);
+  if (withImpulse){
+    a.flash = Math.max(a.flash, 0.45);
+    b.flash = Math.max(b.flash, 0.45);
+  }
   rebuildParts(a); rebuildParts(b);
+}
+
+/* Bodies crowded against the shield must stop at its face, not sink into it.
+   The shield has no give at all, so the body takes the whole correction. */
+function shieldSeparate(o, g, shR){
+  for (let j = 0; j < o.wp.length; j++){
+    const w = o.wp[j];
+    const minD = shR + w.r;
+    let d = 1e9;
+    for (let k = 0; k < 3; k++){
+      const dd = segSegDist(g.pts[k].x, g.pts[k].y, g.pts[k + 1].x, g.pts[k + 1].y,
+                            w.x1, w.y1, w.x2, w.y2, _pair);
+      if (dd < d){
+        d = dd;
+        if (d < minD){
+          let nx = _pair.bx - _pair.ax, ny = _pair.by - _pair.ay;
+          let nl = Math.hypot(nx, ny);
+          if (nl < 1e-4){ nx = 0; ny = -1; nl = 1; }
+          o.x += (nx / nl) * (minD - d);
+          o.y += (ny / nl) * (minD - d);
+          rebuildParts(o);
+        }
+      }
+    }
+  }
 }
 const bar = (len, r) => [{ x1: -len / 2, y1: 0, x2: len / 2, y2: 0, r: r || 9 }];
 const dot = r => [{ x1: 0, y1: 0, x2: 0, y2: 0, r: r }];
@@ -1190,6 +1231,7 @@ function spawnWave(){
   const aimBase = lerp(def.aimStart, def.aimEnd, t);
   const shots = 1 + (rng() < d * 0.5 ? 1 : 0);
   let bodies = 0;                       // a swarm is one wave but five arrivals
+  const fresh = [];                     // this wave's bodies, to be born clear of each other
   for (let i = 0; i < shots; i++){
     // roughly half of what falls is passing traffic: it comes down the flanks,
     // stays wide, and is only your problem if you knock it into your own line
@@ -1198,15 +1240,28 @@ function spawnWave(){
       rng, d,
       x: stray ? (rng() < 0.5 ? 16 + rng() * 74 : VW - 90 + rng() * 74)
                : clamp(40 + rng() * (VW - 80), 24, VW - 24),
-      y: G.cam.y - 40 - rng() * 90 - i * 60,
+      y: G.cam.y - 40 - rng() * 70 - i * 120,
       aim: stray ? 0.04 + rng() * 0.26
                  : clamp(aimBase * (0.86 + rng() * 0.28) * (opening ? 0.85 : 1), 0.3, 1.2),
       fall: def.fall * (0.85 + rng() * 0.35) * (opening ? 0.8 : 1)
     };
     const made = chosen.make(s);
     const look = here ? here.stage.look : "plain";
-    for (const o of made){ o.pid = chosen.id; o.look = look; G.obst.push(o); }
+    for (const o of made){ o.pid = chosen.id; o.look = look; G.obst.push(o); fresh.push(o); }
     bodies += made.length;
+  }
+
+  // nothing is born inside anything else — not inside this wave, and not
+  // inside whatever is still up there from the last one
+  for (let it = 0; it < 4; it++){
+    for (let i = 0; i < fresh.length; i++){
+      for (let j = i + 1; j < fresh.length; j++) solidPair(fresh[i], fresh[j], false);
+      for (const other of G.obst){
+        if (fresh.indexOf(other) >= 0) continue;
+        if (Math.abs(other.y - fresh[i].y) > 300) continue;
+        solidPair(fresh[i], other, false);
+      }
+    }
   }
 
   // gems and power-ups drift down off to one side: leaving the balloon to
@@ -1304,8 +1359,12 @@ function shieldGeom(){
    frames. Rather than quietly fattening its hitbox — which would make it hit
    things it visibly misses — it is tested at its true size along the path it
    actually travelled. */
-const SHIELD_STEP_MAX = 56;          // furthest the shield travels in one frame
+const SHIELD_STEP_MAX = 140;         // furthest the shield travels in one frame
 const POSE_SPACING = 7;              // and the gap between swept samples
+/* The shield is kinematic. Nothing in the world writes to its position — not a
+   heavy slab, not a pile of rubble, not a hit at any speed. It is exactly where
+   your thumb has put it, and its own step bound sits far beyond what a thumb
+   can do, so it is never seen lagging behind your hand either. */
 const POSES = [];
 for (let i = 0; i < Math.ceil(SHIELD_STEP_MAX / POSE_SPACING) + 2; i++) POSES.push(mkPose());
 let poseN = 1;
@@ -1467,9 +1526,16 @@ function step(dt){
     updThreat(o, sdt, playing ? b : null);
     LIVE.push(o);
   }
-  for (let i = 0; i < LIVE.length; i++)
-    for (let j = i + 1; j < LIVE.length; j++)
-      solidPair(LIVE[i], LIVE[j]);
+  // Solve contacts repeatedly: one pass leaves a crowd compressed into itself,
+  // three leaves a pile stacked. Only the first pass exchanges momentum; the
+  // rest are pure separation.
+  for (let it = 0; it < SOLVER_ITERS; it++){
+    for (let i = 0; i < LIVE.length; i++)
+      for (let j = i + 1; j < LIVE.length; j++)
+        solidPair(LIVE[i], LIVE[j], it === 0);
+    if (playing || G.state === "clear")
+      for (let i = 0; i < LIVE.length; i++) shieldSeparate(LIVE[i], shg, sh.r);
+  }
 
   for (let i = 0; i < LIVE.length; i++){
     const o = LIVE[i];
@@ -1497,8 +1563,8 @@ function step(dt){
           nx /= nl; ny /= nl;
           const pen = trueMin - d;
           const inv = 1 / o.mass;
-          o.x += nx * pen * inv * 1.1;
-          o.y += ny * pen * inv * 1.1;
+          o.x += nx * pen;              // full separation: the shield has no give
+          o.y += ny * pen;
           // a fast sweep hits far harder than a parked shield does
           const rel = sh.vx * nx + sh.vy * ny;
           const imp = Math.max(0, rel) * 0.5 + pen * 10 + 30;
@@ -1523,8 +1589,10 @@ function step(dt){
             blockScored(o, _sd.ax, _sd.ay);
             if (o.split){
               for (let c = 0; c < o.split; c++){
-                const child = mkObst(o.x, o.y, dot(12), { mass: 0.7, style: "orb", worth: 5 });
                 const a = Math.atan2(o.vy, o.vx) + (c ? 0.9 : -0.9);
+                // born clear of each other, not stacked in the same spot
+                const child = mkObst(o.x + Math.cos(a) * 14, o.y + Math.sin(a) * 14,
+                                     dot(12), { mass: 0.7, style: "orb", worth: 5 });
                 const csp = clamp(Math.hypot(o.vx, o.vy) * 0.7, 90, 300);
                 child.vx = Math.cos(a) * csp; child.vy = Math.sin(a) * csp;
                 child.pid = o.pid + "-bit";
@@ -1556,6 +1624,17 @@ function step(dt){
   }
   LIVE.length = 0;
   for (const c of spawned) G.obst.push(c);
+
+  // The shield's own pass runs after the solver and shoves bodies clear of its
+  // face, which can push one into its neighbour. Settle once more so the frame
+  // ends with nothing overlapping anything.
+  for (let it = 0; it < 2; it++){
+    for (let i = 0; i < LIVE.length; i++)
+      for (let j = i + 1; j < LIVE.length; j++)
+        solidPair(LIVE[i], LIVE[j], false);
+    if (playing || G.state === "clear")
+      for (let i = 0; i < LIVE.length; i++) shieldSeparate(LIVE[i], shg, sh.r);
+  }
   if (bumpSound && G.T - (G.lastBump || -1) > 0.07){ G.lastBump = G.T; Audio2.SFX.bump(); }
 
   // --- pickups: the shield sweeps these up, so going for them means
