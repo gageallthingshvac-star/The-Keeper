@@ -387,9 +387,10 @@
   <!-- ================= PAUSE ================= -->
   <div class="screen veil" id="scr-pause">
     <h2 class="title" style="font-size:clamp(28px,9vw,44px)">Paused</h2>
-    <p class="hint">The balloon climbs on its own and cannot dodge.
-       Drag anywhere to move the shield and knock away anything aimed at it.
-       Sweep the shield over gems to collect them.</p>
+    <p class="hint">The balloon climbs on its own and cannot dodge. The
+       arrangements ahead hang still until your shield touches them — clear
+       the balloon's line before it arrives. Anything marked red is in that
+       line. Sweep the shield over gems to collect them.</p>
     <div class="row" style="flex-direction:column">
       <button class="btn primary wide" id="resumeBtn">Resume</button>
       <button class="btn wide" id="restartBtn">Restart</button>
@@ -440,8 +441,10 @@
       <p class="brief-eyebrow" id="briefLevel">Level 1 · Meadow</p>
       <h2 class="brief-title">Keep the balloon rising</h2>
       <p class="brief-body">
-        It climbs on its own and it cannot dodge. Everything falling is aimed at
-        it — <b>drag anywhere</b> to move your shield across and knock them away.
+        It climbs on its own and it cannot dodge. The sky ahead is <b>built
+        solid</b> and hangs dead still until your shield reaches it —
+        <b>drag anywhere</b> to move the shield and clear a way through.
+        Anything marked red is standing in the balloon's line.
       </p>
       <div class="brief-stages" id="briefStages"></div>
       <button class="btn primary wide" id="briefGo">Begin</button>
@@ -729,20 +732,14 @@ function levelDef(n){                        // n is 1-based
   return {
     n, biome: bi, gauntlet,
     seed: n * 9176 + 31,
-    lengthU: (170 + n * 7) * 8,
-    gapStart: 46 - d * 10,                    // climb units between arrivals
-    gapEnd: 44 - d * 5 - (gauntlet ? 3 : 0),
-    aimStart: 0.82 + d * 0.16,                // how sharply threats converge
-    aimEnd: 0.94 + d * 0.12,
-    fall: 8 + d * 44,                         // the push they start with; gravity adds the rest
+    lengthU: (210 + n * 11) * 8,
     diff: d,
-    gemRate: 0.22
+    gemRate: 0.75
   };
 }
 function endlessDef(){
   return { n: 0, biome: 0, gauntlet: false, seed: (Math.random() * 1e9) | 0, lengthU: Infinity,
-           gapStart: 46, gapEnd: 46, aimStart: 0.86, aimEnd: 0.86, fall: 8,
-           diff: 0, gemRate: 0.24, endless: true };
+           diff: 0, gemRate: 0.8, endless: true };
 }
 
 /* ------------------------------------------------------------ entities */
@@ -759,7 +756,8 @@ function mkObst(x, y, parts, opt){
     style: opt.style || "solid",
     split: opt.split || 0,                   // children spawned when blocked
     worth: opt.worth || 5,                   // score for swatting it away
-    blocked: false, flash: 0, rad: 0, pid: ""
+    blocked: false, flash: 0, rad: 0, pid: "",
+    asleep: false, look: "plain"
   };
   let r = 0;
   for (const p of parts){
@@ -789,7 +787,17 @@ function timeToBalloon(o){
   const u = o.vy + riseSpeed();
   return (Math.sqrt(u * u + 2 * GRAV * drop) - u) / GRAV;
 }
+/* A sleeping body is part of the scenery: no gravity, no drift, no motion at
+   all. It hangs exactly where it was placed until the shield reaches it, or
+   until something else that is already moving barges into it. */
+function wake(o){
+  if (!o.asleep) return false;
+  o.asleep = false;
+  o.flash = Math.max(o.flash, 0.8);
+  return true;
+}
 function updThreat(o, dt, target){
+  if (o.asleep){ rebuildParts(o); return; }
   // homing threats bend their existing speed toward the balloon
   if (o.home > 0 && target){
     const dx = target.x - o.x, dy = target.y - o.y;
@@ -837,6 +845,9 @@ function solidPair(a, b, withImpulse){
     }
   }
   if (best >= -SLOP) return;
+  // whichever of them was still scenery is scenery no longer
+  if (a.asleep && !b.asleep) wake(a);
+  else if (b.asleep && !a.asleep) wake(b);
   let nl = Math.hypot(nx, ny);
   if (nl < 1e-4){ nx = dx; ny = dy; nl = Math.hypot(nx, ny); }
   if (nl < 1e-4){
@@ -897,111 +908,176 @@ function shieldSeparate(o, g, shR){
 const bar = (len, r) => [{ x1: -len / 2, y1: 0, x2: len / 2, y2: 0, r: r || 9 }];
 const dot = r => [{ x1: 0, y1: 0, x2: 0, y2: 0, r: r }];
 
-/* --------------------------------------------------------- the threats */
-/* Each one is launched from above the view and aimed at the balloon. `aim` is
-   the fraction of the sideways distance it closes before it arrives: 1 is dead
-   on, less than 1 drifts past on one side, more than 1 crosses over. Nothing
-   is on rails — once you hit it, it goes where you sent it.                */
-
-// give a threat the velocity that carries it at the balloon
-function launch(o, aim, fall){
-  const drop = Math.max(60, G.bal.y - o.y);
-  const u = fall + riseSpeed();
-  const t = (Math.sqrt(u * u + 2 * GRAV * drop) - u) / GRAV;   // arrival under gravity
-  o.vy = fall;
-  o.vx = ((VW / 2 - o.x) / Math.max(0.5, t)) * aim;
+/* --------------------------------------------------------- the designs */
+/* Nothing is thrown at you any more. The sky is built: arrangements hang in
+   the balloon's path, dead still, and stay that way until your shield reaches
+   them. The rule every design obeys is that weight lives at the edges and the
+   centre line is always something you can move — you are never asked to shift
+   a slab you cannot shift.                                                  */
+function piece(g, x, y, parts, opt){
+  const o = mkObst(clamp(x, -30, VW + 30), y, parts, opt || {});
+  o.asleep = true;
+  o.vx = 0; o.vy = 0;
+  o.look = g.look;
+  o.pid = g.id;
+  g.push(o);
+  return o;
 }
-const THREATS = [
-{ id: "drifter", min: 0, w: 11, make(s){
-    const o = mkObst(s.x, s.y, dot(15 + s.rng() * 7), { mass: 0.9, style: "orb", worth: 5 });
-    launch(o, s.aim, s.fall * (0.8 + s.rng() * 0.3));
-    return [o];
-  }},
-{ id: "rock", min: 0, w: 9, make(s){
-    const o = mkObst(s.x, s.y, dot(20 + s.rng() * 8), { mass: 2.1, style: "orb", worth: 7,
-      spin: (s.rng() - 0.5) * 1.2 });
-    launch(o, s.aim, s.fall * (0.7 + s.rng() * 0.25));
-    return [o];
-  }},
-{ id: "swarm", min: 2, w: 8, make(s){
-    const n = 3 + (s.rng() * 3 | 0);
-    const out = [];
+const orb = (r) => dot(r);
+const DESIGNS = [
+{ id: "field", name: "Field", min: 0, span: 150, build(g){
+    const n = 4 + (g.rng() * 3 | 0);
     for (let i = 0; i < n; i++){
-      const o = mkObst(clamp(s.x + (i - n / 2) * 30, 10, VW - 10), s.y - i * 26,
-                       dot(9 + s.rng() * 4), { mass: 0.5, style: "orb", worth: 3 });
-      launch(o, s.aim * (0.7 + s.rng() * 0.6), s.fall * (0.9 + s.rng() * 0.4));
-      out.push(o);
+      const x = 30 + (VW - 60) * ((i + g.rng() * 0.6) / n);
+      piece(g, x, g.y - g.rng() * 110, orb(13 + g.rng() * 7),
+            { mass: 1 + g.rng() * 0.6, style: "orb", worth: 5 });
     }
-    return out;
   }},
-{ id: "spinner", min: 4, w: 9, make(s){
-    const len = 84 + s.rng() * 52 + s.d * 40;
-    const o = mkObst(s.x, s.y, bar(len, 8), { mass: 2.6, style: "hub", worth: 9,
-      spin: (s.rng() < 0.5 ? -1 : 1) * (0.9 + s.rng() * 0.8 + s.d * 0.6) });
-    launch(o, s.aim, s.fall * (0.7 + s.rng() * 0.3));
-    return [o];
-  }},
-{ id: "barrier", min: 6, w: 8, make(s){
-    // wide and aimed straight down the middle: shove it aside or it takes you
-    const len = 130 + s.d * 90;
-    const o = mkObst(VW / 2 + (s.rng() - 0.5) * 60, s.y, bar(len, 11),
-                     { mass: 3.4 + s.d * 1.4, style: "wall", worth: 14 });
-    launch(o, 1, s.fall * 0.6);
-    return [o];
-  }},
-{ id: "homer", min: 10, w: 8, make(s){
-    const o = mkObst(s.x, s.y, dot(13), { mass: 0.8, style: "orb", worth: 11,
-      home: 0.5 + s.d * 0.7 });
-    launch(o, 0.6, s.fall * (0.85 + s.rng() * 0.3));
-    return [o];
-  }},
-{ id: "heavy", min: 14, w: 7, make(s){
-    const o = mkObst(s.x, s.y, dot(28 + s.rng() * 7), { mass: 5.2 + s.d * 2, style: "orb", worth: 16 });
-    launch(o, s.aim, s.fall * 0.55);
-    return [o];
-  }},
-{ id: "splitter", min: 18, w: 7, make(s){
-    const o = mkObst(s.x, s.y, dot(21), { mass: 1.8, style: "chain", worth: 8, split: 2,
-      spin: (s.rng() - 0.5) * 1.6 });
-    launch(o, s.aim, s.fall * (0.75 + s.rng() * 0.25));
-    return [o];
-  }},
-{ id: "saw", min: 22, w: 7, make(s){
-    const o = mkObst(s.x, s.y, dot(18), { mass: 1.6, style: "saw", worth: 12, spin: 7 });
-    launch(o, s.aim * 1.05, s.fall * (1.3 + s.rng() * 0.4));
-    return [o];
-  }},
-{ id: "cluster", min: 26, w: 6, make(s){
-    const links = 4, span = 108;
-    // the bar between the links is a real collider, not just a drawn line
-    const parts = [{ x1: -span / 2, y1: 0, x2: span / 2, y2: 0, r: 4.5 }];
-    for (let i = 0; i < links; i++){
-      const off = -span / 2 + i * (span / (links - 1));
-      parts.push({ x1: off, y1: 0, x2: off, y2: 0, r: 12 });
+{ id: "cairn", name: "Cairn", min: 0, span: 170, build(g){
+    // a pyramid: light on top where your line is, heavy at the base corners
+    const cx = VW / 2 + (g.rng() - 0.5) * 90;
+    for (let row = 0; row < 3; row++){
+      const count = row + 1;
+      for (let i = 0; i < count; i++){
+        const x = cx + (i - (count - 1) / 2) * 46;
+        piece(g, x, g.y - 108 + row * 46, orb(18 - row * 2),
+              { mass: 1 + row * 0.9, style: "orb", worth: 6 });
+      }
     }
-    const o = mkObst(s.x, s.y, parts, { mass: 3.2, style: "chain", worth: 15,
-      spin: (s.rng() < 0.5 ? -1 : 1) * (1 + s.d * 0.8) });
-    launch(o, s.aim, s.fall * 0.7);
-    return [o];
   }},
-{ id: "slab", min: 30, w: 6, make(s){
-    // the wall: too heavy to bat aside late, so start pushing early
-    const len = 190 + s.d * 90;
-    const o = mkObst(VW / 2 + (s.rng() - 0.5) * 40, s.y, bar(len, 14),
-                     { mass: 6.5 + s.d * 2.5, style: "wall", worth: 22 });
-    launch(o, 1, s.fall * 0.45);
-    return [o];
+{ id: "curtain", name: "Curtain", min: 2, span: 130, build(g){
+    // a row across the sky with one hole, never where you need it
+    const holeW = 82 - g.d * 14;
+    const holeX = VW / 2 + (g.rng() < 0.5 ? -1 : 1) * (70 + g.rng() * 54);
+    for (let x = 14; x < VW - 6; x += 50){
+      const cx = x + 22;
+      if (Math.abs(cx - holeX) < holeW / 2 + 22) continue;
+      piece(g, cx, g.y, bar(26, 11), { mass: 1.2, style: "wall", worth: 9 });
+    }
   }},
-{ id: "pair", min: 34, w: 6, make(s){
-    // two heavies converging from both sides at once
-    const out = [];
+{ id: "hive", name: "Hive", min: 3, span: 190, build(g){
+    // a honeycomb with one tunnel bored through it
+    const cx = VW / 2 + (g.rng() - 0.5) * 60;
+    const lane = (g.rng() * 5 | 0) - 2;
+    for (let row = 0; row < 3; row++){
+      for (let c = -2; c <= 2; c++){
+        if (c === lane) continue;
+        piece(g, cx + c * 44 + (row % 2 ? 22 : 0), g.y - row * 44, orb(15),
+              { mass: 0.9, style: "orb", worth: 5 });
+      }
+    }
+  }},
+{ id: "arch", name: "Arch", min: 4, span: 190, build(g){
+    const cx = VW / 2;
+    for (const side of [-1, 1])
+      piece(g, cx + side * 104, g.y - 44, [{ x1: 0, y1: -46, x2: 0, y2: 46, r: 11 }],
+            { mass: 3.6, style: "wall", worth: 18 });
+    piece(g, cx, g.y - 100, bar(150, 10), { mass: 1.2, style: "wall", worth: 12 });
+  }},
+{ id: "pinwheel", name: "Pinwheel", min: 5, span: 200, build(g){
+    const cx = VW / 2 + (g.rng() - 0.5) * 70;
+    const cy = g.y - 70;
+    const n = 4, len = 84;
+    for (let i = 0; i < n; i++){
+      const a = i / n * TAU + g.rng() * 0.4;
+      piece(g, cx + Math.cos(a) * len * 0.5, cy + Math.sin(a) * len * 0.5,
+            bar(len, 9), { mass: 1.5, style: "hub", worth: 8, ang: a });
+    }
+  }},
+{ id: "lattice", name: "Lattice", min: 7, span: 210, build(g){
+    // diamonds: every gap is offset from the one above it
+    for (let row = 0; row < 3; row++){
+      const off = row % 2 ? 52 : 0;
+      for (let x = -20; x < VW + 20; x += 104){
+        piece(g, x + off, g.y - row * 62, bar(52, 10),
+              { mass: 1.1 + g.d * 0.4, style: "wall", worth: 8, ang: row % 2 ? 0.5 : -0.5 });
+      }
+    }
+  }},
+{ id: "tower", name: "Tower", min: 8, span: 210, build(g){
+    // straight up your line, one after another
+    const cx = VW / 2 + (g.rng() - 0.5) * 40;
+    for (let i = 0; i < 4; i++)
+      piece(g, cx + Math.sin(i * 1.7) * 16, g.y - i * 46, orb(17),
+            { mass: 0.9 + i * 0.3, style: "orb", worth: 7 });
+  }},
+{ id: "chevrons", name: "Chevrons", min: 10, span: 220, build(g){
+    for (let k = 0; k < 2; k++){
+      const cy = g.y - k * 110;
+      const cx = VW / 2 + (k ? 40 : -40);
+      for (const side of [-1, 1])
+        piece(g, cx + side * 48, cy, bar(96, 9),
+              { mass: 1.4, style: "wall", worth: 8, ang: side * 0.62 });
+    }
+  }},
+{ id: "ring", name: "Ring", min: 12, span: 210, build(g){
+    const cx = VW / 2 + (g.rng() - 0.5) * 40, cy = g.y - 80, R = 76;
+    const n = 9;
+    for (let i = 0; i < n; i++){
+      const a = i / n * TAU;
+      piece(g, cx + Math.cos(a) * R, cy + Math.sin(a) * R, orb(13),
+            { mass: 0.85, style: "orb", worth: 6 });
+    }
+  }},
+{ id: "sawline", name: "Saw Line", min: 14, span: 170, build(g){
+    const gap = (g.rng() * 4 | 0);
+    for (let i = 0; i < 4; i++){
+      if (i === gap) continue;
+      piece(g, 56 + i * 96, g.y - (i % 2) * 44, orb(19),
+            { mass: 1.7, style: "saw", worth: 12, spin: (i % 2 ? 1 : -1) * 0.8 });
+    }
+  }},
+{ id: "boulders", name: "Boulders", min: 16, span: 200, build(g){
+    // three big ones: the heavy pair frame a light middle you can shift
+    const cx = VW / 2 + (g.rng() - 0.5) * 50;
+    piece(g, cx, g.y - 60, orb(24), { mass: 1.8, style: "orb", worth: 12 });
+    piece(g, cx - 96, g.y - 20, orb(30), { mass: 4.5, style: "orb", worth: 20 });
+    piece(g, cx + 96, g.y - 100, orb(30), { mass: 4.5, style: "orb", worth: 20 });
+  }},
+{ id: "necklace", name: "Necklace", min: 18, span: 200, build(g){
+    const cx = VW / 2 + (g.rng() - 0.5) * 60, cy = g.y - 70, R = 90;
+    for (let i = 0; i < 7; i++){
+      const a = Math.PI * (0.15 + 0.7 * i / 6);
+      piece(g, cx + Math.cos(a) * R, cy - Math.sin(a) * R * 0.6, orb(14),
+            { mass: 1.1, style: "chain", worth: 7 });
+    }
+  }},
+{ id: "slabs", name: "Slabs", min: 22, span: 230, build(g){
+    for (let i = 0; i < 3; i++){
+      const side = i % 2 ? 1 : -1;
+      piece(g, VW / 2 + side * 74, g.y - i * 76, bar(176, 13),
+            { mass: 2.6 + g.d * 1.2, style: "wall", worth: 14 });
+    }
+  }},
+{ id: "pincer", name: "Pincer", min: 26, span: 220, build(g){
+    // a funnel that narrows onto your line, with rubble in the throat
+    const cx = VW / 2;
     for (const side of [-1, 1]){
-      const o = mkObst(VW / 2 + side * (VW / 2 - 24), s.y - (side > 0 ? 20 : 0),
-                       dot(19), { mass: 2.4, style: "orb", worth: 10 });
-      launch(o, 1, s.fall * (0.8 + s.rng() * 0.2));
-      out.push(o);
+      piece(g, cx + side * 128, g.y - 40, bar(150, 11),
+            { mass: 4, style: "wall", worth: 20, ang: side * 0.55 });
     }
-    return out;
+    for (let i = 0; i < 3; i++)
+      piece(g, cx + (i - 1) * 34, g.y - 104, orb(14), { mass: 1, style: "orb", worth: 6 });
+  }},
+{ id: "vault", name: "Vault", min: 30, span: 250, build(g){
+    // a heavy frame with a light keystone dead on your line
+    const cx = VW / 2;
+    for (const side of [-1, 1])
+      piece(g, cx + side * 118, g.y - 60, [{ x1: 0, y1: -62, x2: 0, y2: 62, r: 12 }],
+            { mass: 4.5, style: "wall", worth: 22 });
+    piece(g, cx, g.y - 128, bar(180, 12), { mass: 1.6, style: "wall", worth: 16 });
+    piece(g, cx, g.y - 20, bar(120, 11), { mass: 1.4, style: "wall", worth: 14 });
+  }},
+{ id: "storm", name: "Storm", min: 34, span: 260, build(g){
+    const n = 9 + (g.rng() * 4 | 0);
+    for (let i = 0; i < n; i++){
+      const x = 24 + g.rng() * (VW - 48);
+      const y = g.y - g.rng() * 200;
+      const big = g.rng() < 0.25;
+      piece(g, x, y, big ? bar(70 + g.rng() * 60, 10) : orb(11 + g.rng() * 9),
+            { mass: big ? 2.2 : 0.9, style: big ? "wall" : "orb", worth: big ? 10 : 5,
+              ang: big ? g.rng() * TAU : 0 });
+    }
   }}
 ];
 
@@ -1017,7 +1093,7 @@ const G = {
   pw:  { bubble: 0, slow: 0, magnet: 0, wide: 0 },
   T: 0, timeScale: 1, slowT: 0,
   score: 0, bonus: 0, gems: 0, hits: 0, combo: 0, comboT: 0, energy: 0, lastBump: -1, lastClack: -1,
-  climbed: 0, startY: 0, genCount: 0, gemsPlaced: 0, nextSpawn: 40, blocks: 0, formations: 0,
+  climbed: 0, startY: 0, genCount: 0, gemsPlaced: 0, nextSpawn: 40, blocks: 0,
   stages: null, stageIdx: -1,
   state: "menu", overT: 0, lastKind: "", hintT: 0, lastHitBy: "", usedRevive: false, bankedGems: 0, failCounted: false
 };
@@ -1040,20 +1116,20 @@ function burstParts(x, y, n, col, spd, type){
    named stages, each with its own cast and its own marking, so the sky tells
    you what it is doing and you can learn each one on its own terms.        */
 const STAGES = [
-  { id: "drift",   name: "Drifters",  min: 0,  look: "plain",   threats: ["drifter"] },
-  { id: "stones",  name: "Stones",    min: 0,  look: "ring",    threats: ["rock", "drifter"] },
-  { id: "swarm",   name: "Swarm",     min: 2,  look: "dots",    threats: ["swarm"] },
-  { id: "spin",    name: "Spinners",  min: 4,  look: "slash",   threats: ["spinner"] },
-  { id: "bars",    name: "Barriers",  min: 6,  look: "band",    threats: ["barrier"] },
-  { id: "ruins",   name: "Ruins",     min: 7,  look: "brick",   forms: true },
-  { id: "hunt",    name: "Hunters",   min: 10, look: "cross",   threats: ["homer"] },
-  { id: "heavy",   name: "Heavies",   min: 14, look: "hollow",  threats: ["heavy", "rock"] },
-  { id: "split",   name: "Splitters", min: 18, look: "chevron", threats: ["splitter"] },
-  { id: "mill",    name: "Sawmill",   min: 22, look: "slash",   threats: ["saw"] },
-  { id: "chain",   name: "Clusters",  min: 26, look: "dots",    threats: ["cluster"] },
-  { id: "slabs",   name: "Slabs",     min: 30, look: "band",    threats: ["slab", "barrier"] },
-  { id: "pincer",  name: "Pincers",   min: 34, look: "cross",   threats: ["pair", "homer"] },
-  { id: "storm",   name: "Storm",     min: 38, look: "hollow",  threats: ["drifter", "rock", "saw", "homer"] }
+  { id: "open",    name: "Open Sky",  min: 0,  look: "plain",   designs: ["field"] },
+  { id: "cairns",  name: "Cairns",    min: 0,  look: "ring",    designs: ["cairn", "tower"] },
+  { id: "curtain", name: "Curtains",  min: 2,  look: "band",    designs: ["curtain"] },
+  { id: "hive",    name: "Hives",     min: 3,  look: "dots",    designs: ["hive"] },
+  { id: "ruins",   name: "Ruins",     min: 4,  look: "brick",   designs: ["arch", "lattice"] },
+  { id: "wheels",  name: "Wheels",    min: 5,  look: "slash",   designs: ["pinwheel", "ring"] },
+  { id: "wedges",  name: "Wedges",    min: 10, look: "chevron", designs: ["chevrons", "lattice"] },
+  { id: "mill",    name: "Sawmill",   min: 14, look: "slash",   designs: ["sawline"] },
+  { id: "stones",  name: "Boulders",  min: 16, look: "hollow",  designs: ["boulders", "cairn"] },
+  { id: "chains",  name: "Necklaces", min: 18, look: "dots",    designs: ["necklace", "ring"] },
+  { id: "slabs",   name: "Slabs",     min: 22, look: "band",    designs: ["slabs"] },
+  { id: "pincer",  name: "Pincers",   min: 26, look: "cross",   designs: ["pincer"] },
+  { id: "vault",   name: "Vaults",    min: 30, look: "brick",   designs: ["vault", "slabs"] },
+  { id: "storm",   name: "Storm",     min: 34, look: "hollow",  designs: ["storm"] }
 ];
 // which stages this level runs, in order, and where each one starts
 function buildStages(def){
@@ -1090,111 +1166,6 @@ function stageAt(climbed){
   return { idx: 0, of: list.length, stage: list[0].stage, loop: 0 };
 }
 
-/* ------------------------------------------------------ sky puzzles */
-/* Between the aimed traffic, structures hang in the sky on the balloon's line.
-   They are not thrown at you — they simply sit there, and the balloon is going
-   to arrive whether or not you have opened a way through. Because everything
-   is solid, shoving one piece moves the pieces it rests against, which is
-   where the puzzle lives: find the piece worth hitting.                     */
-function fpiece(s, x, y, parts, opt){
-  const o = mkObst(x, y, parts, opt);
-  o.vy = s.fall;
-  o.vx = 0;
-  o.form = 1;
-  o.pid = s.id;
-  o.look = s.look || "brick";
-  G.obst.push(o);
-  return o;
-}
-const FORMATIONS = [
-{ id: "curtain", min: 3, build(s){
-    // a row across the whole sky with one hole, and the hole is never where
-    // you need it: shove the row along until it is
-    const holeW = 74 - s.d * 12;
-    const holeX = VW / 2 + (s.rng() < 0.5 ? -1 : 1) * (74 + s.rng() * 46);
-    const w = 46;
-    for (let x = 12; x < VW - 12; x += w + 5){
-      const cx = x + w / 2;
-      if (Math.abs(cx - holeX) < holeW / 2 + w / 2) continue;
-      fpiece(s, cx, s.y, bar(w - 20, 10), { mass: 1.15, style: "wall", worth: 9 });
-    }
-  }},
-{ id: "column", min: 6, build(s){
-    // four stones stacked down the centre line, arriving one after another
-    for (let i = 0; i < 4; i++){
-      fpiece(s, VW / 2 + (s.rng() - 0.5) * 14, s.y - i * 40, dot(17),
-             { mass: 0.85, style: "orb", worth: 7 });
-    }
-  }},
-{ id: "arch", min: 9, build(s){
-    // heavy legs you will not move, and a light span you can
-    for (const side of [-1, 1]){
-      fpiece(s, VW / 2 + side * 96, s.y - 34, [{ x1: 0, y1: -46, x2: 0, y2: 46, r: 11 }],
-             { mass: 6, style: "wall", worth: 18 });
-    }
-    fpiece(s, VW / 2, s.y - 92, bar(150, 10), { mass: 1.1, style: "wall", worth: 12 });
-  }},
-{ id: "cage", min: 12, build(s){
-    // a heavy core you cannot reach until the light bars around it are gone
-    fpiece(s, VW / 2, s.y - 44, dot(24), { mass: 6.5, style: "orb", worth: 20 });
-    fpiece(s, VW / 2, s.y - 96, bar(96, 9), { mass: 0.8, style: "wall", worth: 7 });
-    fpiece(s, VW / 2, s.y + 10, bar(96, 9), { mass: 0.8, style: "wall", worth: 7 });
-    for (const side of [-1, 1]){
-      fpiece(s, VW / 2 + side * 52, s.y - 44, [{ x1: 0, y1: -34, x2: 0, y2: 34, r: 9 }],
-             { mass: 0.8, style: "wall", worth: 7 });
-    }
-  }},
-{ id: "brick", min: 16, build(s){
-    // two staggered courses: no single gap lines up, so you make one
-    for (let row = 0; row < 2; row++){
-      const off = row ? 40 : 0;
-      for (let x = -20; x < VW + 20; x += 80){
-        fpiece(s, x + off, s.y - row * 46, bar(52, 10),
-               { mass: 1.05 + s.d * 0.5, style: "wall", worth: 8 });
-      }
-    }
-  }},
-{ id: "ring", min: 20, build(s){
-    // a wheel of stones the balloon has to pass clean through
-    const n = 9, R = 74;
-    for (let i = 0; i < n; i++){
-      const a = i / n * TAU;
-      fpiece(s, VW / 2 + Math.cos(a) * R, s.y - 46 + Math.sin(a) * R, dot(13),
-             { mass: 0.75, style: "orb", worth: 6 });
-    }
-  }},
-{ id: "vice", min: 26, build(s){
-    // two slabs closing on the centre line with rubble wedged between them
-    for (const side of [-1, 1]){
-      fpiece(s, VW / 2 + side * 118, s.y - 40, [{ x1: 0, y1: -58, x2: 0, y2: 58, r: 12 }],
-             { mass: 7, style: "wall", worth: 22 });
-    }
-    for (let i = 0; i < 5; i++){
-      fpiece(s, VW / 2 + (i - 2) * 30, s.y - 40 + (i % 2 ? 18 : -18), dot(13),
-             { mass: 0.9, style: "orb", worth: 6 });
-    }
-  }}
-];
-function spawnFormation(rng, d, tier){
-  const pool = FORMATIONS.filter(f => f.min <= tier);
-  const f = pool[(rng() * pool.length) | 0];
-  const here = stageAt(G.climbed);
-  const s = { id: f.id, rng, d, y: G.cam.y - 110, fall: 20 + d * 28,
-              look: here ? here.stage.look : "brick" };
-  f.build(s);
-  G.formations++;
-  if (G.formations <= 2) UI.flash("Clear the way");
-  // gems ride above it, so the reward comes after the work
-  const gx = clamp(VW / 2 + (rng() - 0.5) * 150, 26, VW - 26);
-  for (let i = 0; i < 4; i++){
-    G.picks.push({ x: gx + (rng() - 0.5) * 18, y: s.y - 210 - i * 26,
-                   kind: "gem", r: 11, t: rng() * TAU, dead: false, vy: s.fall });
-    G.gemsPlaced++;
-  }
-  G.genCount++;
-  G.nextSpawn = G.climbed + 250 + 150 * (1 - d);     // room to actually work on it
-}
-
 /* ------------------------------------------------------ the arrivals */
 /* Spawning is keyed to climbed distance, not wall-clock, so a level plays out
    the same way every time you attempt it.                                  */
@@ -1206,88 +1177,50 @@ function spawnWave(){
   const endless = G.mode === "endless";
   const t = endless ? clamp(G.climbed / 5200, 0, 1) : clamp(G.climbed / def.lengthU, 0, 1);
   const d = clamp(endless ? clamp(G.climbed / 7000, 0, 1) : def.diff * 0.72 + t * 0.28, 0, 1);
-  const tier = tierNow();
-  const opening = G.genCount < 2;
   const here = stageAt(G.climbed);
+  const names = here ? here.stage.designs : ["field"];
+  let pick = names[(rng() * names.length) | 0];
+  if (pick === G.lastKind && names.length > 1)
+    pick = names[(names.indexOf(pick) + 1) % names.length];
+  G.lastKind = pick;
+  const design = DESIGNS.find(x => x.id === pick) || DESIGNS[0];
 
-  // a stage of ruins sends structures instead of volleys
-  if (here && here.stage.forms && !opening){
-    spawnFormation(rng, d, tier);
-    return;
-  }
+  const fresh = [];
+  const g = {
+    id: design.id, rng, d,
+    y: G.cam.y - 120,
+    look: here ? here.stage.look : "plain",
+    push: o => { G.obst.push(o); fresh.push(o); }
+  };
+  design.build(g);
 
-  const allow = here && here.stage.threats ? here.stage.threats : null;
-  const pool = THREATS.filter(k => (allow ? allow.indexOf(k.id) >= 0 : k.min <= tier) &&
-                                   k.id !== G.lastKind && !(opening && k.min > 2));
-  const list = pool.length ? pool
-             : THREATS.filter(k => allow ? allow.indexOf(k.id) >= 0 : k.min <= tier);
-  let total = 0;
-  for (const k of list) total += k.w;
-  let pick = rng() * total, chosen = list[list.length - 1];
-  for (const k of list){ pick -= k.w; if (pick <= 0){ chosen = k; break; } }
-  G.lastKind = chosen.id;
+  // nothing is built inside anything else
+  for (let it = 0; it < 4; it++)
+    for (let i = 0; i < fresh.length; i++)
+      for (let j = i + 1; j < fresh.length; j++)
+        solidPair(fresh[i], fresh[j], false);
 
-  // how many arrive at once, and how hard they are aimed
-  const aimBase = lerp(def.aimStart, def.aimEnd, t);
-  const shots = 1 + (rng() < d * 0.5 ? 1 : 0);
-  let bodies = 0;                       // a swarm is one wave but five arrivals
-  const fresh = [];                     // this wave's bodies, to be born clear of each other
-  for (let i = 0; i < shots; i++){
-    // roughly half of what falls is passing traffic: it comes down the flanks,
-    // stays wide, and is only your problem if you knock it into your own line
-    const stray = !opening && rng() < 0.6 + (1 - d) * 0.2;
-    const s = {
-      rng, d,
-      x: stray ? (rng() < 0.5 ? 16 + rng() * 74 : VW - 90 + rng() * 74)
-               : clamp(40 + rng() * (VW - 80), 24, VW - 24),
-      y: G.cam.y - 40 - rng() * 70 - i * 120,
-      aim: stray ? 0.04 + rng() * 0.26
-                 : clamp(aimBase * (0.86 + rng() * 0.28) * (opening ? 0.85 : 1), 0.3, 1.2),
-      fall: def.fall * (0.85 + rng() * 0.35) * (opening ? 0.8 : 1)
-    };
-    const made = chosen.make(s);
-    const look = here ? here.stage.look : "plain";
-    for (const o of made){ o.pid = chosen.id; o.look = look; G.obst.push(o); fresh.push(o); }
-    bodies += made.length;
-  }
-
-  // nothing is born inside anything else — not inside this wave, and not
-  // inside whatever is still up there from the last one
-  for (let it = 0; it < 4; it++){
-    for (let i = 0; i < fresh.length; i++){
-      for (let j = i + 1; j < fresh.length; j++) solidPair(fresh[i], fresh[j], false);
-      for (const other of G.obst){
-        if (fresh.indexOf(other) >= 0) continue;
-        if (Math.abs(other.y - fresh[i].y) > 300) continue;
-        solidPair(fresh[i], other, false);
-      }
-    }
-  }
-
-  // gems and power-ups drift down off to one side: leaving the balloon to
-  // grab them is the whole risk
   G.genCount++;
+  // gems hang in the arrangement, off to one side of the line you must clear
   if (rng() < def.gemRate){
     const side = rng() < 0.5 ? -1 : 1;
-    const gx = clamp(VW / 2 + side * (70 + rng() * 90), 24, VW - 24);
-    const n = 3 + (rng() * 2 | 0);
-    for (let i = 0; i < n; i++){
-      G.picks.push({ x: gx + (rng() - 0.5) * 20, y: G.cam.y - 60 - i * 26,
-                     kind: "gem", t: rng() * TAU, dead: false, vy: def.fall * 0.5 + 10 });
+    const gx = clamp(VW / 2 + side * (72 + rng() * 84), 26, VW - 26);
+    for (let i = 0; i < 3; i++){
+      G.picks.push({ x: gx + (rng() - 0.5) * 16, y: g.y - 30 - i * 28,
+                     kind: "gem", r: 11, t: rng() * TAU, dead: false, vy: 0 });
       G.gemsPlaced++;
     }
   }
-  if (G.genCount % 18 === 9 && rng() < 0.85){
+  if (G.genCount % 7 === 4 && rng() < 0.85){
     const kind = PW_KINDS[(rng() * PW_KINDS.length) | 0];
-    G.picks.push({ x: clamp(40 + rng() * (VW - 80), 30, VW - 30), y: G.cam.y - 80,
-                   kind, r: 15, t: 0, dead: false, vy: def.fall * 0.4 + 8 });
+    G.picks.push({ x: clamp(46 + rng() * (VW - 92), 30, VW - 30), y: g.y - design.span - 30,
+                   kind, r: 15, t: 0, dead: false, vy: 0 });
   }
 
-  const gapBase = endless ? Math.max(22, 46 - G.climbed / 260) : lerp(def.gapStart, def.gapEnd, t);
-  // space the next wave by how much this one actually put in the sky: a swarm
-  // is one wave but five arrivals
-  const crowd = 1 + Math.max(0, bodies - 1) * 0.42;
-  G.nextSpawn = G.climbed + gapBase * (0.85 + rng() * 0.3) * (opening ? 1.5 : 1) * crowd;
+  // room between arrangements: enough to see one coming and get to work
+  const space = endless ? Math.max(96, 250 - G.climbed / 70)
+                        : lerp(270 - d * 80, 215 - d * 95, t);
+  G.nextSpawn = G.climbed + design.span + space * (0.9 + rng() * 0.25);
 }
 function spawnCheck(){
   if (!G.def.endless && G.climbed > G.def.lengthU - 140) return;   // clear run to the line
@@ -1309,7 +1242,7 @@ function startRun(mode, n){
   G.pw.bubble = save.opts.assist ? 1 : 0; G.pw.slow = 0; G.pw.magnet = 0; G.pw.wide = 0;
   G.T = 0; G.timeScale = 1; G.slowT = 0;
   G.score = 0; G.bonus = 0; G.gems = 0; G.hits = 0; G.combo = 0; G.comboT = 0; G.energy = 0; G.lastBump = -1;
-  G.climbed = 0; G.startY = 0; G.genCount = 0; G.gemsPlaced = 0; G.nextSpawn = 40; G.formations = 0;
+  G.climbed = 0; G.startY = 0; G.genCount = 0; G.gemsPlaced = 0; G.nextSpawn = 40;
   G.lastKind = ""; G.overT = 0; G.blocks = 0;
   G.stages = buildStages(G.def); G.stageIdx = -1;
   G.usedRevive = false; G.bankedGems = 0; G.failCounted = false;
@@ -1581,6 +1514,7 @@ function step(dt){
           // and an off-centre hit on something long turns it as well
           const rx = _sd.bx - o.x, ry = _sd.by - o.y;
           o.spin += (rx * ny - ry * nx) * imp * 0.0016 * inv / Math.max(12, o.rad);
+          wake(o);
           o.home = 0;                       // knocked off its lock
           const sp = Math.hypot(o.vx, o.vy);
           if (sp > 380){ o.vx *= 380 / sp; o.vy *= 380 / sp; }
@@ -2324,6 +2258,37 @@ function drawShield(){
   arcAt(g, sh.r, edge, 1);                 // hard edge, exactly the collider
   arcAt(g, sh.r - 2.6, "#ffffff", 1);      // solid white core, inside it
 }
+/* Stages are marked on the sky itself: you fly up through a named line into
+   the next one. */
+function drawStageLines(){
+  if (!G.stages || !G.stages.length || G.def.endless) return;
+  const ink = inkNow();
+  for (let i = 1; i < G.stages.length; i++){
+    const y = G.startY - G.stages[i].from;
+    if (y < G.cam.y - 60 || y > G.cam.y + VH + 60) continue;
+    ctx.globalAlpha = 0.5;
+    ctx.strokeStyle = ink;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([11, 9]);
+    ctx.beginPath(); ctx.moveTo(-10, y); ctx.lineTo(VW + 10, y); ctx.stroke();
+    ctx.setLineDash([]);
+    // the label rides the left edge, clear of the balloon's line and whatever
+    // is hanging over it
+    const label = ("Stage " + (i + 1) + " · " + G.stages[i].stage.name).toUpperCase();
+    ctx.font = "900 11px " + FONT;
+    ctx.textAlign = "left";
+    const w = ctx.measureText(label).width;
+    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(10, y - 20, w + 16, 17, 8)
+                  : ctx.rect(10, y - 20, w + 16, 17);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = ink;
+    ctx.fillText(label, 18, y - 8);
+  }
+}
 function drawFinish(){
   if (G.def.endless){
     // the line to beat, drawn where your best run ended
@@ -2374,6 +2339,7 @@ function render(){
   ctx.save();
   ctx.translate(G.cam.shx, -G.cam.y + G.cam.shy);
   if (G.state !== "menu"){
+    drawStageLines();
     drawFinish();
     drawObstacles();
     drawPickups();
@@ -2402,7 +2368,7 @@ function render(){
     ctx.fillStyle = "#ffffff";
     ctx.font = "800 13px " + FONT;
     ctx.textAlign = "center";
-    ctx.fillText("Drag anywhere — the shield follows your thumb", VW / 2, VH * 0.80);
+    ctx.fillText("Drag anywhere — clear the line before you reach it", VW / 2, VH * 0.80);
     ctx.globalAlpha = 1;
   }
 }
