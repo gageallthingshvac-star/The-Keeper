@@ -908,179 +908,6 @@ function shieldSeparate(o, g, shR){
 const bar = (len, r) => [{ x1: -len / 2, y1: 0, x2: len / 2, y2: 0, r: r || 9 }];
 const dot = r => [{ x1: 0, y1: 0, x2: 0, y2: 0, r: r }];
 
-/* --------------------------------------------------------- the designs */
-/* Nothing is thrown at you any more. The sky is built: arrangements hang in
-   the balloon's path, dead still, and stay that way until your shield reaches
-   them. The rule every design obeys is that weight lives at the edges and the
-   centre line is always something you can move — you are never asked to shift
-   a slab you cannot shift.                                                  */
-function piece(g, x, y, parts, opt){
-  const o = mkObst(clamp(x, -30, VW + 30), y, parts, opt || {});
-  o.asleep = true;
-  o.vx = 0; o.vy = 0;
-  o.look = g.look;
-  o.pid = g.id;
-  g.push(o);
-  return o;
-}
-const orb = (r) => dot(r);
-const DESIGNS = [
-{ id: "field", name: "Field", min: 0, span: 150, build(g){
-    const n = 4 + (g.rng() * 3 | 0);
-    for (let i = 0; i < n; i++){
-      const x = 30 + (VW - 60) * ((i + g.rng() * 0.6) / n);
-      piece(g, x, g.y - g.rng() * 110, orb(13 + g.rng() * 7),
-            { mass: 1 + g.rng() * 0.6, style: "orb", worth: 5 });
-    }
-  }},
-{ id: "cairn", name: "Cairn", min: 0, span: 170, build(g){
-    // a pyramid: light on top where your line is, heavy at the base corners
-    const cx = VW / 2 + (g.rng() - 0.5) * 90;
-    for (let row = 0; row < 3; row++){
-      const count = row + 1;
-      for (let i = 0; i < count; i++){
-        const x = cx + (i - (count - 1) / 2) * 46;
-        piece(g, x, g.y - 108 + row * 46, orb(18 - row * 2),
-              { mass: 1 + row * 0.9, style: "orb", worth: 6 });
-      }
-    }
-  }},
-{ id: "curtain", name: "Curtain", min: 2, span: 130, build(g){
-    // a row across the sky with one hole, never where you need it
-    const holeW = 82 - g.d * 14;
-    const holeX = VW / 2 + (g.rng() < 0.5 ? -1 : 1) * (70 + g.rng() * 54);
-    for (let x = 14; x < VW - 6; x += 50){
-      const cx = x + 22;
-      if (Math.abs(cx - holeX) < holeW / 2 + 22) continue;
-      piece(g, cx, g.y, bar(26, 11), { mass: 1.2, style: "wall", worth: 9 });
-    }
-  }},
-{ id: "hive", name: "Hive", min: 3, span: 190, build(g){
-    // a honeycomb with one tunnel bored through it
-    const cx = VW / 2 + (g.rng() - 0.5) * 60;
-    const lane = (g.rng() * 5 | 0) - 2;
-    for (let row = 0; row < 3; row++){
-      for (let c = -2; c <= 2; c++){
-        if (c === lane) continue;
-        piece(g, cx + c * 44 + (row % 2 ? 22 : 0), g.y - row * 44, orb(15),
-              { mass: 0.9, style: "orb", worth: 5 });
-      }
-    }
-  }},
-{ id: "arch", name: "Arch", min: 4, span: 190, build(g){
-    const cx = VW / 2;
-    for (const side of [-1, 1])
-      piece(g, cx + side * 104, g.y - 44, [{ x1: 0, y1: -46, x2: 0, y2: 46, r: 11 }],
-            { mass: 3.6, style: "wall", worth: 18 });
-    piece(g, cx, g.y - 100, bar(150, 10), { mass: 1.2, style: "wall", worth: 12 });
-  }},
-{ id: "pinwheel", name: "Pinwheel", min: 5, span: 200, build(g){
-    const cx = VW / 2 + (g.rng() - 0.5) * 70;
-    const cy = g.y - 70;
-    const n = 4, len = 84;
-    for (let i = 0; i < n; i++){
-      const a = i / n * TAU + g.rng() * 0.4;
-      piece(g, cx + Math.cos(a) * len * 0.5, cy + Math.sin(a) * len * 0.5,
-            bar(len, 9), { mass: 1.5, style: "hub", worth: 8, ang: a });
-    }
-  }},
-{ id: "lattice", name: "Lattice", min: 7, span: 210, build(g){
-    // diamonds: every gap is offset from the one above it
-    for (let row = 0; row < 3; row++){
-      const off = row % 2 ? 52 : 0;
-      for (let x = -20; x < VW + 20; x += 104){
-        piece(g, x + off, g.y - row * 62, bar(52, 10),
-              { mass: 1.1 + g.d * 0.4, style: "wall", worth: 8, ang: row % 2 ? 0.5 : -0.5 });
-      }
-    }
-  }},
-{ id: "tower", name: "Tower", min: 8, span: 210, build(g){
-    // straight up your line, one after another
-    const cx = VW / 2 + (g.rng() - 0.5) * 40;
-    for (let i = 0; i < 4; i++)
-      piece(g, cx + Math.sin(i * 1.7) * 16, g.y - i * 46, orb(17),
-            { mass: 0.9 + i * 0.3, style: "orb", worth: 7 });
-  }},
-{ id: "chevrons", name: "Chevrons", min: 10, span: 220, build(g){
-    for (let k = 0; k < 2; k++){
-      const cy = g.y - k * 110;
-      const cx = VW / 2 + (k ? 40 : -40);
-      for (const side of [-1, 1])
-        piece(g, cx + side * 48, cy, bar(96, 9),
-              { mass: 1.4, style: "wall", worth: 8, ang: side * 0.62 });
-    }
-  }},
-{ id: "ring", name: "Ring", min: 12, span: 210, build(g){
-    const cx = VW / 2 + (g.rng() - 0.5) * 40, cy = g.y - 80, R = 76;
-    const n = 9;
-    for (let i = 0; i < n; i++){
-      const a = i / n * TAU;
-      piece(g, cx + Math.cos(a) * R, cy + Math.sin(a) * R, orb(13),
-            { mass: 0.85, style: "orb", worth: 6 });
-    }
-  }},
-{ id: "sawline", name: "Saw Line", min: 14, span: 170, build(g){
-    const gap = (g.rng() * 4 | 0);
-    for (let i = 0; i < 4; i++){
-      if (i === gap) continue;
-      piece(g, 56 + i * 96, g.y - (i % 2) * 44, orb(19),
-            { mass: 1.7, style: "saw", worth: 12, spin: (i % 2 ? 1 : -1) * 0.8 });
-    }
-  }},
-{ id: "boulders", name: "Boulders", min: 16, span: 200, build(g){
-    // three big ones: the heavy pair frame a light middle you can shift
-    const cx = VW / 2 + (g.rng() - 0.5) * 50;
-    piece(g, cx, g.y - 60, orb(24), { mass: 1.8, style: "orb", worth: 12 });
-    piece(g, cx - 96, g.y - 20, orb(30), { mass: 4.5, style: "orb", worth: 20 });
-    piece(g, cx + 96, g.y - 100, orb(30), { mass: 4.5, style: "orb", worth: 20 });
-  }},
-{ id: "necklace", name: "Necklace", min: 18, span: 200, build(g){
-    const cx = VW / 2 + (g.rng() - 0.5) * 60, cy = g.y - 70, R = 90;
-    for (let i = 0; i < 7; i++){
-      const a = Math.PI * (0.15 + 0.7 * i / 6);
-      piece(g, cx + Math.cos(a) * R, cy - Math.sin(a) * R * 0.6, orb(14),
-            { mass: 1.1, style: "chain", worth: 7 });
-    }
-  }},
-{ id: "slabs", name: "Slabs", min: 22, span: 230, build(g){
-    for (let i = 0; i < 3; i++){
-      const side = i % 2 ? 1 : -1;
-      piece(g, VW / 2 + side * 74, g.y - i * 76, bar(176, 13),
-            { mass: 2.6 + g.d * 1.2, style: "wall", worth: 14 });
-    }
-  }},
-{ id: "pincer", name: "Pincer", min: 26, span: 220, build(g){
-    // a funnel that narrows onto your line, with rubble in the throat
-    const cx = VW / 2;
-    for (const side of [-1, 1]){
-      piece(g, cx + side * 128, g.y - 40, bar(150, 11),
-            { mass: 4, style: "wall", worth: 20, ang: side * 0.55 });
-    }
-    for (let i = 0; i < 3; i++)
-      piece(g, cx + (i - 1) * 34, g.y - 104, orb(14), { mass: 1, style: "orb", worth: 6 });
-  }},
-{ id: "vault", name: "Vault", min: 30, span: 250, build(g){
-    // a heavy frame with a light keystone dead on your line
-    const cx = VW / 2;
-    for (const side of [-1, 1])
-      piece(g, cx + side * 118, g.y - 60, [{ x1: 0, y1: -62, x2: 0, y2: 62, r: 12 }],
-            { mass: 4.5, style: "wall", worth: 22 });
-    piece(g, cx, g.y - 128, bar(180, 12), { mass: 1.6, style: "wall", worth: 16 });
-    piece(g, cx, g.y - 20, bar(120, 11), { mass: 1.4, style: "wall", worth: 14 });
-  }},
-{ id: "storm", name: "Storm", min: 34, span: 260, build(g){
-    const n = 9 + (g.rng() * 4 | 0);
-    for (let i = 0; i < n; i++){
-      const x = 24 + g.rng() * (VW - 48);
-      const y = g.y - g.rng() * 200;
-      const big = g.rng() < 0.25;
-      piece(g, x, y, big ? bar(70 + g.rng() * 60, 10) : orb(11 + g.rng() * 9),
-            { mass: big ? 2.2 : 0.9, style: big ? "wall" : "orb", worth: big ? 10 : 5,
-              ang: big ? g.rng() * TAU : 0 });
-    }
-  }}
-];
-
 /* ---------------------------------------------------------- game state */
 const PW_KINDS = ["bubble", "slow", "magnet", "wide"];
 const G = {
@@ -1111,25 +938,238 @@ function burstParts(x, y, n, col, spd, type){
   }
 }
 
+/* --------------------------------------------------------- the designs */
+/* The sky is built out of things people already know the shape of. Each
+   arrangement is a picture drawn in balls, hanging dead still in the balloon's
+   path until your shield reaches it. Points are authored in a -1..1 box and
+   scaled on placement, so a heart is a heart on any screen.                 */
+function piece(g, x, y, parts, opt){
+  const o = mkObst(clamp(x, -40, VW + 40), y, parts, opt || {});
+  o.asleep = true;
+  o.vx = 0; o.vy = 0;
+  o.look = g.look;
+  o.pid = g.id;
+  g.push(o);
+  return o;
+}
+const orb = (r) => dot(r);
+
+/* ---- little point-plotters the pictures are drawn with ---- */
+function ptLine(out, x1, y1, x2, y2, n){
+  for (let i = 0; i < n; i++){
+    const t = n === 1 ? 0.5 : i / (n - 1);
+    out.push([lerp(x1, x2, t), lerp(y1, y2, t)]);
+  }
+  return out;
+}
+function ptArc(out, cx, cy, r, a0, a1, n, squash){
+  for (let i = 0; i < n; i++){
+    const a = lerp(a0, a1, n === 1 ? 0.5 : i / (n - 1));
+    out.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r * (squash === undefined ? 1 : squash)]);
+  }
+  return out;
+}
+function ptPoly(out, pts, per){
+  for (let i = 0; i < pts.length; i++){
+    const a = pts[i], b = pts[(i + 1) % pts.length];
+    const n = Math.max(2, Math.round(Math.hypot(b[0] - a[0], b[1] - a[1]) * per));
+    for (let k = 0; k < n; k++){
+      const t = k / n;
+      out.push([lerp(a[0], b[0], t), lerp(a[1], b[1], t)]);
+    }
+  }
+  return out;
+}
+// drop the picture into the sky: points come in as -1..1, y positive downward
+function plot(g, pts, opt){
+  opt = opt || {};
+  const scale = opt.scale || 150;
+  const cx = VW / 2 + (opt.dx || 0);
+  const cy = g.y - (opt.dy === undefined ? 100 : opt.dy);
+  const r = opt.r || 12;
+  for (const p of pts){
+    piece(g, cx + p[0] * scale, cy + p[1] * scale, orb(r + (p[2] || 0)),
+          { mass: opt.mass || 1, style: "orb", worth: opt.worth || 4 });
+  }
+}
+
+/* ---- the pictures ---- */
+const PICTURES = {
+  heart(){
+    const out = [];
+    for (let i = 0; i < 26; i++){
+      const t = i / 26 * TAU;
+      const x = 16 * Math.pow(Math.sin(t), 3);
+      const y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+      out.push([x / 17, y / 17]);
+    }
+    return out;
+  },
+  star(){
+    const pts = [];
+    for (let i = 0; i < 10; i++){
+      const a = -Math.PI / 2 + i * Math.PI / 5;
+      const rr = i % 2 ? 0.44 : 1;
+      pts.push([Math.cos(a) * rr, Math.sin(a) * rr]);
+    }
+    return ptPoly([], pts, 5);
+  },
+  smiley(){
+    const out = ptArc([], 0, 0, 1, 0, TAU, 22);
+    out.push([-0.38, -0.28], [0.38, -0.28]);
+    return ptArc(out, 0, 0.02, 0.58, 0.5, Math.PI - 0.5, 7);
+  },
+  moon(){
+    const out = ptArc([], 0, 0, 1, Math.PI * 0.42, Math.PI * 1.58, 14);
+    return ptArc(out, 0.62, 0, 0.82, Math.PI * 0.64, Math.PI * 1.36, 10);
+  },
+  house(){
+    const out = ptPoly([], [[-0.8, 0.9], [0.8, 0.9], [0.8, -0.1], [-0.8, -0.1]], 5);
+    return ptPoly(out, [[-0.95, -0.1], [0, -1], [0.95, -0.1]], 5);
+  },
+  tree(){
+    const out = ptPoly([], [[0, -1], [0.75, 0.15], [-0.75, 0.15]], 5);
+    return ptLine(out, -0.16, 0.2, -0.16, 0.95, 3).concat(ptLine([], 0.16, 0.2, 0.16, 0.95, 3));
+  },
+  flower(){
+    const out = [];
+    for (let k = 0; k < 6; k++){
+      const a = k / 6 * TAU;
+      ptArc(out, Math.cos(a) * 0.55, Math.sin(a) * 0.55, 0.36, 0, TAU, 7);
+    }
+    out.push([0, 0]);
+    return out;
+  },
+  key(){
+    const out = ptArc([], -0.55, 0, 0.42, 0, TAU, 12);
+    ptLine(out, -0.13, 0, 0.92, 0, 7);
+    out.push([0.62, 0.3], [0.86, 0.3]);
+    return out;
+  },
+  bolt(){
+    return ptPoly([], [[0.1, -1], [-0.6, 0.06], [-0.06, 0.06], [-0.24, 1], [0.62, -0.16], [0.04, -0.16]], 6);
+  },
+  cup(){
+    const out = ptPoly([], [[-0.6, -0.5], [0.6, -0.5], [0.38, 0.7], [-0.38, 0.7]], 5);
+    return ptArc(out, 0.6, 0, 0.34, -1.2, 1.2, 5);
+  },
+  fish(){
+    const out = ptArc([], -0.1, 0, 0.78, -Math.PI * 0.62, Math.PI * 0.62, 10, 0.72);
+    ptArc(out, -0.1, 0, 0.78, Math.PI * 0.38, Math.PI * 1.62, 10, 0.72);
+    ptPoly(out, [[-0.78, 0], [-1.2, -0.44], [-1.2, 0.44]], 5);
+    out.push([0.34, -0.18]);
+    return out;
+  },
+  umbrella(){
+    const out = ptArc([], 0, 0.1, 0.95, Math.PI, TAU, 14);
+    ptLine(out, 0, 0.1, 0, 0.85, 4);
+    return ptArc(out, -0.22, 0.85, 0.22, 0, Math.PI * 0.9, 4);
+  },
+  anchor(){
+    const out = ptArc([], 0, -0.72, 0.26, 0, TAU, 8);
+    ptLine(out, 0, -0.42, 0, 0.72, 7);
+    ptLine(out, -0.48, -0.22, 0.48, -0.22, 5);
+    return ptArc(out, 0, 0.2, 0.78, 0.28, Math.PI - 0.28, 9);
+  },
+  clover(){
+    const out = [];
+    for (const [dx, dy] of [[0, -0.5], [-0.5, 0], [0.5, 0]]) ptArc(out, dx, dy, 0.4, 0, TAU, 8);
+    return ptLine(out, 0, 0.3, 0.12, 1, 3);
+  },
+  arrow(){
+    const out = ptLine([], 0, 1, 0, -0.55, 7);
+    return ptPoly(out, [[0, -1], [0.62, -0.28], [-0.62, -0.28]], 5);
+  },
+  ring(){
+    return ptArc([], 0, 0, 1, 0, TAU, 22);
+  },
+  ladder(){
+    const out = ptLine([], -0.5, -1, -0.5, 1, 8).concat(ptLine([], 0.5, -1, 0.5, 1, 8));
+    for (let i = 0; i < 4; i++) ptLine(out, -0.5, -0.72 + i * 0.48, 0.5, -0.72 + i * 0.48, 3);
+    return out;
+  },
+  spiral(){
+    const out = [];
+    for (let i = 0; i < 26; i++){
+      const t = i / 25;
+      const a = t * TAU * 1.9, r = 0.15 + t * 0.85;
+      out.push([Math.cos(a) * r, Math.sin(a) * r]);
+    }
+    return out;
+  }
+};
+
+function pic(id, name, min, span, key, opt){
+  return { id, name, min, span, build(g){
+    // the same picture is built out of heavier stock the higher you get, so a
+    // late one takes real sweeping to open rather than one pass
+    plot(g, PICTURES[key](), Object.assign({
+      dx: (g.rng() - 0.5) * 40, dy: span * 0.5, scale: 132,
+      r: 11, mass: 0.8 + g.d * 1.5, worth: 4
+    }, opt || {}));
+  } };
+}
+const DESIGNS = [
+  pic("heart",    "Heart",    0,  300, "heart"),
+  pic("ring",     "Ring",     0,  300, "ring"),
+  pic("star",     "Star",     2,  320, "star"),
+  pic("smiley",   "Smiley",   3,  320, "smiley"),
+  pic("house",    "House",    4,  320, "house"),
+  pic("tree",     "Tree",     5,  320, "tree"),
+  pic("flower",   "Flower",   6,  320, "flower"),
+  pic("moon",     "Moon",     7,  300, "moon"),
+  pic("arrow",    "Arrow",    8,  310, "arrow"),
+  pic("bolt",     "Lightning", 10, 330, "bolt"),
+  pic("key",      "Key",      12, 290, "key"),
+  pic("cup",      "Mug",      14, 300, "cup"),
+  pic("clover",   "Clover",   16, 310, "clover"),
+  pic("fish",     "Fish",     18, 300, "fish"),
+  pic("umbrella", "Umbrella", 20, 320, "umbrella"),
+  pic("anchor",   "Anchor",   24, 330, "anchor"),
+  pic("ladder",   "Ladder",   28, 340, "ladder"),
+  pic("spiral",   "Spiral",   32, 330, "spiral"),
+// a couple of plain built things, for a change of texture between pictures
+{ id: "curtain", name: "Curtain", min: 6, span: 150, build(g){
+    const holeW = 86;
+    const holeX = VW / 2 + (g.rng() < 0.5 ? -1 : 1) * (70 + g.rng() * 50);
+    for (let x = 14; x < VW - 6; x += 50){
+      const cx = x + 22;
+      if (Math.abs(cx - holeX) < holeW / 2 + 22) continue;
+      piece(g, cx, g.y - 70, bar(26, 11), { mass: 1.2, style: "wall", worth: 9 });
+    }
+  }},
+{ id: "arch", name: "Arch", min: 12, span: 210, build(g){
+    const cx = VW / 2;
+    for (const side of [-1, 1])
+      piece(g, cx + side * 104, g.y - 78, [{ x1: 0, y1: -46, x2: 0, y2: 46, r: 11 }],
+            { mass: 3.4, style: "wall", worth: 18 });
+    piece(g, cx, g.y - 134, bar(150, 10), { mass: 1.2, style: "wall", worth: 12 });
+  }},
+{ id: "slabs", name: "Slabs", min: 22, span: 240, build(g){
+    for (let i = 0; i < 3; i++){
+      const side = i % 2 ? 1 : -1;
+      piece(g, VW / 2 + side * 74, g.y - 60 - i * 76, bar(176, 13),
+            { mass: 2.6, style: "wall", worth: 14 });
+    }
+  }}
+];
+
 /* ----------------------------------------------------------- the stages */
 /* A level is not one long shuffle of everything. It runs through a handful of
    named stages, each with its own cast and its own marking, so the sky tells
    you what it is doing and you can learn each one on its own terms.        */
 const STAGES = [
-  { id: "open",    name: "Open Sky",  min: 0,  look: "plain",   designs: ["field"] },
-  { id: "cairns",  name: "Cairns",    min: 0,  look: "ring",    designs: ["cairn", "tower"] },
-  { id: "curtain", name: "Curtains",  min: 2,  look: "band",    designs: ["curtain"] },
-  { id: "hive",    name: "Hives",     min: 3,  look: "dots",    designs: ["hive"] },
-  { id: "ruins",   name: "Ruins",     min: 4,  look: "brick",   designs: ["arch", "lattice"] },
-  { id: "wheels",  name: "Wheels",    min: 5,  look: "slash",   designs: ["pinwheel", "ring"] },
-  { id: "wedges",  name: "Wedges",    min: 10, look: "chevron", designs: ["chevrons", "lattice"] },
-  { id: "mill",    name: "Sawmill",   min: 14, look: "slash",   designs: ["sawline"] },
-  { id: "stones",  name: "Boulders",  min: 16, look: "hollow",  designs: ["boulders", "cairn"] },
-  { id: "chains",  name: "Necklaces", min: 18, look: "dots",    designs: ["necklace", "ring"] },
-  { id: "slabs",   name: "Slabs",     min: 22, look: "band",    designs: ["slabs"] },
-  { id: "pincer",  name: "Pincers",   min: 26, look: "cross",   designs: ["pincer"] },
-  { id: "vault",   name: "Vaults",    min: 30, look: "brick",   designs: ["vault", "slabs"] },
-  { id: "storm",   name: "Storm",     min: 34, look: "hollow",  designs: ["storm"] }
+  { id: "shapes",  name: "Shapes",   min: 0,  look: "plain",   designs: ["ring", "heart"] },
+  { id: "sky",     name: "Night Sky",min: 2,  look: "ring",    designs: ["star", "moon"] },
+  { id: "faces",   name: "Faces",    min: 3,  look: "dots",    designs: ["smiley", "heart"] },
+  { id: "home",    name: "Home",     min: 4,  look: "band",    designs: ["house", "cup"] },
+  { id: "garden",  name: "Garden",   min: 5,  look: "chevron", designs: ["tree", "flower", "clover"] },
+  { id: "signs",   name: "Signs",    min: 8,  look: "cross",   designs: ["arrow", "bolt"] },
+  { id: "walls",   name: "Walls",    min: 9,  look: "brick",   designs: ["curtain", "arch"] },
+  { id: "pocket",  name: "Pocket",   min: 12, look: "slash",   designs: ["key", "cup"] },
+  { id: "water",   name: "Water",    min: 18, look: "hollow",  designs: ["fish", "anchor", "umbrella"] },
+  { id: "yard",    name: "Yard",     min: 28, look: "brick",   designs: ["ladder", "slabs"] },
+  { id: "deep",    name: "Deep End", min: 32, look: "hollow",  designs: ["spiral", "bolt", "star"] }
 ];
 // which stages this level runs, in order, and where each one starts
 function buildStages(def){
@@ -1378,7 +1418,42 @@ function takeHit(o, nx, ny){
   }
 }
 /* ---------------------------------------------------------- simulation */
-const LIVE = [];                     // threats inside the view this frame
+const LIVE = [];                     // bodies inside the view this frame
+const CELL = 64;                     // broadphase grid, a little wider than a ball
+const GRID = new Map();
+function gridKey(x, y){ return ((x / CELL) | 0) + "," + ((y / CELL) | 0); }
+function solveContacts(withShield, shg, shR, iters, withImpulse){
+  for (let it = 0; it < iters; it++){
+    GRID.clear();
+    for (let i = 0; i < LIVE.length; i++){
+      const o = LIVE[i];
+      const k = gridKey(o.x, o.y);
+      let cell = GRID.get(k);
+      if (!cell){ cell = []; GRID.set(k, cell); }
+      cell.push(o);
+    }
+    for (let i = 0; i < LIVE.length; i++){
+      const a = LIVE[i];
+      if (a.asleep) continue;                 // sleepers only meet what is moving
+      const reach = Math.ceil((a.rad + 40) / CELL);
+      const gx = (a.x / CELL) | 0, gy = (a.y / CELL) | 0;
+      for (let cx = gx - reach; cx <= gx + reach; cx++){
+        for (let cy = gy - reach; cy <= gy + reach; cy++){
+          const cell = GRID.get(cx + "," + cy);
+          if (!cell) continue;
+          for (let n = 0; n < cell.length; n++){
+            const b = cell[n];
+            if (b === a) continue;
+            if (!b.asleep && LIVE.indexOf(b) < i) continue;   // handle each pair once
+            solidPair(a, b, withImpulse && it === 0);
+          }
+        }
+      }
+    }
+    if (withShield)
+      for (let i = 0; i < LIVE.length; i++) shieldSeparate(LIVE[i], shg, shR);
+  }
+}
 /* The climb is the one fixed thing in the game. Every level, every biome,
    endless included, rises at exactly this rate — difficulty lives in what
    comes down at you, never in how fast the floor moves. */
@@ -1460,15 +1535,10 @@ function step(dt){
     LIVE.push(o);
   }
   // Solve contacts repeatedly: one pass leaves a crowd compressed into itself,
-  // three leaves a pile stacked. Only the first pass exchanges momentum; the
-  // rest are pure separation.
-  for (let it = 0; it < SOLVER_ITERS; it++){
-    for (let i = 0; i < LIVE.length; i++)
-      for (let j = i + 1; j < LIVE.length; j++)
-        solidPair(LIVE[i], LIVE[j], it === 0);
-    if (playing || G.state === "clear")
-      for (let i = 0; i < LIVE.length; i++) shieldSeparate(LIVE[i], shg, sh.r);
-  }
+  // several leave a pile stacked. Only the first exchanges momentum. Two bodies
+  // that are both asleep cannot possibly have moved into each other, so the
+  // grid only ever asks about pairs where something is awake.
+  solveContacts(playing || G.state === "clear", shg, sh.r, SOLVER_ITERS, true);
 
   for (let i = 0; i < LIVE.length; i++){
     const o = LIVE[i];
@@ -1506,11 +1576,14 @@ function step(dt){
           // A push straight down the normal cannot turn a ball — every bit of
           // spin in the world comes from the shield dragging across its face.
           // This is also what makes a sideways swipe carry: it cuts.
+          // Friction, not a launcher: dragging across a face mostly turns it.
+          // A glancing swipe leaves an object roughly where it was, spinning —
+          // to send something anywhere you have to push into it.
           const tx = -ny, ty = nx;
           const relT = sh.vx * tx + sh.vy * ty;
-          o.vx += tx * relT * 0.22 * inv;
-          o.vy += ty * relT * 0.22 * inv;
-          o.spin += relT * 0.02 * inv / Math.max(12, o.rad);
+          o.vx += tx * relT * 0.06 * inv;
+          o.vy += ty * relT * 0.06 * inv;
+          o.spin += relT * 0.022 * inv / Math.max(12, o.rad);
           // and an off-centre hit on something long turns it as well
           const rx = _sd.bx - o.x, ry = _sd.by - o.y;
           o.spin += (rx * ny - ry * nx) * imp * 0.0016 * inv / Math.max(12, o.rad);
@@ -1562,13 +1635,7 @@ function step(dt){
   // The shield's own pass runs after the solver and shoves bodies clear of its
   // face, which can push one into its neighbour. Settle once more so the frame
   // ends with nothing overlapping anything.
-  for (let it = 0; it < 2; it++){
-    for (let i = 0; i < LIVE.length; i++)
-      for (let j = i + 1; j < LIVE.length; j++)
-        solidPair(LIVE[i], LIVE[j], false);
-    if (playing || G.state === "clear")
-      for (let i = 0; i < LIVE.length; i++) shieldSeparate(LIVE[i], shg, sh.r);
-  }
+  solveContacts(playing || G.state === "clear", shg, sh.r, 2, false);
   if (bumpSound && G.T - (G.lastBump || -1) > 0.07){ G.lastBump = G.T; Audio2.SFX.bump(); }
 
   // --- pickups: the shield sweeps these up, so going for them means
