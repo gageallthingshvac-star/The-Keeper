@@ -201,6 +201,8 @@
   .lvl:active{transform:scale(.94)}
   .lvl .stars{font-size:9px;letter-spacing:1px;color:var(--accent-2);height:10px;text-shadow:0 1px 0 rgba(47,52,117,.15)}
   .lvl.locked{background:rgba(255,255,255,.32);color:var(--ink-soft)}
+  .lvl.ahead{box-shadow:0 4px 12px rgba(24,40,80,.1), inset 0 0 0 2px rgba(255,255,255,.75)}
+  .lvl.ahead span:first-child{opacity:.8}
   .lvl.cur{outline:3px solid #fff;outline-offset:2px}
   .biome-tag{
     grid-column:1 / -1;font-size:11px;color:var(--ink-soft);letter-spacing:2.4px;
@@ -716,6 +718,10 @@ const BIOMES = [
   { name: "Night",   sky: ["#4a5a9a", "#2b3570", "#141a3c"], land: ["#3b4577", "#2b3462", "#1e2549"], ink: "#0d1130", cloud: "#8f9ad6", sun: "#f6f4e2", stars: 1 },
   { name: "Aurora",  sky: ["#1f5f6b", "#173f60", "#0d1a3a"], land: ["#1c4a55", "#153944", "#0f2a35"], ink: "#07131f", cloud: "#7ff0d0", sun: "#d8fff2", stars: 1 }
 ];
+/* While the game is still being worked on, the five levels ahead of the one
+   you have reached stay open, so you can go straight to whatever needs
+   looking at instead of earning your way back to it each time. */
+const PEEK_AHEAD = 5;
 const LEVELS_PER_BIOME = 5;
 const TOTAL_LEVELS = BIOMES.length * LEVELS_PER_BIOME; // 45
 
@@ -2850,30 +2856,35 @@ function buildLevelGrid(){
     const head = document.createElement("div");
     head.className = "biome-tag";
     const firstOfBiome = bi * LEVELS_PER_BIOME + 1;
-    const openHere = save.unlocked >= firstOfBiome;
+    const openHere = save.unlocked + PEEK_AHEAD >= firstOfBiome;
     head.textContent = openHere ? BIOMES[bi].name : "— locked —";
     host.appendChild(head);
     for (let k = 0; k < LEVELS_PER_BIOME; k++){
       const n = firstOfBiome + k;
       const rec = save.levels[n];
       if (rec){ cleared++; stars += rec.stars || 0; }
-      const locked = n > save.unlocked;
+      const reached = n <= save.unlocked;
+      const locked = n > save.unlocked + PEEK_AHEAD;
+      const ahead = !reached && !locked;
       const b = document.createElement("button");
-      b.className = "lvl" + (locked ? " locked" : "") + (n === save.unlocked ? " cur" : "");
+      b.className = "lvl" + (locked ? " locked" : "") + (ahead ? " ahead" : "") +
+                    (n === save.unlocked ? " cur" : "");
       if (n === save.unlocked) cur = b;
-      b.style.background = locked ? "" : rgba(BIOMES[bi].sky[1], 0.92);
+      b.style.background = locked ? "" : rgba(BIOMES[bi].sky[1], ahead ? 0.5 : 0.92);
       b.innerHTML = "<span>" + n + "</span><span class='stars'>" +
         (rec ? "★".repeat(rec.stars) : locked ? "·" : "") + "</span>";
       b.title = BIOMES[bi].name + " · level " + n;
       b.addEventListener("click", () => {
         Audio2.SFX.ui();
         if (locked){ UI.flash("Clear level " + save.unlocked + " to open this one"); return; }
+        if (ahead) UI.flash("Playing ahead — level " + n);
         startRun("level", n);
       });
       host.appendChild(b);
     }
   }
-  $("lvlSummary").textContent = cleared + " / " + TOTAL_LEVELS + " cleared · " + stars + " stars · all free";
+  $("lvlSummary").textContent = cleared + " / " + TOTAL_LEVELS + " cleared · " + stars +
+    " stars · " + PEEK_AHEAD + " ahead stay open";
   if (cur) setTimeout(() => { try { cur.scrollIntoView({ block: "center" }); } catch (e){} }, 30);
 }
 function buildSkinGrid(){
