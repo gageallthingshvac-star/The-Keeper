@@ -889,36 +889,163 @@ function solidPair(a, b, withImpulse){
 
 /* Bodies crowded against the shield must stop at its face, not sink into it.
    The shield has no give at all, so the body takes the whole correction. */
-function shieldSeparate(o, g, shR, ux, uy){
+/* Positional-only separation: the shield is immovable scenery for this pass,
+   so anything overlapping it is lifted straight out along the shallowest way
+   out. No velocity is touched here — that is the impulse's job — which is why
+   resting against the face is quiet instead of buzzing. */
+function shieldSeparate(o, g, shR){
   for (let j = 0; j < o.wp.length; j++){
     const w = o.wp[j];
     const minD = shR + w.r;
-    let d = 1e9;
+    let best = 0, bx = 0, by = 0;
     for (let k = 0; k < 3; k++){
       const dd = segSegDist(g.pts[k].x, g.pts[k].y, g.pts[k + 1].x, g.pts[k + 1].y,
                             w.x1, w.y1, w.x2, w.y2, _pair);
-      if (dd < d){
-        d = dd;
-        if (d < minD){
-          let nx = _pair.bx - _pair.ax, ny = _pair.by - _pair.ay;
-          let nl = Math.hypot(nx, ny);
-          if (nl < 1e-4){ nx = 0; ny = -1; nl = 1; }
-          nx /= nl; ny /= nl;
-          // The nearest way out of a moving shield is often backwards through
-          // it, which is exactly what looks like the shield passed through the
-          // ball. Anything the shield is moving into leaves on the leading side.
-          if (ux !== undefined && (nx * ux + ny * uy) < 0.12){ nx = ux; ny = uy; }
-          o.x += nx * (minD - d);
-          o.y += ny * (minD - d);
-          // anything the shield is touching is awake, full stop: being shoved
-          // around while still counted as scenery is how a body ends up with a
-          // nonsense state
-          wake(o);
-          rebuildParts(o);
-        }
+      const pen = minD - dd;
+      if (pen > best){
+        let nx = _pair.bx - _pair.ax, ny = _pair.by - _pair.ay;
+        let nl = Math.hypot(nx, ny);
+        if (nl < 1e-4){ nx = 0; ny = -1; nl = 1; }
+        best = pen; bx = nx / nl; by = ny / nl;
+      }
+    }
+    if (best > 0){
+      o.x += bx * best;
+      o.y += by * best;
+      // anything the shield is touching is awake, full stop: being shoved
+      // around while still counted as scenery is how a body ends up with a
+      // nonsense state
+      wake(o);
+      rebuildParts(o);
+    }
+  }
+}
+/* ------------------------------------------------ meeting the shield
+
+   A dome swept sideways never meets a ball head on. It touches with its
+   outer flank, where the surface points up and away, and only as the swing
+   carries on does the contact slide toward the crown and the push come
+   round to sideways. Resolve that with a single impulse at first touch and
+   you only ever get the glance: the ball hops and the shield sails past it,
+   which is what "it went through" and "that felt wrong" both look like.
+
+   So the swing is replayed. The body is rewound to where it stood at the
+   instant of first touch, then walked forward through the poses the shield
+   actually occupied, meeting it at each one: lifted clear along that pose's
+   own normal, given that pose's own impulse, and moved on by its own speed
+   for the slice of time the pose covers. The contact point migrates across
+   the face by itself, the pushes accumulate, and the body rolls off the
+   dome when it has picked up enough speed to outrun it. Nothing is scripted.
+
+   The one liberty taken with physics is the roll-off below. A hand that
+   crosses the screen in a blink would otherwise launch a ball at several
+   thousand units a second and the game becomes a pinball table, so the
+   speed the impulse sees is passed through tanh: honest and near enough
+   linear at any pace a thumb really moves, flattening only past that. */
+const _shHit = { x: 0, y: 0, n: 0, bump: false };
+function shieldContact(o, sdt){
+  const sh = G.sh, shR = sh.r;
+  const steps = Math.max(1, poseN - 1);
+
+  // first pose on the path that touches any part of this body
+  let hitPose = -1;
+  for (let pi = 0; pi < poseN && hitPose < 0; pi++){
+    const g = POSES[pi];
+    for (let j = 0; j < o.wp.length && hitPose < 0; j++){
+      const w = o.wp[j];
+      const minD = shR + w.r;
+      for (let k = 0; k < 3; k++){
+        if (segSegDist(g.pts[k].x, g.pts[k].y, g.pts[k + 1].x, g.pts[k + 1].y,
+                       w.x1, w.y1, w.x2, w.y2, _sdTmp) < minD){ hitPose = pi; break; }
       }
     }
   }
+  if (hitPose < 0) return false;
+
+  wake(o);
+  _shHit.n = 0; _shHit.bump = false;
+  _shHit.x = o.x; _shHit.y = o.y;
+
+  // where in the frame each pose sits. A single pose means the shield barely
+  // moved, and that one pose is the frame's end — not its start.
+  const tOf = pi => (poseN === 1 ? 1 : pi / steps);
+  const subDt = poseN === 1 ? 0 : sdt / steps;
+  // rewind to first touch: the body was integrated across the whole frame
+  // before the shield was ever consulted
+  let owed = sdt * (1 - tOf(hitPose));
+  if (owed > 0){ o.x -= o.vx * owed; o.y -= o.vy * owed; rebuildParts(o); }
+
+  const im = 1 / o.mass, iM = 1 / SHIELD_MASS, itot = im + iM;
+  let carried = 0;
+
+  for (let pi = hitPose; pi < poseN; pi++){
+    const g = POSES[pi];
+    // how fast the face is moving during this slice, rolled off at the top end
+    let svx = sh.vx, svy = sh.vy;
+    if (pi > 0 && subDt > 0){
+      const gp = POSES[pi - 1];
+      svx = (g.cx - gp.cx) / subDt; svy = (g.cy - gp.cy) / subDt;
+    }
+    const shSp = Math.hypot(svx, svy);
+    if (shSp > 1){
+      const eff = SHIELD_VSOFT * Math.tanh(shSp / SHIELD_VSOFT) / shSp;
+      svx *= eff; svy *= eff;
+    }
+
+    // deepest contact between this pose and any part of the body
+    let pen = 0, nx = 0, ny = 0, cxp = 0, cyp = 0;
+    for (let j = 0; j < o.wp.length; j++){
+      const w = o.wp[j];
+      const minD = shR + w.r;
+      for (let k = 0; k < 3; k++){
+        const dd = segSegDist(g.pts[k].x, g.pts[k].y, g.pts[k + 1].x, g.pts[k + 1].y,
+                              w.x1, w.y1, w.x2, w.y2, _sdTmp);
+        if (minD - dd > pen){
+          let ax = _sdTmp.bx - _sdTmp.ax, ay = _sdTmp.by - _sdTmp.ay;
+          let al = Math.hypot(ax, ay);
+          if (al < 1e-4){ ax = 0; ay = -1; al = 1; }
+          pen = minD - dd; nx = ax / al; ny = ay / al;
+          cxp = _sdTmp.ax; cyp = _sdTmp.ay;
+        }
+      }
+    }
+
+    if (pen > 0){
+      o.x += nx * pen; o.y += ny * pen;
+      carried += pen;
+      _shHit.x = cxp; _shHit.y = cyp; _shHit.n++;
+      const vn = (o.vx - svx) * nx + (o.vy - svy) * ny;
+      if (vn < 0){
+        // settling onto the face is a rest, not a bounce, so a body left
+        // leaning on the shield lies there instead of buzzing
+        const e = -vn < SHIELD_REST_V ? 0 : SHIELD_BOUNCE;
+        const jn = -(1 + e) * vn / itot;
+        o.vx += nx * jn * im; o.vy += ny * jn * im;
+        // friction across the face: the carry sideways, and the spin
+        const tx = -ny, ty = nx;
+        const vt = (o.vx - svx) * tx + (o.vy - svy) * ty;
+        const jt = clamp(-vt / itot, -SHIELD_GRIP * jn, SHIELD_GRIP * jn);
+        o.vx += tx * jt * im; o.vy += ty * jt * im;
+        o.spin -= (jt * im) * 1.1 / Math.max(12, o.rad);
+        const sp = Math.hypot(o.vx, o.vy);
+        if (sp > SHIELD_VCAP){ o.vx *= SHIELD_VCAP / sp; o.vy *= SHIELD_VCAP / sp; }
+        if (-vn > 40) _shHit.bump = true;
+      }
+    }
+
+    // its own motion through this slice of the swing, which is how it finally
+    // outruns the face and leaves
+    if (pi < poseN - 1){ o.x += o.vx * subDt; o.y += o.vy * subDt; owed -= subDt; }
+    rebuildParts(o);
+    // a body pinned to a face moving faster than it can ever go would ride the
+    // whole swing; let it be shoved a shield's width and no further
+    if (carried > SHIELD_R * 1.5) break;
+  }
+  // whatever time was rewound and not replayed still belongs to the body, or
+  // it would appear to flinch backwards on the frame it was struck
+  if (owed > 1e-6){ o.x += o.vx * owed; o.y += o.vy * owed; rebuildParts(o); }
+  o.home = 0;
+  return true;
 }
 const bar = (len, r) => [{ x1: -len / 2, y1: 0, x2: len / 2, y2: 0, r: r || 9 }];
 const dot = r => [{ x1: 0, y1: 0, x2: 0, y2: 0, r: r }];
@@ -1323,6 +1450,12 @@ function shieldLen(){
    Where you put it, and how fast you are already moving when contact
    happens, is the entire game. */
 const SHIELD_R = 74;
+const SHIELD_MASS = 2.2;             // heavy, but not infinitely so: weight still tells
+const SHIELD_BOUNCE = 0.3;           // how lively its face is
+const SHIELD_GRIP = 0.35;            // friction across it, which is where spin comes from
+const SHIELD_VSOFT = 700;            // where the hand's speed starts rolling off in the impulse
+const SHIELD_VCAP = 900;             // a safety net; the roll-off above is what actually governs
+const SHIELD_REST_V = 55;            // below this a contact is a rest, not a bounce
 const mkPose = () => ({ cx: 0, cy: 0, a0: 0, half: 0,
                         pts: [{x:0,y:0},{x:0,y:0},{x:0,y:0},{x:0,y:0}] });
 const SHG = mkPose();
@@ -1440,7 +1573,7 @@ const LIVE = [];                     // bodies inside the view this frame
 const CELL = 64;                     // broadphase grid, a little wider than a ball
 const GRID = new Map();
 function gridKey(x, y){ return ((x / CELL) | 0) + "," + ((y / CELL) | 0); }
-function solveContacts(withShield, shg, shR, iters, withImpulse, ux, uy){
+function solveContacts(withShield, shg, shR, iters, withImpulse){
   for (let it = 0; it < iters; it++){
     GRID.clear();
     for (let i = 0; i < LIVE.length; i++){
@@ -1469,7 +1602,7 @@ function solveContacts(withShield, shg, shR, iters, withImpulse, ux, uy){
       }
     }
     if (withShield)
-      for (let i = 0; i < LIVE.length; i++) shieldSeparate(LIVE[i], shg, shR, ux, uy);
+      for (let i = 0; i < LIVE.length; i++) shieldSeparate(LIVE[i], shg, shR);
   }
 }
 /* The climb is the one fixed thing in the game. Every level, every biome,
@@ -1538,10 +1671,6 @@ function step(dt){
   const shg = shieldGeom();
   buildPoses(sh, prevX, prevY, sh.pang === undefined ? sh.ang : sh.pang);
   sh.pang = sh.ang;
-  // which way the shield swept this frame: everything it touches leaves ahead
-  const sweepD = Math.hypot(sh.x - prevX, sh.y - prevY);
-  const sweepUX = sweepD > 1 ? (sh.x - prevX) / sweepD : undefined;
-  const sweepUY = sweepD > 1 ? (sh.y - prevY) / sweepD : undefined;
 
   // --- send in the next arrivals
   if (playing) spawnCheck();
@@ -1559,131 +1688,49 @@ function step(dt){
     updThreat(o, sdt, playing ? b : null);
     LIVE.push(o);
   }
+  /* The shield meets each body where that body's own flight left it, before
+     anything starts pushing anything else around. Run this after the solver and
+     the shield is arguing with a crowd that has already been shuffled, which is
+     how a clean hit ends up looking like a shove. */
+  for (let i = 0; i < LIVE.length; i++){
+    const o = LIVE[i];
+    // --- the shield turns it away, once for the whole body
+    if ((playing || G.state === "clear") && shieldContact(o, sdt)){
+      if (_shHit.bump && o.flash < 0.45){
+        bumpSound = true;
+        pAdd(_shHit.x, _shHit.y, (Math.random() - 0.5) * 90, -40, 0.3, 3, "#ffffff", "dot");
+      }
+      o.flash = 1;
+      if (!o.blocked && playing){
+        o.blocked = true;
+        blockScored(o, _shHit.x, _shHit.y);
+        if (o.split){
+          for (let c = 0; c < o.split; c++){
+            const ang = Math.atan2(o.vy, o.vx) + (c ? 0.9 : -0.9);
+            const child = mkObst(o.x + Math.cos(ang) * 14, o.y + Math.sin(ang) * 14,
+                                 dot(12), { mass: 0.7, style: "orb", worth: 5 });
+            const csp = clamp(Math.hypot(o.vx, o.vy) * 0.7, 90, 300);
+            child.vx = Math.cos(ang) * csp; child.vy = Math.sin(ang) * csp;
+            child.pid = o.pid + "-bit";
+            child.blocked = true;
+            spawned.push(child);
+          }
+          o.split = 0;
+        }
+      }
+    }
+  }
+
   // Solve contacts repeatedly: one pass leaves a crowd compressed into itself,
   // several leave a pile stacked. Only the first exchanges momentum. Two bodies
   // that are both asleep cannot possibly have moved into each other, so the
   // grid only ever asks about pairs where something is awake.
-  solveContacts(playing || G.state === "clear", shg, sh.r, SOLVER_ITERS, true, sweepUX, sweepUY);
+  solveContacts(playing || G.state === "clear", shg, sh.r, SOLVER_ITERS, true);
 
   for (let i = 0; i < LIVE.length; i++){
     const o = LIVE[i];
     for (let j = 0; j < o.wp.length; j++){
       const w = o.wp[j];
-      // --- the shield turns it away.
-      // A swept shield does not just register the first touch and move on: it
-      // walks every sample along the path it travelled, shoving whatever it
-      // meets at each one. That is what stops a hard swing leaving a ball
-      // sitting behind the shield, which is what "passing through" looks like.
-      if (playing || G.state === "clear"){
-        const trueMin = sh.r + w.r;         // exactly where the drawn edges meet
-        const moveX = sh.x - prevX, moveY = sh.y - prevY;
-        const moveD = Math.hypot(moveX, moveY);
-        const ux = moveD > 0.001 ? moveX / moveD : 0;
-        const uy = moveD > 0.001 ? moveY / moveD : 0;
-        let firstHit = -1;
-        for (let pi = 0; pi < poseN; pi++){
-          const g = POSES[pi];
-          let dp = 1e9;
-          for (let k = 0; k < 3; k++){
-            const dd = segSegDist(g.pts[k].x, g.pts[k].y, g.pts[k + 1].x, g.pts[k + 1].y,
-                                  w.x1, w.y1, w.x2, w.y2, _sdTmp);
-            if (dd < dp){ dp = dd; _sd.ax = _sdTmp.ax; _sd.ay = _sdTmp.ay; _sd.bx = _sdTmp.bx; _sd.by = _sdTmp.by; }
-          }
-          if (dp >= trueMin) continue;
-          let nx = _sd.bx - _sd.ax, ny = _sd.by - _sd.ay;
-          let nl = Math.hypot(nx, ny);
-          if (nl < 1e-4){ nx = 0; ny = -1; nl = 1; }
-          nx /= nl; ny /= nl;
-          // never eject something backwards through a moving shield: if the
-          // nearest way out is behind the sweep, carry it forward instead
-          if (moveD > 1 && nx * ux + ny * uy < 0.12){ nx = ux; ny = uy; }
-          const pen = trueMin - dp;
-          o.x += nx * pen;              // full separation: the shield has no give
-          o.y += ny * pen;
-          rebuildParts(o);
-          if (firstHit < 0){
-            firstHit = pi;
-            const inv = 1 / o.mass;
-            // Whatever the shield crosses, it carries. The push down the normal
-            // does the shoving, the drag across the face adds the spin, and the
-            // shield's own speed counts either way.
-            const rel = sh.vx * nx + sh.vy * ny;
-            const tx = -ny, ty = nx;
-            const relT = sh.vx * tx + sh.vy * ty;
-            const speed = Math.hypot(sh.vx, sh.vy);
-            const imp = Math.max(0, rel) * 0.3 + speed * 0.02 + pen * 8 + 24;
-            o.vx += nx * imp * inv;
-            o.vy += ny * imp * inv;
-            o.vx += tx * relT * 0.04 * inv;
-            o.vy += ty * relT * 0.04 * inv;
-            o.spin += relT * 0.022 * inv / Math.max(12, o.rad);
-            const rx = _sd.bx - o.x, ry = _sd.by - o.y;
-            o.spin += (rx * ny - ry * nx) * imp * 0.0016 * inv / Math.max(12, o.rad);
-            wake(o);
-            o.home = 0;                       // knocked off its lock
-            // Nothing the shield hits may end up slower than the shield that
-            // hit it — otherwise a hard swing simply overtakes what it just
-            // struck and leaves it sitting behind, which is exactly what
-            // passing through looks like. A light ball leaves faster than the
-            // hand that sent it; a heavy one still cannot be outrun.
-            if (moveD > 1){
-              // enough that it leaves with the sweep and is clearly struck —
-              // not so much that it is fired off the screen. Staying in front
-              // of the shield is the placement's job, not the speed's.
-              const want = speed * clamp(0.1 / o.mass, 0.035, 0.16);
-              const along = o.vx * ux + o.vy * uy;
-              if (along < want){
-                o.vx += ux * (want - along);
-                o.vy += uy * (want - along);
-              }
-            }
-            const sp = Math.hypot(o.vx, o.vy);
-            if (sp > 460){ o.vx *= 460 / sp; o.vy *= 460 / sp; }
-            if (!o.blocked && playing){
-              o.blocked = true;
-              blockScored(o, _sd.ax, _sd.ay);
-              if (o.split){
-                for (let c = 0; c < o.split; c++){
-                  const a = Math.atan2(o.vy, o.vx) + (c ? 0.9 : -0.9);
-                  const child = mkObst(o.x + Math.cos(a) * 14, o.y + Math.sin(a) * 14,
-                                       dot(12), { mass: 0.7, style: "orb", worth: 5 });
-                  const csp = clamp(Math.hypot(o.vx, o.vy) * 0.7, 90, 300);
-                  child.vx = Math.cos(a) * csp; child.vy = Math.sin(a) * csp;
-                  child.pid = o.pid + "-bit";
-                  child.blocked = true;
-                  spawned.push(child);
-                }
-                o.split = 0;
-              }
-            }
-            if (o.flash < 0.45){
-              bumpSound = true;
-              pAdd(_sd.ax, _sd.ay, nx * 70 + (Math.random() - 0.5) * 70, ny * 70 - 30, 0.3, 3, "#ffffff", "dot");
-            }
-            o.flash = 1;
-          }
-        }
-        // The shield can cross a hundred and eighty units in a frame, and no
-        // impulse lands until the next one, so speed alone can never keep a
-        // struck body in front of a hard swing. Anything the sweep touched is
-        // therefore *placed* clear of where the sweep ended, on the leading
-        // side. After this there is no arrangement of hand speeds that can
-        // leave a ball sitting behind the shield.
-        if (firstHit >= 0 && moveD > 1){
-          for (let guard = 0; guard < 16; guard++){
-            let dd = 1e9;
-            for (let k = 0; k < 3; k++){
-              const q = segSegDist(shg.pts[k].x, shg.pts[k].y, shg.pts[k + 1].x, shg.pts[k + 1].y,
-                                   w.x1, w.y1, w.x2, w.y2, _sdTmp);
-              if (q < dd) dd = q;
-            }
-            if (dd >= trueMin) break;
-            o.x += ux * (trueMin - dd + 0.6);
-            o.y += uy * (trueMin - dd + 0.6);
-            rebuildParts(o);
-          }
-        }
-      }
       // --- or it reaches the balloon
       if (playing && b.alive){
         const bd = ptSegDist(b.x, b.y, w.x1, w.y1, w.x2, w.y2) - w.r;
@@ -1703,7 +1750,7 @@ function step(dt){
   // The shield's own pass runs after the solver and shoves bodies clear of its
   // face, which can push one into its neighbour. Settle once more so the frame
   // ends with nothing overlapping anything.
-  solveContacts(playing || G.state === "clear", shg, sh.r, 2, false, sweepUX, sweepUY);
+  solveContacts(playing || G.state === "clear", shg, sh.r, 2, false);
   if (bumpSound && G.T - (G.lastBump || -1) > 0.07){ G.lastBump = G.T; Audio2.SFX.bump(); }
 
   // --- pickups: the shield sweeps these up, so going for them means
