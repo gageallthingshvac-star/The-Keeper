@@ -904,6 +904,10 @@ function shieldSeparate(o, g, shR, ux, uy){
           if (ux !== undefined && (nx * ux + ny * uy) < 0.12){ nx = ux; ny = uy; }
           o.x += nx * (minD - d);
           o.y += ny * (minD - d);
+          // anything the shield is touching is awake, full stop: being shoved
+          // around while still counted as scenery is how a body ends up with a
+          // nonsense state
+          wake(o);
           rebuildParts(o);
         }
       }
@@ -1601,11 +1605,11 @@ function step(dt){
             const tx = -ny, ty = nx;
             const relT = sh.vx * tx + sh.vy * ty;
             const speed = Math.hypot(sh.vx, sh.vy);
-            const imp = Math.max(0, rel) * 0.55 + speed * 0.12 + pen * 10 + 34;
+            const imp = Math.max(0, rel) * 0.3 + speed * 0.02 + pen * 8 + 24;
             o.vx += nx * imp * inv;
             o.vy += ny * imp * inv;
-            o.vx += tx * relT * 0.17 * inv;
-            o.vy += ty * relT * 0.17 * inv;
+            o.vx += tx * relT * 0.04 * inv;
+            o.vy += ty * relT * 0.04 * inv;
             o.spin += relT * 0.022 * inv / Math.max(12, o.rad);
             const rx = _sd.bx - o.x, ry = _sd.by - o.y;
             o.spin += (rx * ny - ry * nx) * imp * 0.0016 * inv / Math.max(12, o.rad);
@@ -1617,7 +1621,10 @@ function step(dt){
             // passing through looks like. A light ball leaves faster than the
             // hand that sent it; a heavy one still cannot be outrun.
             if (moveD > 1){
-              const want = speed * clamp(1.15 / o.mass, 0.34, 1.6);
+              // enough that it leaves with the sweep and is clearly struck —
+              // not so much that it is fired off the screen. Staying in front
+              // of the shield is the placement's job, not the speed's.
+              const want = speed * clamp(0.1 / o.mass, 0.035, 0.16);
               const along = o.vx * ux + o.vy * uy;
               if (along < want){
                 o.vx += ux * (want - along);
@@ -1625,7 +1632,7 @@ function step(dt){
               }
             }
             const sp = Math.hypot(o.vx, o.vy);
-            if (sp > 1200){ o.vx *= 1200 / sp; o.vy *= 1200 / sp; }
+            if (sp > 460){ o.vx *= 460 / sp; o.vy *= 460 / sp; }
             if (!o.blocked && playing){
               o.blocked = true;
               blockScored(o, _sd.ax, _sd.ay);
