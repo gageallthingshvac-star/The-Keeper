@@ -1332,16 +1332,19 @@ function shieldGeom(){
    frames. Rather than quietly fattening its hitbox — which would make it hit
    things it visibly misses — it is tested at its true size along the path it
    actually travelled. */
-const SHIELD_STEP_MAX = 140;         // furthest the shield travels in one frame
-const POSE_SPACING = 7;              // and the gap between swept samples
+const SHIELD_STEP_MAX = 340;         // furthest the shield travels in one frame
+const POSE_SPACING = 6;              // and the gap between swept samples
 /* The shield is kinematic. Nothing in the world writes to its position — not a
    heavy slab, not a pile of rubble, not a hit at any speed. It is exactly where
    your thumb has put it, and its own step bound sits far beyond what a thumb
    can do, so it is never seen lagging behind your hand either. */
 const POSES = [];
-for (let i = 0; i < Math.ceil(SHIELD_STEP_MAX / POSE_SPACING) + 2; i++) POSES.push(mkPose());
+for (let i = 0; i < 64; i++) POSES.push(mkPose());
 let poseN = 1;
 function buildPoses(sh, px, py, pang){
+  // Sample the path it actually swept. Move faster and the samples simply get
+  // closer together, so the shield keeps up with any hand and still hits
+  // everything it crosses.
   const dist = Math.hypot(sh.x - px, sh.y - py);
   poseN = clamp(Math.ceil(dist / POSE_SPACING) + 1, 1, POSES.length);
   for (let i = 0; i < poseN; i++){
@@ -1568,21 +1571,19 @@ function step(dt){
           const inv = 1 / o.mass;
           o.x += nx * pen;              // full separation: the shield has no give
           o.y += ny * pen;
-          // a fast sweep hits far harder than a parked shield does
+          // Whatever the shield crosses, it carries. The push down the normal
+          // does the shoving, the drag across the face adds the spin, and the
+          // shield's own speed counts either way — a hard sweep must never look
+          // like it went straight through.
           const rel = sh.vx * nx + sh.vy * ny;
-          const imp = Math.max(0, rel) * 0.5 + pen * 10 + 30;
-          o.vx += nx * imp * inv;
-          o.vy += ny * imp * inv;
-          // A push straight down the normal cannot turn a ball — every bit of
-          // spin in the world comes from the shield dragging across its face.
-          // This is also what makes a sideways swipe carry: it cuts.
-          // Friction, not a launcher: dragging across a face mostly turns it.
-          // A glancing swipe leaves an object roughly where it was, spinning —
-          // to send something anywhere you have to push into it.
           const tx = -ny, ty = nx;
           const relT = sh.vx * tx + sh.vy * ty;
-          o.vx += tx * relT * 0.06 * inv;
-          o.vy += ty * relT * 0.06 * inv;
+          const speed = Math.hypot(sh.vx, sh.vy);
+          const imp = Math.max(0, rel) * 0.55 + speed * 0.12 + pen * 10 + 34;
+          o.vx += nx * imp * inv;
+          o.vy += ny * imp * inv;
+          o.vx += tx * relT * 0.17 * inv;
+          o.vy += ty * relT * 0.17 * inv;
           o.spin += relT * 0.022 * inv / Math.max(12, o.rad);
           // and an off-centre hit on something long turns it as well
           const rx = _sd.bx - o.x, ry = _sd.by - o.y;
@@ -2027,32 +2028,6 @@ function drawObstacles(){
     // the body: solid white, hard dark edge, both inside the collider
     for (const w of o.wp) capsuleSolid(w.x1, w.y1, w.x2, w.y2, w.r, "#ffffff", ink, edgeW);
 
-    // still on course: a red band inside the same radius, and a line to where
-    // it is going
-    let onCourse = 0;
-    if (G.state === "play"){
-      const dy = G.bal.y - o.y;
-      if (dy > 0 && dy < 520){
-        const tt = timeToBalloon(o);
-        const landX = o.x + o.vx * tt;
-        if (Math.abs(landX - G.bal.x) < 44 + o.rad) onCourse = clamp(1 - dy / 520, 0.15, 1);
-      }
-    }
-    if (onCourse){
-      const warn = mix("#2f3475", "#ef5f6b", 0.35 + onCourse * 0.65);
-      for (const w of o.wp)
-        capsuleRing(w.x1, w.y1, w.x2, w.y2, w.r, warn, Math.min(edgeW * 1.6, w.r * 0.6), "#ffffff");
-      ctx.globalAlpha = 0.14 + onCourse * 0.3;
-      ctx.strokeStyle = "#ef5f6b";
-      ctx.lineWidth = 1.6;
-      ctx.setLineDash([5, 7]);
-      ctx.beginPath();
-      ctx.moveTo(o.x, o.y);
-      ctx.lineTo(G.bal.x, G.bal.y);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.globalAlpha = 1;
-    }
     // struck this instant: the edge lights up, still inside the radius
     if (o.flash > 0.01){
       const hot = mix("#ffd166", "#ff8a3d", o.flash);
@@ -2061,7 +2036,7 @@ function drawObstacles(){
     }
     // a thin dark edge goes back on last, so a warning or a flash never eats
     // the outline that tells you where the thing actually ends
-    if (onCourse || o.flash > 0.01){
+    if (o.flash > 0.01){
       ctx.globalAlpha = 0.55;
       for (const w of o.wp) capsuleOutline(w.x1, w.y1, w.x2, w.y2, w.r, ink, 1.6);
       ctx.globalAlpha = 1;
