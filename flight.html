@@ -81,7 +81,7 @@
   <div class="modal" id="menu">
     <div class="card">
       <h1>BLACK<span>BIRD</span></h1>
-      <div class="sub">Mach&nbsp;3 reconnaissance jet &mdash; software-rendered, no plugins</div>
+      <div class="sub">Mach&nbsp;3 reconnaissance jet &mdash; fly-by-wire, software-rendered, no plugins</div>
 
       <h2>Pitch sense</h2>
       <div class="row" id="pitchRow">
@@ -94,7 +94,7 @@
         <button class="opt on" data-scen="free"><b>FREE FLIGHT</b><i>Cold on runway 18 at Keeper Field. Brakes set, engines at idle. Go anywhere &mdash; the envelope reaches Mach 3.2 above 80,000 ft.</i></button>
         <button class="opt" data-scen="air"><b>AIRBORNE START</b><i>Airborne at 23,000 ft and already supersonic. Climb and accelerate.</i></button>
         <button class="opt" data-scen="rings"><b>RING RACE</b><i>12 gates strung across 120 km of sky, against the clock.</i></button>
-        <button class="opt" data-scen="hohenwald"><b>HOHENWALD, TN</b><i>Start low and slow over Lewis County, Tennessee. The Buffalo River, the Natchez Trace and the towns around it are all where they really are.</i></button>
+        <button class="opt" data-scen="hohenwald"><b>HOHENWALD, TN</b><i>Low and slow over Lewis County, Tennessee. Fifty miles of it are built out properly: the Highland Rim and its creek valleys, the Buffalo and the Duck, the Natchez Trace, every town and community, and the monument at Grinder's Stand.</i></button>
         <button class="opt" data-scen="land"><b>LANDING CHALLENGE</b><i>9 km final, gear and flaps set. Stream the chute with <kbd>X</kbd> after touchdown. Scored on centreline, sink rate and touchdown point.</i></button>
       </div>
 
@@ -478,25 +478,217 @@ const CITY_DATA =
   "Bon Aqua|-87.2900|35.9500|0.4;Duck River|-87.3200|35.7100|0.3;Only|-87.6600|35.9600|0.3;" +
   "Nunnelly|-87.4900|35.8700|0.5;Gordonsburg|-87.4700|35.6300|0.3;Napier|-87.5900|35.4400|0.2;" +
   "Iron City|-87.5800|35.0300|0.4;Collinwood|-87.7400|35.1700|1;Clifton|-87.9950|35.3870|2.6;" +
-  "Ashland City|-87.0644|36.2745|5;Fairview|-87.1289|35.9836|9;Kingston Springs|-87.1128|36.1023|2.8";
+  "Ashland City|-87.0644|36.2745|5;Fairview|-87.1289|35.9836|9;Kingston Springs|-87.1128|36.1023|2.8;" +
+  /* Lewis County and everything inside fifty miles of the Hohenwald square.
+     Positions are placed by hand from the real map of middle Tennessee, to
+     roughly a hundred metres; populations are the towns' own. */
+  "Kimmins|-87.6200|35.4500|0.1;Palestine|-87.4400|35.4900|0.1;Riverside|-87.8100|35.5700|0.1;" +
+  "Flatwoods|-87.8100|35.4400|0.2;Topsy|-87.7000|35.3100|0.1;Beardstown|-87.8500|35.5900|0.1;" +
+  "Little Lot|-87.4200|35.7000|0.1;Hampshire|-87.2789|35.6317|0.3;Williamsport|-87.2261|35.7350|0.3;" +
+  "Santa Fe|-87.1300|35.7600|0.4;Primm Springs|-87.2500|35.8100|0.1;Lyles|-87.3400|35.8900|0.3;" +
+  "Pinewood|-87.4744|35.8656|0.2;Coble|-87.6100|35.7700|0.1;Bucksnort|-87.5800|35.9200|0.1;" +
+  "Totty's Bend|-87.3800|35.8300|0.1;Shipps Bend|-87.5400|35.8000|0.1;Defeated Creek|-87.6600|35.6800|0.1;" +
+  "Waverly|-87.7942|36.0834|4.1;New Johnsonville|-87.9678|36.0203|1.9;Camden|-88.0967|36.0578|3.6;" +
+  "McEwen|-87.6300|36.1114|1.8;Burns|-87.3122|36.0511|1.5;White Bluff|-87.2233|36.1028|3.9;" +
+  "Charlotte|-87.3395|36.1784|1.5;Vanleer|-87.4392|36.2170|0.4;Tennessee City|-87.3889|36.1042|0.1;" +
+  "Perryville|-88.0400|35.6300|0.1;Sugar Tree|-88.0300|35.7700|0.1;Decaturville|-88.1100|35.5800|0.8;" +
+  "Scotts Hill|-88.2500|35.5200|0.9;Lexington TN|-88.3900|35.6500|7.9;Holladay|-88.1300|35.8800|0.1;" +
+  "Ethridge|-87.3025|35.3186|0.5;Loretto|-87.4400|35.0781|1.7;St. Joseph|-87.5050|35.0400|0.8;" +
+  "Leoma|-87.3100|35.1600|0.5;Westpoint|-87.4600|35.1900|0.1;Five Points|-87.2700|35.0400|0.1;" +
+  "Goodspring|-87.1700|35.1300|0.1;Minor Hill|-87.1600|35.0300|0.5;Henryville|-87.4100|35.3600|0.1;" +
+  "Cypress Inn|-87.8100|35.0500|0.2;Lutts|-87.8300|35.1000|0.1;Olivehill|-88.0900|35.2900|0.1;" +
+  "Crump|-88.3200|35.2200|1.4;Adamsville|-88.3900|35.2400|2.2;Culleoka|-86.9800|35.4900|0.6;" +
+  "Theta|-87.1200|35.8800|0.1;Bon Aqua Junction|-87.3200|35.9600|0.1;Grinders Switch|-87.4400|35.7700|0.1";
 
-/* Rivers and highways worth seeing from the air, as [width, lon,lat, ...]. */
+/* Rivers and highways worth seeing from the air, as [width, lon,lat, ...].
+   The middle-Tennessee entries are traced from the real courses and routes;
+   everything else is the continental skeleton. */
 const FEATURES = {
   rivers: [
-    [140, -87.90,35.62, -87.75,35.60, -87.62,35.55, -87.48,35.52, -87.36,35.49],   // Buffalo River
-    [190, -87.90,35.92, -87.70,35.86, -87.50,35.80, -87.30,35.74, -87.10,35.66],   // Duck River
-    [520, -88.15,35.05, -88.10,35.30, -88.05,35.55, -88.00,35.85, -87.95,36.15],   // Tennessee River
+    // ---- the fifty miles around Hohenwald ----
+    // Buffalo River: rises above Henryville, runs north-west past Kimmins and
+    // Flatwoods and joins the Duck a few miles above its mouth
+    [120, -87.36,35.20, -87.44,35.28, -87.52,35.36, -87.60,35.44, -87.66,35.50,
+          -87.74,35.58, -87.80,35.67, -87.85,35.78, -87.88,35.88, -87.90,35.94],
+    // Duck River: Columbia, Williamsport, Centerville, Hurricane Mills, the
+    // Tennessee at Johnsonville
+    [180, -86.90,35.58, -87.03,35.61, -87.16,35.68, -87.25,35.74, -87.35,35.77,
+          -87.47,35.79, -87.58,35.83, -87.70,35.88, -87.82,35.92, -87.92,35.98, -87.96,36.04],
+    // Swan Creek, north through Lewis County into the Duck
+    [45, -87.52,35.40, -87.50,35.50, -87.48,35.60, -87.47,35.70, -87.47,35.78],
+    // Little Swan Creek, the one the Trace follows past Meriwether Lewis
+    [30, -87.46,35.46, -87.48,35.53, -87.53,35.60, -87.58,35.66],
+    // Piney River, north into the Duck near Vernon
+    [45, -87.58,35.76, -87.55,35.86, -87.52,35.95, -87.50,36.02],
+    // Beaverdam and Cane Creek, west off the rim into the Buffalo
+    // Beaverdam and Cane Creek, off the rim into the Buffalo. Hohenwald itself
+    // sits on the divide between these and Swan Creek, which is exactly why
+    // the town is where it is, so the courses stay clear of the square.
+    [26, -87.62,35.64, -87.70,35.62, -87.78,35.61],
+    [26, -87.46,35.47, -87.55,35.46, -87.64,35.46],
+    // Forty-Eight Creek and Indian Creek, Wayne County
+    [30, -87.72,35.44, -87.76,35.36, -87.78,35.28],
+    [34, -87.90,35.10, -87.94,35.22, -87.98,35.33],
+    // Shoal Creek, Lawrenceburg south into Alabama
+    [40, -87.32,35.34, -87.34,35.22, -87.38,35.10, -87.40,34.96],
+    // Richland Creek past Pulaski
+    [34, -87.00,35.32, -87.03,35.21, -87.06,35.10],
+    // Big Bigby Creek into the Duck at Columbia
+    [30, -87.14,35.44, -87.10,35.52, -87.05,35.60],
+    // ---- the wider map ----
+    [520, -88.15,35.05, -88.24,35.23, -88.10,35.42, -88.03,35.62, -88.10,35.85,
+          -88.02,36.02, -87.96,36.12, -88.05,36.32, -88.12,36.50],                 // Tennessee R / Kentucky Lake
     [700, -90.10,34.90, -89.95,35.40, -89.70,36.00, -89.55,36.50],                 // Mississippi
-    [260, -87.05,36.28, -87.20,36.40, -87.36,36.53]                                // Cumberland
+    [260, -87.05,36.28, -87.20,36.40, -87.36,36.53],                               // Cumberland
+    [160, -86.78,36.16, -86.62,36.18, -86.45,36.30]                                // Cumberland at Nashville
   ],
   roads: [
-    [70, -87.40,35.02, -87.48,35.25, -87.55,35.55, -87.62,35.85, -87.72,36.08],    // Natchez Trace Parkway
-    [80, -87.55,35.55, -87.35,35.60, -87.03,35.62],                                // TN-48 / US-412 east
-    [80, -87.55,35.55, -87.84,35.62],                                              // US-412 west to Linden
-    [90, -87.03,35.61, -86.93,35.75, -86.87,35.93, -86.78,36.16],                  // I-65 corridor north
-    [90, -87.39,36.08, -87.13,36.10, -86.78,36.16]                                 // I-40 east to Nashville
+    // ---- the fifty miles around Hohenwald ----
+    // Natchez Trace Parkway, Leiper's Fork down to the Alabama line
+    [58, -87.06,35.86, -87.20,35.86, -87.30,35.80, -87.38,35.70, -87.44,35.60,
+         -87.47,35.52, -87.52,35.42, -87.58,35.32, -87.66,35.20, -87.74,35.10, -87.80,35.00],
+    // US-412 / TN-20: Linden - Hohenwald - Mount Pleasant - Columbia
+    [72, -87.84,35.62, -87.72,35.58, -87.62,35.56, -87.5528,35.5492,
+         -87.44,35.54, -87.33,35.54, -87.20,35.54, -87.09,35.58, -87.03,35.61],
+    // TN-48: Summertown - Hohenwald - Centerville - Dickson - Charlotte
+    [58, -87.30,35.41, -87.42,35.47, -87.5528,35.5492, -87.52,35.64, -87.48,35.72,
+         -87.47,35.78, -87.44,35.88, -87.40,35.99, -87.3878,36.077, -87.34,36.18],
+    // TN-99: Columbia - Hampshire - Centerville
+    [46, -87.03,35.61, -87.16,35.64, -87.28,35.68, -87.40,35.74, -87.47,35.78],
+    // TN-13: Collinwood - Waynesboro - Linden - Lobelville - Waverly
+    [58, -87.74,35.17, -87.77,35.32, -87.80,35.46, -87.84,35.62, -87.79,35.75, -87.79,36.08],
+    // TN-100: Nashville - Fairview - Centerville - Linden
+    [50, -86.86,36.06, -87.13,35.98, -87.28,35.88, -87.40,35.82, -87.47,35.78, -87.66,35.72, -87.84,35.62],
+    // US-64: Savannah - Waynesboro - Lawrenceburg - Pulaski
+    [62, -88.25,35.22, -88.00,35.26, -87.77,35.32, -87.55,35.28, -87.33,35.24, -87.03,35.20],
+    // US-43: Lawrenceburg - Mount Pleasant - Columbia
+    [62, -87.33,35.24, -87.29,35.34, -87.24,35.44, -87.20,35.54, -87.12,35.59, -87.03,35.61],
+    // US-70: Nashville - White Bluff - Dickson - McEwen - Waverly - Camden
+    [62, -86.90,36.13, -87.22,36.10, -87.3878,36.077, -87.63,36.11, -87.79,36.08, -88.10,36.06],
+    // US-641 / TN-69: Camden - Parsons - Decaturville
+    [50, -88.10,36.06, -88.13,35.85, -88.13,35.65, -88.11,35.58],
+    // TN-50: Centerville - Hampshire - Columbia south
+    [40, -87.47,35.78, -87.33,35.70, -87.22,35.63, -87.10,35.58],
+    // TN-240 / Summertown road, and the Lewis County spur east to the Trace
+    [34, -87.5528,35.5492, -87.47,35.52],
+    // ---- the wider map ----
+    [92, -87.3878,36.077, -87.13,36.10, -86.78,36.16, -86.45,36.30],               // I-40 east
+    [92, -87.3878,36.077, -87.65,36.09, -87.95,36.04, -88.30,35.90, -88.81,35.62], // I-40 west
+    [92, -87.03,35.61, -86.96,35.72, -86.90,35.87, -86.83,36.02, -86.78,36.16],    // I-65 north
+    [92, -87.03,35.61, -87.02,35.42, -87.03,35.20, -86.98,35.00],                  // I-65 south
+    [70, -86.78,36.16, -86.62,36.20, -86.40,36.30]                                 // I-24 north-east
   ]
 };
+
+/* ---- the fifty miles around Hohenwald, in detail ----------------------- */
+/* Hohenwald sits on the Western Highland Rim: a flat plateau a thousand feet
+   up, cut to pieces by narrow steep-sided creek valleys. That shape is what
+   the country actually looks like from the air, and it is far finer than the
+   world elevation field can carry, so it is built here instead. */
+const HOH = { lon: -87.5528, lat: 35.5492 };
+HOH.x = (HOH.lon - ORIGIN.lon) * M_PER_DEG_LON;
+HOH.z = (HOH.lat - ORIGIN.lat) * M_PER_DEG_LAT;
+const HOH_R = 80467;            // fifty miles
+function hohWeight(x, z) {
+  const dx = x - HOH.x, dz = z - HOH.z;
+  return 1 - sstep(HOH_R, HOH_R + 30000, Math.sqrt(dx * dx + dz * dz));
+}
+
+/* Where the water actually is. The creek valleys have to line up with the
+   creeks, or the rivers end up drawn running along the tops of ridges. Every
+   river course inside the region is rasterised once, at load, into a coarse
+   field of "how far is the nearest water" — which is then cheap enough to ask
+   for every terrain sample. */
+const RIV_N = 256, RIV_SPAN = 200000, RIV_CAP = 3000;
+const RIVD = new Uint8Array(RIV_N * RIV_N);
+const RIV_X0 = () => HOH.x - RIV_SPAN * .5, RIV_Z0 = () => HOH.z - RIV_SPAN * .5;
+(function buildRiverField() {
+  const cell = RIV_SPAN / RIV_N;
+  const x0 = HOH.x - RIV_SPAN * .5, z0 = HOH.z - RIV_SPAN * .5;
+  // gather the segments that touch the box, in metres
+  const segs = [];
+  for (const f of FEATURES.rivers) {
+    let px = 0, pz = 0, have = false;
+    for (let i = 1; i < f.length; i += 2) {
+      const X = (f[i] - ORIGIN.lon) * M_PER_DEG_LON, Z = (f[i + 1] - ORIGIN.lat) * M_PER_DEG_LAT;
+      if (have) {
+        const lo = Math.min(px, X), hi = Math.max(px, X);
+        const lo2 = Math.min(pz, Z), hi2 = Math.max(pz, Z);
+        if (hi > x0 - 6000 && lo < x0 + RIV_SPAN + 6000 && hi2 > z0 - 6000 && lo2 < z0 + RIV_SPAN + 6000)
+          segs.push(px, pz, X, Z);
+      }
+      px = X; pz = Z; have = true;
+    }
+  }
+  for (let j = 0; j < RIV_N; j++) {
+    const wz = z0 + (j + .5) * cell;
+    for (let i = 0; i < RIV_N; i++) {
+      const wx = x0 + (i + .5) * cell;
+      let best = RIV_CAP * RIV_CAP;
+      for (let k = 0; k < segs.length; k += 4) {
+        const ax = segs[k], az = segs[k + 1], bx = segs[k + 2], bz = segs[k + 3];
+        const dx = bx - ax, dz = bz - az;
+        const L2 = dx * dx + dz * dz || 1;
+        let t = ((wx - ax) * dx + (wz - az) * dz) / L2;
+        t = t < 0 ? 0 : t > 1 ? 1 : t;
+        const ex = wx - (ax + dx * t), ez = wz - (az + dz * t);
+        const d2 = ex * ex + ez * ez;
+        if (d2 < best) { best = d2; if (best < 400) break; }
+      }
+      RIVD[j * RIV_N + i] = Math.min(255, Math.round(Math.sqrt(best) / RIV_CAP * 255));
+    }
+  }
+})();
+/* metres to the nearest river, bilinear, capped */
+function riverDist(x, z) {
+  const cell = RIV_SPAN / RIV_N;
+  const fx = (x - (HOH.x - RIV_SPAN * .5)) / cell - .5, fz = (z - (HOH.z - RIV_SPAN * .5)) / cell - .5;
+  if (fx < 0 || fz < 0 || fx > RIV_N - 1 || fz > RIV_N - 1) return RIV_CAP;
+  const i0 = fx | 0, j0 = fz | 0, i1 = Math.min(i0 + 1, RIV_N - 1), j1 = Math.min(j0 + 1, RIV_N - 1);
+  const tx = fx - i0, tz = fz - j0;
+  const a = RIVD[j0 * RIV_N + i0], b = RIVD[j0 * RIV_N + i1];
+  const cc = RIVD[j1 * RIV_N + i0], d = RIVD[j1 * RIV_N + i1];
+  return (lerp(lerp(a, b, tx), lerp(cc, d, tx), tz)) / 255 * RIV_CAP;
+}
+
+/* Lakes, as centre / radii / surface height. Small enough that a disc is a
+   fair likeness from anything above a thousand feet. */
+const LAKES = [
+  { name: "Laurel Hill Lake", lon: -87.4520, lat: 35.2680, rx: 700, rz: 1500, h: 244, rot: .5 },
+  { name: "Meriwether Lewis", lon: -87.4560, lat: 35.5180, rx: 180, rz: 260, h: 250, rot: 0 },
+  { name: "Lake Ellen", lon: -87.4900, lat: 35.5900, rx: 140, rz: 200, h: 235, rot: 0 },
+  { name: "Kentucky Lake", lon: -88.0700, lat: 35.9200, rx: 2600, rz: 20000, h: 109, rot: .08 },
+  { name: "Pickwick Lake", lon: -88.2200, lat: 35.1200, rx: 2000, rz: 9000, h: 126, rot: -.2 },
+  { name: "Woods Reservoir", lon: -86.0900, lat: 35.3600, rx: 2200, rz: 3000, h: 288, rot: 0 }
+];
+for (const L of LAKES) {
+  L.x = (L.lon - ORIGIN.lon) * M_PER_DEG_LON;
+  L.z = (L.lat - ORIGIN.lat) * M_PER_DEG_LAT;
+}
+
+/* Places worth a name on the glass: the ones you would actually pick out
+   flying over Lewis County and the counties around it. */
+const LANDMARKS = [
+  ["Meriwether Lewis Monument", -87.4587, 35.5206],
+  ["The Elephant Sanctuary", -87.5060, 35.5810],
+  ["Lewis County Courthouse", -87.5528, 35.5492],
+  ["Hohenwald Airfield", -87.5980, 35.5410],
+  ["Natchez Trace MP 385", -87.4700, 35.5230],
+  ["Buffalo River Canoe Run", -87.7400, 35.5700],
+  ["David Crockett State Park", -87.3550, 35.2440],
+  ["Mousetail Landing", -87.9200, 35.6700],
+  ["Johnsonville Historic Park", -87.9500, 36.0500],
+  ["Amish Country, Ethridge", -87.3025, 35.3186],
+  ["Laurel Hill WMA", -87.4600, 35.2700],
+  ["Double Arch Bridge", -87.0600, 35.8600],
+  ["Duck River Bottoms", -87.4700, 35.7900],
+  ["Tennessee Valley Divide", -87.2000, 35.9000],
+  ["Maury County Regional", -87.1800, 35.5540],
+  ["Lawrenceburg Airport", -87.2600, 35.2340]
+];
+for (const L of LANDMARKS) {
+  L.push((L[1] - ORIGIN.lon) * M_PER_DEG_LON, (L[2] - ORIGIN.lat) * M_PER_DEG_LAT);
+}
 
 const CITIES = [];
 (function parseCities() {
@@ -508,8 +700,10 @@ const CITIES = [];
     CITIES.push({
       name: f[0], lon, lat, pop,
       x: (lon - ORIGIN.lon) * M_PER_DEG_LON, z: (lat - ORIGIN.lat) * M_PER_DEG_LAT,
-      // built-up radius: a rough but serviceable fit to real urban extent
-      r: Math.max(700, 1350 * Math.pow(pop, .42))
+      // Built-up radius. Urban area scales close to pop^0.85, so radius goes as
+      // pop^0.42; the constant is fitted to real extents at both ends — about
+      // 1.1 km for a town of 3,700 and 50 km across a metropolis of 37 million.
+      r: Math.max(500, 635 * Math.pow(pop, .42))
     });
   }
   CITIES.sort((a, b) => b.pop - a.pop);
@@ -551,7 +745,7 @@ const WORLD = {
   fieldElev: 705,               // Edwards sits at 2,300 ft in the Mojave
   fieldR: 2400,                 // radius of flattened airport basin
   rwyLen: 1900, rwyW: 46,       // runway 18/36, aligned with the Z (north) axis
-  sun: vnorm(v3(-.40, .55, .73)),
+  sun: vnorm(v3(-.38, .70, .60)),
   ground: [82, 104, 60],
 };
 
@@ -562,13 +756,13 @@ const WORLD = {
    flat fog: the haze warms up toward the sun and stays blue away from it. */
 const LIGHT = {
   sun: null,
-  sunCol: [1.08, 1.00, .86],
+  sunCol: [1.14, 1.06, .90],
   skyCol: [.34, .42, .56],
   gndCol: [.24, .23, .17],
   hazeNear: [178, 199, 222],    // horizon haze away from the sun
   hazeSun: [248, 234, 204],     // haze looking into the sun
   hazeHigh: [120, 150, 190],    // what distance does to things above the horizon
-  density: 1 / 15000, dens: 1 / 15000,
+  density: 1 / 27000, dens: 1 / 27000,
   zenith: [34, 82, 156], mid: [108, 160, 212]
 };
 /* Haze lives in the lower atmosphere, so the view opens right up as you climb;
@@ -580,7 +774,7 @@ function horizonDip(h) { return h <= 0 ? 0 : Math.acos(EARTH_R / (EARTH_R + h));
 
 function updateAtmosphere(camY) {
   const k = Math.exp(-Math.max(camY, 0) / 2300);
-  LIGHT.dens = LIGHT.density * (.06 + .94 * k);
+  LIGHT.dens = LIGHT.density * (.030 + .970 * k);
   LIGHT.space = clamp((camY - 12000) / 16000, 0, 1);
 }
 LIGHT.space = 0;
@@ -618,18 +812,94 @@ function terrainH(x, z, cell) {
   const basin = 1 - sstep(WORLD.fieldR, WORLD.fieldR * 2.8, d);
   // the real planet, sampled where this aeroplane actually is
   let h = worldElev(worldToLon(x), worldToLat(z));
-  // Two scales of invented relief on top. The embedded field is ~40 km per
-  // sample, which is right for a continent and far too smooth for a valley.
-  const medium = cell ? clamp(1 - (cell - 1800) / 5000, 0, 1) : 1;
-  if (medium > 0 && h > -600) {
-    const ridge = 1 - Math.abs(fbm(x / 26000, z / 26000, 4) * 2 - 1);
-    h += (fbm(x / 34000, z / 34000, 4) - .45) * 900 * medium
-       + ridge * ridge * 520 * medium * clamp(h / 900, 0, 1.6);
+
+  /* The embedded field is about 40 km per sample: right for the shape of a
+     continent, far too smooth for anything you fly through. Four bands of
+     invented relief sit on top of it, each faded out once the sampling grid
+     gets coarser than the features in it — otherwise they alias into a
+     checkerboard. High ground is rough ground, so amplitude follows the real
+     elevation; lowlands keep a gentle roll. */
+  const rug = .16 + .84 * clamp((h - 150) / 2400, 0, 1);
+  const c = cell || 0;
+
+  const bA = clamp(1 - (c - 15000) / 11000, 0, 1);          // 31 km, continental
+  // Mountains need far more of this than plains do, or a real range a hundred
+  // kilometres off flattens into a plate the moment the fine bands drop out.
+  const mtn = Math.pow(clamp((h - 400) / 2200, 0, 1), 1.15);
+  if (bA > 0 && h > -600) h += (fbm(x / 31000, z / 31000, 3) - .45) * (620 + 1560 * mtn) * bA;
+
+  // 24 km ridges, so a range a hundred kilometres off still reads as a range
+  // rather than flattening into a plate at the LOD boundary
+  const bA2 = clamp(1 - (c - 9000) / 7000, 0, 1);
+  if (bA2 > 0 && h > -400) {
+    const r0 = 1 - Math.abs(fbm(x / 23000, z / 23000, 3) * 2 - 1);
+    h += (r0 * r0 - .26) * 1250 * rug * bA2;
   }
-  const det = cell ? clamp(1 - (cell - 110) / 260, 0, 1) : 1;
-  if (det > 0 && h > -400) h += (fbm(x / 340, z / 340, 3) - .5) * 70 * (1 - basin * .8) * det;
+  const bB = clamp(1 - (c - 3400) / 2600, 0, 1);            // 5.4 km, the ranges themselves
+  if (bB > 0 && h > -400) {
+    const r1 = 1 - Math.abs(fbm(x / 5400, z / 5400, 3) * 2 - 1);
+    h += (r1 * r1 - .22) * 1650 * rug * bB;
+  }
+  const bC = clamp(1 - (c - 600) / 520, 0, 1);              // 1.45 km, ridges and valleys
+  if (bC > 0 && h > -300) h += (fbm(x / 1450, z / 1450, 3) - .5) * 460 * rug * bC;
+
+  const bD = clamp(1 - (c - 140) / 130, 0, 1);              // 340 m, local ground texture
+  if (bD > 0 && h > -200) h += (fbm(x / 340, z / 340, 2) - .5) * 90 * (.4 + rug) * bD;
+
+  /* The Western Highland Rim, where Hohenwald is. The world elevation field
+     is one sample every forty kilometres, blurred: over middle Tennessee it
+     comes out roughly twice the true height and perfectly smooth, which is
+     neither the right altitude nor the right shape. Inside the fifty miles
+     the field is replaced outright by a local model built from the real thing:
+     a plateau at about a thousand feet, falling away west to the Tennessee
+     River bottoms and east into the Central Basin, cut to pieces by creek
+     valleys that drop three or four hundred feet in half a mile. That is why
+     Lewis County reads as green corduroy from the air and nothing like
+     rolling farmland. */
+  const hw = hohWeight(x, z);
+  if (hw > 0) {
+    const lon = worldToLon(x), lat = worldToLat(z);
+    // the plateau surface, anchored on real elevations around the region
+    let hl = 300
+      - 230 * sstep(-87.75, -88.05, lon)      // west, down to the Tennessee
+      - 118 * sstep(-87.25, -86.95, lon)      // east, into the Central Basin
+      - 74 * sstep(35.85, 36.26, lat)         // north, toward the Cumberland
+      + 18 * sstep(35.45, 35.12, lat);        // south, the Lawrence County rim
+    const plat0 = hl;
+    /* The valleys are carved down out of the plateau rather than piled on top
+       of it, so the ridge tops stay level the way they really do. `fbm` runs
+       about .05 to .46 rather than 0 to 1, so it is doubled first and then
+       thresholded: only the low third of it becomes valley, which is roughly
+       the share of the rim the creeks have actually eaten away. */
+    let cut = 0;
+    const bR1 = clamp(1 - (c - 1100) / 850, 0, 1);          // 2.6 km, the main creeks
+    if (bR1 > 0) cut += sstep(.53, .33, fbm(x / 2600, z / 2600, 3) * 2) * 168 * bR1;
+    const bR2 = clamp(1 - (c - 260) / 220, 0, 1);           // 700 m, the hollows off them
+    if (bR2 > 0) cut += sstep(.47, .31, fbm(x / 700 + 17, z / 700 - 9, 2) * 2) * 62 * bR2;
+    // The towns up here are all on the rim — Hohenwald, Summertown, Waynesboro
+    // and Lawrenceburg are every one of them on a ridge top, because that is
+    // where the flat ground is. Keep the valleys out from under them.
+    hl -= cut * (1 - clamp(cityAt(x, z) * 2.4, 0, 1) * .88);
+    /* and the real creeks get real valleys, cut where the water actually
+       runs: a floor at the water line that climbs back to the rim over
+       something under two kilometres, which is what these hollows do */
+    const rd = riverDist(x, z);
+    // how deep the valley is depends on how far the rim stands above the
+    // water: three hundred feet on the Highland Rim, a gentle trough where
+    // the Duck runs through the Central Basin
+    if (rd < 2600) {
+      const depth = clamp((plat0 - 150) * .70, 22, 150);
+      hl = Math.min(hl, plat0 - depth + rd * depth * .00036);
+    }
+    const bR3 = clamp(1 - (c - 90) / 80, 0, 1);             // 220 m, field and woodlot roll
+    if (bR3 > 0) hl += (fbm(x / 220 - 31, z / 220 + 5, 2) - .25) * 34 * bR3;
+    hl = Math.max(hl, 98);                                   // river pool level
+    h = lerp(h, hl, hw);
+  }
+
   return lerp(h, WORLD.fieldElev, basin);
 }
+
 /* Cheap normal by finite difference. */
 function terrainN(x, z, e) {
   e = e || 6;
@@ -654,22 +924,35 @@ function groundH(x, z) {
    the equator down to sea level at the poles, and the belts between them are
    the ones you actually fly over — rainforest, the desert latitudes, temperate
    green, boreal forest, tundra, ice. */
-function terrainColor(h, slope, x, z) {
+/* cityAt, memoised on the last query: terrainColor asks for it twice per
+   sample and the grid walk is not free. */
+let _uX = 1e9, _uZ = 1e9, _uV = 0;
+function urbanShare(x, z) {
+  if (x !== _uX || z !== _uZ) { _uX = x; _uZ = z; _uV = cityAt(x, z); }
+  return _uV;
+}
+function terrainColor(h, slope, x, z, cell) {
   const lat = Math.abs(worldToLat(z));
   const rock = sstep(.30, .60, slope);
-  const snowLine = 4900 - lat * 54;
-  const treeLine = snowLine - 1150;
+  const arid0 = worldArid(worldToLon(x), worldToLat(z));
+  /* The snow line is not linear in latitude: it peaks around the subtropics,
+     where the air is dry, then falls away steeply toward the poles. Roughly
+     5,200 m at 25 degrees, 4,100 at 40, 1,600 at 60, a few hundred at 70.
+     Dry mountains carry it higher still. */
+  const snowLine = 200 + 5000 * (1 - sstep(22, 82, lat)) * (.86 + .14 * sstep(0, 25, lat))
+    + arid0 * 650;
+  const treeLine = snowLine - 1250;
   const snow = sstep(snowLine - 250, snowLine + 350, h) * (1 - rock * .40);
   // latitude belts, blended
   const tropic = 1 - sstep(8, 20, lat);
-  const desert = clamp(worldArid(worldToLon(x), worldToLat(z)) * 1.25, 0, 1) * (1 - sstep(56, 66, lat));
+  const desert = clamp(arid0 * 1.25, 0, 1) * (1 - sstep(56, 66, lat));
   const boreal = sstep(44, 54, lat) * (1 - sstep(62, 70, lat));
   const tundra = sstep(60, 70, lat);
   const polar = sstep(68, 76, lat);
-  let c = [86, 116, 62];                                  // temperate default
-  c = mixc(c, [42, 96, 48], tropic * .9);                 // rainforest
-  c = mixc(c, [178, 152, 104], desert * .92);             // sand and scrub
-  c = mixc(c, [54, 78, 54], boreal * .85);                // conifer
+  let c = [96, 128, 66];                                  // temperate default
+  c = mixc(c, [48, 106, 52], tropic * .9);                // rainforest
+  c = mixc(c, [186, 160, 110], desert * .92);             // sand and scrub
+  c = mixc(c, [60, 86, 58], boreal * .85);                // conifer
   c = mixc(c, [122, 116, 96], tundra * .8);               // tundra
   c = mixc(c, [226, 230, 236], polar * .9);               // ice
   // drying and thinning with height, then bare rock above the tree line
@@ -679,15 +962,43 @@ function terrainColor(h, slope, x, z) {
   c = mixc(c, [240, 245, 250], snow);
   // a narrow beach where the land meets the water
   c = mixc(c, [186, 174, 140], sstep(45, 2, h) * (1 - rock) * .7);
+  /* Everything below here is texture rather than shape, and each piece of it
+     has a wavelength. Sampled once per quad by a grid coarser than that
+     wavelength it stops being texture and becomes a checkerboard, so each
+     fades out as the cells outgrow it — the same rule the relief bands use. */
+  const cl = cell || 0;
+  const fade = (w) => clamp(1 - (cl - w * .55) / (w * .85), 0, 1);
   // built-up ground: grey, flatter in colour, with a street-grid texture
-  const urb = cityAt(x, z);
+  const urb = urbanShare(x, z);
   if (urb > .01) {
-    const grid = (Math.sin(x * .0062) * Math.sin(z * .0062)) * .5 + .5;
+    const gf = fade(1010);
+    const grid = gf > 0 ? ((Math.sin(x * .0062) * Math.sin(z * .0062)) * .5 + .5) * gf + .5 * (1 - gf) : .5;
     c = mixc(c, mixc([104, 102, 100], [138, 136, 132], grid), clamp(urb * .85, 0, .85));
   }
+  /* Middle Tennessee is two thirds timber, and it is not distributed at
+     random: the flat ridge tops are cleared for pasture and the valley sides
+     are hardwood, which is what gives the Highland Rim its corduroy look from
+     the air. */
+  const hw = hohWeight(x, z);
+  if (hw > .01) {
+    /* Where the timber is is not random: it is the valley sides, which is
+       why this reads off the same field the hollows are carved from. Doing it
+       that way also keeps the pattern alive out to four-kilometre cells,
+       where a woodlot-sized texture would long since have had to fade out.
+       `fbm` runs about .05 to .46, so it is doubled before thresholding. */
+    const fV = fade(2600), fW = fade(560);
+    let wood = .44;
+    if (fV > 0) wood = lerp(wood, sstep(.58, .33, fbm(x / 2600, z / 2600, 3) * 2), fV);
+    if (fW > 0) wood = clamp(wood + (sstep(.40, .60, fbm(x / 560, z / 560, 2) * 2) - .5) * .72 * fW, 0, 1);
+    wood = clamp(wood + sstep(.006, .034, slope) * .45, 0, 1);
+    const clear = 1 - urbanShare(x, z);
+    c = mixc(c, mixc([132, 150, 82], [40, 64, 36], wood), .68 * hw * clear);
+  }
   // field-sized patchwork, plus a gentle regional tint
-  const v = (fbm(x / 190, z / 190, 2) - .5) * (urb > .3 ? .08 : .22)
-    + (fbm(x / 26000, z / 26000, 2) - .5) * .26;
+  const fF = fade(190), fR = fade(26000);
+  let v = 0;
+  if (fF > 0) v += (fbm(x / 190, z / 190, 2) - .5) * (urb > .3 ? .08 : .22) * fF;
+  if (fR > 0) v += (fbm(x / 26000, z / 26000, 2) - .5) * .26 * fR;
   return shade(c, 1 + v);
 }
 
@@ -705,10 +1016,10 @@ const MOBILE = COARSE || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent ||
 /* More LOD rings than a propeller aeroplane needs: at Mach 3 you cross the
    old draw distance in eight seconds, and from 24 km you can see most of it. */
 const QLEVELS = [
-  { dpr: 1.00, lev: 7, half: 6, base: 78, trees: .22, treeR: 750, clouds: 9000, glare: 0, vig: 0, shadow: 1, stars: 0, terrShadow: 0, cloudShadow: 0, buildings: 220 },
-  { dpr: 1.25, lev: 8, half: 6, base: 62, trees: .30, treeR: 950, clouds: 14000, glare: 1, vig: 1, shadow: 1, stars: 1, terrShadow: 1, cloudShadow: 0, buildings: 420 },
-  { dpr: 1.50, lev: 8, half: 7, base: 52, trees: .38, treeR: 1150, clouds: 20000, glare: 1, vig: 1, shadow: 1, stars: 1, terrShadow: 1, cloudShadow: 1, buildings: 700 },
-  { dpr: 2.00, lev: 9, half: 7, base: 44, trees: .44, treeR: 1350, clouds: 26000, glare: 1, vig: 1, shadow: 1, stars: 1, terrShadow: 1, cloudShadow: 1, buildings: 820 }
+  { dpr: 1.00, lev: 11, half: 6, base: 78, trees: .22, treeR: 1300, clouds: 26000, glare: 0, vig: 0, shadow: 1, stars: 0, terrShadow: 0, cloudShadow: 0, buildings: 320 },
+  { dpr: 1.25, lev: 12, half: 6, base: 62, trees: .30, treeR: 1900, clouds: 44000, glare: 1, vig: 1, shadow: 1, stars: 1, terrShadow: 1, cloudShadow: 0, buildings: 620 },
+  { dpr: 1.50, lev: 13, half: 8, base: 52, trees: .38, treeR: 2600, clouds: 64000, glare: 1, vig: 1, shadow: 1, stars: 1, terrShadow: 1, cloudShadow: 1, buildings: 1000 },
+  { dpr: 2.00, lev: 14, half: 9, base: 44, trees: .44, treeR: 3200, clouds: 86000, glare: 1, vig: 1, shadow: 1, stars: 1, terrShadow: 1, cloudShadow: 1, buildings: 1400 }
 ];
 const Q = { i: MOBILE ? 1 : 3, auto: true, work: 9, hold: 0, q: QLEVELS[MOBILE ? 1 : 3] };
 
@@ -763,8 +1074,8 @@ function makeVignette() {
   if (!W || !H) return;
   const g = ctx.createRadialGradient(CX, CY * 1.02, Math.min(W, H) * .36, CX, CY, Math.hypot(W, H) * .64);
   g.addColorStop(0, "rgba(0,0,0,0)");
-  g.addColorStop(.62, "rgba(6,10,16,.07)");
-  g.addColorStop(1, "rgba(4,8,14,.34)");
+  g.addColorStop(.62, "rgba(6,10,16,.05)");
+  g.addColorStop(1, "rgba(4,8,14,.26)");
   vignette = g;
 }
 
@@ -901,8 +1212,15 @@ function offscreen(m) {
   }
   return l === m || r === m || t === m || b === m;
 }
+/* The planet curves away underneath you. Over a few kilometres that is a
+   rounding error, but the view now runs to several hundred, and on a flat
+   model ground that far off would stand well above the true horizon instead
+   of sinking below it. One term does the whole job: a point d metres away
+   sits d^2/2R lower than a flat earth would put it. */
+const curveDrop = (dx, dz) => (dx * dx + dz * dz) / (2 * EARTH_R);
 const toView = p => {
-  const dx = p.x - cam.pos.x, dy = p.y - cam.pos.y, dz = p.z - cam.pos.z, m = cam.m;
+  const dx = p.x - cam.pos.x, dy = p.y - cam.pos.y - curveDrop(p.x - cam.pos.x, p.z - cam.pos.z),
+    dz = p.z - cam.pos.z, m = cam.m;
   return v3(m[0] * dx + m[1] * dy + m[2] * dz, m[3] * dx + m[4] * dy + m[5] * dz, m[6] * dx + m[7] * dy + m[8] * dz);
 };
 function projectPoint(p) {
@@ -1088,10 +1406,10 @@ function emitTri(vp, ia, ib, ic, ax, ay, az, bx, by, bz, cx2, cy2, cz2,
   t[0] = vp[ia * 3]; t[1] = vp[ia * 3 + 1]; t[2] = vp[ia * 3 + 2];
   t[3] = vp[ib * 3]; t[4] = vp[ib * 3 + 1]; t[5] = vp[ib * 3 + 2];
   t[6] = vp[ic * 3]; t[7] = vp[ic * 3 + 1]; t[8] = vp[ic * 3 + 2];
-  const save = [vp[0], vp[1], vp[2], vp[3], vp[4], vp[5], vp[6], vp[7], vp[8], vp[9], vp[10], vp[11]];
+  for (let i = 0; i < 12; i++) _triSave[i] = vp[i];
   for (let i = 0; i < 9; i++) vp[i] = t[i];
   const m = clipProject(3);
-  for (let i = 0; i < 12; i++) vp[i] = save[i];
+  for (let i = 0; i < 12; i++) vp[i] = _triSave[i];
   if (m < 3 || offscreen(m)) return;
   // world-space normal of this triangle
   let nx = (by - ay) * (cz2 - az) - (bz - az) * (cy2 - ay);
@@ -1100,19 +1418,23 @@ function emitTri(vp, ia, ib, ic, ax, ay, az, bx, by, bz, cx2, cy2, cz2,
   const nl = Math.hypot(nx, ny, nz) || 1;
   nx /= nl; ny /= nl; nz /= nl;
   if (ny < 0) { nx = -nx; ny = -ny; nz = -nz; }
-  let col = litColor(terrainColor(hAvg, 1 - ny, mcx, mcz), nx, ny, nz);
+  let col = litColor(terrainColor(hAvg, 1 - ny, mcx, mcz, cell), nx, ny, nz);
   if (sh > .01) col = shadowed(col, sh);
   const fill = aerial(col, Math.max(dist, dmin), ex, ey, ez);
   if (inflate > 0) grow(m, inflate);
   DL.poly(dist + bias, _sp, m, fill, null, 0);
 }
-const _tri = new Float32Array(9);
+const _tri = new Float32Array(9), _triSave = new Float32Array(12);
 
 function drawTerrain() {
   const LEV = Q.q.lev, half = Q.q.half, span = half * 2 + 1;
   // Widen every ring as you climb: from 80,000 ft the useful view is thousands
   // of kilometres across, and 50 m cells there would be wasted on nothing.
-  const base = clamp(Q.q.base * (1 + cam.pos.y / 1700), Q.q.base, 26000);
+  const base = clamp(Q.q.base * (1 + cam.pos.y / 5200), Q.q.base, 46000);
+  /* Nothing past the geometric horizon is worth a triangle. This is what
+     makes a fourteen-ring ladder affordable: on the deck it throws almost all
+     of it away, and only at eighty thousand feet does the whole thing draw. */
+  const horiz = Math.sqrt(2 * EARTH_R * Math.max(cam.pos.y - WORLD.sea, 30)) + 190000;
   const sunv = LIGHT.sun;
   const cm = cam.m;
   const inflate = SEAM_PX * DPR;
@@ -1138,7 +1460,7 @@ function drawTerrain() {
         const mcx = x0 + cell * .5, mcz = z0 + cell * .5;
         const dx = mcx - cam.pos.x, dz = mcz - cam.pos.z;
         const dist = Math.hypot(dx, dz);
-        if (dist > cell * 11 + 400) continue;
+        if (dist > cell * 11 + 400 || dist > horiz) continue;
         const push = inField(mcx, mcz) ? FIELD_PUSH : 0;
         // how flooded this patch is, from its mean height rather than a corner
         // count, which would alternate between neighbours and read as a checkerboard
@@ -1155,7 +1477,8 @@ function drawTerrain() {
         // world -> view in place
         let anyFront = false, dmin = 1e9;
         for (let k = 0; k < 4; k++) {
-          const px = _vp[k * 3] - cam.pos.x, py = _vp[k * 3 + 1] - cam.pos.y, pz = _vp[k * 3 + 2] - cam.pos.z;
+          const px = _vp[k * 3] - cam.pos.x, pz = _vp[k * 3 + 2] - cam.pos.z;
+          const py = _vp[k * 3 + 1] - cam.pos.y - curveDrop(px, pz);
           const vx = cm[0] * px + cm[1] * py + cm[2] * pz;
           const vy = cm[3] * px + cm[4] * py + cm[5] * pz;
           const vz = cm[6] * px + cm[7] * py + cm[8] * pz;
@@ -1174,7 +1497,7 @@ function drawTerrain() {
         const ex = dx / d3, ey = dy / d3, ez = dz / d3;
         // Split near ground into two triangles with their own normals. A single
         // flat quad per cell is what makes terrain read as folded paper.
-        const tri = !water && L <= 2 && slope > .012;
+        const tri = !water && L <= 3 && slope > .010;
         let shade0 = 0;
         if (shadows && !water && slope > .03 && dist < cell * 26)
           shade0 = sunShadow(mcx, mcz, hAvg, cell);
@@ -1202,9 +1525,9 @@ function drawTerrain() {
           const chop = .5 + .5 * Math.sin(mcx * .06 + mcz * .045 + WIND.t * 1.7);
           col = mixc(col, [255, 250, 228], clamp(g * (.55 + .45 * chop), 0, .9));
           // the shoreline fades from wet sand into open water
-          if (wetF < 1) col = mixc(litColor(terrainColor(1.5, slope, mcx, mcz), nx, ny, nz), col, wetF);
+          if (wetF < 1) col = mixc(litColor(terrainColor(1.5, slope, mcx, mcz, cell), nx, ny, nz), col, wetF);
         } else {
-          col = litColor(terrainColor(hAvg, slope, mcx, mcz), nx, ny, nz);
+          col = litColor(terrainColor(hAvg, slope, mcx, mcz, cell), nx, ny, nz);
           if (shade0 > .01) col = shadowed(col, shade0);
         }
         const fill = aerial(col, Math.max(dist, dmin), ex, ey, ez);
@@ -1716,7 +2039,7 @@ function drawTrees() {
       const dx = x - cam.pos.x, dz = z - cam.pos.z;
       if (dx * dx + dz * dz > rad * rad) continue;
       const gy = terrainH(x, z);
-      if (gy < 2 || gy > 820) continue;
+      if (gy < 2 || gy > 2600) continue;
       if (Math.abs(x) < 320 && Math.abs(z) < WORLD.rwyLen * .6) continue;   // keep the field clear
       const hgt = 5.5 + (h1 / dens) * (h1 / dens) * 15;
       const base = projectPoint(v3(x, gy, z));
@@ -1758,7 +2081,7 @@ function drawTrees() {
    30 km, and actual blocks of buildings in the last few kilometres. */
 function drawRoadsRivers() {
   const camX = cam.pos.x, camZ = cam.pos.z;
-  const reach = clamp(cam.pos.y * 9 + 60000, 60000, 900000);
+  const reach = clamp(cam.pos.y * 16 + 150000, 150000, 2600000);
   const draw = (set, colFn, widthK) => {
     for (const f of set) {
       const wid = f[0] * widthK;
@@ -1791,7 +2114,8 @@ function drawRoadsRivers() {
       _vp[9] = ax - nx; _vp[10] = gy; _vp[11] = az - nz;
       let front = false;
       for (let k = 0; k < 4; k++) {
-        const px = _vp[k * 3] - cam.pos.x, py = _vp[k * 3 + 1] - cam.pos.y, pz = _vp[k * 3 + 2] - cam.pos.z;
+        const px = _vp[k * 3] - cam.pos.x, pz = _vp[k * 3 + 2] - cam.pos.z;
+        const py = _vp[k * 3 + 1] - cam.pos.y - curveDrop(px, pz);
         const m = cam.m;
         const vx = m[0] * px + m[1] * py + m[2] * pz, vy = m[3] * px + m[4] * py + m[5] * pz,
           vz = m[6] * px + m[7] * py + m[8] * pz;
@@ -1809,6 +2133,85 @@ function drawRoadsRivers() {
   draw(FEATURES.roads, () => litColor([98, 95, 92], 0, 1, 0), .30);
 }
 
+/* Lakes: flat water sitting in the ground, shaded the same way the sea is so
+   a reservoir at two hundred metres reads as water and not as a grey disc. */
+const LAKE_N = 22;
+function drawLakes() {
+  const cp = cam.pos, m = cam.m;
+  const reach = clamp(cp.y * 10 + 70000, 70000, 600000);
+  for (const L of LAKES) {
+    const dx = L.x - cp.x, dz = L.z - cp.z;
+    const d = Math.hypot(dx, dz);
+    if (d > reach) continue;
+    const big = Math.max(L.rx, L.rz);
+    if (d > big * 90 + 30000) continue;
+    const ca = Math.cos(L.rot), sa = Math.sin(L.rot);
+    const pts = [];
+    let front = false;
+    for (let i = 0; i < LAKE_N; i++) {
+      const t = i / LAKE_N * TAU;
+      // a lake is not an ellipse; wobble the rim so it reads as a shoreline
+      const wob = .80 + .34 * (hash2((L.x | 0) + i * 13, (L.z | 0) + i * 7));
+      const ux = Math.cos(t) * L.rx * wob, uz = Math.sin(t) * L.rz * wob;
+      const wx = L.x + ux * ca - uz * sa, wz = L.z + ux * sa + uz * ca;
+      const px = wx - cp.x, pz = wz - cp.z, py = L.h - cp.y - curveDrop(px, pz);
+      const vz = m[6] * px + m[7] * py + m[8] * pz;
+      pts.push(m[0] * px + m[1] * py + m[2] * pz, m[3] * px + m[4] * py + m[5] * pz, vz);
+      if (vz >= NEAR) front = true;
+    }
+    if (!front) continue;
+    for (let i = 0; i < pts.length; i++) _vp[i] = pts[i];
+    const mm = clipProject(LAKE_N);
+    if (mm < 3 || offscreen(mm)) continue;
+    const dy = L.h - cp.y, d3 = Math.hypot(dx, dy, dz) || 1;
+    const ey = dy / d3;
+    // the same Fresnel the sea uses: dark from above, sky-bright at a graze
+    const fres = .03 + .97 * Math.pow(1 - clamp(-ey, 0, 1), 5);
+    const col = mixc([26, 56, 78], mixc(LIGHT.mid, LIGHT.hazeNear, .45), clamp(fres, 0, .90));
+    DL.poly(d - 200, _sp, mm, aerial(col, d, dx / d3, ey, dz / d3), null, 0);
+  }
+}
+
+/* Named ground features — the monument, the sanctuary, the state parks, the
+   airfields. They carry a long way, because from height they are what tells
+   you where you are. */
+function drawLandmarks() {
+  const cp = cam.pos;
+  const reach = clamp(cp.y * 5 + 40000, 40000, 260000);
+  const u = UI;
+  const found = [];
+  for (const L of LANDMARKS) {
+    const dx = L[3] - cp.x, dz = L[4] - cp.z;
+    const d = Math.hypot(dx, dz);
+    if (d > reach) continue;
+    found.push([L, d]);
+  }
+  if (!found.length) return;
+  found.sort((a, b) => b[1] - a[1]);
+  ctx.save(); ctx.textAlign = "left"; ctx.textBaseline = "middle";
+  let shown = 0;
+  for (const [L, d] of found) {
+    if (shown > 12) break;
+    const sp = projectPoint(v3(L[3], terrainH(L[3], L[4]) + 25, L[4]));
+    if (!sp || sp.x < -40 || sp.x > W + 40 || sp.y < 0 || sp.y > H) continue;
+    const a = clamp(1 - d / reach, .16, .8);
+    hudFont(9.5 * u, 600);
+    const tw = ctx.measureText(L[0]).width;
+    ctx.strokeStyle = "rgba(255,206,120," + (a * .75).toFixed(2) + ")";
+    ctx.lineWidth = 1.2 * u;
+    ctx.beginPath();
+    ctx.arc(sp.x, sp.y, 3.4 * u, 0, TAU); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(sp.x + 3.4 * u, sp.y); ctx.lineTo(sp.x + 9 * u, sp.y - 6 * u); ctx.stroke();
+    ctx.fillStyle = "rgba(6,12,18," + (a * .5).toFixed(2) + ")";
+    ctx.fillRect(sp.x + 9 * u, sp.y - 13 * u, tw + 6 * u, 14 * u);
+    ctx.fillStyle = "rgba(255,216,150," + a.toFixed(2) + ")";
+    ctx.fillText(L[0], sp.x + 12 * u, sp.y - 6 * u);
+    shown++;
+  }
+  ctx.restore();
+}
+
 /* Blocks of buildings, grown deterministically from the city's own position so
    the same town looks the same every time you fly over it. */
 function drawCities() {
@@ -1819,10 +2222,10 @@ function drawCities() {
     const dx = c.x - camX, dz = c.z - camZ;
     const d = Math.hypot(dx, dz);
     // labels carry much further than geometry
-    if (d < 40000 + c.pop * 260 && d < 900000) labels.push({ c, d });
+    if (d < 90000 + c.pop * 620 && d < 2400000) labels.push({ c, d });
     if (budget <= 0) continue;
-    const near = c.r * 3.5 + 6000;
-    if (d > near || camY > 26000) continue;
+    const near = c.r * 5.5 + 24000;
+    if (d > near || camY > 62000) continue;
     // block grid: size and height scale with the real population
     const blocks = clamp(Math.round(4 + Math.pow(c.pop, .34) * 3), 4, 26);
     const spacing = (c.r * 1.7) / blocks;
@@ -1854,13 +2257,13 @@ function drawCities() {
   ctx.save(); ctx.textAlign = "center"; ctx.textBaseline = "middle";
   let shown = 0;
   for (const L of labels) {
-    if (shown > 26) break;
+    if (shown > 40) break;
     const c = L.c;
     const sp = projectPoint(v3(c.x, terrainH(c.x, c.z) + 40, c.z));
     if (!sp || sp.x < 0 || sp.x > W || sp.y < 0 || sp.y > H) continue;
     const big = c.pop > 400;
     hudFont((big ? 12 : 10.5) * u, big ? 700 : 600);
-    const a = clamp(1 - L.d / (60000 + c.pop * 300), .18, .9);
+    const a = clamp(1 - L.d / (120000 + c.pop * 700), .14, .9);
     ctx.fillStyle = "rgba(6,12,18," + (a * .55).toFixed(2) + ")";
     const w2 = ctx.measureText(c.name).width;
     ctx.fillRect(sp.x - w2 / 2 - 4 * u, sp.y - 8 * u, w2 + 8 * u, 16 * u);
@@ -1874,27 +2277,34 @@ function drawCities() {
 }
 
 /* one building, as a shaded box standing on the ground */
+/* Unit box: five faces (the underside never shows), each four corners given as
+   multipliers of half-width, height and half-depth, then the outward normal.
+   Built once — rebuilding it per building per frame was thousands of throwaway
+   arrays every frame. */
+const BOX_FACES = new Float32Array([
+  -1,1,-1,  1,1,-1,  1,1,1,  -1,1,1,   0,1,0,
+  -1,0,1,   1,0,1,   1,1,1,  -1,1,1,   0,0,1,
+   1,0,-1, -1,0,-1, -1,1,-1,  1,1,-1,  0,0,-1,
+   1,0,1,   1,0,-1,  1,1,-1,  1,1,1,   1,0,0,
+  -1,0,-1, -1,0,1,  -1,1,1,  -1,1,-1, -1,0,0
+]);
 function boxOnGround(x, gy, z, sx, h, sz, col, dist) {
   const hx = sx * .5, hz = sz * .5, top = gy + h;
-  const faces = [
-    [[-hx, h, -hz], [hx, h, -hz], [hx, h, hz], [-hx, h, hz], 0, 1, 0],
-    [[-hx, 0, hz], [hx, 0, hz], [hx, h, hz], [-hx, h, hz], 0, 0, 1],
-    [[hx, 0, -hz], [-hx, 0, -hz], [-hx, h, -hz], [hx, h, -hz], 0, 0, -1],
-    [[hx, 0, hz], [hx, 0, -hz], [hx, h, -hz], [hx, h, hz], 1, 0, 0],
-    [[-hx, 0, -hz], [-hx, 0, hz], [-hx, h, hz], [-hx, h, -hz], -1, 0, 0]
-  ];
   const cp = cam.pos, m = cam.m;
-  for (const f of faces) {
+  for (let fi = 0; fi < 5; fi++) {
+    const o = fi * 15;
     let front = false;
     for (let k = 0; k < 4; k++) {
-      const px = x + f[k][0] - cp.x, py = gy + f[k][1] - cp.y, pz = z + f[k][2] - cp.z;
+      const px = x + BOX_FACES[o + k * 3] * hx - cp.x,
+        pz = z + BOX_FACES[o + k * 3 + 2] * hz - cp.z,
+        py = gy + BOX_FACES[o + k * 3 + 1] * h - cp.y - curveDrop(px, pz);
       const vx = m[0] * px + m[1] * py + m[2] * pz, vy = m[3] * px + m[4] * py + m[5] * pz,
         vz = m[6] * px + m[7] * py + m[8] * pz;
       _vp[k * 3] = vx; _vp[k * 3 + 1] = vy; _vp[k * 3 + 2] = vz;
       if (vz >= NEAR) front = true;
     }
     if (!front) continue;
-    const nx = f[4], ny = f[5], nz = f[6];
+    const nx = BOX_FACES[o + 12], ny = BOX_FACES[o + 13], nz = BOX_FACES[o + 14];
     // cheap back-face test against the face centre
     if (nx * (x + nx * hx - cp.x) + ny * (top - cp.y) + nz * (z + nz * hz - cp.z) > 0 && ny === 0) continue;
     const mm = clipProject(4);
@@ -2006,7 +2416,7 @@ const SPECS = {
   CL0: .015, CLa: 2.6, k: .085,
   CmA: .50, CmE: .22, CmQ: 4.0,
   Cnb: .090, Cndr: .062, Cnr: .170,
-  Cla: .040, Clp: .400, Clb: .030,
+  Cla: .072, Clp: .360, Clb: .030,
   // Per engine. Ten times what a real J58 gives, which is what it takes to
   // push this shape out to hypersonic speed rather than stopping at Mach 3.
   thrustMil: 260000, thrustAB: 900000,
@@ -2039,7 +2449,7 @@ const PLANE = {
   trim: 0, flap: 0, flapCmd: 0, gear: 1, gearCmd: 1, brake: 0, park: true,
   chute: 0, chuteCmd: 0, mach: 0, ab: 0, abSm: 0, unstart: 0, unstartSide: 0, qbar: 0,
   gMax: 1, gMin: 1, gStress: 0, gRed: 0, heat: 0, burn: 0,
-  rpm: 0, propAng: 0, alpha: 0, beta: 0, ias: 0, tas: 0, gload: 1, vsi: 0,
+  rpm: 0, alpha: 0, beta: 0, ias: 0, tas: 0, gload: 1, vsi: 0,
   onGround: true, wow: 0, stall: 0, crashed: false, crashT: 0, msg: "", holdHdg: undefined,
   hardLand: 0, touched: 0, lastVS: 0, aoaCap: false, dist: 0
 };
@@ -2062,7 +2472,8 @@ function resetPlane(scen) {
   P.inE = P.inA = P.inR = 0; P.trim = 0; P.flap = P.flapCmd = 0;
   P.crashed = false; P.crashT = 0; P.stall = 0; P.hardLand = 0; P.touched = 0; P.pitchI = 0; P.holdHdg = undefined;
   P.gear = P.gearCmd = 1; P.brake = 0; P.rpm = 0; P.dist = 0;
-  P.chute = P.chuteCmd = 0; P.mach = 0; P.overQ = 0; P.gMax = 1; P.gMin = 1; P.gStress = 0; P.gRed = 0; P.heat = 0; P.burn = 0; P.ab = 0; P.abSm = 0; P.unstart = 0; P.apAlt = undefined; P.apHdg = undefined;
+  P.fbwI = 0; P.fbwG = 1; P.steer = 0; P.qbar = 0; P.gload = 0; P.alpha = 0; P.beta = 0; P.aoaCap = false; P.cmdG = 1;
+  P.chute = P.chuteCmd = 0; P.mach = 0; P.overQ = 0; P.gMax = 1; P.gMin = 1; P.gStress = 0; P.gRed = 0; P.heat = 0; P.burn = 0; P.gBreak = 0; P.ab = 0; P.abSm = 0; P.unstart = 0; P.apAlt = undefined; P.apHdg = undefined;
   P.q = qAxis(0, 1, 0, Math.PI);            // runway 18: heading south
   P.thr = 0;
   if (scen === "free") {
@@ -2093,64 +2504,178 @@ function resetPlane(scen) {
   qMat(P.q, P.m);
 }
 
-/* The autopilot. It rides on top of the one flight model: the stick commands
-   bank angle and pitch attitude instead of control-surface deflection, the
-   rudder coordinates itself, angle of attack is limited, and with hands off it
-   holds the altitude and heading it had when you let go. */
-function assist(P, dt, e) {
-  const hands = Math.abs(P.inA) > .04 || Math.abs(P.inE) > .04;
-  // ---- roll: stick commands bank, hands off it rolls level and holds heading
-  let bankTgt = P.inA * 62 * DEG;
-  if (!hands && !P.onGround) {
-    if (P.apHdg === undefined) P.apHdg = e.hdg;
-    let he = P.apHdg - e.hdg;
-    if (he > Math.PI) he -= TAU; else if (he < -Math.PI) he += TAU;
-    bankTgt = clamp(he * 1.6, -22 * DEG, 22 * DEG);
-  } else P.apHdg = undefined;
-  const rollErr = bankTgt - e.roll;
-  P.dA = clamp(rollErr * 2.2 + P.w.z * .60, -1, 1);
+/* ===================================================== flight control ====
+   A fly-by-wire control system. The stick never moves a surface directly:
+   it asks for a manoeuvre, and the computer works out how much deflection
+   that costs at the speed and altitude you happen to be at. Full back stick
+   means the same pull at 200 knots and at Mach 3 — which is the whole point,
+   because the deflection needed for 6 g at Mach 3 is a tiny fraction of the
+   deflection needed for 6 g on final approach.
 
-  // ---- pitch: stick commands attitude, hands off it holds altitude ---------
-  const lvl = 1 / Math.max(Math.cos(clamp(e.roll, -1.3, 1.3)), .30);
-  let pitchTgt = P.inE * 26 * DEG + (lvl - 1) * 7 * DEG;
-  if (P.onGround) { pitchTgt = P.inE * 12 * DEG; P.apAlt = undefined; }
-  else if (!hands) {
-    if (P.apAlt === undefined) P.apAlt = P.pos.y;
-    const ae = clamp((P.apAlt - P.pos.y) * .012, -12 * DEG, 12 * DEG);
-    pitchTgt = clamp(ae - P.vel.y * .035, -14 * DEG, 18 * DEG) + (lvl - 1) * 7 * DEG;
-  } else P.apAlt = undefined;
-  const pitchErr = pitchTgt - e.pitch;
-  P.pitchI = clamp((P.pitchI || 0) + pitchErr * dt * 1.2, -.55, .55);
-  P.dE = clamp(pitchErr * 2.8 + P.pitchI + P.w.x * .55, -1, 1);
+   Three laws, one per axis:
+     pitch  - commands load factor in the air, pitch rate near the ground,
+              blended between the two, with angle-of-attack and g limiters
+     roll   - commands roll rate
+     yaw    - commands sideslip, with a yaw damper underneath it            */
 
-  // hard angle-of-attack limiter: a delta will keep flying far past where it
-  // should, and the drag that comes with it is what actually kills you
-  const amax = 18 * DEG;
-  P.aoaCap = P.alpha > amax && P.dE > 0;
-  if (P.aoaCap) P.dE = clamp(P.dE - (P.alpha - amax) * 22, -1, .05);
+const FBW = {
+  gMax: 7.5,          // g at full back stick
+  gMin: -2.6,         // g at full forward stick
+  pMax: 2.6,          // rad/s roll rate at full lateral stick (~150 deg/s)
+  qMax: .40,          // rad/s pitch rate at full stick in the low-speed law
+  bMax: 7 * DEG,      // sideslip at full rudder
+  aoaMax: 23 * DEG,   // hard angle-of-attack limit
+  kRoll: 9.0,         // roll-rate loop bandwidth, 1/s
+  kPitch: 1.6,        // g loop proportional gain, 1/s
+  kPitchI: 1.5,       // g loop integral gain
+  kRate: .34,         // pitch-rate feedback, for loop damping
+  qRef: 9000,         // Pa the ground law gears its authority against
+  expo: .46,          // how much of the stick travel is the fine, low-gain part
+  kBeta: 11,          // sideslip loop gain
+  kYawD: 1.6          // yaw damper gain
+};
 
-  if (P.onGround) {
-    if (Math.abs(P.inA) > .05 || P.holdHdg === undefined) P.holdHdg = e.hdg;
+/* A stick curve. Straight through would give the same gearing everywhere,
+   which makes small corrections at speed impossible: a couple of degrees of
+   thumb is already a hard pull. This keeps the middle of the travel soft and
+   the last part of it authoritative. */
+function curve(x) {
+  const a = Math.abs(clamp(x, -1, 1));
+  return Math.sign(x) * (FBW.expo * a + (1 - FBW.expo) * a * a);
+}
+
+/* stick position that asks for a given load factor on top of the g the
+   aircraft already needs just to hold its attitude */
+function gToStick(dG, lvl) {
+  return dG >= 0 ? clamp(dG / Math.max(FBW.gMax - lvl, .5), 0, 1)
+                 : clamp(dG / Math.max(lvl - FBW.gMin, .5), -1, 0);
+}
+
+function flightControl(P, dt, e, cE, cA, cR) {
+  const W = SPECS.mass * 9.81;
+  const qbar = P.qbar || 0;
+  const qS = qbar * SPECS.S;
+  // control power actually available, in the units each loop works in
+  const ctlM = lerp(1, .55, sstep(1.0, 2.2, P.mach || 0));
+  // g per unit of elevator
+  const gPer = Math.max(qS * claOfMach(P.mach || 0) * (SPECS.CmE / Math.max(SPECS.CmA, .05)) * ctlM / W, .18);
+  // pitch acceleration per unit of elevator, rad/s^2
+  const qPer = Math.max(qS * SPECS.cbar * SPECS.CmE * ctlM / SPECS.Ipitch, .02);
+  // roll acceleration per unit of aileron, rad/s^2
+  const pPer = Math.max(qS * SPECS.b * SPECS.Cla * ctlM / SPECS.Iroll, .02);
+  // yaw acceleration per unit of rudder, rad/s^2
+  const rPer = Math.max(qS * SPECS.b * SPECS.Cndr * ctlM / SPECS.Iyaw, .01);
+
+  // how much of the low-speed (rate) pitch law to use: all of it on the
+  // ground and at a crawl, none of it once the wing is properly flying
+  P.fbwG = approach(P.fbwG === undefined ? 1 : P.fbwG,
+    (P.onGround ? 1 : 0) + (1 - (P.onGround ? 1 : 0)) * (1 - sstep(70, 135, P.ias || 0)), 3.0, dt);
+  const gnd = clamp(P.fbwG, 0, 1);
+
+  /* ---------------- pitch ------------------------------------------------ */
+  // the g it takes to simply hold the present attitude, so that level stick
+  // means level flight whatever the bank angle
+  const lvl = clamp(Math.cos(clamp(e.roll, -Math.PI, Math.PI)) * Math.cos(clamp(e.pitch, -1.45, 1.45)), -1, 1);
+  const sE = curve(cE), sA = curve(cA), sR = curve(cR);
+  /* Trim on a fly-by-wire aeroplane is not an offset on the tailplane — the
+     computer already holds whatever it is asked to hold. It shifts the datum
+     instead: a touch of nose-up trim means hands off it holds a gentle climb
+     rather than level flight. */
+  const gCmd = (sE >= 0 ? lvl + (FBW.gMax - lvl) * sE : lvl + (lvl - FBW.gMin) * sE)
+    + (P.trim || 0) * .30;
+  const gErr = gCmd - (P.gload || 0);
+  const iGate = 1 - sstep(1.2, 3.0, Math.abs(gErr));
+  P.fbwI = clamp((P.fbwI || 0) + gErr * dt * FBW.kPitchI * iGate, -.75, .75);
+  let dEg = (gErr * FBW.kPitch + P.fbwI) / gPer + P.w.x * FBW.kRate;
+
+  // low-speed / ground law: the stick asks for a pitch rate instead, so that
+  // rotation on the runway is the same positive, controllable thing at any
+  // speed rather than a snap into a loop
+  const qCmd = -sE * FBW.qMax * (P.onGround ? .62 : 1);
+  const gearQ = clamp(FBW.qRef / Math.max(qbar, 500), .03, 1);
+  let dEq = clamp(sE * gearQ + (P.w.x - qCmd) * 2.4 / qPer, -1, 1);
+
+  let dE = clamp(lerp(dEg, dEq, gnd), -1, 1);
+
+  /* angle-of-attack limit. A delta goes on flying long past the point where
+     the drag it is making has already killed you, so the limiter is what
+     keeps a hard pull from turning into a falling brick. */
+  const a = P.alpha || 0;
+  P.aoaCap = a > FBW.aoaMax && dE > 0;
+  if (P.aoaCap) {
+    dE = clamp(dE - (a - FBW.aoaMax) * 26, -1, .04);
+    P.fbwI = Math.min(P.fbwI, .1);          // don't wind the integrator up against the limit
+  }
+  /* load limit: the airframe comes apart past about 9 g, so the system will
+     not let the stick take it there however hard you pull */
+  if ((P.gload || 0) > FBW.gMax + 1.2 && dE > 0) { dE = Math.min(dE, 0); P.fbwI = Math.min(P.fbwI, .1); }
+  if ((P.gload || 0) < FBW.gMin - 1.0 && dE < 0) { dE = Math.max(dE, 0); P.fbwI = Math.max(P.fbwI, -.1); }
+
+  /* ---------------- roll ------------------------------------------------- */
+  // w.z positive is a roll to the left, so a right stick asks for negative w.z
+  const pCmd = -sA * FBW.pMax;
+  const dA = clamp(-(pCmd - P.w.z) * FBW.kRoll / pPer, -1, 1);
+
+  /* ---------------- yaw -------------------------------------------------- */
+  // right rudder yaws the nose right, which drives sideslip negative
+  const bCmd = -sR * FBW.bMax * (1 - gnd);
+  let dR = clamp(((P.beta || 0) - bCmd) * FBW.kBeta / Math.max(rPer, .01) * .12
+    - P.w.y * FBW.kYawD / Math.max(rPer, .01) * .10, -1, 1);
+  // on the ground the pedals are the nosewheel, and the computer keeps the
+  // roll straight rather than trying to hold a sideslip that means nothing
+  if (gnd > .5 && P.onGround) {
+    if (Math.abs(cR) > .05 || P.holdHdg === undefined) P.holdHdg = e.hdg;
     let err = P.holdHdg - e.hdg;
     if (err > Math.PI) err -= TAU; else if (err < -Math.PI) err += TAU;
-    P.dR = clamp(P.inA * .9 + err * 2.4 - P.w.y * .9, -1, 1);
-  } else {
-    P.holdHdg = undefined;
-    P.dR = clamp(P.beta * 4.5 - P.w.y * .45, -1, 1);
-  }
+    dR = clamp(cR + err * 1.8 - P.w.y * .8, -1, 1);
+    P.steer = clamp(cR * .9 + err * 1.2 - P.w.y * .5, -1, 1);
+  } else { P.holdHdg = undefined; P.steer = approach(P.steer || 0, 0, 4, dt); }
+
+  /* ---------------- actuators -------------------------------------------- */
+  // the surfaces themselves still take time to move
+  P.dE = approach(P.dE, dE, 14, dt);
+  P.dA = approach(P.dA, dA, 16, dt);
+  P.dR = approach(P.dR, dR, 12, dt);
+  P.cmdG = gCmd;
+}
+
+/* The autopilot sits on top of the fly-by-wire, not beside it: it produces
+   stick commands and the flight control system flies them, exactly as it
+   flies yours. Hands on, the stick commands bank angle and pitch attitude;
+   hands off, it holds the altitude and heading it had when you let go. */
+function autopilot(P, dt, e) {
+  const hands = Math.abs(P.inA) > .04 || Math.abs(P.inE) > .04;
+  const lvl = clamp(Math.cos(clamp(e.roll, -Math.PI, Math.PI)) * Math.cos(clamp(e.pitch, -1.45, 1.45)), -1, 1);
   P.trim = 0;
+  if (P.onGround) { P.apAlt = undefined; P.apHdg = undefined; return { e: P.inE * .55, a: P.inA, r: P.inR }; }
+
+  let bankTgt, dG;
+  if (hands) {
+    P.apAlt = undefined; P.apHdg = undefined;
+    bankTgt = P.inA * 62 * DEG;
+    const pitchTgt = P.inE * 28 * DEG;
+    dG = clamp((pitchTgt - e.pitch) * 3.2, -2.0, 4.0);
+  } else {
+    if (P.apHdg === undefined) P.apHdg = e.hdg;
+    if (P.apAlt === undefined) P.apAlt = P.pos.y;
+    let he = P.apHdg - e.hdg;
+    if (he > Math.PI) he -= TAU; else if (he < -Math.PI) he += TAU;
+    bankTgt = clamp(he * 1.5, -24 * DEG, 24 * DEG);
+    const vsTgt = clamp((P.apAlt - P.pos.y) * .042, -34, 34);
+    dG = clamp((vsTgt - P.vel.y) * .058, -.9, 1.15);
+  }
+  // bank angle through the roll-rate law
+  const cA = clamp((bankTgt - e.roll) * 1.15, -.85, .85);
+  return { e: gToStick(dG, lvl), a: cA, r: 0 };
 }
 
 function physics(P, dt) {
   const m = P.m;
   const e = eulerOf(m);
-  // --- control surface response ------------------------------------------
-  if (AP.on) assist(P, dt, e);
-  else {
-    P.dE = approach(P.dE, P.inE, 9, dt);
-    P.dA = approach(P.dA, P.inA, 11, dt);
-    P.dR = approach(P.dR, P.inR, 9, dt);
-  }
+  // --- control law ---------------------------------------------------------
+  let cE = P.inE, cA = P.inA, cR = P.inR;
+  if (AP.on) { const c = autopilot(P, dt, e); cE = c.e; cA = c.a; cR = c.r; }
+  flightControl(P, dt, e, cE, cA, cR);
   // Flaps blow back above their placard speed, and the chute is torn away if
   // you stream it too fast.
   const kias = P.ias * 1.94384;
@@ -2233,7 +2758,7 @@ function physics(P, dt) {
     P.gload = (L * Math.cos(P.alpha) + D * Math.sin(P.alpha)) / (SPECS.mass * 9.81);
     // moments
     const cq = .5 * rho * V * SPECS.S;
-    const dET = clamp(P.dE + P.trim, -1.3, 1.3);
+    const dET = clamp(P.dE, -1.3, 1.3);   // the trim datum lives in the command, not here
     // control power falls away supersonically as the shock moves aft
     const ctlM = lerp(1, .55, sstep(1.0, 2.2, M8));
     M.x = qS * SPECS.cbar * (SPECS.CmA * P.alpha - SPECS.CmE * ctlM * dET + .070 * P.flap) - cq * SPECS.cbar * SPECS.cbar * SPECS.CmQ * P.w.x;
@@ -2287,9 +2812,7 @@ function physics(P, dt) {
       // rolling / lateral friction in the wheel's own frame
       let fwd = mRot(m, v3(0, 0, 1));
       if (wh.steer) {
-        // with the autopilot in, dR already carries both the pilot's steering
-        // and the auto-coordination that keeps the roll straight
-        const st = P.dR * (AP.on ? .6 : 1) * 22 * DEG * clamp(1 - V / 55, .25, 1);
+        const st = (P.steer || 0) * 22 * DEG * clamp(1 - V / 55, .25, 1);
         fwd = mRot(m, v3(Math.sin(st), 0, Math.cos(st)));
       }
       fwd = vnorm(vsub(fwd, vmul(n, vdot(fwd, n))));
@@ -2346,7 +2869,6 @@ function physics(P, dt) {
   P.w = v3(clamp(P.w.x, -wcap, wcap), clamp(P.w.y, -wcap, wcap), clamp(P.w.z, -wcap, wcap));
   P.q = qIntegrate(P.q, P.w, dt);
   qMat(P.q, P.m);
-  P.propAng += P.rpm * 145 * dt;
   P.vsi = P.vel.y;
   P.dist += vlen(P.vel) * dt;
   // Stagnation heating rises with the cube of speed and the root of density:
@@ -2368,6 +2890,14 @@ function physics(P, dt) {
   const strain = P.gload > 4.6 ? (P.gload - 4.6) * .40 : P.gload < -1.2 ? (-1.2 - P.gload) * .55 : -1.1;
   P.gStress = clamp((P.gStress || 0) + strain * dt, 0, 1.6);
   P.gRed = P.gload < -1.2 ? 1 : 0;
+  // Pull hard enough for long enough and the wings come off, which is the
+  // limit the G meter's red band is actually marking.
+  if (!P.crashed && Math.abs(P.gload) > 9) {
+    P.gBreak = (P.gBreak || 0) + dt;
+    cam.shake = Math.max(cam.shake, 1.3);
+    if (P.gBreak > .7) crash("AIRFRAME OVERSTRESS");
+  } else P.gBreak = Math.max(0, (P.gBreak || 0) - dt * 1.5);
+
   // Dynamic pressure is the real limit low down: this airframe is built for
   // thin air, and holding Mach 3 at low level tears it apart.
   if (!P.crashed && P.qbar > 160000) {
@@ -3306,6 +3836,9 @@ function drawHUDFull() {
   if (P.unstart > 0) warn.push(["INLET UNSTART", "#ff6a56"]);
   if (P.qbar > 115000) warn.push(["Q LIMIT \u00b7 CLIMB", "#ffb03a"]);
   if (P.heat > .55) warn.push(["SKIN TEMP", "#ffb03a"]);
+  // with this much thrust you are through rotation speed in seconds, so the
+  // callout matters more here than it does in a real aeroplane
+  if (P.onGround && P.ias * 1.94384 > 195 && !P.crashed) warn.push(["ROTATE", "#7ce89a"]);
   hudFont(20 * U, 700); ctx.textAlign = "center";
   const blink = (GAME.t * 4 | 0) % 2 === 0;
   for (let i = 0; i < warn.length; i++) {
@@ -3651,10 +4184,10 @@ const K = Object.create(null);
 let mouseStick = false, mdx = 0, mdy = 0;
 const KEYMAP = {
   common: [
-    ["&larr; &rarr;", "roll left / right (ailerons)"],
-    ["&darr;", "pull back &mdash; nose up"],
-    ["&uarr;", "push forward &mdash; nose down"],
-    ["A D", "rudder left / right"],
+    ["&larr; &rarr;", "roll rate left / right &mdash; same response at any speed"],
+    ["&darr;", "pull back &mdash; commands g, up to 7.5"],
+    ["&uarr;", "push forward &mdash; commands g, down to &minus;2.6"],
+    ["A D", "rudder &mdash; commands sideslip, damped"],
     ["W S", "throttle up / down (also Shift / Ctrl)"],
     ["Drag slider", "throttle, past 80% lights the afterburners"],
     ["Z", "autopilot on / off"],
@@ -3662,19 +4195,18 @@ const KEYMAP = {
     ["B", "parking brake"],
     ["G", "landing gear"],
     ["F V", "flaps extend / retract"],
-    [", .", "elevator trim"],
+    [", .", "trim &mdash; shifts the g the system holds hands off"],
     ["C", "cycle camera"],
     ["L", "control reference"],
     ["R", "reset aircraft"],
     ["T", "swap pitch sense"],
     ["Esc P", "pause"], ["H", "help"], ["M", "mute"],
     ["Y", "mouse as stick"]
-  ],
-  complex: []
+  ]
 };
 (function fillKeys() {
   const el = document.getElementById("keyList");
-  const rows = KEYMAP.common.concat(KEYMAP.complex);
+  const rows = KEYMAP.common;
   el.innerHTML = rows.map(r => "<div><kbd>" + r[0].split(" ").join("</kbd><kbd>") + "</kbd>" + r[1] + "</div>").join("");
   if (MOBILE || COARSE) showTouchHelp();
 })();
@@ -3798,7 +4330,7 @@ function applyInput(dt) {
 function toggleAP() {
   AP.on = !AP.on;
   const P = PLANE;
-  P.pitchI = 0; P.apAlt = undefined; P.apHdg = undefined; P.holdHdg = undefined;
+  P.pitchI = 0; P.fbwI = 0; P.apAlt = undefined; P.apHdg = undefined; P.holdHdg = undefined;
   if (!AP.on) { P.dE = P.dA = P.dR = 0; }
   toast(AP.on ? "AUTOPILOT ENGAGED" : "AUTOPILOT OFF \u00b7 MANUAL", 1.8);
   audio.beep(AP.on ? 760 : 420, .16, .14);
@@ -3882,7 +4414,6 @@ function frame(now) {
     cam.m[0] = r2.x; cam.m[1] = r2.y; cam.m[2] = r2.z;
     cam.m[3] = u2.x; cam.m[4] = u2.y; cam.m[5] = u2.z;
     cam.m[6] = f2.x; cam.m[7] = f2.y; cam.m[8] = f2.z;
-    PLANE.propAng += .3;
   }
 
   // ---- render ----
@@ -3893,6 +4424,7 @@ function frame(now) {
   DL.reset();
   drawTerrain();
   if (Math.hypot(cam.pos.x, cam.pos.z) < 40000) drawMesh(AIRPORT, v3(0, 0, 0), mIdent(), null);
+  drawLakes();
   drawTrees();
   drawRoadsRivers();
   drawCities();
@@ -3901,6 +4433,7 @@ function frame(now) {
   drawParts();
   drawClouds();
   DL.flush();
+  drawLandmarks();
   drawGlare();
   if (Q.q.vig && vignette) { ctx.fillStyle = vignette; ctx.fillRect(0, 0, W, H); }
   if (GAME.started && !GAME.paused) { drawGEffect(PLANE); drawHUD(dt); }
