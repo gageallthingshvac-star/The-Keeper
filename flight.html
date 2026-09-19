@@ -211,10 +211,150 @@ function fbm(x, y, oct) {
   return s / n;
 }
 
+/* ==================================================== the real world ==== */
+/* The page cannot fetch anything, so the planet ships with it: coastlines and
+   mountain ranges as coordinates, rasterised into an elevation field the first
+   time the sim runs. Roughly 40 km per sample — coarse on the ground, but from
+   80,000 ft the continents are the right shape, which is the point. */
+const GEO = {
+  // [lon, lat] pairs, one array per landmass, walked in order
+  lands: [
+    // North America
+    [-168,65.5,-165,60,-162,58,-158,57,-153,58,-148,60,-140,60,-133,55,-128,51,-124,46,-124,40,-120,34,-117,32.5,-114,30,-110,24,-106,22,-97,22,-97,18,-91,18.5,-87,21,-90,19,-94,18,-96,15.5,-104,18,-110,24,-114,30,-117,32.5,-114,32,-110,31,-103,29,-97,26,-93,29,-89,29,-85,30,-82,25,-80,26,-81,31,-76,35,-74,39,-70,42,-67,45,-64,46,-60,47,-56,51,-64,54,-68,58,-78,62,-85,66,-80,70,-95,69,-105,68,-115,70,-125,70,-140,70,-155,71,-165,68,-168,65.5],
+    // Greenland
+    [-45,60,-52,65,-55,70,-60,76,-55,82,-40,83,-25,80,-20,74,-25,70,-35,66,-45,60],
+    // South America
+    [-81,-4,-79,-2,-80,2,-77,8,-72,12,-62,10,-52,5,-50,0,-44,-2,-38,-6,-35,-8,-39,-14,-41,-22,-48,-25,-53,-34,-58,-38,-62,-40,-65,-45,-68,-50,-70,-54,-74,-52,-73,-45,-72,-38,-71,-30,-70,-22,-71,-18,-75,-14,-79,-8,-81,-4],
+    // Africa
+    [-17,15,-16,21,-12,28,-6,35,0,36,10,37,20,32,32,31,35,28,39,21,43,12,51,12,48,5,42,-1,40,-8,40,-15,35,-22,32,-26,26,-33,18,-34,14,-22,12,-14,9,-2,3,6,9,4,9,10,3,6,-7,5,-13,10,-17,15],
+    // Eurasia
+    [-9,43,-9,39,-6,36,0,39,4,43,10,44,16,41,19,40,24,38,28,41,33,42,37,45,40,43,49,41,50,37,48,30,44,29,35,32,34,36,36,36,44,39,50,30,57,26,62,25,68,23,72,20,73,16,78,9,80,13,85,20,90,22,92,17,97,17,100,13,105,10,109,11,107,21,110,21,117,24,122,31,122,37,126,40,130,43,135,48,142,53,140,58,160,60,170,66,180,66,175,71,150,72,130,74,110,74,90,76,75,73,65,70,55,70,45,68,35,66,28,70,20,70,10,64,5,58,10,55,3,51,2,51,-2,48,-5,43,-2,43,-9,43],
+    // British Isles
+    [-6,50,-5,53,-3,55,-2,58,0,58,1,53,1,51,-6,50],
+    [-10,52,-6,55,-6,54,-10,52],
+    // Japan
+    [130,31,134,34,138,35,141,39,141,45,145,44,140,41,137,37,133,33,130,31],
+    // Madagascar
+    [43,-16,48,-13,50,-15,48,-25,45,-25,43,-21,43,-16],
+    // Australia
+    [114,-22,113,-26,115,-32,118,-35,123,-34,129,-32,135,-35,138,-35,141,-38,146,-39,150,-37,153,-31,153,-25,146,-19,142,-11,136,-12,130,-11,126,-14,122,-17,114,-22],
+    // New Zealand
+    [166,-46,170,-43,173,-41,175,-37,177,-38,174,-41,172,-44,168,-47,166,-46],
+    // Indonesia / New Guinea
+    [95,5,100,1,104,-2,106,-6,114,-8,118,-9,124,-9,131,-8,141,-9,147,-9,150,-10,145,-5,138,-2,132,-2,125,1,118,5,110,2,102,6,95,5],
+    // Antarctica
+    [-180,-70,-150,-75,-120,-74,-90,-72,-60,-64,-30,-70,0,-70,30,-68,60,-67,90,-66,120,-66,150,-72,180,-70,180,-90,-180,-90,-180,-70]
+  ],
+  /* mountain ranges: [height in metres, line width in degrees, lon,lat, ...] */
+  ranges: [
+    [3900, 3.2, -152,63, -147,62, -141,61],                                           // Alaska Range
+    [3200, 3.0, -137,60, -130,57, -124,53, -119,50],                                  // Coast Mountains
+    [3600, 3.0, -115,49, -112,45, -108,41, -106,37, -107,33],                         // Rockies
+    [3000, 1.8, -121,48, -121,44, -121,41],                                           // Cascades
+    [3300, 1.6, -120,39, -119,37, -118,36],                                           // Sierra Nevada
+    [1600, 3.0, -84,34, -80,37, -76,40, -72,44],                                      // Appalachians
+    [5200, 3.2, -71,-18, -70,-24, -70,-32, -71,-40, -72,-48],                         // Andes south
+    [5600, 3.6, -77,2, -76,-6, -72,-14, -70,-18],                                     // Andes north
+    [2600, 3.0, -8,32, 0,31, 6,34, 10,35],                                            // Atlas
+    [3400, 2.2, 6,46, 10,47, 14,47, 18,46],                                           // Alps
+    [2200, 3.4, 60,58, 60,64, 62,68],                                                 // Urals
+    [4300, 2.4, 42,43, 46,42, 50,40],                                                 // Caucasus
+    [3800, 3.4, 48,34, 54,32, 60,30],                                                 // Zagros
+    [7200, 3.4, 72,35, 78,32, 84,29, 90,28, 95,29],                                   // Himalaya
+    [5800, 4.0, 74,40, 80,42, 86,44, 92,45],                                          // Tien Shan / Altai
+    [4200, 4.2, 92,32, 98,32, 103,31],                                                // Tibet east
+    [2400, 3.0, 8,60, 12,64, 16,68],                                                  // Scandes
+    [3600, 3.2, 37,9, 39,13, 42,10],                                                  // Ethiopian highlands
+    [1900, 2.2, 147,-20, 150,-26, 152,-31, 149,-36],                                  // Great Dividing
+    [3000, 1.8, 137,36, 139,36, 141,38]                                               // Japanese Alps
+  ]
+};
+
+/* Where the runway sits in the real world: Edwards, in the Mojave, which is
+   where this aeroplane actually lived. World x is east, z is north. */
+const ORIGIN = { lon: -117.884, lat: 34.905 };
+const M_PER_DEG_LAT = 110574, M_PER_DEG_LON = 111320;
+const worldToLon = x => ORIGIN.lon + x / M_PER_DEG_LON;
+const worldToLat = z => ORIGIN.lat + z / M_PER_DEG_LAT;
+
+const GW = 1024, GH = 512;
+const ELEV = new Int16Array(GW * GH);
+
+(function buildWorld() {
+  const mk = (w, h) => { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; };
+  const c0 = mk(GW, GH), g0 = c0.getContext("2d", { willReadFrequently: true });
+  const px = lon => ((lon + 180) / 360) * GW;
+  const py = lat => ((90 - lat) / 180) * GH;
+  g0.fillStyle = "#000"; g0.fillRect(0, 0, GW, GH);
+  // land in red, mountains in green, so one read-back gets both
+  g0.fillStyle = "#f00";
+  for (const pts of GEO.lands) {
+    g0.beginPath();
+    g0.moveTo(px(pts[0]), py(pts[1]));
+    for (let i = 2; i < pts.length; i += 2) g0.lineTo(px(pts[i]), py(pts[i + 1]));
+    g0.closePath(); g0.fill();
+  }
+  g0.globalCompositeOperation = "lighter";
+  g0.lineCap = "round"; g0.lineJoin = "round";
+  for (const r of GEO.ranges) {
+    const h = r[0], wid = r[1];
+    g0.strokeStyle = "rgba(0," + Math.round(clamp(h / 7200, 0, 1) * 255) + ",0,1)";
+    g0.lineWidth = wid / 360 * GW;
+    g0.beginPath();
+    g0.moveTo(px(r[2]), py(r[3]));
+    for (let i = 4; i < r.length; i += 2) g0.lineTo(px(r[i]), py(r[i + 1]));
+    g0.stroke();
+  }
+  g0.globalCompositeOperation = "source-over";
+  const base = g0.getImageData(0, 0, GW, GH).data;
+
+  // Successive halvings give a cheap multi-scale blur: the coarse levels are
+  // what lift continental interiors away from their coasts.
+  const mip = (div) => {
+    const w = Math.max(2, GW / div) | 0, h = Math.max(2, GH / div) | 0;
+    const cs = mk(w, h), gs = cs.getContext("2d", { willReadFrequently: true });
+    gs.imageSmoothingEnabled = true;
+    gs.drawImage(c0, 0, 0, w, h);
+    const d = gs.getImageData(0, 0, w, h).data;
+    return { w, h, d };
+  };
+  const m8 = mip(8), m32 = mip(32), m96 = mip(96);
+  const samp = (m, ch, x, y) => {
+    const xi = clamp((x / GW * m.w) | 0, 0, m.w - 1), yi = clamp((y / GH * m.h) | 0, 0, m.h - 1);
+    return m.d[(yi * m.w + xi) * 4 + ch] / 255;
+  };
+  for (let y = 0; y < GH; y++) {
+    for (let x = 0; x < GW; x++) {
+      const i = y * GW + x;
+      const land = base[i * 4] > 110;
+      const f = samp(m8, 0, x, y) * .40 + samp(m32, 0, x, y) * .36 + samp(m96, 0, x, y) * .24;
+      const ridge = Math.max(base[i * 4 + 1] / 255, samp(m8, 1, x, y) * 1.25, samp(m32, 1, x, y) * .9);
+      let h;
+      if (land) h = 30 + Math.pow(clamp(f, 0, 1), 1.15) * 1500;
+      else h = -90 - Math.pow(clamp(1 - f, 0, 1), 1.6) * 4600;
+      if (ridge > .02) h += Math.pow(clamp(ridge, 0, 1), 1.45) * 7200 * (land ? 1 : .25);
+      ELEV[i] = clamp(h, -9000, 9000) | 0;
+    }
+  }
+})();
+
+/* Bilinear sample of the real elevation field, wrapping in longitude. */
+function worldElev(lon, lat) {
+  let u = ((lon + 180) / 360) * GW - .5;
+  const v = clamp(((90 - lat) / 180) * GH - .5, 0, GH - 1.001);
+  u = ((u % GW) + GW) % GW;
+  const x0 = Math.floor(u), y0 = Math.floor(v);
+  const fx = u - x0, fy = v - y0;
+  const x1 = (x0 + 1) % GW, y1 = Math.min(y0 + 1, GH - 1);
+  const a = ELEV[y0 * GW + x0], b = ELEV[y0 * GW + x1];
+  const c = ELEV[y1 * GW + x0], d = ELEV[y1 * GW + x1];
+  return lerp(lerp(a, b, fx), lerp(c, d, fx), fy);
+}
+
 /* ================================================================ world == */
 const WORLD = {
   sea: 0,                       // water surface height (m)
-  fieldElev: 16,                // airport elevation (m)
+  fieldElev: 705,               // Edwards sits at 2,300 ft in the Mojave
   fieldR: 2400,                 // radius of flattened airport basin
   rwyLen: 1900, rwyW: 46,       // runway 18/36, aligned with the Z (north) axis
   sun: vnorm(v3(-.40, .55, .73)),
@@ -239,8 +379,13 @@ const LIGHT = {
 };
 /* Haze lives in the lower atmosphere, so the view opens right up as you climb;
    by the tropopause you can see a hundred kilometres. */
+/* Horizon dip. From 80,000 ft the edge of the world is five degrees below eye
+   level and visibly bent; at circuit height it is flat, as it looks. */
+const EARTH_R = 6371000;
+function horizonDip(h) { return h <= 0 ? 0 : Math.acos(EARTH_R / (EARTH_R + h)); }
+
 function updateAtmosphere(camY) {
-  const k = Math.exp(-Math.max(camY, 0) / 3400);
+  const k = Math.exp(-Math.max(camY, 0) / 2300);
   LIGHT.dens = LIGHT.density * (.06 + .94 * k);
   LIGHT.space = clamp((camY - 12000) / 16000, 0, 1);
 }
@@ -258,7 +403,9 @@ function litColor(col, nx, ny, nz) {
 /* Aerial perspective. `v` is the normalised world direction from eye to point. */
 function aerial(col, dist, vx, vy, vz) {
   const L = LIGHT;
-  const f = 1 - Math.exp(-dist * L.dens);
+  // A downward line of sight crosses the haze once; one along the horizon runs
+  // through all of it, which is why the ground below stays clear from altitude.
+  const f = 1 - Math.exp(-dist * L.dens * (.30 + .70 * (1 - Math.min(Math.abs(vy), 1))));
   if (f < .004) return rgb(col[0], col[1], col[2]);
   const cs = clamp(vx * L.sun.x + vy * L.sun.y + vz * L.sun.z, 0, 1);
   const up = clamp(vy * 2.2, 0, 1);
@@ -275,18 +422,18 @@ function aerial(col, dist, vx, vy, vz) {
 function terrainH(x, z, cell) {
   const d = Math.hypot(x, z);
   const basin = 1 - sstep(WORLD.fieldR, WORLD.fieldR * 2.8, d);
-  let m = fbm(x / 2600, z / 2600, 5);
-  m = Math.pow(clamp(m, 0, 1), 2.25);
-  let h = m * 1500 - 95;
-  // a lake to the east keeps the terrain from feeling uniform
-  const lake = sstep(2600, 1200, Math.hypot(x - 6200, z + 2300));
-  h = lerp(h, -30, lake * .9);
-  // Fine relief is dropped once the sampling grid is coarser than the feature:
-  // sampled at 500 m intervals it aliases into a checkerboard of hills and
-  // hollows. `cell` is the grid spacing the caller is using; physics and trees
-  // omit it and always get the full detail.
+  // the real planet, sampled where this aeroplane actually is
+  let h = worldElev(worldToLon(x), worldToLat(z));
+  // Two scales of invented relief on top. The embedded field is ~40 km per
+  // sample, which is right for a continent and far too smooth for a valley.
+  const medium = cell ? clamp(1 - (cell - 1800) / 5000, 0, 1) : 1;
+  if (medium > 0 && h > -600) {
+    const ridge = 1 - Math.abs(fbm(x / 26000, z / 26000, 4) * 2 - 1);
+    h += (fbm(x / 34000, z / 34000, 4) - .45) * 900 * medium
+       + ridge * ridge * 520 * medium * clamp(h / 900, 0, 1.6);
+  }
   const det = cell ? clamp(1 - (cell - 110) / 260, 0, 1) : 1;
-  if (det > 0) h += fbm(x / 340, z / 340, 3) * 24 * (1 - basin * .8) * det;
+  if (det > 0 && h > -400) h += (fbm(x / 340, z / 340, 3) - .5) * 70 * (1 - basin * .8) * det;
   return lerp(h, WORLD.fieldElev, basin);
 }
 /* Cheap normal by finite difference. */
@@ -309,25 +456,40 @@ function groundH(x, z) {
   if (Math.abs(x - 225) < 108 && Math.abs(z - 650) < 132) return WORLD.fieldElev; // apron
   return terrainH(x, z);
 }
+/* Ground colour for a real planet: the snow line runs from about 4,800 m at
+   the equator down to sea level at the poles, and the belts between them are
+   the ones you actually fly over — rainforest, the desert latitudes, temperate
+   green, boreal forest, tundra, ice. */
 function terrainColor(h, slope, x, z) {
-  const rock = sstep(.34, .64, slope);
-  const snow = sstep(900, 1180, h) * (1 - rock * .45) * sstep(.62, .30, slope);
-  const dry = sstep(150, 640, h);
-  const scrub = sstep(520, 980, h);
-  // meadow -> dry upland -> alpine scrub, with rock on anything steep
-  let c = mixc([78, 112, 56], [134, 126, 78], dry);
-  c = mixc(c, [96, 104, 74], scrub * .7);
-  c = mixc(c, [108, 102, 96], rock);
-  c = mixc(c, mixc([120, 112, 104], [86, 82, 80], sstep(.5, .8, slope)), rock * .4);
-  c = mixc(c, [240, 246, 252], snow);
+  const lat = Math.abs(worldToLat(z));
+  const rock = sstep(.30, .60, slope);
+  const snowLine = 4900 - lat * 54;
+  const treeLine = snowLine - 1150;
+  const snow = sstep(snowLine - 250, snowLine + 350, h) * (1 - rock * .40);
+  // latitude belts, blended
+  const tropic = 1 - sstep(8, 20, lat);
+  const desert = sstep(11, 19, lat) * (1 - sstep(33, 46, lat));
+  const boreal = sstep(44, 54, lat) * (1 - sstep(62, 70, lat));
+  const tundra = sstep(60, 70, lat);
+  const polar = sstep(68, 76, lat);
+  let c = [86, 116, 62];                                  // temperate default
+  c = mixc(c, [42, 96, 48], tropic * .9);                 // rainforest
+  c = mixc(c, [178, 152, 104], desert * .92);             // sand and scrub
+  c = mixc(c, [54, 78, 54], boreal * .85);                // conifer
+  c = mixc(c, [122, 116, 96], tundra * .8);               // tundra
+  c = mixc(c, [226, 230, 236], polar * .9);               // ice
+  // drying and thinning with height, then bare rock above the tree line
+  c = mixc(c, [128, 120, 94], sstep(300, 1800, h) * .40);
+  c = mixc(c, [112, 106, 98], sstep(treeLine - 700, treeLine + 400, h) * .75);
+  c = mixc(c, mixc([118, 110, 102], [84, 80, 78], sstep(.45, .75, slope)), rock * .60);
+  c = mixc(c, [240, 245, 250], snow);
   // a narrow beach where the land meets the water
-  c = mixc(c, [182, 170, 138], sstep(5, .5, h) * (1 - rock) * .85);
+  c = mixc(c, [186, 174, 140], sstep(45, 2, h) * (1 - rock) * .7);
   // field-sized patchwork, plus a gentle regional tint
-  const v = (fbm(x / 190, z / 190, 2) - .5) * .30 + (fbm(x / 3200, z / 3200, 2) - .5) * .10;
+  const v = (fbm(x / 190, z / 190, 2) - .5) * .22 + (fbm(x / 26000, z / 26000, 2) - .5) * .26;
   return shade(c, 1 + v);
 }
 
-/* ============================================================== renderer == */
 const cv = document.getElementById("c");
 const ctx = cv.getContext("2d", { alpha: false, desynchronized: true });
 let W = 0, H = 0, CX = 0, CY = 0, F = 800, DPR = 1;
@@ -342,10 +504,10 @@ const MOBILE = COARSE || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent ||
 /* More LOD rings than a propeller aeroplane needs: at Mach 3 you cross the
    old draw distance in eight seconds, and from 24 km you can see most of it. */
 const QLEVELS = [
-  { dpr: 1.00, lev: 7, half: 6, base: 78, trees: .22, treeR: 750, clouds: 9000, glare: 0, vig: 0, shadow: 1, stars: 0 },
-  { dpr: 1.25, lev: 8, half: 6, base: 68, trees: .30, treeR: 950, clouds: 14000, glare: 1, vig: 1, shadow: 1, stars: 1 },
-  { dpr: 1.50, lev: 8, half: 7, base: 62, trees: .38, treeR: 1150, clouds: 20000, glare: 1, vig: 1, shadow: 1, stars: 1 },
-  { dpr: 2.00, lev: 9, half: 7, base: 58, trees: .44, treeR: 1350, clouds: 26000, glare: 1, vig: 1, shadow: 1, stars: 1 }
+  { dpr: 1.00, lev: 7, half: 6, base: 78, trees: .22, treeR: 750, clouds: 9000, glare: 0, vig: 0, shadow: 1, stars: 0, terrShadow: 0, cloudShadow: 0 },
+  { dpr: 1.25, lev: 8, half: 6, base: 62, trees: .30, treeR: 950, clouds: 14000, glare: 1, vig: 1, shadow: 1, stars: 1, terrShadow: 1, cloudShadow: 0 },
+  { dpr: 1.50, lev: 8, half: 7, base: 52, trees: .38, treeR: 1150, clouds: 20000, glare: 1, vig: 1, shadow: 1, stars: 1, terrShadow: 1, cloudShadow: 1 },
+  { dpr: 2.00, lev: 9, half: 7, base: 44, trees: .44, treeR: 1350, clouds: 26000, glare: 1, vig: 1, shadow: 1, stars: 1, terrShadow: 1, cloudShadow: 1 }
 ];
 const Q = { i: MOBILE ? 1 : 3, auto: true, work: 9, hold: 0, q: QLEVELS[MOBILE ? 1 : 3] };
 
@@ -585,14 +747,30 @@ function drawSky() {
   g.addColorStop(.72, rgb(...mid2));
   g.addColorStop(sp2 > .3 ? .955 : .90, rgb(...mixc(mid2, hz2, .72)));
   g.addColorStop(1, rgb(...hz2));
-  ctx.fillStyle = g; ctx.fillRect(-R, yOff - R, R * 2, R);
+  ctx.fillStyle = g; ctx.fillRect(-R, yOff - R, R * 2, R + F * Math.tan(horizonDip(cam.pos.y)) + 2);
   if (sp2 > .02 && Q.q.stars) drawStars(sp2, yOff, R);
-  // below the horizon: haze fading into distant ground colour
+  // Below the horizon: the earth itself. Near the ground that edge is straight;
+  // from 80,000 ft it is five degrees down and visibly bowed.
+  const dip = horizonDip(cam.pos.y);
   const g2 = ctx.createLinearGradient(0, yOff, 0, yOff + R * .40);
-  g2.addColorStop(0, rgb(...horizon));
-  g2.addColorStop(.30, rgb(...mixc(horizon, WORLD.ground, .5)));
-  g2.addColorStop(1, rgb(...mixc(shade(WORLD.ground, .92), horizon, .18)));
-  ctx.fillStyle = g2; ctx.fillRect(-R, yOff, R * 2, R);
+  g2.addColorStop(0, rgb(...hz2));
+  g2.addColorStop(.30, rgb(...mixc(hz2, WORLD.ground, .5)));
+  g2.addColorStop(1, rgb(...mixc(shade(WORLD.ground, .92), hz2, .18)));
+  ctx.fillStyle = g2;
+  if (dip < .004) {
+    ctx.fillRect(-R, yOff, R * 2, R);
+  } else {
+    const drop = F * Math.tan(clamp(pitch + dip, -1.45, 1.45));
+    const sag = F * Math.tan(dip) * .55;
+    ctx.beginPath();
+    ctx.moveTo(-R, drop + sag);
+    for (let i = 0; i <= 28; i++) {
+      const px = -R + (i / 28) * R * 2, k = px / (R * 1.02);
+      ctx.lineTo(px, drop + sag * k * k);
+    }
+    ctx.lineTo(R, yOff + R * 2); ctx.lineTo(-R, yOff + R * 2);
+    ctx.closePath(); ctx.fill();
+  }
   ctx.restore();
 
   // sun: halo, then the disc itself
@@ -671,12 +849,73 @@ function drawGlare() {
 }
 
 /* --------------------------------------------------------------- terrain - */
+/* Terrain cast shadows. Marching a few steps toward the sun and asking whether
+   anything stands high enough to block it is what gives mountains their form;
+   slope shading alone leaves them looking like painted cloth. */
+function sunShadow(x, z, h, cell) {
+  const sx = SUN_H.x, sz = SUN_H.z, slope = SUN_H.slope;
+  let sh = 0;
+  for (let i = 1; i <= 4; i++) {
+    const d = cell * i * i * .8 + 70;
+    const th = terrainH(x + sx * d, z + sz * d, cell);
+    const need = h + slope * d;
+    if (th > need) { sh = Math.max(sh, clamp((th - need) / (140 + d * .10), 0, 1)); if (sh > .96) break; }
+  }
+  return sh;
+}
+const SUN_H = (() => {
+  const s = WORLD.sun, hl = Math.hypot(s.x, s.z) || 1e-3;
+  return { x: s.x / hl, z: s.z / hl, slope: s.y / hl };
+})();
+
 const _hg = new Float32Array(19 * 19);
+/* Blend a surface into shadow: the sun goes, the sky ambient stays, which is
+   why real shadows are blue rather than black. */
+function shadowed(col, k) {
+  const L = LIGHT, a = 1 - k * .82;
+  const amb = [L.skyCol[0] * 255 * .55, L.skyCol[1] * 255 * .58, L.skyCol[2] * 255 * .62];
+  return [lerp(col[0] * a, col[0] * .40 + amb[0] * .16, k),
+          lerp(col[1] * a, col[1] * .40 + amb[1] * .16, k),
+          lerp(col[2] * a, col[2] * .42 + amb[2] * .20, k)];
+}
+
+/* One triangle of terrain, normal taken from its own three corners. The view
+   coordinates are already in `_vp` from the quad pass; ia/ib/ic pick them out. */
+function emitTri(vp, ia, ib, ic, ax, ay, az, bx, by, bz, cx2, cy2, cz2,
+                 cell, mcx, mcz, hAvg, slope, dist, dmin, ex, ey, ez, sh, bias, inflate) {
+  const t = _tri;
+  t[0] = vp[ia * 3]; t[1] = vp[ia * 3 + 1]; t[2] = vp[ia * 3 + 2];
+  t[3] = vp[ib * 3]; t[4] = vp[ib * 3 + 1]; t[5] = vp[ib * 3 + 2];
+  t[6] = vp[ic * 3]; t[7] = vp[ic * 3 + 1]; t[8] = vp[ic * 3 + 2];
+  const save = [vp[0], vp[1], vp[2], vp[3], vp[4], vp[5], vp[6], vp[7], vp[8], vp[9], vp[10], vp[11]];
+  for (let i = 0; i < 9; i++) vp[i] = t[i];
+  const m = clipProject(3);
+  for (let i = 0; i < 12; i++) vp[i] = save[i];
+  if (m < 3 || offscreen(m)) return;
+  // world-space normal of this triangle
+  let nx = (by - ay) * (cz2 - az) - (bz - az) * (cy2 - ay);
+  let ny = (bz - az) * (cx2 - ax) - (bx - ax) * (cz2 - az);
+  let nz = (bx - ax) * (cy2 - ay) - (by - ay) * (cx2 - ax);
+  const nl = Math.hypot(nx, ny, nz) || 1;
+  nx /= nl; ny /= nl; nz /= nl;
+  if (ny < 0) { nx = -nx; ny = -ny; nz = -nz; }
+  let col = litColor(terrainColor(hAvg, 1 - ny, mcx, mcz), nx, ny, nz);
+  if (sh > .01) col = shadowed(col, sh);
+  const fill = aerial(col, Math.max(dist, dmin), ex, ey, ez);
+  if (inflate > 0) grow(m, inflate);
+  DL.poly(dist + bias, _sp, m, fill, null, 0);
+}
+const _tri = new Float32Array(9);
+
 function drawTerrain() {
-  const LEV = Q.q.lev, base = Q.q.base, half = Q.q.half, span = half * 2 + 1;
+  const LEV = Q.q.lev, half = Q.q.half, span = half * 2 + 1;
+  // Widen every ring as you climb: from 80,000 ft the useful view is thousands
+  // of kilometres across, and 50 m cells there would be wasted on nothing.
+  const base = clamp(Q.q.base * (1 + cam.pos.y / 1700), Q.q.base, 26000);
   const sunv = LIGHT.sun;
   const cm = cam.m;
   const inflate = SEAM_PX * DPR;
+  const shadows = Q.q.terrShadow;
   for (let L = LEV - 1; L >= 0; L--) {
     const cell = base * (1 << L);
     const gx = Math.round(cam.pos.x / cell), gz = Math.round(cam.pos.z / cell);
@@ -724,18 +963,30 @@ function drawTerrain() {
           if (vz < dmin) dmin = vz;
         }
         if (!anyFront) continue;
-        const m = clipProject(4);
-        if (m < 3 || offscreen(m)) continue;
-        // true bilinear normal of the quad
-        const nxr = (h00 + h01 - h10 - h11) * .5, nzr = (h00 + h10 - h01 - h11) * .5;
-        const nl = Math.hypot(nxr, cell, nzr);
-        const nx = nxr / nl, ny = cell / nl, nz = nzr / nl;
-        const slope = 1 - ny;
         const hAvg = (h00 + h10 + h01 + h11) * .25;
+        const nxr = (h00 + h01 - h10 - h11) * .5, nzr = (h00 + h10 - h01 - h11) * .5;
+        const nl0 = Math.hypot(nxr, cell, nzr);
+        const slope = 1 - cell / nl0;
         // direction from the eye to this patch, for aerial perspective
         const dy = hAvg - cam.pos.y;
         const d3 = Math.hypot(dx, dy, dz) || 1;
         const ex = dx / d3, ey = dy / d3, ez = dz / d3;
+        // Split near ground into two triangles with their own normals. A single
+        // flat quad per cell is what makes terrain read as folded paper.
+        const tri = !water && L <= 2 && slope > .012;
+        let shade0 = 0;
+        if (shadows && !water && slope > .03 && dist < cell * 26)
+          shade0 = sunShadow(mcx, mcz, hAvg, cell);
+        if (tri) {
+          emitTri(_vp, 0, 1, 2, x0, h00, z0, x1, h10, z0, x1, h11, z1,
+            cell, mcx, mcz, hAvg, slope, dist, dmin, ex, ey, ez, shade0, lodBias + push, inflate);
+          emitTri(_vp, 0, 2, 3, x0, h00, z0, x1, h11, z1, x0, h01, z1,
+            cell, mcx, mcz, hAvg, slope, dist, dmin, ex, ey, ez, shade0, lodBias + push, inflate);
+          continue;
+        }
+        const m = clipProject(4);
+        if (m < 3 || offscreen(m)) continue;
+        const nx = nxr / nl0, ny = cell / nl0, nz = nzr / nl0;
         let col;
         if (water) {
           // Fresnel: water is dark looking down into it and mirror-bright at a
@@ -753,6 +1004,7 @@ function drawTerrain() {
           if (wetF < 1) col = mixc(litColor(terrainColor(1.5, slope, mcx, mcz), nx, ny, nz), col, wetF);
         } else {
           col = litColor(terrainColor(hAvg, slope, mcx, mcz), nx, ny, nz);
+          if (shade0 > .01) col = shadowed(col, shade0);
         }
         const fill = aerial(col, Math.max(dist, dmin), ex, ey, ez);
         // adjacent fills leave hairline gaps from antialiasing; grow each quad a
@@ -816,7 +1068,7 @@ function MB() {
 /* transform + emit a mesh. M maps local->world; origin is the world position of
    the local pivot; verts are taken relative to `pivot`. */
 const _mw = []; const _mv = [];
-function drawMesh(mesh, origin, M, pivot, tint, alphaFade) {
+function drawMesh(mesh, origin, M, pivot, tint, alphaFade, tintK) {
   const v = mesh.v, nv = v.length / 3;
   while (_mw.length < nv * 3) { _mw.push(0); _mv.push(0); }
   const px = pivot ? pivot[0] : 0, py = pivot ? pivot[1] : 0, pz = pivot ? pivot[2] : 0;
@@ -859,7 +1111,7 @@ function drawMesh(mesh, origin, M, pivot, tint, alphaFade) {
     const m = clipProject(n);
     if (m < 3 || offscreen(m)) continue;
     let col = fc.c;
-    if (tint) col = mixc(col, tint, .55);
+    if (tint) col = mixc(col, tint, tintK === undefined ? .55 : tintK);
     const dist = Math.hypot(cxv, cyv, czv) || 1;
     const ex = vx / dist, ey = vy / dist, ez = vz / dist;   // eye -> surface
     let c2 = litColor(col, nx, ny, nz);
@@ -892,15 +1144,15 @@ function drawMesh(mesh, origin, M, pivot, tint, alphaFade) {
 
 /* ======================================================= aircraft model == */
 const LIV = {
-  skin: [30, 32, 38], top: [36, 39, 46], belly: [24, 26, 31], edge: [58, 62, 72],
-  chine: [27, 29, 35], nac: [33, 35, 41], hot: [70, 66, 66],
+  skin: [26, 29, 36], top: [31, 35, 43], belly: [21, 23, 29], edge: [50, 55, 66],
+  chine: [24, 27, 34], nac: [29, 32, 40], hot: [66, 62, 62],
   metal: [126, 132, 142], rubber: [30, 30, 34], glass: [96, 140, 170],
   paint: [214, 220, 228], red: [172, 44, 40]
 };
 const TWO = { two: true };
 /* The skin is a dark, slightly blue iron ferrite black with a hard sheen —
    not matte, not chrome. High gloss keeps the highlight tight. */
-const SKIN = { two: true, spec: .55, gloss: 48 };
+const SKIN = { two: true, spec: .42, gloss: 66 };
 const SPEC = { two: true, spec: .55, gloss: 26 };   // painted scenery metal
 const ZSHIFT = 0;
 
@@ -940,8 +1192,8 @@ function buildAircraft() {
     const mb = MB();
     // [z, chine half width, y]
     const CH = [
-      [17.60, .16, .00], [15.20, .95, .00], [12.40, 1.75, .02], [9.20, 2.55, .05],
-      [5.40, 3.15, .07], [1.60, 3.55, .07], [-2.40, 3.72, .05]
+      [18.00, .10, .00], [16.20, .72, .00], [14.00, 1.45, .01], [11.40, 2.24, .03],
+      [8.40, 2.92, .05], [5.00, 3.38, .07], [1.40, 3.62, .07], [-2.40, 3.74, .05]
     ];
     const wOf = z => {   // fuselage half width at this station
       for (let i = 0; i < FST.length - 1; i++)
@@ -1043,7 +1295,7 @@ function buildAircraft() {
 
     // canted vertical fin on top of each nacelle
     const mb2 = MB();
-    const cant = side * 15 * DEG, hgt = 3.15;
+    const cant = side * 16 * DEG, hgt = 3.55;
     const fp = (up, zz) => [side * NACX + Math.sin(-cant) * up * hgt, .86 + Math.cos(cant) * up * hgt, zz];
     const prof = [[0, -1.30], [0, -5.40], [1, -4.70], [1, -2.90]];
     for (const t of [.08, -.08]) {
@@ -1110,7 +1362,7 @@ function buildAircraft() {
     const mb = MB();
     for (const side of [1, -1]) {
       const cant = side * 15 * DEG;
-      const fp = (up, zz, t) => [side * NACX + Math.sin(-cant) * up * 3.15 + t, .86 + Math.cos(cant) * up * 3.15, zz];
+      const fp = (up, zz, t) => [side * NACX + Math.sin(-cant) * up * 3.55 + t, .86 + Math.cos(cant) * up * 3.55, zz];
       for (const t of [.10, -.10])
         mb.quad(fp(.62, -3.30, t), fp(.62, -4.50, t), fp(.86, -4.30, t), fp(.86, -3.35, t), LIV.paint, { two: true, bias: -.4 });
     }
@@ -1400,8 +1652,9 @@ const SPECS = {
   CmA: .50, CmE: .22, CmQ: 4.0,
   Cnb: .090, Cndr: .062, Cnr: .170,
   Cla: .040, Clp: .400, Clb: .030,
-  // military thrust per engine, doubled again in full afterburner
-  thrustMil: 100000, thrustAB: 190000,
+  // Per engine. Ten times what a real J58 gives, which is what it takes to
+  // push this shape out to hypersonic speed rather than stopping at Mach 3.
+  thrustMil: 260000, thrustAB: 900000,
   wheels: [
     { p: v3(-3.30, -2.90, -3.00), brake: 1, steer: 0, grip: 1 },
     { p: v3(3.30, -2.90, -3.00), brake: 1, steer: 0, grip: 1 },
@@ -1419,8 +1672,10 @@ function cd0OfMach(M) {
 }
 /* Lift-curve slope: slender-delta value subsonic, 4/sqrt(M^2-1) supersonic. */
 function claOfMach(M) {
+  // 4/sqrt(M^2-1) collapses toward nothing hypersonically; a floor keeps the
+  // wing usable up there instead of leaving you purely ballistic.
   const suP = 4 / Math.sqrt(Math.max(M * M - 1, .30));
-  return lerp(SPECS.CLa, Math.min(suP, 4.6), sstep(.82, 1.25, M));
+  return lerp(SPECS.CLa, clamp(suP, .85, 4.6), sstep(.82, 1.25, M));
 }
 
 const PLANE = {
@@ -1428,6 +1683,7 @@ const PLANE = {
   thr: 0, inE: 0, inA: 0, inR: 0, dE: 0, dA: 0, dR: 0,
   trim: 0, flap: 0, flapCmd: 0, gear: 1, gearCmd: 1, brake: 0, park: true,
   chute: 0, chuteCmd: 0, mach: 0, ab: 0, abSm: 0, unstart: 0, unstartSide: 0, qbar: 0,
+  gMax: 1, gMin: 1, gStress: 0, gRed: 0, heat: 0, burn: 0,
   rpm: 0, propAng: 0, alpha: 0, beta: 0, ias: 0, tas: 0, gload: 1, vsi: 0,
   onGround: true, wow: 0, stall: 0, crashed: false, crashT: 0, msg: "", holdHdg: undefined,
   hardLand: 0, touched: 0, lastVS: 0, aoaCap: false, dist: 0
@@ -1451,7 +1707,7 @@ function resetPlane(scen) {
   P.inE = P.inA = P.inR = 0; P.trim = 0; P.flap = P.flapCmd = 0;
   P.crashed = false; P.crashT = 0; P.stall = 0; P.hardLand = 0; P.touched = 0; P.pitchI = 0; P.holdHdg = undefined;
   P.gear = P.gearCmd = 1; P.brake = 0; P.rpm = 0; P.dist = 0;
-  P.chute = P.chuteCmd = 0; P.mach = 0; P.overQ = 0; P.ab = 0; P.abSm = 0; P.unstart = 0; P.apAlt = undefined; P.apHdg = undefined;
+  P.chute = P.chuteCmd = 0; P.mach = 0; P.overQ = 0; P.gMax = 1; P.gMin = 1; P.gStress = 0; P.gRed = 0; P.heat = 0; P.burn = 0; P.ab = 0; P.abSm = 0; P.unstart = 0; P.apAlt = undefined; P.apHdg = undefined;
   P.q = qAxis(0, 1, 0, Math.PI);            // runway 18: heading south
   P.thr = 0;
   if (scen === "free") {
@@ -1564,10 +1820,13 @@ function physics(P, dt) {
   P.ab = clamp((thrCmd - AB_GATE) / (1 - AB_GATE), 0, 1);
   const abSm = approach(P.abSm === undefined ? 0 : P.abSm, P.ab, 3.5, dt);
   P.abSm = abSm;
-  // Ram compression: these inlets make more thrust the faster they go, right
-  // up to design Mach, then fall away.
-  const ram = 1 + 2.0 * sstep(.4, 3.05, P.mach) - 1.3 * sstep(3.2, 4.0, P.mach);
-  const dens = Math.pow(clamp(rho / 1.225, .0005, 1), .62);
+  // Ram compression keeps climbing well past Mach 3 — the inlet is doing more
+  // of the compressing the faster it goes — and only gives up in the high
+  // twenties. The density floor is the rocket: it keeps working where there is
+  // no useful air left to breathe.
+  const ram = 1 + 2.4 * sstep(.4, 5, P.mach) + 1.6 * sstep(5, 14, P.mach)
+    - 2.6 * sstep(18, 26.5, P.mach);
+  const dens = Math.max(Math.pow(clamp(rho / 1.225, .0005, 1), .62), .14);
   const perEngine = SPECS.thrustMil * clamp(P.rpm, 0, 1) + SPECS.thrustAB * abSm;
   const thrust = 2 * perEngine * ram * dens;
 
@@ -1606,7 +1865,10 @@ function physics(P, dt) {
     const fb = vadd(vadd(vmul(liftDir, L), vmul(vd, -D)), v3(Y, 0, 0));
     fb.z += thrust;
     F = vadd(F, mRot(m, fb));
-    P.gload = L / (SPECS.mass * 9.81);
+    // Load factor as an accelerometer would read it: the aerodynamic force
+    // along the body vertical, in g, which is what the pilot and the airframe
+    // actually feel — not lift over weight.
+    P.gload = (L * Math.cos(P.alpha) + D * Math.sin(P.alpha)) / (SPECS.mass * 9.81);
     // moments
     const cq = .5 * rho * V * SPECS.S;
     const dET = clamp(P.dE + P.trim, -1.3, 1.3);
@@ -1725,9 +1987,28 @@ function physics(P, dt) {
   P.propAng += P.rpm * 145 * dt;
   P.vsi = P.vel.y;
   P.dist += vlen(P.vel) * dt;
+  // Stagnation heating rises with the cube of speed and the root of density:
+  // this is the real hypersonic limit, and it is worth seeing.
+  const heatRate = Math.sqrt(Math.max(rho, 1e-7) / 1.225) * Math.pow(Math.max(V, 0) / 1000, 3.1);
+  P.heat = clamp(approach(P.heat || 0, clamp(heatRate * .52, 0, 1.6), .55, dt), 0, 1.6);
+  if (!P.crashed && P.heat > 1.25) {
+    P.burn = (P.burn || 0) + dt;
+    cam.shake = Math.max(cam.shake, clamp((P.heat - 1.25) * 2, 0, 1.2));
+    if (P.burn > 6) crash("SKIN TEMPERATURE");
+  } else P.burn = Math.max(0, (P.burn || 0) - dt * .5);
+
+  // peak tracking, and the physiological price of pulling
+  // only once actually flying, or the spawn transient records a false peak
+  if (!P.onGround && V > 60 && GAME.t > 2) {
+    if (P.gload > (P.gMax || 0)) P.gMax = Math.min(P.gload, 20);
+    if (P.gload < (P.gMin === undefined ? 1 : P.gMin)) P.gMin = Math.max(P.gload, -8);
+  }
+  const strain = P.gload > 4.6 ? (P.gload - 4.6) * .40 : P.gload < -1.2 ? (-1.2 - P.gload) * .55 : -1.1;
+  P.gStress = clamp((P.gStress || 0) + strain * dt, 0, 1.6);
+  P.gRed = P.gload < -1.2 ? 1 : 0;
   // Dynamic pressure is the real limit low down: this airframe is built for
   // thin air, and holding Mach 3 at low level tears it apart.
-  if (!P.crashed && P.qbar > 125000) {
+  if (!P.crashed && P.qbar > 160000) {
     P.overQ = (P.overQ || 0) + dt;
     cam.shake = Math.max(cam.shake, clamp(P.overQ * .5, 0, 1.4));
     if (P.overQ > 4) crash("OVERSTRESS");
@@ -1786,7 +2067,7 @@ function drawParts() {
     const f = q.t / q.life;
     const r = (q.r + q.grow * q.t) * sp.s;
     if (r < .6) continue;
-    const a = (1 - f) * (q.kind === 1 ? .9 : .55);
+    const a = (1 - f) * (q.kind === 1 ? .9 : .42);
     const col = q.kind === 1 ? mixc([255, 226, 140], [220, 70, 30], f) : q.col;
     DL.sprite(sp.z, sp.x, sp.y, r, sprite(col[0], col[1], col[2], 1), a);
   }
@@ -1808,7 +2089,7 @@ function spawnTrails(dt) {
   if (air.T < 233 && P.rpm > .45 && Math.random() < dt * 60) {
     for (const sx of [-4.62, 4.62]) {
       const ex = vadd(P.pos, mRot(P.m, v3(sx, -.06, -9.6)));
-      addPart(ex, v3(), 3.0, 16 + Math.random() * 8, [246, 249, 255], 2.1);
+      addPart(ex, v3(), 1.2, 18 + Math.random() * 10, [244, 248, 255], 1.15);
     }
   }
   // transonic vapour cone through the sound barrier
@@ -1915,14 +2196,22 @@ function drawAircraft() {
     const o = vadd(pos, mRot(Rb, v3(piv[0], piv[1], piv[2])));
     drawMesh(part.mesh, o, mmul(Rb, mat), piv);
   };
+  const heat = P.heat || 0;
+  const glow = heat > .25 ? mixc([120, 40, 20], [255, 216, 170], clamp((heat - .25) / 1.0, 0, 1)) : null;
+  const gk = glow ? clamp((heat - .25) * .75, 0, .72) : 0;
   if (external) {
-    drawMesh(AC.fuse, pos, Rb, null);
-    drawMesh(AC.chine, pos, Rb, null);
-    drawMesh(AC.wingL, pos, Rb, null);
-    drawMesh(AC.wingR, pos, Rb, null);
-    drawMesh(AC.nacL, pos, Rb, null);
-    drawMesh(AC.nacR, pos, Rb, null);
+    drawMesh(AC.fuse, pos, Rb, null, glow, undefined, gk);
+    drawMesh(AC.chine, pos, Rb, null, glow, undefined, gk);
+    drawMesh(AC.wingL, pos, Rb, null, glow, undefined, gk * .8);
+    drawMesh(AC.wingR, pos, Rb, null, glow, undefined, gk * .8);
+    drawMesh(AC.nacL, pos, Rb, null, glow, undefined, gk * .8);
+    drawMesh(AC.nacR, pos, Rb, null, glow, undefined, gk * .8);
     drawMesh(AC.marks, pos, Rb, null);
+    if (heat > .35) {   // shock layer standing off the nose
+      const n = projectPoint(vadd(pos, mRot(Rb, v3(0, 0, 21))));
+      if (n) DL.sprite(n.z + 4, n.x, n.y, Math.max(3.2 * n.s, 3),
+        sprite(255, 190, 130, 1), clamp((heat - .35) * .6, 0, .55));
+    }
     // Elevons do both jobs: they move together for pitch and differentially
     // for roll, exactly as they do on a tailless delta.
     hinge(AC.elevOutR, mAxis(1, 0, 0, -ele - ail - fl * .35));
@@ -2601,9 +2890,10 @@ function drawHUDFull() {
   hudFont(12 * U); ctx.fillStyle = GD; ctx.fillText("AGL ft", rx + 8 * U, CY - 4 * U);
   hudFont(16 * U, 600); ctx.fillStyle = G;
   ctx.fillText(Math.round((P.pos.y - groundH(P.pos.x, P.pos.z)) * FT), rx + 8 * U, CY + 16 * U);
-  hudFont(12 * U); ctx.fillStyle = GD; ctx.fillText("G", rx + 8 * U, CY + 38 * U);
-  hudFont(16 * U, 600); ctx.fillStyle = (P.gload > 5 || P.gload < -1.5) ? "rgba(255,120,90,.95)" : G;
-  ctx.fillText(P.gload.toFixed(1), rx + 8 * U, CY + 54 * U);
+  hudFont(12 * U); ctx.fillStyle = GD; ctx.fillText("MACH", rx + 8 * U, CY + 38 * U);
+  hudFont(16 * U, 600); ctx.fillStyle = G;
+  ctx.fillText(P.mach.toFixed(2), rx + 8 * U, CY + 54 * U);
+  drawGMeter(P, 96 * U + tw + 74 * U, H - 146 * U, 60 * U);
 
   // throttle + prop
   const tx = 96 * U - 24 * U, ty = CY + tapeH / 2 + 34 * U, tbw = 100 * U, tbh = 14 * U;
@@ -2652,8 +2942,8 @@ function drawHUDFull() {
   if (P.gear < .98 && P.pos.y - groundH(P.pos.x, P.pos.z) < 220 && P.ias * KT < 130 && !P.crashed) warn.push(["GEAR", "#ff6a56"]);
   if (P.gload > 4.2) warn.push(["OVER G", "#ff6a56"]);
   if (P.unstart > 0) warn.push(["INLET UNSTART", "#ff6a56"]);
-  if (P.qbar > 95000) warn.push(["Q LIMIT", "#ffb03a"]);
-  if (P.mach > 3.3) warn.push(["OVER MACH", "#ffb03a"]);
+  if (P.qbar > 115000) warn.push(["Q LIMIT \u00b7 CLIMB", "#ffb03a"]);
+  if (P.heat > .55) warn.push(["SKIN TEMP", "#ffb03a"]);
   hudFont(20 * U, 700); ctx.textAlign = "center";
   const blink = (GAME.t * 4 | 0) % 2 === 0;
   for (let i = 0; i < warn.length; i++) {
@@ -2709,8 +2999,9 @@ function drawHUDCompact() {
   panel(W - sr - 12 * u - pw, py, pw, ph, "ALT FT", String(Math.round(P.pos.y * FT)), G,
     (vs >= 0 ? "+" : "") + Math.round(vs / 10) * 10);
   hudFont(10 * u); ctx.textAlign = "right"; ctx.fillStyle = GD;
-  ctx.fillText("AGL " + Math.round((P.pos.y - groundH(P.pos.x, P.pos.z)) * FT) + "   G " + P.gload.toFixed(1),
+  ctx.fillText("AGL " + Math.round((P.pos.y - groundH(P.pos.x, P.pos.z)) * FT),
     W - sr - 12 * u, py + ph + 11 * u);
+  drawGMeter(P, W - sr - 12 * u - pw * .5, py + ph + 24 * u + 46 * u, 46 * u);
   // Mach and A/P badge under the speed panel
   box(sl + 12 * u, py + ph + 6 * u, pw, 34 * u, 5 * u, PANEL, GD);
   hudFont(10 * u); ctx.fillStyle = GD; ctx.textAlign = "left";
@@ -2817,6 +3108,97 @@ function drawHUDCompact() {
   hudFont(11.5 * u); ctx.fillStyle = "rgba(200,224,244,.85)"; ctx.textAlign = "center";
   ctx.fillText(objectiveLine(), CX, hy + 26 * u + (camMode === 1 ? 14 * u : 118 * u));
   ctx.restore();
+}
+
+/* The G meter. Load factor is the number this airframe actually lives or dies
+   by, so it gets a dial of its own: current needle on an arc from -2 to +7,
+   the live figure, and the peaks held since the last reset. */
+function drawGMeter(P, x, y, r) {
+  const u = UI;
+  const A0 = Math.PI * .78, A1 = Math.PI * 2.22;      // sweep, clockwise from lower left
+  const gToA = g => A0 + (clamp(g, -2, 7) + 2) / 9 * (A1 - A0);
+  ctx.save();
+  ctx.textBaseline = "middle";
+  // dial face
+  ctx.beginPath(); ctx.arc(x, y, r, 0, TAU);
+  ctx.fillStyle = "rgba(6,12,18,.62)"; ctx.fill();
+  // coloured bands: the safe range, then caution, then the structural limit
+  const band = (g0, g1, col, w) => {
+    ctx.beginPath(); ctx.arc(x, y, r - w * .5 - 2 * u, gToA(g0), gToA(g1));
+    ctx.strokeStyle = col; ctx.lineWidth = w; ctx.stroke();
+  };
+  band(-2, -1.2, "rgba(255,110,90,.55)", 4 * u);
+  band(-1.2, 3.5, "rgba(150,255,190,.40)", 4 * u);
+  band(3.5, 5, "rgba(255,196,80,.55)", 4 * u);
+  band(5, 7, "rgba(255,110,90,.65)", 4 * u);
+  // ticks and numerals
+  hudFont(9 * u, 600); ctx.textAlign = "center";
+  for (let g = -2; g <= 7; g++) {
+    const a = gToA(g), major = g % 1 === 0;
+    const r0 = r - 8 * u, r1 = r - (major ? 14 : 11) * u;
+    ctx.beginPath();
+    ctx.moveTo(x + Math.cos(a) * r0, y + Math.sin(a) * r0);
+    ctx.lineTo(x + Math.cos(a) * r1, y + Math.sin(a) * r1);
+    ctx.strokeStyle = "rgba(170,206,232,.55)"; ctx.lineWidth = 1.3 * u; ctx.stroke();
+    if (g % 2 !== 0) continue;
+    ctx.fillStyle = "rgba(190,214,236,.75)";
+    ctx.fillText(String(g), x + Math.cos(a) * (r - 24 * u), y + Math.sin(a) * (r - 24 * u));
+  }
+  // peak markers, held
+  for (const [pk, col] of [[P.gMax, "rgba(255,150,90,.95)"], [P.gMin, "rgba(120,190,255,.95)"]]) {
+    const a = gToA(pk);
+    ctx.beginPath();
+    ctx.moveTo(x + Math.cos(a) * (r - 7 * u), y + Math.sin(a) * (r - 7 * u));
+    ctx.lineTo(x + Math.cos(a) * (r - 16 * u), y + Math.sin(a) * (r - 16 * u));
+    ctx.strokeStyle = col; ctx.lineWidth = 2.2 * u; ctx.stroke();
+  }
+  // needle
+  const an = gToA(P.gload);
+  const nc = P.gload > 5 || P.gload < -1.2 ? "rgba(255,120,90,.98)"
+    : P.gload > 3.5 ? "rgba(255,206,110,.98)" : "rgba(226,244,255,.98)";
+  ctx.beginPath();
+  ctx.moveTo(x + Math.cos(an + 2.4) * 4 * u, y + Math.sin(an + 2.4) * 4 * u);
+  ctx.lineTo(x + Math.cos(an) * (r - 12 * u), y + Math.sin(an) * (r - 12 * u));
+  ctx.lineTo(x + Math.cos(an - 2.4) * 4 * u, y + Math.sin(an - 2.4) * 4 * u);
+  ctx.closePath(); ctx.fillStyle = nc; ctx.fill();
+  ctx.beginPath(); ctx.arc(x, y, 3.2 * u, 0, TAU);
+  ctx.fillStyle = "rgba(226,244,255,.95)"; ctx.fill();
+  // read-out
+  hudFont(21 * u, 700); ctx.fillStyle = nc; ctx.textAlign = "center";
+  ctx.fillText(P.gload.toFixed(1), x, y + r * .48);
+  hudFont(9 * u, 600); ctx.fillStyle = "rgba(170,196,220,.8)";
+  ctx.fillText("G", x, y - r * .40);
+  hudFont(9.5 * u, 600);
+  ctx.fillStyle = "rgba(255,150,90,.9)"; ctx.textAlign = "right";
+  ctx.fillText("\u25b2" + P.gMax.toFixed(1), x + r * .92, y + r * .78);
+  ctx.fillStyle = "rgba(120,190,255,.9)"; ctx.textAlign = "left";
+  ctx.fillText("\u25bc" + P.gMin.toFixed(1), x - r * .92, y + r * .78);
+  ctx.restore();
+}
+
+/* Grey-out and red-out. Sustained G drains blood from the eyes before it
+   breaks anything, so the view tunnels in before the airframe complains. */
+function drawGEffect(P) {
+  const s = P.gStress || 0;
+  if (s < .02) return;
+  const k = clamp(s, 0, 1.4);
+  const r0 = Math.hypot(W, H) * .58 * (1 - clamp(k * .52, 0, .78));
+  const g = ctx.createRadialGradient(CX, CY, r0 * .25, CX, CY, r0);
+  if (P.gRed) {
+    g.addColorStop(0, "rgba(120,10,10,0)");
+    g.addColorStop(.55, "rgba(150,16,16," + (k * .30).toFixed(3) + ")");
+    g.addColorStop(1, "rgba(120,8,8," + Math.min(.92, k * .85).toFixed(3) + ")");
+  } else {
+    g.addColorStop(0, "rgba(0,0,0,0)");
+    g.addColorStop(.5, "rgba(6,8,10," + (k * .22).toFixed(3) + ")");
+    g.addColorStop(1, "rgba(3,4,6," + Math.min(.96, k * .9).toFixed(3) + ")");
+  }
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  if (k > .9) {
+    hudFont(17 * UI, 700); ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillStyle = P.gRed ? "rgba(255,180,180,.9)" : "rgba(210,224,236,.85)";
+    ctx.fillText(P.gRed ? "RED-OUT" : "GREY-OUT", CX, CY + 120 * UI);
+  }
 }
 
 /* the one-line mission read-out, shared by both HUDs */
@@ -3146,7 +3528,7 @@ function frame(now) {
   DL.flush();
   drawGlare();
   if (Q.q.vig && vignette) { ctx.fillStyle = vignette; ctx.fillRect(0, 0, W, H); }
-  if (GAME.started && !GAME.paused) drawHUD(dt);
+  if (GAME.started && !GAME.paused) { drawGEffect(PLANE); drawHUD(dt); }
   tuneQuality(dt, performance.now() - work0);
   requestAnimationFrame(frame);
 }
