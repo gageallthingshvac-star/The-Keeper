@@ -2519,12 +2519,12 @@ function resetPlane(scen) {
      yaw    - commands sideslip, with a yaw damper underneath it            */
 
 const FBW = {
-  gMax: 7.5,          // g at full back stick
-  gMin: -2.6,         // g at full forward stick
+  gMax: 12,           // g at full back stick — the wing runs out before this does
+  gMin: -4.5,         // g at full forward stick
   pMax: 2.6,          // rad/s roll rate at full lateral stick (~150 deg/s)
   qMax: .40,          // rad/s pitch rate at full stick in the low-speed law
   bMax: 7 * DEG,      // sideslip at full rudder
-  aoaMax: 23 * DEG,   // hard angle-of-attack limit
+  aoaMax: 27 * DEG,   // where the wing actually breaks down, not a soft cap
   kRoll: 9.0,         // roll-rate loop bandwidth, 1/s
   kPitch: 1.6,        // g loop proportional gain, 1/s
   kPitchI: 1.5,       // g loop integral gain
@@ -2597,19 +2597,19 @@ function flightControl(P, dt, e, cE, cA, cR) {
 
   let dE = clamp(lerp(dEg, dEq, gnd), -1, 1);
 
-  /* angle-of-attack limit. A delta goes on flying long past the point where
-     the drag it is making has already killed you, so the limiter is what
-     keeps a hard pull from turning into a falling brick. */
+  /* The one remaining protection, and it is on your side: past about 27
+     degrees this delta stops flying and starts falling, with the vortex gone
+     and nothing but drag left. The limiter holds the pull right at the peak
+     of the lift curve instead of letting you haul it over the back. */
   const a = P.alpha || 0;
   P.aoaCap = a > FBW.aoaMax && dE > 0;
   if (P.aoaCap) {
     dE = clamp(dE - (a - FBW.aoaMax) * 26, -1, .04);
     P.fbwI = Math.min(P.fbwI, .1);          // don't wind the integrator up against the limit
   }
-  /* load limit: the airframe comes apart past about 9 g, so the system will
-     not let the stick take it there however hard you pull */
-  if ((P.gload || 0) > FBW.gMax + 1.2 && dE > 0) { dE = Math.min(dE, 0); P.fbwI = Math.min(P.fbwI, .1); }
-  if ((P.gload || 0) < FBW.gMin - 1.0 && dE < 0) { dE = Math.max(dE, 0); P.fbwI = Math.max(P.fbwI, -.1); }
+  /* There is no load limiter any more. The only thing still standing between
+     the stick and the wing is the angle-of-attack limit above, and that one
+     is there to keep the aeroplane flying, not to keep you off the numbers. */
 
   /* ---------------- roll ------------------------------------------------- */
   // w.z positive is a roll to the left, so a right stick asks for negative w.z
@@ -2778,13 +2778,13 @@ function physics(P, dt) {
     // an inlet unstart: one duct loses its shock and yaws the aircraft hard.
     // Only ever at high Mach and high angle of attack, as in the real thing.
     const risk = sstep(2.4, 3.2, P.mach) * sstep(6 * DEG, 13 * DEG, Math.abs(P.alpha) + Math.abs(P.beta));
-    if (risk > .01 && Math.random() < risk * dt * .45) P.unstart = .9 + Math.random() * .8;
+    if (risk > .01 && Math.random() < risk * dt * .16) P.unstart = .5 + Math.random() * .5;
     if (P.unstart > 0) {
       P.unstart -= dt;
       const sgn = P.unstartSide || (P.unstartSide = Math.random() < .5 ? -1 : 1);
-      M.y += sgn * 2.4e6 * clamp(P.unstart, 0, 1);
-      M.z += sgn * 6.0e5 * clamp(P.unstart, 0, 1);
-      cam.shake = Math.max(cam.shake, 1.1);
+      M.y += sgn * 1.2e6 * clamp(P.unstart, 0, 1);
+      M.z += sgn * 3.0e5 * clamp(P.unstart, 0, 1);
+      cam.shake = Math.max(cam.shake, .7);
       if (P.unstart <= 0) P.unstartSide = 0;
     }
   }
@@ -2842,7 +2842,8 @@ function physics(P, dt) {
       }
       const vsLim = AP.on ? 9.0 : 5.6;
       if (wow && P.lastVS < -vsLim && !P.touched) crash("HARD LANDING");
-      if (maxFn > SPECS.mass * 9.81 * (AP.on ? 6.5 : 4.6)) crash("GEAR COLLAPSE");
+      // the undercarriage is still made of metal, but it is a lot harder to fold
+      if (maxFn > SPECS.mass * 9.81 * (AP.on ? 11 : 8.5)) crash("GEAR COLLAPSE");
       if (wow && !P.gear) crash("GEAR UP LANDING");
     }
   }
@@ -2875,10 +2876,12 @@ function physics(P, dt) {
   // this is the real hypersonic limit, and it is worth seeing.
   const heatRate = Math.sqrt(Math.max(rho, 1e-7) / 1.225) * Math.pow(Math.max(V, 0) / 1000, 3.1);
   P.heat = clamp(approach(P.heat || 0, clamp(heatRate * .52, 0, 1.6), .55, dt), 0, 1.6);
+  /* Heat is a read-out and a rumble, not a countdown. It used to burn the
+     airframe through after six seconds over the limit; it does not any more.
+     Fly it as hot as you like. */
   if (!P.crashed && P.heat > 1.25) {
     P.burn = (P.burn || 0) + dt;
-    cam.shake = Math.max(cam.shake, clamp((P.heat - 1.25) * 2, 0, 1.2));
-    if (P.burn > 6) crash("SKIN TEMPERATURE");
+    cam.shake = Math.max(cam.shake, clamp((P.heat - 1.25) * 1.1, 0, .55));
   } else P.burn = Math.max(0, (P.burn || 0) - dt * .5);
 
   // peak tracking, and the physiological price of pulling
@@ -2887,23 +2890,26 @@ function physics(P, dt) {
     if (P.gload > (P.gMax || 0)) P.gMax = Math.min(P.gload, 20);
     if (P.gload < (P.gMin === undefined ? 1 : P.gMin)) P.gMin = Math.max(P.gload, -8);
   }
-  const strain = P.gload > 4.6 ? (P.gload - 4.6) * .40 : P.gload < -1.2 ? (-1.2 - P.gload) * .55 : -1.1;
-  P.gStress = clamp((P.gStress || 0) + strain * dt, 0, 1.6);
-  P.gRed = P.gload < -1.2 ? 1 : 0;
-  // Pull hard enough for long enough and the wings come off, which is the
-  // limit the G meter's red band is actually marking.
+  /* Vision still narrows under sustained g, because it should — but it comes
+     on later and never closes all the way, so it reads as the pull costing you
+     something rather than as the sim taking the aeroplane away. */
+  const strain = P.gload > 7.5 ? (P.gload - 7.5) * .26 : P.gload < -2.2 ? (-2.2 - P.gload) * .34 : -1.4;
+  P.gStress = clamp((P.gStress || 0) + strain * dt, 0, 1.0);
+  P.gRed = P.gload < -2.2 ? 1 : 0;
+  /* The wings used to come off past nine g. They do not any more — pull as
+     hard as the aeroplane will give you. All that is left of it is the
+     airframe groaning, which is feedback rather than a sentence. */
   if (!P.crashed && Math.abs(P.gload) > 9) {
     P.gBreak = (P.gBreak || 0) + dt;
-    cam.shake = Math.max(cam.shake, 1.3);
-    if (P.gBreak > .7) crash("AIRFRAME OVERSTRESS");
+    cam.shake = Math.max(cam.shake, clamp((Math.abs(P.gload) - 9) * .22, 0, .7));
   } else P.gBreak = Math.max(0, (P.gBreak || 0) - dt * 1.5);
 
-  // Dynamic pressure is the real limit low down: this airframe is built for
-  // thin air, and holding Mach 3 at low level tears it apart.
+  /* Dynamic pressure down low used to tear the airframe apart after four
+     seconds. Now it just shakes: Mach 3 on the deck is punishing to look at
+     and free to do. */
   if (!P.crashed && P.qbar > 160000) {
     P.overQ = (P.overQ || 0) + dt;
-    cam.shake = Math.max(cam.shake, clamp(P.overQ * .5, 0, 1.4));
-    if (P.overQ > 4) crash("OVERSTRESS");
+    cam.shake = Math.max(cam.shake, clamp(P.overQ * .22, 0, .65));
   } else P.overQ = Math.max(0, (P.overQ || 0) - dt * .6);
   // never let the aircraft sink through the world
   const gh = groundH(P.pos.x, P.pos.z);
@@ -3832,10 +3838,11 @@ function drawHUDFull() {
   else if (P.alpha > 24 * DEG && !P.onGround) warn.push(["APPROACHING STALL", "#ffb03a"]);
   if (P.aoaCap) warn.push(["AoA LIMIT", "#ffb03a"]);
   if (P.gear < .98 && P.pos.y - groundH(P.pos.x, P.pos.z) < 220 && P.ias * KT < 130 && !P.crashed) warn.push(["GEAR", "#ff6a56"]);
-  if (P.gload > 4.2) warn.push(["OVER G", "#ff6a56"]);
+  if (P.gload > 8.5) warn.push(["HIGH G", "#ffb03a"]);
   if (P.unstart > 0) warn.push(["INLET UNSTART", "#ff6a56"]);
-  if (P.qbar > 115000) warn.push(["Q LIMIT \u00b7 CLIMB", "#ffb03a"]);
-  if (P.heat > .55) warn.push(["SKIN TEMP", "#ffb03a"]);
+  // nothing below this line will break the aeroplane; they are read-outs
+  if (P.qbar > 150000) warn.push(["HIGH Q", "#7fd4ff"]);
+  if (P.heat > .90) warn.push(["SKIN TEMP", "#7fd4ff"]);
   // with this much thrust you are through rotation speed in seconds, so the
   // callout matters more here than it does in a real aeroplane
   if (P.onGround && P.ias * 1.94384 > 195 && !P.crashed) warn.push(["ROTATE", "#7ce89a"]);
@@ -3991,7 +3998,7 @@ function drawHUDCompact() {
   if (P.stall > .2 && !P.onGround) warn.push(["STALL", "#ff6a56"]);
   else if (P.alpha > 24 * DEG && !P.onGround) warn.push(["APPROACHING STALL", "#ffb03a"]);
   if (P.gear < .98 && P.pos.y - groundH(P.pos.x, P.pos.z) < 220 && P.ias * KT < 130 && !P.crashed) warn.push(["GEAR", "#ff6a56"]);
-  if (P.gload > 4.2) warn.push(["OVER G", "#ff6a56"]);
+  if (P.gload > 8.5) warn.push(["HIGH G", "#ffb03a"]);
   if (P.unstart > 0) warn.push(["INLET UNSTART", "#ff6a56"]);
   hudFont(19 * u, 700); ctx.textAlign = "center";
   const blink = (GAME.t * 4 | 0) % 2 === 0;
@@ -4011,7 +4018,7 @@ function drawHUDCompact() {
 function drawGMeter(P, x, y, r) {
   const u = UI;
   const A0 = Math.PI * .78, A1 = Math.PI * 2.22;      // sweep, clockwise from lower left
-  const gToA = g => A0 + (clamp(g, -2, 7) + 2) / 9 * (A1 - A0);
+  const gToA = g => A0 + (clamp(g, -4, 12) + 4) / 16 * (A1 - A0);
   ctx.save();
   ctx.textBaseline = "middle";
   // dial face
@@ -4022,20 +4029,22 @@ function drawGMeter(P, x, y, r) {
     ctx.beginPath(); ctx.arc(x, y, r - w * .5 - 2 * u, gToA(g0), gToA(g1));
     ctx.strokeStyle = col; ctx.lineWidth = w; ctx.stroke();
   };
-  band(-2, -1.2, "rgba(255,110,90,.55)", 4 * u);
-  band(-1.2, 3.5, "rgba(150,255,190,.40)", 4 * u);
-  band(3.5, 5, "rgba(255,196,80,.55)", 4 * u);
-  band(5, 7, "rgba(255,110,90,.65)", 4 * u);
+  // there is no structural limit any more, so the top of the dial is simply
+  // where the wing stops giving: caution, then everything it has
+  band(-4, -2.2, "rgba(255,196,80,.50)", 4 * u);
+  band(-2.2, 5, "rgba(150,255,190,.40)", 4 * u);
+  band(5, 8.5, "rgba(255,196,80,.55)", 4 * u);
+  band(8.5, 12, "rgba(255,150,90,.55)", 4 * u);
   // ticks and numerals
   hudFont(9 * u, 600); ctx.textAlign = "center";
-  for (let g = -2; g <= 7; g++) {
+  for (let g = -4; g <= 12; g++) {
     const a = gToA(g), major = g % 1 === 0;
     const r0 = r - 8 * u, r1 = r - (major ? 14 : 11) * u;
     ctx.beginPath();
     ctx.moveTo(x + Math.cos(a) * r0, y + Math.sin(a) * r0);
     ctx.lineTo(x + Math.cos(a) * r1, y + Math.sin(a) * r1);
     ctx.strokeStyle = "rgba(170,206,232,.55)"; ctx.lineWidth = 1.3 * u; ctx.stroke();
-    if (g % 2 !== 0) continue;
+    if (g % 4 !== 0) continue;
     ctx.fillStyle = "rgba(190,214,236,.75)";
     ctx.fillText(String(g), x + Math.cos(a) * (r - 24 * u), y + Math.sin(a) * (r - 24 * u));
   }
@@ -4049,8 +4058,8 @@ function drawGMeter(P, x, y, r) {
   }
   // needle
   const an = gToA(P.gload);
-  const nc = P.gload > 5 || P.gload < -1.2 ? "rgba(255,120,90,.98)"
-    : P.gload > 3.5 ? "rgba(255,206,110,.98)" : "rgba(226,244,255,.98)";
+  const nc = P.gload > 8.5 || P.gload < -2.2 ? "rgba(255,150,90,.98)"
+    : P.gload > 5 ? "rgba(255,206,110,.98)" : "rgba(226,244,255,.98)";
   ctx.beginPath();
   ctx.moveTo(x + Math.cos(an + 2.4) * 4 * u, y + Math.sin(an + 2.4) * 4 * u);
   ctx.lineTo(x + Math.cos(an) * (r - 12 * u), y + Math.sin(an) * (r - 12 * u));
@@ -4076,20 +4085,20 @@ function drawGMeter(P, x, y, r) {
 function drawGEffect(P) {
   const s = P.gStress || 0;
   if (s < .02) return;
-  const k = clamp(s, 0, 1.4);
-  const r0 = Math.hypot(W, H) * .58 * (1 - clamp(k * .52, 0, .78));
+  const k = clamp(s, 0, 1.0);
+  const r0 = Math.hypot(W, H) * .58 * (1 - clamp(k * .34, 0, .44));
   const g = ctx.createRadialGradient(CX, CY, r0 * .25, CX, CY, r0);
   if (P.gRed) {
     g.addColorStop(0, "rgba(120,10,10,0)");
-    g.addColorStop(.55, "rgba(150,16,16," + (k * .30).toFixed(3) + ")");
-    g.addColorStop(1, "rgba(120,8,8," + Math.min(.92, k * .85).toFixed(3) + ")");
+    g.addColorStop(.55, "rgba(150,16,16," + (k * .18).toFixed(3) + ")");
+    g.addColorStop(1, "rgba(120,8,8," + Math.min(.60, k * .58).toFixed(3) + ")");
   } else {
     g.addColorStop(0, "rgba(0,0,0,0)");
-    g.addColorStop(.5, "rgba(6,8,10," + (k * .22).toFixed(3) + ")");
-    g.addColorStop(1, "rgba(3,4,6," + Math.min(.96, k * .9).toFixed(3) + ")");
+    g.addColorStop(.5, "rgba(6,8,10," + (k * .13).toFixed(3) + ")");
+    g.addColorStop(1, "rgba(3,4,6," + Math.min(.62, k * .60).toFixed(3) + ")");
   }
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-  if (k > .9) {
+  if (k > .96) {
     hudFont(17 * UI, 700); ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.fillStyle = P.gRed ? "rgba(255,180,180,.9)" : "rgba(210,224,236,.85)";
     ctx.fillText(P.gRed ? "RED-OUT" : "GREY-OUT", CX, CY + 120 * UI);
