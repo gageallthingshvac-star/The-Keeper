@@ -1,0 +1,2095 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Skyward — Flight Simulator</title>
+<style>
+  :root{
+    --ink:#e8eef6; --dim:#9fb0c4; --accent:#6fd3ff; --warn:#ffb03a; --bad:#ff5a4d; --good:#6fe08a;
+    --panel:rgba(8,14,22,.82); --edge:rgba(120,170,215,.28);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;height:100%;background:#05080c;overflow:hidden;
+    font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;color:var(--ink);
+    -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+  #wrap{position:fixed;inset:0}
+  canvas{display:block;width:100%;height:100%;image-rendering:auto}
+  .layer{position:absolute;inset:0;pointer-events:none}
+  .modal{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(1200px 700px at 50% 30%,rgba(18,40,64,.78),rgba(3,6,10,.94));
+    backdrop-filter:blur(3px);pointer-events:auto;overflow:auto;padding:24px}
+  .card{width:min(900px,96vw);background:var(--panel);border:1px solid var(--edge);
+    border-radius:14px;padding:22px 24px 20px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+  h1{margin:0 0 2px;font-size:30px;letter-spacing:.20em;font-weight:600}
+  h1 span{color:var(--accent)}
+  .sub{color:var(--dim);font-size:12.5px;letter-spacing:.06em;margin-bottom:18px}
+  h2{font-size:12px;letter-spacing:.20em;color:var(--dim);margin:18px 0 8px;font-weight:600;text-transform:uppercase}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .opt{flex:1 1 200px;min-width:190px;text-align:left;background:rgba(255,255,255,.04);
+    border:1px solid var(--edge);border-radius:10px;padding:11px 13px;cursor:pointer;color:var(--ink);
+    font:inherit;transition:background .12s,border-color .12s,transform .12s}
+  .opt:hover{background:rgba(111,211,255,.10);border-color:rgba(111,211,255,.5)}
+  .opt.on{background:rgba(111,211,255,.16);border-color:var(--accent)}
+  .opt b{display:block;font-size:14px;letter-spacing:.06em;margin-bottom:3px}
+  .opt i{font-style:normal;color:var(--dim);font-size:11.5px;line-height:1.45;display:block}
+  .go{margin-top:20px;width:100%;padding:14px;font:inherit;font-size:15px;letter-spacing:.22em;
+    background:linear-gradient(180deg,#1d6f96,#12475f);color:#fff;border:1px solid #5fc8f0;
+    border-radius:10px;cursor:pointer}
+  .go:hover{filter:brightness(1.15)}
+  .keys{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:4px 18px;
+    font-size:11.5px;color:var(--dim);line-height:1.6}
+  .keys kbd{display:inline-block;min-width:16px;text-align:center;padding:1px 5px;margin-right:6px;
+    background:rgba(255,255,255,.08);border:1px solid var(--edge);border-radius:4px;color:var(--ink);font-size:10.5px}
+  .foot{margin-top:16px;font-size:11px;color:#68788c;letter-spacing:.05em}
+  #toast{position:absolute;left:50%;top:14%;transform:translateX(-50%);text-align:center;
+    font-size:19px;letter-spacing:.12em;text-shadow:0 2px 14px #000;opacity:0;transition:opacity .25s}
+  #banner{position:absolute;left:0;right:0;top:40%;text-align:center;font-size:40px;letter-spacing:.2em;
+    text-shadow:0 4px 30px #000;opacity:0;transition:opacity .4s}
+  .hide{display:none !important}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="c"></canvas>
+  <div class="layer"><div id="toast"></div><div id="banner"></div></div>
+
+  <div class="modal" id="menu">
+    <div class="card">
+      <h1>SKY<span>WARD</span></h1>
+      <div class="sub">single-engine flight simulator &mdash; software-rendered, no plugins</div>
+
+      <h2>Flight controls</h2>
+      <div class="row" id="modeRow">
+        <button class="opt on" data-mode="simple"><b>SIMPLE</b><i>Stability assist flies the hard parts. Bank to turn, auto-coordinated rudder, stall protection, auto-trim. Forgiving landings.</i></button>
+        <button class="opt" data-mode="complex"><b>COMPLEX</b><i>Full aerodynamics. Independent rudder, trim, flaps, gear, brakes, mixture-free prop. Real stalls, spins, p-factor, torque roll, crosswind.</i></button>
+      </div>
+
+      <h2>Flight</h2>
+      <div class="row" id="scenRow">
+        <button class="opt on" data-scen="free"><b>FREE FLIGHT</b><i>Start on runway 18 at Keeper Field. Go anywhere.</i></button>
+        <button class="opt" data-scen="air"><b>AIRBORNE START</b><i>Already at 900 m, trimmed and fast.</i></button>
+        <button class="opt" data-scen="rings"><b>RING RACE</b><i>12 gates through the valley, against the clock.</i></button>
+        <button class="opt" data-scen="land"><b>LANDING CHALLENGE</b><i>4 km final approach, gear and flaps already set. Scored on centreline, sink rate and touchdown point.</i></button>
+      </div>
+
+      <h2>Keys</h2>
+      <div class="keys" id="keyList"></div>
+
+      <button class="go" id="startBtn">BEGIN FLIGHT</button>
+      <div class="foot">Esc pauses &middot; R resets the aircraft &middot; H toggles this help in flight</div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================================
+   SKYWARD — a single-file flight simulator.
+   Everything is drawn with a hand-written 3D pipeline on a 2D canvas:
+   view transform -> near-plane clip -> perspective project -> painter's fill.
+   ========================================================================== */
+
+/* ---------------------------------------------------------------- math ---- */
+const TAU = Math.PI * 2, DEG = Math.PI / 180, RAD = 180 / Math.PI;
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+const smooth = t => t * t * (3 - 2 * t);
+const sstep = (a, b, x) => smooth(clamp((x - a) / (b - a), 0, 1));
+const sign = Math.sign;
+// exponential smoothing that is stable for any dt
+const approach = (cur, tgt, rate, dt) => cur + (tgt - cur) * (1 - Math.exp(-rate * dt));
+
+const v3 = (x = 0, y = 0, z = 0) => ({ x, y, z });
+const vadd = (a, b) => v3(a.x + b.x, a.y + b.y, a.z + b.z);
+const vsub = (a, b) => v3(a.x - b.x, a.y - b.y, a.z - b.z);
+const vmul = (a, s) => v3(a.x * s, a.y * s, a.z * s);
+const vdot = (a, b) => a.x * b.x + a.y * b.y + a.z * b.z;
+const vcross = (a, b) => v3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
+const vlen = a => Math.hypot(a.x, a.y, a.z);
+const vnorm = a => { const l = vlen(a) || 1; return v3(a.x / l, a.y / l, a.z / l); };
+
+/* Quaternion [w,x,y,z] rotating body vectors into world space.
+   Body axes: +X right wing, +Y up through canopy, +Z out the nose (right-handed). */
+const qId = () => [1, 0, 0, 0];
+function qmul(a, b) {
+  return [
+    a[0] * b[0] - a[1] * b[1] - a[2] * b[2] - a[3] * b[3],
+    a[0] * b[1] + a[1] * b[0] + a[2] * b[3] - a[3] * b[2],
+    a[0] * b[2] - a[1] * b[3] + a[2] * b[0] + a[3] * b[1],
+    a[0] * b[3] + a[1] * b[2] - a[2] * b[1] + a[3] * b[0]];
+}
+function qnorm(q) {
+  const l = Math.hypot(q[0], q[1], q[2], q[3]) || 1;
+  q[0] /= l; q[1] /= l; q[2] /= l; q[3] /= l; return q;
+}
+function qAxis(ax, ay, az, ang) {
+  const h = ang * .5, s = Math.sin(h), l = Math.hypot(ax, ay, az) || 1;
+  return [Math.cos(h), ax / l * s, ay / l * s, az / l * s];
+}
+/* 3x3 matrix, column-major triples: m[0..2]=body X in world, m[3..5]=Y, m[6..8]=Z */
+function qMat(q, m) {
+  const w = q[0], x = q[1], y = q[2], z = q[3];
+  const xx = x * x, yy = y * y, zz = z * z, xy = x * y, xz = x * z, yz = y * z,
+    wx = w * x, wy = w * y, wz = w * z;
+  m[0] = 1 - 2 * (yy + zz); m[1] = 2 * (xy + wz); m[2] = 2 * (xz - wy);
+  m[3] = 2 * (xy - wz); m[4] = 1 - 2 * (xx + zz); m[5] = 2 * (yz + wx);
+  m[6] = 2 * (xz + wy); m[7] = 2 * (yz - wx); m[8] = 1 - 2 * (xx + yy);
+  return m;
+}
+const mRot = (m, v) => v3(
+  m[0] * v.x + m[3] * v.y + m[6] * v.z,
+  m[1] * v.x + m[4] * v.y + m[7] * v.z,
+  m[2] * v.x + m[5] * v.y + m[8] * v.z);
+const mRotT = (m, v) => v3(     // inverse rotation (transpose)
+  m[0] * v.x + m[1] * v.y + m[2] * v.z,
+  m[3] * v.x + m[4] * v.y + m[5] * v.z,
+  m[6] * v.x + m[7] * v.y + m[8] * v.z);
+/* Integrate an orientation quaternion by a body-frame angular velocity. */
+function qIntegrate(q, w, dt) {
+  const d = [0, w.x * dt * .5, w.y * dt * .5, w.z * dt * .5];
+  const r = qmul(q, [1, d[1], d[2], d[3]]);
+  return qnorm(r);
+}
+/* Euler read-outs for the instruments (aviation convention). */
+function eulerOf(m) {
+  const fwd = v3(m[6], m[7], m[8]), up = v3(m[3], m[4], m[5]);
+  const pitch = Math.asin(clamp(fwd.y, -1, 1));
+  const hdg = Math.atan2(fwd.x, fwd.z);
+  // roll: angle of the wing plane about the nose axis
+  const rightLevel = vnorm(vcross(v3(0, 1, 0), fwd));
+  const upLevel = vcross(fwd, rightLevel);
+  const roll = Math.atan2(vdot(up, rightLevel), vdot(up, upLevel)); // +ve = right bank
+  return { pitch, hdg: (hdg + TAU) % TAU, roll };
+}
+
+/* --------------------------------------------------------------- colour --- */
+const rgb = (r, g, b) => "rgb(" + (r | 0) + "," + (g | 0) + "," + (b | 0) + ")";
+function mixc(c1, c2, t) { return [lerp(c1[0], c2[0], t), lerp(c1[1], c2[1], t), lerp(c1[2], c2[2], t)]; }
+function shade(c, k) { return [clamp(c[0] * k, 0, 255), clamp(c[1] * k, 0, 255), clamp(c[2] * k, 0, 255)]; }
+
+/* ----------------------------------------------------------- value noise -- */
+function hash2(i, j) {
+  let n = (i * 374761393 + j * 668265263) | 0;
+  n = (n ^ (n >> 13)) | 0; n = Math.imul(n, 1274126177);
+  return ((n ^ (n >> 16)) >>> 0) / 4294967295;
+}
+function vnoise(x, y) {
+  const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+  const u = smooth(xf), v = smooth(yf);
+  const a = hash2(xi, yi), b = hash2(xi + 1, yi), c = hash2(xi, yi + 1), d = hash2(xi + 1, yi + 1);
+  return lerp(lerp(a, b, u), lerp(c, d, u), v);
+}
+function fbm(x, y, oct) {
+  let s = 0, a = .5, f = 1, n = 0;
+  for (let i = 0; i < oct; i++) { s += a * vnoise(x * f, y * f); n += a; a *= .5; f *= 2.03; }
+  return s / n;
+}
+
+/* ================================================================ world == */
+const WORLD = {
+  sea: 0,                       // water surface height (m)
+  fieldElev: 16,                // airport elevation (m)
+  fieldR: 2400,                 // radius of flattened airport basin
+  rwyLen: 1900, rwyW: 46,       // runway 18/36, aligned with the Z (north) axis
+  sun: vnorm(v3(-.42, .62, .66)),
+  fogDensity: 1 / 13000,
+  skyTop: [42, 96, 168], skyMid: [126, 176, 222], skyHaze: [196, 216, 233],
+  ground: [86, 112, 62],
+};
+
+/* Terrain height at any point. Mountains ring a flat basin holding the field. */
+function terrainH(x, z) {
+  const d = Math.hypot(x, z);
+  const basin = 1 - sstep(WORLD.fieldR, WORLD.fieldR * 2.8, d);
+  let m = fbm(x / 2600, z / 2600, 5);
+  m = Math.pow(clamp(m, 0, 1), 2.25);
+  let h = m * 1500 - 95;
+  // a lake to the east and a broad river valley keep the terrain from feeling uniform
+  const lake = sstep(2600, 1200, Math.hypot(x - 6200, z + 2300));
+  h = lerp(h, -30, lake * .9);
+  h += fbm(x / 340, z / 340, 3) * 26 * (1 - basin * .8);
+  return lerp(h, WORLD.fieldElev, basin);
+}
+/* Cheap normal by finite difference. */
+function terrainN(x, z, e) {
+  e = e || 6;
+  const hl = terrainH(x - e, z), hr = terrainH(x + e, z);
+  const hd = terrainH(x, z - e), hu = terrainH(x, z + e);
+  return vnorm(v3(hl - hr, 2 * e, hd - hu));
+}
+const onRunway = (x, z) => Math.abs(x) < WORLD.rwyW * .5 + 1 && Math.abs(z) < WORLD.rwyLen * .5;
+/* Height used for contact: runway and apron are perfectly flat. */
+function groundH(x, z) {
+  if (onRunway(x, z)) return WORLD.fieldElev;
+  if (Math.abs(x - 225) < 108 && Math.abs(z - 650) < 132) return WORLD.fieldElev; // apron
+  return terrainH(x, z);
+}
+function terrainColor(h, slope, x, z) {
+  if (h < WORLD.sea) return [38, 74, 102];
+  const rock = sstep(.42, .70, slope);
+  const snow = sstep(880, 1120, h) * (1 - rock * .35);
+  const dry = sstep(120, 560, h);
+  let c = mixc([94, 124, 64], [122, 118, 74], dry);
+  c = mixc(c, [104, 100, 92], rock);
+  c = mixc(c, [238, 244, 250], snow);
+  // patchwork so flat land is not a flat colour
+  const v = fbm(x / 210, z / 210, 2) - .5;
+  return shade(c, 1 + v * .22);
+}
+
+/* ============================================================== renderer == */
+const cv = document.getElementById("c");
+const ctx = cv.getContext("2d", { alpha: false });
+let W = 0, H = 0, CX = 0, CY = 0, F = 800, DPR = 1;
+const NEAR = 0.30;
+let FOV = 62 * DEG;
+
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = Math.round(cv.clientWidth * DPR); H = Math.round(cv.clientHeight * DPR);
+  cv.width = W; cv.height = H; CX = W / 2; CY = H / 2;
+  F = (H * .5) / Math.tan(FOV * .5);
+  ctx.lineJoin = "round"; ctx.lineCap = "round";
+}
+window.addEventListener("resize", resize);
+
+/* camera */
+const cam = { pos: v3(), m: new Float32Array(9), roll: 0, pitch: 0, shake: 0 };
+
+/* ---- cached radial sprites: building a gradient per puff is far too slow,
+       so quantise the colour and re-use a pre-rendered 128px canvas ---- */
+const _sprCache = new Map();
+const q8 = v => clamp(Math.round(v / 8) * 8, 0, 248);
+function sprite(r, g, b, profile) {
+  r = q8(r); g = q8(g); b = q8(b);
+  const key = profile + "|" + r + "," + g + "," + b;
+  let im = _sprCache.get(key);
+  if (im) return im;
+  const S = 128, c2 = document.createElement("canvas");
+  c2.width = c2.height = S;
+  const cx2 = c2.getContext("2d");
+  const gr = cx2.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+  const rgba = a => "rgba(" + r + "," + g + "," + b + "," + a + ")";
+  if (profile === 0) {            // cloud puff: broad soft core
+    gr.addColorStop(0, rgba(.95)); gr.addColorStop(.58, rgba(.46));
+    gr.addColorStop(.86, rgba(.10)); gr.addColorStop(1, rgba(0));
+  } else if (profile === 1) {     // smoke / dust / fire
+    gr.addColorStop(0, rgba(1)); gr.addColorStop(.45, rgba(.55)); gr.addColorStop(1, rgba(0));
+  } else if (profile === 2) {     // propeller disc: bright rim, clear centre
+    gr.addColorStop(0, rgba(0)); gr.addColorStop(.72, rgba(.07));
+    gr.addColorStop(.95, rgba(.22)); gr.addColorStop(1, rgba(0));
+  } else {                        // point light
+    gr.addColorStop(0, rgba(1)); gr.addColorStop(.30, rgba(.45)); gr.addColorStop(1, rgba(0));
+  }
+  cx2.fillStyle = gr; cx2.fillRect(0, 0, S, S);
+  _sprCache.set(key, c2);
+  return c2;
+}
+
+/* ---- display list: every polygon in the scene, sorted back-to-front ---- */
+const DLMAX = 9000;
+const DL = {
+  n: 0, kind: new Uint8Array(DLMAX), depth: new Float64Array(DLMAX),
+  off: new Int32Array(DLMAX), cnt: new Int32Array(DLMAX),
+  fill: new Array(DLMAX), stroke: new Array(DLMAX), lw: new Float32Array(DLMAX),
+  pts: new Float32Array(DLMAX * 10), pn: 0,
+  order: new Int32Array(DLMAX),
+  reset() { this.n = 0; this.pn = 0; },
+  poly(depth, sp, count, fill, stroke, lw) {
+    if (this.n >= DLMAX || this.pn + count * 2 > this.pts.length) return;
+    const i = this.n++;
+    this.kind[i] = 0; this.depth[i] = depth; this.off[i] = this.pn; this.cnt[i] = count;
+    this.fill[i] = fill; this.stroke[i] = stroke || null; this.lw[i] = lw || 1;
+    for (let k = 0; k < count * 2; k++) this.pts[this.pn++] = sp[k];
+  },
+  sprite(depth, x, y, r, img, alpha) {
+    if (this.n >= DLMAX || this.pn + 4 > this.pts.length) return;
+    const i = this.n++;
+    this.kind[i] = 1; this.depth[i] = depth; this.off[i] = this.pn; this.cnt[i] = 1;
+    this.fill[i] = img; this.stroke[i] = null;
+    this.pts[this.pn++] = x; this.pts[this.pn++] = y; this.pts[this.pn++] = r;
+    this.pts[this.pn++] = alpha === undefined ? 1 : alpha;
+  },
+  flush() {
+    const n = this.n, ord = this.order;
+    for (let i = 0; i < n; i++) ord[i] = i;
+    const sub = ord.subarray(0, n);
+    Array.prototype.sort.call(sub, (a, b) => this.depth[b] - this.depth[a]);
+    for (let k = 0; k < n; k++) {
+      const i = sub[k], o = this.off[i];
+      if (this.kind[i] === 1) {
+        const r = this.pts[o + 2], a = this.pts[o + 3];
+        if (r < .4 || a < .012) continue;
+        ctx.globalAlpha = a > 1 ? 1 : a;
+        ctx.drawImage(this.fill[i], this.pts[o] - r, this.pts[o + 1] - r, r * 2, r * 2);
+        ctx.globalAlpha = 1;
+        continue;
+      }
+      const c = this.cnt[i];
+      ctx.beginPath();
+      ctx.moveTo(this.pts[o], this.pts[o + 1]);
+      for (let p = 1; p < c; p++) ctx.lineTo(this.pts[o + p * 2], this.pts[o + p * 2 + 1]);
+      ctx.closePath();
+      if (this.fill[i]) { ctx.fillStyle = this.fill[i]; ctx.fill(); }
+      if (this.stroke[i]) { ctx.strokeStyle = this.stroke[i]; ctx.lineWidth = this.lw[i]; ctx.stroke(); }
+    }
+  }
+};
+
+/* ---- view-space polygon -> clipped screen polygon ---- */
+const _vp = new Float32Array(96), _cp = new Float32Array(144), _sp = new Float32Array(96);
+function clipProject(n) {
+  let m = 0;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n, ia = i * 3, ib = j * 3;
+    const az = _vp[ia + 2], bz = _vp[ib + 2];
+    const ain = az >= NEAR, bin = bz >= NEAR;
+    if (ain) { _cp[m * 3] = _vp[ia]; _cp[m * 3 + 1] = _vp[ia + 1]; _cp[m * 3 + 2] = az; m++; }
+    if (ain !== bin) {
+      const t = (NEAR - az) / (bz - az);
+      _cp[m * 3] = _vp[ia] + (_vp[ib] - _vp[ia]) * t;
+      _cp[m * 3 + 1] = _vp[ia + 1] + (_vp[ib + 1] - _vp[ia + 1]) * t;
+      _cp[m * 3 + 2] = NEAR; m++;
+    }
+    if (m > 46) break;
+  }
+  if (m < 3) return 0;
+  for (let i = 0; i < m; i++) {
+    const z = _cp[i * 3 + 2];
+    _sp[i * 2] = CX + F * _cp[i * 3] / z;
+    _sp[i * 2 + 1] = CY - F * _cp[i * 3 + 1] / z;
+  }
+  return m;
+}
+/* quick reject: whole polygon off one side of the viewport */
+function offscreen(m) {
+  let l = 0, r = 0, t = 0, b = 0;
+  for (let i = 0; i < m; i++) {
+    const x = _sp[i * 2], y = _sp[i * 2 + 1];
+    if (x < -8) l++; if (x > W + 8) r++; if (y < -8) t++; if (y > H + 8) b++;
+  }
+  return l === m || r === m || t === m || b === m;
+}
+const toView = p => {
+  const dx = p.x - cam.pos.x, dy = p.y - cam.pos.y, dz = p.z - cam.pos.z, m = cam.m;
+  return v3(m[0] * dx + m[1] * dy + m[2] * dz, m[3] * dx + m[4] * dy + m[5] * dz, m[6] * dx + m[7] * dy + m[8] * dz);
+};
+function projectPoint(p) {
+  const v = toView(p);
+  if (v.z < NEAR) return null;
+  return { x: CX + F * v.x / v.z, y: CY - F * v.y / v.z, z: v.z, s: F / v.z };
+}
+
+/* fog toward the horizon colour */
+let fogCol = WORLD.skyHaze;
+function fogged(c, dist) {
+  const f = 1 - Math.exp(-dist * WORLD.fogDensity);
+  return rgb(lerp(c[0], fogCol[0], f), lerp(c[1], fogCol[1], f), lerp(c[2], fogCol[2], f));
+}
+
+/* --------------------------------------------------------------- sky ----- */
+function drawSky() {
+  const e = eulerOf(cam.m);
+  const pitch = clamp(e.pitch, -1.45, 1.45);
+  const yOff = F * Math.tan(pitch);
+  const R = Math.hypot(W, H) * 1.25;
+  ctx.save();
+  ctx.translate(CX, CY); ctx.rotate(-e.roll);
+  const g = ctx.createLinearGradient(0, yOff - R, 0, yOff + 4);
+  g.addColorStop(0, rgb(...WORLD.skyTop));
+  g.addColorStop(.55, rgb(...mixc(WORLD.skyTop, WORLD.skyMid, .75)));
+  g.addColorStop(.86, rgb(...WORLD.skyMid));
+  g.addColorStop(1, rgb(...WORLD.skyHaze));
+  ctx.fillStyle = g; ctx.fillRect(-R, yOff - R, R * 2, R);
+  const g2 = ctx.createLinearGradient(0, yOff, 0, yOff + R * .5);
+  g2.addColorStop(0, rgb(...WORLD.skyHaze));
+  g2.addColorStop(.35, rgb(...mixc(WORLD.skyHaze, WORLD.ground, .55)));
+  g2.addColorStop(1, rgb(...shade(WORLD.ground, .78)));
+  ctx.fillStyle = g2; ctx.fillRect(-R, yOff, R * 2, R);
+  ctx.restore();
+  // sun disc + bloom
+  const sp = projectPoint(vadd(cam.pos, vmul(WORLD.sun, 9000)));
+  if (sp) {
+    const gl = ctx.createRadialGradient(sp.x, sp.y, 0, sp.x, sp.y, Math.max(W, H) * .42);
+    gl.addColorStop(0, "rgba(255,250,224,.95)");
+    gl.addColorStop(.05, "rgba(255,244,205,.55)");
+    gl.addColorStop(.3, "rgba(255,238,200,.13)");
+    gl.addColorStop(1, "rgba(255,240,210,0)");
+    ctx.fillStyle = gl; ctx.fillRect(0, 0, W, H);
+  }
+}
+
+/* --------------------------------------------------------------- terrain - */
+const _hg = new Float32Array(19 * 19);
+function drawTerrain() {
+  const LEV = 6, base = 58, half = 7, span = half * 2 + 1;
+  const sunv = WORLD.sun;
+  const viewDir = v3(cam.m[6], cam.m[7], cam.m[8]);
+  const cm = cam.m;
+  for (let L = LEV - 1; L >= 0; L--) {
+    const cell = base * (1 << L);
+    const gx = Math.round(cam.pos.x / cell), gz = Math.round(cam.pos.z / cell);
+    for (let j = 0; j <= span - 1; j++) {
+      const wz = (gz - half + j) * cell;
+      for (let i = 0; i <= span - 1; i++) {
+        _hg[j * span + i] = terrainH((gx - half + i) * cell, wz);
+      }
+    }
+    const lodBias = L * 140;
+    for (let j = 0; j < span - 1; j++) {
+      for (let i = 0; i < span - 1; i++) {
+        const ax = Math.max(Math.abs(i - half + .5), Math.abs(j - half + .5));
+        if (L > 0 && ax < 2.9) continue;            // finer ring covers this, with overlap
+        const x0 = (gx - half + i) * cell, z0 = (gz - half + j) * cell;
+        const x1 = x0 + cell, z1 = z0 + cell;
+        let h00 = _hg[j * span + i], h10 = _hg[j * span + i + 1],
+          h01 = _hg[(j + 1) * span + i], h11 = _hg[(j + 1) * span + i + 1];
+        const mcx = x0 + cell * .5, mcz = z0 + cell * .5;
+        const dx = mcx - cam.pos.x, dz = mcz - cam.pos.z;
+        const dist = Math.hypot(dx, dz);
+        if (dist > cell * 11 + 400) continue;
+        const wet = (h00 < 0) + (h10 < 0) + (h01 < 0) + (h11 < 0);
+        const water = wet === 4;
+        if (wet) { h00 = Math.max(h00, 0); h10 = Math.max(h10, 0); h01 = Math.max(h01, 0); h11 = Math.max(h11, 0); }
+        _vp[0] = x0; _vp[1] = h00; _vp[2] = z0;
+        _vp[3] = x1; _vp[4] = h10; _vp[5] = z0;
+        _vp[6] = x1; _vp[7] = h11; _vp[8] = z1;
+        _vp[9] = x0; _vp[10] = h01; _vp[11] = z1;
+        // world -> view in place
+        let anyFront = false, dmin = 1e9;
+        for (let k = 0; k < 4; k++) {
+          const px = _vp[k * 3] - cam.pos.x, py = _vp[k * 3 + 1] - cam.pos.y, pz = _vp[k * 3 + 2] - cam.pos.z;
+          const vx = cm[0] * px + cm[1] * py + cm[2] * pz;
+          const vy = cm[3] * px + cm[4] * py + cm[5] * pz;
+          const vz = cm[6] * px + cm[7] * py + cm[8] * pz;
+          _vp[k * 3] = vx; _vp[k * 3 + 1] = vy; _vp[k * 3 + 2] = vz;
+          if (vz >= NEAR) anyFront = true;
+          if (vz < dmin) dmin = vz;
+        }
+        if (!anyFront) continue;
+        const m = clipProject(4);
+        if (m < 3 || offscreen(m)) continue;
+        // lighting from the quad's slope
+        const nx = (h00 + h01 - h10 - h11) * .5, nz = (h00 + h10 - h01 - h11) * .5;
+        const nl = Math.hypot(nx, cell, nz);
+        const ny = cell / nl;
+        const ndl = clamp((nx / nl) * sunv.x + ny * sunv.y + (nz / nl) * sunv.z, 0, 1);
+        const slope = 1 - ny;
+        const hAvg = (h00 + h10 + h01 + h11) * .25;
+        let col;
+        if (water) {
+          col = [34, 70, 100];
+          // sun glitter: strong when the reflected sun lines up with the view
+          const g = Math.pow(clamp(-viewDir.y, 0, 1), .6) * Math.pow(clamp(vdot(viewDir, v3(sunv.x, -sunv.y, sunv.z)), 0, 1), 22);
+          col = mixc(col, [255, 248, 222], g * .85);
+          col = mixc(col, WORLD.skyMid, .28);
+        } else {
+          col = terrainColor(hAvg, slope, mcx, mcz);
+          col = shade(col, .46 + .74 * ndl);
+        }
+        const fill = fogged(col, Math.max(dist, dmin));
+        // adjacent fills leave hairline gaps from antialiasing, so outline each
+        // quad in its own colour to close them
+        DL.poly(dist + lodBias, _sp, m, fill, fill, 1);
+      }
+    }
+  }
+}
+
+/* ========================================================= mesh plumbing == */
+function mmul(A, B) {   // column-major 3x3 product A*B
+  const o = new Float32Array(9);
+  for (let c = 0; c < 3; c++) {
+    const bx = B[c * 3], by = B[c * 3 + 1], bz = B[c * 3 + 2];
+    o[c * 3] = A[0] * bx + A[3] * by + A[6] * bz;
+    o[c * 3 + 1] = A[1] * bx + A[4] * by + A[7] * bz;
+    o[c * 3 + 2] = A[2] * bx + A[5] * by + A[8] * bz;
+  }
+  return o;
+}
+const mIdent = () => new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]);
+function mAxis(ax, ay, az, ang) { return qMat(qAxis(ax, ay, az, ang), new Float32Array(9)); }
+
+function MB() {
+  return {
+    v: [], f: [],
+    vt(x, y, z) { this.v.push(x, y, z); return this.v.length / 3 - 1; },
+    quad(p0, p1, p2, p3, col, o) {
+      const a = this.vt(p0[0], p0[1], p0[2]), b = this.vt(p1[0], p1[1], p1[2]),
+        c = this.vt(p2[0], p2[1], p2[2]), d = this.vt(p3[0], p3[1], p3[2]);
+      this.f.push(Object.assign({ i: [a, b, c, d], c: col }, o || {}));
+    },
+    tri(p0, p1, p2, col, o) {
+      const a = this.vt(p0[0], p0[1], p0[2]), b = this.vt(p1[0], p1[1], p1[2]), c = this.vt(p2[0], p2[1], p2[2]);
+      this.f.push(Object.assign({ i: [a, b, c], c: col }, o || {}));
+    },
+    box(cx, cy, cz, sx, sy, sz, col, o) {
+      const X = sx / 2, Y = sy / 2, Z = sz / 2;
+      const p = (a, b, c) => [cx + a * X, cy + b * Y, cz + c * Z];
+      this.quad(p(-1, 1, 1), p(1, 1, 1), p(1, 1, -1), p(-1, 1, -1), shade(col, 1.06), o);
+      this.quad(p(-1, -1, -1), p(1, -1, -1), p(1, -1, 1), p(-1, -1, 1), shade(col, .80), o);
+      this.quad(p(-1, -1, 1), p(1, -1, 1), p(1, 1, 1), p(-1, 1, 1), col, o);
+      this.quad(p(1, -1, -1), p(-1, -1, -1), p(-1, 1, -1), p(1, 1, -1), shade(col, .88), o);
+      this.quad(p(1, -1, 1), p(1, -1, -1), p(1, 1, -1), p(1, 1, 1), shade(col, .96), o);
+      this.quad(p(-1, -1, -1), p(-1, -1, 1), p(-1, 1, 1), p(-1, 1, -1), shade(col, .96), o);
+    },
+    disc(cx, cy, cz, r, n, axis, col, o) {  // axis 0=x 1=y 2=z
+      const pts = [];
+      for (let i = 0; i < n; i++) {
+        const a = i / n * TAU, s = Math.sin(a) * r, c2 = Math.cos(a) * r;
+        pts.push(axis === 2 ? [cx + s, cy + c2, cz] : axis === 0 ? [cx, cy + c2, cz + s] : [cx + s, cy, cz + c2]);
+      }
+      for (let i = 1; i < n - 1; i++) this.tri(pts[0], pts[i], pts[i + 1], col, Object.assign({ two: true }, o || {}));
+    },
+    done() { return { v: new Float32Array(this.v), f: this.f }; }
+  };
+}
+
+/* transform + emit a mesh. M maps local->world; origin is the world position of
+   the local pivot; verts are taken relative to `pivot`. */
+const _mw = []; const _mv = [];
+function drawMesh(mesh, origin, M, pivot, tint, alphaFade) {
+  const v = mesh.v, nv = v.length / 3;
+  while (_mw.length < nv * 3) { _mw.push(0); _mv.push(0); }
+  const px = pivot ? pivot[0] : 0, py = pivot ? pivot[1] : 0, pz = pivot ? pivot[2] : 0;
+  const cm = cam.m, cp = cam.pos;
+  for (let i = 0; i < nv; i++) {
+    const lx = v[i * 3] - px, ly = v[i * 3 + 1] - py, lz = v[i * 3 + 2] - pz;
+    const wx = origin.x + M[0] * lx + M[3] * ly + M[6] * lz;
+    const wy = origin.y + M[1] * lx + M[4] * ly + M[7] * lz;
+    const wz = origin.z + M[2] * lx + M[5] * ly + M[8] * lz;
+    _mw[i * 3] = wx; _mw[i * 3 + 1] = wy; _mw[i * 3 + 2] = wz;
+    const dx = wx - cp.x, dy = wy - cp.y, dz = wz - cp.z;
+    _mv[i * 3] = cm[0] * dx + cm[1] * dy + cm[2] * dz;
+    _mv[i * 3 + 1] = cm[3] * dx + cm[4] * dy + cm[5] * dz;
+    _mv[i * 3 + 2] = cm[6] * dx + cm[7] * dy + cm[8] * dz;
+  }
+  const sun = WORLD.sun;
+  for (let fi = 0; fi < mesh.f.length; fi++) {
+    const fc = mesh.f[fi], idx = fc.i, n = idx.length;
+    let cxv = 0, cyv = 0, czv = 0, front = false, dmin = 1e9;
+    for (let k = 0; k < n; k++) {
+      const o = idx[k] * 3;
+      _vp[k * 3] = _mv[o]; _vp[k * 3 + 1] = _mv[o + 1]; _vp[k * 3 + 2] = _mv[o + 2];
+      cxv += _mv[o]; cyv += _mv[o + 1]; czv += _mv[o + 2];
+      if (_mv[o + 2] >= NEAR) front = true;
+      if (_mv[o + 2] < dmin) dmin = _mv[o + 2];
+    }
+    if (!front) continue;
+    cxv /= n; cyv /= n; czv /= n;
+    // world-space normal, for lighting and back-face rejection
+    const a = idx[0] * 3, b = idx[1] * 3, c = idx[2] * 3;
+    const e1x = _mw[b] - _mw[a], e1y = _mw[b + 1] - _mw[a + 1], e1z = _mw[b + 2] - _mw[a + 2];
+    const e2x = _mw[c] - _mw[a], e2y = _mw[c + 1] - _mw[a + 1], e2z = _mw[c + 2] - _mw[a + 2];
+    let nx = e1y * e2z - e1z * e2y, ny = e1z * e2x - e1x * e2z, nz = e1x * e2y - e1y * e2x;
+    const nl = Math.hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl;
+    // view direction to the face (world space)
+    const vx = (_mw[a] + _mw[b] + _mw[c]) / 3 - cam.pos.x;
+    const vy = (_mw[a + 1] + _mw[b + 1] + _mw[c + 1]) / 3 - cam.pos.y;
+    const vz = (_mw[a + 2] + _mw[b + 2] + _mw[c + 2]) / 3 - cam.pos.z;
+    const facing = nx * vx + ny * vy + nz * vz;
+    if (facing > 0) { if (!fc.two) continue; nx = -nx; ny = -ny; nz = -nz; }
+    const m = clipProject(n);
+    if (m < 3 || offscreen(m)) continue;
+    const ndl = clamp(nx * sun.x + ny * sun.y + nz * sun.z, 0, 1);
+    let col = fc.c;
+    if (tint) col = mixc(col, tint, .55);
+    let k = .40 + .72 * ndl;
+    if (fc.spec) {  // metal / glass highlight
+      const hx = sun.x - vx / Math.hypot(vx, vy, vz), hy = sun.y - vy / Math.hypot(vx, vy, vz), hz = sun.z - vz / Math.hypot(vx, vy, vz);
+      const hl = Math.hypot(hx, hy, hz) || 1;
+      const s = Math.pow(clamp((nx * hx + ny * hy + nz * hz) / hl, 0, 1), 22) * fc.spec;
+      k += s * 1.5;
+    }
+    const dist = Math.hypot(cxv, cyv, czv);
+    let c2 = shade(col, k);
+    const fill = fc.alpha !== undefined || alphaFade !== undefined
+      ? (() => { const f = 1 - Math.exp(-dist * WORLD.fogDensity);
+          const cc = mixc(c2, fogCol, f);
+          return "rgba(" + (cc[0] | 0) + "," + (cc[1] | 0) + "," + (cc[2] | 0) + "," + ((fc.alpha !== undefined ? fc.alpha : 1) * (alphaFade !== undefined ? alphaFade : 1)).toFixed(3) + ")"; })()
+      : fogged(c2, dist);
+    DL.poly(dist - (fc.bias || 0), _sp, m, fill, fc.edge ? fogged(shade(col, .55), dist) : null, 1);
+  }
+}
+
+/* ======================================================= aircraft model == */
+const LIV = {
+  top: [48, 66, 94], side: [98, 118, 146], belly: [176, 184, 193],
+  red: [178, 52, 44], yellow: [226, 194, 84], dark: [34, 40, 50],
+  metal: [150, 158, 168], rubber: [38, 38, 42], glass: [150, 196, 226]
+};
+const TWO = { two: true };
+const SPEC = { two: true, spec: .9 };
+
+function buildAircraft() {
+  const P = {};
+  /* ---- fuselage: lathe of elliptical stations ---- */
+  {
+    const mb = MB();
+    const st = [
+      [-4.75, .09, .13, .30], [-4.10, .17, .22, .27], [-3.30, .27, .34, .22],
+      [-2.30, .40, .47, .14], [-1.20, .52, .60, .06], [-.10, .60, .67, .01],
+      [1.00, .59, .65, .00], [1.95, .54, .60, .03], [2.70, .46, .50, .05],
+      [3.25, .38, .40, .06], [3.62, .30, .31, .06]
+    ];
+    const N = 10;
+    const pt = (s, k) => {
+      const a = k / N * TAU;
+      return [s[1] * Math.sin(a), s[3] + s[2] * Math.cos(a), s[0]];
+    };
+    for (let i = 0; i < st.length - 1; i++) {
+      for (let k = 0; k < N; k++) {
+        const a = k / N * TAU, up = Math.cos(a);
+        let col = up > .45 ? LIV.top : up < -.45 ? LIV.belly : LIV.side;
+        col = mixc(col, up > .45 ? LIV.top : LIV.side, .15);
+        // red tail band and a yellow cowl ring for a bit of livery
+        if (st[i][0] < -3.25) col = mixc(col, LIV.red, .85);
+        if (st[i][0] > 3.2) col = mixc(col, LIV.yellow, .75);
+        mb.quad(pt(st[i], k), pt(st[i], k + 1), pt(st[i + 1], k + 1), pt(st[i + 1], k), col, SPEC);
+      }
+    }
+    // cowl face + exhaust stacks
+    mb.disc(0, .06, 3.63, .30, 10, 2, LIV.dark, TWO);
+    mb.box(.34, -.05, 2.55, .12, .10, .7, LIV.dark, TWO);
+    mb.box(-.34, -.05, 2.55, .12, .10, .7, LIV.dark, TWO);
+    P.fuse = mb.done();
+  }
+  /* ---- wing: lofted airfoil sections, low-mounted with dihedral ---- */
+  const AF_U = [0, .12, .40, 1.00, .40, .12], AF_V = [0, .075, .085, .004, -.048, -.042];
+  function wingLoop(t, side) {
+    const x = side * (.42 + t * 5.05);
+    const y = -.30 + t * t * .30 + t * .26;
+    const zLE = 1.85 - t * .70;
+    const chord = (2.25 - t * 1.30) * .74;      // forward 74% is the fixed wing
+    const out = [];
+    for (let k = 0; k < 6; k++) out.push([x, y + AF_V[k] * chord * 1.5, zLE - AF_U[k] * chord]);
+    return { loop: out, x, y, zLE, chord: (2.25 - t * 1.30) };
+  }
+  for (const side of [1, -1]) {
+    const mb = MB();
+    const segs = 5;
+    let prev = wingLoop(0, side);
+    for (let s = 1; s <= segs; s++) {
+      const cur = wingLoop(s / segs, side);
+      for (let k = 0; k < 6; k++) {
+        const k2 = (k + 1) % 6;
+        const up = AF_V[k] + AF_V[k2] > 0;
+        let col = up ? mixc(LIV.top, LIV.side, .35) : LIV.belly;
+        if (s === segs) col = mixc(col, LIV.yellow, .55);   // wingtip flash
+        mb.quad(prev.loop[k], prev.loop[k2], cur.loop[k2], cur.loop[k], col, SPEC);
+      }
+      prev = cur;
+    }
+    // tip cap
+    for (let k = 1; k < 5; k++) mb.tri(prev.loop[0], prev.loop[k], prev.loop[k + 1], mixc(LIV.yellow, LIV.side, .3), TWO);
+    // wing root fairing
+    const r0 = wingLoop(0, side);
+    for (let k = 1; k < 5; k++) mb.tri(r0.loop[0], r0.loop[k], r0.loop[k + 1], LIV.side, TWO);
+    P[side > 0 ? "wingR" : "wingL"] = mb.done();
+
+    // aileron (outboard 45%) and flap (inboard), hinged about the spanwise axis
+    const mkSurf = (t0, t1, col) => {
+      const mb2 = MB();
+      const a = wingLoop(t0, side), b = wingLoop(t1, side);
+      const za = a.zLE - a.chord * .74, zb = b.zLE - b.chord * .74;
+      const ca = a.chord * .26, cb = b.chord * .26;
+      const th = .045;
+      mb2.quad([a.x, a.y + th, za], [b.x, b.y + th, zb], [b.x, b.y + th * .4, zb - cb], [a.x, a.y + th * .4, za - ca], mixc(col, [255, 255, 255], .05), TWO);
+      mb2.quad([a.x, a.y - th, za], [a.x, a.y - th * .4, za - ca], [b.x, b.y - th * .4, zb - cb], [b.x, b.y - th, zb], shade(col, .82), TWO);
+      mb2.quad([a.x, a.y + th, za], [a.x, a.y - th, za], [b.x, b.y - th, zb], [b.x, b.y + th, zb], shade(col, .9), TWO);
+      return { mesh: mb2.done(), pivot: [(a.x + b.x) / 2, (a.y + b.y) / 2, (za + zb) / 2], hz: (za + zb) / 2 };
+    };
+    const ail = mkSurf(.55, .97, mixc(LIV.side, LIV.top, .3));
+    ail.pivot = [0, ail.pivot[1], ail.hz];   // hinge about the body X axis
+    P[side > 0 ? "ailR" : "ailL"] = ail;
+    const fl = mkSurf(.06, .50, mixc(LIV.side, LIV.belly, .2));
+    fl.pivot = [0, fl.pivot[1], fl.hz];
+    P[side > 0 ? "flapR" : "flapL"] = fl;
+  }
+  /* ---- tailplane + fin ---- */
+  {
+    const mb = MB();
+    const span = 2.25, zL = -3.35, ch = .95, th = .075;
+    // a 4-point section lofted root -> tip, same idea as the wing
+    const sect = (side, t) => {
+      const x = side * (.16 + t * (span - .16));
+      const y = .16 + t * .14, zl = zL - t * .30, c = ch * (1 - t * .38);
+      return [[x, y, zl], [x, y + th * (1 - t * .5), zl - c * .45], [x, y, zl - c * .74], [x, y - th * .8 * (1 - t * .5), zl - c * .45]];
+    };
+    for (const side of [1, -1]) {
+      let prev = sect(side, 0);
+      for (let s2 = 1; s2 <= 3; s2++) {
+        const cur = sect(side, s2 / 3);
+        for (let k = 0; k < 4; k++) {
+          const k2 = (k + 1) % 4;
+          const up = k === 0 || k === 1;
+          const col = up ? mixc(LIV.top, LIV.side, .4) : LIV.belly;
+          mb.quad(prev[k], prev[k2], cur[k2], cur[k], col, SPEC);
+        }
+        prev = cur;
+      }
+      mb.quad(prev[0], prev[1], prev[2], prev[3], mixc(LIV.red, LIV.side, .3), TWO);
+    }
+    // fin
+    const fz = -3.15;
+    const fin = [[0, .34, fz + .35], [0, 1.05, fz - .12], [0, 1.72, fz - .55], [0, 1.72, fz - 1.05], [0, .34, fz - 1.30]];
+    for (const sx of [-.055, .055]) {
+      for (let k = 1; k < fin.length - 1; k++)
+        mb.tri([sx, fin[0][1], fin[0][2]], [sx, fin[k][1], fin[k][2]], [sx, fin[k + 1][1], fin[k + 1][2]], mixc(LIV.red, LIV.top, .25), SPEC);
+    }
+    for (let k = 0; k < fin.length; k++) {
+      const a = fin[k], b = fin[(k + 1) % fin.length];
+      mb.quad([-.055, a[1], a[2]], [.055, a[1], a[2]], [.055, b[1], b[2]], [-.055, b[1], b[2]], mixc(LIV.red, LIV.side, .15), TWO);
+    }
+    P.tail = mb.done();
+  }
+  /* ---- elevator & rudder as hinged plates ---- */
+  {
+    const mb = MB(), th = .05, zH = -4.05;
+    for (const side of [1, -1]) {
+      const xo = side * .14, xt = side * 2.2;
+      mb.quad([xo, .16 + th, zH], [xt, .30 + th, zH - .28], [xt, .30, zH - .28 - .36], [xo, .16, zH - .60], mixc(LIV.side, [255, 255, 255], .1), TWO);
+      mb.quad([xo, .16 - th, zH], [xo, .16, zH - .60], [xt, .30, zH - .28 - .36], [xt, .30 - th, zH - .28], shade(LIV.side, .82), TWO);
+    }
+    P.elev = { mesh: mb.done(), pivot: [0, .16, zH] };
+  }
+  {
+    const mb = MB(), th = .05, zH = -4.20;
+    const pr = [[0, .34, zH], [0, 1.02, zH - .10], [0, 1.68, zH - .22], [0, 1.68, zH - .50], [0, .34, zH - .80]];
+    for (const s of [th, -th]) {
+      for (let k = 1; k < pr.length - 1; k++)
+        mb.tri([s, pr[0][1], pr[0][2]], [s, pr[k][1], pr[k][2]], [s, pr[k + 1][1], pr[k + 1][2]], mixc(LIV.red, LIV.side, .2), TWO);
+    }
+    for (let k = 0; k < pr.length; k++) {
+      const a = pr[k], b = pr[(k + 1) % pr.length];
+      mb.quad([-th, a[1], a[2]], [th, a[1], a[2]], [th, b[1], b[2]], [-th, b[1], b[2]], shade(LIV.red, .9), TWO);
+    }
+    P.rud = { mesh: mb.done(), pivot: [0, 1.0, zH] };
+  }
+  /* ---- canopy: tinted glass over a dark frame ---- */
+  {
+    const mb = MB();
+    // stations: [z, half width, dome height]
+    const st = [[2.10, .26, .16], [1.60, .42, .34], [.85, .47, .42], [.10, .45, .40], [-.55, .34, .26], [-1.10, .20, .10]];
+    const N = 6, base = .50;
+    const pt = (s, k) => { const a = -Math.PI / 2 + k / N * Math.PI; return [s[1] * Math.sin(a), base + s[2] * Math.cos(a), s[0]]; };
+    for (let i = 0; i < st.length - 1; i++)
+      for (let k = 0; k < N; k++)
+        mb.quad(pt(st[i], k), pt(st[i], k + 1), pt(st[i + 1], k + 1), pt(st[i + 1], k), LIV.glass, { two: true, spec: 1.6, alpha: .52 });
+    P.glass = mb.done();
+    const mb2 = MB();
+    mb2.box(0, .58, .95, .96, .30, 1.9, LIV.dark, TWO);  // cockpit interior shell
+    mb2.box(0, .72, .30, .48, .34, .30, [58, 48, 42], TWO); // seat back
+    mb2.box(0, .70, 1.75, .70, .26, .22, [26, 28, 32], TWO); // panel
+    P.pit = mb2.done();
+  }
+  /* ---- spinner + blades ---- */
+  {
+    const mb = MB();
+    const N = 10, zb = 3.60, zt = 4.28;
+    for (let k = 0; k < N; k++) {
+      const a = k / N * TAU, a2 = (k + 1) / N * TAU, r = .30;
+      mb.tri([Math.sin(a) * r, .06 + Math.cos(a) * r, zb], [Math.sin(a2) * r, .06 + Math.cos(a2) * r, zb], [0, .06, zt],
+        k % 2 ? LIV.red : mixc(LIV.red, [255, 255, 255], .55), SPEC);
+    }
+    P.spin = mb.done();
+    const mb2 = MB();
+    for (let b = 0; b < 3; b++) {
+      const a = b / 3 * TAU;
+      const ca = Math.cos(a), sa = Math.sin(a);
+      const L = 1.28, w0 = .19, w1 = .10;
+      const p = (r, w, tw) => [sa * r + ca * w, .06 + ca * r - sa * w, 3.95 + tw];
+      mb2.quad(p(.24, w0, -.05), p(L, w1, .06), p(L, -w1, -.02), p(.24, -w0, -.10), LIV.dark, { two: true, spec: .6 });
+    }
+    P.blades = mb2.done();
+  }
+  /* ---- what the pilot sees over the panel: the forward fuselage itself,
+         so the nose is shaped and lit exactly as it is from outside ---- */
+  {
+    const mb = MB();
+    // the pilot's eye sits at z = 0.85 here; the decking runs from behind the
+    // eye forward to the spinner so there is no open rear rim to see down
+    const st = [
+      [.20, .60, .66, .01], [1.00, .59, .65, .00], [1.95, .54, .60, .03],
+      [2.70, .46, .50, .05], [3.25, .38, .40, .06], [3.62, .30, .31, .06]
+    ];
+    const N = 10;
+    const pt = (sq, k) => { const a = k / N * TAU; return [sq[1] * Math.sin(a), sq[3] + sq[2] * Math.cos(a), sq[0]]; };
+    for (let i = 0; i < st.length - 1; i++) {
+      for (let k = 0; k < N; k++) {
+        const a = k / N * TAU, up = Math.cos(a);
+        // matte anti-glare panel along the top, normal livery down the sides
+        let col = up > .62 ? [62, 67, 75] : up > .05 ? mixc(LIV.top, [70, 76, 84], .4) : LIV.side;
+        if (st[i][0] > 3.2) col = mixc(col, LIV.yellow, .55);
+        mb.quad(pt(st[i], k), pt(st[i], k + 1), pt(st[i + 1], k + 1), pt(st[i + 1], k), col, SPEC);
+      }
+    }
+    // close off the front so the pilot is not looking down an open tube
+    mb.disc(0, .06, 3.62, .30, 10, 2, [30, 32, 36], { two: true });
+    // reflector gunsight, sitting proud of the cowling
+    mb.box(0, .72, 2.60, .05, .13, .07, [28, 30, 34], TWO);
+    mb.box(0, .83, 2.62, .16, .012, .12, [170, 215, 185], { two: true, alpha: .28 });
+    P.cowl = mb.done();
+  }
+  /* ---- landing gear ---- */
+  function leg(len, wheelR, col) {
+    const mb = MB();
+    mb.box(0, -len * .5, 0, .09, len, .11, LIV.metal, TWO);
+    mb.box(0, -len * .82, 0, .16, .16, .16, LIV.metal, TWO);
+    for (const s of [-.055, .055]) mb.disc(s, -len - wheelR * .15, 0, wheelR, 9, 0, LIV.rubber, TWO);
+    mb.box(0, -len - wheelR * .15, 0, .16, wheelR * 1.4, wheelR * 1.4, shade(LIV.rubber, 1.15), TWO);
+    return mb.done();
+  }
+  P.gearL = { mesh: leg(.85, .32), pivot: [-1.05, -.22, .85] };
+  P.gearR = { mesh: leg(.85, .32), pivot: [1.05, -.22, .85] };
+  P.gearN = { mesh: leg(.74, .24), pivot: [0, -.42, 2.75] };
+  for (const k of ["gearL", "gearR", "gearN"]) {
+    const g = P[k], p = g.pivot;
+    // the generic leg is built at the origin; slide it under its own hinge
+    const v = g.mesh.v;
+    for (let i = 0; i < v.length; i += 3) { v[i] += p[0]; v[i + 1] += p[1]; v[i + 2] += p[2]; }
+  }
+  // Slide the whole airframe aft so the body origin — the centre of gravity the
+  // physics works from — sits on the wing quarter chord, with the main wheels
+  // just behind it and the nose wheel well forward.
+  for (const key in P) {
+    const part = P[key], mesh = part.v ? part : part.mesh;
+    for (let i = 2; i < mesh.v.length; i += 3) mesh.v[i] += ZSHIFT;
+    if (part.pivot) part.pivot[2] += ZSHIFT;
+  }
+  return P;
+}
+const ZSHIFT = -1.30;
+const AC = buildAircraft();
+
+/* ========================================================== scenery ====== */
+const E = WORLD.fieldElev;
+function buildAirport() {
+  const mb = MB();
+  const L = WORLD.rwyLen, Wd = WORLD.rwyW, hw = Wd / 2, y = E + .10;
+  const asph = [58, 60, 64], paint = [226, 230, 234];
+  const segs = 38;
+  for (let i = 0; i < segs; i++) {
+    const z0 = -L / 2 + i * L / segs, z1 = z0 + L / segs;
+    mb.quad([-hw, y, z0], [hw, y, z0], [hw, y, z1], [-hw, y, z1],
+      shade(asph, 1 + (hash2(i, 7) - .5) * .09), { two: true, bias: 3, edge: 1 });
+  }
+  const mark = (x0, z0, x1, z1, col, b) => mb.quad([x0, y + .02, z0], [x1, y + .02, z0], [x1, y + .02, z1], [x0, y + .02, z1], col || paint, { two: true, bias: b || 6 });
+  // centreline dashes
+  for (let z = -L / 2 + 40; z < L / 2 - 40; z += 50) mark(-.7, z, .7, z + 30);
+  // threshold bars at both ends
+  for (const dir of [1, -1]) {
+    const zt = dir * (L / 2 - 6);
+    for (let k = -4; k <= 4; k++) {
+      if (k === 0) continue;
+      const x = k * 4.2;
+      mark(x - 1.1, zt - dir * 22, x + 1.1, zt);
+    }
+    // touchdown zone bars
+    for (const off of [150, 230]) {
+      const z = dir * (L / 2 - off);
+      mark(-9, z, -5.6, z - dir * 20); mark(5.6, z, 9, z - dir * 20);
+    }
+    // aiming point
+    const za = dir * (L / 2 - 300);
+    mark(-12, za, -6.5, za - dir * 42); mark(6.5, za, 12, za - dir * 42);
+  }
+  // edge lines
+  mark(-hw + .6, -L / 2, -hw + 1.6, L / 2, [214, 218, 222], 5);
+  mark(hw - 1.6, -L / 2, hw - .6, L / 2, [214, 218, 222], 5);
+  // taxiway + apron, laid out east of the runway so the strip stays clear
+  mb.quad([hw, y, 556], [120, y, 556], [120, y, 600], [hw, y, 600], shade(asph, .95), { two: true, bias: 3 });
+  mb.quad([118, y, 520], [332, y, 520], [332, y, 780], [118, y, 780], shade(asph, .90), { two: true, bias: 2 });
+  // hangars
+  const hangar = (cx, cz, w, d, h, col) => {
+    mb.box(cx, E + h / 2, cz, w, h, d, col, TWO);
+    const n = 7;
+    for (let i = 0; i < n; i++) {   // barrel roof
+      const a0 = Math.PI * i / n, a1 = Math.PI * (i + 1) / n;
+      const r = w / 2, hh = h * .55;
+      const p = a => [cx + Math.cos(a) * r, E + h + Math.sin(a) * hh, cz];
+      mb.quad(p(a0), p(a1), [p(a1)[0], p(a1)[1], cz + d], [p(a0)[0], p(a0)[1], cz + d], shade([176, 182, 188], .85 + i * .04), SPEC);
+      mb.tri([cx, E + h, cz], p(a0), p(a1), shade(col, .9), TWO);
+      mb.tri([cx, E + h, cz + d], [p(a0)[0], p(a0)[1], cz + d], [p(a1)[0], p(a1)[1], cz + d], shade(col, .8), TWO);
+    }
+    mb.quad([cx - w * .3, E, cz - .1], [cx + w * .3, E, cz - .1], [cx + w * .3, E + h * .8, cz - .1], [cx - w * .3, E + h * .8, cz - .1], [66, 72, 80], TWO);
+  };
+  hangar(168, 700, 54, 44, 11, [150, 156, 162]);
+  hangar(252, 700, 54, 44, 11, [158, 150, 142]);
+  hangar(322, 706, 40, 34, 9, [146, 152, 158]);
+  // control tower
+  mb.box(-70, E + 9, 620, 9, 18, 9, [186, 186, 180], TWO);
+  mb.box(-70, E + 20, 620, 14, 5, 14, [64, 70, 78], { two: true, spec: 1.2 });
+  mb.box(-70, E + 23.4, 620, 15.5, 1.2, 15.5, [150, 152, 150], TWO);
+  mb.box(-70, E + 25.6, 620, .5, 3.5, .5, [120, 122, 124], TWO);
+  // windsock
+  mb.box(-40, E + 4, -300, .4, 8, .4, [190, 190, 190], TWO);
+  mb.quad([-40, E + 7.4, -300], [-40, E + 8.2, -300], [-37.5, E + 7.9, -298.4], [-37.5, E + 7.3, -298.4], [230, 120, 40], TWO);
+  return mb.done();
+}
+const AIRPORT = buildAirport();
+
+function buildRing() {
+  const mb = MB(), R = 30, t = 2.4, N = 20;
+  for (let i = 0; i < N; i++) {
+    const a0 = i / N * TAU, a1 = (i + 1) / N * TAU;
+    const col = i % 2 ? [238, 86, 60] : [242, 242, 238];
+    const p = (a, r, z) => [Math.cos(a) * r, Math.sin(a) * r, z];
+    mb.quad(p(a0, R - t, 0), p(a1, R - t, 0), p(a1, R + t, 0), p(a0, R + t, 0), col, { two: true, bias: 1 });
+    mb.quad(p(a0, R + t, -.7), p(a1, R + t, -.7), p(a1, R + t, .7), p(a0, R + t, .7), shade(col, .8), TWO);
+    mb.quad(p(a0, R - t, .7), p(a1, R - t, .7), p(a1, R - t, -.7), p(a0, R - t, -.7), shade(col, .7), TWO);
+  }
+  return mb.done();
+}
+const RING = buildRing();
+
+/* scattered trees, drawn as depth-sorted billboards */
+function drawTrees() {
+  const cell = 78, rad = 1250;
+  const gx = Math.round(cam.pos.x / cell), gz = Math.round(cam.pos.z / cell);
+  const n = Math.ceil(rad / cell);
+  for (let j = -n; j <= n; j++) {
+    for (let i = -n; i <= n; i++) {
+      const h1 = hash2((gx + i) * 31 + 7, (gz + j) * 17 + 3);
+      if (h1 > .42) continue;
+      const x = (gx + i) * cell + (hash2(gx + i, gz + j) - .5) * cell * .9;
+      const z = (gz + j) * cell + (hash2(gz + j, gx + i) - .5) * cell * .9;
+      const dx = x - cam.pos.x, dz = z - cam.pos.z;
+      if (dx * dx + dz * dz > rad * rad) continue;
+      const gy = terrainH(x, z);
+      if (gy < 2 || gy > 760) continue;
+      if (Math.abs(x) < 320 && Math.abs(z) < WORLD.rwyLen * .6) continue;   // keep the field clear
+      const hgt = 7 + h1 * 22;
+      const base = projectPoint(v3(x, gy, z));
+      if (!base) continue;
+      const top = projectPoint(v3(x, gy + hgt, z));
+      if (!top) continue;
+      const w = Math.abs(base.y - top.y) * .42;
+      if (w < .6) continue;
+      const dist = base.z;
+      const dark = fogged(shade([44, 72, 46], .7 + h1 * .5), dist);
+      const trunkW = Math.max(1, w * .2);
+      DL.poly(dist + .5, [base.x - trunkW, base.y, base.x + trunkW, base.y, top.x + trunkW * .5, top.y * .35 + base.y * .65, top.x - trunkW * .5, top.y * .35 + base.y * .65], 4, fogged([72, 56, 40], dist), null, 0);
+      DL.poly(dist, [top.x, top.y, base.x + w, base.y - (base.y - top.y) * .26, base.x + w * .55, base.y, base.x - w * .55, base.y, base.x - w, base.y - (base.y - top.y) * .26], 5, dark, null, 0);
+    }
+  }
+}
+
+/* volumetric-ish cloud field */
+const CLOUDS = [];
+(function makeClouds() {
+  for (let i = 0; i < 150; i++) {
+    const a = hash2(i, 11) * TAU, r = 900 + hash2(i, 12) * 21000;
+    const base = 760 + hash2(i, 13) * 1350;
+    const puffs = [];
+    const np = 5 + ((hash2(i, 14) * 7) | 0);
+    const sc = .7 + hash2(i, 19) * 1.4;
+    for (let k = 0; k < np; k++) {
+      puffs.push({
+        x: (hash2(i * 13 + k, 15) - .5) * 460 * sc,
+        y: (hash2(i * 13 + k, 16) - .5) * 110 * sc,
+        z: (hash2(i * 13 + k, 17) - .5) * 460 * sc,
+        r: (70 + hash2(i * 13 + k, 18) * 130) * sc
+      });
+    }
+    CLOUDS.push({ p: v3(Math.cos(a) * r, base, Math.sin(a) * r), puffs, t: hash2(i, 21) });
+  }
+})();
+function drawClouds() {
+  for (const cl of CLOUDS) {
+    const dx = cl.p.x - cam.pos.x, dz = cl.p.z - cam.pos.z;
+    const d2 = dx * dx + dz * dz;
+    if (d2 > 16000 * 16000) continue;
+    for (const pf of cl.puffs) {
+      const wp = v3(cl.p.x + pf.x, cl.p.y + pf.y, cl.p.z + pf.z);
+      const sp = projectPoint(wp);
+      if (!sp) continue;
+      const r = pf.r * sp.s;
+      if (r < 1.5 || sp.x < -r * 2 || sp.x > W + r * 2 || sp.y < -r * 2 || sp.y > H + r * 2) continue;
+      const fog = 1 - Math.exp(-sp.z * WORLD.fogDensity * .55);
+      const lit = 1 - clamp((pf.y + 60) / 200, 0, 1) * .30;
+      const c = mixc(mixc([255, 255, 255], [168, 186, 208], 1 - lit), fogCol, fog * .75);
+      DL.sprite(sp.z, sp.x, sp.y, r, sprite(c[0], c[1], c[2], 0), .90);
+    }
+  }
+}
+
+/* ======================================================= flight model === */
+const SPECS = {
+  mass: 1450, S: 16.2, b: 11.0, cbar: 1.55,
+  Ipitch: 4200, Iroll: 3000, Iyaw: 4800,
+  CL0: .15, CLa: 5.2, CD0: .026, k: .0533,
+  CmA: .60, CmE: .300, CmQ: 14.0,
+  Cnb: .095, Cndr: .070, Cnr: .150,
+  Cla: .200, Clp: .420, Clb: .055,
+  thrustMax: 7100, vProp: 200,
+  // main wheels just aft of the CG, nose wheel well forward (tricycle gear)
+  wheels: [
+    { p: v3(-1.05, -1.44, -.45), brake: 1, steer: 0, grip: 1 },
+    { p: v3(1.05, -1.44, -.45), brake: 1, steer: 0, grip: 1 },
+    { p: v3(0, -1.44, 1.35), brake: .15, steer: 1, grip: 0 }
+  ],
+  // points that must never touch the ground
+  hard: [v3(-5.47, .18, -.10), v3(5.47, .18, -.10), v3(0, -.26, 2.95), v3(0, .26, -6.00), v3(0, -.62, 0)]
+};
+const rhoAt = y => 1.225 * Math.exp(-Math.max(y, 0) / 8500);
+
+const PLANE = {
+  pos: v3(0, E + 1.46, 800), vel: v3(), q: qId(), w: v3(), m: mIdent(),
+  thr: 0, inE: 0, inA: 0, inR: 0, dE: 0, dA: 0, dR: 0,
+  trim: 0, flap: 0, flapCmd: 0, gear: 1, gearCmd: 1, brake: 0, park: true,
+  rpm: 0, propAng: 0, alpha: 0, beta: 0, ias: 0, tas: 0, gload: 1, vsi: 0,
+  onGround: true, wow: 0, stall: 0, crashed: false, crashT: 0, msg: "", holdHdg: undefined,
+  hardLand: 0, touched: 0, lastVS: 0, aoaCap: false, dist: 0
+};
+let MODE = "simple", SCEN = "free";
+
+function resetPlane(scen) {
+  const P = PLANE;
+  P.vel = v3(); P.w = v3(); P.thr = 0; P.dE = P.dA = P.dR = 0;
+  P.inE = P.inA = P.inR = 0; P.trim = 0; P.flap = P.flapCmd = 0;
+  P.crashed = false; P.crashT = 0; P.stall = 0; P.hardLand = 0; P.touched = 0; P.pitchI = 0; P.holdHdg = undefined;
+  P.gear = P.gearCmd = 1; P.brake = 0; P.rpm = 0; P.dist = 0;
+  P.q = qAxis(0, 1, 0, Math.PI);            // runway 18: heading south
+  if (scen === "free") {
+    P.pos = v3(0, E + 1.46, 800); P.thr = 0; P.park = true; P.brake = 1;
+  } else if (scen === "air") {
+    P.pos = v3(0, 900, 1200); P.q = qAxis(0, 1, 0, Math.PI);
+    P.vel = mRot(qMat(P.q, new Float32Array(9)), v3(0, 0, 72)); P.thr = .72; P.park = false;
+  } else if (scen === "rings") {
+    P.pos = v3(0, 620, 900); P.q = qAxis(0, 1, 0, Math.PI);
+    P.vel = mRot(qMat(P.q, new Float32Array(9)), v3(0, 0, 80)); P.thr = .85; P.park = false;
+  } else if (scen === "land") {
+    // 4.2 km out on final for runway 18, ~720 ft above the field, dirty and slow
+    P.pos = v3(0, E + 220, 4200); P.q = qAxis(0, 1, 0, Math.PI);
+    P.q = qmul(P.q, qAxis(1, 0, 0, 3 * DEG));
+    P.vel = mRot(qMat(P.q, new Float32Array(9)), v3(0, 0, 40)); P.thr = .34;
+    P.flap = P.flapCmd = .5; P.park = false;
+  }
+  qMat(P.q, P.m);
+}
+
+/* pilot assist for SIMPLE mode: turns the stick into an autopilot command */
+function assist(P, dt, e) {
+  const bankTgt = P.inA * 58 * DEG;
+  const rollErr = bankTgt - e.roll;
+  // w.z is positive when rolling LEFT, so it damps a right-roll command directly
+  P.dA = clamp(rollErr * 2.4 + P.w.z * .55, -1, 1);
+  // pitch: stick commands a flight-path change, with turn compensation
+  const lvl = 1 / Math.max(Math.cos(clamp(e.roll, -1.2, 1.2)), .35);
+  let pitchTgt = P.inE * 26 * DEG + (lvl - 1) * 9 * DEG;
+  if (P.onGround) pitchTgt = P.inE * 14 * DEG;
+  const pitchErr = pitchTgt - e.pitch;
+  // proportional alone leaves a standing error, which shows up as a banked turn
+  // that quietly descends, so trim it out with a bounded integral term
+  P.pitchI = clamp((P.pitchI || 0) + pitchErr * dt * 1.5, -.55, .55);
+  // w.x is positive pitching DOWN, so it adds directly to a nose-up command
+  P.dE = clamp(pitchErr * 3.2 + P.pitchI + P.w.x * .50, -1, 1);
+  // hard angle-of-attack limiter keeps the wing flying
+  const amax = (13.5 - P.flap * 1.5) * DEG;
+  P.aoaCap = P.alpha > amax && P.dE > 0;
+  if (P.aoaCap) P.dE = clamp(P.dE - (P.alpha - amax) * 26, -1, .05);
+  if (P.onGround) {
+    // on the ground, hold the runway heading rather than chasing zero sideslip:
+    // zeroing sideslip in a crosswind just walks the aircraft off the centreline
+    if (Math.abs(P.inA) > .05 || P.holdHdg === undefined) P.holdHdg = e.hdg;
+    let err = P.holdHdg - e.hdg;
+    if (err > Math.PI) err -= TAU; else if (err < -Math.PI) err += TAU;
+    P.dR = clamp(P.inA * .9 + err * 2.4 - P.w.y * .9, -1, 1);
+  } else {
+    // in the air, auto-coordinate: a slip to the right needs RIGHT rudder
+    P.holdHdg = undefined;
+    P.dR = clamp(P.beta * 4.5 - P.w.y * .45, -1, 1);
+  }
+  P.trim = 0;
+}
+
+function physics(P, dt) {
+  const m = P.m;
+  const e = eulerOf(m);
+  // --- control surface response ------------------------------------------
+  if (MODE === "simple") assist(P, dt, e);
+  else {
+    P.dE = approach(P.dE, P.inE, 9, dt);
+    P.dA = approach(P.dA, P.inA, 11, dt);
+    P.dR = approach(P.dR, P.inR, 9, dt);
+  }
+  P.flap = approach(P.flap, P.flapCmd, 1.1, dt);
+  P.gear = clamp(P.gear + (P.gearCmd - P.gear > 0 ? dt / 3.2 : -dt / 3.2), 0, 1);
+  if (Math.abs(P.gearCmd - P.gear) < .02) P.gear = P.gearCmd;
+
+  // --- engine -------------------------------------------------------------
+  const thrCmd = P.crashed ? 0 : P.thr;
+  P.rpm = approach(P.rpm, .18 + thrCmd * .82, 2.4, dt);
+  const rho = rhoAt(P.pos.y);
+  const wind = WIND.at(P.pos, P);
+  const va = vsub(P.vel, wind);
+  const vb = mRotT(m, va);
+  const V = vlen(vb);
+  P.tas = V;
+  P.ias = V * Math.sqrt(rho / 1.225);
+  const thrust = SPECS.thrustMax * P.rpm * clamp(1 - V / SPECS.vProp, .10, 1) *
+    Math.pow(rho / 1.225, .85) * (MODE === "simple" ? 1.12 : 1);
+
+  let F = v3(0, -SPECS.mass * 9.81, 0);      // world-frame accumulator
+  let M = v3();                              // body-frame torque
+
+  if (V > .6) {
+    const vd = vmul(vb, 1 / V);
+    const slow = clamp((V - 3) / 6, 0, 1);   // the angles are meaningless at a standstill
+    P.alpha = clamp(Math.atan2(-vd.y, vd.z), -1.4, 1.4) * slow;
+    P.beta = Math.asin(clamp(vd.x, -1, 1)) * slow;
+    const qbar = .5 * rho * V * V, qS = qbar * SPECS.S;
+    // lift curve with a proper stall break
+    const aStall = (15.5 + P.flap * 1.5) * DEG;
+    let st = 1 - sstep(aStall, aStall + 8 * DEG, Math.abs(P.alpha));
+    if (MODE === "simple") st = Math.max(st, .55);
+    const CLlin = SPECS.CL0 + SPECS.CLa * P.alpha + .60 * P.flap;
+    const CLstall = 1.05 * Math.sin(2 * P.alpha);
+    const CL = lerp(CLstall, CLlin, st);
+    P.stall = approach(P.stall, 1 - st, 6, dt);
+    const CD = SPECS.CD0 + SPECS.k * CL * CL + .022 * P.gear + .055 * P.flap + (1 - st) * .09;
+    const L = qS * CL, D = qS * CD, Y = -qS * .90 * P.beta;
+    // lift acts perpendicular to the relative wind, in the plane of symmetry
+    const liftDir = vnorm(vcross(vd, v3(1, 0, 0)));
+    const fb = vadd(vadd(vmul(liftDir, L), vmul(vd, -D)), v3(Y, 0, 0));
+    fb.z += thrust;
+    F = vadd(F, mRot(m, fb));
+    P.gload = L / (SPECS.mass * 9.81);
+    // moments
+    const cq = .5 * rho * V * SPECS.S;
+    const dET = clamp(P.dE + P.trim, -1.3, 1.3);
+    M.x = qS * SPECS.cbar * (SPECS.CmA * P.alpha - SPECS.CmE * dET) - cq * SPECS.cbar * SPECS.cbar * SPECS.CmQ * P.w.x;
+    M.y = qS * SPECS.b * (SPECS.Cnb * P.beta + SPECS.Cndr * P.dR - .020 * P.dA) - cq * SPECS.b * SPECS.b * SPECS.Cnr * P.w.y;
+    M.z = qS * SPECS.b * (-SPECS.Cla * P.dA + SPECS.Clb * P.beta) - cq * SPECS.b * SPECS.b * SPECS.Clp * P.w.z;
+    if (1 - st > .05) {   // asymmetric stall: wing drop and buffet
+      const drop = (1 - st) * (hash2((P.pos.x * 3) | 0, (P.pos.z * 3) | 0) - .5);
+      M.z += drop * 9000;
+      M.x += (1 - st) * 5200;      // nose drops
+      cam.shake = Math.max(cam.shake, (1 - st) * .5);
+    }
+  } else {
+    P.alpha = 0; P.beta = 0; P.gload = 0; P.stall = 0;
+    F = vadd(F, mRot(m, v3(0, 0, thrust)));
+  }
+  if (MODE === "complex") {
+    // engine torque rolls the airframe left, p-factor yaws it left
+    const pw = P.rpm * clamp(1 - V / 110, .15, 1);
+    M.z += 900 * pw;
+    M.y -= 700 * pw * (.5 + clamp(P.alpha, 0, .5));
+  }
+
+  // --- ground contact ------------------------------------------------------
+  let wow = 0, maxFn = 0;
+  if (P.pos.y - groundH(P.pos.x, P.pos.z) < 6) {
+    const wOmega = mRot(m, P.w);
+    for (const wh of SPECS.wheels) {
+      const legDrop = (1 - P.gear) * .95;   // retracted wheels sit inside the airframe
+      const wl = v3(wh.p.x, wh.p.y + legDrop, wh.p.z);
+      const rw = mRot(m, wl);
+      const wp = vadd(P.pos, rw);
+      const gh = groundH(wp.x, wp.z);
+      const pen = gh - wp.y;
+      if (pen <= 0) continue;
+      wow++;
+      const flat = onRunway(wp.x, wp.z);
+      const n = flat ? v3(0, 1, 0) : terrainN(wp.x, wp.z, 4);
+      const vp = vadd(P.vel, vcross(wOmega, rw));
+      const vn = vdot(vp, n);
+      let Fn = clamp(pen * 190000 - vn * 14000, 0, SPECS.mass * 9.81 * 7);
+      maxFn = Math.max(maxFn, Fn);
+      let Fw = vmul(n, Fn);
+      // rolling / lateral friction in the wheel's own frame
+      let fwd = mRot(m, v3(0, 0, 1));
+      if (wh.steer) {
+        // in simple mode dR already carries the pilot's steering plus the
+        // auto-coordination that keeps the roll straight
+        const st = P.dR * (MODE === "simple" ? .6 : 1) * 26 * DEG * clamp(1 - V / 40, .25, 1);
+        fwd = mRot(m, v3(Math.sin(st), 0, Math.cos(st)));
+      }
+      fwd = vnorm(vsub(fwd, vmul(n, vdot(fwd, n))));
+      const side = vnorm(vcross(n, fwd));
+      const vs = vdot(vp, side), vf = vdot(vp, fwd);
+      // nose-wheel grip fades with speed; a hard-gripping wheel ahead of the
+      // centre of gravity is directionally unstable and ground-loops the aircraft
+      const grip = wh.grip || lerp(.75, .16, clamp(V / 26, 0, 1));
+      const muS = (flat ? .92 : .72) * grip;
+      Fw = vadd(Fw, vmul(side, clamp(-vs * 3200 * grip, -muS * Fn, muS * Fn)));
+      const bk = P.brake * wh.brake * (MODE === "simple" ? .8 : 1);
+      const roll = (flat ? .022 : .075) + bk * .70;
+      Fw = vadd(Fw, vmul(fwd, clamp(-vf * 900, -roll * Fn, roll * Fn)));
+      F = vadd(F, Fw);
+      M = vadd(M, mRotT(m, vcross(rw, Fw)));
+      if (Fn > 200 && V > 3 && Math.random() < .25) spawnDust(wp, vmul(vp, -.1));
+    }
+    // structural contact = crash
+    if (!P.crashed) {
+      for (const hp of SPECS.hard) {
+        const wp = vadd(P.pos, mRot(m, hp));
+        if (wp.y < groundH(wp.x, wp.z) - .05) { crash("STRUCTURAL CONTACT"); break; }
+      }
+      const vsLim = MODE === "simple" ? 9.5 : 5.2;
+      if (wow && P.lastVS < -vsLim && !P.touched) crash("HARD LANDING");
+      if (maxFn > SPECS.mass * 9.81 * (MODE === "simple" ? 6.5 : 4.4)) crash("GEAR COLLAPSE");
+      if (wow && !P.gear) crash("GEAR UP LANDING");
+    }
+  }
+  P.wow = wow;
+  if (wow && !P.onGround) { P.touched = 1.2; P.hardLand = -P.lastVS; }
+  P.onGround = wow > 0;
+  if (P.touched > 0) P.touched = Math.max(0, P.touched - dt);
+  if (!wow) P.lastVS = P.vel.y;
+
+  // --- integrate -----------------------------------------------------------
+  if (P.crashed) {
+    F = v3(0, -SPECS.mass * 9.81, 0);
+    if (P.pos.y <= groundH(P.pos.x, P.pos.z) + 1.0) {
+      P.vel = vmul(P.vel, Math.exp(-6 * dt));
+      P.w = vmul(P.w, Math.exp(-5 * dt));
+      F = v3();
+    }
+  }
+  const acc = vmul(F, 1 / SPECS.mass);
+  P.vel = vadd(P.vel, vmul(acc, dt));
+  P.pos = vadd(P.pos, vmul(P.vel, dt));
+  P.w = v3(P.w.x + M.x / SPECS.Ipitch * dt, P.w.y + M.y / SPECS.Iyaw * dt, P.w.z + M.z / SPECS.Iroll * dt);
+  const wcap = 6;
+  P.w = v3(clamp(P.w.x, -wcap, wcap), clamp(P.w.y, -wcap, wcap), clamp(P.w.z, -wcap, wcap));
+  P.q = qIntegrate(P.q, P.w, dt);
+  qMat(P.q, P.m);
+  P.propAng += P.rpm * 145 * dt;
+  P.vsi = P.vel.y;
+  P.dist += vlen(P.vel) * dt;
+  // never let the aircraft sink through the world
+  const gh = groundH(P.pos.x, P.pos.z);
+  if (P.pos.y < gh + .35) { P.pos.y = gh + .35; if (P.vel.y < 0) P.vel.y *= -.05; }
+}
+
+/* wind & turbulence */
+const WIND = {
+  base: v3(3.2, 0, -1.6), t: 0,
+  at(pos, P) {
+    if (MODE === "simple") return v3(this.base.x * .22, 0, this.base.z * .22);
+    const g = Math.sin(this.t * .7) * .5 + Math.sin(this.t * 1.9 + 1.3) * .3;
+    const alt = clamp(pos.y / 1200, 0, 1);
+    const turb = (1 - alt) * .9 + .15;
+    return v3(
+      this.base.x * (1 + g * .5) * (.6 + alt) + Math.sin(this.t * 3.1 + pos.x * .01) * turb,
+      Math.sin(this.t * 2.6 + pos.z * .013) * turb * .8,
+      this.base.z * (1 + g * .5) * (.6 + alt) + Math.cos(this.t * 2.3 + pos.z * .011) * turb);
+  }
+};
+
+/* ======================================================== particles ====== */
+const PARTS = [];
+function addPart(p, v, r, life, col, grow, kind) {
+  if (PARTS.length > 420) PARTS.shift();
+  PARTS.push({ p: v3(p.x, p.y, p.z), v: v3(v.x, v.y, v.z), r, t: 0, life, col, grow: grow || 1.6, kind: kind || 0 });
+}
+function spawnDust(p, v) {
+  addPart(p, v3(v.x + (Math.random() - .5) * 3, 1 + Math.random() * 2, v.z + (Math.random() - .5) * 3),
+    .6, .9 + Math.random() * .7, [196, 188, 170], 5.5);
+}
+function spawnSmoke(p, v) {
+  addPart(p, v3(v.x * .2 + (Math.random() - .5) * 2, 2 + Math.random() * 3, v.z * .2 + (Math.random() - .5) * 2),
+    1.2, 2.4, [58, 58, 62], 7);
+}
+function spawnFire(p) {
+  addPart(p, v3((Math.random() - .5) * 9, 5 + Math.random() * 9, (Math.random() - .5) * 9),
+    1.6, .5 + Math.random() * .5, [255, 178, 60], 6, 1);
+}
+function updateParts(dt) {
+  for (let i = PARTS.length - 1; i >= 0; i--) {
+    const q = PARTS[i];
+    q.t += dt;
+    if (q.t >= q.life) { PARTS.splice(i, 1); continue; }
+    q.p = vadd(q.p, vmul(q.v, dt));
+    q.v = vmul(q.v, Math.exp(-1.6 * dt));
+    if (q.kind === 1) q.v.y += 18 * dt; else q.v.y += 1.2 * dt;
+  }
+}
+function drawParts() {
+  for (const q of PARTS) {
+    const sp = projectPoint(q.p);
+    if (!sp) continue;
+    const f = q.t / q.life;
+    const r = (q.r + q.grow * q.t) * sp.s;
+    if (r < .6) continue;
+    const a = (1 - f) * (q.kind === 1 ? .9 : .55);
+    const col = q.kind === 1 ? mixc([255, 226, 140], [220, 70, 30], f) : q.col;
+    DL.sprite(sp.z, sp.x, sp.y, r, sprite(col[0], col[1], col[2], 1), a);
+  }
+}
+
+/* ============================================================ events ==== */
+let banner = document.getElementById("banner"), toastEl = document.getElementById("toast");
+let toastT = 0;
+function toast(msg, secs) { toastEl.textContent = msg; toastEl.style.opacity = 1; toastT = secs || 2.2; }
+function showBanner(msg, col) {
+  banner.textContent = msg; banner.style.color = col || "#fff"; banner.style.opacity = 1;
+}
+function hideBanner() { banner.style.opacity = 0; }
+
+function crash(why) {
+  const P = PLANE;
+  if (P.crashed) return;
+  P.crashed = true; P.crashT = 0; P.msg = why;
+  for (let i = 0; i < 34; i++) spawnFire(P.pos);
+  for (let i = 0; i < 16; i++) spawnSmoke(P.pos, P.vel);
+  cam.shake = 2.2;
+  audio.boom();
+  showBanner(why + "  \u00b7  R TO RESET", "#ff6a56");
+  GAME.over = true; GAME.result = why;
+}
+
+/* ============================================================ camera ==== */
+let camMode = 0;
+const CAMNAMES = ["CHASE", "COCKPIT", "ORBIT", "WING", "TOWER"];
+let orbitA = 0;
+function updateCamera(dt) {
+  const P = PLANE, m = P.m;
+  const fwd = v3(m[6], m[7], m[8]), up = v3(m[3], m[4], m[5]), right = v3(m[0], m[1], m[2]);
+  let want, look, rollBlend = 1;
+  if (camMode === 1) {                      // cockpit
+    want = vadd(P.pos, mRot(m, v3(0, .80, -.45)));
+    cam.pos = want;
+    cam.m = qMat(P.q, cam.m);
+    FOV = 72 * DEG; F = (H * .5) / Math.tan(FOV * .5);
+    return;
+  }
+  FOV = 62 * DEG; F = (H * .5) / Math.tan(FOV * .5);
+  if (camMode === 0) {
+    const back = 17 + clamp(vlen(P.vel) * .06, 0, 7);
+    want = vadd(P.pos, vadd(vmul(fwd, -back), vadd(vmul(up, 3.4), vmul(right, 0))));
+    look = vadd(P.pos, vmul(fwd, 10));
+    rollBlend = .35;
+  } else if (camMode === 2) {
+    orbitA += dt * .22;
+    const r = 26;
+    want = vadd(P.pos, v3(Math.cos(orbitA) * r, 7, Math.sin(orbitA) * r));
+    look = P.pos; rollBlend = 0;
+  } else if (camMode === 3) {
+    want = vadd(P.pos, mRot(m, v3(7.5, 1.4, -1.5)));
+    look = vadd(P.pos, mRot(m, v3(0, .3, 2)));
+    rollBlend = 1;
+  } else {
+    want = v3(-70, E + 24, 620);
+    look = P.pos; rollBlend = 0;
+  }
+  // smooth follow
+  if (!cam.init) { cam.pos = want; cam.init = 1; }
+  const k = camMode === 0 ? 9 : 5;
+  cam.pos = v3(approach(cam.pos.x, want.x, k, dt), approach(cam.pos.y, want.y, k, dt), approach(cam.pos.z, want.z, k, dt));
+  const gh = groundH(cam.pos.x, cam.pos.z) + 1.5;
+  if (cam.pos.y < gh) cam.pos.y = gh;
+  // build a look-at basis, then blend in some of the aircraft roll
+  const f2 = vnorm(vsub(look, cam.pos));
+  let upRef = v3(0, 1, 0);
+  if (rollBlend > 0) upRef = vnorm(vadd(vmul(v3(0, 1, 0), 1 - rollBlend), vmul(up, rollBlend)));
+  let r2 = vnorm(vcross(upRef, f2));
+  if (!isFinite(r2.x) || vlen(r2) < .01) r2 = vnorm(vcross(v3(0, 0, 1), f2));
+  const u2 = vcross(f2, r2);
+  const sh = cam.shake;
+  cam.m[0] = r2.x; cam.m[1] = r2.y; cam.m[2] = r2.z;
+  cam.m[3] = u2.x; cam.m[4] = u2.y; cam.m[5] = u2.z;
+  cam.m[6] = f2.x; cam.m[7] = f2.y; cam.m[8] = f2.z;
+  if (sh > .001) {
+    const jq = qmul(qAxis(1, 0, 0, (Math.random() - .5) * sh * .05), qAxis(0, 1, 0, (Math.random() - .5) * sh * .05));
+    const jm = qMat(jq, new Float32Array(9));
+    cam.m = mmul(cam.m, jm);
+  }
+}
+
+/* ======================================================= draw aircraft == */
+function drawAircraft() {
+  const P = PLANE, Rb = P.m, pos = P.pos;
+  const external = camMode !== 1;
+  const ail = P.dA * 22 * DEG, ele = P.dE * 24 * DEG, rud = P.dR * 26 * DEG, fl = P.flap * 35 * DEG;
+  const gearAng = (1 - P.gear) * 84 * DEG;
+  if (external) {
+    drawMesh(AC.fuse, pos, Rb, null);
+    drawMesh(AC.wingL, pos, Rb, null);
+    drawMesh(AC.wingR, pos, Rb, null);
+    drawMesh(AC.tail, pos, Rb, null);
+    drawMesh(AC.pit, pos, Rb, null);
+    // hinged surfaces: rotate about the body axis through each pivot
+    const hinge = (part, mat) => {
+      const piv = part.pivot;
+      const o = vadd(pos, mRot(Rb, v3(piv[0], piv[1], piv[2])));
+      drawMesh(part.mesh, o, mmul(Rb, mat), piv);
+    };
+    hinge(AC.ailR, mAxis(1, 0, 0, -ail));   // right aileron up when rolling right
+    hinge(AC.ailL, mAxis(1, 0, 0, ail));
+    hinge(AC.flapL, mAxis(1, 0, 0, -fl));
+    hinge(AC.flapR, mAxis(1, 0, 0, -fl));
+    hinge(AC.elev, mAxis(1, 0, 0, -ele));
+    hinge(AC.rud, mAxis(0, 1, 0, rud));
+    if (P.gear > .01) {
+      hinge(AC.gearL, mAxis(0, 0, 1, -gearAng));
+      hinge(AC.gearR, mAxis(0, 0, 1, gearAng));
+      hinge(AC.gearN, mAxis(1, 0, 0, gearAng));
+    }
+    // propeller: discrete blades when slow, a translucent disc when spinning up
+    const spin = P.rpm;
+    drawMesh(AC.spin, pos, mmul(Rb, mAxis(0, 0, 1, P.propAng)), null);
+    if (spin < .32) {
+      drawMesh(AC.blades, pos, mmul(Rb, mAxis(0, 0, 1, P.propAng)), null);
+    } else {
+      for (let i = 0; i < 3; i++)
+        drawMesh(AC.blades, pos, mmul(Rb, mAxis(0, 0, 1, P.propAng + i * .55)), null, null, .30);
+      const hub = projectPoint(vadd(pos, mRot(Rb, v3(0, .06, 2.65))));
+      if (hub) DL.sprite(hub.z - .5, hub.x, hub.y, 1.45 * hub.s, sprite(208, 216, 226, 2), 1);
+    }
+    drawMesh(AC.glass, pos, Rb, null);
+    // navigation lights
+    const navs = [[v3(-5.45, .24, -.15), [255, 70, 60]], [v3(5.45, .24, -.15), [70, 255, 120]], [v3(0, 1.7, -5.1), [255, 255, 255]]];
+    for (const [lp, c] of navs) {
+      const sp = projectPoint(vadd(pos, mRot(Rb, lp)));
+      if (!sp) continue;
+      DL.sprite(sp.z - 2, sp.x, sp.y, clamp(.55 * sp.s, 1.6, 16), sprite(c[0], c[1], c[2], 3), .9);
+    }
+  } else {
+    // from inside: the nose deck, the wings and the propeller, nothing else
+    drawMesh(AC.wingL, pos, Rb, null);
+    drawMesh(AC.wingR, pos, Rb, null);
+    drawMesh(AC.cowl, pos, Rb, null);
+    drawMesh(AC.spin, pos, mmul(Rb, mAxis(0, 0, 1, P.propAng)), null);
+    // only the blur disc: the blades themselves are a smear at these speeds
+    const hub = projectPoint(vadd(pos, mRot(Rb, v3(0, .06, 2.65))));
+    if (hub && P.rpm > .2) DL.sprite(hub.z - .5, hub.x, hub.y, 1.45 * hub.s, sprite(208, 216, 226, 2), 1);
+    drawMesh(AC.glass, pos, Rb, null, null, .11);
+  }
+  // engine smoke when damaged
+  if (P.crashed && Math.random() < .5) spawnSmoke(vadd(pos, mRot(Rb, v3(0, .3, 1.2))), P.vel);
+}
+
+/* ============================================================= audio ==== */
+const audio = {
+  ctx: null, ok: false,
+  init() {
+    if (this.ctx) return;
+    const AC2 = window.AudioContext || window.webkitAudioContext;
+    if (!AC2) return;
+    this.ctx = new AC2();
+    const c = this.ctx;
+    this.master = c.createGain(); this.master.gain.value = .55; this.master.connect(c.destination);
+    // engine: two detuned saws through a lowpass
+    this.eg = c.createGain(); this.eg.gain.value = 0;
+    this.ef = c.createBiquadFilter(); this.ef.type = "lowpass"; this.ef.frequency.value = 900;
+    this.o1 = c.createOscillator(); this.o1.type = "sawtooth"; this.o1.frequency.value = 70;
+    this.o2 = c.createOscillator(); this.o2.type = "square"; this.o2.frequency.value = 35;
+    this.o1.connect(this.ef); this.o2.connect(this.ef);
+    this.ef.connect(this.eg); this.eg.connect(this.master);
+    this.o1.start(); this.o2.start();
+    // wind: filtered noise
+    const len = c.sampleRate * 2, buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    this.ns = c.createBufferSource(); this.ns.buffer = buf; this.ns.loop = true;
+    this.nf = c.createBiquadFilter(); this.nf.type = "bandpass"; this.nf.frequency.value = 500; this.nf.Q.value = .7;
+    this.ng = c.createGain(); this.ng.gain.value = 0;
+    this.ns.connect(this.nf); this.nf.connect(this.ng); this.ng.connect(this.master);
+    this.ns.start();
+    // stall horn
+    this.sg = c.createGain(); this.sg.gain.value = 0;
+    this.so = c.createOscillator(); this.so.type = "sawtooth"; this.so.frequency.value = 420;
+    this.so.connect(this.sg); this.sg.connect(this.master);
+    this.so.start();
+    this.ok = true;
+  },
+  update(P, dt) {
+    if (!this.ok) return;
+    if (this.ctx.state === "suspended") this.ctx.resume();
+    const t = this.ctx.currentTime;
+    const rpmHz = 46 + P.rpm * 128;
+    this.o1.frequency.setTargetAtTime(rpmHz, t, .08);
+    this.o2.frequency.setTargetAtTime(rpmHz * .5, t, .08);
+    this.ef.frequency.setTargetAtTime(420 + P.rpm * 2100, t, .1);
+    this.eg.gain.setTargetAtTime(P.crashed ? 0 : (camMode === 1 ? .17 : .12) * (.25 + P.rpm * .9), t, .1);
+    const wv = clamp(P.tas / 130, 0, 1.4);
+    this.ng.gain.setTargetAtTime(wv * wv * .21, t, .12);
+    this.nf.frequency.setTargetAtTime(320 + wv * 900, t, .12);
+    const warn = (P.stall > .22 || (MODE === "complex" && P.alpha > 13.5 * DEG)) && !P.onGround && !P.crashed;
+    this.sg.gain.setTargetAtTime(warn ? (Math.sin(t * 34) > 0 ? .06 : 0) : 0, t, .02);
+  },
+  boom() {
+    if (!this.ok) return;
+    const c = this.ctx, t = c.currentTime;
+    const len = c.sampleRate * 1.4, buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.5);
+    const src = c.createBufferSource(); src.buffer = buf;
+    const f = c.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 380;
+    const g = c.createGain(); g.gain.value = .85;
+    src.connect(f); f.connect(g); g.connect(this.master); src.start(t);
+  },
+  beep(freq, dur, vol) {
+    if (!this.ok) return;
+    const c = this.ctx, t = c.currentTime;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = "triangle"; o.frequency.value = freq;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol || .18, t + .01);
+    g.gain.exponentialRampToValueAtTime(.001, t + (dur || .12));
+    o.connect(g); g.connect(this.master); o.start(t); o.stop(t + (dur || .14));
+  }
+};
+
+/* ========================================================== scenarios === */
+const GAME = {
+  t: 0, over: false, result: "", started: false, paused: false,
+  rings: [], ringIdx: 0, ringT: 0, landScore: null
+};
+function buildRingCourse() {
+  GAME.rings = [];
+  let a = Math.PI, x = 0, z = -300, y = 560;
+  for (let i = 0; i < 12; i++) {
+    a += (hash2(i, 51) - .5) * .85 + (i % 2 ? .30 : -.30);
+    if (i >= 6) {   // second half curves back toward the field
+      let d = Math.atan2(-x, -z) - a;
+      if (d > Math.PI) d -= TAU; else if (d < -Math.PI) d += TAU;
+      a += clamp(d, -.8, .8) * .55;
+    }
+    const step = 950 + hash2(i, 52) * 550;
+    x += Math.sin(a) * step; z += Math.cos(a) * step;
+    y = clamp(terrainH(x, z) + 180 + hash2(i, 53) * 260, 140, 1500);
+    GAME.rings.push({ p: v3(x, y, z), a, passed: false });
+  }
+  GAME.ringIdx = 0; GAME.ringT = 0;
+}
+function drawRings() {
+  for (let i = 0; i < GAME.rings.length; i++) {
+    const rg = GAME.rings[i];
+    if (rg.passed) continue;
+    const d = vlen(vsub(rg.p, cam.pos));
+    if (d > 9000) continue;
+    const M = qMat(qAxis(0, 1, 0, rg.a), new Float32Array(9));
+    const tint = i === GAME.ringIdx ? [120, 255, 160] : null;
+    drawMesh(RING, rg.p, M, null, tint);
+    // pylon to the ground so the gate reads in 3D
+    const gh = terrainH(rg.p.x, rg.p.z);
+    const a = projectPoint(v3(rg.p.x, rg.p.y - 30, rg.p.z)), b = projectPoint(v3(rg.p.x, gh, rg.p.z));
+    if (a && b) DL.poly(a.z + 30, [a.x - 1.5, a.y, a.x + 1.5, a.y, b.x + 2.5, b.y, b.x - 2.5, b.y], 4,
+      fogged([132, 138, 146], a.z), null, 0);
+  }
+}
+function checkRings(dt) {
+  if (SCEN !== "rings" || GAME.over) return;
+  GAME.ringT += dt;
+  const rg = GAME.rings[GAME.ringIdx];
+  if (!rg) return;
+  const rel = vsub(PLANE.pos, rg.p);
+  const n = v3(Math.sin(rg.a), 0, Math.cos(rg.a));
+  const along = vdot(rel, n);
+  const radial = Math.hypot(rel.x - n.x * along, rel.y, rel.z - n.z * along);
+  if (rg.last === undefined) rg.last = along;
+  // `along` runs negative before the gate and positive once past it
+  if (rg.last < 0 && along >= 0 && radial < 30) {
+    rg.passed = true; GAME.ringIdx++;
+    audio.beep(880, .13, .2);
+    if (GAME.ringIdx >= GAME.rings.length) {
+      GAME.over = true; GAME.result = "COURSE COMPLETE  " + GAME.ringT.toFixed(2) + "s";
+      showBanner("COURSE COMPLETE — " + GAME.ringT.toFixed(2) + "s", "#8bf0a8");
+    } else toast("GATE " + GAME.ringIdx + " / " + GAME.rings.length, 1.2);
+  }
+  rg.last = along;
+}
+function checkLanding() {
+  const P = PLANE;
+  if (SCEN !== "land" || GAME.over || P.crashed) return;
+  if (P.onGround && P.touched > 1.1 && GAME.landScore === null) {
+    const onRwy = onRunway(P.pos.x, P.pos.z);
+    const vs = P.hardLand;
+    const offC = Math.abs(P.pos.x);
+    const zone = 950 - P.pos.z;     // metres past the threshold
+    let sc = 0, notes = [];
+    if (!onRwy) { notes.push("OFF RUNWAY"); }
+    else {
+      sc = 100;
+      sc -= clamp(Math.abs(vs) * 12, 0, 45); notes.push("SINK " + (Math.abs(vs) * 196.85).toFixed(0) + " fpm");
+      sc -= clamp(offC * 2.2, 0, 25); notes.push("CENTRE " + offC.toFixed(1) + " m");
+      sc -= clamp(Math.abs(zone - 320) * .06, 0, 30); notes.push("TOUCHDOWN " + zone.toFixed(0) + " m");
+      sc = Math.max(0, Math.round(sc));
+    }
+    GAME.landScore = sc;
+    GAME.over = true;
+    GAME.result = (onRwy ? "TOUCHDOWN — " + sc + " / 100" : "MISSED THE RUNWAY");
+    showBanner(GAME.result, onRwy ? (sc > 75 ? "#8bf0a8" : "#ffd27a") : "#ff8c6a");
+    toast(notes.join("   "), 5);
+  }
+}
+
+/* =============================================================== HUD ==== */
+const KT = 1.94384, FT = 3.28084, FPM = 196.85;
+function hudFont(px, w) { ctx.font = (w || 400) + " " + px.toFixed(0) + "px ui-monospace,Menlo,Consolas,monospace"; }
+function box(x, y, w, h, r, fill, stroke) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1.2 * (H / 900); ctx.stroke(); }
+}
+function drawHUD() {
+  const P = PLANE, e = eulerOf(P.m), U = H / 900;
+  const G = "rgba(150,255,190,.92)", GD = "rgba(150,255,190,.42)", PANEL = "rgba(6,12,18,.52)";
+  ctx.save();
+  ctx.textBaseline = "middle";
+  ctx.lineWidth = 1.6 * U;
+
+  /* ---- airspeed (left) and altitude (right) tapes ---- */
+  const tapeH = 300 * U, tw = 78 * U;
+  const drawTape = (x, cy, val, step, unit, digits, right) => {
+    box(x, cy - tapeH / 2, tw, tapeH, 5 * U, PANEL, GD);
+    ctx.save(); ctx.beginPath(); ctx.rect(x, cy - tapeH / 2, tw, tapeH); ctx.clip();
+    const pxPer = tapeH / (step * 10);
+    const v0 = Math.floor(val / step) * step;
+    hudFont(12 * U);
+    for (let i = -6; i <= 6; i++) {
+      const v = v0 + i * step;
+      const y = cy + (val - v) * pxPer;
+      if (y < cy - tapeH / 2 - 10 || y > cy + tapeH / 2 + 10) continue;
+      const major = (Math.round(v / step) % 2) === 0;
+      ctx.strokeStyle = GD; ctx.beginPath();
+      ctx.moveTo(right ? x : x + tw, y); ctx.lineTo(right ? x + (major ? 12 : 7) * U : x + tw - (major ? 12 : 7) * U, y);
+      ctx.stroke();
+      if (major && v >= 0) {
+        ctx.fillStyle = GD; ctx.textAlign = right ? "left" : "right";
+        ctx.fillText(String(Math.round(v)), right ? x + 16 * U : x + tw - 16 * U, y);
+      }
+    }
+    ctx.restore();
+    // read-out
+    const bw = 62 * U, bh = 26 * U, bx = right ? x + tw - 6 * U : x - bw + 6 * U;
+    box(bx, cy - bh / 2, bw, bh, 3 * U, "rgba(4,10,14,.92)", G);
+    hudFont(17 * U, 600); ctx.fillStyle = G; ctx.textAlign = "center";
+    ctx.fillText(digits === 0 ? String(Math.round(val)) : val.toFixed(digits), bx + bw / 2, cy);
+    hudFont(10 * U); ctx.fillStyle = GD; ctx.textAlign = "center";
+    ctx.fillText(unit, x + tw / 2, cy + tapeH / 2 + 12 * U);
+  };
+  const ias = P.ias * KT, alt = (P.pos.y - 0) * FT;
+  drawTape(96 * U, CY, ias, 20, "KIAS", 0, false);
+  drawTape(W - 96 * U - tw, CY, alt, 200, "FT MSL", 0, true);
+
+  /* ---- heading tape ---- */
+  const hw2 = Math.min(W * .34, 420 * U), hx = CX - hw2 / 2, hy = 26 * U;
+  box(hx, hy, hw2, 30 * U, 4 * U, PANEL, GD);
+  ctx.save(); ctx.beginPath(); ctx.rect(hx, hy, hw2, 30 * U); ctx.clip();
+  const hdgDeg = e.hdg * RAD, pxPerDeg = hw2 / 90;
+  hudFont(12 * U);
+  for (let d = -50; d <= 50; d += 5) {
+    const a = Math.round(hdgDeg / 5) * 5 + d;
+    const x = CX + (a - hdgDeg) * pxPerDeg;
+    const aa = ((a % 360) + 360) % 360;
+    ctx.strokeStyle = GD; ctx.beginPath();
+    ctx.moveTo(x, hy + 30 * U); ctx.lineTo(x, hy + 30 * U - (aa % 10 === 0 ? 9 : 5) * U); ctx.stroke();
+    if (aa % 10 === 0) {
+      ctx.fillStyle = G; ctx.textAlign = "center";
+      const lbl = aa === 0 ? "N" : aa === 90 ? "E" : aa === 180 ? "S" : aa === 270 ? "W" : String(aa / 10);
+      ctx.fillText(lbl, x, hy + 11 * U);
+    }
+  }
+  ctx.restore();
+  ctx.fillStyle = G; ctx.beginPath();
+  ctx.moveTo(CX, hy + 32 * U); ctx.lineTo(CX - 6 * U, hy + 42 * U); ctx.lineTo(CX + 6 * U, hy + 42 * U); ctx.fill();
+  hudFont(13 * U, 600); ctx.textAlign = "center"; ctx.fillStyle = G;
+  ctx.fillText(("00" + Math.round(hdgDeg)).slice(-3) + "°", CX, hy + 56 * U);
+
+  /* ---- attitude: full HUD ladder in the cockpit, compact ball outside ---- */
+  if (camMode === 1) {
+    ctx.save();
+    ctx.translate(CX, CY); ctx.rotate(-e.roll);
+    ctx.strokeStyle = G; ctx.fillStyle = G;
+    hudFont(12 * U);
+    for (let p = -90; p <= 90; p += 5) {
+      const y = (Math.tan((e.pitch - p * DEG)) * F);
+      if (Math.abs(y) > H * .48) continue;
+      const wl = p === 0 ? 230 * U : (p % 10 === 0 ? 120 * U : 70 * U);
+      ctx.globalAlpha = p === 0 ? .95 : .7;
+      ctx.beginPath();
+      if (p < 0) {  // dashed below the horizon
+        ctx.setLineDash([9 * U, 7 * U]);
+      } else ctx.setLineDash([]);
+      ctx.moveTo(-wl, y); ctx.lineTo(-wl * .28, y);
+      ctx.moveTo(wl * .28, y); ctx.lineTo(wl, y);
+      if (p !== 0) { ctx.moveTo(-wl, y); ctx.lineTo(-wl, y + (p > 0 ? 7 : -7) * U); ctx.moveTo(wl, y); ctx.lineTo(wl, y + (p > 0 ? 7 : -7) * U); }
+      ctx.stroke(); ctx.setLineDash([]);
+      if (p !== 0 && p % 10 === 0) {
+        ctx.textAlign = "right"; ctx.fillText(String(Math.abs(p)), -wl - 6 * U, y);
+        ctx.textAlign = "left"; ctx.fillText(String(Math.abs(p)), wl + 6 * U, y);
+      }
+    }
+    ctx.globalAlpha = 1; ctx.restore();
+    // bank scale
+    ctx.strokeStyle = GD;
+    for (const b of [-60, -45, -30, -20, -10, 0, 10, 20, 30, 45, 60]) {
+      const a = -Math.PI / 2 + b * DEG, r0 = 150 * U, r1 = r0 + (b % 30 === 0 ? 12 : 7) * U;
+      ctx.beginPath();
+      ctx.moveTo(CX + Math.cos(a) * r0, CY + Math.sin(a) * r0);
+      ctx.lineTo(CX + Math.cos(a) * r1, CY + Math.sin(a) * r1); ctx.stroke();
+    }
+    const ab = -Math.PI / 2 + e.roll;
+    ctx.fillStyle = G; ctx.beginPath();
+    const rr = 146 * U;
+    ctx.moveTo(CX + Math.cos(ab) * rr, CY + Math.sin(ab) * rr);
+    ctx.lineTo(CX + Math.cos(ab + .035) * (rr - 13 * U), CY + Math.sin(ab + .035) * (rr - 13 * U));
+    ctx.lineTo(CX + Math.cos(ab - .035) * (rr - 13 * U), CY + Math.sin(ab - .035) * (rr - 13 * U));
+    ctx.fill();
+    // flight path marker: where the aircraft is actually going
+    const vv = PLANE.vel;
+    if (vlen(vv) > 6) {
+      const sp = projectPoint(vadd(cam.pos, vmul(vnorm(vv), 400)));
+      if (sp) {
+        ctx.strokeStyle = "rgba(190,255,150,.95)"; ctx.lineWidth = 2 * U;
+        ctx.beginPath(); ctx.arc(sp.x, sp.y, 7 * U, 0, TAU); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(sp.x - 16 * U, sp.y); ctx.lineTo(sp.x - 7 * U, sp.y);
+        ctx.moveTo(sp.x + 7 * U, sp.y); ctx.lineTo(sp.x + 16 * U, sp.y);
+        ctx.moveTo(sp.x, sp.y - 7 * U); ctx.lineTo(sp.x, sp.y - 14 * U); ctx.stroke();
+      }
+    }
+    // gun-sight style aircraft reference
+    ctx.strokeStyle = "rgba(255,240,170,.9)"; ctx.lineWidth = 2.4 * U;
+    ctx.beginPath();
+    ctx.moveTo(CX - 46 * U, CY); ctx.lineTo(CX - 18 * U, CY); ctx.lineTo(CX - 10 * U, CY + 9 * U);
+    ctx.moveTo(CX + 46 * U, CY); ctx.lineTo(CX + 18 * U, CY); ctx.lineTo(CX + 10 * U, CY + 9 * U);
+    ctx.stroke();
+  } else {
+    // compact artificial horizon
+    const r = 62 * U, ox = CX, oy = H - 96 * U;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(ox, oy, r, 0, TAU); ctx.clip();
+    ctx.translate(ox, oy); ctx.rotate(-e.roll);
+    const yo = clamp(Math.tan(e.pitch) * r * 1.5, -r * 2, r * 2);
+    ctx.fillStyle = "rgba(60,116,178,.92)"; ctx.fillRect(-r * 2, -r * 2 + yo, r * 4, r * 2);
+    ctx.fillStyle = "rgba(112,84,50,.92)"; ctx.fillRect(-r * 2, yo, r * 4, r * 2);
+    ctx.strokeStyle = "rgba(255,255,255,.9)"; ctx.lineWidth = 1.6 * U;
+    ctx.beginPath(); ctx.moveTo(-r, yo); ctx.lineTo(r, yo); ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,.55)"; ctx.lineWidth = 1.1 * U;
+    for (const p of [-20, -10, 10, 20]) {
+      const y = yo - Math.tan(p * DEG) * r * 1.5, wl = p % 20 === 0 ? 18 * U : 11 * U;
+      ctx.beginPath(); ctx.moveTo(-wl, y); ctx.lineTo(wl, y); ctx.stroke();
+    }
+    ctx.restore();
+    ctx.strokeStyle = GD; ctx.lineWidth = 1.6 * U;
+    ctx.beginPath(); ctx.arc(ox, oy, r, 0, TAU); ctx.stroke();
+    ctx.strokeStyle = "rgba(255,226,120,.95)"; ctx.lineWidth = 2.4 * U;
+    ctx.beginPath();
+    ctx.moveTo(ox - 26 * U, oy); ctx.lineTo(ox - 9 * U, oy);
+    ctx.moveTo(ox + 26 * U, oy); ctx.lineTo(ox + 9 * U, oy);
+    ctx.moveTo(ox, oy - 3 * U); ctx.lineTo(ox, oy + 3 * U); ctx.stroke();
+  }
+
+  /* ---- vertical speed + throttle + config strip ---- */
+  const vs = P.vsi * FPM;
+  hudFont(12 * U); ctx.textAlign = "left"; ctx.fillStyle = G;
+  const rx = W - 96 * U - tw - 92 * U;
+  box(rx, CY - 62 * U, 82 * U, 124 * U, 4 * U, PANEL, GD);
+  ctx.fillStyle = GD; ctx.fillText("V/S fpm", rx + 8 * U, CY - 48 * U);
+  hudFont(16 * U, 600); ctx.fillStyle = Math.abs(vs) > 1400 ? "rgba(255,170,90,.95)" : G;
+  ctx.fillText((vs >= 0 ? "+" : "") + Math.round(vs / 10) * 10, rx + 8 * U, CY - 28 * U);
+  hudFont(12 * U); ctx.fillStyle = GD; ctx.fillText("AGL ft", rx + 8 * U, CY - 4 * U);
+  hudFont(16 * U, 600); ctx.fillStyle = G;
+  ctx.fillText(Math.round((P.pos.y - groundH(P.pos.x, P.pos.z)) * FT), rx + 8 * U, CY + 16 * U);
+  hudFont(12 * U); ctx.fillStyle = GD; ctx.fillText("G", rx + 8 * U, CY + 38 * U);
+  hudFont(16 * U, 600); ctx.fillStyle = (P.gload > 5 || P.gload < -1.5) ? "rgba(255,120,90,.95)" : G;
+  ctx.fillText(P.gload.toFixed(1), rx + 8 * U, CY + 54 * U);
+
+  // throttle + prop
+  const tx = 96 * U - 24 * U, ty = CY + tapeH / 2 + 34 * U, tbw = 100 * U, tbh = 14 * U;
+  box(tx, ty, tbw, tbh, 3 * U, PANEL, GD);
+  ctx.fillStyle = "rgba(150,255,190,.65)"; ctx.fillRect(tx + 2 * U, ty + 2 * U, (tbw - 4 * U) * P.thr, tbh - 4 * U);
+  hudFont(11 * U); ctx.fillStyle = "rgba(190,230,208,.92)"; ctx.textAlign = "left";
+  ctx.fillText("THROTTLE " + Math.round(P.thr * 100) + "%", tx, ty + tbh + 13 * U);
+  ctx.fillText("RPM " + Math.round(P.rpm * 2700), tx, ty + tbh + 27 * U);
+
+  // configuration strip
+  const cfg = [];
+  cfg.push(["GEAR", P.gear > .98 ? "DN" : P.gear < .02 ? "UP" : "↑↓", P.gear > .98 ? "#7ce89a" : P.gear < .02 ? "#9fb0c4" : "#ffc451"]);
+  cfg.push(["FLAP", Math.round(P.flap * 100) + "%", P.flap > .05 ? "#7ce89a" : "#9fb0c4"]);
+  if (MODE === "complex") cfg.push(["TRIM", (P.trim >= 0 ? "+" : "") + P.trim.toFixed(2), "#9fb0c4"]);
+  cfg.push(["BRK", P.brake > .5 ? "ON" : "off", P.brake > .5 ? "#ffc451" : "#69788c"]);
+  if (MODE === "complex") cfg.push(["AoA", (P.alpha * RAD).toFixed(1) + "°", P.alpha > 13 * DEG ? "#ff8b6a" : "#9fb0c4"]);
+  if (MODE === "complex") cfg.push(["SLIP", (P.beta * RAD).toFixed(1) + "°", Math.abs(P.beta) > .08 ? "#ffc451" : "#9fb0c4"]);
+  let cy2 = H - 44 * U;
+  hudFont(12 * U);
+  for (let i = 0; i < cfg.length; i++) {
+    const x = 26 * U + i * 108 * U;
+    ctx.fillStyle = "rgba(159,176,196,.75)"; ctx.textAlign = "left";
+    ctx.fillText(cfg[i][0], x, cy2);
+    ctx.fillStyle = cfg[i][2]; hudFont(14 * U, 600);
+    ctx.fillText(cfg[i][1], x + 46 * U, cy2); hudFont(12 * U);
+  }
+  // slip/skid ball for complex mode
+  if (MODE === "complex") {
+    const bx = CX, by = H - 22 * U, bw2 = 110 * U;
+    ctx.strokeStyle = GD; ctx.lineWidth = 1.2 * U;
+    ctx.beginPath(); ctx.moveTo(bx - bw2 / 2, by); ctx.lineTo(bx + bw2 / 2, by); ctx.stroke();
+    ctx.beginPath(); ctx.arc(bx - 9 * U, by, 2 * U, 0, TAU); ctx.arc(bx + 9 * U, by, 2 * U, 0, TAU); ctx.stroke();
+    const lat = clamp(P.beta * 6, -1, 1);
+    ctx.fillStyle = Math.abs(lat) < .18 ? "#7ce89a" : "#ffc451";
+    ctx.beginPath(); ctx.arc(bx + lat * bw2 * .45, by, 5 * U, 0, TAU); ctx.fill();
+  }
+
+  /* ---- warnings ---- */
+  const warn = [];
+  if (P.stall > .2 && !P.onGround) warn.push(["STALL", "#ff6a56"]);
+  else if (MODE === "complex" && P.alpha > 12.8 * DEG && !P.onGround) warn.push(["APPROACHING STALL", "#ffb03a"]);
+  if (P.aoaCap) warn.push(["AoA LIMIT", "#ffb03a"]);
+  if (P.gear < .98 && P.pos.y - groundH(P.pos.x, P.pos.z) < 220 && P.ias * KT < 130 && !P.crashed) warn.push(["GEAR", "#ff6a56"]);
+  if (P.gload > 6.2) warn.push(["OVER G", "#ff6a56"]);
+  if (P.ias * KT > 300) warn.push(["OVERSPEED", "#ffb03a"]);
+  hudFont(20 * U, 700); ctx.textAlign = "center";
+  const blink = (GAME.t * 4 | 0) % 2 === 0;
+  for (let i = 0; i < warn.length; i++) {
+    if (!blink && i === 0) continue;
+    ctx.fillStyle = warn[i][1];
+    ctx.fillText(warn[i][0], CX, CY - 150 * U + i * 26 * U);
+  }
+
+  /* ---- objective line + guidance arrow ---- */
+  let obj = "";
+  if (SCEN === "rings") {
+    obj = "GATE " + Math.min(GAME.ringIdx + 1, GAME.rings.length) + "/" + GAME.rings.length + "   T " + GAME.ringT.toFixed(1) + "s";
+    const rg = GAME.rings[GAME.ringIdx];
+    if (rg) obj += "   " + (vlen(vsub(rg.p, P.pos)) / 1000).toFixed(2) + " km";
+  } else if (SCEN === "land") {
+    const d = Math.hypot(P.pos.x, P.pos.z - 950) / 1000;
+    obj = "LAND RWY 18   " + d.toFixed(2) + " km to threshold";
+  } else {
+    obj = "FREE FLIGHT   " + (Math.hypot(P.pos.x, P.pos.z) / 1000).toFixed(1) + " km from field   " + (P.dist / 1000).toFixed(1) + " km flown";
+  }
+  hudFont(12.5 * U); ctx.textAlign = "center"; ctx.fillStyle = "rgba(200,224,244,.8)";
+  ctx.fillText(obj, CX, H - 62 * U);
+  hudFont(11 * U); ctx.fillStyle = "rgba(140,158,178,.75)";
+  ctx.fillText(CAMNAMES[camMode] + "  ·  " + MODE.toUpperCase() + " CONTROLS  ·  C camera  H help", CX, hy + 74 * U);
+
+  // direction cue to the next objective
+  const tgt = SCEN === "rings" ? (GAME.rings[GAME.ringIdx] && GAME.rings[GAME.ringIdx].p) : v3(0, E, 950);
+  if (tgt && !GAME.over) {
+    const rel = mRotT(cam.m, vsub(tgt, cam.pos));
+    if (rel.z < 40) {
+      const a = Math.atan2(rel.x, -rel.z) * (rel.z < 0 ? 1 : 1);
+      const rr2 = 190 * U;
+      const px = CX + Math.sin(a) * rr2, py = CY + 40 * U;
+      ctx.save(); ctx.translate(px, py); ctx.rotate(a * .4);
+      ctx.fillStyle = "rgba(255,210,110,.75)";
+      ctx.beginPath(); ctx.moveTo(0, -9 * U); ctx.lineTo(7 * U, 6 * U); ctx.lineTo(-7 * U, 6 * U); ctx.fill();
+      ctx.restore();
+    }
+  }
+  ctx.restore();
+}
+
+/* ============================================================= input ==== */
+const K = Object.create(null);
+let mouseStick = false, mdx = 0, mdy = 0;
+const KEYMAP = {
+  common: [
+    ["&larr; &rarr;", "roll / turn"],
+    ["&uarr; &darr;", "pitch up / down"],
+    ["W S", "throttle up / down (also Shift / Ctrl)"],
+    ["Space", "wheel brakes"],
+    ["G", "landing gear"],
+    ["F V", "flaps extend / retract"],
+    ["C", "cycle camera"],
+    ["R", "reset aircraft"],
+    ["Esc P", "pause"], ["H", "help"], ["M", "mute"], ["T", "swap simple / complex"],
+    ["Y", "mouse as stick"]
+  ],
+  complex: [
+    ["A D", "rudder left / right &mdash; complex only"],
+    [", .", "elevator trim &mdash; complex only"],
+    ["B", "parking brake &mdash; complex only"]
+  ]
+};
+(function fillKeys() {
+  const el = document.getElementById("keyList");
+  const rows = KEYMAP.common.concat(KEYMAP.complex);
+  el.innerHTML = rows.map(r => "<div><kbd>" + r[0].split(" ").join("</kbd><kbd>") + "</kbd>" + r[1] + "</div>").join("");
+})();
+
+window.addEventListener("keydown", ev => {
+  const k = ev.key;
+  if (k === " " || k.startsWith("Arrow") || k === "Tab") ev.preventDefault();
+  if (K[k.toLowerCase()] === undefined || !K[k.toLowerCase()]) onKeyPress(k);
+  K[k.toLowerCase()] = true;
+  if (k === "Shift") K.shift = true;
+  if (k === "Control") K.ctrl = true;
+});
+window.addEventListener("keyup", ev => {
+  K[ev.key.toLowerCase()] = false;
+  if (ev.key === "Shift") K.shift = false;
+  if (ev.key === "Control") K.ctrl = false;
+});
+window.addEventListener("blur", () => { for (const k in K) K[k] = false; });
+
+function onKeyPress(k) {
+  const P = PLANE;
+  const lk = k.toLowerCase();
+  if (!GAME.started) return;
+  if (lk === "escape" || lk === "p") { togglePause(); return; }
+  if (lk === "h") { togglePause(); return; }
+  if (GAME.paused) return;
+  if (lk === "c") { camMode = (camMode + 1) % CAMNAMES.length; toast("CAMERA: " + CAMNAMES[camMode], 1.2); }
+  if (lk === "r") { startFlight(); }
+  if (lk === "g") {
+    P.gearCmd = P.gearCmd > .5 ? 0 : 1;
+    toast(P.gearCmd ? "GEAR DOWN" : "GEAR UP", 1.2); audio.beep(P.gearCmd ? 520 : 400, .18, .12);
+  }
+  if (lk === "f") { P.flapCmd = clamp(P.flapCmd + .25, 0, 1); toast("FLAPS " + Math.round(P.flapCmd * 100) + "%", 1); }
+  if (lk === "v") { P.flapCmd = clamp(P.flapCmd - .25, 0, 1); toast("FLAPS " + Math.round(P.flapCmd * 100) + "%", 1); }
+  if (lk === "b" && MODE === "complex") { P.park = !P.park; toast(P.park ? "PARKING BRAKE SET" : "BRAKES RELEASED", 1.4); }
+  if (lk === "m") { if (audio.ok) { audio.master.gain.value = audio.master.gain.value > .01 ? 0 : .55; toast(audio.master.gain.value > .01 ? "SOUND ON" : "MUTED", 1.2); } }
+  if (lk === "t") {
+    MODE = MODE === "simple" ? "complex" : "simple";
+    document.querySelectorAll("#modeRow .opt").forEach(b => b.classList.toggle("on", b.dataset.mode === MODE));
+    toast(MODE.toUpperCase() + " CONTROLS", 1.8);
+  }
+  if (lk === "y") {
+    mouseStick = !mouseStick;
+    if (mouseStick) cv.requestPointerLock && cv.requestPointerLock();
+    else document.exitPointerLock && document.exitPointerLock();
+    toast(mouseStick ? "MOUSE STICK ON" : "MOUSE STICK OFF", 1.4);
+  }
+}
+document.addEventListener("pointerlockchange", () => {
+  if (!document.pointerLockElement) mouseStick = false;
+});
+window.addEventListener("mousemove", ev => {
+  if (!mouseStick || !document.pointerLockElement) return;
+  mdx = clamp(mdx + ev.movementX * .0045, -1, 1);
+  mdy = clamp(mdy + ev.movementY * .0045, -1, 1);
+});
+
+function applyInput(dt) {
+  const P = PLANE;
+  const simple = MODE === "simple";
+  let a = 0, e2 = 0, r = 0;
+  if (K.arrowleft) a -= 1;
+  if (K.arrowright) a += 1;
+  if (K.arrowup) e2 += 1;
+  if (K.arrowdown) e2 -= 1;
+  if (simple) { if (K.a) a -= 1; if (K.d) a += 1; }
+  else { if (K.a) r -= 1; if (K.d) r += 1; }
+  if (K.q) r -= 1; if (K.e) r += 1;
+  if (mouseStick) { a = clamp(a + mdx, -1, 1); e2 = clamp(e2 - mdy, -1, 1); mdx *= Math.exp(-.8 * dt); mdy *= Math.exp(-.8 * dt); }
+  const rate = simple ? 3.0 : 4.2, ret = simple ? 3.6 : 5.0;
+  P.inA = a ? clamp(P.inA + a * rate * dt, -1, 1) : approach(P.inA, 0, ret, dt);
+  P.inE = e2 ? clamp(P.inE + e2 * rate * dt, -1, 1) : approach(P.inE, 0, ret, dt);
+  P.inR = r ? clamp(P.inR + r * 4 * dt, -1, 1) : approach(P.inR, 0, 6, dt);
+  // throttle
+  let tdir = 0;
+  if (K.w || K.shift) tdir += 1;
+  if (K.s || K.ctrl) tdir -= 1;
+  if (tdir) { P.thr = clamp(P.thr + tdir * .5 * dt, 0, 1); if (P.thr > .02) P.park = false; }
+  // trim
+  if (MODE === "complex") {
+    if (K[","] || K.home) P.trim = clamp(P.trim + .30 * dt, -.8, .8);
+    if (K["."] || K.end) P.trim = clamp(P.trim - .30 * dt, -.8, .8);
+  } else P.trim = 0;
+  // brakes
+  const held = K[" "] ? 1 : 0;
+  P.brake = clamp(approach(P.brake, Math.max(held, P.park && P.onGround ? 1 : 0), 12, dt), 0, 1);
+}
+
+/* ============================================================== flow ==== */
+function togglePause() {
+  if (!GAME.started) return;
+  GAME.paused = !GAME.paused;
+  const m = document.getElementById("menu");
+  m.classList.toggle("hide", !GAME.paused);
+  document.getElementById("startBtn").textContent = GAME.paused ? (dirty ? "RESTART FLIGHT" : "RESUME FLIGHT") : "BEGIN FLIGHT";
+  if (GAME.paused && mouseStick) { mouseStick = false; document.exitPointerLock && document.exitPointerLock(); }
+}
+let dirty = false;
+function startFlight(keepMode) {
+  GAME.t = 0; GAME.over = false; GAME.result = ""; GAME.landScore = null;
+  GAME.paused = false; GAME.started = true; dirty = false;
+  PARTS.length = 0; cam.shake = 0; cam.init = 0;
+  hideBanner();
+  resetPlane(SCEN);
+  if (SCEN === "rings") buildRingCourse(); else GAME.rings = [];
+  document.getElementById("menu").classList.add("hide");
+  audio.init();
+  toast(SCEN === "free" ? "BRAKES SET · THROTTLE UP WITH W" :
+    SCEN === "land" ? "RUNWAY 18 AHEAD · AIM FOR THE WHITE BARS" :
+      SCEN === "rings" ? "FLY THROUGH THE GREEN GATE" : "AIRBORNE", 3.2);
+}
+document.querySelectorAll("#modeRow .opt").forEach(b => b.addEventListener("click", () => {
+  MODE = b.dataset.mode; dirty = true;
+  document.querySelectorAll("#modeRow .opt").forEach(o => o.classList.toggle("on", o === b));
+  document.getElementById("startBtn").textContent = GAME.started ? "RESTART FLIGHT" : "BEGIN FLIGHT";
+}));
+document.querySelectorAll("#scenRow .opt").forEach(b => b.addEventListener("click", () => {
+  SCEN = b.dataset.scen; dirty = true;
+  document.querySelectorAll("#scenRow .opt").forEach(o => o.classList.toggle("on", o === b));
+  document.getElementById("startBtn").textContent = GAME.started ? "RESTART FLIGHT" : "BEGIN FLIGHT";
+}));
+document.getElementById("startBtn").addEventListener("click", () => {
+  if (GAME.started && GAME.paused && !dirty) { togglePause(); return; }
+  startFlight();
+});
+
+/* ============================================================== loop ==== */
+let last = performance.now(), fps = 60, acc = 0;
+function frame(now) {
+  let dt = (now - last) / 1000; last = now;
+  if (!isFinite(dt) || dt < 0) dt = .016;
+  dt = Math.min(dt, .066);
+  fps = lerp(fps, 1 / Math.max(dt, .001), .06);
+
+  if (GAME.started && !GAME.paused) {
+    WIND.t += dt;
+    applyInput(dt);
+    const h = 1 / 240;
+    acc += dt;
+    let steps = 0;
+    while (acc >= h && steps < 16) { physics(PLANE, h); acc -= h; steps++; }
+    if (acc > h) acc = 0;
+    GAME.t += dt;
+    updateParts(dt);
+    checkRings(dt);
+    checkLanding();
+    if (PLANE.crashed) {
+      PLANE.crashT += dt;
+      if (PLANE.crashT > 1 && PLANE.crashT < 3.4 && Math.random() < .35) spawnFire(PLANE.pos);
+    }
+    cam.shake = Math.max(0, cam.shake - dt * 1.6);
+    updateCamera(dt);
+    audio.update(PLANE, dt);
+    if (toastT > 0) { toastT -= dt; if (toastT <= 0) toastEl.style.opacity = 0; }
+  } else if (GAME.started) {
+    updateCamera(0);
+  } else {
+    // slow fly-by of the field behind the menu
+    const a = now * .00007;
+    cam.pos = v3(Math.cos(a) * 900, E + 320, Math.sin(a) * 900 + 200);
+    const look = v3(0, E + 20, 0);
+    const f2 = vnorm(vsub(look, cam.pos)), r2 = vnorm(vcross(v3(0, 1, 0), f2)), u2 = vcross(f2, r2);
+    cam.m[0] = r2.x; cam.m[1] = r2.y; cam.m[2] = r2.z;
+    cam.m[3] = u2.x; cam.m[4] = u2.y; cam.m[5] = u2.z;
+    cam.m[6] = f2.x; cam.m[7] = f2.y; cam.m[8] = f2.z;
+    PLANE.propAng += .3;
+  }
+
+  // ---- render ----
+  fogCol = mixc(WORLD.skyHaze, WORLD.skyMid, .25);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  drawSky();
+  DL.reset();
+  drawTerrain();
+  if (Math.hypot(cam.pos.x, cam.pos.z) < 14000) drawMesh(AIRPORT, v3(0, 0, 0), mIdent(), null);
+  drawTrees();
+  if (GAME.rings.length) drawRings();
+  if (GAME.started) drawAircraft();
+  drawParts();
+  drawClouds();
+  DL.flush();
+  if (GAME.started && !GAME.paused) drawHUD();
+  requestAnimationFrame(frame);
+}
+resize();
+resetPlane("free");
+qMat(PLANE.q, PLANE.m);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
