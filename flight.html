@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#05080c">
-<title>Skyward — Flight Simulator</title>
+<title>Blackbird Mach 3</title>
 <style>
   :root{
     --ink:#e8eef6; --dim:#9fb0c4; --accent:#6fd3ff; --warn:#ffb03a; --bad:#ff5a4d; --good:#6fe08a;
@@ -80,21 +80,21 @@
 
   <div class="modal" id="menu">
     <div class="card">
-      <h1>SKY<span>WARD</span></h1>
-      <div class="sub">single-engine flight simulator &mdash; software-rendered, no plugins</div>
+      <h1>BLACK<span>BIRD</span></h1>
+      <div class="sub">Mach&nbsp;3 reconnaissance jet &mdash; software-rendered, no plugins</div>
 
-      <h2>Flight controls</h2>
-      <div class="row" id="modeRow">
-        <button class="opt on" data-mode="simple"><b>SIMPLE</b><i>Stability assist flies the hard parts. Bank to turn, auto-coordinated rudder, stall protection, auto-trim. Forgiving landings.</i></button>
-        <button class="opt" data-mode="complex"><b>COMPLEX</b><i>Full aerodynamics. Independent rudder, trim, flaps, gear, brakes, mixture-free prop. Real stalls, spins, p-factor, torque roll, crosswind.</i></button>
+      <h2>Pitch sense</h2>
+      <div class="row" id="pitchRow">
+        <button class="opt on" data-pitch="real"><b>PULL BACK TO CLIMB</b><i>What a control stick really does. <kbd>&darr;</kbd> or thumb back raises the nose, <kbd>&uarr;</kbd> or thumb forward drops it. Swap any time with <kbd>T</kbd>.</i></button>
+        <button class="opt" data-pitch="direct"><b>PUSH UP TO CLIMB</b><i>Arcade sense. <kbd>&uarr;</kbd> or thumb forward raises the nose.</i></button>
       </div>
 
       <h2>Flight</h2>
       <div class="row" id="scenRow">
-        <button class="opt on" data-scen="free"><b>FREE FLIGHT</b><i>Start on runway 18 at Keeper Field. Go anywhere.</i></button>
-        <button class="opt" data-scen="air"><b>AIRBORNE START</b><i>Already at 900 m, trimmed and fast.</i></button>
-        <button class="opt" data-scen="rings"><b>RING RACE</b><i>12 gates through the valley, against the clock.</i></button>
-        <button class="opt" data-scen="land"><b>LANDING CHALLENGE</b><i>4 km final approach, gear and flaps already set. Scored on centreline, sink rate and touchdown point.</i></button>
+        <button class="opt on" data-scen="free"><b>FREE FLIGHT</b><i>Cold on runway 18 at Keeper Field. Brakes set, engines at idle. Go anywhere &mdash; the envelope reaches Mach 3.2 above 80,000 ft.</i></button>
+        <button class="opt" data-scen="air"><b>AIRBORNE START</b><i>Airborne at 23,000 ft and already supersonic. Climb and accelerate.</i></button>
+        <button class="opt" data-scen="rings"><b>RING RACE</b><i>12 gates strung across 120 km of sky, against the clock.</i></button>
+        <button class="opt" data-scen="land"><b>LANDING CHALLENGE</b><i>9 km final, gear and flaps set. Stream the chute with <kbd>X</kbd> after touchdown. Scored on centreline, sink rate and touchdown point.</i></button>
       </div>
 
       <h2 id="keyHead">Keys</h2>
@@ -102,7 +102,7 @@
       <div id="touchNote" class="hide"></div>
 
       <button class="go" id="startBtn">BEGIN FLIGHT</button>
-      <div class="foot">Esc pauses &middot; R resets the aircraft &middot; H toggles this help in flight</div>
+      <div class="foot">Esc pauses &middot; R resets the aircraft &middot; L shows the control card in flight &middot; Z flies the autopilot</div>
     </div>
   </div>
 </div>
@@ -234,9 +234,17 @@ const LIGHT = {
   hazeNear: [178, 199, 222],    // horizon haze away from the sun
   hazeSun: [248, 234, 204],     // haze looking into the sun
   hazeHigh: [120, 150, 190],    // what distance does to things above the horizon
-  density: 1 / 15000,
+  density: 1 / 15000, dens: 1 / 15000,
   zenith: [34, 82, 156], mid: [108, 160, 212]
 };
+/* Haze lives in the lower atmosphere, so the view opens right up as you climb;
+   by the tropopause you can see a hundred kilometres. */
+function updateAtmosphere(camY) {
+  const k = Math.exp(-Math.max(camY, 0) / 3400);
+  LIGHT.dens = LIGHT.density * (.06 + .94 * k);
+  LIGHT.space = clamp((camY - 12000) / 16000, 0, 1);
+}
+LIGHT.space = 0;
 LIGHT.sun = WORLD.sun;
 
 /* Shade a base colour by a world-space normal. */
@@ -250,7 +258,7 @@ function litColor(col, nx, ny, nz) {
 /* Aerial perspective. `v` is the normalised world direction from eye to point. */
 function aerial(col, dist, vx, vy, vz) {
   const L = LIGHT;
-  const f = 1 - Math.exp(-dist * L.density);
+  const f = 1 - Math.exp(-dist * L.dens);
   if (f < .004) return rgb(col[0], col[1], col[2]);
   const cs = clamp(vx * L.sun.x + vy * L.sun.y + vz * L.sun.z, 0, 1);
   const up = clamp(vy * 2.2, 0, 1);
@@ -331,11 +339,13 @@ const MOBILE = COARSE || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent ||
 
 /* Quality ladder. Phones start two rungs down and the frame timer moves the
    dial at runtime, so a 60 Hz phone and a desktop both stay smooth. */
+/* More LOD rings than a propeller aeroplane needs: at Mach 3 you cross the
+   old draw distance in eight seconds, and from 24 km you can see most of it. */
 const QLEVELS = [
-  { dpr: 1.00, lev: 4, half: 6, base: 78, trees: .22, treeR: 750, clouds: 7000, glare: 0, vig: 0, shadow: 1 },
-  { dpr: 1.25, lev: 5, half: 6, base: 68, trees: .30, treeR: 950, clouds: 10000, glare: 1, vig: 1, shadow: 1 },
-  { dpr: 1.50, lev: 5, half: 7, base: 62, trees: .38, treeR: 1150, clouds: 13000, glare: 1, vig: 1, shadow: 1 },
-  { dpr: 2.00, lev: 6, half: 7, base: 58, trees: .44, treeR: 1350, clouds: 16000, glare: 1, vig: 1, shadow: 1 }
+  { dpr: 1.00, lev: 7, half: 6, base: 78, trees: .22, treeR: 750, clouds: 9000, glare: 0, vig: 0, shadow: 1, stars: 0 },
+  { dpr: 1.25, lev: 8, half: 6, base: 68, trees: .30, treeR: 950, clouds: 14000, glare: 1, vig: 1, shadow: 1, stars: 1 },
+  { dpr: 1.50, lev: 8, half: 7, base: 62, trees: .38, treeR: 1150, clouds: 20000, glare: 1, vig: 1, shadow: 1, stars: 1 },
+  { dpr: 2.00, lev: 9, half: 7, base: 58, trees: .44, treeR: 1350, clouds: 26000, glare: 1, vig: 1, shadow: 1, stars: 1 }
 ];
 const Q = { i: MOBILE ? 1 : 3, auto: true, work: 9, hold: 0, q: QLEVELS[MOBILE ? 1 : 3] };
 
@@ -396,7 +406,7 @@ function makeVignette() {
 }
 
 /* camera */
-const cam = { pos: v3(), m: new Float32Array(9), roll: 0, pitch: 0, shake: 0 };
+const cam = { pos: v3(), off: v3(), m: new Float32Array(9), roll: 0, pitch: 0, shake: 0 };
 
 /* ---- cached radial sprites: building a gradient per puff is far too slow,
        so quantise the colour and re-use a pre-rendered 128px canvas ---- */
@@ -541,7 +551,7 @@ function projectPoint(p) {
 /* fog toward the horizon colour */
 let fogCol = LIGHT.hazeNear;
 function fogged(c, dist) {
-  const f = 1 - Math.exp(-dist * LIGHT.density);
+  const f = 1 - Math.exp(-dist * LIGHT.dens);
   return rgb(lerp(c[0], fogCol[0], f), lerp(c[1], fogCol[1], f), lerp(c[2], fogCol[2], f));
 }
 
@@ -560,19 +570,23 @@ function drawSky() {
   const toSun = clamp(vdot(fwd, L.sun), 0, 1);
   const warm = Math.pow(toSun, 3);
   const horizon = mixc(L.hazeNear, L.hazeSun, warm * .55);
-  // thinner air with altitude: the zenith darkens as you climb
-  const alt = clamp(cam.pos.y / 9000, 0, 1);
-  const zen = mixc(L.zenith, [14, 36, 92], alt);
+  // thinner air with altitude: by 26 km the zenith is essentially space and
+  // only a bright band of atmosphere is left on the limb
+  const sp2 = L.space;
+  const zen = mixc(L.zenith, [3, 5, 14], sp2);
 
   ctx.save();
   ctx.translate(CX, CY); ctx.rotate(-e.roll);
+  const mid2 = mixc(L.mid, [10, 22, 58], sp2 * .92);
+  const hz2 = mixc(horizon, mixc(horizon, [96, 150, 214], .55), sp2 * .7);
   const g = ctx.createLinearGradient(0, yOff - R, 0, yOff + 2);
   g.addColorStop(0, rgb(...zen));
-  g.addColorStop(.42, rgb(...mixc(zen, L.mid, .72)));
-  g.addColorStop(.72, rgb(...L.mid));
-  g.addColorStop(.90, rgb(...mixc(L.mid, horizon, .72)));
-  g.addColorStop(1, rgb(...horizon));
+  g.addColorStop(.42, rgb(...mixc(zen, mid2, .72)));
+  g.addColorStop(.72, rgb(...mid2));
+  g.addColorStop(sp2 > .3 ? .955 : .90, rgb(...mixc(mid2, hz2, .72)));
+  g.addColorStop(1, rgb(...hz2));
   ctx.fillStyle = g; ctx.fillRect(-R, yOff - R, R * 2, R);
+  if (sp2 > .02 && Q.q.stars) drawStars(sp2, yOff, R);
   // below the horizon: haze fading into distant ground colour
   const g2 = ctx.createLinearGradient(0, yOff, 0, yOff + R * .40);
   g2.addColorStop(0, rgb(...horizon));
@@ -600,6 +614,38 @@ function drawSky() {
     ctx.fillStyle = gd;
     ctx.beginPath(); ctx.arc(sp.x, sp.y, rd, 0, TAU); ctx.fill();
   }
+}
+
+/* Stars, fixed to the world rather than the screen so they hold still while
+   the aircraft rolls. Only visible once the air above is thin enough. */
+const STARS = (() => {
+  const a = [];
+  for (let i = 0; i < 380; i++) {
+    const u = hash2(i, 91) * TAU, v = Math.acos(clamp(hash2(i, 92), .02, 1));
+    a.push({ d: v3(Math.sin(v) * Math.cos(u), Math.cos(v), Math.sin(v) * Math.sin(u)),
+             m: .25 + hash2(i, 93) * .75 });
+  }
+  return a;
+})();
+function drawStars(sp2, yOff, R) {
+  // drawn inside the rotated sky frame, so undo that first
+  ctx.restore(); ctx.save();
+  const cm = cam.m;
+  for (const st of STARS) {
+    const d = st.d;
+    const vz = cm[6] * d.x + cm[7] * d.y + cm[8] * d.z;
+    if (vz < .25) continue;
+    const vx = cm[0] * d.x + cm[1] * d.y + cm[2] * d.z;
+    const vy = cm[3] * d.x + cm[4] * d.y + cm[5] * d.z;
+    const x = CX + F * vx / vz, y = CY - F * vy / vz;
+    if (x < 0 || x > W || y < 0 || y > H) continue;
+    const a = clamp(sp2 * st.m * (d.y * .6 + .4), 0, 1);
+    if (a < .03) continue;
+    ctx.fillStyle = "rgba(226,234,255," + a.toFixed(3) + ")";
+    ctx.fillRect(x, y, Math.max(1, st.m * 1.6 * DPR), Math.max(1, st.m * 1.6 * DPR));
+  }
+  ctx.save();
+  ctx.translate(CX, CY); ctx.rotate(-eulerOf(cam.m).roll);
 }
 
 /* anamorphic glare streaks, drawn over the scene when the sun is in frame */
@@ -657,7 +703,7 @@ function drawTerrain() {
         // how flooded this patch is, from its mean height rather than a corner
         // count, which would alternate between neighbours and read as a checkerboard
         const hRaw = (h00 + h10 + h01 + h11) * .25;
-        const wetF = sstep(4, -7, hRaw);
+        const wetF = sstep(4 + cell * .05, -7 - cell * .06, hRaw);
         const water = wetF > .02;
         if (h00 < 0 || h10 < 0 || h01 < 0 || h11 < 0) {
           h00 = Math.max(h00, 0); h10 = Math.max(h10, 0); h01 = Math.max(h01, 0); h11 = Math.max(h11, 0);
@@ -831,7 +877,7 @@ function drawMesh(mesh, origin, M, pivot, tint, alphaFade) {
     const alpha = (fc.alpha !== undefined ? fc.alpha : 1) * (alphaFade !== undefined ? alphaFade : 1);
     let fill;
     if (alpha < .999) {
-      const f = 1 - Math.exp(-dist * LIGHT.density);
+      const f = 1 - Math.exp(-dist * LIGHT.dens);
       const cc = mixc(c2, fogCol, f);
       fill = "rgba(" + (clamp(cc[0], 0, 255) | 0) + "," + (clamp(cc[1], 0, 255) | 0) + "," +
         (clamp(cc[2], 0, 255) | 0) + "," + alpha.toFixed(3) + ")";
@@ -846,252 +892,249 @@ function drawMesh(mesh, origin, M, pivot, tint, alphaFade) {
 
 /* ======================================================= aircraft model == */
 const LIV = {
-  top: [48, 66, 94], side: [98, 118, 146], belly: [176, 184, 193],
-  red: [178, 52, 44], yellow: [226, 194, 84], dark: [34, 40, 50],
-  metal: [150, 158, 168], rubber: [38, 38, 42], glass: [150, 196, 226]
+  skin: [30, 32, 38], top: [36, 39, 46], belly: [24, 26, 31], edge: [58, 62, 72],
+  chine: [27, 29, 35], nac: [33, 35, 41], hot: [70, 66, 66],
+  metal: [126, 132, 142], rubber: [30, 30, 34], glass: [96, 140, 170],
+  paint: [214, 220, 228], red: [172, 44, 40]
 };
 const TWO = { two: true };
-const SPEC = { two: true, spec: .9 };
+/* The skin is a dark, slightly blue iron ferrite black with a hard sheen —
+   not matte, not chrome. High gloss keeps the highlight tight. */
+const SKIN = { two: true, spec: .55, gloss: 48 };
+const SPEC = { two: true, spec: .55, gloss: 26 };   // painted scenery metal
+const ZSHIFT = 0;
 
 function buildAircraft() {
   const P = {};
-  /* ---- fuselage: lathe of elliptical stations ---- */
+  /* ---- fuselage: a slender body, flattened top and bottom ---- */
+  // [z, half width, half height, y centre]
+  const FST = [
+    [18.20, .06, .05, .00], [16.60, .34, .26, .00], [14.40, .66, .44, .00],
+    [11.80, .98, .60, .03], [8.80, 1.24, .74, .06], [5.40, 1.42, .84, .08],
+    [1.60, 1.48, .88, .08], [-2.40, 1.44, .86, .06], [-6.40, 1.26, .76, .03],
+    [-10.00, .98, .60, .00], [-12.60, .68, .42, -.03], [-14.10, .40, .26, -.05]
+  ];
+  const NF = 12;
+  // a flattened section: |cos|^0.7 keeps the top and bottom broad and the
+  // sides tucked, which is what gives the real thing its slab-sided look
+  const fpt = (st, k) => {
+    const a = k / NF * TAU, sa = Math.sin(a), ca = Math.cos(a);
+    const fx = Math.sign(sa) * Math.pow(Math.abs(sa), .78);
+    const fy = Math.sign(ca) * Math.pow(Math.abs(ca), .70);
+    return [st[1] * fx, st[3] + st[2] * fy, st[0]];
+  };
   {
     const mb = MB();
-    const st = [
-      [-4.75, .09, .13, .30], [-4.10, .17, .22, .27], [-3.30, .27, .34, .22],
-      [-2.30, .40, .47, .14], [-1.20, .52, .60, .06], [-.10, .60, .67, .01],
-      [1.00, .59, .65, .00], [1.95, .54, .60, .03], [2.70, .46, .50, .05],
-      [3.25, .38, .40, .06], [3.62, .30, .31, .06]
-    ];
-    const N = 12;
-    const pt = (s, k) => {
-      const a = k / N * TAU;
-      return [s[1] * Math.sin(a), s[3] + s[2] * Math.cos(a), s[0]];
-    };
-    for (let i = 0; i < st.length - 1; i++) {
-      for (let k = 0; k < N; k++) {
-        const a = k / N * TAU, up = Math.cos(a);
-        let col = up > .45 ? LIV.top : up < -.45 ? LIV.belly : LIV.side;
-        col = mixc(col, up > .45 ? LIV.top : LIV.side, .15);
-        // red tail band and a yellow cowl ring for a bit of livery
-        if (st[i][0] < -3.25) col = mixc(col, LIV.red, .85);
-        if (st[i][0] > 3.2) col = mixc(col, LIV.yellow, .75);
-        mb.quad(pt(st[i], k), pt(st[i], k + 1), pt(st[i + 1], k + 1), pt(st[i + 1], k), col, SPEC);
+    for (let i = 0; i < FST.length - 1; i++) {
+      for (let k = 0; k < NF; k++) {
+        const a = k / NF * TAU, up = Math.cos(a);
+        let col = up > .5 ? LIV.top : up < -.5 ? LIV.belly : LIV.skin;
+        if (FST[i][0] > 15.5) col = mixc(col, [14, 15, 18], .6);   // radome
+        mb.quad(fpt(FST[i], k), fpt(FST[i], k + 1), fpt(FST[i + 1], k + 1), fpt(FST[i + 1], k), col, SKIN);
       }
     }
-    // cowl face + exhaust stacks
-    mb.disc(0, .06, 3.63, .30, 10, 2, LIV.dark, TWO);
-    mb.box(.34, -.05, 2.55, .12, .10, .7, LIV.dark, TWO);
-    mb.box(-.34, -.05, 2.55, .12, .10, .7, LIV.dark, TWO);
     P.fuse = mb.done();
   }
-  /* ---- wing: lofted airfoil sections, low-mounted with dihedral ---- */
-  const AF_U = [0, .12, .40, 1.00, .40, .12], AF_V = [0, .075, .085, .004, -.048, -.042];
-  function wingLoop(t, side) {
-    const x = side * (.42 + t * 5.05);
-    const y = -.30 + t * t * .30 + t * .26;
-    const zLE = 1.85 - t * .70;
-    const chord = (2.25 - t * 1.30) * .74;      // forward 74% is the fixed wing
-    const out = [];
-    for (let k = 0; k < 6; k++) out.push([x, y + AF_V[k] * chord * 1.5, zLE - AF_U[k] * chord]);
-    return { loop: out, x, y, zLE, chord: (2.25 - t * 1.30) };
+  /* ---- chines: the blade that runs the whole length and blends into the wing ---- */
+  {
+    const mb = MB();
+    // [z, chine half width, y]
+    const CH = [
+      [17.60, .16, .00], [15.20, .95, .00], [12.40, 1.75, .02], [9.20, 2.55, .05],
+      [5.40, 3.15, .07], [1.60, 3.55, .07], [-2.40, 3.72, .05]
+    ];
+    const wOf = z => {   // fuselage half width at this station
+      for (let i = 0; i < FST.length - 1; i++)
+        if (z <= FST[i][0] && z >= FST[i + 1][0]) {
+          const t = (FST[i][0] - z) / (FST[i][0] - FST[i + 1][0]);
+          return [lerp(FST[i][1], FST[i + 1][1], t), lerp(FST[i][3], FST[i + 1][3], t)];
+        }
+      return [FST[FST.length - 1][1], FST[FST.length - 1][3]];
+    };
+    for (let i = 0; i < CH.length - 1; i++) {
+      const a = CH[i], b = CH[i + 1];
+      const fa = wOf(a[0]), fb = wOf(b[0]);
+      for (const sx of [1, -1]) {
+        const t = .10;
+        // top and bottom of the blade, and its knife edge
+        mb.quad([sx * fa[0], fa[1] + a[2], a[0]], [sx * a[1], a[2] + t, a[0]],
+          [sx * b[1], b[2] + t, b[0]], [sx * fb[0], fb[1] + b[2], b[0]], LIV.chine, SKIN);
+        mb.quad([sx * fa[0], fa[1] + a[2] - .1, a[0]], [sx * fb[0], fb[1] + b[2] - .1, b[0]],
+          [sx * b[1], b[2] - t, b[0]], [sx * a[1], a[2] - t, a[0]], shade(LIV.belly, .92), SKIN);
+        mb.quad([sx * a[1], a[2] + t, a[0]], [sx * a[1], a[2] - t, a[0]],
+          [sx * b[1], b[2] - t, b[0]], [sx * b[1], b[2] + t, b[0]], LIV.edge, SKIN);
+      }
+    }
+    P.chine = mb.done();
+  }
+  /* ---- delta wing ---- */
+  // planform, right side: leading edge from the chine out to the tip
+  const WLE = [[3.72, -2.40], [8.42, -9.30]];        // [x, z]
+  const WTE = [[8.42, -11.30], [3.30, -14.05]];
+  function wingEdge(t) {   // t 0 at root, 1 at tip
+    const xl = lerp(WLE[0][0], WLE[1][0], t), zl = lerp(WLE[0][1], WLE[1][1], t);
+    const xt = lerp(WTE[1][0], WTE[0][0], t), zt = lerp(WTE[1][1], WTE[0][1], t);
+    const th = lerp(.30, .10, t);
+    return { xl, zl, xt, zt, th, chord: zl - zt };
   }
   for (const side of [1, -1]) {
     const mb = MB();
-    const segs = 5;
-    let prev = wingLoop(0, side);
-    for (let s = 1; s <= segs; s++) {
-      const cur = wingLoop(s / segs, side);
-      for (let k = 0; k < 6; k++) {
-        const k2 = (k + 1) % 6;
-        const up = AF_V[k] + AF_V[k2] > 0;
-        let col = up ? mixc(LIV.top, LIV.side, .35) : LIV.belly;
-        if (s === segs) col = mixc(col, LIV.yellow, .55);   // wingtip flash
-        mb.quad(prev.loop[k], prev.loop[k2], cur.loop[k2], cur.loop[k], col, SPEC);
+    const N = 5;
+    const sect = t => {
+      const w = wingEdge(t);
+      const x = side * lerp(w.xl, w.xt, 0);
+      // a symmetric thin section: LE, upper, TE, lower
+      const zle = w.zl, zte = w.zl - w.chord * .72;   // fixed part; elevons take the rest
+      return [[side * w.xl, .02, zle], [side * lerp(w.xl, w.xt, .35), w.th, lerp(zle, zte, .38)],
+              [side * w.xt, .02, zte], [side * lerp(w.xl, w.xt, .35), -w.th * .75, lerp(zle, zte, .38)]];
+    };
+    let prev = sect(0);
+    for (let i = 1; i <= N; i++) {
+      const cur = sect(i / N);
+      for (let k = 0; k < 4; k++) {
+        const k2 = (k + 1) % 4;
+        const up = k === 0 || k === 1;
+        mb.quad(prev[k], prev[k2], cur[k2], cur[k], up ? LIV.top : LIV.belly, SKIN);
       }
       prev = cur;
     }
-    // tip cap
-    for (let k = 1; k < 5; k++) mb.tri(prev.loop[0], prev.loop[k], prev.loop[k + 1], mixc(LIV.yellow, LIV.side, .3), TWO);
-    // wing root fairing
-    const r0 = wingLoop(0, side);
-    for (let k = 1; k < 5; k++) mb.tri(r0.loop[0], r0.loop[k], r0.loop[k + 1], LIV.side, TWO);
+    mb.quad(prev[0], prev[1], prev[2], prev[3], LIV.edge, SKIN);   // tip cap
     P[side > 0 ? "wingR" : "wingL"] = mb.done();
 
-    // aileron (outboard 45%) and flap (inboard), hinged about the spanwise axis
-    const mkSurf = (t0, t1, col) => {
-      const mb2 = MB();
-      const a = wingLoop(t0, side), b = wingLoop(t1, side);
-      const za = a.zLE - a.chord * .74, zb = b.zLE - b.chord * .74;
-      const ca = a.chord * .26, cb = b.chord * .26;
-      const th = .045;
-      mb2.quad([a.x, a.y + th, za], [b.x, b.y + th, zb], [b.x, b.y + th * .4, zb - cb], [a.x, a.y + th * .4, za - ca], mixc(col, [255, 255, 255], .05), TWO);
-      mb2.quad([a.x, a.y - th, za], [a.x, a.y - th * .4, za - ca], [b.x, b.y - th * .4, zb - cb], [b.x, b.y - th, zb], shade(col, .82), TWO);
-      mb2.quad([a.x, a.y + th, za], [a.x, a.y - th, za], [b.x, b.y - th, zb], [b.x, b.y + th, zb], shade(col, .9), TWO);
-      return { mesh: mb2.done(), pivot: [(a.x + b.x) / 2, (a.y + b.y) / 2, (za + zb) / 2], hz: (za + zb) / 2 };
+    // elevons: the whole trailing edge, split inboard and outboard
+    const mkElevon = (t0, t1) => {
+      const mb2 = MB(), a = wingEdge(t0), b = wingEdge(t1);
+      const za = a.zl - a.chord * .72, zb = b.zl - b.chord * .72;
+      const ca = a.chord * .28, cb = b.chord * .28;
+      const xa = side * lerp(a.xl, a.xt, .72), xb = side * lerp(b.xl, b.xt, .72);
+      const th = .055;
+      mb2.quad([xa, th, za], [xb, th, zb], [xb, th * .3, zb - cb], [xa, th * .3, za - ca], mixc(LIV.top, LIV.edge, .2), SKIN);
+      mb2.quad([xa, -th, za], [xa, -th * .3, za - ca], [xb, -th * .3, zb - cb], [xb, -th, zb], shade(LIV.belly, .95), SKIN);
+      mb2.quad([xa, th, za], [xa, -th, za], [xb, -th, zb], [xb, th, zb], LIV.edge, TWO);
+      return { mesh: mb2.done(), pivot: [0, 0, (za + zb) / 2] };
     };
-    const ail = mkSurf(.55, .97, mixc(LIV.side, LIV.top, .3));
-    ail.pivot = [0, ail.pivot[1], ail.hz];   // hinge about the body X axis
-    P[side > 0 ? "ailR" : "ailL"] = ail;
-    const fl = mkSurf(.06, .50, mixc(LIV.side, LIV.belly, .2));
-    fl.pivot = [0, fl.pivot[1], fl.hz];
-    P[side > 0 ? "flapR" : "flapL"] = fl;
+    P[side > 0 ? "elevOutR" : "elevOutL"] = mkElevon(.54, .97);
+    P[side > 0 ? "elevInR" : "elevInL"] = mkElevon(.10, .50);
   }
-  /* ---- tailplane + fin ---- */
-  {
+  /* ---- engine nacelles with inlet spikes ---- */
+  const NACX = 4.62;
+  for (const side of [1, -1]) {
     const mb = MB();
-    const span = 2.25, zL = -3.35, ch = .95, th = .075;
-    // a 4-point section lofted root -> tip, same idea as the wing
-    const sect = (side, t) => {
-      const x = side * (.16 + t * (span - .16));
-      const y = .16 + t * .14, zl = zL - t * .30, c = ch * (1 - t * .38);
-      return [[x, y, zl], [x, y + th * (1 - t * .5), zl - c * .45], [x, y, zl - c * .74], [x, y - th * .8 * (1 - t * .5), zl - c * .45]];
+    const NN = 12, r = .98;
+    // [z, radius] — spike, inlet lip, body, nozzle
+    const NS = [[7.60, .10], [6.40, .52], [5.30, .95], [2.00, 1.00], [-3.00, 1.00],
+                [-6.60, .95], [-8.10, .80], [-8.60, .74]];
+    const npt = (st, k) => {
+      const a = k / NN * TAU;
+      return [side * NACX + st[1] * Math.sin(a), -.06 + st[1] * Math.cos(a), st[0]];
     };
-    for (const side of [1, -1]) {
-      let prev = sect(side, 0);
-      for (let s2 = 1; s2 <= 3; s2++) {
-        const cur = sect(side, s2 / 3);
-        for (let k = 0; k < 4; k++) {
-          const k2 = (k + 1) % 4;
-          const up = k === 0 || k === 1;
-          const col = up ? mixc(LIV.top, LIV.side, .4) : LIV.belly;
-          mb.quad(prev[k], prev[k2], cur[k2], cur[k], col, SPEC);
-        }
-        prev = cur;
+    for (let i = 0; i < NS.length - 1; i++) {
+      for (let k = 0; k < NN; k++) {
+        const a = k / NN * TAU, up = Math.cos(a);
+        let col = NS[i][0] > 5.2 ? [20, 21, 25] : up > .4 ? LIV.top : LIV.nac;
+        if (NS[i][0] < -6.0) col = mixc(LIV.hot, [92, 84, 80], .4);   // scorched nozzle
+        mb.quad(npt(NS[i], k), npt(NS[i], k + 1), npt(NS[i + 1], k + 1), npt(NS[i + 1], k), col, SKIN);
       }
-      mb.quad(prev[0], prev[1], prev[2], prev[3], mixc(LIV.red, LIV.side, .3), TWO);
     }
-    // fin
-    const fz = -3.15;
-    const fin = [[0, .34, fz + .35], [0, 1.05, fz - .12], [0, 1.72, fz - .55], [0, 1.72, fz - 1.05], [0, .34, fz - 1.05]];
-    for (const sx of [-.055, .055]) {
-      for (let k = 1; k < fin.length - 1; k++)
-        mb.tri([sx, fin[0][1], fin[0][2]], [sx, fin[k][1], fin[k][2]], [sx, fin[k + 1][1], fin[k + 1][2]], mixc(LIV.red, LIV.top, .25), SPEC);
+    // inlet lip ring and the dark duct behind it
+    mb.disc(side * NACX, -.06, 5.28, .80, NN, 2, [10, 11, 13], { two: true, bias: -1 });
+    mb.disc(side * NACX, -.06, -8.62, .70, NN, 2, [14, 12, 12], { two: true, bias: -1 });
+    P[side > 0 ? "nacR" : "nacL"] = mb.done();
+
+    // canted vertical fin on top of each nacelle
+    const mb2 = MB();
+    const cant = side * 15 * DEG, hgt = 3.15;
+    const fp = (up, zz) => [side * NACX + Math.sin(-cant) * up * hgt, .86 + Math.cos(cant) * up * hgt, zz];
+    const prof = [[0, -1.30], [0, -5.40], [1, -4.70], [1, -2.90]];
+    for (const t of [.08, -.08]) {
+      for (let k = 1; k < prof.length - 1; k++) {
+        const a = fp(prof[0][0], prof[0][1]), b = fp(prof[k][0], prof[k][1]), c = fp(prof[k + 1][0], prof[k + 1][1]);
+        mb2.tri([a[0] + t, a[1], a[2]], [b[0] + t, b[1], b[2]], [c[0] + t, c[1], c[2]], LIV.skin, SKIN);
+      }
     }
-    for (let k = 0; k < fin.length; k++) {
-      const a = fin[k], b = fin[(k + 1) % fin.length];
-      mb.quad([-.055, a[1], a[2]], [.055, a[1], a[2]], [.055, b[1], b[2]], [-.055, b[1], b[2]], mixc(LIV.red, LIV.side, .15), TWO);
+    for (let k = 0; k < prof.length; k++) {
+      const a = fp(prof[k][0], prof[k][1]), b = fp(prof[(k + 1) % prof.length][0], prof[(k + 1) % prof.length][1]);
+      mb2.quad([a[0] - .08, a[1], a[2]], [a[0] + .08, a[1], a[2]], [b[0] + .08, b[1], b[2]], [b[0] - .08, b[1], b[2]], LIV.edge, SKIN);
     }
-    P.tail = mb.done();
+    P[side > 0 ? "finR" : "finL"] = { mesh: mb2.done(), pivot: [side * NACX, .86, -3.4] };
   }
-  /* ---- elevator & rudder as hinged plates ---- */
-  {
-    const mb = MB(), th = .05, zH = -4.05;
-    for (const side of [1, -1]) {
-      const xo = side * .14, xt = side * 2.2;
-      mb.quad([xo, .16 + th, zH], [xt, .30 + th, zH - .28], [xt, .30, zH - .28 - .36], [xo, .16, zH - .60], mixc(LIV.side, [255, 255, 255], .1), TWO);
-      mb.quad([xo, .16 - th, zH], [xo, .16, zH - .60], [xt, .30, zH - .28 - .36], [xt, .30 - th, zH - .28], shade(LIV.side, .82), TWO);
-    }
-    P.elev = { mesh: mb.done(), pivot: [0, .16, zH] };
-  }
-  {
-    const mb = MB(), th = .05, zH = -4.20;
-    const pr = [[0, .34, zH], [0, 1.02, zH - .10], [0, 1.68, zH - .22], [0, 1.68, zH - .50], [0, .34, zH - .80]];
-    for (const s of [th, -th]) {
-      for (let k = 1; k < pr.length - 1; k++)
-        mb.tri([s, pr[0][1], pr[0][2]], [s, pr[k][1], pr[k][2]], [s, pr[k + 1][1], pr[k + 1][2]], mixc(LIV.red, LIV.side, .2), TWO);
-    }
-    for (let k = 0; k < pr.length; k++) {
-      const a = pr[k], b = pr[(k + 1) % pr.length];
-      mb.quad([-th, a[1], a[2]], [th, a[1], a[2]], [th, b[1], b[2]], [-th, b[1], b[2]], shade(LIV.red, .9), TWO);
-    }
-    P.rud = { mesh: mb.done(), pivot: [0, 1.0, zH] };
-  }
-  /* ---- canopy: tinted glass over a dark frame ---- */
+  /* ---- cockpit: two small windows well forward ---- */
   {
     const mb = MB();
-    // stations: [z, half width, dome height]
-    const st = [[2.10, .26, .16], [1.60, .42, .34], [.85, .47, .42], [.10, .45, .40], [-.55, .34, .26], [-1.10, .20, .10]];
-    const N = 6, base = .50;
-    const pt = (s, k) => { const a = -Math.PI / 2 + k / N * Math.PI; return [s[1] * Math.sin(a), base + s[2] * Math.cos(a), s[0]]; };
+    const st = [[12.60, .30, .12], [11.40, .56, .34], [10.00, .62, .40], [8.60, .58, .34], [7.40, .44, .14]];
+    const N = 6, base = .70;
+    const pt = (sq, k) => { const a = -Math.PI / 2 + k / N * Math.PI; return [sq[1] * Math.sin(a), base + sq[2] * Math.cos(a), sq[0]]; };
     for (let i = 0; i < st.length - 1; i++)
       for (let k = 0; k < N; k++)
-        mb.quad(pt(st[i], k), pt(st[i], k + 1), pt(st[i + 1], k + 1), pt(st[i + 1], k), LIV.glass, { two: true, spec: .75, gloss: 60, alpha: .46 });
+        mb.quad(pt(st[i], k), pt(st[i], k + 1), pt(st[i + 1], k + 1), pt(st[i + 1], k),
+          i === 1 || i === 2 ? LIV.glass : [18, 19, 22], i === 1 || i === 2
+            ? { two: true, spec: 1.1, gloss: 70, alpha: .55 } : SKIN);
     P.glass = mb.done();
-    const mb2 = MB();
-    mb2.box(0, .58, .95, .96, .30, 1.9, LIV.dark, TWO);  // cockpit interior shell
-    mb2.box(0, .72, .30, .48, .34, .30, [58, 48, 42], TWO); // seat back
-    mb2.box(0, .70, 1.75, .70, .26, .22, [26, 28, 32], TWO); // panel
-    P.pit = mb2.done();
   }
-  /* ---- spinner + blades ---- */
+  /* ---- what the pilot sees over the coaming ---- */
   {
     const mb = MB();
-    const N = 10, zb = 3.60, zt = 4.28;
-    for (let k = 0; k < N; k++) {
-      const a = k / N * TAU, a2 = (k + 1) / N * TAU, r = .30;
-      mb.tri([Math.sin(a) * r, .06 + Math.cos(a) * r, zb], [Math.sin(a2) * r, .06 + Math.cos(a2) * r, zb], [0, .06, zt],
-        k % 2 ? LIV.red : mixc(LIV.red, [255, 255, 255], .55), SPEC);
-    }
-    P.spin = mb.done();
-    const mb2 = MB();
-    for (let b = 0; b < 3; b++) {
-      const a = b / 3 * TAU;
-      const ca = Math.cos(a), sa = Math.sin(a);
-      const L = 1.28, w0 = .19, w1 = .10;
-      const p = (r, w, tw) => [sa * r + ca * w, .06 + ca * r - sa * w, 3.95 + tw];
-      mb2.quad(p(.24, w0, -.05), p(L, w1, .06), p(L, -w1, -.02), p(.24, -w0, -.10), LIV.dark, { two: true, spec: .2 });
-    }
-    P.blades = mb2.done();
-  }
-  /* ---- what the pilot sees over the panel: the forward fuselage itself,
-         so the nose is shaped and lit exactly as it is from outside ---- */
-  {
-    const mb = MB();
-    // the pilot's eye sits at z = 0.85 here; the decking runs from behind the
-    // eye forward to the spinner so there is no open rear rim to see down
-    const st = [
-      [.20, .60, .66, .01], [1.00, .59, .65, .00], [1.95, .54, .60, .03],
-      [2.70, .46, .50, .05], [3.25, .38, .40, .06], [3.62, .30, .31, .06]
-    ];
-    const N = 12;
-    const pt = (sq, k) => { const a = k / N * TAU; return [sq[1] * Math.sin(a), sq[3] + sq[2] * Math.cos(a), sq[0]]; };
-    for (let i = 0; i < st.length - 1; i++) {
-      for (let k = 0; k < N; k++) {
-        const a = k / N * TAU, up = Math.cos(a);
-        // matte anti-glare panel along the top, normal livery down the sides
-        let col = up > .62 ? [62, 67, 75] : up > .05 ? mixc(LIV.top, [70, 76, 84], .4) : LIV.side;
-        if (st[i][0] > 3.2) col = mixc(col, LIV.yellow, .55);
-        mb.quad(pt(st[i], k), pt(st[i], k + 1), pt(st[i + 1], k + 1), pt(st[i + 1], k), col, SPEC);
+    const st = [[9.40, 1.28, .78, .06], [11.80, .98, .60, .03], [14.40, .66, .44, .00],
+                [16.60, .34, .26, .00], [18.20, .06, .05, .00]];
+    for (let i = 0; i < st.length - 1; i++)
+      for (let k = 0; k < NF; k++) {
+        const a = k / NF * TAU, up = Math.cos(a);
+        const col = up > .55 ? [30, 32, 37] : up > .05 ? mixc(LIV.top, [34, 36, 42], .5) : LIV.skin;
+        mb.quad(fpt(st[i], k), fpt(st[i], k + 1), fpt(st[i + 1], k + 1), fpt(st[i + 1], k), col, SKIN);
       }
-    }
-    // close off the front so the pilot is not looking down an open tube
-    mb.disc(0, .06, 3.62, .30, 10, 2, [30, 32, 36], { two: true });
-    // reflector gunsight, sitting proud of the cowling
-    mb.box(0, .72, 2.60, .05, .13, .07, [28, 30, 34], TWO);
-    mb.box(0, .83, 2.62, .16, .012, .12, [170, 215, 185], { two: true, alpha: .28 });
+    mb.box(0, .88, 10.10, .24, .05, .26, [130, 170, 190], { two: true, alpha: .30 });
     P.cowl = mb.done();
   }
   /* ---- landing gear ---- */
-  function leg(len, wheelR, col) {
+  function leg(len, wheelR, pairs, col) {
     const mb = MB();
-    mb.box(0, -len * .5, 0, .09, len, .11, LIV.metal, TWO);
-    mb.box(0, -len * .82, 0, .16, .16, .16, LIV.metal, TWO);
-    for (const s of [-.055, .055]) mb.disc(s, -len - wheelR * .15, 0, wheelR, 9, 0, LIV.rubber, TWO);
-    mb.box(0, -len - wheelR * .15, 0, .16, wheelR * 1.4, wheelR * 1.4, shade(LIV.rubber, 1.15), TWO);
+    mb.box(0, -len * .5, 0, .16, len, .20, LIV.metal, TWO);
+    mb.box(0, -len * .84, 0, .30, .26, .30, shade(LIV.metal, .85), TWO);
+    const off = pairs === 3 ? [-.34, 0, .34] : [-.20, .20];
+    for (const sx of off) {
+      mb.disc(sx, -len - wheelR * .12, 0, wheelR, 10, 0, LIV.rubber, TWO);
+      mb.disc(sx + .001, -len - wheelR * .12, 0, wheelR * .45, 8, 0, shade(LIV.metal, .7), TWO);
+    }
+    mb.box(0, -len - wheelR * .12, 0, pairs === 3 ? .9 : .55, wheelR * 1.1, wheelR * 1.1, shade(LIV.rubber, 1.1), TWO);
     return mb.done();
   }
-  P.gearL = { mesh: leg(.85, .32), pivot: [-1.05, -.22, .85] };
-  P.gearR = { mesh: leg(.85, .32), pivot: [1.05, -.22, .85] };
-  P.gearN = { mesh: leg(.74, .24), pivot: [0, -.42, 2.75] };
+  P.gearL = { mesh: leg(1.30, .52, 3), pivot: [-3.30, -1.02, -3.00] };
+  P.gearR = { mesh: leg(1.30, .52, 3), pivot: [3.30, -1.02, -3.00] };
+  P.gearN = { mesh: leg(1.425, .46, 2), pivot: [0, -.96, 10.50] };
   for (const k of ["gearL", "gearR", "gearN"]) {
-    const g = P[k], p = g.pivot;
-    // the generic leg is built at the origin; slide it under its own hinge
-    const v = g.mesh.v;
-    for (let i = 0; i < v.length; i += 3) { v[i] += p[0]; v[i + 1] += p[1]; v[i + 2] += p[2]; }
+    const g = P[k], q = g.pivot, v = g.mesh.v;
+    for (let i = 0; i < v.length; i += 3) { v[i] += q[0]; v[i + 1] += q[1]; v[i + 2] += q[2]; }
   }
-  // Slide the whole airframe aft so the body origin — the centre of gravity the
-  // physics works from — sits on the wing quarter chord, with the main wheels
-  // just behind it and the nose wheel well forward.
-  for (const key in P) {
-    const part = P[key], mesh = part.v ? part : part.mesh;
-    for (let i = 2; i < mesh.v.length; i += 3) mesh.v[i] += ZSHIFT;
-    if (part.pivot) part.pivot[2] += ZSHIFT;
+  /* ---- markings: the only paint on an otherwise black aeroplane ---- */
+  {
+    const mb = MB();
+    for (const side of [1, -1]) {
+      const cant = side * 15 * DEG;
+      const fp = (up, zz, t) => [side * NACX + Math.sin(-cant) * up * 3.15 + t, .86 + Math.cos(cant) * up * 3.15, zz];
+      for (const t of [.10, -.10])
+        mb.quad(fp(.62, -3.30, t), fp(.62, -4.50, t), fp(.86, -4.30, t), fp(.86, -3.35, t), LIV.paint, { two: true, bias: -.4 });
+    }
+    P.marks = mb.done();
+  }
+  /* ---- drag chute ---- */
+  {
+    const mb = MB(), N = 12, R = 3.4;
+    for (let i = 0; i < N; i++) {
+      const a0 = i / N * TAU, a1 = (i + 1) / N * TAU;
+      const p = (a, r, z) => [Math.sin(a) * r, Math.cos(a) * r, z];
+      const col = i % 2 ? [226, 108, 52] : [238, 238, 234];
+      mb.tri([0, 0, -24.5], p(a0, R, -22.0), p(a1, R, -22.0), col, TWO);
+      mb.quad(p(a0, R, -22.0), p(a1, R, -22.0), p(a1, R * .82, -20.6), p(a0, R * .82, -20.6), shade(col, .85), TWO);
+    }
+    for (let i = 0; i < 6; i++) {
+      const a = i / 6 * TAU;
+      mb.quad([Math.sin(a) * R * .8, Math.cos(a) * R * .8, -20.6], [Math.sin(a) * R * .8 + .05, Math.cos(a) * R * .8, -20.6],
+        [.05, 0, -14.4], [0, 0, -14.4], [210, 206, 196], TWO);
+    }
+    P.chute = mb.done();
   }
   return P;
 }
-const ZSHIFT = -1.30;
 const AC = buildAircraft();
 
 /* ========================================================== scenery ====== */
@@ -1190,14 +1233,14 @@ function buildAirport() {
 const AIRPORT = buildAirport();
 
 function buildRing() {
-  const mb = MB(), R = 30, t = 2.4, N = 20;
+  const mb = MB(), R = 240, t = 18, N = 22;
   for (let i = 0; i < N; i++) {
     const a0 = i / N * TAU, a1 = (i + 1) / N * TAU;
     const col = i % 2 ? [238, 86, 60] : [242, 242, 238];
     const p = (a, r, z) => [Math.cos(a) * r, Math.sin(a) * r, z];
     mb.quad(p(a0, R - t, 0), p(a1, R - t, 0), p(a1, R + t, 0), p(a0, R + t, 0), col, { two: true, bias: 1 });
-    mb.quad(p(a0, R + t, -.7), p(a1, R + t, -.7), p(a1, R + t, .7), p(a0, R + t, .7), shade(col, .8), TWO);
-    mb.quad(p(a0, R - t, .7), p(a1, R - t, .7), p(a1, R - t, -.7), p(a0, R - t, -.7), shade(col, .7), TWO);
+    mb.quad(p(a0, R + t, -5), p(a1, R + t, -5), p(a1, R + t, 5), p(a0, R + t, 5), shade(col, .8), TWO);
+    mb.quad(p(a0, R - t, 5), p(a1, R - t, 5), p(a1, R - t, -5), p(a0, R - t, -5), shade(col, .7), TWO);
   }
   return mb.done();
 }
@@ -1258,17 +1301,17 @@ function drawTrees() {
 /* The aircraft's own shadow, cast along the sun onto the ground beneath it.
    Nothing sells altitude like this on takeoff and landing. */
 const SHADOW_HULL = [
-  v3(0, 0, 2.9), v3(1.0, 0, 1.4), v3(5.45, 0, .2), v3(5.3, 0, -.9), v3(1.1, 0, -1.7),
-  v3(2.2, 0, -4.4), v3(.5, 0, -5.4), v3(-.5, 0, -5.4), v3(-2.2, 0, -4.4), v3(-1.1, 0, -1.7),
-  v3(-5.3, 0, -.9), v3(-5.45, 0, .2), v3(-1.0, 0, 1.4)
+  v3(0, 0, 18.2), v3(1.7, 0, 12.4), v3(3.2, 0, 5.4), v3(3.7, 0, -2.4), v3(8.4, 0, -9.3),
+  v3(8.4, 0, -11.3), v3(3.3, 0, -14.0), v3(0, 0, -14.1), v3(-3.3, 0, -14.0),
+  v3(-8.4, 0, -11.3), v3(-8.4, 0, -9.3), v3(-3.7, 0, -2.4), v3(-3.2, 0, 5.4), v3(-1.7, 0, 12.4)
 ];
 function drawShadow() {
   if (!Q.q.shadow) return;
   const P = PLANE, sun = LIGHT.sun;
   const gh = groundH(P.pos.x, P.pos.z);
   const agl = P.pos.y - gh;
-  if (agl > 420 || agl < -2) return;
-  const fade = (1 - sstep(60, 420, agl)) * .46 + .04;
+  if (agl > 1400 || agl < -2) return;
+  const fade = (1 - sstep(150, 1400, agl)) * .46 + .04;
   const N = SHADOW_HULL.length;
   let cxs = 0, cys = 0, ok = true, dmin = 1e9;
   for (let i = 0; i < N; i++) {
@@ -1283,7 +1326,7 @@ function drawShadow() {
   }
   if (!ok) return;
   // soften the edge as the aircraft climbs away from the ground
-  grow(N, clamp(agl * .05, .5, 6) * DPR);
+  grow(N, clamp(agl * .02, .5, 8) * DPR);
   DL.poly(dmin - 4, _sp, N, "rgba(16,26,22," + fade.toFixed(3) + ")", null, 0);
 }
 
@@ -1318,7 +1361,7 @@ function drawClouds() {
       if (!sp) continue;
       const r = pf.r * sp.s;
       if (r < 1.5 || sp.x < -r * 2 || sp.x > W + r * 2 || sp.y < -r * 2 || sp.y > H + r * 2) continue;
-      const fog = 1 - Math.exp(-sp.z * LIGHT.density * .5);
+      const fog = 1 - Math.exp(-sp.z * LIGHT.dens * .5);
       // light each puff by where it sits in the cloud: tops and the sun side
       // catch the light, the underside stays blue-grey
       const pl = Math.hypot(pf.x, pf.y, pf.z) || 1;
@@ -1332,34 +1375,75 @@ function drawClouds() {
 }
 
 /* ======================================================= flight model === */
+/* ---------------------------------------------------------- atmosphere -- */
+/* A proper standard atmosphere: at 24 km the exponential approximation is out
+   by enough to matter, and Mach number drives the whole flight envelope here. */
+function isa(h) {
+  h = clamp(h, -500, 47000);
+  let T, p;
+  if (h < 11000) { T = 288.15 - .0065 * h; p = 101325 * Math.pow(T / 288.15, 5.2559); }
+  else if (h < 20000) { T = 216.65; p = 22632 * Math.exp(-9.80665 * (h - 11000) / (287.05 * 216.65)); }
+  else if (h < 32000) { T = 216.65 + .001 * (h - 20000); p = 5474.9 * Math.pow(T / 216.65, -34.163); }
+  else { T = 228.65 + .0028 * (h - 32000); p = 868.02 * Math.pow(T / 228.65, -12.201); }
+  return { rho: p / (287.05 * T), a: 20.046 * Math.sqrt(T), T, p };
+}
+const rhoAt = y => isa(y).rho;
+
+/* ===================================================== the aeroplane ==== */
+/* A Mach 3 reconnaissance jet: slender delta, twin nacelles outboard, chines
+   running the length of the fuselage. Big, heavy, and absurdly overpowered
+   above the tropopause, where its inlets are doing most of the work. */
 const SPECS = {
-  mass: 1450, S: 16.2, b: 11.0, cbar: 1.55,
-  Ipitch: 4200, Iroll: 3000, Iyaw: 4800,
-  CL0: .15, CLa: 5.2, CD0: .026, k: .0533,
-  CmA: .60, CmE: .300, CmQ: 14.0,
-  Cnb: .095, Cndr: .070, Cnr: .150,
-  Cla: .200, Clp: .420, Clb: .055,
-  thrustMax: 7100, vProp: 200,
-  // main wheels just aft of the CG, nose wheel well forward (tricycle gear)
+  mass: 52000, S: 167, b: 16.9, cbar: 11.0,
+  Ipitch: 1400000, Iroll: 400000, Iyaw: 1550000,
+  CL0: .015, CLa: 2.6, k: .085,
+  CmA: .50, CmE: .22, CmQ: 4.0,
+  Cnb: .090, Cndr: .062, Cnr: .170,
+  Cla: .040, Clp: .400, Clb: .030,
+  // military thrust per engine, doubled again in full afterburner
+  thrustMil: 100000, thrustAB: 190000,
   wheels: [
-    { p: v3(-1.05, -1.44, -.45), brake: 1, steer: 0, grip: 1 },
-    { p: v3(1.05, -1.44, -.45), brake: 1, steer: 0, grip: 1 },
-    { p: v3(0, -1.44, 1.35), brake: .15, steer: 1, grip: 0 }
+    { p: v3(-3.30, -2.90, -3.00), brake: 1, steer: 0, grip: 1 },
+    { p: v3(3.30, -2.90, -3.00), brake: 1, steer: 0, grip: 1 },
+    { p: v3(0, -2.90, 10.50), brake: .12, steer: 1, grip: 0 }
   ],
-  // points that must never touch the ground
-  hard: [v3(-5.47, .18, -.10), v3(5.47, .18, -.10), v3(0, -.26, 2.95), v3(0, .26, -6.00), v3(0, -.62, 0)]
+  // oleo rates scaled to the airframe: about 180 mm of static compression
+  gearK: 950000, gearC: 190000,
+  hard: [v3(-8.40, -.10, -9.60), v3(8.40, -.10, -9.60), v3(0, -.20, 18.20),
+         v3(0, .25, -14.10), v3(0, -1.05, 0), v3(-4.65, -1.02, -2), v3(4.65, -1.02, -2)]
 };
-const rhoAt = y => 1.225 * Math.exp(-Math.max(y, 0) / 8500);
+/* Zero-lift drag against Mach: the transonic hump, then the thin-wing
+   supersonic floor that lets it cruise at three times the speed of sound. */
+function cd0OfMach(M) {
+  return .0165 + .040 * Math.exp(-Math.pow((M - 1.06) / .30, 2)) + .012 * sstep(0, .35, .35 - M);
+}
+/* Lift-curve slope: slender-delta value subsonic, 4/sqrt(M^2-1) supersonic. */
+function claOfMach(M) {
+  const suP = 4 / Math.sqrt(Math.max(M * M - 1, .30));
+  return lerp(SPECS.CLa, Math.min(suP, 4.6), sstep(.82, 1.25, M));
+}
 
 const PLANE = {
-  pos: v3(0, E + 1.46, 800), vel: v3(), q: qId(), w: v3(), m: mIdent(),
+  pos: v3(0, E + 2.92, 860), vel: v3(), q: qId(), w: v3(), m: mIdent(),
   thr: 0, inE: 0, inA: 0, inR: 0, dE: 0, dA: 0, dR: 0,
   trim: 0, flap: 0, flapCmd: 0, gear: 1, gearCmd: 1, brake: 0, park: true,
+  chute: 0, chuteCmd: 0, mach: 0, ab: 0, abSm: 0, unstart: 0, unstartSide: 0, qbar: 0,
   rpm: 0, propAng: 0, alpha: 0, beta: 0, ias: 0, tas: 0, gload: 1, vsi: 0,
   onGround: true, wow: 0, stall: 0, crashed: false, crashT: 0, msg: "", holdHdg: undefined,
   hardLand: 0, touched: 0, lastVS: 0, aoaCap: false, dist: 0
 };
-let MODE = "simple", SCEN = "free";
+let SCEN = "free";
+/* Autopilot. There is one flight model now — the real one — and this rides on
+   top of it: the stick commands bank angle and pitch attitude, the rudder
+   coordinates itself, angle of attack is limited, and hands off it holds what
+   it has. Engage with Z. */
+const AP = { on: false };
+/* Pitch sense. REAL is what a stick does: pull back (Down / thumb back) to
+   raise the nose. DIRECT is the arcade sense, Up to climb. */
+let PITCH_REAL = true;
+const AB_GATE = .80;
+const FLAP_LIMIT = 260;     // KIAS the flaps will stay out to
+const CHUTE_LIMIT = 230;    // KIAS the drag chute survives
 
 function resetPlane(scen) {
   const P = PLANE;
@@ -1367,54 +1451,72 @@ function resetPlane(scen) {
   P.inE = P.inA = P.inR = 0; P.trim = 0; P.flap = P.flapCmd = 0;
   P.crashed = false; P.crashT = 0; P.stall = 0; P.hardLand = 0; P.touched = 0; P.pitchI = 0; P.holdHdg = undefined;
   P.gear = P.gearCmd = 1; P.brake = 0; P.rpm = 0; P.dist = 0;
+  P.chute = P.chuteCmd = 0; P.mach = 0; P.overQ = 0; P.ab = 0; P.abSm = 0; P.unstart = 0; P.apAlt = undefined; P.apHdg = undefined;
   P.q = qAxis(0, 1, 0, Math.PI);            // runway 18: heading south
+  P.thr = 0;
   if (scen === "free") {
-    P.pos = v3(0, E + 1.46, 800); P.thr = 0; P.park = true; P.brake = 1;
+    P.pos = v3(0, E + 2.92, 860); P.thr = 0; P.park = true; P.brake = 1;
   } else if (scen === "air") {
-    P.pos = v3(0, 900, 1200); P.q = qAxis(0, 1, 0, Math.PI);
-    P.vel = mRot(qMat(P.q, new Float32Array(9)), v3(0, 0, 72)); P.thr = .72; P.park = false;
+    P.pos = v3(0, 7000, 9000); P.q = qAxis(0, 1, 0, Math.PI);
+    P.vel = mRot(qMat(P.q, new Float32Array(9)), v3(0, 0, 250)); P.thr = .70; P.park = false;
+    P.gear = P.gearCmd = 0;
   } else if (scen === "rings") {
-    P.pos = v3(0, 620, 900); P.q = qAxis(0, 1, 0, Math.PI);
-    P.vel = mRot(qMat(P.q, new Float32Array(9)), v3(0, 0, 80)); P.thr = .85; P.park = false;
+    P.pos = v3(0, 4200, 6000); P.q = qAxis(0, 1, 0, Math.PI);
+    P.vel = mRot(qMat(P.q, new Float32Array(9)), v3(0, 0, 320)); P.thr = .88; P.park = false;
+    P.gear = P.gearCmd = 0;
   } else if (scen === "land") {
     // 4.2 km out on final for runway 18, ~720 ft above the field, dirty and slow
-    P.pos = v3(0, E + 220, 4200); P.q = qAxis(0, 1, 0, Math.PI);
+    // 9 km out on final, 500 m above the field, dirty and on speed
+    P.pos = v3(0, E + 500, 9000); P.q = qAxis(0, 1, 0, Math.PI);
     P.q = qmul(P.q, qAxis(1, 0, 0, 3 * DEG));
-    P.vel = mRot(qMat(P.q, new Float32Array(9)), v3(0, 0, 40)); P.thr = .34;
-    P.flap = P.flapCmd = .5; P.park = false;
+    P.vel = mRot(qMat(P.q, new Float32Array(9)), v3(0, 0, 100)); P.thr = .40;
+    P.flap = P.flapCmd = 1; P.park = false;
   }
   qMat(P.q, P.m);
 }
 
-/* pilot assist for SIMPLE mode: turns the stick into an autopilot command */
+/* The autopilot. It rides on top of the one flight model: the stick commands
+   bank angle and pitch attitude instead of control-surface deflection, the
+   rudder coordinates itself, angle of attack is limited, and with hands off it
+   holds the altitude and heading it had when you let go. */
 function assist(P, dt, e) {
-  const bankTgt = P.inA * 58 * DEG;
+  const hands = Math.abs(P.inA) > .04 || Math.abs(P.inE) > .04;
+  // ---- roll: stick commands bank, hands off it rolls level and holds heading
+  let bankTgt = P.inA * 62 * DEG;
+  if (!hands && !P.onGround) {
+    if (P.apHdg === undefined) P.apHdg = e.hdg;
+    let he = P.apHdg - e.hdg;
+    if (he > Math.PI) he -= TAU; else if (he < -Math.PI) he += TAU;
+    bankTgt = clamp(he * 1.6, -22 * DEG, 22 * DEG);
+  } else P.apHdg = undefined;
   const rollErr = bankTgt - e.roll;
-  // w.z is positive when rolling LEFT, so it damps a right-roll command directly
-  P.dA = clamp(rollErr * 2.4 + P.w.z * .55, -1, 1);
-  // pitch: stick commands a flight-path change, with turn compensation
-  const lvl = 1 / Math.max(Math.cos(clamp(e.roll, -1.2, 1.2)), .35);
-  let pitchTgt = P.inE * 26 * DEG + (lvl - 1) * 9 * DEG;
-  if (P.onGround) pitchTgt = P.inE * 14 * DEG;
+  P.dA = clamp(rollErr * 2.2 + P.w.z * .60, -1, 1);
+
+  // ---- pitch: stick commands attitude, hands off it holds altitude ---------
+  const lvl = 1 / Math.max(Math.cos(clamp(e.roll, -1.3, 1.3)), .30);
+  let pitchTgt = P.inE * 26 * DEG + (lvl - 1) * 7 * DEG;
+  if (P.onGround) { pitchTgt = P.inE * 12 * DEG; P.apAlt = undefined; }
+  else if (!hands) {
+    if (P.apAlt === undefined) P.apAlt = P.pos.y;
+    const ae = clamp((P.apAlt - P.pos.y) * .012, -12 * DEG, 12 * DEG);
+    pitchTgt = clamp(ae - P.vel.y * .035, -14 * DEG, 18 * DEG) + (lvl - 1) * 7 * DEG;
+  } else P.apAlt = undefined;
   const pitchErr = pitchTgt - e.pitch;
-  // proportional alone leaves a standing error, which shows up as a banked turn
-  // that quietly descends, so trim it out with a bounded integral term
-  P.pitchI = clamp((P.pitchI || 0) + pitchErr * dt * 1.5, -.55, .55);
-  // w.x is positive pitching DOWN, so it adds directly to a nose-up command
-  P.dE = clamp(pitchErr * 3.2 + P.pitchI + P.w.x * .50, -1, 1);
-  // hard angle-of-attack limiter keeps the wing flying
-  const amax = (13.5 - P.flap * 1.5) * DEG;
+  P.pitchI = clamp((P.pitchI || 0) + pitchErr * dt * 1.2, -.55, .55);
+  P.dE = clamp(pitchErr * 2.8 + P.pitchI + P.w.x * .55, -1, 1);
+
+  // hard angle-of-attack limiter: a delta will keep flying far past where it
+  // should, and the drag that comes with it is what actually kills you
+  const amax = 18 * DEG;
   P.aoaCap = P.alpha > amax && P.dE > 0;
-  if (P.aoaCap) P.dE = clamp(P.dE - (P.alpha - amax) * 26, -1, .05);
+  if (P.aoaCap) P.dE = clamp(P.dE - (P.alpha - amax) * 22, -1, .05);
+
   if (P.onGround) {
-    // on the ground, hold the runway heading rather than chasing zero sideslip:
-    // zeroing sideslip in a crosswind just walks the aircraft off the centreline
     if (Math.abs(P.inA) > .05 || P.holdHdg === undefined) P.holdHdg = e.hdg;
     let err = P.holdHdg - e.hdg;
     if (err > Math.PI) err -= TAU; else if (err < -Math.PI) err += TAU;
     P.dR = clamp(P.inA * .9 + err * 2.4 - P.w.y * .9, -1, 1);
   } else {
-    // in the air, auto-coordinate: a slip to the right needs RIGHT rudder
     P.holdHdg = undefined;
     P.dR = clamp(P.beta * 4.5 - P.w.y * .45, -1, 1);
   }
@@ -1425,28 +1527,49 @@ function physics(P, dt) {
   const m = P.m;
   const e = eulerOf(m);
   // --- control surface response ------------------------------------------
-  if (MODE === "simple") assist(P, dt, e);
+  if (AP.on) assist(P, dt, e);
   else {
     P.dE = approach(P.dE, P.inE, 9, dt);
     P.dA = approach(P.dA, P.inA, 11, dt);
     P.dR = approach(P.dR, P.inR, 9, dt);
   }
-  P.flap = approach(P.flap, P.flapCmd, 1.1, dt);
+  // Flaps blow back above their placard speed, and the chute is torn away if
+  // you stream it too fast.
+  const kias = P.ias * 1.94384;
+  if (kias > FLAP_LIMIT && P.flapCmd > 0) {
+    P.flapCmd = 0;
+    if (P.flapWarn === undefined || GAME.t - P.flapWarn > 4) { P.flapWarn = GAME.t; toast("FLAPS BLOWN BACK \u00b7 OVER " + FLAP_LIMIT + " KT", 2.2); }
+  }
+  P.flap = approach(P.flap, P.flapCmd, .9, dt);
+  if (P.chuteCmd && kias > CHUTE_LIMIT) { P.chuteCmd = 0; toast("CHUTE TORN AWAY \u00b7 OVER " + CHUTE_LIMIT + " KT", 2.2); }
+  if (!P.onGround && P.chute > 0 && P.tas < 30) P.chuteCmd = 0;   // cut it when stopped
+  P.chute = approach(P.chute, P.chuteCmd, 2.6, dt);
   P.gear = clamp(P.gear + (P.gearCmd - P.gear > 0 ? dt / 3.2 : -dt / 3.2), 0, 1);
   if (Math.abs(P.gearCmd - P.gear) < .02) P.gear = P.gearCmd;
 
   // --- engine -------------------------------------------------------------
   const thrCmd = P.crashed ? 0 : P.thr;
-  P.rpm = approach(P.rpm, .18 + thrCmd * .82, 2.4, dt);
-  const rho = rhoAt(P.pos.y);
+  P.rpm = approach(P.rpm, .035 + thrCmd * .965, 1.5, dt);
+  const air = isa(P.pos.y);
+  const rho = air.rho;
   const wind = WIND.at(P.pos, P);
   const va = vsub(P.vel, wind);
   const vb = mRotT(m, va);
   const V = vlen(vb);
   P.tas = V;
+  P.mach = V / air.a;
   P.ias = V * Math.sqrt(rho / 1.225);
-  const thrust = SPECS.thrustMax * P.rpm * clamp(1 - V / SPECS.vProp, .10, 1) *
-    Math.pow(rho / 1.225, .85) * (MODE === "simple" ? 1.12 : 1);
+  // Afterburner lives in the top fifth of the throttle and is what the gate
+  // between "fast aeroplane" and "Mach 3" actually is.
+  P.ab = clamp((thrCmd - AB_GATE) / (1 - AB_GATE), 0, 1);
+  const abSm = approach(P.abSm === undefined ? 0 : P.abSm, P.ab, 3.5, dt);
+  P.abSm = abSm;
+  // Ram compression: these inlets make more thrust the faster they go, right
+  // up to design Mach, then fall away.
+  const ram = 1 + 2.0 * sstep(.4, 3.05, P.mach) - 1.3 * sstep(3.2, 4.0, P.mach);
+  const dens = Math.pow(clamp(rho / 1.225, .0005, 1), .62);
+  const perEngine = SPECS.thrustMil * clamp(P.rpm, 0, 1) + SPECS.thrustAB * abSm;
+  const thrust = 2 * perEngine * ram * dens;
 
   let F = v3(0, -SPECS.mass * 9.81, 0);      // world-frame accumulator
   let M = v3();                              // body-frame torque
@@ -1457,15 +1580,26 @@ function physics(P, dt) {
     P.alpha = clamp(Math.atan2(-vd.y, vd.z), -1.4, 1.4) * slow;
     P.beta = Math.asin(clamp(vd.x, -1, 1)) * slow;
     const qbar = .5 * rho * V * V, qS = qbar * SPECS.S;
-    // lift curve with a proper stall break
-    const aStall = (15.5 + P.flap * 1.5) * DEG;
-    let st = 1 - sstep(aStall, aStall + 8 * DEG, Math.abs(P.alpha));
-    if (MODE === "simple") st = Math.max(st, .55);
-    const CLlin = SPECS.CL0 + SPECS.CLa * P.alpha + .60 * P.flap;
-    const CLstall = 1.05 * Math.sin(2 * P.alpha);
+    P.qbar = qbar;
+    const M8 = P.mach;
+    // A slender delta does not stall the way a straight wing does: the leading
+    // edge sheds a vortex that keeps adding lift far past where a wing would
+    // let go, so the break is late and soft.
+    const aStall = (27 + P.flap * 2) * DEG;
+    let st = 1 - sstep(aStall, aStall + 12 * DEG, Math.abs(P.alpha));
+    if (AP.on) st = Math.max(st, .55);
+    const sa = Math.sin(P.alpha);
+    const vortex = 1.55 * sa * sa * Math.cos(P.alpha) * Math.sign(P.alpha);
+    const CLlin = SPECS.CL0 + claOfMach(M8) * P.alpha + vortex + .35 * P.flap;
+    const CLstall = 1.15 * Math.sin(2 * P.alpha);
     const CL = lerp(CLstall, CLlin, st);
     P.stall = approach(P.stall, 1 - st, 6, dt);
-    const CD = SPECS.CD0 + SPECS.k * CL * CL + .022 * P.gear + .055 * P.flap + (1 - st) * .09;
+    // Flaps are mostly drag: full flap roughly triples the zero-lift drag,
+    // which is what makes them work as a speed brake on approach. The chute
+    // adds an area of its own once it is out.
+    const CD = cd0OfMach(M8) + SPECS.k * CL * CL + .030 * P.gear
+      + (.055 * P.flap + .105 * P.flap * P.flap) + (1 - st) * .12
+      + 1.05 * P.chute * (P.onGround ? 1 : .8);
     const L = qS * CL, D = qS * CD, Y = -qS * .90 * P.beta;
     // lift acts perpendicular to the relative wind, in the plane of symmetry
     const liftDir = vnorm(vcross(vd, v3(1, 0, 0)));
@@ -1476,24 +1610,34 @@ function physics(P, dt) {
     // moments
     const cq = .5 * rho * V * SPECS.S;
     const dET = clamp(P.dE + P.trim, -1.3, 1.3);
-    M.x = qS * SPECS.cbar * (SPECS.CmA * P.alpha - SPECS.CmE * dET) - cq * SPECS.cbar * SPECS.cbar * SPECS.CmQ * P.w.x;
-    M.y = qS * SPECS.b * (SPECS.Cnb * P.beta + SPECS.Cndr * P.dR - .020 * P.dA) - cq * SPECS.b * SPECS.b * SPECS.Cnr * P.w.y;
-    M.z = qS * SPECS.b * (-SPECS.Cla * P.dA + SPECS.Clb * P.beta) - cq * SPECS.b * SPECS.b * SPECS.Clp * P.w.z;
+    // control power falls away supersonically as the shock moves aft
+    const ctlM = lerp(1, .55, sstep(1.0, 2.2, M8));
+    M.x = qS * SPECS.cbar * (SPECS.CmA * P.alpha - SPECS.CmE * ctlM * dET + .070 * P.flap) - cq * SPECS.cbar * SPECS.cbar * SPECS.CmQ * P.w.x;
+    M.y = qS * SPECS.b * (SPECS.Cnb * P.beta + SPECS.Cndr * ctlM * P.dR - .020 * P.dA) - cq * SPECS.b * SPECS.b * SPECS.Cnr * P.w.y;
+    M.z = qS * SPECS.b * (-SPECS.Cla * ctlM * P.dA + SPECS.Clb * P.beta) - cq * SPECS.b * SPECS.b * SPECS.Clp * P.w.z;
     if (1 - st > .05) {   // asymmetric stall: wing drop and buffet
       const drop = (1 - st) * (hash2((P.pos.x * 3) | 0, (P.pos.z * 3) | 0) - .5);
-      M.z += drop * 9000;
-      M.x += (1 - st) * 5200;      // nose drops
+      M.z += drop * 260000;
+      M.x += (1 - st) * 150000;      // nose drops
       cam.shake = Math.max(cam.shake, (1 - st) * .5);
     }
   } else {
     P.alpha = 0; P.beta = 0; P.gload = 0; P.stall = 0;
     F = vadd(F, mRot(m, v3(0, 0, thrust)));
   }
-  if (MODE === "complex") {
-    // engine torque rolls the airframe left, p-factor yaws it left
-    const pw = P.rpm * clamp(1 - V / 110, .15, 1);
-    M.z += 900 * pw;
-    M.y -= 700 * pw * (.5 + clamp(P.alpha, 0, .5));
+  if (!AP.on && V > 40) {
+    // an inlet unstart: one duct loses its shock and yaws the aircraft hard.
+    // Only ever at high Mach and high angle of attack, as in the real thing.
+    const risk = sstep(2.4, 3.2, P.mach) * sstep(6 * DEG, 13 * DEG, Math.abs(P.alpha) + Math.abs(P.beta));
+    if (risk > .01 && Math.random() < risk * dt * .45) P.unstart = .9 + Math.random() * .8;
+    if (P.unstart > 0) {
+      P.unstart -= dt;
+      const sgn = P.unstartSide || (P.unstartSide = Math.random() < .5 ? -1 : 1);
+      M.y += sgn * 2.4e6 * clamp(P.unstart, 0, 1);
+      M.z += sgn * 6.0e5 * clamp(P.unstart, 0, 1);
+      cam.shake = Math.max(cam.shake, 1.1);
+      if (P.unstart <= 0) P.unstartSide = 0;
+    }
   }
 
   // --- ground contact ------------------------------------------------------
@@ -1513,15 +1657,15 @@ function physics(P, dt) {
       const n = flat ? v3(0, 1, 0) : terrainN(wp.x, wp.z, 4);
       const vp = vadd(P.vel, vcross(wOmega, rw));
       const vn = vdot(vp, n);
-      let Fn = clamp(pen * 190000 - vn * 14000, 0, SPECS.mass * 9.81 * 7);
+      let Fn = clamp(pen * SPECS.gearK - vn * SPECS.gearC, 0, SPECS.mass * 9.81 * 5);
       maxFn = Math.max(maxFn, Fn);
       let Fw = vmul(n, Fn);
       // rolling / lateral friction in the wheel's own frame
       let fwd = mRot(m, v3(0, 0, 1));
       if (wh.steer) {
-        // in simple mode dR already carries the pilot's steering plus the
-        // auto-coordination that keeps the roll straight
-        const st = P.dR * (MODE === "simple" ? .6 : 1) * 26 * DEG * clamp(1 - V / 40, .25, 1);
+        // with the autopilot in, dR already carries both the pilot's steering
+        // and the auto-coordination that keeps the roll straight
+        const st = P.dR * (AP.on ? .6 : 1) * 22 * DEG * clamp(1 - V / 55, .25, 1);
         fwd = mRot(m, v3(Math.sin(st), 0, Math.cos(st)));
       }
       fwd = vnorm(vsub(fwd, vmul(n, vdot(fwd, n))));
@@ -1530,14 +1674,18 @@ function physics(P, dt) {
       // nose-wheel grip fades with speed; a hard-gripping wheel ahead of the
       // centre of gravity is directionally unstable and ground-loops the aircraft
       const grip = wh.grip || lerp(.75, .16, clamp(V / 26, 0, 1));
-      const muS = (flat ? .92 : .72) * grip;
+      const muS = (flat ? 1.00 : .74) * grip;
       Fw = vadd(Fw, vmul(side, clamp(-vs * 3200 * grip, -muS * Fn, muS * Fn)));
-      const bk = P.brake * wh.brake * (MODE === "simple" ? .8 : 1);
-      const roll = (flat ? .022 : .075) + bk * .70;
-      Fw = vadd(Fw, vmul(fwd, clamp(-vf * 900, -roll * Fn, roll * Fn)));
+      const bk = P.brake * wh.brake;
+      // Static friction at a crawl. Without it the idle thrust always wins
+      // against rolling resistance and the aircraft creeps along the runway
+      // for ever instead of coming to a stop.
+      const stick = (1 - sstep(0, 2.2, Math.abs(vf))) * .14;
+      const roll = (flat ? .016 : .070) + bk * 1.05 + stick;
+      Fw = vadd(Fw, vmul(fwd, clamp(-vf * 26000, -roll * Fn, roll * Fn)));
       F = vadd(F, Fw);
       M = vadd(M, mRotT(m, vcross(rw, Fw)));
-      if (Fn > 200 && V > 3 && Math.random() < .25) spawnDust(wp, vmul(vp, -.1));
+      if (Fn > 4000 && V > 6 && Math.random() < .25) spawnDust(wp, vmul(vp, -.1));
     }
     // structural contact = crash
     if (!P.crashed) {
@@ -1545,9 +1693,9 @@ function physics(P, dt) {
         const wp = vadd(P.pos, mRot(m, hp));
         if (wp.y < groundH(wp.x, wp.z) - .05) { crash("STRUCTURAL CONTACT"); break; }
       }
-      const vsLim = MODE === "simple" ? 9.5 : 5.2;
+      const vsLim = AP.on ? 9.0 : 5.6;
       if (wow && P.lastVS < -vsLim && !P.touched) crash("HARD LANDING");
-      if (maxFn > SPECS.mass * 9.81 * (MODE === "simple" ? 6.5 : 4.4)) crash("GEAR COLLAPSE");
+      if (maxFn > SPECS.mass * 9.81 * (AP.on ? 6.5 : 4.6)) crash("GEAR COLLAPSE");
       if (wow && !P.gear) crash("GEAR UP LANDING");
     }
   }
@@ -1570,23 +1718,29 @@ function physics(P, dt) {
   P.vel = vadd(P.vel, vmul(acc, dt));
   P.pos = vadd(P.pos, vmul(P.vel, dt));
   P.w = v3(P.w.x + M.x / SPECS.Ipitch * dt, P.w.y + M.y / SPECS.Iyaw * dt, P.w.z + M.z / SPECS.Iroll * dt);
-  const wcap = 6;
+  const wcap = 3.2;
   P.w = v3(clamp(P.w.x, -wcap, wcap), clamp(P.w.y, -wcap, wcap), clamp(P.w.z, -wcap, wcap));
   P.q = qIntegrate(P.q, P.w, dt);
   qMat(P.q, P.m);
   P.propAng += P.rpm * 145 * dt;
   P.vsi = P.vel.y;
   P.dist += vlen(P.vel) * dt;
+  // Dynamic pressure is the real limit low down: this airframe is built for
+  // thin air, and holding Mach 3 at low level tears it apart.
+  if (!P.crashed && P.qbar > 125000) {
+    P.overQ = (P.overQ || 0) + dt;
+    cam.shake = Math.max(cam.shake, clamp(P.overQ * .5, 0, 1.4));
+    if (P.overQ > 4) crash("OVERSTRESS");
+  } else P.overQ = Math.max(0, (P.overQ || 0) - dt * .6);
   // never let the aircraft sink through the world
   const gh = groundH(P.pos.x, P.pos.z);
-  if (P.pos.y < gh + .35) { P.pos.y = gh + .35; if (P.vel.y < 0) P.vel.y *= -.05; }
+  if (P.pos.y < gh + 1.2) { P.pos.y = gh + 1.2; if (P.vel.y < 0) P.vel.y *= -.05; }
 }
 
 /* wind & turbulence */
 const WIND = {
   base: v3(3.2, 0, -1.6), t: 0,
   at(pos, P) {
-    if (MODE === "simple") return v3(this.base.x * .22, 0, this.base.z * .22);
     const g = Math.sin(this.t * .7) * .5 + Math.sin(this.t * 1.9 + 1.3) * .3;
     const alt = clamp(pos.y / 1200, 0, 1);
     const turb = (1 - alt) * .9 + .15;
@@ -1641,16 +1795,27 @@ function drawParts() {
 /* Wingtip vortices when the wing is working hard, and exhaust haze at power. */
 function spawnTrails(dt) {
   const P = PLANE;
-  if (P.crashed || P.onGround || P.tas < 45) return;
-  if ((P.gload > 2.3 || P.alpha > 9 * DEG) && Math.random() < dt * 34) {
-    for (const sx of [-5.35, 5.35]) {
-      const wp = vadd(P.pos, mRot(P.m, v3(sx, .24, -.15)));
-      addPart(wp, vmul(P.vel, .04), .30, .6 + Math.random() * .4, [252, 253, 255], 3.4);
+  if (P.crashed || P.onGround || P.tas < 60) return;
+  // wingtip vortices when the delta is working
+  if ((P.gload > 2.0 || P.alpha > 12 * DEG) && Math.random() < dt * 30) {
+    for (const sx of [-8.3, 8.3]) {
+      const wp = vadd(P.pos, mRot(P.m, v3(sx, .05, -10.2)));
+      addPart(wp, vmul(P.vel, .02), 1.0, .7 + Math.random() * .5, [252, 253, 255], 7);
     }
   }
-  if (P.rpm > .72 && Math.random() < dt * 9) {
-    const ex = vadd(P.pos, mRot(P.m, v3((Math.random() < .5 ? -.34 : .34), -.05, 1.25)));
-    addPart(ex, vmul(P.vel, -.02), .18, .5, [86, 84, 82], 2.2);
+  // contrails: only where the air is cold enough to make them
+  const air = isa(P.pos.y);
+  if (air.T < 233 && P.rpm > .45 && Math.random() < dt * 60) {
+    for (const sx of [-4.62, 4.62]) {
+      const ex = vadd(P.pos, mRot(P.m, v3(sx, -.06, -9.6)));
+      addPart(ex, v3(), 3.0, 16 + Math.random() * 8, [246, 249, 255], 2.1);
+    }
+  }
+  // transonic vapour cone through the sound barrier
+  if (P.mach > .95 && P.mach < 1.06 && P.pos.y < 11000 && Math.random() < dt * 55) {
+    const a = Math.random() * TAU, r = 3 + Math.random() * 4;
+    const wp = vadd(P.pos, mRot(P.m, v3(Math.cos(a) * r, Math.sin(a) * r * .5, -7 - Math.random() * 3)));
+    addPart(wp, v3(), 1.1, .13, [238, 244, 255], 5);
   }
 }
 
@@ -1684,7 +1849,7 @@ function updateCamera(dt) {
   const fwd = v3(m[6], m[7], m[8]), up = v3(m[3], m[4], m[5]), right = v3(m[0], m[1], m[2]);
   let want, look, rollBlend = 1;
   if (camMode === 1) {                      // cockpit
-    want = vadd(P.pos, mRot(m, v3(0, .80, -.45)));
+    want = vadd(P.pos, mRot(m, v3(0, .92, 9.10)));
     cam.pos = want;
     cam.m = qMat(P.q, cam.m);
     FOV = FOVBASE * 1.16; F = (H * .5) / Math.tan(FOV * .5);
@@ -1692,28 +1857,34 @@ function updateCamera(dt) {
   }
   FOV = FOVBASE; F = (H * .5) / Math.tan(FOV * .5);
   if (camMode === 0) {
-    const back = 17 + clamp(vlen(P.vel) * .06, 0, 7);
-    want = vadd(P.pos, vadd(vmul(fwd, -back), vadd(vmul(up, 3.4), vmul(right, 0))));
-    look = vadd(P.pos, vmul(fwd, 10));
+    const back = 52 + clamp(vlen(P.vel) * .10, 0, 34);
+    want = vadd(P.pos, vadd(vmul(fwd, -back), vmul(up, 9)));
+    look = vadd(P.pos, vmul(fwd, 24));
     rollBlend = .35;
   } else if (camMode === 2) {
     orbitA += dt * .22;
-    const r = 26;
-    want = vadd(P.pos, v3(Math.cos(orbitA) * r, 7, Math.sin(orbitA) * r));
+    const r = 62;
+    want = vadd(P.pos, v3(Math.cos(orbitA) * r, 16, Math.sin(orbitA) * r));
     look = P.pos; rollBlend = 0;
   } else if (camMode === 3) {
-    want = vadd(P.pos, mRot(m, v3(7.5, 1.4, -1.5)));
+    want = vadd(P.pos, mRot(m, v3(26, 6, -14)));
     look = vadd(P.pos, mRot(m, v3(0, .3, 2)));
     rollBlend = 1;
   } else {
-    want = v3(-70, E + 24, 620);
+    want = v3(-70, E + 26, 620);
     look = P.pos; rollBlend = 0;
   }
-  // smooth follow
-  if (!cam.init) { cam.pos = want; cam.init = 1; }
-  const k = camMode === 0 ? 9 : 5;
-  cam.pos = v3(approach(cam.pos.x, want.x, k, dt), approach(cam.pos.y, want.y, k, dt), approach(cam.pos.z, want.z, k, dt));
-  const gh = groundH(cam.pos.x, cam.pos.z) + 1.5;
+  // Smooth the offset from the aircraft, not the world position. Smoothing in
+  // world space works fine at 60 m/s and leaves the camera kilometres behind at
+  // Mach 3, because the lag scales with speed.
+  const anchor = camMode === 4 ? v3(0, 0, 0) : P.pos;
+  const wantOff = vsub(want, anchor);
+  if (!cam.init) { cam.off = wantOff; cam.init = 1; }
+  const k = camMode === 0 ? 7 : 5;
+  cam.off = v3(approach(cam.off.x, wantOff.x, k, dt), approach(cam.off.y, wantOff.y, k, dt),
+               approach(cam.off.z, wantOff.z, k, dt));
+  cam.pos = vadd(anchor, cam.off);
+  const gh = groundH(cam.pos.x, cam.pos.z) + 3;
   if (cam.pos.y < gh) cam.pos.y = gh;
   // build a look-at basis, then blend in some of the aircraft roll
   const f2 = vnorm(vsub(look, cam.pos));
@@ -1737,63 +1908,106 @@ function updateCamera(dt) {
 function drawAircraft() {
   const P = PLANE, Rb = P.m, pos = P.pos;
   const external = camMode !== 1;
-  const ail = P.dA * 22 * DEG, ele = P.dE * 24 * DEG, rud = P.dR * 26 * DEG, fl = P.flap * 35 * DEG;
-  const gearAng = (1 - P.gear) * 84 * DEG;
+  const ail = P.dA * 20 * DEG, ele = P.dE * 22 * DEG, rud = P.dR * 22 * DEG, fl = P.flap * 28 * DEG;
+  const gearAng = (1 - P.gear) * 92 * DEG;
+  const hinge = (part, mat) => {
+    const piv = part.pivot;
+    const o = vadd(pos, mRot(Rb, v3(piv[0], piv[1], piv[2])));
+    drawMesh(part.mesh, o, mmul(Rb, mat), piv);
+  };
   if (external) {
     drawMesh(AC.fuse, pos, Rb, null);
+    drawMesh(AC.chine, pos, Rb, null);
     drawMesh(AC.wingL, pos, Rb, null);
     drawMesh(AC.wingR, pos, Rb, null);
-    drawMesh(AC.tail, pos, Rb, null);
-    drawMesh(AC.pit, pos, Rb, null);
-    // hinged surfaces: rotate about the body axis through each pivot
-    const hinge = (part, mat) => {
-      const piv = part.pivot;
-      const o = vadd(pos, mRot(Rb, v3(piv[0], piv[1], piv[2])));
-      drawMesh(part.mesh, o, mmul(Rb, mat), piv);
-    };
-    hinge(AC.ailR, mAxis(1, 0, 0, -ail));   // right aileron up when rolling right
-    hinge(AC.ailL, mAxis(1, 0, 0, ail));
-    hinge(AC.flapL, mAxis(1, 0, 0, -fl));
-    hinge(AC.flapR, mAxis(1, 0, 0, -fl));
-    hinge(AC.elev, mAxis(1, 0, 0, -ele));
-    hinge(AC.rud, mAxis(0, 1, 0, rud));
+    drawMesh(AC.nacL, pos, Rb, null);
+    drawMesh(AC.nacR, pos, Rb, null);
+    drawMesh(AC.marks, pos, Rb, null);
+    // Elevons do both jobs: they move together for pitch and differentially
+    // for roll, exactly as they do on a tailless delta.
+    hinge(AC.elevOutR, mAxis(1, 0, 0, -ele - ail - fl * .35));
+    hinge(AC.elevOutL, mAxis(1, 0, 0, -ele + ail - fl * .35));
+    hinge(AC.elevInR, mAxis(1, 0, 0, -ele - ail * .4 - fl));
+    hinge(AC.elevInL, mAxis(1, 0, 0, -ele + ail * .4 - fl));
+    hinge(AC.finL, mAxis(0, 1, 0, rud));
+    hinge(AC.finR, mAxis(0, 1, 0, rud));
     if (P.gear > .01) {
       hinge(AC.gearL, mAxis(0, 0, 1, -gearAng));
       hinge(AC.gearR, mAxis(0, 0, 1, gearAng));
       hinge(AC.gearN, mAxis(1, 0, 0, gearAng));
     }
-    // propeller: discrete blades when slow, a translucent disc when spinning up
-    const spin = P.rpm;
-    drawMesh(AC.spin, pos, mmul(Rb, mAxis(0, 0, 1, P.propAng)), null);
-    if (spin < .32) {
-      drawMesh(AC.blades, pos, mmul(Rb, mAxis(0, 0, 1, P.propAng)), null);
-    } else {
-      for (let i = 0; i < 3; i++)
-        drawMesh(AC.blades, pos, mmul(Rb, mAxis(0, 0, 1, P.propAng + i * .55)), null, null, .17);
-      const hub = projectPoint(vadd(pos, mRot(Rb, v3(0, .06, 2.65))));
-      if (hub) DL.sprite(hub.z - .5, hub.x, hub.y, 1.45 * hub.s, sprite(208, 216, 226, 2), 1);
-    }
     drawMesh(AC.glass, pos, Rb, null);
-    // navigation lights
-    const navs = [[v3(-5.45, .24, -.15), [255, 70, 60]], [v3(5.45, .24, -.15), [70, 255, 120]], [v3(0, 1.7, -5.1), [255, 255, 255]]];
+    if (P.chute > .02) {
+      // the canopy trails behind and streams with the airflow
+      const back = vnorm(vsub(P.vel, vmul(mRot(Rb, v3(0, 0, 1)), 0)));
+      const sway = Math.sin(GAME.t * 3.1) * .04, sway2 = Math.cos(GAME.t * 2.3) * .03;
+      const swing = mmul(mAxis(1, 0, 0, sway), mAxis(0, 1, 0, sway2));
+      drawMesh(AC.chute, pos, mmul(Rb, swing), null, null, clamp(P.chute * 1.4, 0, 1));
+    }
+    drawNozzles(P, Rb, pos);
+    const navs = [[v3(-8.40, .06, -9.5), [255, 70, 60]], [v3(8.40, .06, -9.5), [70, 255, 120]],
+                  [v3(0, .22, -14.0), [255, 255, 255]]];
     for (const [lp, c] of navs) {
       const sp = projectPoint(vadd(pos, mRot(Rb, lp)));
       if (!sp) continue;
-      DL.sprite(sp.z - 2, sp.x, sp.y, clamp(.55 * sp.s, 1.6, 16), sprite(c[0], c[1], c[2], 3), .9);
+      DL.sprite(sp.z - 2, sp.x, sp.y, clamp(.8 * sp.s, 1.6, 18), sprite(c[0], c[1], c[2], 3), .9);
     }
   } else {
-    // from inside: the nose deck, the wings and the propeller, nothing else
     drawMesh(AC.wingL, pos, Rb, null);
     drawMesh(AC.wingR, pos, Rb, null);
+    drawMesh(AC.nacL, pos, Rb, null);
+    drawMesh(AC.nacR, pos, Rb, null);
+    drawMesh(AC.chine, pos, Rb, null);
     drawMesh(AC.cowl, pos, Rb, null);
-    drawMesh(AC.spin, pos, mmul(Rb, mAxis(0, 0, 1, P.propAng)), null);
-    // only the blur disc: the blades themselves are a smear at these speeds
-    const hub = projectPoint(vadd(pos, mRot(Rb, v3(0, .06, 2.65))));
-    if (hub && P.rpm > .2) DL.sprite(hub.z - .5, hub.x, hub.y, 1.45 * hub.s, sprite(208, 216, 226, 2), 1);
-    drawMesh(AC.glass, pos, Rb, null, null, .055);
+    drawMesh(AC.glass, pos, Rb, null, null, .16);
   }
-  // engine smoke when damaged
-  if (P.crashed && Math.random() < .5) spawnSmoke(vadd(pos, mRot(Rb, v3(0, .3, 1.2))), P.vel);
+  if (P.crashed && Math.random() < .5) spawnSmoke(vadd(pos, mRot(Rb, v3(0, .3, 2))), P.vel);
+}
+
+/* Afterburner: a translucent cone out of each nozzle with shock diamonds
+   standing in it, plus a bloom sprite. Only lit when the throttle is past the
+   A/B gate, and it stretches with how hard the burners are working. */
+function drawNozzles(P, Rb, pos) {
+  const ab = P.abSm || 0, core = clamp(P.rpm * .55 + ab * .8, 0, 1.4);
+  if (P.crashed || core < .12) return;
+  const len = 3.0 + ab * 16;
+  for (const sx of [-4.62, 4.62]) {
+    const base = vadd(pos, mRot(Rb, v3(sx, -.06, -8.7)));
+    const b = projectPoint(base);
+    if (!b) continue;
+    const tip = projectPoint(vadd(pos, mRot(Rb, v3(sx, -.06, -8.7 - len))));
+    if (!tip) continue;
+    const r0 = .66 * b.s;
+    DL.sprite(b.z - 1, b.x, b.y, Math.max(r0 * 1.3, 2), sprite(255, 196, 120, 1), clamp(core * .45, 0, .7));
+    // Built in short segments so the plume can fade and narrow along its
+    // length instead of reading as a solid rod.
+    const SEG = 7;
+    let px = b.x, py = b.y, pr = r0;
+    for (let i = 1; i <= SEG; i++) {
+      const t = i / SEG;
+      const sp = projectPoint(vadd(pos, mRot(Rb, v3(sx, -.06, -8.7 - len * t))));
+      if (!sp) break;
+      const rr = r0 * (1 - t * .86) * (1 + Math.sin(t * 9 + GAME.t * 26) * .12 * ab);
+      const dx = sp.x - px, dy = sp.y - py, dl = Math.hypot(dx, dy) || 1;
+      const nx = -dy / dl, ny = dx / dl;
+      const a = (ab * .30 + .06) * (1 - t) * (1 - t);
+      const col = t < .25 ? "rgba(190,214,255," : t < .55 ? "rgba(255,186,96," : "rgba(255,142,58,";
+      DL.poly(b.z - 1.5 - i * .01,
+        [px + nx * pr, py + ny * pr, px - nx * pr, py - ny * pr,
+         sp.x - nx * rr, sp.y - ny * rr, sp.x + nx * rr, sp.y + ny * rr],
+        4, col + a.toFixed(3) + ")", null, 0);
+      px = sp.x; py = sp.y; pr = rr;
+    }
+    if (ab > .05) {
+      for (let i = 1; i <= 4; i++) {   // shock diamonds standing in the plume
+        const t = i / 5, dz = -8.7 - len * t * .55;
+        const sp = projectPoint(vadd(pos, mRot(Rb, v3(sx, -.06, dz))));
+        if (!sp) continue;
+        DL.sprite(sp.z - 2, sp.x, sp.y, Math.max(.22 * sp.s * (1 - t * .7), .8),
+          sprite(255, 240, 200, 1), ab * (1 - t) * .40);
+      }
+    }
+  }
 }
 
 /* ============================================================= audio ==== */
@@ -1833,15 +2047,18 @@ const audio = {
     if (!this.ok) return;
     if (this.ctx.state === "suspended") this.ctx.resume();
     const t = this.ctx.currentTime;
-    const rpmHz = 46 + P.rpm * 128;
-    this.o1.frequency.setTargetAtTime(rpmHz, t, .08);
-    this.o2.frequency.setTargetAtTime(rpmHz * .5, t, .08);
-    this.ef.frequency.setTargetAtTime(420 + P.rpm * 2100, t, .1);
-    this.eg.gain.setTargetAtTime(P.crashed ? 0 : (camMode === 1 ? .17 : .12) * (.25 + P.rpm * .9), t, .1);
-    const wv = clamp(P.tas / 130, 0, 1.4);
-    this.ng.gain.setTargetAtTime(wv * wv * .21, t, .12);
-    this.nf.frequency.setTargetAtTime(320 + wv * 900, t, .12);
-    const warn = (P.stall > .22 || (MODE === "complex" && P.alpha > 13.5 * DEG)) && !P.onGround && !P.crashed;
+    // two turbojets: a low rumble, a compressor whine that tracks spool speed,
+    // and a wall of noise that the afterburners open right up
+    const spool = P.rpm, ab = P.abSm || 0;
+    this.o1.frequency.setTargetAtTime(52 + spool * 46, t, .12);
+    this.o2.frequency.setTargetAtTime(390 + spool * 1150, t, .12);
+    this.ef.frequency.setTargetAtTime(300 + spool * 2600 + ab * 1800, t, .12);
+    this.eg.gain.setTargetAtTime(P.crashed ? 0 : (camMode === 1 ? .15 : .11) * (.18 + spool * .85), t, .12);
+    const wv = clamp(P.tas / 240, 0, 1.5);
+    this.ng.gain.setTargetAtTime(clamp(wv * wv * .16 + ab * .20 + spool * .06, 0, .42), t, .12);
+    this.nf.frequency.setTargetAtTime(240 + wv * 700 + ab * 420, t, .12);
+    this.nf.Q.setTargetAtTime(ab > .1 ? .35 : .7, t, .2);
+    const warn = (P.stall > .22 || P.alpha > 24 * DEG || P.unstart > 0) && !P.onGround && !P.crashed;
     this.sg.gain.setTargetAtTime(warn ? (Math.sin(t * 34) > 0 ? .06 : 0) : 0, t, .02);
   },
   boom() {
@@ -1872,17 +2089,18 @@ const GAME = {
 };
 function buildRingCourse() {
   GAME.rings = [];
-  let a = Math.PI, x = 0, z = -300, y = 560;
+  let a = Math.PI, x = 0, z = -2000, y = 4000;
   for (let i = 0; i < 12; i++) {
-    a += (hash2(i, 51) - .5) * .85 + (i % 2 ? .30 : -.30);
+    a += (hash2(i, 51) - .5) * .70 + (i % 2 ? .22 : -.22);
     if (i >= 6) {   // second half curves back toward the field
       let d = Math.atan2(-x, -z) - a;
       if (d > Math.PI) d -= TAU; else if (d < -Math.PI) d += TAU;
       a += clamp(d, -.8, .8) * .55;
     }
-    const step = 950 + hash2(i, 52) * 550;
+    // gates are minutes apart, not seconds, at three times the speed of sound
+    const step = 11000 + hash2(i, 52) * 9000;
     x += Math.sin(a) * step; z += Math.cos(a) * step;
-    y = clamp(terrainH(x, z) + 180 + hash2(i, 53) * 260, 140, 1500);
+    y = clamp(terrainH(x, z) + 2600 + hash2(i, 53) * 7000, 1200, 20000);
     GAME.rings.push({ p: v3(x, y, z), a, passed: false });
   }
   GAME.ringIdx = 0; GAME.ringT = 0;
@@ -1892,13 +2110,13 @@ function drawRings() {
     const rg = GAME.rings[i];
     if (rg.passed) continue;
     const d = vlen(vsub(rg.p, cam.pos));
-    if (d > 9000) continue;
+    if (d > 90000) continue;
     const M = qMat(qAxis(0, 1, 0, rg.a), new Float32Array(9));
     const tint = i === GAME.ringIdx ? [120, 255, 160] : null;
     drawMesh(RING, rg.p, M, null, tint);
     // pylon to the ground so the gate reads in 3D
     const gh = terrainH(rg.p.x, rg.p.z);
-    const a = projectPoint(v3(rg.p.x, rg.p.y - 30, rg.p.z)), b = projectPoint(v3(rg.p.x, gh, rg.p.z));
+    const a = projectPoint(v3(rg.p.x, rg.p.y - 240, rg.p.z)), b = projectPoint(v3(rg.p.x, gh, rg.p.z));
     if (a && b) DL.poly(a.z + 30, [a.x - 1.5, a.y, a.x + 1.5, a.y, b.x + 2.5, b.y, b.x - 2.5, b.y], 4,
       fogged([132, 138, 146], a.z), null, 0);
   }
@@ -1914,7 +2132,7 @@ function checkRings(dt) {
   const radial = Math.hypot(rel.x - n.x * along, rel.y, rel.z - n.z * along);
   if (rg.last === undefined) rg.last = along;
   // `along` runs negative before the gate and positive once past it
-  if (rg.last < 0 && along >= 0 && radial < 30) {
+  if (rg.last < 0 && along >= 0 && radial < 240) {
     rg.passed = true; GAME.ringIdx++;
     audio.beep(880, .13, .2);
     if (GAME.ringIdx >= GAME.rings.length) {
@@ -1936,9 +2154,9 @@ function checkLanding() {
     if (!onRwy) { notes.push("OFF RUNWAY"); }
     else {
       sc = 100;
-      sc -= clamp(Math.abs(vs) * 12, 0, 45); notes.push("SINK " + (Math.abs(vs) * 196.85).toFixed(0) + " fpm");
-      sc -= clamp(offC * 2.2, 0, 25); notes.push("CENTRE " + offC.toFixed(1) + " m");
-      sc -= clamp(Math.abs(zone - 320) * .06, 0, 30); notes.push("TOUCHDOWN " + zone.toFixed(0) + " m");
+      sc -= clamp(Math.abs(vs) * 11, 0, 45); notes.push("SINK " + (Math.abs(vs) * 196.85).toFixed(0) + " fpm");
+      sc -= clamp(offC * 1.8, 0, 25); notes.push("CENTRE " + offC.toFixed(1) + " m");
+      sc -= clamp(Math.abs(zone - 380) * .05, 0, 30); notes.push("TOUCHDOWN " + zone.toFixed(0) + " m");
       sc = Math.max(0, Math.round(sc));
     }
     GAME.landScore = sc;
@@ -1955,6 +2173,9 @@ function checkLanding() {
    slider on the right, tap buttons for the switches, and rudder pads in
    complex mode. Nothing is a DOM element, so it scales with the canvas and
    costs nothing in layout. */
+/* The throttle slider, the switches and the pause button are always on screen
+   and work with a mouse as well as a thumb; only the virtual stick is
+   touch-only, since a keyboard already has one. */
 const TOUCH = {
   on: MOBILE, ptr: new Map(),
   stick: { id: null, hx: 0, hy: 0, cx: 0, cy: 0, r: 80, dx: 0, dy: 0, zw: 0, zh: 0 },
@@ -1990,6 +2211,10 @@ function layoutTouch() {
   }
   T.thr.w = tw; T.thr.h = th;
   T.btns = [
+    { k: "ap", x: bx, y: by - (bh + g) * 2, w: bw, h: bh },
+    { k: "keys", x: bx + bw + g, y: by - (bh + g) * 2, w: bw, h: bh },
+    { k: "chute", x: bx, y: by - bh - g, w: bw, h: bh },
+    { k: "flapup", x: bx + bw + g, y: by - bh - g, w: bw, h: bh },
     { k: "gear", x: bx, y: by, w: bw, h: bh },
     { k: "flap", x: bx + bw + g, y: by, w: bw, h: bh },
     { k: "brake", x: bx, y: by + bh + g, w: bw, h: bh, hold: 1 },
@@ -2012,10 +2237,19 @@ function touchAct(k) {
   if (k === "gear") { P.gearCmd = P.gearCmd > .5 ? 0 : 1; toast(P.gearCmd ? "GEAR DOWN" : "GEAR UP", 1.2); audio.beep(P.gearCmd ? 520 : 400, .18, .12); }
   else if (k === "flap") { P.flapCmd = P.flapCmd >= .99 ? 0 : clamp(P.flapCmd + .25, 0, 1); toast("FLAPS " + Math.round(P.flapCmd * 100) + "%", 1); }
   else if (k === "cam") { camMode = (camMode + 1) % CAMNAMES.length; toast("CAMERA: " + CAMNAMES[camMode], 1.2); }
+  else if (k === "ap") toggleAP();
+  else if (k === "keys") SHOWKEYS = !SHOWKEYS;
+  else if (k === "flapup") { P.flapCmd = clamp(P.flapCmd - .25, 0, 1); toast("FLAPS " + Math.round(P.flapCmd * 100) + "%", 1); }
+  else if (k === "chute") {
+    if (P.chuteCmd) { P.chuteCmd = 0; toast("CHUTE JETTISONED", 1.4); }
+    else if (P.ias * 1.94384 > CHUTE_LIMIT) toast("TOO FAST FOR THE CHUTE", 1.6);
+    else { P.chuteCmd = 1; toast("DRAG CHUTE STREAMED", 1.6); }
+  }
 }
-function touchDown(id, x, y) {
+function touchDown(id, x, y, isTouch) {
   const T = TOUCH;
   if (!GAME.started || GAME.paused) return false;
+  if (SHOWKEYS) { SHOWKEYS = false; return true; }
   if (inBox(T.pause, x, y)) { togglePause(); return true; }
   for (const b of T.btns) {
     if (inBox(b, x, y)) {
@@ -2024,7 +2258,7 @@ function touchDown(id, x, y) {
       return true;
     }
   }
-  if (MODE === "complex") {
+  if (isTouch) {
     for (const b of T.rud.boxes) {
       if (inBox(b, x, y)) { T.ptr.set(id, { kind: "rud", b }); T.rud.v = b.k === "rudR" ? 1 : -1; return true; }
     }
@@ -2032,7 +2266,7 @@ function touchDown(id, x, y) {
   if (x > T.thr.x - 28 * UI && y > T.thr.y - 28 * UI) {
     T.ptr.set(id, { kind: "thr" }); T.thr.id = id; touchThrottle(y); return true;
   }
-  if (x < T.stick.zw && y > H - T.stick.zh) {
+  if (isTouch && x < T.stick.zw && y > H - T.stick.zh) {
     // relative stick: it appears wherever the thumb lands
     T.stick.id = id; T.stick.cx = x; T.stick.cy = y; T.stick.dx = 0; T.stick.dy = 0;
     T.ptr.set(id, { kind: "stick" });
@@ -2076,14 +2310,14 @@ function canvasXY(ev) {
   return [(ev.clientX - r.left) * (W / r.width), (ev.clientY - r.top) * (H / r.height)];
 }
 cv.addEventListener("pointerdown", ev => {
-  if (ev.pointerType === "mouse" && !TOUCH.on) return;
-  if (ev.pointerType !== "mouse") {
+  const isTouch = ev.pointerType !== "mouse";
+  if (isTouch) {
     if (!TOUCH.on) { TOUCH.on = true; layoutTouch(); showTouchHelp(); }
     audio.init();                       // iOS only unlocks audio inside a gesture
     if (audio.ctx && audio.ctx.state === "suspended") audio.ctx.resume();
   }
   const [x, y] = canvasXY(ev);
-  if (touchDown(ev.pointerId, x, y)) { ev.preventDefault(); cv.setPointerCapture && cv.setPointerCapture(ev.pointerId); }
+  if (touchDown(ev.pointerId, x, y, isTouch)) { ev.preventDefault(); cv.setPointerCapture && cv.setPointerCapture(ev.pointerId); }
 }, { passive: false });
 cv.addEventListener("pointermove", ev => {
   const [x, y] = canvasXY(ev);
@@ -2112,11 +2346,17 @@ function padBox(x, y, w, h, r, on, label, sub) {
   }
 }
 function drawTouch(dt) {
-  if (!TOUCH.on || !GAME.started) return;
+  if (!GAME.started) return;
   const T = TOUCH, P = PLANE, u = UI;
   for (const k in T.flash) if (T.flash[k] > 0 && T.flash[k] < 1) T.flash[k] = Math.max(0, T.flash[k] - dt);
   ctx.save();
-  // thumb stick
+  if (TOUCH.on) drawStick();
+  drawPanel(P, u);
+  ctx.restore();
+  if (SHOWKEYS) drawKeyCard();
+}
+function drawStick() {
+  const T = TOUCH, u = UI;
   const sx = T.stick.id !== null ? T.stick.cx : T.stick.hx;
   const sy = T.stick.id !== null ? T.stick.cy : T.stick.hy;
   const r = T.stick.r;
@@ -2131,29 +2371,50 @@ function drawTouch(dt) {
   ctx.fillStyle = T.stick.id !== null ? "rgba(120,220,255,.38)" : "rgba(150,200,230,.20)";
   ctx.fill();
   ctx.strokeStyle = "rgba(180,236,255,.75)"; ctx.lineWidth = 2 * u; ctx.stroke();
+  const lbl = PITCH_REAL ? "PULL BACK = NOSE UP" : "PUSH UP = NOSE UP";
+  hudFont(10 * u); ctx.fillStyle = "rgba(170,200,224,.55)"; ctx.textAlign = "center";
+  ctx.fillText(lbl, sx, sy + r + 14 * u);
+}
+function drawPanel(P, u) {
+  const T = TOUCH;
   // throttle
   const t = T.thr;
   padBox(t.x, t.y, t.w, t.h, 10 * u, false, null);
-  const fh = (t.h - 6 * u) * P.thr;
-  ctx.fillStyle = "rgba(120,220,255,.42)";
+  const inner = t.h - 6 * u, fh = inner * P.thr;
+  const abY = t.y + 3 * u + inner * (1 - AB_GATE);
+  ctx.fillStyle = "rgba(120,220,255,.40)";
   ctx.fillRect(t.x + 3 * u, t.y + t.h - 3 * u - fh, t.w - 6 * u, fh);
-  ctx.fillStyle = "rgba(226,244,255,.92)"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  if (P.thr > AB_GATE) {   // the afterburner band burns orange
+    const abH = inner * (P.thr - AB_GATE);
+    const g2 = ctx.createLinearGradient(0, abY, 0, abY - abH);
+    g2.addColorStop(0, "rgba(255,150,40,.75)"); g2.addColorStop(1, "rgba(255,226,120,.95)");
+    ctx.fillStyle = g2;
+    ctx.fillRect(t.x + 3 * u, abY - abH, t.w - 6 * u, abH);
+  }
+  ctx.strokeStyle = "rgba(255,170,70,.75)"; ctx.lineWidth = 1.4 * u;
+  ctx.beginPath(); ctx.moveTo(t.x + 1 * u, abY); ctx.lineTo(t.x + t.w - 1 * u, abY); ctx.stroke();
+  hudFont(9 * u, 600); ctx.fillStyle = "rgba(255,190,110,.9)"; ctx.textAlign = "right";
+  ctx.textBaseline = "middle"; ctx.fillText("A/B", t.x - 4 * u, abY);
+  ctx.fillStyle = "rgba(226,244,255,.95)"; ctx.textAlign = "center";
   hudFont(13 * u, 700);
   ctx.fillText(Math.round(P.thr * 100) + "", t.x + t.w / 2, t.y + t.h - 3 * u - fh - 12 * u);
   hudFont(10 * u); ctx.fillStyle = "rgba(190,214,232,.7)";
-  ctx.fillText("THR", t.x + t.w / 2, t.y - 10 * u);
+  ctx.fillText("THR", t.x + t.w / 2, t.y - 11 * u);
   // switches
   for (const b of T.btns) {
     let on = false, label = "", sub = "";
-    if (b.k === "gear") { on = P.gearCmd > .5; label = "GEAR"; sub = P.gear > .98 ? "DOWN" : P.gear < .02 ? "UP" : "…"; }
-    else if (b.k === "flap") { on = P.flapCmd > .02; label = "FLAP"; sub = Math.round(P.flapCmd * 100) + "%"; }
-    else if (b.k === "brake") { on = P.brake > .4; label = "BRAKE"; }
-    else if (b.k === "cam") { label = "VIEW"; sub = CAMNAMES[camMode]; }
+    if (b.k === "gear") { on = P.gearCmd > .5; label = "GEAR"; sub = (P.gear > .98 ? "DOWN" : P.gear < .02 ? "UP" : "…") + "  G"; }
+    else if (b.k === "flap") { on = P.flapCmd > .02; label = "FLAP \u2193"; sub = Math.round(P.flapCmd * 100) + "%  F"; }
+    else if (b.k === "brake") { on = P.brake > .4; label = "BRAKE"; sub = "SPACE"; }
+    else if (b.k === "cam") { label = "VIEW"; sub = CAMNAMES[camMode] + "  C"; }
+    else if (b.k === "ap") { on = AP.on; label = "A/P"; sub = (AP.on ? "ON" : "OFF") + "  Z"; }
+    else if (b.k === "keys") { on = SHOWKEYS; label = "KEYS"; sub = "L"; }
+    else if (b.k === "chute") { on = P.chuteCmd > .5; label = "CHUTE"; sub = "X"; }
+    else if (b.k === "flapup") { label = "FLAP \u2191"; sub = "V"; }
     padBox(b.x, b.y, b.w, b.h, 9 * u, on || T.flash[b.k] > 0, label, sub);
   }
-  if (MODE === "complex")
-    for (const b of T.rud.boxes)
-      padBox(b.x, b.y, b.w, b.h, 9 * u, T.rud.v === (b.k === "rudR" ? 1 : -1), b.k === "rudR" ? "RUD ▶" : "◀ RUD");
+  if (TOUCH.on) for (const b of T.rud.boxes)
+    padBox(b.x, b.y, b.w, b.h, 9 * u, T.rud.v === (b.k === "rudR" ? 1 : -1), b.k === "rudR" ? "RUD ▶" : "◀ RUD");
   // pause
   padBox(T.pause.x, T.pause.y, T.pause.w, T.pause.h, 8 * u, false, "II");
   ctx.restore();
@@ -2206,9 +2467,19 @@ function drawHUDFull() {
     hudFont(10 * U); ctx.fillStyle = GD; ctx.textAlign = "center";
     ctx.fillText(unit, x + tw / 2, cy + tapeH / 2 + 12 * U);
   };
-  const ias = P.ias * KT, alt = (P.pos.y - 0) * FT;
-  drawTape(96 * U, CY, ias, 20, "KIAS", 0, false);
-  drawTape(W - 96 * U - tw, CY, alt, 200, "FT MSL", 0, true);
+  const ias = P.ias * KT, alt = P.pos.y * FT;
+  drawTape(96 * U, CY, ias, ias > 400 ? 50 : 20, "KIAS", 0, false);
+  drawTape(W - 96 * U - tw, CY, alt, alt > 20000 ? 2000 : 500, "FT MSL", 0, true);
+  // Mach and afterburner, right under the speed tape
+  const mx = 96 * U - 24 * U, my = CY + tapeH / 2 + 92 * U;
+  box(mx, my, 132 * U, 52 * U, 4 * U, PANEL, GD);
+  hudFont(10 * U); ctx.fillStyle = GD; ctx.textAlign = "left";
+  ctx.fillText("MACH", mx + 8 * U, my + 11 * U);
+  hudFont(20 * U, 700); ctx.fillStyle = P.mach > 3.2 ? "rgba(255,150,90,.95)" : G;
+  ctx.fillText(P.mach.toFixed(2), mx + 8 * U, my + 27 * U);
+  hudFont(11 * U, 700); ctx.textAlign = "left";
+  ctx.fillStyle = P.ab > .01 ? "rgba(255,176,80,.95)" : "rgba(120,140,155,.55)";
+  ctx.fillText(P.ab > .01 ? "A/B  " + Math.round(P.ab * 100) + "%" : "A/B  \u2014", mx + 8 * U, my + 43 * U);
 
   /* ---- heading tape ---- */
   const hw2 = Math.min(W * .34, 420 * U), hx = CX - hw2 / 2, hy = 26 * U;
@@ -2346,21 +2617,24 @@ function drawHUDFull() {
   const cfg = [];
   cfg.push(["GEAR", P.gear > .98 ? "DN" : P.gear < .02 ? "UP" : "↑↓", P.gear > .98 ? "#7ce89a" : P.gear < .02 ? "#9fb0c4" : "#ffc451"]);
   cfg.push(["FLAP", Math.round(P.flap * 100) + "%", P.flap > .05 ? "#7ce89a" : "#9fb0c4"]);
-  if (MODE === "complex") cfg.push(["TRIM", (P.trim >= 0 ? "+" : "") + P.trim.toFixed(2), "#9fb0c4"]);
+  cfg.push(["TRIM", (P.trim >= 0 ? "+" : "") + P.trim.toFixed(2), "#9fb0c4"]);
   cfg.push(["BRK", P.brake > .5 ? "ON" : "off", P.brake > .5 ? "#ffc451" : "#69788c"]);
-  if (MODE === "complex") cfg.push(["AoA", (P.alpha * RAD).toFixed(1) + "°", P.alpha > 13 * DEG ? "#ff8b6a" : "#9fb0c4"]);
-  if (MODE === "complex") cfg.push(["SLIP", (P.beta * RAD).toFixed(1) + "°", Math.abs(P.beta) > .08 ? "#ffc451" : "#9fb0c4"]);
-  let cy2 = H - 44 * U;
+  cfg.push(["CHUTE", P.chuteCmd ? "OUT" : "stowed", P.chuteCmd ? "#ffc451" : "#69788c"]);
+  cfg.push(["A/P", AP.on ? "ON" : "off", AP.on ? "#7ce89a" : "#69788c"]);
+  cfg.push(["AoA", (P.alpha * RAD).toFixed(1) + "°", P.alpha > 22 * DEG ? "#ff8b6a" : "#9fb0c4"]);
+  cfg.push(["SLIP", (P.beta * RAD).toFixed(1) + "°", Math.abs(P.beta) > .08 ? "#ffc451" : "#9fb0c4"]);
+  const perRow = 4, colW = 108 * U;
   hudFont(12 * U);
   for (let i = 0; i < cfg.length; i++) {
-    const x = 26 * U + i * 108 * U;
+    const row = Math.floor(i / perRow), col = i % perRow;
+    const x = 26 * U + col * colW, cy2 = H - 46 * U + row * 19 * U;
     ctx.fillStyle = "rgba(159,176,196,.75)"; ctx.textAlign = "left";
     ctx.fillText(cfg[i][0], x, cy2);
-    ctx.fillStyle = cfg[i][2]; hudFont(14 * U, 600);
-    ctx.fillText(cfg[i][1], x + 46 * U, cy2); hudFont(12 * U);
+    ctx.fillStyle = cfg[i][2]; hudFont(13.5 * U, 600);
+    ctx.fillText(cfg[i][1], x + 50 * U, cy2); hudFont(12 * U);
   }
   // slip/skid ball for complex mode
-  if (MODE === "complex") {
+  {
     const bx = CX, by = H - 22 * U, bw2 = 110 * U;
     ctx.strokeStyle = GD; ctx.lineWidth = 1.2 * U;
     ctx.beginPath(); ctx.moveTo(bx - bw2 / 2, by); ctx.lineTo(bx + bw2 / 2, by); ctx.stroke();
@@ -2373,11 +2647,13 @@ function drawHUDFull() {
   /* ---- warnings ---- */
   const warn = [];
   if (P.stall > .2 && !P.onGround) warn.push(["STALL", "#ff6a56"]);
-  else if (MODE === "complex" && P.alpha > 12.8 * DEG && !P.onGround) warn.push(["APPROACHING STALL", "#ffb03a"]);
+  else if (P.alpha > 24 * DEG && !P.onGround) warn.push(["APPROACHING STALL", "#ffb03a"]);
   if (P.aoaCap) warn.push(["AoA LIMIT", "#ffb03a"]);
   if (P.gear < .98 && P.pos.y - groundH(P.pos.x, P.pos.z) < 220 && P.ias * KT < 130 && !P.crashed) warn.push(["GEAR", "#ff6a56"]);
-  if (P.gload > 6.2) warn.push(["OVER G", "#ff6a56"]);
-  if (P.ias * KT > 300) warn.push(["OVERSPEED", "#ffb03a"]);
+  if (P.gload > 4.2) warn.push(["OVER G", "#ff6a56"]);
+  if (P.unstart > 0) warn.push(["INLET UNSTART", "#ff6a56"]);
+  if (P.qbar > 95000) warn.push(["Q LIMIT", "#ffb03a"]);
+  if (P.mach > 3.3) warn.push(["OVER MACH", "#ffb03a"]);
   hudFont(20 * U, 700); ctx.textAlign = "center";
   const blink = (GAME.t * 4 | 0) % 2 === 0;
   for (let i = 0; i < warn.length; i++) {
@@ -2389,9 +2665,9 @@ function drawHUDFull() {
   /* ---- objective line + guidance arrow ---- */
   const obj = objectiveLine();
   hudFont(12.5 * U); ctx.textAlign = "center"; ctx.fillStyle = "rgba(200,224,244,.8)";
-  ctx.fillText(obj, CX, H - 62 * U);
+  ctx.fillText(obj, CX, H - 74 * U);
   hudFont(11 * U); ctx.fillStyle = "rgba(140,158,178,.75)";
-  ctx.fillText(CAMNAMES[camMode] + "  ·  " + MODE.toUpperCase() + " CONTROLS  ·  C camera  H help", CX, hy + 74 * U);
+  ctx.fillText(CAMNAMES[camMode] + "  ·  " + (AP.on ? "AUTOPILOT ON" : "MANUAL") + "  ·  L controls  ·  H help", CX, hy + 74 * U);
 
   // direction cue to the next objective
   const tgt = SCEN === "rings" ? (GAME.rings[GAME.ringIdx] && GAME.rings[GAME.ringIdx].p) : v3(0, E, 950);
@@ -2435,6 +2711,20 @@ function drawHUDCompact() {
   hudFont(10 * u); ctx.textAlign = "right"; ctx.fillStyle = GD;
   ctx.fillText("AGL " + Math.round((P.pos.y - groundH(P.pos.x, P.pos.z)) * FT) + "   G " + P.gload.toFixed(1),
     W - sr - 12 * u, py + ph + 11 * u);
+  // Mach and A/P badge under the speed panel
+  box(sl + 12 * u, py + ph + 6 * u, pw, 34 * u, 5 * u, PANEL, GD);
+  hudFont(10 * u); ctx.fillStyle = GD; ctx.textAlign = "left";
+  ctx.fillText("MACH", sl + 20 * u, py + ph + 16 * u);
+  hudFont(17 * u, 700); ctx.fillStyle = P.mach > 3.2 ? "rgba(255,150,90,.95)" : G;
+  ctx.fillText(P.mach.toFixed(2), sl + 60 * u, py + ph + 23 * u);
+  if (P.ab > .01) {
+    hudFont(11 * u, 700); ctx.fillStyle = "rgba(255,176,80,.95)";
+    ctx.fillText("A/B", sl + 20 * u, py + ph + 30 * u);
+  }
+  if (AP.on) {
+    hudFont(11 * u, 700); ctx.fillStyle = "rgba(124,232,154,.95)"; ctx.textAlign = "right";
+    ctx.fillText("A/P", sl + 12 * u + pw - 8 * u, py + ph + 30 * u);
+  }
 
   // heading strip
   const hw2 = Math.min(W * .34, 300 * u), hx = CX - hw2 / 2, hy = py;
@@ -2513,9 +2803,10 @@ function drawHUDCompact() {
   // warnings + objective
   const warn = [];
   if (P.stall > .2 && !P.onGround) warn.push(["STALL", "#ff6a56"]);
-  else if (MODE === "complex" && P.alpha > 12.8 * DEG && !P.onGround) warn.push(["APPROACHING STALL", "#ffb03a"]);
+  else if (P.alpha > 24 * DEG && !P.onGround) warn.push(["APPROACHING STALL", "#ffb03a"]);
   if (P.gear < .98 && P.pos.y - groundH(P.pos.x, P.pos.z) < 220 && P.ias * KT < 130 && !P.crashed) warn.push(["GEAR", "#ff6a56"]);
-  if (P.gload > 6.2) warn.push(["OVER G", "#ff6a56"]);
+  if (P.gload > 4.2) warn.push(["OVER G", "#ff6a56"]);
+  if (P.unstart > 0) warn.push(["INLET UNSTART", "#ff6a56"]);
   hudFont(19 * u, 700); ctx.textAlign = "center";
   const blink = (GAME.t * 4 | 0) % 2 === 0;
   for (let i = 0; i < warn.length; i++) {
@@ -2541,6 +2832,60 @@ function objectiveLine() {
   return "FREE FLIGHT   " + (Math.hypot(P.pos.x, P.pos.z) / 1000).toFixed(1) + " km from field   " + (P.dist / 1000).toFixed(1) + " km flown";
 }
 
+/* Every control, named, for both a keyboard and a thumb. Toggled with L or
+   the KEYS button; tap or click anywhere to dismiss. */
+const KEYCARD = [
+  ["Pitch", "\u2193 pull back / \u2191 push fwd", "thumb back / forward"],
+  ["Roll", "\u2190  \u2192", "thumb left / right"],
+  ["Rudder", "A  D", "RUD pads"],
+  ["Throttle", "W  S   (Shift / Ctrl)", "drag the slider"],
+  ["Afterburner", "throttle past 80%", "slider past the A/B line"],
+  ["Autopilot", "Z", "A/P button"],
+  ["Wheel brakes", "Space (hold)", "BRAKE (hold)"],
+  ["Parking brake", "B", "\u2014"],
+  ["Drag chute", "X", "CHUTE button"],
+  ["Landing gear", "G", "GEAR button"],
+  ["Flaps", "F down / V up", "FLAP \u2193 / FLAP \u2191"],
+  ["Elevator trim", ",  .", "\u2014"],
+  ["Camera", "C", "VIEW button"],
+  ["Reset aircraft", "R", "\u2014"],
+  ["Pitch sense", "T", "\u2014"],
+  ["Pause", "Esc  or  P", "II button"],
+  ["This card", "L", "KEYS button"]
+];
+function drawKeyCard() {
+  const u = UI;
+  const rows = KEYCARD.length;
+  const rowH = 22 * u, padX = 22 * u, padY = 20 * u;
+  const cw = [128 * u, 196 * u, 168 * u];
+  const bw2 = padX * 2 + cw[0] + cw[1] + cw[2];
+  const bh2 = padY * 2 + 30 * u + rows * rowH;
+  const scale = Math.min(1, (W - 24 * u) / bw2, (H - 24 * u) / bh2);
+  ctx.save();
+  ctx.fillStyle = "rgba(4,8,13,.80)"; ctx.fillRect(0, 0, W, H);
+  ctx.translate(CX, CY); ctx.scale(scale, scale); ctx.translate(-bw2 / 2, -bh2 / 2);
+  box(0, 0, bw2, bh2, 10 * u, "rgba(9,16,24,.96)", "rgba(120,180,220,.42)");
+  ctx.textBaseline = "middle";
+  hudFont(15 * u, 700); ctx.fillStyle = "rgba(190,232,255,.95)"; ctx.textAlign = "left";
+  ctx.fillText("CONTROLS", padX, padY + 4 * u);
+  hudFont(10.5 * u, 600); ctx.fillStyle = "rgba(150,180,206,.8)";
+  ctx.fillText("KEYBOARD", padX + cw[0], padY + 22 * u);
+  ctx.fillText("TOUCH", padX + cw[0] + cw[1], padY + 22 * u);
+  let y = padY + 30 * u + rowH * .5;
+  for (const [what, pc, touch] of KEYCARD) {
+    hudFont(12 * u, 600); ctx.fillStyle = "rgba(214,232,246,.95)";
+    ctx.fillText(what, padX, y);
+    hudFont(12 * u); ctx.fillStyle = "rgba(150,255,190,.92)";
+    ctx.fillText(pc, padX + cw[0], y);
+    ctx.fillStyle = "rgba(160,206,236,.85)";
+    ctx.fillText(touch, padX + cw[0] + cw[1], y);
+    y += rowH;
+  }
+  hudFont(10.5 * u); ctx.fillStyle = "rgba(140,164,186,.8)";
+  ctx.fillText("tap or press L to close", padX, bh2 - padY * .5);
+  ctx.restore();
+}
+
 function drawHUD(dt) {
   if (TOUCH.on || W < 900 || H < 620) drawHUDCompact(); else drawHUDFull();
   drawTouch(dt);
@@ -2551,22 +2896,26 @@ const K = Object.create(null);
 let mouseStick = false, mdx = 0, mdy = 0;
 const KEYMAP = {
   common: [
-    ["&larr; &rarr;", "roll / turn"],
-    ["&uarr; &darr;", "pitch up / down"],
+    ["&larr; &rarr;", "roll left / right (ailerons)"],
+    ["&darr;", "pull back &mdash; nose up"],
+    ["&uarr;", "push forward &mdash; nose down"],
+    ["A D", "rudder left / right"],
     ["W S", "throttle up / down (also Shift / Ctrl)"],
+    ["Drag slider", "throttle, past 80% lights the afterburners"],
+    ["Z", "autopilot on / off"],
     ["Space", "wheel brakes"],
+    ["B", "parking brake"],
     ["G", "landing gear"],
     ["F V", "flaps extend / retract"],
+    [", .", "elevator trim"],
     ["C", "cycle camera"],
+    ["L", "control reference"],
     ["R", "reset aircraft"],
-    ["Esc P", "pause"], ["H", "help"], ["M", "mute"], ["T", "swap simple / complex"],
+    ["T", "swap pitch sense"],
+    ["Esc P", "pause"], ["H", "help"], ["M", "mute"],
     ["Y", "mouse as stick"]
   ],
-  complex: [
-    ["A D", "rudder left / right &mdash; complex only"],
-    [", .", "elevator trim &mdash; complex only"],
-    ["B", "parking brake &mdash; complex only"]
-  ]
+  complex: []
 };
 (function fillKeys() {
   const el = document.getElementById("keyList");
@@ -2580,11 +2929,11 @@ function showTouchHelp() {
   list.classList.add("hide"); note.classList.remove("hide");
   note.innerHTML =
     "<b>Left thumb</b> &mdash; put it anywhere on the left of the screen and the stick appears there. " +
-    "Left / right rolls, up / down pitches.<br>" +
-    "<b>Right slider</b> &mdash; throttle. <b>GEAR / FLAP / BRAKE / VIEW</b> &mdash; tap to work the switches. " +
-    "<b>II</b> top right pauses.<br>" +
-    "In <b>COMPLEX</b> two extra rudder pads appear along the bottom.<br>" +
-    "Turn the phone <b>landscape</b> for the widest view. Graphics detail tunes itself to keep the frame rate up.";
+    "Left / right rolls; pull the thumb <b>back</b> to raise the nose.<br>" +
+    "<b>Right slider</b> &mdash; throttle. Past the orange <b>A/B</b> line the afterburners light.<br>" +
+    "<b>A/P</b> flies it for you &middot; <b>CHUTE</b> stops it on the runway &middot; " +
+    "<b>KEYS</b> lists every control &middot; <b>II</b> pauses.<br>" +
+    "Rudder pads sit along the bottom. Turn the phone <b>landscape</b> for the widest view.";
 }
 
 window.addEventListener("keydown", ev => {
@@ -2617,12 +2966,18 @@ function onKeyPress(k) {
   }
   if (lk === "f") { P.flapCmd = clamp(P.flapCmd + .25, 0, 1); toast("FLAPS " + Math.round(P.flapCmd * 100) + "%", 1); }
   if (lk === "v") { P.flapCmd = clamp(P.flapCmd - .25, 0, 1); toast("FLAPS " + Math.round(P.flapCmd * 100) + "%", 1); }
-  if (lk === "b" && MODE === "complex") { P.park = !P.park; toast(P.park ? "PARKING BRAKE SET" : "BRAKES RELEASED", 1.4); }
+  if (lk === "b") { P.park = !P.park; toast(P.park ? "PARKING BRAKE SET" : "BRAKES RELEASED", 1.4); }
   if (lk === "m") { if (audio.ok) { audio.master.gain.value = audio.master.gain.value > .01 ? 0 : .55; toast(audio.master.gain.value > .01 ? "SOUND ON" : "MUTED", 1.2); } }
+  if (lk === "z") { toggleAP(); }
+  if (lk === "x") {
+    if (P.chuteCmd) { P.chuteCmd = 0; toast("CHUTE JETTISONED", 1.4); }
+    else if (P.ias * 1.94384 > CHUTE_LIMIT) toast("TOO FAST FOR THE CHUTE", 1.6);
+    else { P.chuteCmd = 1; toast("DRAG CHUTE STREAMED", 1.6); audio.beep(240, .3, .16); }
+  }
+  if (lk === "l") { SHOWKEYS = !SHOWKEYS; }
   if (lk === "t") {
-    MODE = MODE === "simple" ? "complex" : "simple";
-    document.querySelectorAll("#modeRow .opt").forEach(b => b.classList.toggle("on", b.dataset.mode === MODE));
-    toast(MODE.toUpperCase() + " CONTROLS", 1.8);
+    PITCH_REAL = !PITCH_REAL;
+    toast(PITCH_REAL ? "PITCH: PULL BACK TO CLIMB" : "PITCH: PUSH UP TO CLIMB", 2.2);
   }
   if (lk === "y") {
     mouseStick = !mouseStick;
@@ -2643,23 +2998,27 @@ window.addEventListener("mousemove", ev => {
 const touchHeld = k => TOUCH.flash[k] === 1;
 function applyInput(dt) {
   const P = PLANE;
-  const simple = MODE === "simple";
+
   let a = 0, e2 = 0, r = 0;
   const stick = TOUCH.on && TOUCH.stick.id !== null;
   if (K.arrowleft) a -= 1;
   if (K.arrowright) a += 1;
-  if (K.arrowup) e2 += 1;
-  if (K.arrowdown) e2 -= 1;
-  if (simple) { if (K.a) a -= 1; if (K.d) a += 1; }
-  else { if (K.a) r -= 1; if (K.d) r += 1; }
+  // A real stick is pulled back to raise the nose, so Down is nose-up by
+  // default. PITCH_REAL flips it for anyone who wants the arcade sense.
+  const ps = PITCH_REAL ? -1 : 1;
+  if (K.arrowup) e2 += ps;
+  if (K.arrowdown) e2 -= ps;
+  if (K.k) e2 -= ps; if (K.i) e2 += ps;
+  if (K.a) r -= 1; if (K.d) r += 1;
   if (K.q) r -= 1; if (K.e) r += 1;
-  if (mouseStick) { a = clamp(a + mdx, -1, 1); e2 = clamp(e2 - mdy, -1, 1); mdx *= Math.exp(-.8 * dt); mdy *= Math.exp(-.8 * dt); }
+  if (mouseStick) { a = clamp(a + mdx, -1, 1); e2 = clamp(e2 + mdy * ps, -1, 1); mdx *= Math.exp(-.8 * dt); mdy *= Math.exp(-.8 * dt); }
   if (TOUCH.on && TOUCH.rud.v) r = TOUCH.rud.v;
-  const rate = simple ? 3.0 : 4.2, ret = simple ? 3.6 : 5.0;
+  const rate = 4.0, ret = 4.8;
   if (stick) {
     // the thumb stick is an absolute position, not a rate
     P.inA = approach(P.inA, TOUCH.stick.dx, 15, dt);
-    P.inE = approach(P.inE, -TOUCH.stick.dy, 15, dt);
+    // pushing the thumb forward (up the screen) is pushing the stick forward
+    P.inE = approach(P.inE, TOUCH.stick.dy * ps, 15, dt);
   } else {
     P.inA = a ? clamp(P.inA + a * rate * dt, -1, 1) : approach(P.inA, 0, ret, dt);
     P.inE = e2 ? clamp(P.inE + e2 * rate * dt, -1, 1) : approach(P.inE, 0, ret, dt);
@@ -2670,17 +3029,27 @@ function applyInput(dt) {
   if (K.w || K.shift) tdir += 1;
   if (K.s || K.ctrl) tdir -= 1;
   if (tdir) { P.thr = clamp(P.thr + tdir * .5 * dt, 0, 1); if (P.thr > .02) P.park = false; }
-  // trim
-  if (MODE === "complex") {
+  // trim (the autopilot owns trim while it is engaged)
+  if (!AP.on) {
     if (K[","] || K.home) P.trim = clamp(P.trim + .30 * dt, -.8, .8);
     if (K["."] || K.end) P.trim = clamp(P.trim - .30 * dt, -.8, .8);
-  } else P.trim = 0;
+  }
   // brakes
   const held = (K[" "] || touchHeld("brake")) ? 1 : 0;
   P.brake = clamp(approach(P.brake, Math.max(held, P.park && P.onGround ? 1 : 0), 12, dt), 0, 1);
 }
 
 /* ============================================================== flow ==== */
+function toggleAP() {
+  AP.on = !AP.on;
+  const P = PLANE;
+  P.pitchI = 0; P.apAlt = undefined; P.apHdg = undefined; P.holdHdg = undefined;
+  if (!AP.on) { P.dE = P.dA = P.dR = 0; }
+  toast(AP.on ? "AUTOPILOT ENGAGED" : "AUTOPILOT OFF \u00b7 MANUAL", 1.8);
+  audio.beep(AP.on ? 760 : 420, .16, .14);
+}
+let SHOWKEYS = false;
+
 function togglePause() {
   if (!GAME.started) return;
   GAME.paused = !GAME.paused;
@@ -2693,20 +3062,19 @@ let dirty = false;
 function startFlight(keepMode) {
   GAME.t = 0; GAME.over = false; GAME.result = ""; GAME.landScore = null;
   GAME.paused = false; GAME.started = true; dirty = false;
-  PARTS.length = 0; cam.shake = 0; cam.init = 0;
+  PARTS.length = 0; cam.shake = 0; cam.init = 0; cam.off = v3();
   hideBanner();
   resetPlane(SCEN);
   if (SCEN === "rings") buildRingCourse(); else GAME.rings = [];
   document.getElementById("menu").classList.add("hide");
   audio.init();
-  toast(SCEN === "free" ? "BRAKES SET · THROTTLE UP WITH W" :
-    SCEN === "land" ? "RUNWAY 18 AHEAD · AIM FOR THE WHITE BARS" :
-      SCEN === "rings" ? "FLY THROUGH THE GREEN GATE" : "AIRBORNE", 3.2);
+  toast(SCEN === "free" ? "BRAKES SET · THROTTLE UP WITH W · PRESS L FOR CONTROLS" :
+    SCEN === "land" ? "RUNWAY 18 AHEAD · CHUTE ON TOUCHDOWN WITH X" :
+      SCEN === "rings" ? "FLY THROUGH THE GREEN GATE" : "AIRBORNE · PRESS L FOR CONTROLS", 3.6);
 }
-document.querySelectorAll("#modeRow .opt").forEach(b => b.addEventListener("click", () => {
-  MODE = b.dataset.mode; dirty = true;
-  document.querySelectorAll("#modeRow .opt").forEach(o => o.classList.toggle("on", o === b));
-  document.getElementById("startBtn").textContent = GAME.started ? "RESTART FLIGHT" : "BEGIN FLIGHT";
+document.querySelectorAll("#pitchRow .opt").forEach(b => b.addEventListener("click", () => {
+  PITCH_REAL = b.dataset.pitch === "real";
+  document.querySelectorAll("#pitchRow .opt").forEach(o => o.classList.toggle("on", o === b));
 }));
 document.querySelectorAll("#scenRow .opt").forEach(b => b.addEventListener("click", () => {
   SCEN = b.dataset.scen; dirty = true;
@@ -2763,12 +3131,13 @@ function frame(now) {
   }
 
   // ---- render ----
+  updateAtmosphere(cam.pos.y);
   fogCol = LIGHT.hazeNear;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   drawSky();
   DL.reset();
   drawTerrain();
-  if (Math.hypot(cam.pos.x, cam.pos.z) < 14000) drawMesh(AIRPORT, v3(0, 0, 0), mIdent(), null);
+  if (Math.hypot(cam.pos.x, cam.pos.z) < 40000) drawMesh(AIRPORT, v3(0, 0, 0), mIdent(), null);
   drawTrees();
   if (GAME.rings.length) drawRings();
   if (GAME.started) { drawShadow(); drawAircraft(); }
