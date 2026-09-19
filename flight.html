@@ -2599,10 +2599,17 @@ function flightControl(P, dt, e, cE, cA, cR) {
   // yaw acceleration per unit of rudder, rad/s^2
   const rPer = Math.max(qS * SPECS.b * SPECS.Cndr * ctlM / SPECS.Iyaw, .01);
 
-  // how much of the low-speed (rate) pitch law to use: all of it on the
-  // ground and at a crawl, none of it once the wing is properly flying
+  /* How much of the low-speed (rate) pitch law to use. The rate law is for
+     the runway — it is what makes rotation the same controllable thing at any
+     ground speed — and it has no integral path, so it holds an ATTITUDE, not
+     a flight path. Blending it up to 262 kt therefore left the pitch loop
+     with no way to close a steady error exactly where it most needed one:
+     hands off at 190 kt the aeroplane sank at 6,000 fpm with the integrator
+     pinned against its stop. It now hands over by 140 kt, just above the
+     stall, and the g law owns the aeroplane everywhere above that.
+     (P.ias is metres per second: 50 to 72 is 97 to 140 knots.) */
   P.fbwG = approach(P.fbwG === undefined ? 1 : P.fbwG,
-    (P.onGround ? 1 : 0) + (1 - (P.onGround ? 1 : 0)) * (1 - sstep(70, 135, P.ias || 0)), 3.0, dt);
+    P.onGround ? 1 : (1 - sstep(50, 72, P.ias || 0)), 3.0, dt);
   const gnd = clamp(P.fbwG, 0, 1);
 
   /* ---------------- pitch ------------------------------------------------ */
@@ -2790,16 +2797,21 @@ function physics(P, dt) {
     // A slender delta does not stall the way a straight wing does: the leading
     // edge sheds a vortex that keeps adding lift far past where a wing would
     // let go, so the break is late and soft.
-    const aStall = (27 + P.flap * 2) * DEG;
+    // Drooping a trailing edge buys lift at every angle and gives the stall
+    // angle back: the wing lets go a couple of degrees EARLIER with flap out.
+    // The stall SPEED still falls, because the lift increment more than pays
+    // for the lost angle.
+    const aStall = (27 - P.flap * 2) * DEG;
     let st = 1 - sstep(aStall, aStall + 12 * DEG, Math.abs(P.alpha));
     if (AP.on) st = Math.max(st, .55);
     const sa = Math.sin(P.alpha);
     const vortex = 1.55 * sa * sa * Math.cos(P.alpha) * Math.sign(P.alpha);
     const CLlin = SPECS.CL0 + claOfMach(M8) * P.alpha + vortex + .35 * P.flap;
-    const CLstall = 1.15 * Math.sin(2 * P.alpha);
+    const CLstall = 1.15 * Math.sin(2 * P.alpha) + .12 * P.flap;
     const CL = lerp(CLstall, CLlin, st);
     P.stall = approach(P.stall, 1 - st, 6, dt);
-    // Flaps are mostly drag: full flap roughly triples the zero-lift drag,
+    // Flaps are mostly drag: full flap adds .160 to the zero-lift drag, which
+    // on an airframe this clean is very nearly ten times it —
     // which is what makes them work as a speed brake on approach. The chute
     // adds an area of its own once it is out.
     const CD = cd0OfMach(M8) + SPECS.k * CL * CL + .030 * P.gear
@@ -3173,10 +3185,13 @@ function drawAircraft() {
     }
     // Elevons do both jobs: they move together for pitch and differentially
     // for roll, exactly as they do on a tailless delta.
-    hinge(AC.elevOutR, mAxis(1, 0, 0, -ele - ail - fl * .35));
-    hinge(AC.elevOutL, mAxis(1, 0, 0, -ele + ail - fl * .35));
-    hinge(AC.elevInR, mAxis(1, 0, 0, -ele - ail * .4 - fl));
-    hinge(AC.elevInL, mAxis(1, 0, 0, -ele + ail * .4 - fl));
+    // A positive rotation about the wing axis puts a trailing edge DOWN, so
+    // nose-up elevator is -ele and drooped flap is +fl. The flap term used to
+    // carry the elevator's sign, which drew the flaps deflecting upward.
+    hinge(AC.elevOutR, mAxis(1, 0, 0, -ele - ail + fl * .35));
+    hinge(AC.elevOutL, mAxis(1, 0, 0, -ele + ail + fl * .35));
+    hinge(AC.elevInR, mAxis(1, 0, 0, -ele - ail * .4 + fl));
+    hinge(AC.elevInL, mAxis(1, 0, 0, -ele + ail * .4 + fl));
     hinge(AC.finL, mAxis(0, 1, 0, rud));
     hinge(AC.finR, mAxis(0, 1, 0, rud));
     if (P.gear > .01) {
@@ -3483,7 +3498,9 @@ function touchAct(k) {
   const P = PLANE;
   TOUCH.flash[k] = .18;
   if (k === "gear") { P.gearCmd = P.gearCmd > .5 ? 0 : 1; toast(P.gearCmd ? "GEAR DOWN" : "GEAR UP", 1.2); audio.beep(P.gearCmd ? 520 : 400, .18, .12); }
-  else if (k === "flap") { P.flapCmd = P.flapCmd >= .99 ? 0 : clamp(P.flapCmd + .25, 0, 1); toast("FLAPS " + Math.round(P.flapCmd * 100) + "%", 1); }
+  // clamps at full, like the F key. It used to wrap back to 0%, so one extra
+  // tap on a control marked FLAP-DOWN dumped the whole configuration on short final.
+  else if (k === "flap") { P.flapCmd = clamp(P.flapCmd + .25, 0, 1); toast("FLAPS " + Math.round(P.flapCmd * 100) + "%", 1); }
   else if (k === "cam") { camMode = (camMode + 1) % CAMNAMES.length; toast("CAMERA: " + CAMNAMES[camMode], 1.2); }
   else if (k === "ap") toggleAP();
   else if (k === "keys") SHOWKEYS = !SHOWKEYS;
