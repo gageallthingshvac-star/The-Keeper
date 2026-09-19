@@ -94,6 +94,7 @@
         <button class="opt on" data-scen="free"><b>FREE FLIGHT</b><i>Cold on runway 18 at Keeper Field. Brakes set, engines at idle. Go anywhere &mdash; the envelope reaches Mach 3.2 above 80,000 ft.</i></button>
         <button class="opt" data-scen="air"><b>AIRBORNE START</b><i>Airborne at 23,000 ft and already supersonic. Climb and accelerate.</i></button>
         <button class="opt" data-scen="rings"><b>RING RACE</b><i>12 gates strung across 120 km of sky, against the clock.</i></button>
+        <button class="opt" data-scen="hohenwald"><b>HOHENWALD, TN</b><i>Start low and slow over Lewis County, Tennessee. The Buffalo River, the Natchez Trace and the towns around it are all where they really are.</i></button>
         <button class="opt" data-scen="land"><b>LANDING CHALLENGE</b><i>9 km final, gear and flaps set. Stream the chute with <kbd>X</kbd> after touchdown. Scored on centreline, sink rate and touchdown point.</i></button>
       </div>
 
@@ -245,6 +246,20 @@ const GEO = {
     // Antarctica
     [-180,-70,-150,-75,-120,-74,-90,-72,-60,-64,-30,-70,0,-70,30,-68,60,-67,90,-66,120,-66,150,-72,180,-70,180,-90,-180,-90,-180,-70]
   ],
+  /* The dry places, as polygons. Aridity is not a latitude band: Tennessee and
+     the Mojave sit at the same one. */
+  deserts: [
+    [-17,20,-6,28,10,31,25,30,33,24,36,17,25,13,8,14,-6,15,-16,17],            // Sahara
+    [34,30,42,32,52,26,57,19,45,13,37,17],                                      // Arabian
+    [-122,41,-115,44,-109,40,-106,32,-113,27,-118,31,-122,36],                  // Great Basin / Mojave / Sonoran
+    [-76,-14,-70,-20,-68,-28,-71,-33,-75,-20],                                  // Atacama
+    [-72,-40,-64,-42,-63,-50,-70,-53,-73,-46],                                  // Patagonia
+    [12,-18,20,-20,25,-26,20,-31,13,-29,11,-23],                                // Kalahari / Namib
+    [115,-22,126,-19,140,-21,142,-29,134,-33,120,-33,114,-27],                  // Australian interior
+    [75,38,90,43,105,45,113,40,100,35,84,34],                                   // Taklamakan / Gobi
+    [59,31,70,28,75,25,70,22,61,26],                                            // Thar / Iranian
+    [-106,48,-98,46,-99,33,-105,31,-108,38]                                     // High Plains
+  ],
   /* mountain ranges: [height in metres, line width in degrees, lon,lat, ...] */
   ranges: [
     [3900, 3.2, -152,63, -147,62, -141,61],                                           // Alaska Range
@@ -279,6 +294,7 @@ const worldToLat = z => ORIGIN.lat + z / M_PER_DEG_LAT;
 
 const GW = 1024, GH = 512;
 const ELEV = new Int16Array(GW * GH);
+const ARID = new Uint8Array(GW * GH);
 
 (function buildWorld() {
   const mk = (w, h) => { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; };
@@ -294,7 +310,14 @@ const ELEV = new Int16Array(GW * GH);
     for (let i = 2; i < pts.length; i += 2) g0.lineTo(px(pts[i]), py(pts[i + 1]));
     g0.closePath(); g0.fill();
   }
+  g0.fillStyle = "#00f";
   g0.globalCompositeOperation = "lighter";
+  for (const pts of GEO.deserts) {
+    g0.beginPath();
+    g0.moveTo(px(pts[0]), py(pts[1]));
+    for (let i = 2; i < pts.length; i += 2) g0.lineTo(px(pts[i]), py(pts[i + 1]));
+    g0.closePath(); g0.fill();
+  }
   g0.lineCap = "round"; g0.lineJoin = "round";
   for (const r of GEO.ranges) {
     const h = r[0], wid = r[1];
@@ -330,13 +353,22 @@ const ELEV = new Int16Array(GW * GH);
       const f = samp(m8, 0, x, y) * .40 + samp(m32, 0, x, y) * .36 + samp(m96, 0, x, y) * .24;
       const ridge = Math.max(base[i * 4 + 1] / 255, samp(m8, 1, x, y) * 1.25, samp(m32, 1, x, y) * .9);
       let h;
-      if (land) h = 30 + Math.pow(clamp(f, 0, 1), 1.15) * 1500;
+      if (land) h = 18 + Math.pow(clamp(f, 0, 1), 1.75) * 680;
       else h = -90 - Math.pow(clamp(1 - f, 0, 1), 1.6) * 4600;
       if (ridge > .02) h += Math.pow(clamp(ridge, 0, 1), 1.45) * 7200 * (land ? 1 : .25);
       ELEV[i] = clamp(h, -9000, 9000) | 0;
+      // aridity, softened at the edges so deserts fade into what surrounds them
+      ARID[i] = clamp(base[i * 4 + 2] * .55 + samp(m8, 2, x, y) * 255 * .65, 0, 255) | 0;
     }
   }
 })();
+
+/* How dry it is here, 0 to 1, from the painted desert regions. */
+function worldArid(lon, lat) {
+  const u = ((((lon + 180) / 360) * GW) % GW + GW) % GW;
+  const v = clamp(((90 - lat) / 180) * GH, 0, GH - 1);
+  return ARID[(v | 0) * GW + (u | 0)] / 255;
+}
 
 /* Bilinear sample of the real elevation field, wrapping in longitude. */
 function worldElev(lon, lat) {
@@ -349,6 +381,168 @@ function worldElev(lon, lat) {
   const a = ELEV[y0 * GW + x0], b = ELEV[y0 * GW + x1];
   const c = ELEV[y1 * GW + x0], d = ELEV[y1 * GW + x1];
   return lerp(lerp(a, b, fx), lerp(c, d, fx), fy);
+}
+
+/* ====================================================== places ========== */
+/* Real cities at their real coordinates. Street-level data for the whole
+   planet is measured in terabytes and this file has no network, so what ships
+   is every place that matters — name, position, population — and the urban
+   fabric around each one is grown from that seed: block grids, building
+   heights and lit area all scale with how big the place actually is. */
+const CITY_DATA =
+  // name|lon|lat|thousands of people
+  "Tokyo|139.69|35.69|37400;Delhi|77.21|28.61|32900;Shanghai|121.47|31.23|29200;" +
+  "Dhaka|90.41|23.81|23200;Sao Paulo|-46.63|-23.55|22400;Cairo|31.24|30.04|22200;" +
+  "Mexico City|-99.13|19.43|22100;Beijing|116.41|39.90|21900;Mumbai|72.88|19.08|21300;" +
+  "Osaka|135.50|34.69|19000;Karachi|67.01|24.86|17200;Chongqing|106.55|29.56|17000;" +
+  "Istanbul|28.98|41.01|15900;Buenos Aires|-58.38|-34.60|15400;Kolkata|88.36|22.57|15300;" +
+  "Lagos|3.38|6.52|15300;Kinshasa|15.31|-4.32|15000;Manila|120.98|14.60|14400;" +
+  "Tianjin|117.19|39.13|14000;Guangzhou|113.26|23.13|13600;Rio de Janeiro|-43.17|-22.91|13500;" +
+  "Lahore|74.34|31.55|13100;Bangalore|77.59|12.97|13000;Moscow|37.62|55.76|12600;" +
+  "Shenzhen|114.06|22.54|12400;Chennai|80.27|13.08|11500;Bogota|-74.07|4.71|11300;" +
+  "Paris|2.35|48.86|11200;Jakarta|106.85|-6.21|11000;Lima|-77.04|-12.05|11000;" +
+  "Bangkok|100.50|13.76|10900;Hyderabad|78.49|17.39|10500;Seoul|126.98|37.57|10000;" +
+  "Nagoya|136.91|35.18|9600;London|-0.13|51.51|9500;Tehran|51.39|35.69|9500;" +
+  "Chicago|-87.63|41.88|8900;Chengdu|104.07|30.57|8800;Nanjing|118.80|32.06|8800;" +
+  "Wuhan|114.31|30.59|8500;Ho Chi Minh City|106.66|10.82|8600;Luanda|13.23|-8.84|8600;" +
+  "Ahmedabad|72.57|23.02|8400;Kuala Lumpur|101.69|3.14|8400;Xian|108.94|34.34|8200;" +
+  "Hong Kong|114.17|22.32|7600;Dongguan|113.75|23.02|7400;Hangzhou|120.15|30.27|7600;" +
+  "Foshan|113.12|23.02|7300;Shenyang|123.43|41.80|7200;Riyadh|46.72|24.71|7500;" +
+  "Baghdad|44.36|33.31|7500;Santiago|-70.67|-33.45|6800;Surat|72.83|21.17|7800;" +
+  "Madrid|-3.70|40.42|6700;Suzhou|120.59|31.30|7100;Pune|73.86|18.52|6800;" +
+  "Harbin|126.53|45.80|6500;Houston|-95.37|29.76|6600;Dallas|-96.80|32.78|6500;" +
+  "Toronto|-79.38|43.65|6300;Dar es Salaam|39.28|-6.79|7400;Miami|-80.19|25.76|6300;" +
+  "Belo Horizonte|-43.94|-19.92|6200;Singapore|103.82|1.35|6000;Philadelphia|-75.17|39.95|5700;" +
+  "Atlanta|-84.39|33.75|5800;Fukuoka|130.40|33.59|5500;Khartoum|32.53|15.50|6200;" +
+  "Barcelona|2.17|41.39|5600;Johannesburg|28.04|-26.20|6000;Saint Petersburg|30.34|59.93|5500;" +
+  "Qingdao|120.38|36.07|5500;Dalian|121.61|38.91|5300;Washington|-77.04|38.91|5400;" +
+  "Yangon|96.16|16.87|5400;Alexandria|29.92|31.20|5300;Jinan|117.00|36.65|5300;" +
+  "Guadalajara|-103.35|20.66|5300;Sydney|151.21|-33.87|5300;Melbourne|144.96|-37.81|5100;" +
+  "Ankara|32.86|39.93|5200;Abidjan|-4.02|5.36|5100;New York|-74.01|40.71|18800;" +
+  "Los Angeles|-118.24|34.05|12500;Berlin|13.40|52.52|3700;Rome|12.50|41.90|4300;" +
+  "Kyiv|30.52|50.45|3000;Athens|23.73|37.98|3200;Lisbon|-9.14|38.72|2900;" +
+  "Vienna|16.37|48.21|2000;Warsaw|21.01|52.23|1800;Bucharest|26.10|44.43|1900;" +
+  "Budapest|19.04|47.50|1800;Hamburg|10.00|53.55|1800;Munich|11.58|48.14|1500;" +
+  "Milan|9.19|45.46|3100;Amsterdam|4.90|52.37|1200;Brussels|4.35|50.85|2100;" +
+  "Stockholm|18.07|59.33|1600;Oslo|10.75|59.91|1100;Copenhagen|12.57|55.68|1300;" +
+  "Helsinki|24.94|60.17|1300;Dublin|-6.26|53.35|1200;Manchester|-2.24|53.48|2700;" +
+  "Glasgow|-4.25|55.86|1000;Zurich|8.54|47.38|1400;Prague|14.42|50.08|1300;" +
+  "Naples|14.27|40.85|2200;Casablanca|-7.59|33.57|3800;Algiers|3.06|36.75|2800;" +
+  "Tunis|10.17|36.81|2400;Tripoli|13.19|32.89|1200;Addis Ababa|38.75|9.02|5200;" +
+  "Nairobi|36.82|-1.29|5100;Accra|-0.19|5.60|2600;Dakar|-17.44|14.72|3200;" +
+  "Cape Town|18.42|-33.92|4800;Durban|31.02|-29.86|3700;Harare|31.05|-17.83|1600;" +
+  "Maputo|32.59|-25.97|1200;Kampala|32.58|0.35|3700;Khartoum North|32.56|15.64|1000;" +
+  "Vancouver|-123.12|49.28|2600;Montreal|-73.57|45.50|4300;Calgary|-114.07|51.05|1500;" +
+  "Seattle|-122.33|47.61|4000;Portland|-122.68|45.52|2500;San Francisco|-122.42|37.77|4700;" +
+  "San Diego|-117.16|32.72|3300;Phoenix|-112.07|33.45|4900;Las Vegas|-115.14|36.17|2300;" +
+  "Denver|-104.99|39.74|2900;Salt Lake City|-111.89|40.76|1200;Albuquerque|-106.65|35.08|920;" +
+  "Kansas City|-94.58|39.10|2200;Minneapolis|-93.27|44.98|3700;Saint Louis|-90.20|38.63|2200;" +
+  "Detroit|-83.05|42.33|3500;Cleveland|-81.69|41.50|2000;Pittsburgh|-79.99|40.44|1700;" +
+  "Boston|-71.06|42.36|4900;Baltimore|-76.61|39.29|2300;Charlotte|-80.84|35.23|2700;" +
+  "Orlando|-81.38|28.54|2700;Tampa|-82.46|27.95|3200;Jacksonville|-81.66|30.33|1600;" +
+  "New Orleans|-90.07|29.95|1300;San Antonio|-98.49|29.42|2600;Austin|-97.74|30.27|2300;" +
+  "Oklahoma City|-97.52|35.47|1440;Omaha|-95.94|41.26|970;Indianapolis|-86.16|39.77|2100;" +
+  "Columbus|-82.999|39.96|2150;Cincinnati|-84.51|39.10|2260;Louisville|-85.76|38.25|1390;" +
+  "Milwaukee|-87.91|43.04|1570;Richmond|-77.44|37.54|1300;Raleigh|-78.64|35.78|1450;" +
+  "Birmingham|-86.80|33.52|1110;Honolulu|-157.86|21.31|1020;Anchorage|-149.90|61.22|400;" +
+  "Havana|-82.38|23.11|2100;Guatemala City|-90.51|14.63|3000;Panama City|-79.52|8.98|1900;" +
+  "Caracas|-66.90|10.49|2900;Quito|-78.47|-0.18|1900;Medellin|-75.56|6.24|4000;" +
+  "Brasilia|-47.88|-15.79|4800;Salvador|-38.48|-12.97|3900;Fortaleza|-38.54|-3.73|4100;" +
+  "Recife|-34.88|-8.05|4200;Porto Alegre|-51.23|-30.03|4100;Curitiba|-49.27|-25.43|3700;" +
+  "Montevideo|-56.16|-34.90|1800;Asuncion|-57.58|-25.26|3400;La Paz|-68.15|-16.50|2000;" +
+  "Auckland|174.76|-36.85|1700;Wellington|174.78|-41.29|420;Brisbane|153.03|-27.47|2600;" +
+  "Perth|115.86|-31.95|2200;Adelaide|138.60|-34.93|1400;Port Moresby|147.19|-9.44|400;" +
+  "Taipei|121.56|25.03|7400;Busan|129.08|35.18|3400;Sapporo|141.35|43.06|2700;" +
+  "Sendai|140.87|38.27|2300;Hiroshima|132.46|34.39|2100;Kyoto|135.77|35.01|1800;" +
+  "Pyongyang|125.75|39.04|3000;Ulaanbaatar|106.92|47.89|1600;Almaty|76.89|43.24|2000;" +
+  "Tashkent|69.24|41.30|2600;Baku|49.87|40.41|2400;Tbilisi|44.79|41.72|1200;" +
+  "Yerevan|44.51|40.18|1100;Kabul|69.21|34.53|4600;Islamabad|73.06|33.68|1200;" +
+  "Colombo|79.86|6.93|600;Kathmandu|85.32|27.72|1500;Hanoi|105.83|21.03|8100;" +
+  "Phnom Penh|104.92|11.56|2300;Vientiane|102.60|17.97|950;Male|73.51|4.18|150;" +
+  "Jeddah|39.20|21.49|4700;Dubai|55.27|25.20|3500;Doha|51.53|25.29|2400;" +
+  "Kuwait City|47.98|29.38|3100;Muscat|58.54|23.59|1500;Amman|35.93|31.96|4000;" +
+  "Damascus|36.30|33.51|2500;Beirut|35.50|33.89|2400;Jerusalem|35.21|31.77|950;" +
+  "Tel Aviv|34.78|32.09|4200;Novosibirsk|82.93|55.03|1600;Yekaterinburg|60.60|56.84|1500;" +
+  "Vladivostok|131.89|43.12|600;Krasnoyarsk|92.87|56.01|1100;Omsk|73.37|54.99|1150;" +
+  "Reykjavik|-21.94|64.15|230;Murmansk|33.08|68.97|290;Nuuk|-51.72|64.18|19;" +
+  "Ushuaia|-68.31|-54.80|75;Suva|178.44|-18.14|93;Noumea|166.46|-22.28|94;" +
+  // Tennessee and the country around Hohenwald, in much finer detail
+  "Hohenwald|-87.5539|35.5487|3.7;Summertown|-87.2972|35.4114|0.9;Linden|-87.8397|35.6175|0.9;" +
+  "Waynesboro|-87.7714|35.3200|2.4;Centerville|-87.4664|35.7811|3.8;Lobelville|-87.7936|35.7548|0.9;" +
+  "Mount Pleasant|-87.2003|35.5384|4.6;Columbia|-87.0353|35.6151|41;Lawrenceburg|-87.3347|35.2423|11;" +
+  "Pulaski|-87.0325|35.1998|8;Dickson|-87.3878|36.0770|16;Franklin|-86.8689|35.9251|83;" +
+  "Spring Hill|-86.9300|35.7512|54;Nashville|-86.7816|36.1627|690;Brentwood|-86.7828|36.0331|45;" +
+  "Murfreesboro|-86.3903|35.8456|152;Clarksville|-87.3595|36.5298|166;Jackson|-88.8139|35.6145|68;" +
+  "Memphis|-90.0490|35.1495|633;Knoxville|-83.9207|35.9606|190;Chattanooga|-85.3097|35.0456|181;" +
+  "Savannah TN|-88.2495|35.2245|7;Parsons|-88.1267|35.6473|2.4;Hurricane Mills|-87.7500|35.9100|0.3;" +
+  "Bon Aqua|-87.2900|35.9500|0.4;Duck River|-87.3200|35.7100|0.3;Only|-87.6600|35.9600|0.3;" +
+  "Nunnelly|-87.4900|35.8700|0.5;Gordonsburg|-87.4700|35.6300|0.3;Napier|-87.5900|35.4400|0.2;" +
+  "Iron City|-87.5800|35.0300|0.4;Collinwood|-87.7400|35.1700|1;Clifton|-87.9950|35.3870|2.6;" +
+  "Ashland City|-87.0644|36.2745|5;Fairview|-87.1289|35.9836|9;Kingston Springs|-87.1128|36.1023|2.8";
+
+/* Rivers and highways worth seeing from the air, as [width, lon,lat, ...]. */
+const FEATURES = {
+  rivers: [
+    [140, -87.90,35.62, -87.75,35.60, -87.62,35.55, -87.48,35.52, -87.36,35.49],   // Buffalo River
+    [190, -87.90,35.92, -87.70,35.86, -87.50,35.80, -87.30,35.74, -87.10,35.66],   // Duck River
+    [520, -88.15,35.05, -88.10,35.30, -88.05,35.55, -88.00,35.85, -87.95,36.15],   // Tennessee River
+    [700, -90.10,34.90, -89.95,35.40, -89.70,36.00, -89.55,36.50],                 // Mississippi
+    [260, -87.05,36.28, -87.20,36.40, -87.36,36.53]                                // Cumberland
+  ],
+  roads: [
+    [70, -87.40,35.02, -87.48,35.25, -87.55,35.55, -87.62,35.85, -87.72,36.08],    // Natchez Trace Parkway
+    [80, -87.55,35.55, -87.35,35.60, -87.03,35.62],                                // TN-48 / US-412 east
+    [80, -87.55,35.55, -87.84,35.62],                                              // US-412 west to Linden
+    [90, -87.03,35.61, -86.93,35.75, -86.87,35.93, -86.78,36.16],                  // I-65 corridor north
+    [90, -87.39,36.08, -87.13,36.10, -86.78,36.16]                                 // I-40 east to Nashville
+  ]
+};
+
+const CITIES = [];
+(function parseCities() {
+  for (const rec of CITY_DATA.split(";")) {
+    if (!rec) continue;
+    const f = rec.split("|");
+    if (f.length < 4) continue;
+    const lon = +f[1], lat = +f[2], pop = +f[3];
+    CITIES.push({
+      name: f[0], lon, lat, pop,
+      x: (lon - ORIGIN.lon) * M_PER_DEG_LON, z: (lat - ORIGIN.lat) * M_PER_DEG_LAT,
+      // built-up radius: a rough but serviceable fit to real urban extent
+      r: Math.max(700, 1350 * Math.pow(pop, .42))
+    });
+  }
+  CITIES.sort((a, b) => b.pop - a.pop);
+})();
+
+/* Coarse spatial index so the terrain shader can ask "is this built up?"
+   without walking every city on the planet for every quad. */
+const CITY_CELL = 120000, CITY_GRID = new Map();
+(function indexCities() {
+  for (const c of CITIES) {
+    const reach = Math.ceil((c.r * 2.2) / CITY_CELL);
+    const gx = Math.round(c.x / CITY_CELL), gz = Math.round(c.z / CITY_CELL);
+    for (let j = -reach; j <= reach; j++)
+      for (let i = -reach; i <= reach; i++) {
+        const k = (gx + i) + "," + (gz + j);
+        let a = CITY_GRID.get(k);
+        if (!a) CITY_GRID.set(k, a = []);
+        a.push(c);
+      }
+  }
+})();
+function cityAt(x, z) {
+  const a = CITY_GRID.get(Math.round(x / CITY_CELL) + "," + Math.round(z / CITY_CELL));
+  if (!a) return 0;
+  let u = 0;
+  for (let i = 0; i < a.length; i++) {
+    const c = a[i], dx = x - c.x, dz = z - c.z;
+    const d = Math.sqrt(dx * dx + dz * dz);
+    if (d > c.r * 2.1) continue;
+    // dense core, thinning suburbs
+    u = Math.max(u, (1 - sstep(c.r * .45, c.r * 2.1, d)) * clamp(.35 + c.pop / 900, .4, 1));
+  }
+  return clamp(u, 0, 1);
 }
 
 /* ================================================================ world == */
@@ -468,7 +662,7 @@ function terrainColor(h, slope, x, z) {
   const snow = sstep(snowLine - 250, snowLine + 350, h) * (1 - rock * .40);
   // latitude belts, blended
   const tropic = 1 - sstep(8, 20, lat);
-  const desert = sstep(11, 19, lat) * (1 - sstep(33, 46, lat));
+  const desert = clamp(worldArid(worldToLon(x), worldToLat(z)) * 1.25, 0, 1) * (1 - sstep(56, 66, lat));
   const boreal = sstep(44, 54, lat) * (1 - sstep(62, 70, lat));
   const tundra = sstep(60, 70, lat);
   const polar = sstep(68, 76, lat);
@@ -485,8 +679,15 @@ function terrainColor(h, slope, x, z) {
   c = mixc(c, [240, 245, 250], snow);
   // a narrow beach where the land meets the water
   c = mixc(c, [186, 174, 140], sstep(45, 2, h) * (1 - rock) * .7);
+  // built-up ground: grey, flatter in colour, with a street-grid texture
+  const urb = cityAt(x, z);
+  if (urb > .01) {
+    const grid = (Math.sin(x * .0062) * Math.sin(z * .0062)) * .5 + .5;
+    c = mixc(c, mixc([104, 102, 100], [138, 136, 132], grid), clamp(urb * .85, 0, .85));
+  }
   // field-sized patchwork, plus a gentle regional tint
-  const v = (fbm(x / 190, z / 190, 2) - .5) * .22 + (fbm(x / 26000, z / 26000, 2) - .5) * .26;
+  const v = (fbm(x / 190, z / 190, 2) - .5) * (urb > .3 ? .08 : .22)
+    + (fbm(x / 26000, z / 26000, 2) - .5) * .26;
   return shade(c, 1 + v);
 }
 
@@ -504,10 +705,10 @@ const MOBILE = COARSE || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent ||
 /* More LOD rings than a propeller aeroplane needs: at Mach 3 you cross the
    old draw distance in eight seconds, and from 24 km you can see most of it. */
 const QLEVELS = [
-  { dpr: 1.00, lev: 7, half: 6, base: 78, trees: .22, treeR: 750, clouds: 9000, glare: 0, vig: 0, shadow: 1, stars: 0, terrShadow: 0, cloudShadow: 0 },
-  { dpr: 1.25, lev: 8, half: 6, base: 62, trees: .30, treeR: 950, clouds: 14000, glare: 1, vig: 1, shadow: 1, stars: 1, terrShadow: 1, cloudShadow: 0 },
-  { dpr: 1.50, lev: 8, half: 7, base: 52, trees: .38, treeR: 1150, clouds: 20000, glare: 1, vig: 1, shadow: 1, stars: 1, terrShadow: 1, cloudShadow: 1 },
-  { dpr: 2.00, lev: 9, half: 7, base: 44, trees: .44, treeR: 1350, clouds: 26000, glare: 1, vig: 1, shadow: 1, stars: 1, terrShadow: 1, cloudShadow: 1 }
+  { dpr: 1.00, lev: 7, half: 6, base: 78, trees: .22, treeR: 750, clouds: 9000, glare: 0, vig: 0, shadow: 1, stars: 0, terrShadow: 0, cloudShadow: 0, buildings: 220 },
+  { dpr: 1.25, lev: 8, half: 6, base: 62, trees: .30, treeR: 950, clouds: 14000, glare: 1, vig: 1, shadow: 1, stars: 1, terrShadow: 1, cloudShadow: 0, buildings: 420 },
+  { dpr: 1.50, lev: 8, half: 7, base: 52, trees: .38, treeR: 1150, clouds: 20000, glare: 1, vig: 1, shadow: 1, stars: 1, terrShadow: 1, cloudShadow: 1, buildings: 700 },
+  { dpr: 2.00, lev: 9, half: 7, base: 44, trees: .44, treeR: 1350, clouds: 26000, glare: 1, vig: 1, shadow: 1, stars: 1, terrShadow: 1, cloudShadow: 1, buildings: 820 }
 ];
 const Q = { i: MOBILE ? 1 : 3, auto: true, work: 9, hold: 0, q: QLEVELS[MOBILE ? 1 : 3] };
 
@@ -1550,6 +1751,160 @@ function drawTrees() {
   }
 }
 
+
+/* ---- built-up ground, buildings, roads and rivers ---------------------- */
+/* Cities are drawn in three layers depending on how close you are: a grey
+   stain on the terrain from any distance, a street grid once inside about
+   30 km, and actual blocks of buildings in the last few kilometres. */
+function drawRoadsRivers() {
+  const camX = cam.pos.x, camZ = cam.pos.z;
+  const reach = clamp(cam.pos.y * 9 + 60000, 60000, 900000);
+  const draw = (set, colFn, widthK) => {
+    for (const f of set) {
+      const wid = f[0] * widthK;
+      let prev = null;
+      for (let i = 1; i < f.length; i += 2) {
+        const x = (f[i] - ORIGIN.lon) * M_PER_DEG_LON, z = (f[i + 1] - ORIGIN.lat) * M_PER_DEG_LAT;
+        const pt = { x, z };
+        if (prev) {
+          const mx = (prev.x + x) * .5, mz = (prev.z + z) * .5;
+          if (Math.hypot(mx - camX, mz - camZ) < reach) segment(prev, pt, wid, colFn);
+        }
+        prev = pt;
+      }
+    }
+  };
+  const segment = (a, b, wid, colFn) => {
+    const dx = b.x - a.x, dz = b.z - a.z, len = Math.hypot(dx, dz) || 1;
+    const nx = -dz / len * wid, nz = dx / len * wid;
+    const N = clamp(Math.round(len / 2600), 1, 16);
+    for (let i = 0; i < N; i++) {
+      const t0 = i / N, t1 = (i + 1) / N;
+      const ax = a.x + dx * t0, az = a.z + dz * t0, bx = a.x + dx * t1, bz = a.z + dz * t1;
+      const mx = (ax + bx) * .5, mz = (az + bz) * .5;
+      const d = Math.hypot(mx - camX, mz - camZ);
+      if (d > reach) continue;
+      const gy = terrainH(mx, mz) + 2;
+      _vp[0] = ax + nx; _vp[1] = gy; _vp[2] = az + nz;
+      _vp[3] = bx + nx; _vp[4] = gy; _vp[5] = bz + nz;
+      _vp[6] = bx - nx; _vp[7] = gy; _vp[8] = bz - nz;
+      _vp[9] = ax - nx; _vp[10] = gy; _vp[11] = az - nz;
+      let front = false;
+      for (let k = 0; k < 4; k++) {
+        const px = _vp[k * 3] - cam.pos.x, py = _vp[k * 3 + 1] - cam.pos.y, pz = _vp[k * 3 + 2] - cam.pos.z;
+        const m = cam.m;
+        const vx = m[0] * px + m[1] * py + m[2] * pz, vy = m[3] * px + m[4] * py + m[5] * pz,
+          vz = m[6] * px + m[7] * py + m[8] * pz;
+        _vp[k * 3] = vx; _vp[k * 3 + 1] = vy; _vp[k * 3 + 2] = vz;
+        if (vz >= NEAR) front = true;
+      }
+      if (!front) continue;
+      const mm = clipProject(4);
+      if (mm < 3 || offscreen(mm)) continue;
+      const dy = gy - cam.pos.y, d3 = Math.hypot(mx - camX, dy, mz - camZ) || 1;
+      DL.poly(d - 260, _sp, mm, aerial(colFn(), d, (mx - camX) / d3, dy / d3, (mz - camZ) / d3), null, 0);
+    }
+  };
+  draw(FEATURES.rivers, () => litColor([40, 70, 96], 0, 1, 0), .32);
+  draw(FEATURES.roads, () => litColor([98, 95, 92], 0, 1, 0), .30);
+}
+
+/* Blocks of buildings, grown deterministically from the city's own position so
+   the same town looks the same every time you fly over it. */
+function drawCities() {
+  const camX = cam.pos.x, camZ = cam.pos.z, camY = cam.pos.y;
+  let budget = Q.q.buildings;
+  const labels = [];
+  for (const c of CITIES) {
+    const dx = c.x - camX, dz = c.z - camZ;
+    const d = Math.hypot(dx, dz);
+    // labels carry much further than geometry
+    if (d < 40000 + c.pop * 260 && d < 900000) labels.push({ c, d });
+    if (budget <= 0) continue;
+    const near = c.r * 3.5 + 6000;
+    if (d > near || camY > 26000) continue;
+    // block grid: size and height scale with the real population
+    const blocks = clamp(Math.round(4 + Math.pow(c.pop, .34) * 3), 4, 26);
+    const spacing = (c.r * 1.7) / blocks;
+    const maxH = clamp(9 + Math.pow(c.pop, .52) * 2.4, 9, 260);
+    for (let j = -blocks; j <= blocks && budget > 0; j++) {
+      for (let i = -blocks; i <= blocks && budget > 0; i++) {
+        const rr = Math.hypot(i, j) / blocks;
+        if (rr > 1) continue;
+        const h1 = hash2((c.x | 0) + i * 7, (c.z | 0) + j * 13);
+        if (h1 > 1 - rr * .75) continue;                    // thins toward the edge
+        const bx = c.x + i * spacing + (h1 - .5) * spacing * .4;
+        const bz = c.z + j * spacing + (hash2(i * 3, j * 5) - .5) * spacing * .4;
+        const bd = Math.hypot(bx - camX, bz - camZ);
+        if (bd > near) continue;
+        const gy = terrainH(bx, bz);
+        if (gy < 2) continue;
+        const h2 = hash2(i * 17 + 3, j * 29 + 7);
+        const hgt = (4 + h2 * h2 * maxH) * (1 - rr * .62);
+        const wid = spacing * (.32 + h1 * .26);
+        budget--;
+        const tone = 92 + h2 * 46;
+        boxOnGround(bx, gy, bz, wid, hgt, wid * (.7 + h2 * .6), [tone * .92, tone * .95, tone], bd);
+      }
+    }
+  }
+  // names, nearest last so the closest wins the overlap
+  labels.sort((a, b) => b.d - a.d);
+  const u = UI;
+  ctx.save(); ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  let shown = 0;
+  for (const L of labels) {
+    if (shown > 26) break;
+    const c = L.c;
+    const sp = projectPoint(v3(c.x, terrainH(c.x, c.z) + 40, c.z));
+    if (!sp || sp.x < 0 || sp.x > W || sp.y < 0 || sp.y > H) continue;
+    const big = c.pop > 400;
+    hudFont((big ? 12 : 10.5) * u, big ? 700 : 600);
+    const a = clamp(1 - L.d / (60000 + c.pop * 300), .18, .9);
+    ctx.fillStyle = "rgba(6,12,18," + (a * .55).toFixed(2) + ")";
+    const w2 = ctx.measureText(c.name).width;
+    ctx.fillRect(sp.x - w2 / 2 - 4 * u, sp.y - 8 * u, w2 + 8 * u, 16 * u);
+    ctx.fillStyle = "rgba(232,244,255," + a.toFixed(2) + ")";
+    ctx.fillText(c.name, sp.x, sp.y);
+    ctx.fillStyle = "rgba(255,206,120," + (a * .9).toFixed(2) + ")";
+    ctx.fillRect(sp.x - 1.5 * u, sp.y + 9 * u, 3 * u, 3 * u);
+    shown++;
+  }
+  ctx.restore();
+}
+
+/* one building, as a shaded box standing on the ground */
+function boxOnGround(x, gy, z, sx, h, sz, col, dist) {
+  const hx = sx * .5, hz = sz * .5, top = gy + h;
+  const faces = [
+    [[-hx, h, -hz], [hx, h, -hz], [hx, h, hz], [-hx, h, hz], 0, 1, 0],
+    [[-hx, 0, hz], [hx, 0, hz], [hx, h, hz], [-hx, h, hz], 0, 0, 1],
+    [[hx, 0, -hz], [-hx, 0, -hz], [-hx, h, -hz], [hx, h, -hz], 0, 0, -1],
+    [[hx, 0, hz], [hx, 0, -hz], [hx, h, -hz], [hx, h, hz], 1, 0, 0],
+    [[-hx, 0, -hz], [-hx, 0, hz], [-hx, h, hz], [-hx, h, -hz], -1, 0, 0]
+  ];
+  const cp = cam.pos, m = cam.m;
+  for (const f of faces) {
+    let front = false;
+    for (let k = 0; k < 4; k++) {
+      const px = x + f[k][0] - cp.x, py = gy + f[k][1] - cp.y, pz = z + f[k][2] - cp.z;
+      const vx = m[0] * px + m[1] * py + m[2] * pz, vy = m[3] * px + m[4] * py + m[5] * pz,
+        vz = m[6] * px + m[7] * py + m[8] * pz;
+      _vp[k * 3] = vx; _vp[k * 3 + 1] = vy; _vp[k * 3 + 2] = vz;
+      if (vz >= NEAR) front = true;
+    }
+    if (!front) continue;
+    const nx = f[4], ny = f[5], nz = f[6];
+    // cheap back-face test against the face centre
+    if (nx * (x + nx * hx - cp.x) + ny * (top - cp.y) + nz * (z + nz * hz - cp.z) > 0 && ny === 0) continue;
+    const mm = clipProject(4);
+    if (mm < 3 || offscreen(mm)) continue;
+    const dy = gy + h * .5 - cp.y, d3 = Math.hypot(x - cp.x, dy, z - cp.z) || 1;
+    const lit = litColor(col, nx, ny, nz);
+    DL.poly(dist - 12, _sp, mm, aerial(lit, dist, (x - cp.x) / d3, dy / d3, (z - cp.z) / d3), null, 0);
+  }
+}
+
 /* The aircraft's own shadow, cast along the sun onto the ground beneath it.
    Nothing sells altitude like this on takeoff and landing. */
 const SHADOW_HULL = [
@@ -1720,6 +2075,13 @@ function resetPlane(scen) {
     P.pos = v3(0, 4200, 6000); P.q = qAxis(0, 1, 0, Math.PI);
     P.vel = mRot(qMat(P.q, new Float32Array(9)), v3(0, 0, 320)); P.thr = .88; P.park = false;
     P.gear = P.gearCmd = 0;
+  } else if (scen === "hohenwald") {
+    // 6 km up and a little north-west of the town, running in toward it
+    const cx = (-87.62 - ORIGIN.lon) * M_PER_DEG_LON, cz = (35.72 - ORIGIN.lat) * M_PER_DEG_LAT;
+    P.pos = v3(cx, terrainH(cx, cz) + 5200, cz);
+    P.q = qAxis(0, 1, 0, Math.PI * .86);
+    P.vel = mRot(qMat(P.q, new Float32Array(9)), v3(0, 0, 240));
+    P.thr = .62; P.park = false; P.gear = P.gearCmd = 0;
   } else if (scen === "land") {
     // 4.2 km out on final for runway 18, ~720 ft above the field, dirty and slow
     // 9 km out on final, 500 m above the field, dirty and on speed
@@ -3211,6 +3573,17 @@ function objectiveLine() {
     return o;
   }
   if (SCEN === "land") return "LAND RWY 18   " + (Math.hypot(P.pos.x, P.pos.z - 950) / 1000).toFixed(2) + " km to threshold";
+  // anywhere else, say where on earth you actually are
+  const lon = worldToLon(P.pos.x), lat = worldToLat(P.pos.z);
+  let near = null, nd = 1e12;
+  for (const c of CITIES) {
+    const d = Math.hypot(c.x - P.pos.x, c.z - P.pos.z) / Math.max(1, Math.pow(c.pop, .28));
+    if (d < nd) { nd = d; near = c; }
+  }
+  const pos = Math.abs(lat).toFixed(2) + (lat >= 0 ? "\u00b0N " : "\u00b0S ") +
+    Math.abs(lon).toFixed(2) + (lon >= 0 ? "\u00b0E" : "\u00b0W");
+  const dn = near ? Math.hypot(near.x - P.pos.x, near.z - P.pos.z) / 1000 : 0;
+  return pos + (near ? "   " + dn.toFixed(0) + " km from " + near.name : "");
   return "FREE FLIGHT   " + (Math.hypot(P.pos.x, P.pos.z) / 1000).toFixed(1) + " km from field   " + (P.dist / 1000).toFixed(1) + " km flown";
 }
 
@@ -3521,6 +3894,8 @@ function frame(now) {
   drawTerrain();
   if (Math.hypot(cam.pos.x, cam.pos.z) < 40000) drawMesh(AIRPORT, v3(0, 0, 0), mIdent(), null);
   drawTrees();
+  drawRoadsRivers();
+  drawCities();
   if (GAME.rings.length) drawRings();
   if (GAME.started) { drawShadow(); drawAircraft(); }
   drawParts();
