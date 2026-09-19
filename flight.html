@@ -2544,11 +2544,22 @@ function curve(x) {
   return Math.sign(x) * (FBW.expo * a + (1 - FBW.expo) * a * a);
 }
 
-/* stick position that asks for a given load factor on top of the g the
-   aircraft already needs just to hold its attitude */
+/* Exact inverse of the stick curve. curve() is a quadratic, so this is just
+   the positive root of (1-e)a^2 + e*a - y = 0. */
+function uncurve(y) {
+  const e = FBW.expo, k = 1 - e;
+  const a = Math.abs(clamp(y, -1, 1));
+  const r = k < 1e-6 ? a / e : (-e + Math.sqrt(e * e + 4 * k * a)) / (2 * k);
+  return Math.sign(y) * clamp(r, 0, 1);
+}
+/* Stick position that asks for a given load factor on top of the g the
+   aircraft already needs just to hold its attitude. This inverts the whole
+   pitch command law, shaping included — otherwise raising the pilot's g
+   ceiling silently geared the autopilot down by the same factor, which is
+   exactly what happened when gMax went from 7.5 to 12. */
 function gToStick(dG, lvl) {
-  return dG >= 0 ? clamp(dG / Math.max(FBW.gMax - lvl, .5), 0, 1)
-                 : clamp(dG / Math.max(lvl - FBW.gMin, .5), -1, 0);
+  const range = dG >= 0 ? Math.max(FBW.gMax - lvl, .5) : Math.max(lvl - FBW.gMin, .5);
+  return uncurve(clamp(dG / range, -1, 1));
 }
 
 function flightControl(P, dt, e, cE, cA, cR) {
@@ -2584,7 +2595,11 @@ function flightControl(P, dt, e, cE, cA, cR) {
   const gCmd = (sE >= 0 ? lvl + (FBW.gMax - lvl) * sE : lvl + (lvl - FBW.gMin) * sE)
     + (P.trim || 0) * .30;
   const gErr = gCmd - (P.gload || 0);
-  const iGate = 1 - sstep(1.2, 3.0, Math.abs(gErr));
+  /* Anti-windup. The span scales with the command range: fixed at 1.2-3.0 g
+     it would have gated the integrator off for the whole of any pull worth
+     making once the ceiling went to 12, leaving the loop proportional-only. */
+  const iSpan = clamp((FBW.gMax - 1) * .25, 1.5, 4);
+  const iGate = 1 - sstep(iSpan, iSpan * 2.5, Math.abs(gErr));
   P.fbwI = clamp((P.fbwI || 0) + gErr * dt * FBW.kPitchI * iGate, -.75, .75);
   let dEg = (gErr * FBW.kPitch + P.fbwI) / gPer + P.w.x * FBW.kRate;
 
@@ -2806,7 +2821,9 @@ function physics(P, dt) {
       const n = flat ? v3(0, 1, 0) : terrainN(wp.x, wp.z, 4);
       const vp = vadd(P.vel, vcross(wOmega, rw));
       const vn = vdot(vp, n);
-      let Fn = clamp(pen * SPECS.gearK - vn * SPECS.gearC, 0, SPECS.mass * 9.81 * 5);
+      // the clamp is a solver guard on the contact spike, not the gear's own
+      // limit — it has to sit above the collapse threshold or that test is dead
+      let Fn = clamp(pen * SPECS.gearK - vn * SPECS.gearC, 0, SPECS.mass * 9.81 * 11);
       maxFn = Math.max(maxFn, Fn);
       let Fw = vmul(n, Fn);
       // rolling / lateral friction in the wheel's own frame
@@ -2843,7 +2860,7 @@ function physics(P, dt) {
       const vsLim = AP.on ? 9.0 : 5.6;
       if (wow && P.lastVS < -vsLim && !P.touched) crash("HARD LANDING");
       // the undercarriage is still made of metal, but it is a lot harder to fold
-      if (maxFn > SPECS.mass * 9.81 * (AP.on ? 11 : 8.5)) crash("GEAR COLLAPSE");
+      if (maxFn > SPECS.mass * 9.81 * (AP.on ? 9.5 : 8.0)) crash("GEAR COLLAPSE");
       if (wow && !P.gear) crash("GEAR UP LANDING");
     }
   }
