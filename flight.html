@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#05080c">
 <title>Skyward — Flight Simulator</title>
 <style>
   :root{
@@ -16,10 +19,10 @@
   #wrap{position:fixed;inset:0}
   canvas{display:block;width:100%;height:100%;image-rendering:auto}
   .layer{position:absolute;inset:0;pointer-events:none}
-  .modal{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  .modal{position:absolute;inset:0;display:flex;align-items:flex-start;justify-content:center;
     background:radial-gradient(1200px 700px at 50% 30%,rgba(18,40,64,.78),rgba(3,6,10,.94));
     backdrop-filter:blur(3px);pointer-events:auto;overflow:auto;padding:24px}
-  .card{width:min(900px,96vw);background:var(--panel);border:1px solid var(--edge);
+  .card{width:min(900px,96vw);margin:auto;background:var(--panel);border:1px solid var(--edge);
     border-radius:14px;padding:22px 24px 20px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
   h1{margin:0 0 2px;font-size:30px;letter-spacing:.20em;font-weight:600}
   h1 span{color:var(--accent)}
@@ -47,9 +50,30 @@
   #banner{position:absolute;left:0;right:0;top:40%;text-align:center;font-size:40px;letter-spacing:.2em;
     text-shadow:0 4px 30px #000;opacity:0;transition:opacity .4s}
   .hide{display:none !important}
+  #safe{position:fixed;top:0;left:0;width:0;height:0;pointer-events:none;visibility:hidden;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+  html,body{overscroll-behavior:none;-webkit-touch-callout:none}
+  canvas{touch-action:none}
+  .modal{touch-action:pan-y;-webkit-overflow-scrolling:touch}
+  .modal{padding:calc(16px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right))
+         calc(16px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))}
+  @media (max-width:760px),(max-height:520px){
+    .card{padding:15px 16px 14px;border-radius:12px}
+    h1{font-size:22px;letter-spacing:.16em}
+    .sub{font-size:11px;margin-bottom:12px}
+    h2{font-size:10.5px;margin:12px 0 6px}
+    .opt{flex:1 1 140px;min-width:130px;padding:9px 10px}
+    .opt b{font-size:12px} .opt i{font-size:10.5px;line-height:1.35}
+    .keys{font-size:10.5px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+    .go{padding:16px;font-size:14px;margin-top:14px}
+    .foot{font-size:10px}
+  }
+  #touchNote{font-size:11.5px;color:var(--dim);line-height:1.6}
+  #touchNote b{color:var(--ink);font-weight:600}
 </style>
 </head>
 <body>
+<div id="safe"></div>
 <div id="wrap">
   <canvas id="c"></canvas>
   <div class="layer"><div id="toast"></div><div id="banner"></div></div>
@@ -73,8 +97,9 @@
         <button class="opt" data-scen="land"><b>LANDING CHALLENGE</b><i>4 km final approach, gear and flaps already set. Scored on centreline, sink rate and touchdown point.</i></button>
       </div>
 
-      <h2>Keys</h2>
+      <h2 id="keyHead">Keys</h2>
       <div class="keys" id="keyList"></div>
+      <div id="touchNote" class="hide"></div>
 
       <button class="go" id="startBtn">BEGIN FLIGHT</button>
       <div class="foot">Esc pauses &middot; R resets the aircraft &middot; H toggles this help in flight</div>
@@ -192,23 +217,68 @@ const WORLD = {
   fieldElev: 16,                // airport elevation (m)
   fieldR: 2400,                 // radius of flattened airport basin
   rwyLen: 1900, rwyW: 46,       // runway 18/36, aligned with the Z (north) axis
-  sun: vnorm(v3(-.42, .62, .66)),
-  fogDensity: 1 / 13000,
-  skyTop: [42, 96, 168], skyMid: [126, 176, 222], skyHaze: [196, 216, 233],
-  ground: [86, 112, 62],
+  sun: vnorm(v3(-.40, .55, .73)),
+  ground: [82, 104, 60],
 };
 
+/* Lighting: one directional sun plus a hemisphere ambient (cool light from the
+   sky above, warm bounce from the ground below). Everything in the scene is
+   shaded through this, which is what makes surfaces read as the same material
+   under the same sky. Distance is handled as aerial perspective rather than
+   flat fog: the haze warms up toward the sun and stays blue away from it. */
+const LIGHT = {
+  sun: null,
+  sunCol: [1.08, 1.00, .86],
+  skyCol: [.34, .42, .56],
+  gndCol: [.24, .23, .17],
+  hazeNear: [178, 199, 222],    // horizon haze away from the sun
+  hazeSun: [248, 234, 204],     // haze looking into the sun
+  hazeHigh: [120, 150, 190],    // what distance does to things above the horizon
+  density: 1 / 15000,
+  zenith: [34, 82, 156], mid: [108, 160, 212]
+};
+LIGHT.sun = WORLD.sun;
+
+/* Shade a base colour by a world-space normal. */
+function litColor(col, nx, ny, nz) {
+  const L = LIGHT, s = Math.max(nx * L.sun.x + ny * L.sun.y + nz * L.sun.z, 0);
+  const sky = .5 + .5 * ny, gnd = .5 - .5 * ny;
+  return [col[0] * (L.sunCol[0] * s + L.skyCol[0] * sky + L.gndCol[0] * gnd),
+          col[1] * (L.sunCol[1] * s + L.skyCol[1] * sky + L.gndCol[1] * gnd),
+          col[2] * (L.sunCol[2] * s + L.skyCol[2] * sky + L.gndCol[2] * gnd)];
+}
+/* Aerial perspective. `v` is the normalised world direction from eye to point. */
+function aerial(col, dist, vx, vy, vz) {
+  const L = LIGHT;
+  const f = 1 - Math.exp(-dist * L.density);
+  if (f < .004) return rgb(col[0], col[1], col[2]);
+  const cs = clamp(vx * L.sun.x + vy * L.sun.y + vz * L.sun.z, 0, 1);
+  const up = clamp(vy * 2.2, 0, 1);
+  const h0 = lerp(L.hazeNear[0], L.hazeHigh[0], up), h1 = lerp(L.hazeNear[1], L.hazeHigh[1], up),
+    h2 = lerp(L.hazeNear[2], L.hazeHigh[2], up);
+  const mie = Math.pow(cs, 5) * .85;
+  return rgb(
+    lerp(col[0], lerp(h0, L.hazeSun[0], mie), f),
+    lerp(col[1], lerp(h1, L.hazeSun[1], mie), f),
+    lerp(col[2], lerp(h2, L.hazeSun[2], mie), f));
+}
+
 /* Terrain height at any point. Mountains ring a flat basin holding the field. */
-function terrainH(x, z) {
+function terrainH(x, z, cell) {
   const d = Math.hypot(x, z);
   const basin = 1 - sstep(WORLD.fieldR, WORLD.fieldR * 2.8, d);
   let m = fbm(x / 2600, z / 2600, 5);
   m = Math.pow(clamp(m, 0, 1), 2.25);
   let h = m * 1500 - 95;
-  // a lake to the east and a broad river valley keep the terrain from feeling uniform
+  // a lake to the east keeps the terrain from feeling uniform
   const lake = sstep(2600, 1200, Math.hypot(x - 6200, z + 2300));
   h = lerp(h, -30, lake * .9);
-  h += fbm(x / 340, z / 340, 3) * 26 * (1 - basin * .8);
+  // Fine relief is dropped once the sampling grid is coarser than the feature:
+  // sampled at 500 m intervals it aliases into a checkerboard of hills and
+  // hollows. `cell` is the grid spacing the caller is using; physics and trees
+  // omit it and always get the full detail.
+  const det = cell ? clamp(1 - (cell - 110) / 260, 0, 1) : 1;
+  if (det > 0) h += fbm(x / 340, z / 340, 3) * 24 * (1 - basin * .8) * det;
   return lerp(h, WORLD.fieldElev, basin);
 }
 /* Cheap normal by finite difference. */
@@ -219,6 +289,12 @@ function terrainN(x, z, e) {
   return vnorm(v3(hl - hr, 2 * e, hd - hu));
 }
 const onRunway = (x, z) => Math.abs(x) < WORLD.rwyW * .5 + 1 && Math.abs(z) < WORLD.rwyLen * .5;
+/* Footprint of the paved airfield. The runway is coplanar with the terrain, so
+   a centroid depth sort alone lets nearer ground quads paint over it. Terrain
+   inside this box is pushed back in the order instead, which settles it
+   without disturbing how anything else sorts against the ground. */
+const inField = (x, z) => x > -260 && x < 440 && Math.abs(z) < 1100;
+const FIELD_PUSH = 400;
 /* Height used for contact: runway and apron are perfectly flat. */
 function groundH(x, z) {
   if (onRunway(x, z)) return WORLD.fieldElev;
@@ -226,33 +302,98 @@ function groundH(x, z) {
   return terrainH(x, z);
 }
 function terrainColor(h, slope, x, z) {
-  if (h < WORLD.sea) return [38, 74, 102];
-  const rock = sstep(.42, .70, slope);
-  const snow = sstep(880, 1120, h) * (1 - rock * .35);
-  const dry = sstep(120, 560, h);
-  let c = mixc([94, 124, 64], [122, 118, 74], dry);
-  c = mixc(c, [104, 100, 92], rock);
-  c = mixc(c, [238, 244, 250], snow);
-  // patchwork so flat land is not a flat colour
-  const v = fbm(x / 210, z / 210, 2) - .5;
-  return shade(c, 1 + v * .22);
+  const rock = sstep(.34, .64, slope);
+  const snow = sstep(900, 1180, h) * (1 - rock * .45) * sstep(.62, .30, slope);
+  const dry = sstep(150, 640, h);
+  const scrub = sstep(520, 980, h);
+  // meadow -> dry upland -> alpine scrub, with rock on anything steep
+  let c = mixc([78, 112, 56], [134, 126, 78], dry);
+  c = mixc(c, [96, 104, 74], scrub * .7);
+  c = mixc(c, [108, 102, 96], rock);
+  c = mixc(c, mixc([120, 112, 104], [86, 82, 80], sstep(.5, .8, slope)), rock * .4);
+  c = mixc(c, [240, 246, 252], snow);
+  // a narrow beach where the land meets the water
+  c = mixc(c, [182, 170, 138], sstep(5, .5, h) * (1 - rock) * .85);
+  // field-sized patchwork, plus a gentle regional tint
+  const v = (fbm(x / 190, z / 190, 2) - .5) * .30 + (fbm(x / 3200, z / 3200, 2) - .5) * .10;
+  return shade(c, 1 + v);
 }
 
 /* ============================================================== renderer == */
 const cv = document.getElementById("c");
-const ctx = cv.getContext("2d", { alpha: false });
+const ctx = cv.getContext("2d", { alpha: false, desynchronized: true });
 let W = 0, H = 0, CX = 0, CY = 0, F = 800, DPR = 1;
 const NEAR = 0.30;
-let FOV = 62 * DEG;
+let FOV = 62 * DEG, FOVBASE = 62 * DEG;
 
+const COARSE = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+const MOBILE = COARSE || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || "");
+
+/* Quality ladder. Phones start two rungs down and the frame timer moves the
+   dial at runtime, so a 60 Hz phone and a desktop both stay smooth. */
+const QLEVELS = [
+  { dpr: 1.00, lev: 4, half: 6, base: 78, trees: .22, treeR: 750, clouds: 7000, glare: 0, vig: 0, shadow: 1 },
+  { dpr: 1.25, lev: 5, half: 6, base: 68, trees: .30, treeR: 950, clouds: 10000, glare: 1, vig: 1, shadow: 1 },
+  { dpr: 1.50, lev: 5, half: 7, base: 62, trees: .38, treeR: 1150, clouds: 13000, glare: 1, vig: 1, shadow: 1 },
+  { dpr: 2.00, lev: 6, half: 7, base: 58, trees: .44, treeR: 1350, clouds: 16000, glare: 1, vig: 1, shadow: 1 }
+];
+const Q = { i: MOBILE ? 1 : 3, auto: true, work: 9, hold: 0, q: QLEVELS[MOBILE ? 1 : 3] };
+
+function applyQuality() {
+  Q.q = QLEVELS[Q.i];
+  resize();
+}
+/* Tuned on the time spent inside the frame, not the frame interval: vsync
+   pins the interval at 16.7 ms whatever the load, so it can never show headroom. */
+function tuneQuality(dt, workMs) {
+  Q.work += (workMs - Q.work) * .06;
+  if (!Q.auto || !GAME.started || GAME.paused) return;
+  Q.hold -= dt;
+  if (Q.hold > 0) return;
+  if (Q.work > 11.5 && Q.i > 0) { Q.i--; Q.hold = 2.5; applyQuality(); }
+  else if (Q.work < 6.5 && Q.i < QLEVELS.length - 1) { Q.i++; Q.hold = 4; applyQuality(); }
+}
+
+let PORTRAIT = false, UI = 1;
+const SAFE = { t: 0, r: 0, b: 0, l: 0 };
+function readSafe() {
+  const el = document.getElementById("safe");
+  if (!el) return;
+  const cs = getComputedStyle(el);
+  SAFE.t = parseFloat(cs.paddingTop) || 0; SAFE.r = parseFloat(cs.paddingRight) || 0;
+  SAFE.b = parseFloat(cs.paddingBottom) || 0; SAFE.l = parseFloat(cs.paddingLeft) || 0;
+}
 function resize() {
-  DPR = Math.min(window.devicePixelRatio || 1, 2);
-  W = Math.round(cv.clientWidth * DPR); H = Math.round(cv.clientHeight * DPR);
+  const cw = cv.clientWidth || window.innerWidth, ch = cv.clientHeight || window.innerHeight;
+  DPR = Math.min(window.devicePixelRatio || 1, Q.q.dpr);
+  W = Math.max(2, Math.round(cw * DPR)); H = Math.max(2, Math.round(ch * DPR));
   cv.width = W; cv.height = H; CX = W / 2; CY = H / 2;
+  PORTRAIT = H > W;
+  readSafe();
+  // HUD scale: proportional to the canvas, then boosted on a physically small
+  // screen so the numbers stay readable at arm's length
+  UI = (H / 900) * clamp(640 / Math.max(H / DPR, 1), 1, 2);
+  // a phone held upright has almost no horizontal view, so widen the lens
+  FOVBASE = (PORTRAIT ? 78 : MOBILE ? 68 : 62) * DEG;
+  FOV = FOVBASE;
   F = (H * .5) / Math.tan(FOV * .5);
   ctx.lineJoin = "round"; ctx.lineCap = "round";
+  makeVignette();
+  if (typeof layoutTouch === "function") layoutTouch();
 }
 window.addEventListener("resize", resize);
+window.addEventListener("orientationchange", () => setTimeout(resize, 120));
+
+/* vignette + lens dirt, baked once per resize */
+let vignette = null;
+function makeVignette() {
+  if (!W || !H) return;
+  const g = ctx.createRadialGradient(CX, CY * 1.02, Math.min(W, H) * .36, CX, CY, Math.hypot(W, H) * .64);
+  g.addColorStop(0, "rgba(0,0,0,0)");
+  g.addColorStop(.62, "rgba(6,10,16,.07)");
+  g.addColorStop(1, "rgba(4,8,14,.34)");
+  vignette = g;
+}
 
 /* camera */
 const cam = { pos: v3(), m: new Float32Array(9), roll: 0, pitch: 0, shake: 0 };
@@ -362,6 +503,22 @@ function clipProject(n) {
   }
   return m;
 }
+/* Nudge a screen polygon outward about its centroid. Cheaper than stroking
+   every quad, and it hides the antialiasing seams between neighbours. */
+const SEAM_PX = .45;
+function grow(m, px) {
+  let cx = 0, cy = 0;
+  for (let i = 0; i < m; i++) { cx += _sp[i * 2]; cy += _sp[i * 2 + 1]; }
+  cx /= m; cy /= m;
+  for (let i = 0; i < m; i++) {
+    const dx = _sp[i * 2] - cx, dy = _sp[i * 2 + 1] - cy;
+    const l = Math.hypot(dx, dy);
+    if (l < .0001) continue;
+    const k = (l + px) / l;
+    _sp[i * 2] = cx + dx * k; _sp[i * 2 + 1] = cy + dy * k;
+  }
+}
+
 /* quick reject: whole polygon off one side of the viewport */
 function offscreen(m) {
   let l = 0, r = 0, t = 0, b = 0;
@@ -382,58 +539,105 @@ function projectPoint(p) {
 }
 
 /* fog toward the horizon colour */
-let fogCol = WORLD.skyHaze;
+let fogCol = LIGHT.hazeNear;
 function fogged(c, dist) {
-  const f = 1 - Math.exp(-dist * WORLD.fogDensity);
+  const f = 1 - Math.exp(-dist * LIGHT.density);
   return rgb(lerp(c[0], fogCol[0], f), lerp(c[1], fogCol[1], f), lerp(c[2], fogCol[2], f));
 }
 
 /* --------------------------------------------------------------- sky ----- */
+/* The sky is a rotated gradient anchored to the true horizon line, plus the
+   sun's Mie halo. Its horizon colour is exactly the haze colour used by aerial
+   perspective, so distant terrain dissolves into the sky with no visible seam. */
 function drawSky() {
   const e = eulerOf(cam.m);
   const pitch = clamp(e.pitch, -1.45, 1.45);
   const yOff = F * Math.tan(pitch);
-  const R = Math.hypot(W, H) * 1.25;
+  const R = Math.hypot(W, H) * 1.3;
+  const L = LIGHT;
+  // how much the camera is looking into the sun, for the horizon warm-up
+  const fwd = v3(cam.m[6], cam.m[7], cam.m[8]);
+  const toSun = clamp(vdot(fwd, L.sun), 0, 1);
+  const warm = Math.pow(toSun, 3);
+  const horizon = mixc(L.hazeNear, L.hazeSun, warm * .55);
+  // thinner air with altitude: the zenith darkens as you climb
+  const alt = clamp(cam.pos.y / 9000, 0, 1);
+  const zen = mixc(L.zenith, [14, 36, 92], alt);
+
   ctx.save();
   ctx.translate(CX, CY); ctx.rotate(-e.roll);
-  const g = ctx.createLinearGradient(0, yOff - R, 0, yOff + 4);
-  g.addColorStop(0, rgb(...WORLD.skyTop));
-  g.addColorStop(.55, rgb(...mixc(WORLD.skyTop, WORLD.skyMid, .75)));
-  g.addColorStop(.86, rgb(...WORLD.skyMid));
-  g.addColorStop(1, rgb(...WORLD.skyHaze));
+  const g = ctx.createLinearGradient(0, yOff - R, 0, yOff + 2);
+  g.addColorStop(0, rgb(...zen));
+  g.addColorStop(.42, rgb(...mixc(zen, L.mid, .72)));
+  g.addColorStop(.72, rgb(...L.mid));
+  g.addColorStop(.90, rgb(...mixc(L.mid, horizon, .72)));
+  g.addColorStop(1, rgb(...horizon));
   ctx.fillStyle = g; ctx.fillRect(-R, yOff - R, R * 2, R);
-  const g2 = ctx.createLinearGradient(0, yOff, 0, yOff + R * .5);
-  g2.addColorStop(0, rgb(...WORLD.skyHaze));
-  g2.addColorStop(.35, rgb(...mixc(WORLD.skyHaze, WORLD.ground, .55)));
-  g2.addColorStop(1, rgb(...shade(WORLD.ground, .78)));
+  // below the horizon: haze fading into distant ground colour
+  const g2 = ctx.createLinearGradient(0, yOff, 0, yOff + R * .40);
+  g2.addColorStop(0, rgb(...horizon));
+  g2.addColorStop(.30, rgb(...mixc(horizon, WORLD.ground, .5)));
+  g2.addColorStop(1, rgb(...mixc(shade(WORLD.ground, .92), horizon, .18)));
   ctx.fillStyle = g2; ctx.fillRect(-R, yOff, R * 2, R);
   ctx.restore();
-  // sun disc + bloom
-  const sp = projectPoint(vadd(cam.pos, vmul(WORLD.sun, 9000)));
+
+  // sun: halo, then the disc itself
+  const sp = projectPoint(vadd(cam.pos, vmul(L.sun, 9000)));
   if (sp) {
-    const gl = ctx.createRadialGradient(sp.x, sp.y, 0, sp.x, sp.y, Math.max(W, H) * .42);
-    gl.addColorStop(0, "rgba(255,250,224,.95)");
-    gl.addColorStop(.05, "rgba(255,244,205,.55)");
-    gl.addColorStop(.3, "rgba(255,238,200,.13)");
-    gl.addColorStop(1, "rgba(255,240,210,0)");
+    const big = Math.max(W, H);
+    const gl = ctx.createRadialGradient(sp.x, sp.y, 0, sp.x, sp.y, big * .46);
+    gl.addColorStop(0, "rgba(255,250,228,.85)");
+    gl.addColorStop(.035, "rgba(255,246,214,.42)");
+    gl.addColorStop(.12, "rgba(255,240,206,.16)");
+    gl.addColorStop(.42, "rgba(250,236,210,.05)");
+    gl.addColorStop(1, "rgba(250,238,214,0)");
     ctx.fillStyle = gl; ctx.fillRect(0, 0, W, H);
+    const rd = big * .016;
+    const gd = ctx.createRadialGradient(sp.x, sp.y, 0, sp.x, sp.y, rd);
+    gd.addColorStop(0, "rgba(255,255,248,1)");
+    gd.addColorStop(.62, "rgba(255,252,232,.96)");
+    gd.addColorStop(1, "rgba(255,244,214,0)");
+    ctx.fillStyle = gd;
+    ctx.beginPath(); ctx.arc(sp.x, sp.y, rd, 0, TAU); ctx.fill();
   }
+}
+
+/* anamorphic glare streaks, drawn over the scene when the sun is in frame */
+function drawGlare() {
+  if (!Q.q.glare) return;
+  const sp = projectPoint(vadd(cam.pos, vmul(LIGHT.sun, 9000)));
+  if (!sp || sp.x < -W * .4 || sp.x > W * 1.4 || sp.y < -H * .4 || sp.y > H * 1.4) return;
+  const big = Math.max(W, H);
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.translate(sp.x, sp.y);
+  for (const [ang, len, wid, a] of [[0, .40, .012, .20], [Math.PI / 2, .13, .010, .10], [.7, .22, .006, .07]]) {
+    ctx.save(); ctx.rotate(ang);
+    const g = ctx.createLinearGradient(-big * len, 0, big * len, 0);
+    g.addColorStop(0, "rgba(255,240,206,0)");
+    g.addColorStop(.5, "rgba(255,246,222," + a + ")");
+    g.addColorStop(1, "rgba(255,240,206,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(-big * len, -big * wid, big * len * 2, big * wid * 2);
+    ctx.restore();
+  }
+  ctx.restore();
 }
 
 /* --------------------------------------------------------------- terrain - */
 const _hg = new Float32Array(19 * 19);
 function drawTerrain() {
-  const LEV = 6, base = 58, half = 7, span = half * 2 + 1;
-  const sunv = WORLD.sun;
-  const viewDir = v3(cam.m[6], cam.m[7], cam.m[8]);
+  const LEV = Q.q.lev, base = Q.q.base, half = Q.q.half, span = half * 2 + 1;
+  const sunv = LIGHT.sun;
   const cm = cam.m;
+  const inflate = SEAM_PX * DPR;
   for (let L = LEV - 1; L >= 0; L--) {
     const cell = base * (1 << L);
     const gx = Math.round(cam.pos.x / cell), gz = Math.round(cam.pos.z / cell);
     for (let j = 0; j <= span - 1; j++) {
       const wz = (gz - half + j) * cell;
       for (let i = 0; i <= span - 1; i++) {
-        _hg[j * span + i] = terrainH((gx - half + i) * cell, wz);
+        _hg[j * span + i] = terrainH((gx - half + i) * cell, wz, cell);
       }
     }
     const lodBias = L * 140;
@@ -449,9 +653,15 @@ function drawTerrain() {
         const dx = mcx - cam.pos.x, dz = mcz - cam.pos.z;
         const dist = Math.hypot(dx, dz);
         if (dist > cell * 11 + 400) continue;
-        const wet = (h00 < 0) + (h10 < 0) + (h01 < 0) + (h11 < 0);
-        const water = wet === 4;
-        if (wet) { h00 = Math.max(h00, 0); h10 = Math.max(h10, 0); h01 = Math.max(h01, 0); h11 = Math.max(h11, 0); }
+        const push = inField(mcx, mcz) ? FIELD_PUSH : 0;
+        // how flooded this patch is, from its mean height rather than a corner
+        // count, which would alternate between neighbours and read as a checkerboard
+        const hRaw = (h00 + h10 + h01 + h11) * .25;
+        const wetF = sstep(4, -7, hRaw);
+        const water = wetF > .02;
+        if (h00 < 0 || h10 < 0 || h01 < 0 || h11 < 0) {
+          h00 = Math.max(h00, 0); h10 = Math.max(h10, 0); h01 = Math.max(h01, 0); h11 = Math.max(h11, 0);
+        }
         _vp[0] = x0; _vp[1] = h00; _vp[2] = z0;
         _vp[3] = x1; _vp[4] = h10; _vp[5] = z0;
         _vp[6] = x1; _vp[7] = h11; _vp[8] = z1;
@@ -470,28 +680,39 @@ function drawTerrain() {
         if (!anyFront) continue;
         const m = clipProject(4);
         if (m < 3 || offscreen(m)) continue;
-        // lighting from the quad's slope
-        const nx = (h00 + h01 - h10 - h11) * .5, nz = (h00 + h10 - h01 - h11) * .5;
-        const nl = Math.hypot(nx, cell, nz);
-        const ny = cell / nl;
-        const ndl = clamp((nx / nl) * sunv.x + ny * sunv.y + (nz / nl) * sunv.z, 0, 1);
+        // true bilinear normal of the quad
+        const nxr = (h00 + h01 - h10 - h11) * .5, nzr = (h00 + h10 - h01 - h11) * .5;
+        const nl = Math.hypot(nxr, cell, nzr);
+        const nx = nxr / nl, ny = cell / nl, nz = nzr / nl;
         const slope = 1 - ny;
         const hAvg = (h00 + h10 + h01 + h11) * .25;
+        // direction from the eye to this patch, for aerial perspective
+        const dy = hAvg - cam.pos.y;
+        const d3 = Math.hypot(dx, dy, dz) || 1;
+        const ex = dx / d3, ey = dy / d3, ez = dz / d3;
         let col;
         if (water) {
-          col = [34, 70, 100];
-          // sun glitter: strong when the reflected sun lines up with the view
-          const g = Math.pow(clamp(-viewDir.y, 0, 1), .6) * Math.pow(clamp(vdot(viewDir, v3(sunv.x, -sunv.y, sunv.z)), 0, 1), 22);
-          col = mixc(col, [255, 248, 222], g * .85);
-          col = mixc(col, WORLD.skyMid, .28);
+          // Fresnel: water is dark looking down into it and mirror-bright at a
+          // grazing angle, where it picks up the sky
+          const cosi = clamp(-ey, 0, 1);
+          const fres = .03 + .97 * Math.pow(1 - cosi, 5);
+          const skyRefl = mixc(LIGHT.mid, LIGHT.hazeNear, .45);
+          col = mixc([22, 52, 76], skyRefl, clamp(fres, 0, .92));
+          // specular glitter where the reflected sun lines up with the view
+          const rx = ex, ry = -ey, rz = ez;
+          const g = Math.pow(clamp(rx * sunv.x + ry * sunv.y + rz * sunv.z, 0, 1), 64);
+          const chop = .5 + .5 * Math.sin(mcx * .06 + mcz * .045 + WIND.t * 1.7);
+          col = mixc(col, [255, 250, 228], clamp(g * (.55 + .45 * chop), 0, .9));
+          // the shoreline fades from wet sand into open water
+          if (wetF < 1) col = mixc(litColor(terrainColor(1.5, slope, mcx, mcz), nx, ny, nz), col, wetF);
         } else {
-          col = terrainColor(hAvg, slope, mcx, mcz);
-          col = shade(col, .46 + .74 * ndl);
+          col = litColor(terrainColor(hAvg, slope, mcx, mcz), nx, ny, nz);
         }
-        const fill = fogged(col, Math.max(dist, dmin));
-        // adjacent fills leave hairline gaps from antialiasing, so outline each
-        // quad in its own colour to close them
-        DL.poly(dist + lodBias, _sp, m, fill, fill, 1);
+        const fill = aerial(col, Math.max(dist, dmin), ex, ey, ez);
+        // adjacent fills leave hairline gaps from antialiasing; grow each quad a
+        // fraction of a pixel instead of paying for a stroke on every one
+        if (inflate > 0) grow(m, inflate);
+        DL.poly(dist + lodBias + push, _sp, m, fill, null, 0);
       }
     }
   }
@@ -565,7 +786,6 @@ function drawMesh(mesh, origin, M, pivot, tint, alphaFade) {
     _mv[i * 3 + 1] = cm[3] * dx + cm[4] * dy + cm[5] * dz;
     _mv[i * 3 + 2] = cm[6] * dx + cm[7] * dy + cm[8] * dz;
   }
-  const sun = WORLD.sun;
   for (let fi = 0; fi < mesh.f.length; fi++) {
     const fc = mesh.f[fi], idx = fc.i, n = idx.length;
     let cxv = 0, cyv = 0, czv = 0, front = false, dmin = 1e9;
@@ -592,24 +812,35 @@ function drawMesh(mesh, origin, M, pivot, tint, alphaFade) {
     if (facing > 0) { if (!fc.two) continue; nx = -nx; ny = -ny; nz = -nz; }
     const m = clipProject(n);
     if (m < 3 || offscreen(m)) continue;
-    const ndl = clamp(nx * sun.x + ny * sun.y + nz * sun.z, 0, 1);
     let col = fc.c;
     if (tint) col = mixc(col, tint, .55);
-    let k = .40 + .72 * ndl;
-    if (fc.spec) {  // metal / glass highlight
-      const hx = sun.x - vx / Math.hypot(vx, vy, vz), hy = sun.y - vy / Math.hypot(vx, vy, vz), hz = sun.z - vz / Math.hypot(vx, vy, vz);
+    const dist = Math.hypot(cxv, cyv, czv) || 1;
+    const ex = vx / dist, ey = vy / dist, ez = vz / dist;   // eye -> surface
+    let c2 = litColor(col, nx, ny, nz);
+    // Blinn-Phong highlight: paint and glass both catch the sun
+    const sh = fc.spec;
+    if (sh) {
+      const hx = LIGHT.sun.x - ex, hy = LIGHT.sun.y - ey, hz = LIGHT.sun.z - ez;
       const hl = Math.hypot(hx, hy, hz) || 1;
-      const s = Math.pow(clamp((nx * hx + ny * hy + nz * hz) / hl, 0, 1), 22) * fc.spec;
-      k += s * 1.5;
+      const sp2 = Math.pow(clamp((nx * hx + ny * hy + nz * hz) / hl, 0, 1), fc.gloss || 30) * sh;
+      c2 = [c2[0] + sp2 * 235, c2[1] + sp2 * 232, c2[2] + sp2 * 215];
+      // sky reflection at grazing angles gives curved metal its sheen
+      const fres = Math.pow(1 - clamp(-(nx * ex + ny * ey + nz * ez), 0, 1), 4) * .30 * sh;
+      c2 = [c2[0] + fres * LIGHT.mid[0], c2[1] + fres * LIGHT.mid[1], c2[2] + fres * LIGHT.mid[2]];
     }
-    const dist = Math.hypot(cxv, cyv, czv);
-    let c2 = shade(col, k);
-    const fill = fc.alpha !== undefined || alphaFade !== undefined
-      ? (() => { const f = 1 - Math.exp(-dist * WORLD.fogDensity);
-          const cc = mixc(c2, fogCol, f);
-          return "rgba(" + (cc[0] | 0) + "," + (cc[1] | 0) + "," + (cc[2] | 0) + "," + ((fc.alpha !== undefined ? fc.alpha : 1) * (alphaFade !== undefined ? alphaFade : 1)).toFixed(3) + ")"; })()
-      : fogged(c2, dist);
-    DL.poly(dist - (fc.bias || 0), _sp, m, fill, fc.edge ? fogged(shade(col, .55), dist) : null, 1);
+    const alpha = (fc.alpha !== undefined ? fc.alpha : 1) * (alphaFade !== undefined ? alphaFade : 1);
+    let fill;
+    if (alpha < .999) {
+      const f = 1 - Math.exp(-dist * LIGHT.density);
+      const cc = mixc(c2, fogCol, f);
+      fill = "rgba(" + (clamp(cc[0], 0, 255) | 0) + "," + (clamp(cc[1], 0, 255) | 0) + "," +
+        (clamp(cc[2], 0, 255) | 0) + "," + alpha.toFixed(3) + ")";
+    } else {
+      fill = aerial([clamp(c2[0], 0, 255), clamp(c2[1], 0, 255), clamp(c2[2], 0, 255)], dist, ex, ey, ez);
+    }
+    DL.poly(dist - (fc.bias || 0), _sp, m, fill,
+      fc.edge ? aerial([clamp(c2[0] * .76, 0, 255), clamp(c2[1] * .76, 0, 255), clamp(c2[2] * .76, 0, 255)], dist, ex, ey, ez) : null,
+      Math.max(1, .9 * DPR));
   }
 }
 
@@ -633,7 +864,7 @@ function buildAircraft() {
       [1.00, .59, .65, .00], [1.95, .54, .60, .03], [2.70, .46, .50, .05],
       [3.25, .38, .40, .06], [3.62, .30, .31, .06]
     ];
-    const N = 10;
+    const N = 12;
     const pt = (s, k) => {
       const a = k / N * TAU;
       return [s[1] * Math.sin(a), s[3] + s[2] * Math.cos(a), s[0]];
@@ -733,7 +964,7 @@ function buildAircraft() {
     }
     // fin
     const fz = -3.15;
-    const fin = [[0, .34, fz + .35], [0, 1.05, fz - .12], [0, 1.72, fz - .55], [0, 1.72, fz - 1.05], [0, .34, fz - 1.30]];
+    const fin = [[0, .34, fz + .35], [0, 1.05, fz - .12], [0, 1.72, fz - .55], [0, 1.72, fz - 1.05], [0, .34, fz - 1.05]];
     for (const sx of [-.055, .055]) {
       for (let k = 1; k < fin.length - 1; k++)
         mb.tri([sx, fin[0][1], fin[0][2]], [sx, fin[k][1], fin[k][2]], [sx, fin[k + 1][1], fin[k + 1][2]], mixc(LIV.red, LIV.top, .25), SPEC);
@@ -776,7 +1007,7 @@ function buildAircraft() {
     const pt = (s, k) => { const a = -Math.PI / 2 + k / N * Math.PI; return [s[1] * Math.sin(a), base + s[2] * Math.cos(a), s[0]]; };
     for (let i = 0; i < st.length - 1; i++)
       for (let k = 0; k < N; k++)
-        mb.quad(pt(st[i], k), pt(st[i], k + 1), pt(st[i + 1], k + 1), pt(st[i + 1], k), LIV.glass, { two: true, spec: 1.6, alpha: .52 });
+        mb.quad(pt(st[i], k), pt(st[i], k + 1), pt(st[i + 1], k + 1), pt(st[i + 1], k), LIV.glass, { two: true, spec: .75, gloss: 60, alpha: .46 });
     P.glass = mb.done();
     const mb2 = MB();
     mb2.box(0, .58, .95, .96, .30, 1.9, LIV.dark, TWO);  // cockpit interior shell
@@ -800,7 +1031,7 @@ function buildAircraft() {
       const ca = Math.cos(a), sa = Math.sin(a);
       const L = 1.28, w0 = .19, w1 = .10;
       const p = (r, w, tw) => [sa * r + ca * w, .06 + ca * r - sa * w, 3.95 + tw];
-      mb2.quad(p(.24, w0, -.05), p(L, w1, .06), p(L, -w1, -.02), p(.24, -w0, -.10), LIV.dark, { two: true, spec: .6 });
+      mb2.quad(p(.24, w0, -.05), p(L, w1, .06), p(L, -w1, -.02), p(.24, -w0, -.10), LIV.dark, { two: true, spec: .2 });
     }
     P.blades = mb2.done();
   }
@@ -814,7 +1045,7 @@ function buildAircraft() {
       [.20, .60, .66, .01], [1.00, .59, .65, .00], [1.95, .54, .60, .03],
       [2.70, .46, .50, .05], [3.25, .38, .40, .06], [3.62, .30, .31, .06]
     ];
-    const N = 10;
+    const N = 12;
     const pt = (sq, k) => { const a = k / N * TAU; return [sq[1] * Math.sin(a), sq[3] + sq[2] * Math.cos(a), sq[0]]; };
     for (let i = 0; i < st.length - 1; i++) {
       for (let k = 0; k < N; k++) {
@@ -868,14 +1099,22 @@ const E = WORLD.fieldElev;
 function buildAirport() {
   const mb = MB();
   const L = WORLD.rwyLen, Wd = WORLD.rwyW, hw = Wd / 2, y = E + .10;
-  const asph = [58, 60, 64], paint = [226, 230, 234];
+  const PAVE_PUSH = 220;
+  const asph = [52, 54, 58], paint = [230, 234, 238];
   const segs = 38;
   for (let i = 0; i < segs; i++) {
     const z0 = -L / 2 + i * L / segs, z1 = z0 + L / segs;
-    mb.quad([-hw, y, z0], [hw, y, z0], [hw, y, z1], [-hw, y, z1],
-      shade(asph, 1 + (hash2(i, 7) - .5) * .09), { two: true, bias: 3, edge: 1 });
+    const zc = Math.abs((z0 + z1) * .5);
+    // tyre rubber laid down where aeroplanes actually touch down
+    const rub = sstep(L / 2 - 430, L / 2 - 190, zc) * (1 - sstep(L / 2 - 95, L / 2 - 25, zc));
+    let c = shade(asph, 1 + (hash2(i, 7) - .5) * .09);
+    c = mixc(c, [33, 32, 33], rub * .78);
+    mb.quad([-hw, y, z0], [hw, y, z0], [hw, y, z1], [-hw, y, z1], c, { two: true, bias: -PAVE_PUSH, edge: 1 });
   }
-  const mark = (x0, z0, x1, z1, col, b) => mb.quad([x0, y + .02, z0], [x1, y + .02, z0], [x1, y + .02, z1], [x0, y + .02, z1], col || paint, { two: true, bias: b || 6 });
+  /* Paint sits at true depth. The asphalt under it is pushed back instead, and
+     the terrain under that further still, so the three coplanar layers stack in
+     the right order without any of them jumping in front of the aeroplane. */
+  const mark = (x0, z0, x1, z1, col) => mb.quad([x0, y + .02, z0], [x1, y + .02, z0], [x1, y + .02, z1], [x0, y + .02, z1], col || paint, { two: true, bias: 0 });
   // centreline dashes
   for (let z = -L / 2 + 40; z < L / 2 - 40; z += 50) mark(-.7, z, .7, z + 30);
   // threshold bars at both ends
@@ -895,12 +1134,32 @@ function buildAirport() {
     const za = dir * (L / 2 - 300);
     mark(-12, za, -6.5, za - dir * 42); mark(6.5, za, 12, za - dir * 42);
   }
+  /* Runway designators. A seven-segment block font is how these are actually
+     painted, and each reads correctly from its own approach end. */
+  const SEGS = { 1: "bc", 3: "abcdg", 6: "acdefg", 8: "abcdefg" };
+  const digit = (d, cx, cz, dir) => {
+    const hh = 9, hwd = 5, t = 2.3, on = SEGS[d];
+    const put = (u0, v0, u1, v1) => {
+      const za = cz + dir * v0, zb = cz + dir * v1;
+      mark(cx + Math.min(u0, u1), Math.min(za, zb), cx + Math.max(u0, u1), Math.max(za, zb), paint, 50);
+    };
+    if (on.includes("a")) put(-hwd, hh - t, hwd, hh);
+    if (on.includes("g")) put(-hwd, -t / 2, hwd, t / 2);
+    if (on.includes("d")) put(-hwd, -hh, hwd, -hh + t);
+    if (on.includes("f")) put(-hwd, 0, -hwd + t, hh);
+    if (on.includes("b")) put(hwd - t, 0, hwd, hh);
+    if (on.includes("e")) put(-hwd, -hh, -hwd + t, 0);
+    if (on.includes("c")) put(hwd - t, -hh, hwd, 0);
+  };
+  digit(1, -8, L / 2 - 66, -1); digit(8, 8, L / 2 - 66, -1);   // runway 18, read heading south
+  digit(3, -8, -L / 2 + 66, 1); digit(6, 8, -L / 2 + 66, 1);   // runway 36, read heading north
+
   // edge lines
-  mark(-hw + .6, -L / 2, -hw + 1.6, L / 2, [214, 218, 222], 5);
-  mark(hw - 1.6, -L / 2, hw - .6, L / 2, [214, 218, 222], 5);
+  mark(-hw + .6, -L / 2, -hw + 1.6, L / 2, [214, 218, 222], 40);
+  mark(hw - 1.6, -L / 2, hw - .6, L / 2, [214, 218, 222], 40);
   // taxiway + apron, laid out east of the runway so the strip stays clear
-  mb.quad([hw, y, 556], [120, y, 556], [120, y, 600], [hw, y, 600], shade(asph, .95), { two: true, bias: 3 });
-  mb.quad([118, y, 520], [332, y, 520], [332, y, 780], [118, y, 780], shade(asph, .90), { two: true, bias: 2 });
+  mb.quad([hw, y, 556], [120, y, 556], [120, y, 600], [hw, y, 600], shade(asph, .95), { two: true, bias: -PAVE_PUSH });
+  mb.quad([118, y, 520], [332, y, 520], [332, y, 780], [118, y, 780], shade(asph, .90), { two: true, bias: -PAVE_PUSH - 10 });
   // hangars
   const hangar = (cx, cz, w, d, h, col) => {
     mb.box(cx, E + h / 2, cz, w, h, d, col, TWO);
@@ -946,34 +1205,86 @@ const RING = buildRing();
 
 /* scattered trees, drawn as depth-sorted billboards */
 function drawTrees() {
-  const cell = 78, rad = 1250;
+  const cell = 86, rad = Q.q.treeR, dens = Q.q.trees;
   const gx = Math.round(cam.pos.x / cell), gz = Math.round(cam.pos.z / cell);
   const n = Math.ceil(rad / cell);
+  // which way is the sun on screen? the lit half of each canopy goes that side
+  const right = v3(cam.m[0], cam.m[1], cam.m[2]);
+  const sunSide = vdot(right, LIGHT.sun) >= 0 ? 1 : -1;
   for (let j = -n; j <= n; j++) {
     for (let i = -n; i <= n; i++) {
       const h1 = hash2((gx + i) * 31 + 7, (gz + j) * 17 + 3);
-      if (h1 > .42) continue;
+      if (h1 > dens) continue;
       const x = (gx + i) * cell + (hash2(gx + i, gz + j) - .5) * cell * .9;
       const z = (gz + j) * cell + (hash2(gz + j, gx + i) - .5) * cell * .9;
       const dx = x - cam.pos.x, dz = z - cam.pos.z;
       if (dx * dx + dz * dz > rad * rad) continue;
       const gy = terrainH(x, z);
-      if (gy < 2 || gy > 760) continue;
+      if (gy < 2 || gy > 820) continue;
       if (Math.abs(x) < 320 && Math.abs(z) < WORLD.rwyLen * .6) continue;   // keep the field clear
-      const hgt = 7 + h1 * 22;
+      const hgt = 5.5 + (h1 / dens) * (h1 / dens) * 15;
       const base = projectPoint(v3(x, gy, z));
       if (!base) continue;
       const top = projectPoint(v3(x, gy + hgt, z));
       if (!top) continue;
-      const w = Math.abs(base.y - top.y) * .42;
+      const w = Math.abs(base.y - top.y) * .40;
       if (w < .6) continue;
+      if (base.x < -w * 2 || base.x > W + w * 2) continue;
       const dist = base.z;
-      const dark = fogged(shade([44, 72, 46], .7 + h1 * .5), dist);
-      const trunkW = Math.max(1, w * .2);
-      DL.poly(dist + .5, [base.x - trunkW, base.y, base.x + trunkW, base.y, top.x + trunkW * .5, top.y * .35 + base.y * .65, top.x - trunkW * .5, top.y * .35 + base.y * .65], 4, fogged([72, 56, 40], dist), null, 0);
-      DL.poly(dist, [top.x, top.y, base.x + w, base.y - (base.y - top.y) * .26, base.x + w * .55, base.y, base.x - w * .55, base.y, base.x - w, base.y - (base.y - top.y) * .26], 5, dark, null, 0);
+      const dy = gy + hgt * .5 - cam.pos.y, d3 = Math.hypot(dx, dy, dz) || 1;
+      const ex = dx / d3, ey = dy / d3, ez = dz / d3;
+      // species variation, then light the two halves of the canopy differently
+      const tone = hash2((gx + i) * 5, (gz + j) * 11);
+      const leaf = mixc([46, 78, 44], [74, 96, 52], tone);
+      const litc = litColor(leaf, sunSide * .55, .72, 0);
+      const shc = litColor(leaf, -sunSide * .55, .34, 0);
+      const fillL = aerial(litc, dist, ex, ey, ez), fillS = aerial(shc, dist, ex, ey, ez);
+      const trunkW = Math.max(.9, w * .17);
+      const ty = top.y * .34 + base.y * .66;
+      DL.poly(dist + .6, [base.x - trunkW, base.y, base.x + trunkW, base.y,
+        base.x + trunkW * .5, ty, base.x - trunkW * .5, ty], 4,
+        aerial(litColor([58, 45, 34], 0, .3, 0), dist, ex, ey, ez), null, 0);
+      const mid = base.y - (base.y - top.y) * .24;
+      // shaded half
+      DL.poly(dist, [top.x, top.y, base.x - sunSide * w, mid,
+        base.x - sunSide * w * .52, base.y, base.x, base.y], 4, fillS, null, 0);
+      // sunlit half
+      DL.poly(dist - .05, [top.x, top.y, base.x + sunSide * w, mid,
+        base.x + sunSide * w * .52, base.y, base.x, base.y], 4, fillL, null, 0);
     }
   }
+}
+
+/* The aircraft's own shadow, cast along the sun onto the ground beneath it.
+   Nothing sells altitude like this on takeoff and landing. */
+const SHADOW_HULL = [
+  v3(0, 0, 2.9), v3(1.0, 0, 1.4), v3(5.45, 0, .2), v3(5.3, 0, -.9), v3(1.1, 0, -1.7),
+  v3(2.2, 0, -4.4), v3(.5, 0, -5.4), v3(-.5, 0, -5.4), v3(-2.2, 0, -4.4), v3(-1.1, 0, -1.7),
+  v3(-5.3, 0, -.9), v3(-5.45, 0, .2), v3(-1.0, 0, 1.4)
+];
+function drawShadow() {
+  if (!Q.q.shadow) return;
+  const P = PLANE, sun = LIGHT.sun;
+  const gh = groundH(P.pos.x, P.pos.z);
+  const agl = P.pos.y - gh;
+  if (agl > 420 || agl < -2) return;
+  const fade = (1 - sstep(60, 420, agl)) * .46 + .04;
+  const N = SHADOW_HULL.length;
+  let cxs = 0, cys = 0, ok = true, dmin = 1e9;
+  for (let i = 0; i < N; i++) {
+    const w = vadd(P.pos, mRot(P.m, SHADOW_HULL[i]));
+    const t = (w.y - gh) / sun.y;
+    const sx = w.x - sun.x * t, sz = w.z - sun.z * t;
+    const sp = projectPoint(v3(sx, groundH(sx, sz) + .10, sz));
+    if (!sp) { ok = false; break; }
+    _sp[i * 2] = sp.x; _sp[i * 2 + 1] = sp.y;
+    cxs += sp.x; cys += sp.y;
+    if (sp.z < dmin) dmin = sp.z;
+  }
+  if (!ok) return;
+  // soften the edge as the aircraft climbs away from the ground
+  grow(N, clamp(agl * .05, .5, 6) * DPR);
+  DL.poly(dmin - 4, _sp, N, "rgba(16,26,22," + fade.toFixed(3) + ")", null, 0);
 }
 
 /* volumetric-ish cloud field */
@@ -1000,17 +1311,22 @@ function drawClouds() {
   for (const cl of CLOUDS) {
     const dx = cl.p.x - cam.pos.x, dz = cl.p.z - cam.pos.z;
     const d2 = dx * dx + dz * dz;
-    if (d2 > 16000 * 16000) continue;
+    if (d2 > Q.q.clouds * Q.q.clouds) continue;
     for (const pf of cl.puffs) {
       const wp = v3(cl.p.x + pf.x, cl.p.y + pf.y, cl.p.z + pf.z);
       const sp = projectPoint(wp);
       if (!sp) continue;
       const r = pf.r * sp.s;
       if (r < 1.5 || sp.x < -r * 2 || sp.x > W + r * 2 || sp.y < -r * 2 || sp.y > H + r * 2) continue;
-      const fog = 1 - Math.exp(-sp.z * WORLD.fogDensity * .55);
-      const lit = 1 - clamp((pf.y + 60) / 200, 0, 1) * .30;
-      const c = mixc(mixc([255, 255, 255], [168, 186, 208], 1 - lit), fogCol, fog * .75);
-      DL.sprite(sp.z, sp.x, sp.y, r, sprite(c[0], c[1], c[2], 0), .90);
+      const fog = 1 - Math.exp(-sp.z * LIGHT.density * .5);
+      // light each puff by where it sits in the cloud: tops and the sun side
+      // catch the light, the underside stays blue-grey
+      const pl = Math.hypot(pf.x, pf.y, pf.z) || 1;
+      const sd = (pf.x / pl) * LIGHT.sun.x + (pf.y / pl) * LIGHT.sun.y + (pf.z / pl) * LIGHT.sun.z;
+      const lit = clamp(.42 + .58 * (sd * .5 + .5) + clamp(pf.y / 140, -.3, .3), 0, 1);
+      let c = mixc([150, 166, 192], [255, 253, 246], lit);
+      c = mixc(c, LIGHT.hazeNear, fog * .8);
+      DL.sprite(sp.z, sp.x, sp.y, r, sprite(c[0], c[1], c[2], 0), .92);
     }
   }
 }
@@ -1322,6 +1638,22 @@ function drawParts() {
   }
 }
 
+/* Wingtip vortices when the wing is working hard, and exhaust haze at power. */
+function spawnTrails(dt) {
+  const P = PLANE;
+  if (P.crashed || P.onGround || P.tas < 45) return;
+  if ((P.gload > 2.3 || P.alpha > 9 * DEG) && Math.random() < dt * 34) {
+    for (const sx of [-5.35, 5.35]) {
+      const wp = vadd(P.pos, mRot(P.m, v3(sx, .24, -.15)));
+      addPart(wp, vmul(P.vel, .04), .30, .6 + Math.random() * .4, [252, 253, 255], 3.4);
+    }
+  }
+  if (P.rpm > .72 && Math.random() < dt * 9) {
+    const ex = vadd(P.pos, mRot(P.m, v3((Math.random() < .5 ? -.34 : .34), -.05, 1.25)));
+    addPart(ex, vmul(P.vel, -.02), .18, .5, [86, 84, 82], 2.2);
+  }
+}
+
 /* ============================================================ events ==== */
 let banner = document.getElementById("banner"), toastEl = document.getElementById("toast");
 let toastT = 0;
@@ -1355,10 +1687,10 @@ function updateCamera(dt) {
     want = vadd(P.pos, mRot(m, v3(0, .80, -.45)));
     cam.pos = want;
     cam.m = qMat(P.q, cam.m);
-    FOV = 72 * DEG; F = (H * .5) / Math.tan(FOV * .5);
+    FOV = FOVBASE * 1.16; F = (H * .5) / Math.tan(FOV * .5);
     return;
   }
-  FOV = 62 * DEG; F = (H * .5) / Math.tan(FOV * .5);
+  FOV = FOVBASE; F = (H * .5) / Math.tan(FOV * .5);
   if (camMode === 0) {
     const back = 17 + clamp(vlen(P.vel) * .06, 0, 7);
     want = vadd(P.pos, vadd(vmul(fwd, -back), vadd(vmul(up, 3.4), vmul(right, 0))));
@@ -1437,7 +1769,7 @@ function drawAircraft() {
       drawMesh(AC.blades, pos, mmul(Rb, mAxis(0, 0, 1, P.propAng)), null);
     } else {
       for (let i = 0; i < 3; i++)
-        drawMesh(AC.blades, pos, mmul(Rb, mAxis(0, 0, 1, P.propAng + i * .55)), null, null, .30);
+        drawMesh(AC.blades, pos, mmul(Rb, mAxis(0, 0, 1, P.propAng + i * .55)), null, null, .17);
       const hub = projectPoint(vadd(pos, mRot(Rb, v3(0, .06, 2.65))));
       if (hub) DL.sprite(hub.z - .5, hub.x, hub.y, 1.45 * hub.s, sprite(208, 216, 226, 2), 1);
     }
@@ -1458,7 +1790,7 @@ function drawAircraft() {
     // only the blur disc: the blades themselves are a smear at these speeds
     const hub = projectPoint(vadd(pos, mRot(Rb, v3(0, .06, 2.65))));
     if (hub && P.rpm > .2) DL.sprite(hub.z - .5, hub.x, hub.y, 1.45 * hub.s, sprite(208, 216, 226, 2), 1);
-    drawMesh(AC.glass, pos, Rb, null, null, .11);
+    drawMesh(AC.glass, pos, Rb, null, null, .055);
   }
   // engine smoke when damaged
   if (P.crashed && Math.random() < .5) spawnSmoke(vadd(pos, mRot(Rb, v3(0, .3, 1.2))), P.vel);
@@ -1617,6 +1949,216 @@ function checkLanding() {
   }
 }
 
+/* ============================================================== touch ==== */
+/* On a phone the whole control set is drawn into the canvas and driven by
+   pointer events: a relative thumb stick on the left, an absolute throttle
+   slider on the right, tap buttons for the switches, and rudder pads in
+   complex mode. Nothing is a DOM element, so it scales with the canvas and
+   costs nothing in layout. */
+const TOUCH = {
+  on: MOBILE, ptr: new Map(),
+  stick: { id: null, hx: 0, hy: 0, cx: 0, cy: 0, r: 80, dx: 0, dy: 0, zw: 0, zh: 0 },
+  thr: { id: null, x: 0, y: 0, w: 0, h: 0 },
+  rud: { l: null, r: null, v: 0, boxes: [] },
+  btns: [], pause: { x: 0, y: 0, w: 0, h: 0 }, flash: {}
+};
+function layoutTouch() {
+  if (!W || !H) return;
+  const T = TOUCH, u = UI;
+  const sl = SAFE.l * DPR, sr = SAFE.r * DPR, sb = SAFE.b * DPR, st = SAFE.t * DPR;
+  const r = clamp(Math.min(W, H) * (PORTRAIT ? .20 : .17), 54 * u, 130 * u);
+  T.stick.r = r;
+  T.stick.hx = sl + r + 24 * u;
+  T.stick.hy = H - sb - r - 24 * u;
+  T.stick.zw = PORTRAIT ? W * .58 : W * .46;
+  T.stick.zh = PORTRAIT ? H * .40 : H * .70;
+  const bw = 78 * u, bh = 54 * u, g = 9 * u, tw = 54 * u;
+  let th, bx, by;
+  if (PORTRAIT) {
+    // narrow screen: throttle low on the right, switches stacked above it
+    th = Math.min(H * .30, 300 * u);
+    T.thr.x = W - sr - tw - 16 * u;
+    T.thr.y = H - sb - th - 16 * u;
+    bx = W - sr - 16 * u - (bw * 2 + g);
+    by = T.thr.y - 14 * u - (bh * 2 + g);
+  } else {
+    th = Math.min(H * .54, 330 * u);
+    T.thr.x = W - sr - tw - 16 * u;
+    T.thr.y = H - sb - th - 16 * u;
+    bx = T.thr.x - 16 * u - (bw * 2 + g);
+    by = H - sb - 16 * u - (bh * 2 + g);
+  }
+  T.thr.w = tw; T.thr.h = th;
+  T.btns = [
+    { k: "gear", x: bx, y: by, w: bw, h: bh },
+    { k: "flap", x: bx + bw + g, y: by, w: bw, h: bh },
+    { k: "brake", x: bx, y: by + bh + g, w: bw, h: bh, hold: 1 },
+    { k: "cam", x: bx + bw + g, y: by + bh + g, w: bw, h: bh }
+  ];
+  const rw = 82 * u, rh = 54 * u, ry = H - sb - 16 * u - rh;
+  const rcx = PORTRAIT ? W * .5 : clamp((T.stick.hx + r + bx) / 2, T.stick.hx + r + rw + 16 * u, bx - rw - 16 * u);
+  T.rud.boxes = [
+    { k: "rudL", x: rcx - rw - 8 * u, y: ry, w: rw, h: rh },
+    { k: "rudR", x: rcx + 8 * u, y: ry, w: rw, h: rh }
+  ];
+  // tucked under the altitude read-out so it never sits on top of it
+  T.pause = { x: W - sr - 12 * u - 46 * u, y: st + 8 * u + 56 * u + 20 * u, w: 46 * u, h: 40 * u };
+}
+const inBox = (b, x, y) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h;
+
+function touchAct(k) {
+  const P = PLANE;
+  TOUCH.flash[k] = .18;
+  if (k === "gear") { P.gearCmd = P.gearCmd > .5 ? 0 : 1; toast(P.gearCmd ? "GEAR DOWN" : "GEAR UP", 1.2); audio.beep(P.gearCmd ? 520 : 400, .18, .12); }
+  else if (k === "flap") { P.flapCmd = P.flapCmd >= .99 ? 0 : clamp(P.flapCmd + .25, 0, 1); toast("FLAPS " + Math.round(P.flapCmd * 100) + "%", 1); }
+  else if (k === "cam") { camMode = (camMode + 1) % CAMNAMES.length; toast("CAMERA: " + CAMNAMES[camMode], 1.2); }
+}
+function touchDown(id, x, y) {
+  const T = TOUCH;
+  if (!GAME.started || GAME.paused) return false;
+  if (inBox(T.pause, x, y)) { togglePause(); return true; }
+  for (const b of T.btns) {
+    if (inBox(b, x, y)) {
+      T.ptr.set(id, { kind: "btn", b });
+      if (!b.hold) touchAct(b.k); else TOUCH.flash[b.k] = 1;
+      return true;
+    }
+  }
+  if (MODE === "complex") {
+    for (const b of T.rud.boxes) {
+      if (inBox(b, x, y)) { T.ptr.set(id, { kind: "rud", b }); T.rud.v = b.k === "rudR" ? 1 : -1; return true; }
+    }
+  }
+  if (x > T.thr.x - 28 * UI && y > T.thr.y - 28 * UI) {
+    T.ptr.set(id, { kind: "thr" }); T.thr.id = id; touchThrottle(y); return true;
+  }
+  if (x < T.stick.zw && y > H - T.stick.zh) {
+    // relative stick: it appears wherever the thumb lands
+    T.stick.id = id; T.stick.cx = x; T.stick.cy = y; T.stick.dx = 0; T.stick.dy = 0;
+    T.ptr.set(id, { kind: "stick" });
+    return true;
+  }
+  return false;
+}
+function touchThrottle(y) {
+  const T = TOUCH.thr;
+  PLANE.thr = clamp(1 - (y - T.y) / T.h, 0, 1);
+  if (PLANE.thr > .02) PLANE.park = false;
+}
+function touchMove(id, x, y) {
+  const e = TOUCH.ptr.get(id);
+  if (!e) return false;
+  if (e.kind === "stick") {
+    const T = TOUCH.stick;
+    let dx = (x - T.cx) / T.r, dy = (y - T.cy) / T.r;
+    const l = Math.hypot(dx, dy);
+    if (l > 1) { dx /= l; dy /= l; }
+    T.dx = dx; T.dy = dy;
+  } else if (e.kind === "thr") touchThrottle(y);
+  else if (e.kind === "rud") {
+    if (!inBox(e.b, x, y)) { TOUCH.rud.v = 0; TOUCH.ptr.delete(id); }
+  } else if (e.kind === "btn" && e.b.hold) {
+    if (!inBox(e.b, x, y)) { TOUCH.flash[e.b.k] = 0; TOUCH.ptr.delete(id); }
+  }
+  return true;
+}
+function touchUp(id) {
+  const e = TOUCH.ptr.get(id);
+  if (!e) return;
+  if (e.kind === "stick") { TOUCH.stick.id = null; TOUCH.stick.dx = 0; TOUCH.stick.dy = 0; }
+  else if (e.kind === "thr") TOUCH.thr.id = null;
+  else if (e.kind === "rud") TOUCH.rud.v = 0;
+  else if (e.kind === "btn" && e.b.hold) TOUCH.flash[e.b.k] = 0;
+  TOUCH.ptr.delete(id);
+}
+function canvasXY(ev) {
+  const r = cv.getBoundingClientRect();
+  return [(ev.clientX - r.left) * (W / r.width), (ev.clientY - r.top) * (H / r.height)];
+}
+cv.addEventListener("pointerdown", ev => {
+  if (ev.pointerType === "mouse" && !TOUCH.on) return;
+  if (ev.pointerType !== "mouse") {
+    if (!TOUCH.on) { TOUCH.on = true; layoutTouch(); showTouchHelp(); }
+    audio.init();                       // iOS only unlocks audio inside a gesture
+    if (audio.ctx && audio.ctx.state === "suspended") audio.ctx.resume();
+  }
+  const [x, y] = canvasXY(ev);
+  if (touchDown(ev.pointerId, x, y)) { ev.preventDefault(); cv.setPointerCapture && cv.setPointerCapture(ev.pointerId); }
+}, { passive: false });
+cv.addEventListener("pointermove", ev => {
+  const [x, y] = canvasXY(ev);
+  if (touchMove(ev.pointerId, x, y)) ev.preventDefault();
+}, { passive: false });
+for (const t of ["pointerup", "pointercancel"])
+  window.addEventListener(t, ev => { touchUp(ev.pointerId); }, { passive: true });
+window.addEventListener("touchmove", ev => { if (TOUCH.on && ev.target === cv) ev.preventDefault(); }, { passive: false });
+document.addEventListener("gesturestart", ev => ev.preventDefault());
+
+/* ---- drawing the controls ---- */
+function padBox(x, y, w, h, r, on, label, sub) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  ctx.fillStyle = on ? "rgba(120,220,255,.30)" : "rgba(8,16,24,.40)";
+  ctx.fill();
+  ctx.strokeStyle = on ? "rgba(170,236,255,.85)" : "rgba(160,200,230,.35)";
+  ctx.lineWidth = 1.6 * UI; ctx.stroke();
+  if (label) {
+    ctx.fillStyle = on ? "#eafaff" : "rgba(215,232,245,.88)";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    hudFont(sub ? 13 * UI : 15 * UI, 600);
+    ctx.fillText(label, x + w / 2, y + h / 2 - (sub ? 7 * UI : 0));
+    if (sub) { hudFont(11 * UI); ctx.fillStyle = "rgba(190,214,232,.80)"; ctx.fillText(sub, x + w / 2, y + h / 2 + 10 * UI); }
+  }
+}
+function drawTouch(dt) {
+  if (!TOUCH.on || !GAME.started) return;
+  const T = TOUCH, P = PLANE, u = UI;
+  for (const k in T.flash) if (T.flash[k] > 0 && T.flash[k] < 1) T.flash[k] = Math.max(0, T.flash[k] - dt);
+  ctx.save();
+  // thumb stick
+  const sx = T.stick.id !== null ? T.stick.cx : T.stick.hx;
+  const sy = T.stick.id !== null ? T.stick.cy : T.stick.hy;
+  const r = T.stick.r;
+  ctx.beginPath(); ctx.arc(sx, sy, r, 0, TAU);
+  ctx.fillStyle = "rgba(8,16,24,.26)"; ctx.fill();
+  ctx.strokeStyle = "rgba(160,200,230,.34)"; ctx.lineWidth = 1.8 * u; ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(sx - r * .5, sy); ctx.lineTo(sx + r * .5, sy);
+  ctx.moveTo(sx, sy - r * .5); ctx.lineTo(sx, sy + r * .5);
+  ctx.strokeStyle = "rgba(160,200,230,.18)"; ctx.lineWidth = 1.2 * u; ctx.stroke();
+  const kx = sx + T.stick.dx * r, ky = sy + T.stick.dy * r;
+  ctx.beginPath(); ctx.arc(kx, ky, r * .34, 0, TAU);
+  ctx.fillStyle = T.stick.id !== null ? "rgba(120,220,255,.38)" : "rgba(150,200,230,.20)";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(180,236,255,.75)"; ctx.lineWidth = 2 * u; ctx.stroke();
+  // throttle
+  const t = T.thr;
+  padBox(t.x, t.y, t.w, t.h, 10 * u, false, null);
+  const fh = (t.h - 6 * u) * P.thr;
+  ctx.fillStyle = "rgba(120,220,255,.42)";
+  ctx.fillRect(t.x + 3 * u, t.y + t.h - 3 * u - fh, t.w - 6 * u, fh);
+  ctx.fillStyle = "rgba(226,244,255,.92)"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  hudFont(13 * u, 700);
+  ctx.fillText(Math.round(P.thr * 100) + "", t.x + t.w / 2, t.y + t.h - 3 * u - fh - 12 * u);
+  hudFont(10 * u); ctx.fillStyle = "rgba(190,214,232,.7)";
+  ctx.fillText("THR", t.x + t.w / 2, t.y - 10 * u);
+  // switches
+  for (const b of T.btns) {
+    let on = false, label = "", sub = "";
+    if (b.k === "gear") { on = P.gearCmd > .5; label = "GEAR"; sub = P.gear > .98 ? "DOWN" : P.gear < .02 ? "UP" : "…"; }
+    else if (b.k === "flap") { on = P.flapCmd > .02; label = "FLAP"; sub = Math.round(P.flapCmd * 100) + "%"; }
+    else if (b.k === "brake") { on = P.brake > .4; label = "BRAKE"; }
+    else if (b.k === "cam") { label = "VIEW"; sub = CAMNAMES[camMode]; }
+    padBox(b.x, b.y, b.w, b.h, 9 * u, on || T.flash[b.k] > 0, label, sub);
+  }
+  if (MODE === "complex")
+    for (const b of T.rud.boxes)
+      padBox(b.x, b.y, b.w, b.h, 9 * u, T.rud.v === (b.k === "rudR" ? 1 : -1), b.k === "rudR" ? "RUD ▶" : "◀ RUD");
+  // pause
+  padBox(T.pause.x, T.pause.y, T.pause.w, T.pause.h, 8 * u, false, "II");
+  ctx.restore();
+}
+
 /* =============================================================== HUD ==== */
 const KT = 1.94384, FT = 3.28084, FPM = 196.85;
 function hudFont(px, w) { ctx.font = (w || 400) + " " + px.toFixed(0) + "px ui-monospace,Menlo,Consolas,monospace"; }
@@ -1627,8 +2169,8 @@ function box(x, y, w, h, r, fill, stroke) {
   if (fill) { ctx.fillStyle = fill; ctx.fill(); }
   if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1.2 * (H / 900); ctx.stroke(); }
 }
-function drawHUD() {
-  const P = PLANE, e = eulerOf(P.m), U = H / 900;
+function drawHUDFull() {
+  const P = PLANE, e = eulerOf(P.m), U = UI;
   const G = "rgba(150,255,190,.92)", GD = "rgba(150,255,190,.42)", PANEL = "rgba(6,12,18,.52)";
   ctx.save();
   ctx.textBaseline = "middle";
@@ -1845,17 +2387,7 @@ function drawHUD() {
   }
 
   /* ---- objective line + guidance arrow ---- */
-  let obj = "";
-  if (SCEN === "rings") {
-    obj = "GATE " + Math.min(GAME.ringIdx + 1, GAME.rings.length) + "/" + GAME.rings.length + "   T " + GAME.ringT.toFixed(1) + "s";
-    const rg = GAME.rings[GAME.ringIdx];
-    if (rg) obj += "   " + (vlen(vsub(rg.p, P.pos)) / 1000).toFixed(2) + " km";
-  } else if (SCEN === "land") {
-    const d = Math.hypot(P.pos.x, P.pos.z - 950) / 1000;
-    obj = "LAND RWY 18   " + d.toFixed(2) + " km to threshold";
-  } else {
-    obj = "FREE FLIGHT   " + (Math.hypot(P.pos.x, P.pos.z) / 1000).toFixed(1) + " km from field   " + (P.dist / 1000).toFixed(1) + " km flown";
-  }
+  const obj = objectiveLine();
   hudFont(12.5 * U); ctx.textAlign = "center"; ctx.fillStyle = "rgba(200,224,244,.8)";
   ctx.fillText(obj, CX, H - 62 * U);
   hudFont(11 * U); ctx.fillStyle = "rgba(140,158,178,.75)";
@@ -1876,6 +2408,142 @@ function drawHUD() {
     }
   }
   ctx.restore();
+}
+
+
+/* Compact instrument set for phones: large read-outs, no tall tapes, and
+   nothing in the corners the thumbs live in. */
+function drawHUDCompact() {
+  const P = PLANE, e = eulerOf(P.m), u = UI;
+  const st = SAFE.t * DPR, sl = SAFE.l * DPR, sr = SAFE.r * DPR;
+  const G = "rgba(150,255,190,.95)", GD = "rgba(150,255,190,.50)", PANEL = "rgba(6,12,18,.55)";
+  ctx.save();
+  ctx.textBaseline = "middle";
+  const panel = (x, y, w, h, lbl, val, col, sub) => {
+    box(x, y, w, h, 6 * u, PANEL, GD);
+    hudFont(10 * u); ctx.fillStyle = GD; ctx.textAlign = "left";
+    ctx.fillText(lbl, x + 8 * u, y + 11 * u);
+    hudFont(25 * u, 700); ctx.fillStyle = col || G;
+    ctx.fillText(val, x + 8 * u, y + h * .60);
+    if (sub) { hudFont(10 * u); ctx.fillStyle = GD; ctx.textAlign = "right"; ctx.fillText(sub, x + w - 8 * u, y + h - 9 * u); }
+  };
+  const pw = 112 * u, ph = 56 * u, py = st + 8 * u;
+  panel(sl + 12 * u, py, pw, ph, "KIAS", String(Math.round(P.ias * KT)), P.stall > .2 ? "rgba(255,120,96,.95)" : G);
+  const vs = P.vsi * FPM;
+  panel(W - sr - 12 * u - pw, py, pw, ph, "ALT FT", String(Math.round(P.pos.y * FT)), G,
+    (vs >= 0 ? "+" : "") + Math.round(vs / 10) * 10);
+  hudFont(10 * u); ctx.textAlign = "right"; ctx.fillStyle = GD;
+  ctx.fillText("AGL " + Math.round((P.pos.y - groundH(P.pos.x, P.pos.z)) * FT) + "   G " + P.gload.toFixed(1),
+    W - sr - 12 * u, py + ph + 11 * u);
+
+  // heading strip
+  const hw2 = Math.min(W * .34, 300 * u), hx = CX - hw2 / 2, hy = py;
+  box(hx, hy, hw2, 26 * u, 4 * u, PANEL, GD);
+  ctx.save(); ctx.beginPath(); ctx.rect(hx, hy, hw2, 26 * u); ctx.clip();
+  const hdgDeg = e.hdg * RAD, pxPerDeg = hw2 / 80;
+  hudFont(11 * u);
+  for (let d = -45; d <= 45; d += 5) {
+    const a = Math.round(hdgDeg / 5) * 5 + d, x = CX + (a - hdgDeg) * pxPerDeg;
+    const aa = ((a % 360) + 360) % 360;
+    ctx.strokeStyle = GD; ctx.beginPath();
+    ctx.moveTo(x, hy + 26 * u); ctx.lineTo(x, hy + 26 * u - (aa % 10 === 0 ? 8 : 4) * u); ctx.stroke();
+    if (aa % 30 === 0) {
+      ctx.fillStyle = G; ctx.textAlign = "center";
+      ctx.fillText(aa === 0 ? "N" : aa === 90 ? "E" : aa === 180 ? "S" : aa === 270 ? "W" : String(aa), x, hy + 10 * u);
+    }
+  }
+  ctx.restore();
+  ctx.fillStyle = G; ctx.beginPath();
+  ctx.moveTo(CX, hy + 28 * u); ctx.lineTo(CX - 5 * u, hy + 37 * u); ctx.lineTo(CX + 5 * u, hy + 37 * u); ctx.fill();
+
+  // attitude: ladder in the cockpit, ball everywhere else
+  if (camMode === 1) {
+    ctx.save(); ctx.translate(CX, CY); ctx.rotate(-e.roll);
+    ctx.strokeStyle = G; ctx.fillStyle = G; ctx.lineWidth = 1.6 * u;
+    hudFont(11 * u);
+    for (let pp = -60; pp <= 60; pp += 10) {
+      const y = Math.tan(e.pitch - pp * DEG) * F;
+      if (Math.abs(y) > H * .46) continue;
+      const wl = pp === 0 ? 150 * u : 82 * u;
+      ctx.globalAlpha = pp === 0 ? .95 : .7;
+      ctx.beginPath();
+      if (pp < 0) ctx.setLineDash([8 * u, 6 * u]); else ctx.setLineDash([]);
+      ctx.moveTo(-wl, y); ctx.lineTo(-wl * .3, y);
+      ctx.moveTo(wl * .3, y); ctx.lineTo(wl, y);
+      ctx.stroke(); ctx.setLineDash([]);
+      if (pp !== 0) { ctx.textAlign = "right"; ctx.fillText(String(Math.abs(pp)), -wl - 5 * u, y); }
+    }
+    ctx.globalAlpha = 1; ctx.restore();
+    const vv = PLANE.vel;
+    if (vlen(vv) > 6) {
+      const sp = projectPoint(vadd(cam.pos, vmul(vnorm(vv), 400)));
+      if (sp) {
+        ctx.strokeStyle = "rgba(190,255,150,.95)"; ctx.lineWidth = 2 * u;
+        ctx.beginPath(); ctx.arc(sp.x, sp.y, 6 * u, 0, TAU); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(sp.x - 14 * u, sp.y); ctx.lineTo(sp.x - 6 * u, sp.y);
+        ctx.moveTo(sp.x + 6 * u, sp.y); ctx.lineTo(sp.x + 14 * u, sp.y);
+        ctx.moveTo(sp.x, sp.y - 6 * u); ctx.lineTo(sp.x, sp.y - 12 * u); ctx.stroke();
+      }
+    }
+    ctx.strokeStyle = "rgba(255,240,170,.9)"; ctx.lineWidth = 2.4 * u;
+    ctx.beginPath();
+    ctx.moveTo(CX - 40 * u, CY); ctx.lineTo(CX - 15 * u, CY); ctx.lineTo(CX - 8 * u, CY + 8 * u);
+    ctx.moveTo(CX + 40 * u, CY); ctx.lineTo(CX + 15 * u, CY); ctx.lineTo(CX + 8 * u, CY + 8 * u);
+    ctx.stroke();
+  } else {
+    const r = 46 * u, ox = CX, oy = hy + 26 * u + 12 * u + r;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(ox, oy, r, 0, TAU); ctx.clip();
+    ctx.translate(ox, oy); ctx.rotate(-e.roll);
+    const yo = clamp(Math.tan(e.pitch) * r * 1.5, -r * 2, r * 2);
+    ctx.fillStyle = "rgba(60,116,178,.92)"; ctx.fillRect(-r * 2, -r * 2 + yo, r * 4, r * 2);
+    ctx.fillStyle = "rgba(112,84,50,.92)"; ctx.fillRect(-r * 2, yo, r * 4, r * 2);
+    ctx.strokeStyle = "rgba(255,255,255,.9)"; ctx.lineWidth = 1.5 * u;
+    ctx.beginPath(); ctx.moveTo(-r, yo); ctx.lineTo(r, yo); ctx.stroke();
+    ctx.restore();
+    ctx.strokeStyle = GD; ctx.lineWidth = 1.5 * u;
+    ctx.beginPath(); ctx.arc(ox, oy, r, 0, TAU); ctx.stroke();
+    ctx.strokeStyle = "rgba(255,226,120,.95)"; ctx.lineWidth = 2.2 * u;
+    ctx.beginPath();
+    ctx.moveTo(ox - 20 * u, oy); ctx.lineTo(ox - 7 * u, oy);
+    ctx.moveTo(ox + 20 * u, oy); ctx.lineTo(ox + 7 * u, oy); ctx.stroke();
+  }
+
+  // warnings + objective
+  const warn = [];
+  if (P.stall > .2 && !P.onGround) warn.push(["STALL", "#ff6a56"]);
+  else if (MODE === "complex" && P.alpha > 12.8 * DEG && !P.onGround) warn.push(["APPROACHING STALL", "#ffb03a"]);
+  if (P.gear < .98 && P.pos.y - groundH(P.pos.x, P.pos.z) < 220 && P.ias * KT < 130 && !P.crashed) warn.push(["GEAR", "#ff6a56"]);
+  if (P.gload > 6.2) warn.push(["OVER G", "#ff6a56"]);
+  hudFont(19 * u, 700); ctx.textAlign = "center";
+  const blink = (GAME.t * 4 | 0) % 2 === 0;
+  for (let i = 0; i < warn.length; i++) {
+    if (!blink && i === 0) continue;
+    ctx.fillStyle = warn[i][1];
+    ctx.fillText(warn[i][0], CX, CY - 60 * u + i * 24 * u);
+  }
+  hudFont(11.5 * u); ctx.fillStyle = "rgba(200,224,244,.85)"; ctx.textAlign = "center";
+  ctx.fillText(objectiveLine(), CX, hy + 26 * u + (camMode === 1 ? 14 * u : 118 * u));
+  ctx.restore();
+}
+
+/* the one-line mission read-out, shared by both HUDs */
+function objectiveLine() {
+  const P = PLANE;
+  if (SCEN === "rings") {
+    let o = "GATE " + Math.min(GAME.ringIdx + 1, GAME.rings.length) + "/" + GAME.rings.length + "   T " + GAME.ringT.toFixed(1) + "s";
+    const rg = GAME.rings[GAME.ringIdx];
+    if (rg) o += "   " + (vlen(vsub(rg.p, P.pos)) / 1000).toFixed(2) + " km";
+    return o;
+  }
+  if (SCEN === "land") return "LAND RWY 18   " + (Math.hypot(P.pos.x, P.pos.z - 950) / 1000).toFixed(2) + " km to threshold";
+  return "FREE FLIGHT   " + (Math.hypot(P.pos.x, P.pos.z) / 1000).toFixed(1) + " km from field   " + (P.dist / 1000).toFixed(1) + " km flown";
+}
+
+function drawHUD(dt) {
+  if (TOUCH.on || W < 900 || H < 620) drawHUDCompact(); else drawHUDFull();
+  drawTouch(dt);
 }
 
 /* ============================================================= input ==== */
@@ -1904,7 +2572,20 @@ const KEYMAP = {
   const el = document.getElementById("keyList");
   const rows = KEYMAP.common.concat(KEYMAP.complex);
   el.innerHTML = rows.map(r => "<div><kbd>" + r[0].split(" ").join("</kbd><kbd>") + "</kbd>" + r[1] + "</div>").join("");
+  if (MOBILE || COARSE) showTouchHelp();
 })();
+function showTouchHelp() {
+  const note = document.getElementById("touchNote"), list = document.getElementById("keyList");
+  document.getElementById("keyHead").textContent = "Touch controls";
+  list.classList.add("hide"); note.classList.remove("hide");
+  note.innerHTML =
+    "<b>Left thumb</b> &mdash; put it anywhere on the left of the screen and the stick appears there. " +
+    "Left / right rolls, up / down pitches.<br>" +
+    "<b>Right slider</b> &mdash; throttle. <b>GEAR / FLAP / BRAKE / VIEW</b> &mdash; tap to work the switches. " +
+    "<b>II</b> top right pauses.<br>" +
+    "In <b>COMPLEX</b> two extra rudder pads appear along the bottom.<br>" +
+    "Turn the phone <b>landscape</b> for the widest view. Graphics detail tunes itself to keep the frame rate up.";
+}
 
 window.addEventListener("keydown", ev => {
   const k = ev.key;
@@ -1959,10 +2640,12 @@ window.addEventListener("mousemove", ev => {
   mdy = clamp(mdy + ev.movementY * .0045, -1, 1);
 });
 
+const touchHeld = k => TOUCH.flash[k] === 1;
 function applyInput(dt) {
   const P = PLANE;
   const simple = MODE === "simple";
   let a = 0, e2 = 0, r = 0;
+  const stick = TOUCH.on && TOUCH.stick.id !== null;
   if (K.arrowleft) a -= 1;
   if (K.arrowright) a += 1;
   if (K.arrowup) e2 += 1;
@@ -1971,10 +2654,17 @@ function applyInput(dt) {
   else { if (K.a) r -= 1; if (K.d) r += 1; }
   if (K.q) r -= 1; if (K.e) r += 1;
   if (mouseStick) { a = clamp(a + mdx, -1, 1); e2 = clamp(e2 - mdy, -1, 1); mdx *= Math.exp(-.8 * dt); mdy *= Math.exp(-.8 * dt); }
+  if (TOUCH.on && TOUCH.rud.v) r = TOUCH.rud.v;
   const rate = simple ? 3.0 : 4.2, ret = simple ? 3.6 : 5.0;
-  P.inA = a ? clamp(P.inA + a * rate * dt, -1, 1) : approach(P.inA, 0, ret, dt);
-  P.inE = e2 ? clamp(P.inE + e2 * rate * dt, -1, 1) : approach(P.inE, 0, ret, dt);
-  P.inR = r ? clamp(P.inR + r * 4 * dt, -1, 1) : approach(P.inR, 0, 6, dt);
+  if (stick) {
+    // the thumb stick is an absolute position, not a rate
+    P.inA = approach(P.inA, TOUCH.stick.dx, 15, dt);
+    P.inE = approach(P.inE, -TOUCH.stick.dy, 15, dt);
+  } else {
+    P.inA = a ? clamp(P.inA + a * rate * dt, -1, 1) : approach(P.inA, 0, ret, dt);
+    P.inE = e2 ? clamp(P.inE + e2 * rate * dt, -1, 1) : approach(P.inE, 0, ret, dt);
+  }
+  P.inR = r ? clamp(P.inR + r * 5 * dt, -1, 1) : approach(P.inR, 0, 6, dt);
   // throttle
   let tdir = 0;
   if (K.w || K.shift) tdir += 1;
@@ -1986,7 +2676,7 @@ function applyInput(dt) {
     if (K["."] || K.end) P.trim = clamp(P.trim - .30 * dt, -.8, .8);
   } else P.trim = 0;
   // brakes
-  const held = K[" "] ? 1 : 0;
+  const held = (K[" "] || touchHeld("brake")) ? 1 : 0;
   P.brake = clamp(approach(P.brake, Math.max(held, P.park && P.onGround ? 1 : 0), 12, dt), 0, 1);
 }
 
@@ -2031,6 +2721,7 @@ document.getElementById("startBtn").addEventListener("click", () => {
 /* ============================================================== loop ==== */
 let last = performance.now(), fps = 60, acc = 0;
 function frame(now) {
+  const work0 = performance.now();
   let dt = (now - last) / 1000; last = now;
   if (!isFinite(dt) || dt < 0) dt = .016;
   dt = Math.min(dt, .066);
@@ -2046,6 +2737,7 @@ function frame(now) {
     if (acc > h) acc = 0;
     GAME.t += dt;
     updateParts(dt);
+    spawnTrails(dt);
     checkRings(dt);
     checkLanding();
     if (PLANE.crashed) {
@@ -2071,7 +2763,7 @@ function frame(now) {
   }
 
   // ---- render ----
-  fogCol = mixc(WORLD.skyHaze, WORLD.skyMid, .25);
+  fogCol = LIGHT.hazeNear;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   drawSky();
   DL.reset();
@@ -2079,14 +2771,17 @@ function frame(now) {
   if (Math.hypot(cam.pos.x, cam.pos.z) < 14000) drawMesh(AIRPORT, v3(0, 0, 0), mIdent(), null);
   drawTrees();
   if (GAME.rings.length) drawRings();
-  if (GAME.started) drawAircraft();
+  if (GAME.started) { drawShadow(); drawAircraft(); }
   drawParts();
   drawClouds();
   DL.flush();
-  if (GAME.started && !GAME.paused) drawHUD();
+  drawGlare();
+  if (Q.q.vig && vignette) { ctx.fillStyle = vignette; ctx.fillRect(0, 0, W, H); }
+  if (GAME.started && !GAME.paused) drawHUD(dt);
+  tuneQuality(dt, performance.now() - work0);
   requestAnimationFrame(frame);
 }
-resize();
+applyQuality();
 resetPlane("free");
 qMat(PLANE.q, PLANE.m);
 requestAnimationFrame(frame);
