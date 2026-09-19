@@ -2472,7 +2472,7 @@ function resetPlane(scen) {
   P.inE = P.inA = P.inR = 0; P.trim = 0; P.flap = P.flapCmd = 0;
   P.crashed = false; P.crashT = 0; P.stall = 0; P.hardLand = 0; P.touched = 0; P.pitchI = 0; P.holdHdg = undefined;
   P.gear = P.gearCmd = 1; P.brake = 0; P.rpm = 0; P.dist = 0;
-  P.fbwI = 0; P.fbwG = 1; P.steer = 0; P.qbar = 0; P.gload = 0; P.alpha = 0; P.beta = 0; P.aoaCap = false; P.cmdG = 1;
+  P.fbwI = 0; P.fbwG = 1; P.pCmdS = 0; P.wxF = 0; P.steer = 0; P.qbar = 0; P.gload = 0; P.alpha = 0; P.beta = 0; P.aoaCap = false; P.cmdG = 1;
   P.chute = P.chuteCmd = 0; P.mach = 0; P.overQ = 0; P.gMax = 1; P.gMin = 1; P.gStress = 0; P.gRed = 0; P.heat = 0; P.burn = 0; P.gBreak = 0; P.ab = 0; P.abSm = 0; P.unstart = 0; P.apAlt = undefined; P.apHdg = undefined;
   P.q = qAxis(0, 1, 0, Math.PI);            // runway 18: heading south
   P.thr = 0;
@@ -2526,9 +2526,10 @@ const FBW = {
   bMax: 7 * DEG,      // sideslip at full rudder
   aoaMax: 27 * DEG,   // where the wing actually breaks down, not a soft cap
   kRoll: 9.0,         // roll-rate loop bandwidth, 1/s
+  pSmooth: 5.5,       // how fast the roll-rate command itself is allowed to move
   kPitch: 1.6,        // g loop proportional gain, 1/s
   kPitchI: 1.5,       // g loop integral gain
-  kRate: .34,         // pitch-rate feedback, for loop damping
+  zeta: .62,          // damping ratio the pitch loop holds the short period to
   qRef: 9000,         // Pa the ground law gears its authority against
   expo: .46,          // how much of the stick travel is the fine, low-gain part
   kBeta: 11,          // sideslip loop gain
@@ -2542,6 +2543,25 @@ const FBW = {
 function curve(x) {
   const a = Math.abs(clamp(x, -1, 1));
   return Math.sign(x) * (FBW.expo * a + (1 - FBW.expo) * a * a);
+}
+
+/* The load factor it takes to simply hold the present flight path.
+
+   Bank the wings and the lift vector tilts with them, so the part of it
+   holding you up falls as cos(bank) — keeping the flight path means taking
+   1/cos(bank) of it back. Thirty degrees costs 1.15 g, sixty costs 2, and
+   seventy-five costs nearly 4. Climb or dive and it is cos(pitch) of that,
+   because gravity is no longer square to the wing.
+
+   This is what neutral stick commands, which is why a turn holds altitude
+   without the pilot having to pull as well as bank. */
+function levelG(e) {
+  const cg = Math.cos(clamp(e.pitch, -1.45, 1.45));
+  const cb = Math.cos(clamp(e.roll, -Math.PI, Math.PI));
+  // compensated fully out to about 75 degrees, then frozen, then faded away
+  // past knife-edge — rolling inverted should not command four g
+  const k = cb > .26 ? 1 / cb : (1 / .26) * sstep(-.12, .26, cb);
+  return clamp(cg * k, -1.2, 4.2);
 }
 
 /* Exact inverse of the stick curve. curve() is a quadratic, so this is just
@@ -2584,9 +2604,7 @@ function flightControl(P, dt, e, cE, cA, cR) {
   const gnd = clamp(P.fbwG, 0, 1);
 
   /* ---------------- pitch ------------------------------------------------ */
-  // the g it takes to simply hold the present attitude, so that level stick
-  // means level flight whatever the bank angle
-  const lvl = clamp(Math.cos(clamp(e.roll, -Math.PI, Math.PI)) * Math.cos(clamp(e.pitch, -1.45, 1.45)), -1, 1);
+  const lvl = levelG(e);
   const sE = curve(cE), sA = curve(cA), sR = curve(cR);
   /* Trim on a fly-by-wire aeroplane is not an offset on the tailplane — the
      computer already holds whatever it is asked to hold. It shifts the datum
@@ -2600,8 +2618,28 @@ function flightControl(P, dt, e, cE, cA, cR) {
      making once the ceiling went to 12, leaving the loop proportional-only. */
   const iSpan = clamp((FBW.gMax - 1) * .25, 1.5, 4);
   const iGate = 1 - sstep(iSpan, iSpan * 2.5, Math.abs(gErr));
-  P.fbwI = clamp((P.fbwI || 0) + gErr * dt * FBW.kPitchI * iGate, -.75, .75);
-  let dEg = (gErr * FBW.kPitch + P.fbwI) / gPer + P.w.x * FBW.kRate;
+  P.fbwI = clamp((P.fbwI || 0) + gErr * dt * FBW.kPitchI * iGate, -1.6, 1.6);
+  /* Pitch-rate damping.
+
+     Two things were wrong with this before. It fed back the raw rate, and a
+     sustained turn carries a real body pitch rate of omega*sin(bank), so it
+     subtracted nose-up elevator for as long as the turn lasted and left a
+     standing g error. And its gain was a fixed number of units of ELEVATOR
+     per unit of rate, while every other term in this loop is scheduled by
+     dynamic pressure — so at Mach 3 it was applying the same deflection into
+     forty times the air, and the loop rang against the actuator lag at the
+     short-period frequency. That is the rocking chair.
+
+     Both are fixed here. The rate is high-passed, so the damping works on the
+     way into a manoeuvre and lets go once the rate is steady. And the gain is
+     expressed the way the rest of the loop is — as a pitch ACCELERATION per
+     unit of rate — which means scheduling it against the frequency of the
+     very mode it is damping. The short period goes as the square root of
+     dynamic pressure, so the damping follows it up. */
+  const wsp = Math.sqrt(Math.max(qS * SPECS.cbar * SPECS.CmA / SPECS.Ipitch, .25));
+  P.wxF = approach(P.wxF === undefined ? 0 : P.wxF, P.w.x, 1.1, dt);
+  let dEg = (gErr * FBW.kPitch + P.fbwI) / gPer
+    + (P.w.x - P.wxF) * (2 * FBW.zeta * wsp) / qPer;
 
   // low-speed / ground law: the stick asks for a pitch rate instead, so that
   // rotation on the runway is the same positive, controllable thing at any
@@ -2627,8 +2665,12 @@ function flightControl(P, dt, e, cE, cA, cR) {
      is there to keep the aeroplane flying, not to keep you off the numbers. */
 
   /* ---------------- roll ------------------------------------------------- */
-  // w.z positive is a roll to the left, so a right stick asks for negative w.z
-  const pCmd = -sA * FBW.pMax;
+  /* w.z positive is a roll to the left, so a right stick asks for negative
+     w.z. The command is eased rather than stepped: with a loop this quick,
+     feeding it a square edge rolls the aeroplane off its wing in a tenth of
+     a second, which is accurate and horrible to fly. */
+  P.pCmdS = approach(P.pCmdS === undefined ? 0 : P.pCmdS, -sA * FBW.pMax, FBW.pSmooth, dt);
+  const pCmd = P.pCmdS;
   const dA = clamp(-(pCmd - P.w.z) * FBW.kRoll / pPer, -1, 1);
 
   /* ---------------- yaw -------------------------------------------------- */
@@ -2660,7 +2702,7 @@ function flightControl(P, dt, e, cE, cA, cR) {
    hands off, it holds the altitude and heading it had when you let go. */
 function autopilot(P, dt, e) {
   const hands = Math.abs(P.inA) > .04 || Math.abs(P.inE) > .04;
-  const lvl = clamp(Math.cos(clamp(e.roll, -Math.PI, Math.PI)) * Math.cos(clamp(e.pitch, -1.45, 1.45)), -1, 1);
+  const lvl = levelG(e);
   P.trim = 0;
   if (P.onGround) { P.apAlt = undefined; P.apHdg = undefined; return { e: P.inE * .55, a: P.inA, r: P.inR }; }
 
