@@ -2475,7 +2475,7 @@ function resetPlane(scen) {
   P.crashed = false; P.crashT = 0; P.stall = 0; P.hardLand = 0; P.touched = 0; P.pitchI = 0; P.holdHdg = undefined;
   P.gear = P.gearCmd = 1; P.brake = 0; P.rpm = 0; P.dist = 0;
   P.fbwI = 0; P.fbwG = 1; P.pCmdS = 0; P.wxF = 0; P.steer = 0; P.qbar = 0; P.gload = 0; P.alpha = 0; P.beta = 0; P.aoaCap = false; P.cmdG = 1;
-  P.chute = P.chuteCmd = 0; P.mach = 0; P.overQ = 0; P.gMax = 1; P.gMin = 1; P.gStress = 0; P.gRed = 0; P.heat = 0; P.burn = 0; P.gBreak = 0; P.ab = 0; P.abSm = 0; P.unstart = 0; P.apAlt = undefined; P.apHdg = undefined;
+  P.chute = P.chuteCmd = 0; P.mach = 0; P.overQ = 0; P.gMax = 1; P.gMin = 1; P.gStress = 0; P.gRed = 0; P.heat = 0; P.burn = 0; P.ab = 0; P.abSm = 0; P.unstart = 0; P.apAlt = undefined; P.apHdg = undefined;
   P.q = qAxis(0, 1, 0, Math.PI);            // runway 18: heading south
   P.thr = 0;
   if (scen === "free") {
@@ -2521,7 +2521,8 @@ function resetPlane(scen) {
      yaw    - commands sideslip, with a yaw damper underneath it            */
 
 const FBW = {
-  gMax: 12,           // g at full back stick — the wing runs out before this does
+  gMax: 12,           // g at full back stick. Below about 385 kt the wing runs
+                      // out first; above it, this is what you get.
   gMin: -4.5,         // g at full forward stick
   pMax: 2.6,          // rad/s roll rate at full lateral stick (~150 deg/s)
   qMax: .40,          // rad/s pitch rate at full stick in the low-speed law
@@ -2680,7 +2681,15 @@ function flightControl(P, dt, e, cE, cA, cR) {
      a second, which is accurate and horrible to fly. */
   P.pCmdS = approach(P.pCmdS === undefined ? 0 : P.pCmdS, -sA * FBW.pMax, FBW.pSmooth, dt);
   const pCmd = P.pCmdS;
-  const dA = clamp(-(pCmd - P.w.z) * FBW.kRoll / pPer, -1, 1);
+  /* A wing resists rolling in proportion to how fast it is already rolling,
+     so a purely proportional loop settles wherever its gain happens to
+     balance that damping and never reaches what it asked for — full stick was
+     buying 99 deg/s at one speed and 125 at another against a command of 149.
+     The damping is not a mystery, though: it is Clp, and the model already
+     knows it. Feeding it forward means the aeroplane rolls at the rate the
+     stick asked for, and at the same rate at every speed that can sustain it. */
+  const rollD = qS * SPECS.b * SPECS.b * SPECS.Clp / (Math.max(P.tas || 1, 25) * SPECS.Iroll);
+  const dA = clamp(-((pCmd - P.w.z) * FBW.kRoll + pCmd * rollD) / pPer, -1, 1);
 
   /* ---------------- yaw -------------------------------------------------- */
   // right rudder yaws the nose right, which drives sideslip negative
@@ -2972,10 +2981,8 @@ function physics(P, dt) {
   /* The wings used to come off past nine g. They do not any more — pull as
      hard as the aeroplane will give you. All that is left of it is the
      airframe groaning, which is feedback rather than a sentence. */
-  if (!P.crashed && Math.abs(P.gload) > 9) {
-    P.gBreak = (P.gBreak || 0) + dt;
+  if (!P.crashed && Math.abs(P.gload) > 9)
     cam.shake = Math.max(cam.shake, clamp((Math.abs(P.gload) - 9) * .22, 0, .7));
-  } else P.gBreak = Math.max(0, (P.gBreak || 0) - dt * 1.5);
 
   /* Dynamic pressure down low used to tear the airframe apart after four
      seconds. Now it just shakes: Mach 3 on the deck is punishing to look at
