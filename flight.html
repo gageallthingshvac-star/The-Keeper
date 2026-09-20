@@ -2587,7 +2587,7 @@ const AP = { on: false, mode: "", togo: 0, close: 0, accel: 0, aimW: null, ramp:
    the air runs out, because that is the moment it starts mattering. */
 const SPD = { on: false, tgt: 0, auto: false, ramp: 0 };
 /* What you are flying at, for the marker and the map. */
-const NAV = { idx: -1, map: false };
+const NAV = { idx: -1, map: false, hits: [] };
 function navTarget() { return (NAV.idx >= 0 && typeof BODIES !== "undefined") ? BODIES[NAV.idx] : null; }
 function cycleNav(d) {
   if (typeof BODIES === "undefined") return;
@@ -4228,65 +4228,244 @@ function navSpeed(v) {
    still gets the directions right — and direction is the thing you actually
    need. Bearing around the circle is where to turn; the ring you are on is
    how far. */
+function navETA(s) {
+  if (!isFinite(s) || s <= 0) return "--";
+  if (s < 90) return Math.round(s) + "s";
+  if (s < 5400) return Math.floor(s / 60) + "m " + Math.round(s % 60) + "s";
+  if (s < 172800) return Math.floor(s / 3600) + "h " + Math.round(s % 3600 / 60) + "m";
+  return (s / 86400).toFixed(1) + " d";
+}
+/* One tappable thing on the map. Everything the map can be touched on goes
+   through here, so the draw pass and the hit pass can never drift apart. */
+function mapHit(k, i, x, y, w, h) {
+  const m = Math.max(0, 46 * UI - Math.min(w, h)) / 2;   // finger-sized, always
+  NAV.hits.push({ k: k, i: i, x: x - m, y: y - m, w: w + m * 2, h: h + m * 2 });
+}
+function mapAct(k, i) {
+  TOUCH.flash["m_" + k] = .18;
+  if (k === "close") { NAV.map = false; audio.beep(430, .12, .1); }
+  else if (k === "off") { NAV.idx = -1; toast("NAV OFF", 1.2); audio.beep(430, .12, .1); }
+  else if (k === "ap") toggleAP();
+  else if (k === "spd") toggleSpeedHold();
+  else if (k === "body") {
+    NAV.idx = i;
+    const t = navTarget();
+    toast("NAV → " + t.name.toUpperCase(), 1.4);
+    audio.beep(780, .14, .12);
+  }
+}
+function mapChip(x, y, w, h, on, label, k, i) {
+  const u = UI;
+  box(x, y, w, h, 8 * u,
+    on ? "rgba(70,150,110,.55)" : "rgba(10,20,30,.72)",
+    on ? "rgba(140,246,180,.9)" : "rgba(120,170,215,.45)");
+  hudFont(11 * u, 700);
+  ctx.fillStyle = on ? "rgba(190,255,214,.98)" : "rgba(206,228,248,.9)";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(label, x + w / 2, y + h / 2);
+  if (k) mapHit(k, i, x, y, w, h);
+}
 function drawMap() {
   if (!NAV.map || typeof BODIES === "undefined") return;
   const u = UI, P = PLANE;
-  const R = Math.min(W, H) * .40, cx = CX, cy = CY;
+  NAV.hits = [];
+  const top = SAFE.t * DPR + 12 * u, bot = H - SAFE.b * DPR - 12 * u;
+  const inW = W - (SAFE.l + SAFE.r) * DPR - 24 * u;
+  /* Narrow enough that a name, three numbers and two chips will not sit on
+     one line: the bottom bar grows a second row instead of overlapping. */
+  const narrow = inW < 460 * u;
+  const barH = (narrow ? 104 : 58) * u;
+  const head = top + 68 * u;                      // under the chips and title
+  const R = Math.min(W * .40, (bot - barH - 14 * u - head) * .48);
+  const cx = CX, cy = (head + bot - barH - 14 * u) * .5;
   ctx.save();
-  ctx.fillStyle = "rgba(4,8,14,.88)"; ctx.fillRect(0, 0, W, H);
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
 
-  // range rings, one per decade of kilometres
-  ctx.strokeStyle = "rgba(120,170,215,.22)"; ctx.lineWidth = 1 * u;
+  /* backdrop: deep space, not a grey sheet */
+  ctx.fillStyle = "rgb(3,6,11)"; ctx.fillRect(0, 0, W, H);
+  const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 1.6);
+  bg.addColorStop(0, "rgba(28,58,92,.34)");
+  bg.addColorStop(.6, "rgba(12,26,44,.16)");
+  bg.addColorStop(1, "rgba(4,8,14,0)");
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+  // a few hundred fixed specks, so the sheet has depth
+  for (let i = 0; i < 260; i++) {
+    const sx = hash2(i, 401) * W, sy = hash2(i, 402) * H;
+    const a = .05 + hash2(i, 403) * .22;
+    ctx.fillStyle = "rgba(200,220,255," + a.toFixed(3) + ")";
+    ctx.fillRect(sx, sy, DPR, DPR);
+  }
+
+  /* range rings, one per decade of kilometres, and bearing spokes */
   const L0 = 3, L1 = 10;                       // 1e3 km .. 1e10 km
   const rr = lk => R * clamp((lk - L0) / (L1 - L0), 0, 1);
-  for (let lk = L0; lk <= L1; lk++) {
-    ctx.beginPath(); ctx.arc(cx, cy, rr(lk), 0, TAU); ctx.stroke();
-    hudFont(9 * u, 600); ctx.fillStyle = "rgba(150,190,225,.55)";
-    const lbl = lk >= 9 ? (10 ** (lk - 9)) + " Gm" : lk >= 6 ? (10 ** (lk - 6)) + " Mm" : (10 ** lk) + " km";
-    ctx.fillText(lbl, cx, cy - rr(lk) - 7 * u);
+  ctx.lineWidth = 1 * u;
+  for (let s = 0; s < 12; s++) {
+    const a = s / 12 * TAU;
+    ctx.strokeStyle = s % 3 === 0 ? "rgba(120,170,215,.26)" : "rgba(120,170,215,.10)";
+    ctx.beginPath();
+    ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.sin(a) * R, cy - Math.cos(a) * R);
+    ctx.stroke();
   }
-  // you, in the middle, pointing where the nose points
-  const e = eulerOf(PLANE.m);
-  ctx.save(); ctx.translate(cx, cy); ctx.rotate(0);
-  ctx.fillStyle = "rgba(126,232,154,.95)";
-  ctx.beginPath(); ctx.moveTo(0, -9 * u); ctx.lineTo(6 * u, 7 * u); ctx.lineTo(0, 3 * u); ctx.lineTo(-6 * u, 7 * u);
-  ctx.closePath(); ctx.fill();
-  ctx.restore();
+  for (let lk = L0; lk <= L1; lk++) {
+    ctx.strokeStyle = "rgba(120,170,215,.22)";
+    ctx.beginPath(); ctx.arc(cx, cy, rr(lk), 0, TAU); ctx.stroke();
+    hudFont(9 * u, 600);
+    const lbl = lk >= 9 ? (10 ** (lk - 9)) + " Gm" : lk >= 6 ? (10 ** (lk - 6)) + " Mm" : (10 ** lk) + " km";
+    // down the left spoke, backed, so a world sitting on the ring cannot eat it
+    const ly = cy - rr(lk) * .707, lx = cx - rr(lk) * .707;
+    const lw = ctx.measureText(lbl).width;
+    ctx.fillStyle = "rgba(3,6,11,.72)";
+    ctx.fillRect(lx - lw / 2 - 3 * u, ly - 6 * u, lw + 6 * u, 12 * u);
+    ctx.fillStyle = "rgba(150,190,225,.62)";
+    ctx.fillText(lbl, lx, ly);
+  }
+  hudFont(9.5 * u, 700); ctx.fillStyle = "rgba(126,232,154,.75)";
+  ctx.fillText("NOSE", cx, cy - R - 13 * u);
+  ctx.fillStyle = "rgba(150,190,225,.45)";
+  ctx.fillText("◀ LEFT", cx - R + 22 * u, cy - 11 * u);
+  ctx.fillText("RIGHT ▶", cx + R - 22 * u, cy - 11 * u);
+  ctx.fillText("TAIL", cx, cy + R + 13 * u);
 
-  for (const b of BODIES) {
+  /* velocity vector: where the aeroplane is actually going, which in space is
+     not where the nose points and is the thing that decides where you end up */
+  const m2 = PLANE.m, V = Math.hypot(P.vel.x, P.vel.y, P.vel.z);
+  if (V > 1) {
+    const vf = (m2[6] * P.vel.x + m2[7] * P.vel.y + m2[8] * P.vel.z) / V;
+    const vr = (m2[0] * P.vel.x + m2[1] * P.vel.y + m2[2] * P.vel.z) / V;
+    const va = Math.atan2(vr, vf);
+    const vX = cx + Math.sin(va) * R * .92, vY = cy - Math.cos(va) * R * .92;
+    ctx.strokeStyle = "rgba(255,206,110,.75)"; ctx.lineWidth = 1.5 * u;
+    ctx.setLineDash([5 * u, 5 * u]);
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(vX, vY); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(vX, vY, 5 * u, 0, TAU); ctx.stroke();
+    hudFont(9 * u, 700); ctx.fillStyle = "rgba(255,206,110,.85)";
+    ctx.fillText("VEL " + navSpeed(V), vX, vY - 12 * u);
+  }
+
+  /* the bodies. Nearest last, so what matters sits on top. */
+  const list = [];
+  for (let i = 0; i < BODIES.length; i++) {
+    const b = BODIES[i];
     const dx = b.p.x - P.pos.x, dy = b.p.y - P.pos.y, dz = b.p.z - P.pos.z;
     const d = Math.hypot(dx, dy, dz);
-    const km = Math.max(d, 1) / 1000;
-    const r = rr(Math.log10(km));
     /* Bearing is measured from the NOSE, so straight up the map is straight
        ahead: turn the way the dot lies and you are pointing at it. */
-    const m2 = PLANE.m;
     const fx = m2[6] * dx + m2[7] * dy + m2[8] * dz;   // ahead
     const rx = m2[0] * dx + m2[1] * dy + m2[2] * dz;   // right
     const ang = Math.atan2(rx, fx);
-    const px = cx + Math.sin(ang) * r, py = cy - Math.cos(ang) * r;
-    const sel = navTarget() === b;
-    const rad = Math.max(3.4 * u, Math.min(11 * u, 3 * u + Math.log10(b.r / 1e5) * 2.6 * u));
-    ctx.fillStyle = "rgb(" + (b.col[0] | 0) + "," + (b.col[1] | 0) + "," + (b.col[2] | 0) + ")";
+    const r = rr(Math.log10(Math.max(d, 1) / 1000));
+    list.push({ b: b, i: i, d: d,
+      x: cx + Math.sin(ang) * r, y: cy - Math.cos(ang) * r });
+  }
+  list.sort((a, b) => b.d - a.d);
+  for (const it of list) {
+    const b = it.b, px = it.x, py = it.y;
+    const sel = NAV.idx === it.i;
+    const rad = Math.max(4 * u, Math.min(13 * u, 3.4 * u + Math.log10(b.r / 1e5) * 2.8 * u));
+    const cr = b.col[0] | 0, cg = b.col[1] | 0, cb2 = b.col[2] | 0;
+    // glow, then disc, then a lit crescent so it reads as a world
+    const gg = ctx.createRadialGradient(px, py, 0, px, py, rad * 3.2);
+    gg.addColorStop(0, "rgba(" + cr + "," + cg + "," + cb2 + ",.45)");
+    gg.addColorStop(1, "rgba(" + cr + "," + cg + "," + cb2 + ",0)");
+    ctx.fillStyle = gg;
+    ctx.beginPath(); ctx.arc(px, py, rad * 3.2, 0, TAU); ctx.fill();
+    ctx.fillStyle = "rgb(" + cr + "," + cg + "," + cb2 + ")";
     ctx.beginPath(); ctx.arc(px, py, rad, 0, TAU); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,.28)";
+    ctx.beginPath(); ctx.arc(px - rad * .3, py - rad * .3, rad * .48, 0, TAU); ctx.fill();
+    if (b.ring) {
+      ctx.strokeStyle = "rgba(216,200,164,.8)"; ctx.lineWidth = 1.4 * u;
+      ctx.beginPath(); ctx.ellipse(px, py, rad * 2.1, rad * .8, -.5, 0, TAU); ctx.stroke();
+    }
     if (sel) {
       ctx.strokeStyle = "rgba(126,232,154,.95)"; ctx.lineWidth = 1.8 * u;
-      ctx.beginPath(); ctx.arc(px, py, rad + 5 * u, 0, TAU); ctx.stroke();
+      ctx.beginPath(); ctx.arc(px, py, rad + 7 * u, 0, TAU); ctx.stroke();
+      for (let k = 0; k < 4; k++) {
+        const a = k / 4 * TAU + Math.PI / 4;
+        ctx.beginPath();
+        ctx.moveTo(px + Math.cos(a) * (rad + 4 * u), py + Math.sin(a) * (rad + 4 * u));
+        ctx.lineTo(px + Math.cos(a) * (rad + 13 * u), py + Math.sin(a) * (rad + 13 * u));
+        ctx.stroke();
+      }
+      ctx.setLineDash([4 * u, 6 * u]); ctx.lineWidth = 1.2 * u;
+      ctx.strokeStyle = "rgba(126,232,154,.5)";
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(px, py); ctx.stroke();
+      ctx.setLineDash([]);
     }
-    hudFont(10 * u, sel ? 700 : 600);
-    ctx.fillStyle = sel ? "rgba(126,232,154,.95)" : "rgba(214,232,248,.85)";
-    ctx.fillText(b.name, px, py - rad - 9 * u);
-    hudFont(9 * u, 600); ctx.fillStyle = "rgba(160,190,216,.75)";
-    ctx.fillText(navRange(Math.max(d - b.r, 0)), px, py + rad + 9 * u);
+    hudFont(10.5 * u, sel ? 800 : 600);
+    ctx.fillStyle = sel ? "rgba(126,232,154,.98)" : "rgba(214,232,248,.88)";
+    ctx.fillText(b.name, px, py - rad - 11 * u);
+    hudFont(9 * u, 600); ctx.fillStyle = "rgba(160,190,216,.72)";
+    ctx.fillText(navRange(Math.max(it.d - b.r, 0)), px, py + rad + 11 * u);
+    mapHit("body", it.i, px - rad, py - rad, rad * 2, rad * 2);
   }
-  hudFont(13 * u, 700); ctx.fillStyle = "rgba(226,244,255,.95)";
-  ctx.fillText("SOLAR SYSTEM \u00b7 up is where the nose points", cx, 34 * u);
-  hudFont(10.5 * u, 600); ctx.fillStyle = "rgba(160,190,216,.8)";
-  ctx.fillText("J cycles the target \u00b7 N closes the map \u00b7 rings are decades of distance", cx, H - 30 * u);
+
+  /* you, in the middle. Drawn last so nothing buries it. */
+  ctx.fillStyle = "rgba(126,232,154,.98)";
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - 10 * u); ctx.lineTo(cx + 7 * u, cy + 8 * u);
+  ctx.lineTo(cx, cy + 3.5 * u); ctx.lineTo(cx - 7 * u, cy + 8 * u);
+  ctx.closePath(); ctx.fill();
+
+  /* title, and the chips you can actually press */
+  const cw = 62 * u, ch = 34 * u;
+  hudFont(13.5 * u, 800); ctx.fillStyle = "rgba(226,244,255,.95)";
+  ctx.textAlign = "center";
+  ctx.fillText("SOLAR SYSTEM", cx, top + ch * .5);
+  hudFont(9.5 * u, 600); ctx.fillStyle = "rgba(150,190,225,.7)";
+  ctx.fillText(narrow ? "tap a world to fly to it" : "tap a world to fly to it · up is where the nose points",
+    cx, top + ch + 11 * u);
+  mapChip(W - SAFE.r * DPR - 12 * u - cw, top, cw, ch, false, "CLOSE", "close", 0);
+  mapChip(SAFE.l * DPR + 12 * u, top, cw, ch, NAV.idx < 0, "NAV OFF", "off", 0);
+
+  /* the numbers, along the bottom */
+  const t = navTarget();
+  const barY = bot - barH;
+  box(SAFE.l * DPR + 12 * u, barY, inW, barH, 10 * u,
+    "rgba(6,12,20,.78)", "rgba(120,170,215,.35)");
+  if (t) {
+    const dx = t.p.x - P.pos.x, dy = t.p.y - P.pos.y, dz = t.p.z - P.pos.z;
+    const d = Math.hypot(dx, dy, dz) || 1;
+    const range = Math.max(d - t.r, 0);
+    const close = (P.vel.x * dx + P.vel.y * dy + P.vel.z * dz) / d;
+    const eta = close > 1 ? navETA(range / close) : "--";
+    hudFont(12.5 * u, 800); ctx.fillStyle = "rgba(126,232,154,.98)";
+    ctx.textAlign = "left";
+    ctx.fillText(t.name.toUpperCase(), SAFE.l * DPR + 26 * u, barY + 19 * u);
+    hudFont(10.5 * u, 600); ctx.fillStyle = "rgba(190,214,236,.88)";
+    ctx.fillText(navRange(range) + "   " + (close >= 0 ? "closing " : "opening ")
+      + navSpeed(Math.abs(close)) + "   ETA " + eta,
+      SAFE.l * DPR + 26 * u, barY + 40 * u);
+    ctx.textAlign = "center";
+    if (AP.on && AP.mode && !narrow) {
+      hudFont(11 * u, 700);
+      ctx.fillStyle = AP.mode === "BRAKING" ? "rgba(255,176,90,.95)"
+        : AP.mode === "ARRIVED" ? "rgba(126,232,154,.95)" : "rgba(111,211,255,.95)";
+      ctx.textAlign = "center";
+      ctx.fillText("TRANSFER · " + AP.mode, cx, barY + 40 * u);
+    } else if (AP.on && AP.mode) {
+      hudFont(10 * u, 700);
+      ctx.fillStyle = AP.mode === "BRAKING" ? "rgba(255,176,90,.95)"
+        : AP.mode === "ARRIVED" ? "rgba(126,232,154,.95)" : "rgba(111,211,255,.95)";
+      ctx.textAlign = "right";
+      ctx.fillText(AP.mode, W - SAFE.r * DPR - 26 * u, barY + 19 * u);
+    }
+    ctx.textAlign = "center";
+  } else {
+    hudFont(narrow ? 10 * u : 11.5 * u, 600); ctx.fillStyle = "rgba(160,190,216,.8)";
+    ctx.fillText(narrow ? "pick a world · the autopilot flies the transfer"
+      : "no target · pick one and the autopilot will fly the transfer",
+      cx, barY + (narrow ? 26 * u : barH / 2));
+  }
+  const bw2 = 84 * u, chH = 30 * u;
+  const cy2 = narrow ? barY + barH - 12 * u - chH : barY + (barH - chH) / 2;
+  const cx2 = narrow ? cx + 6 * u : W - SAFE.r * DPR - 26 * u - bw2;
+  mapChip(cx2, cy2, bw2, chH, AP.on, AP.on ? "A/P ON" : "FLY IT", "ap", 0);
+  mapChip(cx2 - 12 * u - bw2, cy2, bw2, chH, SPD.on, SPD.on ? "HOLD ON" : "HOLD", "spd", 0);
   ctx.restore();
 }
-
 /* ============================================================= audio ==== */
 const audio = {
   ctx: null, ok: false,
@@ -4489,6 +4668,8 @@ function layoutTouch() {
   }
   T.thr.w = tw; T.thr.h = th;
   T.btns = [
+    { k: "map", x: bx, y: by - (bh + g) * 3, w: bw, h: bh },
+    { k: "spd", x: bx + bw + g, y: by - (bh + g) * 3, w: bw, h: bh },
     { k: "ap", x: bx, y: by - (bh + g) * 2, w: bw, h: bh },
     { k: "keys", x: bx + bw + g, y: by - (bh + g) * 2, w: bw, h: bh },
     { k: "chute", x: bx, y: by - bh - g, w: bw, h: bh },
@@ -4517,6 +4698,8 @@ function touchAct(k) {
   // tap on a control marked FLAP-DOWN dumped the whole configuration on short final.
   else if (k === "flap") { P.flapCmd = clamp(P.flapCmd + .25, 0, 1); toast("FLAPS " + Math.round(P.flapCmd * 100) + "%", 1); }
   else if (k === "cam") { camMode = (camMode + 1) % CAMNAMES.length; toast("CAMERA: " + CAMNAMES[camMode], 1.2); }
+  else if (k === "map") { NAV.map = !NAV.map; audio.beep(NAV.map ? 700 : 430, .12, .1); }
+  else if (k === "spd") toggleSpeedHold();
   else if (k === "ap") toggleAP();
   else if (k === "keys") SHOWKEYS = !SHOWKEYS;
   else if (k === "flapup") { P.flapCmd = clamp(P.flapCmd - .25, 0, 1); toast("FLAPS " + Math.round(P.flapCmd * 100) + "%", 1); }
@@ -4530,6 +4713,14 @@ function touchDown(id, x, y, isTouch) {
   const T = TOUCH;
   if (!GAME.started || GAME.paused) return false;
   if (SHOWKEYS) { SHOWKEYS = false; return true; }
+  /* The map is a full-screen modal. Anything pressed on it is a map press,
+     and anything pressed OFF a chip is swallowed rather than handed to the
+     stick underneath — a map you cannot touch without rolling the aeroplane
+     is worse than no map. */
+  if (NAV.map) {
+    for (const h of NAV.hits) if (inBox(h, x, y)) { mapAct(h.k, h.i); return true; }
+    return true;
+  }
   if (inBox(T.pause, x, y)) { togglePause(); return true; }
   for (const b of T.btns) {
     if (inBox(b, x, y)) {
@@ -4689,6 +4880,8 @@ function drawPanel(P, u) {
     else if (b.k === "cam") { label = "VIEW"; sub = CAMNAMES[camMode] + "  C"; }
     else if (b.k === "ap") { on = AP.on; label = "A/P"; sub = (AP.on ? "ON" : "OFF") + "  Z"; }
     else if (b.k === "keys") { on = SHOWKEYS; label = "KEYS"; sub = "L"; }
+    else if (b.k === "map") { on = NAV.map; label = "MAP"; sub = (navTarget() ? navTarget().name.toUpperCase().slice(0, 5) : "SYS") + "  N"; }
+    else if (b.k === "spd") { on = SPD.on; label = "HOLD"; sub = (SPD.on ? navSpeed(SPD.tgt) : "OFF") + "  O"; }
     else if (b.k === "chute") { on = P.chuteCmd > .5; label = "CHUTE"; sub = "X"; }
     else if (b.k === "flapup") { label = "FLAP \u2191"; sub = "V"; }
     padBox(b.x, b.y, b.w, b.h, 9 * u, on || T.flash[b.k] > 0, label, sub);
