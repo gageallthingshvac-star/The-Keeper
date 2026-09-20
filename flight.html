@@ -2646,7 +2646,7 @@ const AP = { on: false, mode: "", togo: 0, close: 0, accel: 0, aimW: null, ramp:
    the throttle sets a SPEED and the engine does whatever it takes to sit on
    it — including thrusting backwards to slow down. It arms itself the moment
    the air runs out, because that is the moment it starts mattering. */
-const SPD = { on: false, tgt: 0, auto: false, ramp: 0 };
+const SPD = { on: false, tgt: 0, auto: false, ramp: 0, lever: null, thrSave: undefined };
 /* What you are flying at, for the marker and the map. */
 const NAV = { idx: -1, map: false, hits: [] };
 function navTarget() { return (NAV.idx >= 0 && typeof BODIES !== "undefined") ? BODIES[NAV.idx] : null; }
@@ -2658,9 +2658,18 @@ function cycleNav(d) {
   const t = navTarget();
   toast(t ? "NAV \u2192 " + t.name.toUpperCase() : "NAV OFF", 1.4);
 }
+/* In vacuum a throttle lever has nothing to do: there is no air to push
+   against and the speed controller decides the thrust. So it stops being a
+   throttle and becomes the thing you actually want out there — a SPEED
+   SELECTOR, logarithmic, ten metres a second at the bottom of its travel and
+   twenty thousand kilometres a second at the top. Nothing else in the
+   aeroplane can ask for a speed. */
+const SPD_LO = 10, SPD_SPAN = 2e6;         // top of travel = 10 * span
+const spdOfLever = t => SPD_LO * Math.pow(SPD_SPAN, clamp(t, 0, 1));
+const leverOfSpd = v => clamp(Math.log(Math.max(v, SPD_LO) / SPD_LO) / Math.log(SPD_SPAN), 0, 1);
 function toggleSpeedHold() {
   SPD.on = !SPD.on;
-  if (SPD.on) { SPD.tgt = Math.max(PLANE.tas, 60); SPD.auto = false; }
+  if (SPD.on) { SPD.tgt = Math.max(PLANE.tas, 60); SPD.auto = false; SPD.lever = null; }
   toast(SPD.on ? "SPEED HOLD \u00b7 " + Math.round(SPD.tgt) + " m/s" : "SPEED HOLD OFF", 1.8);
   audio.beep(SPD.on ? 820 : 430, .14, .12);
 }
@@ -3343,9 +3352,25 @@ function physics(P, dt) {
     const thinAir = rho < 2e-5;
     if (thinAir && !SPD.on && !SPD.auto && !P.crashed && P.tas > 40) {
       SPD.on = true; SPD.auto = true; SPD.tgt = P.tas;
-      toast("SPEED HOLD ARMED \u00b7 " + Math.round(P.tas) + " m/s \u00b7 O", 2.4);
+      SPD.thrSave = P.thr;
+      SPD.lever = leverOfSpd(P.tas); P.thr = SPD.lever;   // lever meets the speed
+      toast("SPEED SELECT \u00b7 " + Math.round(P.tas) + " m/s \u00b7 throttle sets it", 2.8);
     }
-    if (!thinAir && SPD.auto) { SPD.on = false; SPD.auto = false; }
+    if (!thinAir && SPD.auto) {
+      SPD.on = false; SPD.auto = false;
+      if (SPD.thrSave !== undefined) { P.thr = SPD.thrSave; SPD.thrSave = undefined; }
+      SPD.lever = null;
+    }
+    /* Moving the lever commands a new speed. Moving it is the ONLY thing that
+       does, so an autopilot transfer trimming the target back does not drag
+       the lever around under the pilot's hand. */
+    if (SPD.on && thinAir && !P.crashed) {
+      if (SPD.lever === null || SPD.lever === undefined) SPD.lever = leverOfSpd(SPD.tgt);
+      if (Math.abs(P.thr - SPD.lever) > .0015) {
+        SPD.lever = P.thr;
+        SPD.tgt = spdOfLever(P.thr);
+      }
+    }
 
     /* Under transfer guidance the engine pushes along the NOSE, because the
        guidance has already decided where the nose should be. It only pushes
@@ -5339,8 +5364,8 @@ function drawPanel(P, u) {
   ctx.fillStyle = "rgba(226,244,255,.95)"; ctx.textAlign = "center";
   hudFont(13 * u, 700);
   ctx.fillText(Math.round(P.thr * 100) + "", t.x + t.w / 2, t.y + t.h - 3 * u - fh - 12 * u);
-  hudFont(10 * u); ctx.fillStyle = "rgba(190,214,232,.7)";
-  ctx.fillText("THR", t.x + t.w / 2, t.y - 11 * u);
+  hudFont(10 * u); ctx.fillStyle = SPD.on && SPD.auto ? "rgba(126,232,154,.85)" : "rgba(190,214,232,.7)";
+  ctx.fillText(SPD.on && SPD.auto ? "SPD" : "THR", t.x + t.w / 2, t.y - 11 * u);
   // switches
   for (const b of T.btns) {
     let on = false, label = "", sub = "";
@@ -5611,8 +5636,14 @@ function drawHUDFull() {
   box(tx, ty, tbw, tbh, 3 * U, PANEL, GD);
   ctx.fillStyle = "rgba(150,255,190,.65)"; ctx.fillRect(tx + 2 * U, ty + 2 * U, (tbw - 4 * U) * P.thr, tbh - 4 * U);
   hudFont(11 * U); ctx.fillStyle = "rgba(190,230,208,.92)"; ctx.textAlign = "left";
-  ctx.fillText("THROTTLE " + Math.round(P.thr * 100) + "%", tx, ty + tbh + 13 * U);
-  ctx.fillText("RPM " + Math.round(P.rpm * 2700), tx, ty + tbh + 27 * U);
+  // out of the air the lever has no thrust to set, so it sets the speed
+  if (SPD.on && SPD.auto) {
+    ctx.fillText("SPEED SEL " + navSpeed(SPD.tgt), tx, ty + tbh + 13 * U);
+    ctx.fillText("HOLDING " + navSpeed(P.tas), tx, ty + tbh + 27 * U);
+  } else {
+    ctx.fillText("THROTTLE " + Math.round(P.thr * 100) + "%", tx, ty + tbh + 13 * U);
+    ctx.fillText("RPM " + Math.round(P.rpm * 2700), tx, ty + tbh + 27 * U);
+  }
 
   // configuration strip
   const cfg = [];
@@ -6005,10 +6036,11 @@ const KEYCARD = [
   ["Rudder", "A  D", "RUD pads"],
   ["Throttle", "W  S   (Shift / Ctrl)", "drag the slider"],
   ["Afterburner", "throttle past 80%", "slider past the A/B line"],
-  ["Autopilot", "Z", "A/P button"],
-  ["Speed hold", "O   (then W / S set the speed)", "\u2014"],
-  ["Nav target", "J   cycles Moon / planets / Sun", "\u2014"],
-  ["Solar system map", "N", "\u2014"],
+  ["Speed select", "in vacuum the throttle sets SPEED", "same slider, marked SPD"],
+  ["Autopilot", "Z   flies the transfer", "A/P button, or FLY IT"],
+  ["Speed hold", "O", "HOLD button"],
+  ["Nav target", "J   cycles Moon / planets / Sun", "tap a world on the map"],
+  ["Solar system map", "N", "MAP button"],
   ["Wheel brakes", "Space (hold)", "BRAKE (hold)"],
   ["Parking brake", "B", "\u2014"],
   ["Drag chute", "X", "CHUTE button"],
