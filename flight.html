@@ -91,7 +91,7 @@
 
       <h2>Flight</h2>
       <div class="row" id="scenRow">
-        <button class="opt on" data-scen="free"><b>FREE FLIGHT</b><i>Cold on runway 18 at Keeper Field. Brakes set, engines at idle. Go anywhere. There is no top end: climb out of the air and it keeps accelerating, and everything you gain comes back as heat when you fall in again.</i></button>
+        <button class="opt on" data-scen="free"><b>FREE FLIGHT</b><i>Cold on runway 18 at Keeper Field. Brakes set, engines at idle. There is no top end and no ceiling: hold the burners in and it never stops accelerating. Orbit is 7.8 km/s, the Moon is a two-minute burn past that, and everything you gain comes back as heat on the way down.</i></button>
         <button class="opt" data-scen="air"><b>AIRBORNE START</b><i>Airborne at 23,000 ft and already supersonic. Climb and accelerate.</i></button>
         <button class="opt" data-scen="rings"><b>RING RACE</b><i>12 gates strung across 120 km of sky, against the clock.</i></button>
         <button class="opt" data-scen="hohenwald"><b>HOHENWALD, TN</b><i>Low and slow over Lewis County, Tennessee. Fifty miles of it are built out properly: the Highland Rim and its creek valleys, the Buffalo and the Duck, the Natchez Trace, every town and community, and the monument at Grinder's Stand.</i></button>
@@ -778,8 +778,17 @@ function updateAtmosphere(camY) {
   const k = Math.exp(-Math.max(camY, 0) / 2300);
   LIGHT.dens = LIGHT.density * (.030 + .970 * k);
   LIGHT.space = clamp((camY - 12000) / 16000, 0, 1);
+  /* `space` is saturated by 28 km, which is right for an aeroplane and leaves
+     nothing to say from two hundred kilometres. This keeps going: the lit
+     band of atmosphere on the limb thins and cools as you climb away from it,
+     until what is left is a bright line on a black sky. */
+  LIGHT.deep = clamp((camY - 45000) / 105000, 0, 1);
+  /* Far enough out that the planet has to stop being a floor and start being
+     an object. Below 900 km you are flying over the Earth and it is terrain
+     and sky; past 3,500 km you are looking at it and it is a sphere. */
+  LIGHT.far = clamp((camY - 900000) / 2600000, 0, 1);
 }
-LIGHT.space = 0;
+LIGHT.space = 0; LIGHT.deep = 0; LIGHT.far = 0;
 LIGHT.sun = WORLD.sun;
 
 /* Shade a base colour by a world-space normal. */
@@ -1225,6 +1234,18 @@ const toView = p => {
     dz = p.z - cam.pos.z, m = cam.m;
   return v3(m[0] * dx + m[1] * dy + m[2] * dz, m[3] * dx + m[4] * dy + m[5] * dz, m[6] * dx + m[7] * dy + m[8] * dz);
 };
+/* The curvature term in toView is a rendering trick for ground a few hundred
+   kilometres away. Applied to something a hundred million kilometres away it
+   is nonsense — d^2/2R at Mars is larger than the solar system. Anything off
+   the planet projects through here instead. */
+function projectRaw(p) {
+  const dx = p.x - cam.pos.x, dy = p.y - cam.pos.y, dz = p.z - cam.pos.z, m = cam.m;
+  const vz = m[6] * dx + m[7] * dy + m[8] * dz;
+  if (vz < NEAR) return null;
+  const vx = m[0] * dx + m[1] * dy + m[2] * dz, vy = m[3] * dx + m[4] * dy + m[5] * dz;
+  return { x: CX + F * vx / vz, y: CY - F * vy / vz, z: vz, s: F / vz };
+}
+
 function projectPoint(p) {
   const v = toView(p);
   if (v.z < NEAR) return null;
@@ -1243,6 +1264,16 @@ function fogged(c, dist) {
    sun's Mie halo. Its horizon colour is exactly the haze colour used by aerial
    perspective, so distant terrain dissolves into the sky with no visible seam. */
 function drawSky() {
+  /* Out past a few thousand kilometres there is no sky and no horizon: the
+     planet is behind you and it is an object, not a floor. Everything below
+     draws the view from ON the Earth, so far from it there is nothing here
+     to draw but black. */
+  const away = LIGHT.far || 0;
+  if (away > .995) {
+    ctx.fillStyle = "#01020a"; ctx.fillRect(0, 0, W, H);
+    if (Q.q.stars) starField(1);
+    return;
+  }
   const e = eulerOf(cam.m);
   const pitch = clamp(e.pitch, -1.45, 1.45);
   const yOff = F * Math.tan(pitch);
@@ -1260,13 +1291,16 @@ function drawSky() {
 
   ctx.save();
   ctx.translate(CX, CY); ctx.rotate(-e.roll);
-  const mid2 = mixc(L.mid, [10, 22, 58], sp2 * .92);
-  const hz2 = mixc(horizon, mixc(horizon, [96, 150, 214], .55), sp2 * .7);
+  const dp = L.deep || 0;
+  const mid2 = mixc(mixc(L.mid, [10, 22, 58], sp2 * .92), [4, 7, 18], dp * .92);
+  // From orbit the lit atmosphere is a thin arc on the limb, not a sky
+  const hz2 = mixc(mixc(horizon, mixc(horizon, [96, 150, 214], .55), sp2 * .7),
+    [12, 26, 60], dp * .93);
   const g = ctx.createLinearGradient(0, yOff - R, 0, yOff + 2);
   g.addColorStop(0, rgb(...zen));
   g.addColorStop(.42, rgb(...mixc(zen, mid2, .72)));
   g.addColorStop(.72, rgb(...mid2));
-  g.addColorStop(sp2 > .3 ? .955 : .90, rgb(...mixc(mid2, hz2, .72)));
+  g.addColorStop(sp2 > .3 ? lerp(.955, .9935, dp) : .90, rgb(...mixc(mid2, hz2, .72)));
   g.addColorStop(1, rgb(...hz2));
   ctx.fillStyle = g; ctx.fillRect(-R, yOff - R, R * 2, R + F * Math.tan(horizonDip(cam.pos.y)) + 2);
   if (sp2 > .02 && Q.q.stars) drawStars(sp2, yOff, R);
@@ -1326,9 +1360,12 @@ const STARS = (() => {
   }
   return a;
 })();
-function drawStars(sp2, yOff, R) {
-  // drawn inside the rotated sky frame, so undo that first
-  ctx.restore(); ctx.save();
+/* The stars themselves, in absolute screen coordinates and touching nothing
+   else. drawStars below has to climb out of the rotated sky frame to call it,
+   which is a contract worth keeping in one place rather than at every call
+   site — calling drawStars from outside that frame unbalances the canvas save
+   stack and shunts the entire HUD sideways, which is exactly what it did. */
+function starField(sp2) {
   const cm = cam.m;
   for (const st of STARS) {
     const d = st.d;
@@ -1343,7 +1380,11 @@ function drawStars(sp2, yOff, R) {
     ctx.fillStyle = "rgba(226,234,255," + a.toFixed(3) + ")";
     ctx.fillRect(x, y, Math.max(1, st.m * 1.6 * DPR), Math.max(1, st.m * 1.6 * DPR));
   }
-  ctx.save();
+}
+function drawStars(sp2, yOff, R) {
+  ctx.restore(); ctx.save();      // out of the rotated sky frame
+  starField(sp2);
+  ctx.save();                     // and back into it
   ctx.translate(CX, CY); ctx.rotate(-eulerOf(cam.m).roll);
 }
 
@@ -1371,6 +1412,8 @@ function drawReentryWash(P) {
 
 function drawGlare() {
   if (!Q.q.glare) return;
+  // no atmosphere to scatter in: the flare tightens right down out there
+  const gk = 1 - .72 * clamp(LIGHT.deep || 0, 0, 1);
   const sp = projectPoint(vadd(cam.pos, vmul(LIGHT.sun, 9000)));
   if (!sp || sp.x < -W * .4 || sp.x > W * 1.4 || sp.y < -H * .4 || sp.y > H * 1.4) return;
   const big = Math.max(W, H);
@@ -1379,9 +1422,9 @@ function drawGlare() {
   ctx.translate(sp.x, sp.y);
   for (const [ang, len, wid, a] of [[0, .40, .012, .20], [Math.PI / 2, .13, .010, .10], [.7, .22, .006, .07]]) {
     ctx.save(); ctx.rotate(ang);
-    const g = ctx.createLinearGradient(-big * len, 0, big * len, 0);
+    const g = ctx.createLinearGradient(-big * len * gk, 0, big * len * gk, 0);
     g.addColorStop(0, "rgba(255,240,206,0)");
-    g.addColorStop(.5, "rgba(255,246,222," + a + ")");
+    g.addColorStop(.5, "rgba(255,246,222," + (a * gk).toFixed(3) + ")");
     g.addColorStop(1, "rgba(255,240,206,0)");
     ctx.fillStyle = g;
     ctx.fillRect(-big * len, -big * wid, big * len * 2, big * wid * 2);
@@ -1450,6 +1493,7 @@ function emitTri(vp, ia, ib, ic, ax, ay, az, bx, by, bz, cx2, cy2, cz2,
 const _tri = new Float32Array(9), _triSave = new Float32Array(12);
 
 function drawTerrain() {
+  if ((LIGHT.far || 0) > .995) return;     // the ground is a planet now
   const LEV = Q.q.lev, half = Q.q.half, span = half * 2 + 1;
   // Widen every ring as you climb: from 80,000 ft the useful view is thousands
   // of kilometres across, and 50 m cells there would be wasted on nothing.
@@ -1464,6 +1508,11 @@ function drawTerrain() {
   const shadows = Q.q.terrShadow;
   for (let L = LEV - 1; L >= 0; L--) {
     const cell = base * (1 << L);
+    /* A ring whose cells are wider than the horizon is far away is one or two
+       enormous quads stretched across the whole view — the flat grey slabs
+       that showed up above three hundred kilometres. There is nothing out
+       there for them to describe, so they are not drawn. */
+    if (cell > horiz * .34) continue;
     const gx = Math.round(cam.pos.x / cell), gz = Math.round(cam.pos.z / cell);
     for (let j = 0; j <= span - 1; j++) {
       const wz = (gz - half + j) * cell;
@@ -2519,7 +2568,7 @@ function resetPlane(scen) {
   P.inE = P.inA = P.inR = 0; P.trim = 0; P.flap = P.flapCmd = 0;
   P.crashed = false; P.crashT = 0; P.stall = 0; P.hardLand = 0; P.touched = 0; P.pitchI = 0; P.holdHdg = undefined;
   P.gear = P.gearCmd = 1; P.brake = 0; P.rpm = 0; P.dist = 0;
-  P.fbwI = 0; P.fbwG = 1; P.pCmdS = 0; P.wxF = 0; P.steer = 0; P.qbar = 0; P.gload = 0; P.alpha = 0; P.beta = 0; P.aoaCap = false; P.cmdG = 1;
+  P.fbwI = 0; P.fbwG = 1; P.pCmdS = 0; P.wxF = 0; P.steer = 0; P.gRatio = 1; P.qbar = 0; P.gload = 0; P.alpha = 0; P.beta = 0; P.aoaCap = false; P.cmdG = 1;
   P.chute = P.chuteCmd = 0; P.mach = 0; P.overQ = 0; P.gMax = 1; P.gMin = 1; P.gStress = 0; P.gRed = 0; P.heat = 0; P.burn = 0; P.ab = 0; P.abSm = 0; P.unstart = 0; P.apAlt = undefined; P.apHdg = undefined;
   P.q = qAxis(0, 1, 0, Math.PI);            // runway 18: heading south
   P.thr = 0;
@@ -2603,8 +2652,12 @@ function curve(x) {
 
    This is what neutral stick commands, which is why a turn holds altitude
    without the pilot having to pull as well as bank. */
-function levelG(e) {
-  const cg = Math.cos(clamp(e.pitch, -1.45, 1.45));
+function levelG(e, gr) {
+  // gr is how much of your weight you still have: one down here, zero in
+  // orbit, and negative if you are going round faster than the orbit wants.
+  // Without it the system would hold you at one g in free fall and fly you
+  // steadily out of the trajectory you were on.
+  const cg = Math.cos(clamp(e.pitch, -1.45, 1.45)) * (gr === undefined ? 1 : gr);
   const cb = Math.cos(clamp(e.roll, -Math.PI, Math.PI));
   // compensated fully out to about 75 degrees, then frozen, then faded away
   // past knife-edge — rolling inverted should not command four g
@@ -2659,7 +2712,7 @@ function flightControl(P, dt, e, cE, cA, cR) {
   const gnd = clamp(P.fbwG, 0, 1);
 
   /* ---------------- pitch ------------------------------------------------ */
-  const lvl = levelG(e);
+  const lvl = levelG(e, P.gRatio);
   const sE = curve(cE), sA = curve(cA), sR = curve(cR);
   /* Trim on a fly-by-wire aeroplane is not an offset on the tailplane — the
      computer already holds whatever it is asked to hold. It shifts the datum
@@ -2765,7 +2818,7 @@ function flightControl(P, dt, e, cE, cA, cR) {
    hands off, it holds the altitude and heading it had when you let go. */
 function autopilot(P, dt, e) {
   const hands = Math.abs(P.inA) > .04 || Math.abs(P.inE) > .04;
-  const lvl = levelG(e);
+  const lvl = levelG(e, P.gRatio);
   P.trim = 0;
   if (P.onGround) { P.apAlt = undefined; P.apHdg = undefined; return { e: P.inE * .55, a: P.inA, r: P.inR }; }
 
@@ -2837,7 +2890,51 @@ function physics(P, dt) {
   const perEngine = SPECS.thrustMil * clamp(P.rpm, 0, 1) + SPECS.thrustAB * abSm;
   const thrust = 2 * perEngine * ram * dens;
 
-  let F = v3(0, -SPECS.mass * 9.81, 0);      // world-frame accumulator
+  /* Gravity. It used to be a flat 9.81 straight down at every altitude and
+     every speed, which is exactly right for an aeroplane and quite wrong for
+     anything that leaves the atmosphere. Two terms were missing.
+
+     It falls off as the inverse square — 9.81 at the surface, 9.51 at a
+     hundred kilometres, 8.69 at four hundred, 7.33 at a thousand.
+
+     And going fast enough sideways over a round planet takes the weight off
+     you, because part of what gravity is doing is bending your path around
+     the curve instead of pulling you down. That term is v_horizontal squared
+     over your distance from the centre, and it is the whole of what an orbit
+     is: at 7.78 km/s a hundred kilometres up it exactly cancels, which is why
+     that is the speed low orbit runs at. Without it you could not orbit at
+     any speed whatsoever — you came straight back down from 7,900 m/s at
+     200 km, losing seventy kilometres in two minutes.
+
+     Both terms vanish at any speed you would fly a circuit at: at 250 m/s the
+     centrifugal relief is a tenth of one percent of your weight. */
+  const rOrb = EARTH_R + Math.max(P.pos.y, 0);
+  const gLoc = 9.81 * (EARTH_R / rOrb) * (EARTH_R / rOrb);
+  const gEff = gLoc - (P.vel.x * P.vel.x + P.vel.z * P.vel.z) / rOrb;
+  P.gRatio = gEff / 9.81;
+  let F = v3(0, -SPECS.mass * gEff, 0);      // world-frame accumulator
+
+  /* And everything else in the solar system, by GM over r squared. Near the
+     Earth these are rounding errors — the Sun pulls at six millimetres per
+     second squared out here — but they are what make the Moon something you
+     can fall toward and orbit rather than a painted disc. At the lunar
+     surface this gives 1.62 m/s^2, because that is what 4.905e12 over
+     1737 km squared comes to. */
+  if (typeof BODIES !== "undefined") {
+    for (let i = 0; i < BODIES.length; i++) {
+      const b = BODIES[i];
+      const bx = b.p.x - P.pos.x, by = b.p.y - P.pos.y, bz = b.p.z - P.pos.z;
+      const r2 = bx * bx + by * by + bz * bz;
+      if (r2 < 1) continue;
+      const r = Math.sqrt(r2);
+      if (b.gm <= 0) continue;
+      const a = b.gm / r2;
+      if (a < 2e-4) continue;                // below noticing, skip the work
+      F.x += SPECS.mass * a * bx / r;
+      F.y += SPECS.mass * a * by / r;
+      F.z += SPECS.mass * a * bz / r;
+    }
+  }
   let M = v3();                              // body-frame torque
 
   if (V > .6) {
@@ -2876,6 +2973,46 @@ function physics(P, dt) {
     const liftDir = vnorm(vcross(vd, v3(1, 0, 0)));
     const fb = vadd(vadd(vmul(liftDir, L), vmul(vd, -D)), v3(Y, 0, 0));
     fb.z += thrust;
+    /* The afterburner does not run out of breath.
+
+       Drag rises with the SQUARE of speed, so an engine whose thrust rises
+       any slower gets matched by it sooner or later and the needle stops —
+       that is what a terminal velocity is, and it is why there was a top
+       speed. With the burners lit there is no longer one: whatever the air
+       is taking out of you, the burners put back more, and the surplus is a
+       guaranteed net acceleration rather than a guaranteed thrust.
+
+       It has to be done that way round. The obvious fix is to let thrust
+       climb faster than drag — but any law that makes acceleration grow
+       faster than linearly with speed reaches infinity in FINITE time, and a
+       cubic one duly did: it ran to NaN eighty-five seconds after brake
+       release. The surplus here grows with the logarithm of Mach instead, so
+       the aeroplane accelerates harder and harder for ever and never reaches
+       a singularity. Twenty-eight metres per second per second at Mach 3,
+       thirty-nine at Mach 10, sixty-four at Mach 100, ninety at Mach 1000.
+
+       On the dry throttle none of this applies and drag still sets an honest
+       top end, which is the point: it is the burners that buy you infinity. */
+    if (abSm > .01 && !P.crashed) {
+      /* Out of the atmosphere the burners have nothing left to fight and the
+         distances stop being aeronautical: the Moon is 384,400 km away and
+         Mars is two hundred times that. At aircraft accelerations those are
+         not journeys, they are careers. Once the air is genuinely gone the
+         surplus is multiplied, which puts the Moon a couple of minutes out
+         and the inner planets within half an hour. Inside the atmosphere
+         nothing changes — the boost is keyed to there being no air at all. */
+      const vac = 1 - clamp(rho / 2e-5, 0, 1);
+      /* In air the surplus grows with the logarithm of Mach and never stops.
+         In vacuum it goes to a flat figure instead of carrying on growing:
+         multiplying the two ran the speed to a third of the speed of light
+         inside a quarter of an hour, which is not flying anything. Eighty
+         thousand puts the Moon a couple of minutes out on a burn-and-brake
+         and Mars in the half hour it deserves to be. */
+      const aAir = 12 + 26 * Math.log10(1 + Math.max(P.mach, 0));
+      const push = SPECS.mass * abSm * lerp(aAir, Math.max(aAir, 80000), vac);
+      const net = thrust - D;
+      if (net < push) fb.z += push - net;
+    }
     F = vadd(F, mRot(m, fb));
     // Load factor as an accelerometer would read it: the aerodynamic force
     // along the body vertical, in g, which is what the pilot and the airframe
@@ -2996,7 +3133,7 @@ function physics(P, dt) {
 
   // --- integrate -----------------------------------------------------------
   if (P.crashed) {
-    F = v3(0, -SPECS.mass * 9.81, 0);
+    F = v3(0, -SPECS.mass * gEff, 0);
     if (P.pos.y <= groundH(P.pos.x, P.pos.z) + 1.0) {
       P.vel = vmul(P.vel, Math.exp(-6 * dt));
       P.w = vmul(P.w, Math.exp(-5 * dt));
@@ -3055,6 +3192,28 @@ function physics(P, dt) {
     P.overQ = (P.overQ || 0) + dt;
     cam.shake = Math.max(cam.shake, clamp(P.overQ * .22, 0, .65));
   } else P.overQ = Math.max(0, (P.overQ || 0) - dt * .6);
+  /* They are solid. Fly into one and that is the end of the flight, the same
+     as flying into a hill. */
+  if (!P.crashed && typeof BODIES !== "undefined" && P.prev) {
+    /* Swept, not a point test. At a million metres a second a substep is
+       twenty kilometres long and a point test walks straight through a moon
+       without touching it. This asks how close the SEGMENT travelled this
+       step came to the centre. */
+    const ax = P.prev.x, ay = P.prev.y, az = P.prev.z;
+    const mx = P.pos.x - ax, my = P.pos.y - ay, mz = P.pos.z - az;
+    const mm = mx * mx + my * my + mz * mz;
+    for (let i = 0; i < BODIES.length; i++) {
+      const b = BODIES[i];
+      if (b.noHit) continue;
+      const cx = b.p.x - ax, cy = b.p.y - ay, cz = b.p.z - az;
+      let t = mm > 1e-9 ? (cx * mx + cy * my + cz * mz) / mm : 0;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const ex = cx - mx * t, ey = cy - my * t, ez = cz - mz * t;
+      if (ex * ex + ey * ey + ez * ez < b.r * b.r) { crash("IMPACT \u00b7 " + b.name.toUpperCase()); break; }
+    }
+  }
+  P.prev = v3(P.pos.x, P.pos.y, P.pos.z);
+
   // never let the aircraft sink through the world
   const gh = groundH(P.pos.x, P.pos.z);
   if (P.pos.y < gh + 1.2) { P.pos.y = gh + 1.2; if (P.vel.y < 0) P.vel.y *= -.05; }
@@ -3064,13 +3223,17 @@ function physics(P, dt) {
 const WIND = {
   base: v3(3.2, 0, -1.6), t: 0,
   at(pos, P) {
+    // There is no weather above the stratosphere, and there was: this used to
+    // return a steady seven metres a second at three hundred kilometres up.
+    const air = 1 - sstep(20000, 46000, pos.y);
+    if (air <= 0) return v3();
     const g = Math.sin(this.t * .7) * .5 + Math.sin(this.t * 1.9 + 1.3) * .3;
     const alt = clamp(pos.y / 1200, 0, 1);
-    const turb = (1 - alt) * .9 + .15;
+    const turb = ((1 - alt) * .9 + .15) * air;
     return v3(
-      this.base.x * (1 + g * .5) * (.6 + alt) + Math.sin(this.t * 3.1 + pos.x * .01) * turb,
+      (this.base.x * (1 + g * .5) * (.6 + alt)) * air + Math.sin(this.t * 3.1 + pos.x * .01) * turb,
       Math.sin(this.t * 2.6 + pos.z * .013) * turb * .8,
-      this.base.z * (1 + g * .5) * (.6 + alt) + Math.cos(this.t * 2.3 + pos.z * .011) * turb);
+      (this.base.z * (1 + g * .5) * (.6 + alt)) * air + Math.cos(this.t * 2.3 + pos.z * .011) * turb);
   }
 };
 
@@ -3437,6 +3600,165 @@ function drawPlasma(P, Rb, pos) {
       }
     }
   }
+}
+
+/* ===================================================== solar system ====
+   Real radii, real distances, real surface gravities. The positions are a
+   snapshot rather than an ephemeris — the planets do not move — but the
+   scale is honest, and that is the part that matters when you are flying
+   at it: the Moon is 384,400 km away and 1,737 km across, so it stays a
+   speck for a very long time and then, very suddenly, is not.
+
+   Distances are along real-ish directions from Earth. The Sun sits where the
+   scene's light comes from, so what lights the planets is what lights you. */
+const AU = 1.496e11;
+const BODIES = [
+  // name, radius m, GM, base colour, dir x,y,z (unnormalised), distance m
+  ["Sun",     6.957e8, 1.327e20, [255, 244, 214], -.38, .70, .60, AU],
+  ["Moon",    1.7374e6, 4.905e12, [166, 162, 156], .12, 1, .18, 3.844e8],
+  ["Venus",   6.0518e6, 3.249e14, [226, 210, 172], .62, .74, -.25, 1.08e11],
+  ["Mars",    3.3895e6, 4.283e13, [196, 108, 68], -.70, .60, .38, 9.2e10],
+  ["Mercury", 2.4397e6, 2.203e13, [148, 142, 134], -.20, .52, -.83, 1.31e11],
+  ["Jupiter", 6.9911e7, 1.267e17, [214, 186, 150], .34, .82, .46, 6.3e11],
+  ["Saturn",  5.8232e7, 3.793e16, [222, 206, 160], -.55, .66, -.51, 1.28e12],
+  ["Uranus",  2.5362e7, 5.794e15, [172, 214, 220], .80, .44, .41, 2.72e12],
+  ["Neptune", 2.4622e7, 6.837e15, [108, 140, 210], -.28, .50, -.82, 4.35e12]
+].map(b => {
+  const L = Math.hypot(b[4], b[5], b[6]) || 1;
+  return {
+    name: b[0], r: b[1], gm: b[2], col: b[3],
+    p: v3(b[4] / L * b[7], b[5] / L * b[7], b[6] / L * b[7]),
+    dist: b[7], sun: b[0] === "Sun", ring: b[0] === "Saturn"
+  };
+});
+/* Earth itself, for when you are far enough away to see it whole. Its centre
+   is one planetary radius below the runway, because that is where the runway
+   is. It carries no GM and no collision of its own — gravity is already the
+   inverse-square field in physics(), and the ground you can hit is the
+   terrain — so this entry is purely something to look at. */
+BODIES.push({
+  name: "Earth", r: 6.371e6, gm: 0, col: [96, 138, 186],
+  p: v3(0, -6.371e6, 0), dist: 0, sun: false, ring: false,
+  noHit: true, home: true
+});
+const SUNBODY = BODIES[0];
+
+/* Which one you are nearest, and how far off its surface — the navigation
+   read-out, and what the gravity and the collision test both key off. */
+function nearestBody() {
+  let best = null, bd = 1e30;
+  for (const b of BODIES) {
+    const d = Math.hypot(b.p.x - PLANE.pos.x, b.p.y - PLANE.pos.y, b.p.z - PLANE.pos.z) - b.r;
+    if (d < bd) { bd = d; best = b; }
+  }
+  return { body: best, alt: bd };
+}
+
+/* One body, drawn as a lit sphere. The terminator on a sphere projects to an
+   ellipse, so the sunlit part is a half-limb joined to a half-ellipse whose
+   width is the cosine of the phase angle — which is what gives you a gibbous
+   Moon from one side and a crescent from the other. */
+const BODY_N = 44;
+function drawBody(b) {
+  // the home planet fades in exactly as the sky and the terrain fade out
+  const fade = b.home ? (LIGHT.far || 0) : 1;
+  if (fade < .01) return;
+  const dx = b.p.x - cam.pos.x, dy = b.p.y - cam.pos.y, dz = b.p.z - cam.pos.z;
+  const d = Math.hypot(dx, dy, dz);
+  if (d < b.r * .999) return;                       // inside it: nothing to draw
+  const c = projectRaw(b.p);
+  if (!c) return;
+  const rp = F * b.r / Math.max(d, 1);              // angular radius, pixels
+  if (rp < .25) {                                   // far enough to be a star
+    if (c.x < 0 || c.x > W || c.y < 0 || c.y > H) return;
+    DL.sprite(d, c.x, c.y, Math.max(1.4, rp * 4), sprite(b.col[0], b.col[1], b.col[2], 3), .85);
+    return;
+  }
+  if (c.x < -rp * 2 || c.x > W + rp * 2 || c.y < -rp * 2 || c.y > H + rp * 2) return;
+
+  if (b.sun) {                                      // the Sun is its own light
+    DL.sprite(d + 2, c.x, c.y, Math.max(rp * 9, 26), sprite(255, 232, 178, 3), .40);
+    const pts = [];
+    for (let i = 0; i < BODY_N; i++) {
+      const t = i / BODY_N * TAU;
+      pts.push(c.x + Math.cos(t) * rp, c.y + Math.sin(t) * rp);
+    }
+    DL.poly(d, pts, BODY_N, "rgb(255,250,232)", null, 0);
+    return;
+  }
+
+  // toward the viewer, and toward the Sun, from the body
+  const vx = -dx / d, vy = -dy / d, vz = -dz / d;
+  let sx = SUNBODY.p.x - b.p.x, sy = SUNBODY.p.y - b.p.y, sz = SUNBODY.p.z - b.p.z;
+  const sl = Math.hypot(sx, sy, sz) || 1; sx /= sl; sy /= sl; sz /= sl;
+  const cosPh = clamp(sx * vx + sy * vy + sz * vz, -1, 1);
+
+  // screen direction of the sunward side
+  const sp2 = projectRaw(v3(b.p.x + sx * b.r, b.p.y + sy * b.r, b.p.z + sz * b.r));
+  let ux = 1, uy = 0;
+  if (sp2) {
+    const ex = sp2.x - c.x, ey = sp2.y - c.y, el = Math.hypot(ex, ey);
+    if (el > 1e-6) { ux = ex / el; uy = ey / el; }
+  }
+  const wx = -uy, wy = ux;
+
+  // the whole disc, in shadow
+  const dark = [b.col[0] * .10 * fade, b.col[1] * .10 * fade, b.col[2] * .13 * fade];
+  const full = [];
+  for (let i = 0; i < BODY_N; i++) {
+    const t = i / BODY_N * TAU;
+    full.push(c.x + Math.cos(t) * rp * ux + Math.sin(t) * rp * wx,
+              c.y + Math.cos(t) * rp * uy + Math.sin(t) * rp * wy);
+  }
+  DL.poly(d + 1, full, BODY_N, rgb(dark[0], dark[1], dark[2]), null, 0);
+
+  if (b.ring) drawRing(b, c, rp, ux, uy, wx, wy, d, cosPh);
+
+  // the lit part: half the limb, then the terminator ellipse back again
+  const lit = [];
+  const H2 = BODY_N / 2;
+  for (let i = 0; i <= H2; i++) {
+    const t = -Math.PI / 2 + i / H2 * Math.PI;
+    lit.push(c.x + Math.cos(t) * rp * ux + Math.sin(t) * rp * wx,
+             c.y + Math.cos(t) * rp * uy + Math.sin(t) * rp * wy);
+  }
+  for (let i = H2; i >= 0; i--) {
+    const t = -Math.PI / 2 + i / H2 * Math.PI;
+    lit.push(c.x + cosPh * Math.cos(t) * rp * ux + Math.sin(t) * rp * wx,
+             c.y + cosPh * Math.cos(t) * rp * uy + Math.sin(t) * rp * wy);
+  }
+  const n = lit.length / 2;
+  // a little limb darkening so it reads as a ball and not a sticker
+  const lc = fade < 1 ? [b.col[0] * fade, b.col[1] * fade, b.col[2] * fade] : b.col;
+  DL.poly(d, lit, n, rgb(lc[0], lc[1], lc[2]), null, 0);
+  DL.sprite(d - 1, c.x + ux * rp * .22, c.y + uy * rp * .22, rp * .82,
+    sprite(lc[0] * 1.12, lc[1] * 1.12, lc[2] * 1.12, 0), .30);
+}
+
+/* Saturn, because it would be a waste not to. */
+function drawRing(b, c, rp, ux, uy, wx, wy, d, cosPh) {
+  const inner = 1.24, outer = 2.27;                 // in planet radii, real
+  const tilt = .42;                                 // how open the rings are
+  const seg = 40;
+  for (const [r0, r1, a] of [[inner, 1.52, .34], [1.56, 1.95, .46], [1.99, outer, .22]]) {
+    const pts = [];
+    for (let i = 0; i <= seg; i++) {
+      const t = i / seg * TAU;
+      pts.push(c.x + Math.cos(t) * rp * r1 * ux + Math.sin(t) * rp * r1 * tilt * wx,
+               c.y + Math.cos(t) * rp * r1 * uy + Math.sin(t) * rp * r1 * tilt * wy);
+    }
+    for (let i = seg; i >= 0; i--) {
+      const t = i / seg * TAU;
+      pts.push(c.x + Math.cos(t) * rp * r0 * ux + Math.sin(t) * rp * r0 * tilt * wx,
+               c.y + Math.cos(t) * rp * r0 * uy + Math.sin(t) * rp * r0 * tilt * wy);
+    }
+    DL.poly(d + 2, pts, pts.length / 2,
+      "rgba(216,200,164," + (a * clamp(.4 + cosPh * .6, .15, 1)).toFixed(3) + ")", null, 0);
+  }
+}
+
+function drawBodies() {
+  for (const b of BODIES) drawBody(b);
 }
 
 /* ============================================================= audio ==== */
@@ -3898,9 +4220,18 @@ function drawHUDFull() {
     hudFont(10 * U); ctx.fillStyle = GD; ctx.textAlign = "center";
     ctx.fillText(unit, x + tw / 2, cy + tapeH / 2 + 12 * U);
   };
+  /* Above a few hundred thousand feet an altimeter in feet is a wall of
+     digits nobody can read, and past a billion it simply overflows its box.
+     Out there it switches to kilometres, and past the Moon to thousands. */
   const ias = P.ias * KT, alt = P.pos.y * FT;
+  const bigAlt = P.pos.y > 4e5;
   drawTape(96 * U, CY, ias, ias > 400 ? 50 : 20, "KIAS", 0, false);
-  drawTape(W - 96 * U - tw, CY, alt, alt > 20000 ? 2000 : 500, "FT MSL", 0, true);
+  if (bigAlt) {
+    const km = P.pos.y / 1000;
+    const far = km > 4e5;
+    drawTape(W - 96 * U - tw, CY, far ? km / 1000 : km,
+      far ? 2000 : km > 20000 ? 2000 : 200, far ? "1000 KM" : "KM MSL", far ? 1 : 0, true);
+  } else drawTape(W - 96 * U - tw, CY, alt, alt > 20000 ? 2000 : 500, "FT MSL", 0, true);
   // Mach and afterburner, right under the speed tape
   const mx = 96 * U - 24 * U, my = CY + tapeH / 2 + 92 * U;
   box(mx, my, 132 * U, 52 * U, 4 * U, PANEL, GD);
@@ -4029,9 +4360,22 @@ function drawHUDFull() {
   ctx.fillStyle = GD; ctx.fillText("V/S fpm", rx + 8 * U, CY - 48 * U);
   hudFont(16 * U, 600); ctx.fillStyle = Math.abs(vs) > 1400 ? "rgba(255,170,90,.95)" : G;
   ctx.fillText((vs >= 0 ? "+" : "") + Math.round(vs / 10) * 10, rx + 8 * U, CY - 28 * U);
-  hudFont(12 * U); ctx.fillStyle = GD; ctx.fillText("AGL ft", rx + 8 * U, CY - 4 * U);
-  hudFont(16 * U, 600); ctx.fillStyle = G;
-  ctx.fillText(Math.round((P.pos.y - groundH(P.pos.x, P.pos.z)) * FT), rx + 8 * U, CY + 16 * U);
+  /* Height above the ground, until there is no ground under you worth the
+     name — at which point it becomes range to whatever you are nearest, which
+     is what you actually want to know when the nearest thing is the Moon. */
+  const nb = (typeof nearestBody === "function" && P.pos.y > 1.2e6) ? nearestBody() : null;
+  if (nb && nb.body && !nb.body.home) {
+    hudFont(12 * U); ctx.fillStyle = GD;
+    ctx.fillText(nb.body.name.toUpperCase().slice(0, 8), rx + 8 * U, CY - 4 * U);
+    hudFont(16 * U, 600); ctx.fillStyle = nb.alt < 2e6 ? "rgba(255,170,90,.95)" : G;
+    const k = nb.alt / 1000;
+    ctx.fillText(k > 1e6 ? (k / 1e6).toFixed(2) + "Gm" : k > 1000 ? (k / 1000).toFixed(1) + "Mm"
+      : Math.round(k) + "km", rx + 8 * U, CY + 16 * U);
+  } else {
+    hudFont(12 * U); ctx.fillStyle = GD; ctx.fillText("AGL ft", rx + 8 * U, CY - 4 * U);
+    hudFont(16 * U, 600); ctx.fillStyle = G;
+    ctx.fillText(Math.round((P.pos.y - groundH(P.pos.x, P.pos.z)) * FT), rx + 8 * U, CY + 16 * U);
+  }
   hudFont(12 * U); ctx.fillStyle = GD; ctx.fillText("MACH", rx + 8 * U, CY + 38 * U);
   hudFont(16 * U, 600); ctx.fillStyle = G;
   ctx.fillText(P.mach.toFixed(2), rx + 8 * U, CY + 54 * U);
@@ -4676,6 +5020,7 @@ function frame(now) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   drawSky();
   DL.reset();
+  drawBodies();
   drawTerrain();
   if (Math.hypot(cam.pos.x, cam.pos.z) < 40000) drawMesh(AIRPORT, v3(0, 0, 0), mIdent(), null);
   drawLakes();
