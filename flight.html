@@ -91,7 +91,7 @@
 
       <h2>Flight</h2>
       <div class="row" id="scenRow">
-        <button class="opt on" data-scen="free"><b>FREE FLIGHT</b><i>Cold on runway 18 at Keeper Field. Brakes set, engines at idle. Go anywhere &mdash; the envelope reaches Mach 3.2 above 80,000 ft.</i></button>
+        <button class="opt on" data-scen="free"><b>FREE FLIGHT</b><i>Cold on runway 18 at Keeper Field. Brakes set, engines at idle. Go anywhere. There is no top end: climb out of the air and it keeps accelerating, and everything you gain comes back as heat when you fall in again.</i></button>
         <button class="opt" data-scen="air"><b>AIRBORNE START</b><i>Airborne at 23,000 ft and already supersonic. Climb and accelerate.</i></button>
         <button class="opt" data-scen="rings"><b>RING RACE</b><i>12 gates strung across 120 km of sky, against the clock.</i></button>
         <button class="opt" data-scen="hohenwald"><b>HOHENWALD, TN</b><i>Low and slow over Lewis County, Tennessee. Fifty miles of it are built out properly: the Highland Rim and its creek valleys, the Buffalo and the Duck, the Natchez Trace, every town and community, and the monument at Grinder's Stand.</i></button>
@@ -1348,6 +1348,27 @@ function drawStars(sp2, yOff, R) {
 }
 
 /* anamorphic glare streaks, drawn over the scene when the sun is in frame */
+/* What re-entry looks like from inside. The shock layer is a few metres
+   ahead of the windscreen and brighter than the sun, so it washes the whole
+   view — more so from the cockpit, where you are sitting in it, than from a
+   chase camera watching from outside. */
+function drawReentryWash(P) {
+  const h = P.heat || 0;
+  if (h < .8 || !GAME.started) return;
+  const k = clamp((h - .8) / 3.4, 0, 1);
+  const c = plasmaColor(h);
+  const inside = camMode === 1 ? 1 : .42;
+  const g = ctx.createRadialGradient(CX, CY * .82, 0, CX, CY, Math.hypot(W, H) * .62);
+  const a0 = (k * .21 * inside).toFixed(3), a1 = (k * .075 * inside).toFixed(3);
+  g.addColorStop(0, "rgba(" + (c[0] | 0) + "," + (c[1] | 0) + "," + (c[2] | 0) + "," + a0 + ")");
+  g.addColorStop(.55, "rgba(" + (c[0] | 0) + "," + (c[1] | 0) + "," + (c[2] | 0) + "," + a1 + ")");
+  g.addColorStop(1, "rgba(" + (c[0] | 0) + "," + (c[1] | 0) + "," + (c[2] | 0) + ",0)");
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.restore();
+}
+
 function drawGlare() {
   if (!Q.q.glare) return;
   const sp = projectPoint(vadd(cam.pos, vmul(LIGHT.sun, 9000)));
@@ -2397,14 +2418,36 @@ function drawClouds() {
 /* ---------------------------------------------------------- atmosphere -- */
 /* A proper standard atmosphere: at 24 km the exponential approximation is out
    by enough to matter, and Mach number drives the whole flight envelope here. */
+/* The standard atmosphere, all the way out. It used to stop at 47 km and hold
+   the density there for ever, which meant space had as much air in it as the
+   stratopause: you could never stop pushing air aside, so there was a terminal
+   velocity, and at two thousand kilometres up the aeroplane was still ploughing
+   through 100 Pa of it. The real layers run to 86 km and above that the
+   density just keeps halving — so now it does, and in vacuum there is nothing
+   left to hold you back. */
 function isa(h) {
-  h = clamp(h, -500, 47000);
+  h = Math.max(h, -500);
   let T, p;
   if (h < 11000) { T = 288.15 - .0065 * h; p = 101325 * Math.pow(T / 288.15, 5.2559); }
   else if (h < 20000) { T = 216.65; p = 22632 * Math.exp(-9.80665 * (h - 11000) / (287.05 * 216.65)); }
   else if (h < 32000) { T = 216.65 + .001 * (h - 20000); p = 5474.9 * Math.pow(T / 216.65, -34.163); }
-  else { T = 228.65 + .0028 * (h - 32000); p = 868.02 * Math.pow(T / 228.65, -12.201); }
-  return { rho: p / (287.05 * T), a: 20.046 * Math.sqrt(T), T, p };
+  else if (h < 47000) { T = 228.65 + .0028 * (h - 32000); p = 868.02 * Math.pow(T / 228.65, -12.201); }
+  else if (h < 51000) { T = 270.65; p = 110.906 * Math.exp(-(h - 47000) / 7922.6); }
+  else if (h < 71000) { T = 270.65 - .0028 * (h - 51000); p = 66.939 * Math.pow(T / 270.65, 12.2009); }
+  else if (h < 86000) { T = 214.65 - .0020 * (h - 71000); p = 3.9564 * Math.pow(T / 214.65, 17.0813); }
+  else {
+    /* Above the mesopause a single exponential with a scale height that grows
+       as you climb tracks the real thing to within a factor of two all the way
+       to four hundred kilometres, which is far closer than anything up here
+       needs to be. Temperature is held at the mesopause value: the real
+       thermosphere is a thousand degrees and almost no molecules, and the only
+       thing T is used for here is putting a number on the Mach meter. */
+    T = 184.65;
+    const dh = h - 86000;
+    p = .30234 * Math.exp(-dh / (5800 + dh * .05)) * (T / 184.65);
+  }
+  const rho = Math.max(p / (287.05 * T), 0);
+  return { rho, a: 20.046 * Math.sqrt(T), T, p };
 }
 const rhoAt = y => isa(y).rho;
 
@@ -2428,6 +2471,8 @@ const SPECS = {
     { p: v3(0, -2.90, 10.50), brake: .12, steer: 1, grip: 0 }
   ],
   // oleo rates scaled to the airframe: about 180 mm of static compression
+  // ballistic control thrusters, in newton-metres
+  rcsP: 340000, rcsY: 300000, rcsR: 260000,
   gearK: 950000, gearC: 190000,
   hard: [v3(-8.40, -.10, -9.60), v3(8.40, -.10, -9.60), v3(0, -.20, 18.20),
          v3(0, .25, -14.10), v3(0, -1.05, 0), v3(-4.65, -1.02, -2), v3(4.65, -1.02, -2)]
@@ -2854,6 +2899,20 @@ function physics(P, dt) {
     P.alpha = 0; P.beta = 0; P.gload = 0; P.stall = 0;
     F = vadd(F, mRot(m, v3(0, 0, thrust)));
   }
+  /* Ballistic control. Out where there is no air, the elevons are moving
+     nothing and a control law with no authority leaves you a passenger. The
+     X-15 carried peroxide thrusters for exactly this, and so does this: they
+     fade in as dynamic pressure fades out. The pitch law has already handed
+     over to its rate mode by then, since indicated airspeed in vacuum is
+     zero — so out there the stick asks for a rotation rate and the thrusters
+     deliver it, which is how a reaction control system is flown. */
+  const rcs = 1 - clamp(P.qbar / 1200, 0, 1);
+  if (rcs > .002 && !P.crashed) {
+    M.x -= SPECS.rcsP * rcs * clamp(P.dE, -1, 1);
+    M.y += SPECS.rcsY * rcs * clamp(P.dR, -1, 1);
+    M.z -= SPECS.rcsR * rcs * clamp(P.dA, -1, 1);
+  }
+
   if (!AP.on && V > 40) {
     // an inlet unstart: one duct loses its shock and yaws the aircraft hard.
     // Only ever at high Mach and high angle of attack, as in the real thing.
@@ -2957,13 +3016,18 @@ function physics(P, dt) {
   // Stagnation heating rises with the cube of speed and the root of density:
   // this is the real hypersonic limit, and it is worth seeing.
   const heatRate = Math.sqrt(Math.max(rho, 1e-7) / 1.225) * Math.pow(Math.max(V, 0) / 1000, 3.1);
-  P.heat = clamp(approach(P.heat || 0, clamp(heatRate * .52, 0, 1.6), .55, dt), 0, 1.6);
+  /* Stagnation heating, and the ceiling is gone with it. It was pinned at 1.6
+     — reached at about Mach 10 in the stratosphere — so everything past that
+     looked identical. A return from orbit runs to about 5, and there is head
+     room above that for anything faster. The thermal lag is real: the skin
+     takes a couple of seconds to catch up, and a couple to let go. */
+  P.heat = clamp(approach(P.heat || 0, clamp(heatRate * .52, 0, 8), .55, dt), 0, 8);
   /* Heat is a read-out and a rumble, not a countdown. It used to burn the
      airframe through after six seconds over the limit; it does not any more.
      Fly it as hot as you like. */
   if (!P.crashed && P.heat > 1.25) {
     P.burn = (P.burn || 0) + dt;
-    cam.shake = Math.max(cam.shake, clamp((P.heat - 1.25) * 1.1, 0, .55));
+    cam.shake = Math.max(cam.shake, clamp((P.heat - 1.25) * .42, 0, .8));
   } else P.burn = Math.max(0, (P.burn || 0) - dt * .5);
 
   // peak tracking, and the physiological price of pulling
@@ -3174,9 +3238,12 @@ function drawAircraft() {
     const o = vadd(pos, mRot(Rb, v3(piv[0], piv[1], piv[2])));
     drawMesh(part.mesh, o, mmul(Rb, mat), piv);
   };
+  /* The skin itself, heating up. The ramp used to top out at a warm cream
+     around heat 1.25; it now runs all the way to the blue-white of a shock
+     layer, because there is now somewhere past 1.25 to go. */
   const heat = P.heat || 0;
-  const glow = heat > .25 ? mixc([120, 40, 20], [255, 216, 170], clamp((heat - .25) / 1.0, 0, 1)) : null;
-  const gk = glow ? clamp((heat - .25) * .75, 0, .72) : 0;
+  const glow = heat > .22 ? plasmaColor(heat) : null;
+  const gk = glow ? clamp((heat - .22) * .62, 0, .94) : 0;
   if (external) {
     drawMesh(AC.fuse, pos, Rb, null, glow, undefined, gk);
     drawMesh(AC.chine, pos, Rb, null, glow, undefined, gk);
@@ -3185,11 +3252,7 @@ function drawAircraft() {
     drawMesh(AC.nacL, pos, Rb, null, glow, undefined, gk * .8);
     drawMesh(AC.nacR, pos, Rb, null, glow, undefined, gk * .8);
     drawMesh(AC.marks, pos, Rb, null);
-    if (heat > .35) {   // shock layer standing off the nose
-      const n = projectPoint(vadd(pos, mRot(Rb, v3(0, 0, 21))));
-      if (n) DL.sprite(n.z + 4, n.x, n.y, Math.max(3.2 * n.s, 3),
-        sprite(255, 190, 130, 1), clamp((heat - .35) * .6, 0, .55));
-    }
+    drawPlasma(P, Rb, pos);
     // Elevons do both jobs: they move together for pitch and differentially
     // for roll, exactly as they do on a tailless delta.
     // A positive rotation about the wing axis puts a trailing edge DOWN, so
@@ -3275,6 +3338,102 @@ function drawNozzles(P, Rb, pos) {
         if (!sp) continue;
         DL.sprite(sp.z - 2, sp.x, sp.y, Math.max(.22 * sp.s * (1 - t * .7), .8),
           sprite(255, 240, 200, 1), ab * (1 - t) * .40);
+      }
+    }
+  }
+}
+
+/* What air looks like at a given stagnation temperature. It runs from a dull
+   cherry red through orange and straw to white, and then to the blue-white of
+   a shock layer hot enough to be ionising — which is the colour a capsule
+   comes home in. */
+function plasmaColor(h) {
+  if (h < 1.1) return mixc([104, 24, 10], [236, 104, 28], clamp(h / 1.1, 0, 1));
+  if (h < 2.8) return mixc([236, 104, 28], [255, 218, 158], clamp((h - 1.1) / 1.7, 0, 1));
+  return mixc([255, 218, 158], [188, 222, 255], clamp((h - 2.8) / 3.2, 0, 1));
+}
+
+/* The re-entry sheath.
+
+   Every part of this is driven by skin temperature, and skin temperature is
+   the square root of density times velocity cubed — so it is speed that
+   lights it and thin air that puts it out. That is the shape of a real
+   re-entry and it falls out of the physics rather than being staged: nothing
+   at all coasting in vacuum however fast you are going, and the whole
+   aeroplane inside a bubble of fire the moment it touches air again. */
+function drawPlasma(P, Rb, pos) {
+  const h = P.heat || 0;
+  if (h < .28 || P.crashed) return;
+  const k = clamp((h - .28) / 2.0, 0, 1);       // first glow to fully developed
+  const hot = clamp((h - 2.2) / 3.4, 0, 1);     // the ionised, blue-white end
+  const col = plasmaColor(h);
+  const R = col[0], G = col[1], B = col[2];
+  const shimmer = 1 + Math.sin(GAME.t * 31) * .06 + Math.sin(GAME.t * 17.3) * .04;
+
+  /* The bow shock stands off the nose, and it stands closer the faster you
+     go — at these speeds it is welded to the airframe. */
+  const stand = lerp(4.2, 1.2, k);
+  for (let i = 0; i < 5; i++) {
+    const t = i / 4;
+    const sp = projectPoint(vadd(pos, mRot(Rb, v3(0, .3, 19.5 + stand * (.4 + t * 2.1)))));
+    if (!sp) continue;
+    DL.sprite(sp.z + 6 - i * .5, sp.x, sp.y,
+      Math.max(sp.s * (4 + t * 16) * (.45 + k * .85) * shimmer, 2),
+      sprite(R, G, B, 1),
+      clamp(k * (.50 - t * .30) * (1 + hot * .9), 0, .62));
+  }
+
+  /* The sheath wrapping the airframe: brightest along the chines and the
+     leading edges, which is where the air is being compressed hardest. */
+  const EDGE = [
+    [0, .4, 17], [0, .4, 11], [0, .3, 4], [0, .2, -3],
+    [3.2, 0, 6], [-3.2, 0, 6], [6.0, -.2, -1], [-6.0, -.2, -1],
+    [8.4, -.3, -8], [-8.4, -.3, -8], [4.6, .1, -8.4], [-4.6, .1, -8.4]
+  ];
+  for (let i = 0; i < EDGE.length; i++) {
+    const e = EDGE[i];
+    const sp = projectPoint(vadd(pos, mRot(Rb, v3(e[0], e[1], e[2]))));
+    if (!sp) continue;
+    const near = i < 4 ? 1 : .72;                // the nose runs hottest
+    DL.sprite(sp.z + 2, sp.x, sp.y,
+      Math.max(sp.s * (2.6 + k * 5.5) * shimmer, 1.5),
+      sprite(R, G, B, 1),
+      clamp(k * .34 * near * (1 + hot * .7), 0, .50));
+  }
+
+  /* The wake. Ionised air does not follow the nose, it follows the flight
+     path, so this streams along the velocity vector rather than the body
+     axis — at a high angle of attack, which is how you come home, the
+     difference is the whole point. */
+  const V = vlen(P.vel);
+  if (V > 60) {
+    const d = vmul(P.vel, -1 / V);
+    const tail = vadd(pos, mRot(Rb, v3(0, 0, -12)));
+    const len = (26 + k * 150) * (1 + hot * 1.4);
+    const SEG = 12;
+    for (let i = 1; i <= SEG; i++) {
+      const t = i / SEG;
+      const sp = projectPoint(vadd(tail, vmul(d, len * t * t)));
+      if (!sp) continue;
+      const cool = plasmaColor(h * (1 - t * .55));
+      DL.sprite(sp.z - 1 - i * .02, sp.x, sp.y,
+        Math.max(sp.s * (3.4 + k * 9) * (.5 + t * 1.9), 1.2),
+        sprite(cool[0], cool[1], cool[2], 1),
+        clamp(k * .30 * (1 - t) * (1 - t) * (1 + hot), 0, .55));
+    }
+    /* Ablation: once it is properly hot the airframe starts shedding sparks,
+       and they trail off down the wake. */
+    if (h > 1.6) {
+      const n = Math.min(14, Math.round((h - 1.6) * 5));
+      for (let i = 0; i < n; i++) {
+        const ph = (GAME.t * 2.2 + i * .618) % 1;
+        const sx = (hash2(i * 13, (GAME.t * 6) | 0) - .5) * 14;
+        const sy = (hash2(i * 29, ((GAME.t * 6) | 0) + 7) - .5) * 4;
+        const o = vadd(vadd(pos, mRot(Rb, v3(sx, sy, lerp(12, -8, ph)))), vmul(d, ph * ph * 190));
+        const sp = projectPoint(o);
+        if (!sp) continue;
+        DL.sprite(sp.z - 3, sp.x, sp.y, Math.max(sp.s * 1.6, .9),
+          sprite(255, 236, 200, 3), clamp((1 - ph) * .75 * clamp(h - 1.6, 0, 1), 0, .8));
       }
     }
   }
@@ -3927,7 +4086,8 @@ function drawHUDFull() {
   if (P.unstart > 0) warn.push(["INLET UNSTART", "#ff6a56"]);
   // nothing below this line will break the aeroplane; they are read-outs
   if (P.qbar > 150000) warn.push(["HIGH Q", "#7fd4ff"]);
-  if (P.heat > .90) warn.push(["SKIN TEMP", "#7fd4ff"]);
+  if (P.heat > 3.2) warn.push(["RE-ENTRY", "#ff9a5a"]);
+  else if (P.heat > .90) warn.push(["SKIN TEMP", "#7fd4ff"]);
   // with this much thrust you are through rotation speed in seconds, so the
   // callout matters more here than it does in a real aeroplane
   if (P.onGround && P.ias * 1.94384 > 195 && !P.crashed) warn.push(["ROTATE", "#7ce89a"]);
@@ -4527,6 +4687,7 @@ function frame(now) {
   drawParts();
   drawClouds();
   DL.flush();
+  drawReentryWash(PLANE);
   drawLandmarks();
   drawGlare();
   if (Q.q.vig && vignette) { ctx.fillStyle = vignette; ctx.fillRect(0, 0, W, H); }
