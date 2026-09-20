@@ -2162,7 +2162,16 @@ function drawTrees() {
 /* Cities are drawn in three layers depending on how close you are: a grey
    stain on the terrain from any distance, a street grid once inside about
    30 km, and actual blocks of buildings in the last few kilometres. */
+/* The roads, the rivers, the lakes, the landmarks, the town labels and the
+   airfield are all painted on a flat plane with its origin at Edwards. That
+   plane stops being the Earth somewhere around four hundred kilometres up —
+   past which they were still being drawn, so the Natchez Trace and a set of
+   Tennessee lakes hung in space alongside the Moon. One test, used by all of
+   them. */
+const onPlanet = () => (LIGHT.far || 0) < .5;
+
 function drawRoadsRivers() {
+  if (!onPlanet()) return;
   const camX = cam.pos.x, camZ = cam.pos.z;
   const reach = clamp(cam.pos.y * 16 + 150000, 150000, 2600000);
   const draw = (set, colFn, widthK) => {
@@ -2220,6 +2229,7 @@ function drawRoadsRivers() {
    a reservoir at two hundred metres reads as water and not as a grey disc. */
 const LAKE_N = 22;
 function drawLakes() {
+  if (!onPlanet()) return;
   const cp = cam.pos, m = cam.m;
   const reach = clamp(cp.y * 10 + 70000, 70000, 600000);
   for (const L of LAKES) {
@@ -2259,6 +2269,7 @@ function drawLakes() {
    airfields. They carry a long way, because from height they are what tells
    you where you are. */
 function drawLandmarks() {
+  if (!onPlanet()) return;
   const cp = cam.pos;
   const reach = clamp(cp.y * 5 + 40000, 40000, 260000);
   const u = UI;
@@ -2298,6 +2309,7 @@ function drawLandmarks() {
 /* Blocks of buildings, grown deterministically from the city's own position so
    the same town looks the same every time you fly over it. */
 function drawCities() {
+  if (!onPlanet()) return;
   const camX = cam.pos.x, camZ = cam.pos.z, camY = cam.pos.y;
   let budget = Q.q.buildings;
   const labels = [];
@@ -2605,7 +2617,12 @@ function resetPlane(scen) {
   P.inE = P.inA = P.inR = 0; P.trim = 0; P.flap = P.flapCmd = 0;
   P.crashed = false; P.crashT = 0; P.stall = 0; P.hardLand = 0; P.touched = 0; P.pitchI = 0; P.holdHdg = undefined;
   P.gear = P.gearCmd = 1; P.brake = 0; P.rpm = 0; P.dist = 0;
-  P.fbwI = 0; P.fbwG = 1; P.pCmdS = 0; P.wxF = 0; P.steer = 0; P.gRatio = 1; P.qbar = 0; P.gload = 0; P.alpha = 0; P.beta = 0; P.aoaCap = false; P.cmdG = 1;
+  P.fbwI = 0; P.fbwG = 1; P.pCmdS = 0; P.wxF = 0; P.steer = 0; P.gRatio = 1;
+  /* The swept collision test draws a line from where you were to where you
+     are. A reset moves the aeroplane without flying it there, so leaving the
+     old point in place hands the test a segment tens of millions of
+     kilometres long that skewers half the solar system. */
+  P.prev = null; P.qbar = 0; P.gload = 0; P.alpha = 0; P.beta = 0; P.aoaCap = false; P.cmdG = 1;
   P.chute = P.chuteCmd = 0; P.mach = 0; P.overQ = 0; P.gMax = 1; P.gMin = 1; P.gStress = 0; P.gRed = 0; P.heat = 0; P.burn = 0; P.ab = 0; P.abSm = 0; P.unstart = 0; P.apAlt = undefined; P.apHdg = undefined;
   P.q = qAxis(0, 1, 0, Math.PI);            // runway 18: heading south
   P.thr = 0;
@@ -2980,6 +2997,14 @@ function transferAP(P, dt) {
     // hold station: kill whatever is left and look at it
     AP.ramp = 0;
     AP.accel = clamp(V * 1.2, 0, Math.max(V / 2.5, 3000));
+    /* Hand back cleanly. The speed hold's target was set once, on arming at
+       the edge of the atmosphere, and the transfer commands acceleration
+       directly rather than through it — so the stale number sat there for the
+       whole flight and the instant anything took the transfer off the engine
+       (a touch of the stick, Z, or clearing the target) the speed hold spooled
+       straight back up to it. Arrive at the Moon, reach for the stick to look
+       around, and it flew you into the surface about ninety seconds later. */
+    SPD.tgt = Math.min(SPD.tgt, Math.max(V, 60));
     AP.mode = mode; AP.togo = range; AP.close = close;
     AP.aimW = v3(-P.vel.x / Math.max(V, 1), -P.vel.y / Math.max(V, 1), -P.vel.z / Math.max(V, 1));
     return { aim: AP.aimW, look: v3(lx, ly, lz) };
@@ -2992,6 +3017,7 @@ function transferAP(P, dt) {
      and sailed past the Moon at five million metres a second having barely
      slowed at all. Whether we are speeding up or slowing down is simply
      whether the correction opposes the velocity we already have. */
+  SPD.tgt = Math.min(SPD.tgt, Math.max(V, vProf));   // never hand back a stale target
   const slowing = (wx * P.vel.x + wy * P.vel.y + wz * P.vel.z) < 0;
   if (slowing) {
     AP.ramp = 0;
@@ -3063,6 +3089,13 @@ function autopilot(P, dt, e) {
     bankTgt = P.inA * 62 * DEG;
     const pitchTgt = P.inE * 28 * DEG;
     dG = clamp((pitchTgt - e.pitch) * 3.2, -2.0, 4.0);
+  } else if ((P.qbar || 0) < 60) {
+    /* Hands off, out of the air, with nowhere to go: hold the attitude you
+       are in rather than an "altitude" and a "heading", neither of which
+       means anything in orbit. The altitude hold used to run here and fought
+       gravity with elevons that were moving nothing. */
+    P.apAlt = undefined; P.apHdg = undefined; AP.mode = "";
+    return { e: clamp(P.w.x * 2.2, -1, 1), a: clamp(P.w.z * 2.6, -1, 1), r: clamp(-P.w.y * 2.2, -1, 1) };
   } else {
     if (P.apHdg === undefined) P.apHdg = e.hdg;
     if (P.apAlt === undefined) P.apAlt = P.pos.y;
@@ -3145,7 +3178,13 @@ function physics(P, dt) {
      centrifugal relief is a tenth of one percent of your weight. */
   const rOrb = EARTH_R + Math.max(P.pos.y, 0);
   const gLoc = 9.81 * (EARTH_R / rOrb) * (EARTH_R / rOrb);
-  const gEff = gLoc - (P.vel.x * P.vel.x + P.vel.z * P.vel.z) / rOrb;
+  /* Going faster than orbital speed genuinely does push you outward, and
+     that is the term doing it — but it is unbounded in v squared, so at forty
+     thousand metres a second down low it reaches thirty g of lift and throws
+     the aeroplane off the planet. Real physics, wrong model: at that speed
+     over a flat plane the geometry stopped applying long ago. The floor keeps
+     orbits exact (they need a fraction of a g) and stops the absurdity. */
+  const gEff = Math.max(gLoc - (P.vel.x * P.vel.x + P.vel.z * P.vel.z) / rOrb, -3 * 9.81);
   P.gRatio = gEff / 9.81;
   let F = v3(0, -SPECS.mass * gEff, 0);      // world-frame accumulator
 
@@ -4009,7 +4048,11 @@ function drawBody(b) {
   if (d < b.r * .999) return;                       // inside it: nothing to draw
   const c = projectRaw(b.p);
   if (!c) return;
-  const rp = F * b.r / Math.max(d, 1);              // angular radius, pixels
+  /* The silhouette of a sphere subtends asin(r/d) and projects to F*tan of
+     that, not F*sin — identical while a body is far away and increasingly
+     wrong as you close on it, which is exactly when it matters. */
+  const sinT = clamp(b.r / Math.max(d, b.r), 0, .999);
+  const rp = F * sinT / Math.sqrt(1 - sinT * sinT);   // = F * tan(asin(r/d))
   if (rp < .25) {                                   // far enough to be a star
     if (c.x < 0 || c.x > W || c.y < 0 || c.y > H) return;
     DL.sprite(d, c.x, c.y, Math.max(1.4, rp * 4), sprite(b.col[0], b.col[1], b.col[2], 3), .85);
@@ -5008,13 +5051,44 @@ function drawHUDCompact() {
     if (sub) { hudFont(10 * u); ctx.fillStyle = GD; ctx.textAlign = "right"; ctx.fillText(sub, x + w - 8 * u, y + h - 9 * u); }
   };
   const pw = 112 * u, ph = 56 * u, py = st + 8 * u;
-  panel(sl + 12 * u, py, pw, ph, "KIAS", String(Math.round(P.ias * KT)), P.stall > .2 ? "rgba(255,120,96,.95)" : G);
-  const vs = P.vsi * FPM;
-  panel(W - sr - 12 * u - pw, py, pw, ph, "ALT FT", String(Math.round(P.pos.y * FT)), G,
-    (vs >= 0 ? "+" : "") + Math.round(vs / 10) * 10);
+
+  /* Every vacuum guard the full HUD got, the phone HUD needs too — and it had
+     none of them. This panel is about seven characters wide: indicated
+     airspeed reads zero above a hundred kilometres, so the speed instrument
+     showed nothing at all, and altitude in feet is ten digits at the Moon,
+     which sheared off the right-hand edge of the screen because the panel is
+     anchored to it. The phone was the worst place to fly this, not the best. */
+  const cvac = (P.qbar || 0) < 40;
+  const spdVal = cvac
+    ? (P.tas > 1e5 ? (P.tas / 1000).toFixed(0) : Math.round(P.tas))
+    : Math.round(P.ias * KT);
+  panel(sl + 12 * u, py, pw, ph, cvac ? (P.tas > 1e5 ? "KM/S" : "M/S TAS") : "KIAS",
+    String(spdVal), P.stall > .2 ? "rgba(255,120,96,.95)" : G);
+
+  const vs = P.vsi * FPM, avs = Math.abs(vs);
+  const vsTxt = avs > 1e6 ? (vs / 1e6).toFixed(1) + "M" : avs > 99999 ? (vs / 1000).toFixed(0) + "k"
+    : (vs >= 0 ? "+" : "") + Math.round(vs / 10) * 10;
+  const km = P.pos.y / 1000;
+  const altBig = P.pos.y > 4e5;
+  panel(W - sr - 12 * u - pw, py, pw, ph,
+    altBig ? (km > 4e5 ? "ALT Mm" : "ALT KM") : "ALT FT",
+    altBig ? (km > 4e5 ? (km / 1000).toFixed(1) : Math.round(km).toString())
+           : String(Math.round(P.pos.y * FT)), G, vsTxt);
+
+  /* And the third line: height above the ground until there is no ground,
+     then range to whatever you are flying at — which on a phone was the only
+     instrument left that could have told the pilot anything. */
   hudFont(10 * u); ctx.textAlign = "right"; ctx.fillStyle = GD;
-  ctx.fillText("AGL " + Math.round((P.pos.y - groundH(P.pos.x, P.pos.z)) * FT),
-    W - sr - 12 * u, py + ph + 11 * u);
+  const cnt = (typeof navTarget === "function") ? navTarget() : null;
+  if (P.pos.y > 4e5 && cnt && !cnt.home) {
+    const cr = Math.max(Math.hypot(cnt.p.x - P.pos.x, cnt.p.y - P.pos.y, cnt.p.z - P.pos.z) - cnt.r, 0);
+    ctx.fillText(cnt.name.toUpperCase() + " " + navRange(cr), W - sr - 12 * u, py + ph + 11 * u);
+  } else if (P.pos.y > 4e5) {
+    ctx.fillText("ALT " + navRange(P.pos.y), W - sr - 12 * u, py + ph + 11 * u);
+  } else {
+    ctx.fillText("AGL " + Math.round((P.pos.y - groundH(P.pos.x, P.pos.z)) * FT),
+      W - sr - 12 * u, py + ph + 11 * u);
+  }
   drawGMeter(P, W - sr - 12 * u - pw * .5, py + ph + 24 * u + 46 * u, 46 * u);
   // Mach and A/P badge under the speed panel
   box(sl + 12 * u, py + ph + 6 * u, pw, 34 * u, 5 * u, PANEL, GD);
@@ -5252,6 +5326,9 @@ const KEYCARD = [
   ["Throttle", "W  S   (Shift / Ctrl)", "drag the slider"],
   ["Afterburner", "throttle past 80%", "slider past the A/B line"],
   ["Autopilot", "Z", "A/P button"],
+  ["Speed hold", "O   (then W / S set the speed)", "\u2014"],
+  ["Nav target", "J   cycles Moon / planets / Sun", "\u2014"],
+  ["Solar system map", "N", "\u2014"],
   ["Wheel brakes", "Space (hold)", "BRAKE (hold)"],
   ["Parking brake", "B", "\u2014"],
   ["Drag chute", "X", "CHUTE button"],
@@ -5448,8 +5525,10 @@ function applyInput(dt) {
     if (SPD.on) {
       // the lever is a speed now: a proportional nudge, so it is usable from
       // a taxi speed to a hundred kilometres a second
+      // changing the number is not the same as taking the system out; the
+      // auto flag only records who armed it, so that leaving the atmosphere
+      // does not re-arm it underneath a pilot who has set their own speed
       SPD.tgt = clamp(SPD.tgt * (1 + tdir * .55 * dt) + tdir * 22 * dt, 0, 4e8);
-      SPD.auto = false;
     } else { P.thr = clamp(P.thr + tdir * .5 * dt, 0, 1); if (P.thr > .02) P.park = false; }
   }
   // trim (the autopilot owns trim while it is engaged)
@@ -5560,7 +5639,10 @@ function frame(now) {
   DL.reset();
   drawBodies();
   drawTerrain();
-  if (Math.hypot(cam.pos.x, cam.pos.z) < 40000) drawMesh(AIRPORT, v3(0, 0, 0), mIdent(), null);
+  // the airfield was gated on horizontal distance alone, so it stayed in
+  // view all the way to the Moon if you climbed straight up off the runway
+  if (onPlanet() && Math.hypot(cam.pos.x, cam.pos.z) < 40000)
+    drawMesh(AIRPORT, v3(0, 0, 0), mIdent(), null);
   drawLakes();
   drawTrees();
   drawRoadsRivers();
