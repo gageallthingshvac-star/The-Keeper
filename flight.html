@@ -1277,7 +1277,7 @@ function drawSky() {
   const away = LIGHT.far || 0;
   if (away > .5) {
     ctx.fillStyle = "#01020a"; ctx.fillRect(0, 0, W, H);
-    if (Q.q.stars) starField(1);
+    if (Q.q.stars) starField(1, true);
     return;
   }
   const e = eulerOf(cam.m);
@@ -1359,20 +1359,51 @@ function drawSky() {
    the aircraft rolls. Only visible once the air above is thin enough. */
 const STARS = (() => {
   const a = [];
-  for (let i = 0; i < 380; i++) {
-    const u = hash2(i, 91) * TAU, v = Math.acos(clamp(hash2(i, 92), .02, 1));
-    a.push({ d: v3(Math.sin(v) * Math.cos(u), Math.cos(v), Math.sin(v) * Math.sin(u)),
-             m: .25 + hash2(i, 93) * .75 });
+  /* Two populations. A thin uniform field, and a far denser one crowded into
+     a band a few degrees thick — because that is what a galaxy seen from
+     inside it looks like, and an empty sky is the one thing that makes deep
+     space look cheap. */
+  const NB = [.36, .86, -.37], nl = Math.hypot(NB[0], NB[1], NB[2]);
+  const bn = [NB[0] / nl, NB[1] / nl, NB[2] / nl];
+  const up = Math.abs(bn[1]) > .9 ? [1, 0, 0] : [0, 1, 0];
+  let e1 = [up[1] * bn[2] - up[2] * bn[1], up[2] * bn[0] - up[0] * bn[2], up[0] * bn[1] - up[1] * bn[0]];
+  const el = Math.hypot(e1[0], e1[1], e1[2]); e1 = [e1[0] / el, e1[1] / el, e1[2] / el];
+  const e2 = [bn[1] * e1[2] - bn[2] * e1[1], bn[2] * e1[0] - bn[0] * e1[2], bn[0] * e1[1] - bn[1] * e1[0]];
+  const star = (d, m, ci) => a.push({ d: d, m: m, c: ci });
+  const NU = 940, GA = 2.399963229728653;
+  /* Golden angle, not two hash draws. hash2(i, j) walked over small
+     consecutive i correlates badly enough to pile the whole uniform field
+     into one hemisphere, which is how the sky ended up empty whenever you
+     happened to be looking the other way. */
+  for (let i = 0; i < NU; i++) {
+    const z = 1 - (i + .5) / NU * 2 + (hash2(i, 92) - .5) * 1.6 / NU;
+    const zc = clamp(z, -.999, .999);
+    const s = Math.sqrt(1 - zc * zc), u = (i + hash2(i, 91) * .8) * GA;
+    star(v3(s * Math.cos(u), zc, s * Math.sin(u)), .22 + hash2(i, 93) * .78, hash2(i, 94));
+  }
+  const NM = 1500;
+  for (let i = 0; i < NM; i++) {
+    const th = (i + hash2(i, 95) * .9) / NM * TAU;
+    // three draws summed: a soft pile-up on the galactic plane, not a stripe
+    const w = (hash2(i, 96) + hash2(i, 97) + hash2(i, 98) - 1.5) * .30;
+    const cw = Math.cos(w), sw = Math.sin(w), ct = Math.cos(th), st = Math.sin(th);
+    star(v3((e1[0] * ct + e2[0] * st) * cw + bn[0] * sw,
+            (e1[1] * ct + e2[1] * st) * cw + bn[1] * sw,
+            (e1[2] * ct + e2[2] * st) * cw + bn[2] * sw),
+      .12 + hash2(i, 99) * .52, hash2(i, 100));
   }
   return a;
 })();
+/* Star colour by spectral class, blue-white through to orange. */
+const STARCOL = [[186, 208, 255], [216, 228, 255], [255, 252, 244], [255, 238, 202], [255, 204, 150]];
 /* The stars themselves, in absolute screen coordinates and touching nothing
    else. drawStars below has to climb out of the rotated sky frame to call it,
    which is a contract worth keeping in one place rather than at every call
    site — calling drawStars from outside that frame unbalances the canvas save
    stack and shunts the entire HUD sideways, which is exactly what it did. */
-function starField(sp2) {
+function starField(sp2, deep) {
   const cm = cam.m;
+  const bright = Q.q.glare ? .82 : 1.1;      // the brightest get a glint below
   for (const st of STARS) {
     const d = st.d;
     const vz = cm[6] * d.x + cm[7] * d.y + cm[8] * d.z;
@@ -1381,10 +1412,20 @@ function starField(sp2) {
     const vy = cm[3] * d.x + cm[4] * d.y + cm[5] * d.z;
     const x = CX + F * vx / vz, y = CY - F * vy / vz;
     if (x < 0 || x > W || y < 0 || y > H) continue;
-    const a = clamp(sp2 * st.m * (d.y * .6 + .4), 0, 1);
+    // near the planet the lower sky is washed out by air; away from it there
+    // is no lower sky, and dimming by world elevation just deletes half of them
+    const a = clamp(sp2 * st.m * (deep ? 1 : d.y * .6 + .4), 0, 1);
     if (a < .03) continue;
-    ctx.fillStyle = "rgba(226,234,255," + a.toFixed(3) + ")";
-    ctx.fillRect(x, y, Math.max(1, st.m * 1.6 * DPR), Math.max(1, st.m * 1.6 * DPR));
+    const col = STARCOL[(st.c * 5) | 0] || STARCOL[2];
+    ctx.fillStyle = "rgba(" + col[0] + "," + col[1] + "," + col[2] + "," + a.toFixed(3) + ")";
+    const s = Math.max(1, st.m * 1.7 * DPR);
+    ctx.fillRect(x, y, s, s);
+    if (st.m > bright && a > .5) {            // a diffraction glint on the few
+      ctx.fillStyle = "rgba(" + col[0] + "," + col[1] + "," + col[2] + "," + (a * .32).toFixed(3) + ")";
+      const g = s * 3.4;
+      ctx.fillRect(x - g, y + s * .35, g * 2 + s, Math.max(1, DPR * .8));
+      ctx.fillRect(x + s * .35, y - g, Math.max(1, DPR * .8), g * 2 + s);
+    }
   }
 }
 function drawStars(sp2, yOff, R) {
@@ -1435,6 +1476,26 @@ function drawGlare() {
     ctx.fillStyle = g;
     ctx.fillRect(-big * len, -big * wid, big * len * 2, big * wid * 2);
     ctx.restore();
+  }
+  ctx.restore();
+  /* Ghosts: the internal reflections between lens elements, which land on the
+     line through the optical centre at fixed fractions of the way across. */
+  const dxg = CX - sp.x, dyg = CY - sp.y;
+  const hazy = clamp(1 - (LIGHT.deep || 0), 0, 1);
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  for (const [t, r, a, col] of [
+    [-.32, .030, .055, "255,214,150"], [.30, .022, .045, "150,230,255"],
+    [.62, .046, .040, "180,255,206"], [.95, .030, .050, "255,196,170"],
+    [1.34, .062, .030, "170,206,255"], [1.62, .020, .055, "255,240,190"]]) {
+    const gx = sp.x + dxg * (1 + t), gy = sp.y + dyg * (1 + t);
+    const rr = big * r * (.55 + .45 * gk);
+    const g2 = ctx.createRadialGradient(gx, gy, rr * .25, gx, gy, rr);
+    g2.addColorStop(0, "rgba(" + col + ",0)");
+    g2.addColorStop(.74, "rgba(" + col + "," + (a * (.35 + .65 * hazy)).toFixed(3) + ")");
+    g2.addColorStop(1, "rgba(" + col + ",0)");
+    ctx.fillStyle = g2;
+    ctx.beginPath(); ctx.arc(gx, gy, rr, 0, TAU); ctx.fill();
   }
   ctx.restore();
 }
@@ -4039,6 +4100,397 @@ function nearestBody() {
    width is the cosine of the phase angle — which is what gives you a gibbous
    Moon from one side and a crescent from the other. */
 const BODY_N = 44;
+/* ---- what a world looks like once you are close enough to see it ---------
+
+   The disc on its own is a coloured circle. What makes it read as a PLACE is
+   detail that sits on the sphere: every patch is placed by its surface
+   normal, culled the moment that normal turns away from the camera, squashed
+   toward the limb by the same foreshortening a real sphere has, and lit by
+   the same dot(n, sun) that draws the terminator — so it fades into the
+   night side instead of being pasted over it.
+
+   None of it is projected point by point. A sphere this far away is
+   orthographic to well under a pixel, so a normal goes to the screen through
+   the camera's own right and up axes and costs six multiplies. */
+const BODYART = {
+  Moon:    { kind: "crater", pole: [.02, .999, .04], craters: 34, maria: 7 },
+  Mercury: { kind: "crater", pole: [.00, 1, .00], craters: 40, maria: 3 },
+  Mars:    { kind: "rock", pole: [.42, .90, .10], atm: [222, 150, 116, .9], cap: .22 },
+  Venus:   { kind: "swirl", pole: [.05, .998, .03], atm: [255, 240, 198, 2.4] },
+  Earth:   { kind: "earth", pole: [.40, .91, .08], atm: [120, 186, 255, 2.0], cap: .20 },
+  Jupiter: { kind: "gas", pole: [.05, .998, .03], atm: [236, 214, 180, 1.1], bands: 9, spot: [-.36, .30] },
+  Saturn:  { kind: "gas", pole: [-.44, .89, .10], atm: [240, 226, 186, .9], bands: 7 },
+  Uranus:  { kind: "gas", pole: [.92, .34, .18], atm: [196, 232, 236, .8], bands: 4 },
+  Neptune: { kind: "gas", pole: [.28, .94, .18], atm: [140, 176, 236, .9], bands: 5, spot: [-.42, .18] }
+};
+/* Evenly spread over the sphere, jittered, NOT drawn at random: two hash
+   draws per point pile a couple of dozen features into one hemisphere often
+   enough to matter, and a Moon with every crater behind the limb is a
+   billiard ball. The Fibonacci lattice cannot do that. */
+function unitDir(i, n, salt) {
+  const y = 1 - (i + .5) / Math.max(n, 1) * 2 + (hash2(i, salt + 11) - .5) * .9 / Math.max(n, 1);
+  const yc = clamp(y, -.999, .999);
+  const r = Math.sqrt(1 - yc * yc);
+  const th = (i + hash2(i, salt) * .7) * 2.399963229728653;
+  return [r * Math.cos(th), yc, r * Math.sin(th)];
+}
+/* A patch: normal, angular radius, colour, alpha, sprite profile. */
+function bodyFeatures(b, art) {
+  const f = [], col = b.col;
+  const tint = (k, g) => [clamp(col[0] * k + (g || 0), 0, 255),
+                          clamp(col[1] * k + (g || 0), 0, 255),
+                          clamp(col[2] * k + (g || 0), 0, 255)];
+  const pole = art.pole, pl = Math.hypot(pole[0], pole[1], pole[2]) || 1;
+  const ax = [pole[0] / pl, pole[1] / pl, pole[2] / pl];
+  if (art.kind === "crater") {
+    for (let i = 0; i < (art.maria || 0); i++)
+      f.push({ n: unitDir(i, art.maria || 1, 700), a: .20 + hash2(i, 703) * .26, col: tint(.46), al: .88, p: 0 });
+    for (let i = 0; i < art.craters; i++) {
+      const n = unitDir(i, art.craters, 710), a = .028 + hash2(i, 713) * .075;
+      f.push({ n: n, a: a * 1.5, col: tint(1.34, 30), al: .95, p: 2 });  // bright rim
+      f.push({ n: n, a: a * .8, col: tint(.50), al: .70, p: 0 });         // dark floor
+      if (a > .075) for (let k = 0; k < 5; k++) {                         // ray system
+        const t = k / 5 * TAU, e = orthoPair(n);
+        const rr = a * (2.6 + hash2(i * 7 + k, 717) * 3.4);
+        f.push({ n: nrm3([n[0] + (e[0][0] * Math.cos(t) + e[1][0] * Math.sin(t)) * rr,
+                          n[1] + (e[0][1] * Math.cos(t) + e[1][1] * Math.sin(t)) * rr,
+                          n[2] + (e[0][2] * Math.cos(t) + e[1][2] * Math.sin(t)) * rr]),
+                 a: a * 1.1, col: tint(1.26, 20), al: .30, p: 1 });
+      }
+    }
+  } else if (art.kind === "rock") {
+    for (let i = 0; i < 11; i++)
+      f.push({ n: unitDir(i, 11, 730), a: .14 + hash2(i, 733) * .22,
+               col: tint(hash2(i, 735) > .5 ? .56 : 1.30, 0), al: .70, p: 0 });
+    for (let i = 0; i < 22; i++)
+      f.push({ n: unitDir(i, 22, 740), a: .03 + hash2(i, 743) * .05, col: tint(.46), al: .58, p: 0 });
+    f.push({ n: ax, a: art.cap, col: [246, 250, 255], al: .78, p: 0 });
+    f.push({ n: [-ax[0], -ax[1], -ax[2]], a: art.cap * .8, col: [242, 248, 255], al: .70, p: 0 });
+  } else if (art.kind === "earth") {
+    for (let i = 0; i < 9; i++) {                       // land
+      const n = unitDir(i, 9, 750);
+      f.push({ n: n, a: .17 + hash2(i, 753) * .21,
+               col: hash2(i, 755) > .62 ? [178, 152, 96] : [72, 122, 74], al: .95, p: 0 });
+      for (let k = 0; k < 3; k++) {                     // coasts and islands
+        const e = orthoPair(n), t = hash2(i * 5 + k, 757) * TAU, rr = .12 + hash2(i + k, 759) * .22;
+        f.push({ n: nrm3([n[0] + (e[0][0] * Math.cos(t) + e[1][0] * Math.sin(t)) * rr,
+                          n[1] + (e[0][1] * Math.cos(t) + e[1][1] * Math.sin(t)) * rr,
+                          n[2] + (e[0][2] * Math.cos(t) + e[1][2] * Math.sin(t)) * rr]),
+                 a: .07 + hash2(i + k, 761) * .10,
+                 col: hash2(i + k, 763) > .5 ? [150, 130, 84] : [86, 130, 82], al: .82, p: 0 });
+      }
+    }
+    f.push({ n: ax, a: art.cap, col: [250, 253, 255], al: .80, p: 0 });
+    f.push({ n: [-ax[0], -ax[1], -ax[2]], a: art.cap * 1.15, col: [250, 253, 255], al: .86, p: 0 });
+    for (let i = 0; i < 26; i++)                        // weather
+      f.push({ n: unitDir(i, 26, 770), a: .06 + hash2(i, 773) * .13,
+               col: [248, 252, 255], al: .44 + hash2(i, 775) * .34, p: 0 });
+  } else if (art.kind === "swirl") {
+    for (let i = 0; i < 30; i++)
+      f.push({ n: unitDir(i, 30, 780), a: .10 + hash2(i, 783) * .24,
+               col: tint(hash2(i, 785) > .5 ? 1.16 : .82), al: .42, p: 0 });
+  } else if (art.kind === "gas") {
+    if (art.spot) {
+      const e = orthoPair(ax), la = art.spot[0], ca = Math.cos(la), sa = Math.sin(la);
+      const n = nrm3([ax[0] * sa + e[0][0] * ca, ax[1] * sa + e[0][1] * ca, ax[2] * sa + e[0][2] * ca]);
+      f.push({ n: n, a: art.spot[1], col: tint(.72, 34), al: .70, p: 0 });
+      f.push({ n: n, a: art.spot[1] * .55, col: tint(.60, 52), al: .55, p: 0 });
+    }
+    for (let i = 0; i < 16; i++)                        // turbulence riding the bands
+      f.push({ n: unitDir(i, 16, 790), a: .05 + hash2(i, 793) * .10,
+               col: tint(hash2(i, 795) > .5 ? 1.18 : .80), al: .36, p: 0 });
+  }
+  b.ax = ax;
+  return f;
+}
+function nrm3(v) { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; }
+function orthoPair(n) {
+  const up = Math.abs(n[1]) > .9 ? [1, 0, 0] : [0, 1, 0];
+  const e1 = nrm3([up[1] * n[2] - up[2] * n[1], up[2] * n[0] - up[0] * n[2], up[0] * n[1] - up[1] * n[0]]);
+  const e2 = [n[1] * e1[2] - n[2] * e1[1], n[2] * e1[0] - n[0] * e1[2], n[0] * e1[1] - n[1] * e1[0]];
+  return [e1, e2];
+}
+/* Latitude bands, as one polygon per band: the visible arc of the lower
+   latitude forward and the upper latitude back again. When the pole faces
+   you the two arcs close into an annulus and the winding rule punches the
+   hole for free; when it does not, both arcs end on the limb and the join
+   is a chord a couple of pixels long. */
+function drawGasBands(b, art, c, d, rp, vx, vy, vz, sx, sy, sz, fade, cosPh) {
+  const cm = cam.m, ax = b.ax;
+  /* The band is sampled all the way round and then cut down to the part that
+     is both facing you and in daylight. That cut only yields ONE run of
+     points — one polygon — if the seam at theta = 0 is somewhere you cannot
+     see, so the equatorial basis is anchored AWAY from the camera. Anchor it
+     anywhere else and the retained points wrap the seam, the polygon folds
+     over itself, and the winding rule quietly erases the band. */
+  const vd = vx * ax[0] + vy * ax[1] + vz * ax[2];
+  let ex = vx - ax[0] * vd, ey = vy - ax[1] * vd, ez = vz - ax[2] * vd;
+  let el = Math.hypot(ex, ey, ez);
+  let e1, e2;
+  if (el < 1e-4) { const o = orthoPair(ax); e1 = o[0]; e2 = o[1]; }
+  else {
+    e1 = [-ex / el, -ey / el, -ez / el];
+    e2 = [ax[1] * e1[2] - ax[2] * e1[1], ax[2] * e1[0] - ax[0] * e1[2], ax[0] * e1[1] - ax[1] * e1[0]];
+  }
+  const N = 34, nb = art.bands;
+  const pts = [];
+  for (let k = 0; k < nb; k++) {
+    const l0 = -1.36 + (k / nb) * 2.72, l1 = -1.36 + ((k + .82) / nb) * 2.72;
+    const shade = k % 2 ? 1.17 : .81;
+    const col = [clamp(b.col[0] * shade, 0, 255), clamp(b.col[1] * shade, 0, 255),
+                 clamp(b.col[2] * shade, 0, 255)];
+    pts.length = 0;
+    let lit = 0, nlit = 0;
+    for (let pass = 0; pass < 2; pass++) {
+      const lat = pass ? l1 : l0, ca = Math.cos(lat), sa = Math.sin(lat);
+      for (let i = 0; i <= N; i++) {
+        const t = (pass ? N - i : i) / N * TAU, ct = Math.cos(t), st = Math.sin(t);
+        const nx = ax[0] * sa + (e1[0] * ct + e2[0] * st) * ca;
+        const ny = ax[1] * sa + (e1[1] * ct + e2[1] * st) * ca;
+        const nz = ax[2] * sa + (e1[2] * ct + e2[2] * st) * ca;
+        if (nx * vx + ny * vy + nz * vz < .015) continue;
+        if (nx * sx + ny * sy + nz * sz < .02) continue;
+        lit++; nlit++;
+        pts.push(c.x + rp * (cm[0] * nx + cm[1] * ny + cm[2] * nz),
+                 c.y - rp * (cm[3] * nx + cm[4] * ny + cm[5] * nz));
+      }
+    }
+    if (pts.length < 8) continue;
+    const a = .62 * fade;
+    if (a < .02) continue;
+    DL.poly(d - .5, pts, pts.length / 2,
+      "rgba(" + (col[0] | 0) + "," + (col[1] | 0) + "," + (col[2] | 0) + "," + a.toFixed(3) + ")", null, 0);
+  }
+}
+function drawBodyDetail(b, c, d, rp, vx, vy, vz, sx, sy, sz, fade) {
+  const art = BODYART[b.name];
+  if (!art || rp < 9) return;
+  if (!b.feat) b.feat = bodyFeatures(b, art);
+  const cm = cam.m;
+  if (art.kind === "gas") drawGasBands(b, art, c, d, rp, vx, vy, vz, sx, sy, sz, fade, 1);
+  const detail = clamp((rp - 9) / 26, 0, 1);            // fine work only once it is big
+  for (const f of b.feat) {
+    const n = f.n;
+    const mu = n[0] * vx + n[1] * vy + n[2] * vz;
+    if (mu < .10) continue;
+    const li = n[0] * sx + n[1] * sy + n[2] * sz;
+    if (li < .015) continue;
+    const r = rp * Math.sin(f.a) * (.26 + .74 * mu);
+    if (r < .6) continue;
+    if (f.a < .09 && detail < .35) continue;
+    const a = f.al * clamp(li * 1.9, 0, 1) * fade * (f.a < .09 ? detail : 1) * clamp(mu * 3, 0, 1);
+    if (a < .02) continue;
+    DL.sprite(d - .6, c.x + rp * (cm[0] * n[0] + cm[1] * n[1] + cm[2] * n[2]),
+      c.y - rp * (cm[3] * n[0] + cm[4] * n[1] + cm[5] * n[2]), r,
+      sprite(f.col[0], f.col[1], f.col[2], f.p), a);
+  }
+}
+/* The air, seen edge-on. A planet with an atmosphere has a bright rim that a
+   bare rock does not, and it is most of what tells the two apart at a glance. */
+function drawBodyAir(b, c, d, rp, fade, cosPh, ux, uy) {
+  const art = BODYART[b.name];
+  if (!art || !art.atm || rp < 2) return;
+  const A = art.atm, t = A[3];
+  const lim = clamp(.16 + cosPh * .84, 0, 1) * fade;
+  if (lim < .03) return;
+  /* The ring sprite is a bright rim around a clear centre, which is what an
+     atmosphere seen edge-on is. Drawn under the disc so only the part beyond
+     the limb survives, and pushed a little toward the Sun, because the day
+     side of the limb scatters and the night side does not. */
+  const off = rp * .05 * clamp(cosPh + .2, 0, 1);
+  const img = sprite(A[0], A[1], A[2], 2);
+  DL.sprite(d + .8, c.x + ux * off, c.y + uy * off, rp * (1 + t * .05) / .95,
+    img, clamp(lim * (.55 + t * .45), 0, 1));
+  DL.sprite(d + .7, c.x + ux * off * 1.6, c.y + uy * off * 1.6, rp * (1 + t * .16) / .95,
+    img, clamp(lim * (.24 + t * .22), 0, 1));
+}
+
+/* ---- a world you are close to -------------------------------------------
+
+   The flat-disc path projects the centre and draws a circle round it. That
+   works until you get near, and then it fails completely: once the centre
+   passes behind the camera there is nothing to project, drawBody returns,
+   and the planet is simply not there. That is what low orbit looked like —
+   black sky, no Earth, four hundred kilometres up.
+
+   Near enough, draw the real surface instead: the visible cap, tessellated,
+   pushed through the same near-plane clip every other surface uses, and lit
+   per quad. It costs a few hundred polygons and it is the difference between
+   orbit and a black screen. */
+const NEARBODY = 4.2;                 // switch over inside this many radii
+function bodyFrame(b) {
+  /* The home planet's surface has to agree with the ground you took off from:
+     +Y is up at the runway, +Z is north, +X is east, so the pole sits at
+     (90 - origin latitude) away from +Y in the +Z direction. */
+  if (b._fr) return b._fr;
+  const la = ORIGIN.lat * DEG, cl = Math.cos(la), sl = Math.sin(la);
+  const P = [0 * sl, sl, cl];                       // pole, in world axes
+  const ref = [0, cl, -sl];                         // the origin's meridian
+  const eas = [1, 0, 0];                            // ref x P
+  b._fr = { P: P, ref: ref, eas: eas };
+  return b._fr;
+}
+/* Sea, land, ice and cloud, from the same elevation field the terrain uses —
+   so the continents you fly over are the continents you see from orbit. */
+function earthCap(nx, ny, nz, fr) {
+  const sinLat = clamp(nx * fr.P[0] + ny * fr.P[1] + nz * fr.P[2], -1, 1);
+  const lat = Math.asin(sinLat) / DEG;
+  const lon = Math.atan2(nx * fr.eas[0] + ny * fr.eas[1] + nz * fr.eas[2],
+                         nx * fr.ref[0] + ny * fr.ref[1] + nz * fr.ref[2]) / DEG + ORIGIN.lon;
+  const h = worldElev(lon, lat);
+  const ice = clamp((Math.abs(lat) - 63) / 12, 0, 1);
+  let col;
+  if (h <= 0) {
+    const deep = clamp(-h / 4200, 0, 1);
+    col = [lerp(34, 12, deep), lerp(74, 34, deep), lerp(118, 74, deep)];
+  } else {
+    const arid = worldArid(lon, lat);
+    const rock = clamp((h - 1800) / 2600, 0, 1);
+    col = [lerp(lerp(58, 172, arid), 148, rock),
+           lerp(lerp(102, 152, arid), 140, rock),
+           lerp(lerp(60, 104, arid), 134, rock)];
+  }
+  if (ice > .01) col = mixc(col, [238, 244, 250], ice * .92);
+  // weather, from the same noise the sky uses, at planetary scale
+  const cl2 = clamp((fbm(lon * .11 + 40, lat * .11 + 40, 4) - .24) * 5.2, 0, 1);
+  if (cl2 > .01) col = mixc(col, [244, 248, 252], cl2 * .80);
+  return col;
+}
+function drawBodyNear(b, d, fade) {
+  const r = b.r, m = cam.m, art = BODYART[b.name];
+  const cp = cam.pos;
+  let vx = (cp.x - b.p.x) / d, vy = (cp.y - b.p.y) / d, vz = (cp.z - b.p.z) / d;
+  let sx = SUNBODY.p.x - b.p.x, sy = SUNBODY.p.y - b.p.y, sz = SUNBODY.p.z - b.p.z;
+  const sl = Math.hypot(sx, sy, sz) || 1; sx /= sl; sy /= sl; sz /= sl;
+  // a basis across the cap
+  const upv = Math.abs(vy) > .9 ? [1, 0, 0] : [0, 1, 0];
+  let e1 = [upv[1] * vz - upv[2] * vy, upv[2] * vx - upv[0] * vz, upv[0] * vy - upv[1] * vx];
+  const el = Math.hypot(e1[0], e1[1], e1[2]) || 1; e1 = [e1[0] / el, e1[1] / el, e1[2] / el];
+  const e2 = [vy * e1[2] - vz * e1[1], vz * e1[0] - vx * e1[2], vx * e1[1] - vy * e1[0]];
+  const amax = Math.acos(clamp(r / d, 0, 1));
+  const home = !!b.home, fr = home ? bodyFrame(b) : null;
+  const atm = art && art.atm;
+  const fine = Q.i >= 2;
+  const NR = fine ? 24 : 14, NS = fine ? 68 : 34;
+  /* Rings even on the SCREEN, not on the sphere. From four hundred kilometres
+     up the visible cap is twenty degrees of surface and a hundred and forty
+     degrees of sky: spaced evenly in surface angle, nine rings out of ten
+     land in the middle of the picture and the whole horizon is one enormous
+     quad. Inverting for the look-down angle costs an asin per ring.
+       r sin(theta + psi) = d sin(psi)  =>  theta = asin(d sin psi / r) - psi */
+  const psiMax = Math.asin(clamp(r / d, 0, 1));
+  const th = new Float64Array(NR + 1);
+  for (let j = 0; j <= NR; j++) {
+    const psi = psiMax * (j / NR);
+    th[j] = Math.asin(clamp(d * Math.sin(psi) / r, -1, 1)) - psi;
+  }
+  th[NR] = amax;
+  const nrm = (t, k) => {
+    const ct = Math.cos(t), st = Math.sin(t), ph = k / NS * TAU;
+    const cf = Math.cos(ph) * st, sf = Math.sin(ph) * st;
+    return [vx * ct + e1[0] * cf + e2[0] * sf,
+            vy * ct + e1[1] * cf + e2[1] * sf,
+            vz * ct + e1[2] * cf + e2[2] * sf];
+  };
+  const ring = [];
+  for (let j = 0; j <= NR; j++) {
+    const row = [];
+    for (let k = 0; k <= NS; k++) row.push(nrm(th[j], k));
+    ring.push(row);
+  }
+  const base = b.col;
+  for (let j = 0; j < NR; j++) {
+    for (let k = 0; k < NS; k++) {
+      const q = [ring[j][k], ring[j][k + 1], ring[j + 1][k + 1], ring[j + 1][k]];
+      let ok = false;
+      for (let i = 0; i < 4; i++) {
+        const n = q[i];
+        const px = b.p.x + n[0] * r - cp.x, py = b.p.y + n[1] * r - cp.y, pz = b.p.z + n[2] * r - cp.z;
+        const w = m[6] * px + m[7] * py + m[8] * pz;
+        _vp[i * 3] = m[0] * px + m[1] * py + m[2] * pz;
+        _vp[i * 3 + 1] = m[3] * px + m[4] * py + m[5] * pz;
+        _vp[i * 3 + 2] = w;
+        if (w >= NEAR) ok = true;
+      }
+      if (!ok) continue;
+      const mm = clipProject(4);
+      if (mm < 3 || offscreen(mm)) continue;
+      // the quad's own normal, for light and for the limb
+      const cx2 = (q[0][0] + q[1][0] + q[2][0] + q[3][0]) * .25;
+      const cy2 = (q[0][1] + q[1][1] + q[2][1] + q[3][1]) * .25;
+      const cz2 = (q[0][2] + q[1][2] + q[2][2] + q[3][2]) * .25;
+      const nl = Math.hypot(cx2, cy2, cz2) || 1;
+      const ux2 = cx2 / nl, uy2 = cy2 / nl, uz2 = cz2 / nl;
+      const li = ux2 * sx + uy2 * sy + uz2 * sz;
+      // terminator with a little softness, and a floor so the night side is
+      // dark rather than absent
+      const k2 = clamp(li * 1.5 + .06, .05, 1);
+      let col;
+      if (home) col = earthCap(ux2, uy2, uz2, fr);
+      else {
+        const mot = hash2((ux2 * 340) | 0, (uy2 * 340 + uz2 * 91) | 0) * .34 + .83;
+        col = [base[0] * mot, base[1] * mot, base[2] * mot];
+      }
+      let cr = col[0] * k2, cg = col[1] * k2, cb = col[2] * k2;
+      if (atm) {                       // air thickens toward the limb
+        const graze = 1 - clamp(ux2 * vx + uy2 * vy + uz2 * vz, 0, 1);
+        const gk = Math.pow(graze, 2.4) * clamp(li * 2, 0, 1) * (.35 + atm[3] * .3);
+        cr = lerp(cr, atm[0], gk); cg = lerp(cg, atm[1], gk); cb = lerp(cb, atm[2], gk);
+      }
+      grow(mm, SEAM_PX);
+      DL.poly(d - th[j] * r * .001, _sp, mm,
+        fade < .999 ? "rgba(" + (cr | 0) + "," + (cg | 0) + "," + (cb | 0) + "," + fade.toFixed(3) + ")"
+                    : rgb(cr, cg, cb), null, 0);
+    }
+  }
+  if (!atm) return;
+  /* The horizon glow. A shell of air a couple of per cent bigger than the
+     rock has its own limb a little further out; the sliver between the two
+     is the bright line you see from orbit, and it is most of what makes the
+     view read as a planet with weather rather than a painted ball. */
+  const SH = [[1.004, .52], [1.012, .34], [1.028, .17], [1.055, .07]];
+  let prevN = null, prevR = r;
+  for (let s = 0; s < SH.length; s++) {
+    const R2 = r * SH[s][0];
+    if (R2 >= d) break;
+    const t2 = Math.acos(clamp(R2 / d, 0, 1));
+    const ct = Math.cos(t2), st = Math.sin(t2);
+    const outer = [];
+    for (let k = 0; k <= NS; k++) {
+      const ph = k / NS * TAU, cf = Math.cos(ph) * st, sf = Math.sin(ph) * st;
+      outer.push([vx * ct + e1[0] * cf + e2[0] * sf,
+                  vy * ct + e1[1] * cf + e2[1] * sf,
+                  vz * ct + e1[2] * cf + e2[2] * sf]);
+    }
+    const inner = prevN || ring[NR], iR = prevR;
+    for (let k = 0; k < NS; k++) {
+      const q = [inner[k], inner[k + 1], outer[k + 1], outer[k]];
+      const rr = [iR, iR, R2, R2];
+      let ok = false;
+      for (let i = 0; i < 4; i++) {
+        const n = q[i], rq = rr[i];
+        const px = b.p.x + n[0] * rq - cp.x, py = b.p.y + n[1] * rq - cp.y, pz = b.p.z + n[2] * rq - cp.z;
+        const w = m[6] * px + m[7] * py + m[8] * pz;
+        _vp[i * 3] = m[0] * px + m[1] * py + m[2] * pz;
+        _vp[i * 3 + 1] = m[3] * px + m[4] * py + m[5] * pz;
+        _vp[i * 3 + 2] = w;
+        if (w >= NEAR) ok = true;
+      }
+      if (!ok) continue;
+      const mm = clipProject(4);
+      if (mm < 3 || offscreen(mm)) continue;
+      const n0 = q[0];
+      const li2 = clamp((n0[0] * sx + n0[1] * sy + n0[2] * sz) * 1.7 + .10, 0, 1);
+      const a = SH[s][1] * li2 * fade * (.45 + atm[3] * .40);
+      if (a < .012) continue;
+      grow(mm, SEAM_PX);
+      DL.poly(d + .5 + s * .01, _sp, mm,
+        "rgba(" + atm[0] + "," + atm[1] + "," + atm[2] + "," + a.toFixed(3) + ")", null, 0);
+    }
+    prevN = outer; prevR = R2;
+  }
+}
+
 function drawBody(b) {
   // the home planet fades in exactly as the sky and the terrain fade out
   const fade = b.home ? (LIGHT.far || 0) : 1;
@@ -4046,6 +4498,12 @@ function drawBody(b) {
   const dx = b.p.x - cam.pos.x, dy = b.p.y - cam.pos.y, dz = b.p.z - cam.pos.z;
   const d = Math.hypot(dx, dy, dz);
   if (d < b.r * .999) return;                       // inside it: nothing to draw
+  /* Close enough that the disc would break down — and, past a certain point,
+     vanish entirely as its centre swings behind the camera. Draw the surface. */
+  if (!b.sun && d < b.r * NEARBODY) {
+    drawBodyNear(b, d, b.home ? clamp((LIGHT.far || 0) * 2, 0, 1) : fade);
+    return;
+  }
   const c = projectRaw(b.p);
   if (!c) return;
   /* The silhouette of a sphere subtends asin(r/d) and projects to F*tan of
@@ -4086,21 +4544,32 @@ function drawBody(b) {
   }
   const wx = -uy, wy = ux;
 
+  drawBodyAir(b, c, d, rp, fade, cosPh, ux, uy);
+
   // the whole disc, in shadow
   const dark = [b.col[0] * .10 * fade, b.col[1] * .10 * fade, b.col[2] * .13 * fade];
+  /* Tessellation by how big it actually is. A fixed 44-gon is invisible at
+     arm's length and a hexagon-ish mess when the planet fills the screen. */
+  const NS = clamp(Math.round(rp * .55) * 2, BODY_N, 160);
   const full = [];
-  for (let i = 0; i < BODY_N; i++) {
-    const t = i / BODY_N * TAU;
+  for (let i = 0; i < NS; i++) {
+    const t = i / NS * TAU;
     full.push(c.x + Math.cos(t) * rp * ux + Math.sin(t) * rp * wx,
               c.y + Math.cos(t) * rp * uy + Math.sin(t) * rp * wy);
   }
-  DL.poly(d + 1, full, BODY_N, rgb(dark[0], dark[1], dark[2]), null, 0);
+  DL.poly(d + 1, full, NS, rgb(dark[0], dark[1], dark[2]), null, 0);
 
   if (b.ring) drawRing(b, c, rp, ux, uy, wx, wy, d, cosPh);
 
-  // the lit part: half the limb, then the terminator ellipse back again
+  /* The lit part: the sunward half of the limb, then the terminator ellipse
+     back again. The ellipse reaches -cosPh along the sunward axis, NOT
+     +cosPh: with the sun behind you (cosPh = +1) the terminator is the far
+     limb and the whole disc is lit, and with the sun behind the planet
+     (cosPh = -1) it collapses onto the near limb and nothing is. The sign
+     used to be the other way round, which lit every world in the sky on the
+     side facing away from the Sun. */
   const lit = [];
-  const H2 = BODY_N / 2;
+  const H2 = NS / 2;
   for (let i = 0; i <= H2; i++) {
     const t = -Math.PI / 2 + i / H2 * Math.PI;
     lit.push(c.x + Math.cos(t) * rp * ux + Math.sin(t) * rp * wx,
@@ -4108,15 +4577,16 @@ function drawBody(b) {
   }
   for (let i = H2; i >= 0; i--) {
     const t = -Math.PI / 2 + i / H2 * Math.PI;
-    lit.push(c.x + cosPh * Math.cos(t) * rp * ux + Math.sin(t) * rp * wx,
-             c.y + cosPh * Math.cos(t) * rp * uy + Math.sin(t) * rp * wy);
+    lit.push(c.x - cosPh * Math.cos(t) * rp * ux + Math.sin(t) * rp * wx,
+             c.y - cosPh * Math.cos(t) * rp * uy + Math.sin(t) * rp * wy);
   }
   const n = lit.length / 2;
   // a little limb darkening so it reads as a ball and not a sticker
   const lc = fade < 1 ? [b.col[0] * fade, b.col[1] * fade, b.col[2] * fade] : b.col;
   DL.poly(d, lit, n, rgb(lc[0], lc[1], lc[2]), null, 0);
-  DL.sprite(d - 1, c.x + ux * rp * .22, c.y + uy * rp * .22, rp * .82,
-    sprite(lc[0] * 1.12, lc[1] * 1.12, lc[2] * 1.12, 0), .30);
+  drawBodyDetail(b, c, d, rp, vx, vy, vz, sx, sy, sz, fade);
+  DL.sprite(d - 1, c.x - ux * rp * .22, c.y - uy * rp * .22, rp * .82,
+    sprite(lc[0] * 1.12, lc[1] * 1.12, lc[2] * 1.12, 0), BODYART[b.name] ? .14 : .30);
 }
 
 /* Saturn, because it would be a waste not to. */
@@ -4968,7 +5438,7 @@ function drawHUDFull() {
   hudFont(10 * U); ctx.fillStyle = GD; ctx.textAlign = "left";
   ctx.fillText("MACH", mx + 8 * U, my + 11 * U);
   hudFont(20 * U, 700); ctx.fillStyle = P.mach > 3.2 ? "rgba(255,150,90,.95)" : G;
-  ctx.fillText(P.mach.toFixed(2), mx + 8 * U, my + 27 * U);
+  ctx.fillText((P.qbar || 0) > 5 ? P.mach.toFixed(2) : "\u2014", mx + 8 * U, my + 27 * U);
   hudFont(11 * U, 700); ctx.textAlign = "left";
   ctx.fillStyle = P.ab > .01 ? "rgba(255,176,80,.95)" : "rgba(120,140,155,.55)";
   ctx.fillText(P.ab > .01 ? "A/B  " + Math.round(P.ab * 100) + "%" : "A/B  \u2014", mx + 8 * U, my + 43 * U);
@@ -5120,6 +5590,11 @@ function drawHUDFull() {
     const k = nb.alt / 1000;
     ctx.fillText(k > 1e6 ? (k / 1e6).toFixed(2) + "Gm" : k > 1000 ? (k / 1000).toFixed(1) + "Mm"
       : Math.round(k) + "km", rx + 8 * U, CY + 16 * U);
+  } else if (P.pos.y > 4e5) {
+    // nothing out there worth ranging to, so range to the one you came from
+    hudFont(12 * U); ctx.fillStyle = GD; ctx.fillText("EARTH", rx + 8 * U, CY - 4 * U);
+    hudFont(16 * U, 600); ctx.fillStyle = G;
+    ctx.fillText(navRange(P.pos.y), rx + 8 * U, CY + 16 * U);
   } else {
     hudFont(12 * U); ctx.fillStyle = GD; ctx.fillText("AGL ft", rx + 8 * U, CY - 4 * U);
     hudFont(16 * U, 600); ctx.fillStyle = G;
@@ -5127,7 +5602,8 @@ function drawHUDFull() {
   }
   hudFont(12 * U); ctx.fillStyle = GD; ctx.fillText("MACH", rx + 8 * U, CY + 38 * U);
   hudFont(16 * U, 600); ctx.fillStyle = G;
-  ctx.fillText(P.mach.toFixed(2), rx + 8 * U, CY + 54 * U);
+  // Mach against air that is not there is a number about nothing
+  ctx.fillText((P.qbar || 0) > 5 ? P.mach.toFixed(2) : "--", rx + 8 * U, CY + 54 * U);
   drawGMeter(P, 96 * U + tw + 74 * U, H - 146 * U, 60 * U);
 
   // throttle + prop
@@ -5288,7 +5764,7 @@ function drawHUDCompact() {
   hudFont(10 * u); ctx.fillStyle = GD; ctx.textAlign = "left";
   ctx.fillText("MACH", sl + 20 * u, py + ph + 16 * u);
   hudFont(17 * u, 700); ctx.fillStyle = P.mach > 3.2 ? "rgba(255,150,90,.95)" : G;
-  ctx.fillText(P.mach.toFixed(2), sl + 60 * u, py + ph + 23 * u);
+  ctx.fillText((P.qbar || 0) > 5 ? P.mach.toFixed(2) : "\u2014", sl + 60 * u, py + ph + 23 * u);
   if (P.ab > .01) {
     hudFont(11 * u, 700); ctx.fillStyle = "rgba(255,176,80,.95)";
     ctx.fillText("A/B", sl + 20 * u, py + ph + 30 * u);
@@ -5496,6 +5972,17 @@ function objectiveLine() {
     return o;
   }
   if (SCEN === "land") return "LAND RWY 18   " + (Math.hypot(P.pos.x, P.pos.z - 950) / 1000).toFixed(2) + " km to threshold";
+  /* Off the planet, a latitude and a distance from Tokyo are noise: the map
+     that produces them is a flat sheet under the runway, and out here you are
+     nowhere on it. Say what there is instead — how far out, and what is
+     nearest. */
+  if (!onPlanet() || Math.hypot(P.pos.x, P.pos.z) > 2e7) {
+    let s = "EARTH " + navRange(Math.max(P.pos.y, 0));
+    const nb = typeof nearestBody === "function" ? nearestBody() : null;
+    if (nb && nb.body && !nb.body.home)
+      s += "   NEAREST " + nb.body.name.toUpperCase() + " " + navRange(Math.max(nb.alt, 0));
+    return s + "   " + navSpeed(vlen(P.vel));
+  }
   // anywhere else, say where on earth you actually are
   const lon = worldToLon(P.pos.x), lat = worldToLat(P.pos.z);
   let near = null, nd = 1e12;
