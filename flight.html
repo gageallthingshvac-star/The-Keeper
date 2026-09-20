@@ -2555,6 +2555,31 @@ let SCEN = "free";
    coordinates itself, angle of attack is limited, and hands off it holds what
    it has. Engage with Z. */
 const AP = { on: false };
+/* Speed hold. The throttle sets how hard the engine pushes, which is the
+   right control for an aeroplane and the wrong one for crossing a solar
+   system: thrust that never stops means speed that never stops, and you
+   spend the whole flight chasing a number instead of flying. With this in,
+   the throttle sets a SPEED and the engine does whatever it takes to sit on
+   it — including thrusting backwards to slow down. It arms itself the moment
+   the air runs out, because that is the moment it starts mattering. */
+const SPD = { on: false, tgt: 0, auto: false };
+/* What you are flying at, for the marker and the map. */
+const NAV = { idx: -1, map: false };
+function navTarget() { return (NAV.idx >= 0 && typeof BODIES !== "undefined") ? BODIES[NAV.idx] : null; }
+function cycleNav(d) {
+  if (typeof BODIES === "undefined") return;
+  NAV.idx = NAV.idx + (d || 1);
+  if (NAV.idx >= BODIES.length) NAV.idx = -1;
+  if (NAV.idx < -1) NAV.idx = BODIES.length - 1;
+  const t = navTarget();
+  toast(t ? "NAV \u2192 " + t.name.toUpperCase() : "NAV OFF", 1.4);
+}
+function toggleSpeedHold() {
+  SPD.on = !SPD.on;
+  if (SPD.on) { SPD.tgt = Math.max(PLANE.tas, 60); SPD.auto = false; }
+  toast(SPD.on ? "SPEED HOLD \u00b7 " + Math.round(SPD.tgt) + " m/s" : "SPEED HOLD OFF", 1.8);
+  audio.beep(SPD.on ? 820 : 430, .14, .12);
+}
 /* Pitch sense. REAL is what a stick does: pull back (Down / thumb back) to
    raise the nose. DIRECT is the arcade sense, Up to climb. */
 let PITCH_REAL = true;
@@ -2564,6 +2589,7 @@ const CHUTE_LIMIT = 230;    // KIAS the drag chute survives
 
 function resetPlane(scen) {
   const P = PLANE;
+  SPD.on = false; SPD.auto = false; SPD.tgt = 0;
   P.vel = v3(); P.w = v3(); P.thr = 0; P.dE = P.dA = P.dR = 0;
   P.inE = P.inA = P.inR = 0; P.trim = 0; P.flap = P.flapCmd = 0;
   P.crashed = false; P.crashT = 0; P.stall = 0; P.hardLand = 0; P.touched = 0; P.pitchI = 0; P.holdHdg = undefined;
@@ -2686,17 +2712,36 @@ function gToStick(dG, lvl) {
 function flightControl(P, dt, e, cE, cA, cR) {
   const W = SPECS.mass * 9.81;
   const qbar = P.qbar || 0;
+  // how much of the ballistic control system is awake — the same fade the
+  // moment accumulator in physics() uses, so the loops and the actuator agree
+  const rcsAuth = 1 - clamp(qbar / 1200, 0, 1);
+  // and how much of the aeroplane is still an aeroplane
+  const aeroShare = clamp(1 - rcsAuth, 0, 1);
   const qS = qbar * SPECS.S;
   // control power actually available, in the units each loop works in
   const ctlM = lerp(1, .55, sstep(1.0, 2.2, P.mach || 0));
   // g per unit of elevator
   const gPer = Math.max(qS * claOfMach(P.mach || 0) * (SPECS.CmE / Math.max(SPECS.CmA, .05)) * ctlM / W, .18);
-  // pitch acceleration per unit of elevator, rad/s^2
-  const qPer = Math.max(qS * SPECS.cbar * SPECS.CmE * ctlM / SPECS.Ipitch, .02);
-  // roll acceleration per unit of aileron, rad/s^2
-  const pPer = Math.max(qS * SPECS.b * SPECS.Cla * ctlM / SPECS.Iroll, .02);
-  // yaw acceleration per unit of rudder, rad/s^2
-  const rPer = Math.max(qS * SPECS.b * SPECS.Cndr * ctlM / SPECS.Iyaw, .01);
+
+  /* Control authority per unit of stick — and it has to count the THRUSTERS,
+     not just the surfaces.
+
+     These terms are what every loop below divides by, so they have to be what
+     the aeroplane can actually do. In vacuum the aerodynamic terms collapse
+     to their floors, which are placeholders to stop a divide by zero rather
+     than a statement about the vehicle — but the ballistic thrusters are
+     still there, and they are an order of magnitude stronger than the floor.
+     Dividing by the floor made every loop in space over-gained by about
+     twelve times: the stick saturated at a hundredth of a radian a second,
+     the thrusters went hard over, the actuator lag carried them past centre,
+     and the aeroplane tumbled. Hands off at 200 km it was turning through
+     355 degrees of roll. Counting the thrusters is the whole fix. */
+  const rcsQ = SPECS.rcsP * rcsAuth / SPECS.Ipitch;
+  const rcsR = SPECS.rcsR * rcsAuth / SPECS.Iroll;
+  const rcsY = SPECS.rcsY * rcsAuth / SPECS.Iyaw;
+  const qPer = Math.max(qS * SPECS.cbar * SPECS.CmE * ctlM / SPECS.Ipitch + rcsQ, .02);
+  const pPer = Math.max(qS * SPECS.b * SPECS.Cla * ctlM / SPECS.Iroll + rcsR, .02);
+  const rPer = Math.max(qS * SPECS.b * SPECS.Cndr * ctlM / SPECS.Iyaw + rcsY, .01);
 
   /* How much of the low-speed (rate) pitch law to use. The rate law is for
      the runway — it is what makes rotation the same controllable thing at any
@@ -2762,10 +2807,17 @@ function flightControl(P, dt, e, cE, cA, cR) {
      degrees this delta stops flying and starts falling, with the vortex gone
      and nothing but drag left. The limiter holds the pull right at the peak
      of the lift curve instead of letting you haul it over the back. */
+  /* ...and it only applies where there is air to stall in. Coasting in free
+     fall the velocity vector swings round under gravity while the nose stays
+     where you left it, so angle of attack grows without limit — it reached
+     fifty-six degrees in twenty seconds at 200 km. The limiter read that as
+     an imminent stall and fired full nose-down thrusters against it, for
+     ever, and the aeroplane tumbled with the stick centred. There is no wing
+     loading in vacuum and nothing to protect, so out there it stands down. */
   const a = P.alpha || 0;
-  P.aoaCap = a > FBW.aoaMax && dE > 0;
+  P.aoaCap = aeroShare > .25 && a > FBW.aoaMax && dE > 0;
   if (P.aoaCap) {
-    dE = clamp(dE - (a - FBW.aoaMax) * 26, -1, .04);
+    dE = clamp(dE - (a - FBW.aoaMax) * 26 * aeroShare, -1, .04);
     P.fbwI = Math.min(P.fbwI, .1);          // don't wind the integrator up against the limit
   }
   /* There is no load limiter any more. The only thing still standing between
@@ -2787,13 +2839,25 @@ function flightControl(P, dt, e, cE, cA, cR) {
      knows it. Feeding it forward means the aeroplane rolls at the rate the
      stick asked for, and at the same rate at every speed that can sustain it. */
   const rollD = qS * SPECS.b * SPECS.b * SPECS.Clp / (Math.max(P.tas || 1, 25) * SPECS.Iroll);
-  const dA = clamp(-((pCmd - P.w.z) * FBW.kRoll + pCmd * rollD) / pPer, -1, 1);
+  let dA = clamp(-((pCmd - P.w.z) * FBW.kRoll + pCmd * rollD) / pPer, -1, 1);
 
   /* ---------------- yaw -------------------------------------------------- */
-  // right rudder yaws the nose right, which drives sideslip negative
+  /* Right rudder yaws the nose right, which drives sideslip negative.
+
+     The sideslip term only means something when there is air to slip through.
+     In vacuum `beta` is just the angle between the nose and the velocity
+     vector, and under thrust and gravity that angle wanders continuously —
+     so the loop chased it with the thrusters and yawed the aeroplane through
+     three hundred and fifty-eight degrees while the pilot sat with the stick
+     centred. Out there the rudder commands a yaw RATE and nothing else, which
+     is what a reaction control system does; the sideslip loop fades out with
+     the air that justifies it. */
+  const aero = aeroShare;
   const bCmd = -sR * FBW.bMax * (1 - gnd);
-  let dR = clamp(((P.beta || 0) - bCmd) * FBW.kBeta / Math.max(rPer, .01) * .12
-    - P.w.y * FBW.kYawD / Math.max(rPer, .01) * .10, -1, 1);
+  const yRate = -sR * 0.45 * rcsAuth;
+  let dR = clamp(
+    aero * (((P.beta || 0) - bCmd) * FBW.kBeta / Math.max(rPer, .01) * .12)
+    + (P.w.y - yRate) * FBW.kYawD / Math.max(rPer, .01) * -.10, -1, 1);
   // on the ground the pedals are the nosewheel, and the computer keeps the
   // roll straight rather than trying to hold a sideslip that means nothing
   if (gnd > .5 && P.onGround) {
@@ -2805,6 +2869,16 @@ function flightControl(P, dt, e, cE, cA, cR) {
   } else { P.holdHdg = undefined; P.steer = approach(P.steer || 0, 0, 4, dt); }
 
   /* ---------------- actuators -------------------------------------------- */
+  /* A reaction control system is a set of valves, not a proportional surface,
+     and every real one has a deadband — without it the thing chatters around
+     null for ever, firing at rates far too small to matter. Inside the
+     atmosphere there are no valves and no deadband. */
+  if (rcsAuth > .5) {
+    const db = .035 * rcsAuth;
+    if (Math.abs(dE) < db && Math.abs(P.w.x) < .004) dE = 0;
+    if (Math.abs(dA) < db && Math.abs(P.w.z) < .004) dA = 0;
+    if (Math.abs(dR) < db && Math.abs(P.w.y) < .004) dR = 0;
+  }
   // the surfaces themselves still take time to move
   P.dE = approach(P.dE, dE, 14, dt);
   P.dA = approach(P.dA, dA, 16, dt);
@@ -2993,7 +3067,41 @@ function physics(P, dt) {
 
        On the dry throttle none of this applies and drag still sets an honest
        top end, which is the point: it is the burners that buy you infinity. */
-    if (abSm > .01 && !P.crashed) {
+    /* Speed hold takes precedence over everything the throttle would
+       otherwise do. It arms itself once the air is gone and the pilot has not
+       already taken charge, and from then on the aeroplane holds the number
+       until somebody changes it. */
+    const thinAir = rho < 2e-5;
+    if (thinAir && !SPD.on && !SPD.auto && !P.crashed && P.tas > 40) {
+      SPD.on = true; SPD.auto = true; SPD.tgt = P.tas;
+      toast("SPEED HOLD ARMED \u00b7 " + Math.round(P.tas) + " m/s \u00b7 O", 2.4);
+    }
+    if (!thinAir && SPD.auto) { SPD.on = false; SPD.auto = false; }
+
+    if (SPD.on && !P.crashed) {
+      /* Whatever it takes to sit on the number, either way — including
+         thrusting backwards to slow down.
+
+         The error has to be taken on the SIGNED forward component, not on
+         speed. `V` is a magnitude, so asking for 3,000 while doing 40,000
+         decelerated the aeroplane through zero and then kept pushing: going
+         backwards, the magnitude rose again, the error stayed negative, and
+         it ran away to two and a half million metres a second in the wrong
+         direction. Against vb.z it simply settles on the number. */
+      /* The correction goes along the VELOCITY, not along the nose.
+
+         Down the nose it only works while the two are lined up, and they stop
+         being lined up the moment gravity bends the trajectory — so braking
+         quietly died whenever it was most needed. Along velocity it is a
+         cruise control: it holds the number whatever attitude you are in, and
+         it cannot run away, because the error is on speed and speed falls to
+         the target and stops there. */
+      const aMax = thinAir ? 80000 : 400;
+      const aCmd = clamp((SPD.tgt - V) * .6, -aMax, aMax);
+      const along = thrust * vd.z - D;            // what the engine is already doing
+      const add = SPECS.mass * aCmd - along;
+      fb.x += add * vd.x; fb.y += add * vd.y; fb.z += add * vd.z;
+    } else if (abSm > .01 && !P.crashed) {
       /* Out of the atmosphere the burners have nothing left to fight and the
          distances stop being aeronautical: the Moon is 384,400 km away and
          Mars is two hundred times that. At aircraft accelerations those are
@@ -3026,11 +3134,18 @@ function physics(P, dt) {
     M.x = qS * SPECS.cbar * (SPECS.CmA * P.alpha - SPECS.CmE * ctlM * dET + .070 * P.flap) - cq * SPECS.cbar * SPECS.cbar * SPECS.CmQ * P.w.x;
     M.y = qS * SPECS.b * (SPECS.Cnb * P.beta + SPECS.Cndr * ctlM * P.dR - .020 * P.dA) - cq * SPECS.b * SPECS.b * SPECS.Cnr * P.w.y;
     M.z = qS * SPECS.b * (-SPECS.Cla * ctlM * P.dA + SPECS.Clb * P.beta) - cq * SPECS.b * SPECS.b * SPECS.Clp * P.w.z;
-    if (1 - st > .05) {   // asymmetric stall: wing drop and buffet
+    /* Asymmetric stall: wing drop and buffet. These were flat newton-metre
+       constants rather than aerodynamic moments, so they did not scale with
+       dynamic pressure and fired at full strength in vacuum — where angle of
+       attack runs to eighty degrees simply because you are coasting and
+       gravity is bending the velocity vector away from the nose. A stall with
+       no air in it was throwing the aeroplane around in orbit. They are
+       proper coefficients now and go to nothing with the air. */
+    if (1 - st > .05) {
       const drop = (1 - st) * (hash2((P.pos.x * 3) | 0, (P.pos.z * 3) | 0) - .5);
-      M.z += drop * 260000;
-      M.x += (1 - st) * 150000;      // nose drops
-      cam.shake = Math.max(cam.shake, (1 - st) * .5);
+      M.z += drop * qS * SPECS.b * .031;
+      M.x += (1 - st) * qS * SPECS.cbar * .028;      // nose drops
+      cam.shake = Math.max(cam.shake, (1 - st) * .5 * clamp(qbar / 2500, 0, 1));
     }
   } else {
     P.alpha = 0; P.beta = 0; P.gload = 0; P.stall = 0;
@@ -3053,7 +3168,12 @@ function physics(P, dt) {
   if (!AP.on && V > 40) {
     // an inlet unstart: one duct loses its shock and yaws the aircraft hard.
     // Only ever at high Mach and high angle of attack, as in the real thing.
-    const risk = sstep(2.4, 3.2, P.mach) * sstep(6 * DEG, 13 * DEG, Math.abs(P.alpha) + Math.abs(P.beta));
+    /* An inlet unstart is the shock falling out of an air intake. It needs an
+       intake with air going through it, so it is gated on there being enough
+       of that to matter — it was firing in orbit and kicking the aeroplane
+       through a quarter of a radian a second with the stick centred. */
+    const risk = sstep(2.4, 3.2, P.mach) * sstep(6 * DEG, 13 * DEG, Math.abs(P.alpha) + Math.abs(P.beta))
+      * clamp(P.qbar / 4000, 0, 1);
     if (risk > .01 && Math.random() < risk * dt * .16) P.unstart = .5 + Math.random() * .5;
     if (P.unstart > 0) {
       P.unstart -= dt;
@@ -3759,6 +3879,141 @@ function drawRing(b, c, rp, ux, uy, wx, wy, d, cosPh) {
 
 function drawBodies() {
   for (const b of BODIES) drawBody(b);
+}
+
+/* The nav marker. Where the thing you picked is, and if it is not on the
+   glass, which way to turn to bring it there. Everything a pilot needs to
+   point an aeroplane at something is in these two facts. */
+function drawNavMarker() {
+  const t = navTarget();
+  if (!t || !GAME.started || GAME.paused || NAV.map) return;
+  const P = PLANE, u = UI;
+  const dx = t.p.x - P.pos.x, dy = t.p.y - P.pos.y, dz = t.p.z - P.pos.z;
+  const d = Math.hypot(dx, dy, dz);
+  const range = Math.max(d - t.r, 0);
+  // closing speed: how fast the gap is shutting, which is the sign of whether
+  // you are going to arrive or sail past
+  const close = (P.vel.x * dx + P.vel.y * dy + P.vel.z * dz) / Math.max(d, 1);
+  const sp = projectRaw(t.p);
+  ctx.save();
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  const on = sp && sp.x > 40 * u && sp.x < W - 40 * u && sp.y > 40 * u && sp.y < H - 40 * u;
+  const col = close > 0 ? "rgba(126,232,154,.95)" : "rgba(255,176,90,.95)";
+  if (on) {
+    const r = 13 * u;
+    ctx.strokeStyle = col; ctx.lineWidth = 1.6 * u;
+    ctx.beginPath();
+    ctx.moveTo(sp.x, sp.y - r); ctx.lineTo(sp.x + r, sp.y);
+    ctx.lineTo(sp.x, sp.y + r); ctx.lineTo(sp.x - r, sp.y);
+    ctx.closePath(); ctx.stroke();
+    hudFont(11 * u, 700); ctx.fillStyle = col;
+    ctx.fillText(t.name.toUpperCase(), sp.x, sp.y - r - 11 * u);
+    hudFont(10.5 * u, 600);
+    ctx.fillText(navRange(range), sp.x, sp.y + r + 11 * u);
+  } else {
+    /* Off the glass: an arrow on the rim of a circle, pointing the way you
+       have to turn. The direction comes from the target in VIEW space, so it
+       is correct even when the thing is behind you. */
+    const m = cam.m;
+    const vx = m[0] * dx + m[1] * dy + m[2] * dz;
+    const vy = m[3] * dx + m[4] * dy + m[5] * dz;
+    const vz = m[6] * dx + m[7] * dy + m[8] * dz;
+    let ang = Math.atan2(-vy, vx);
+    if (vz < 0 && Math.hypot(vx, vy) < 1e-6) ang = Math.PI / 2;
+    const rad = Math.min(W, H) * .33;
+    const ax = CX + Math.cos(ang) * rad, ay = CY + Math.sin(ang) * rad;
+    ctx.translate(ax, ay); ctx.rotate(ang);
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.moveTo(15 * u, 0); ctx.lineTo(-9 * u, 9 * u); ctx.lineTo(-4 * u, 0); ctx.lineTo(-9 * u, -9 * u);
+    ctx.closePath(); ctx.fill();
+    ctx.rotate(-ang);
+    hudFont(10.5 * u, 700);
+    ctx.fillText(t.name.toUpperCase(), 0, -19 * u);
+    hudFont(10 * u, 600);
+    ctx.fillText(navRange(range), 0, 20 * u);
+    if (vz < 0) { hudFont(9.5 * u, 600); ctx.fillText("BEHIND", 0, 31 * u); }
+  }
+  // the numbers, bottom centre, where they do not fight the HUD
+  hudFont(11 * u, 600); ctx.fillStyle = "rgba(190,214,236,.85)";
+  ctx.fillText("NAV " + t.name.toUpperCase() + "   " + navRange(range) + "   " +
+    (close >= 0 ? "closing " : "opening ") + navSpeed(Math.abs(close)),
+    CX, 100 * u);
+  ctx.restore();
+}
+function navRange(m) {
+  const k = m / 1000;
+  return k > 1e6 ? (k / 1e6).toFixed(2) + " Gm" : k > 1000 ? (k / 1000).toFixed(1) + " Mm"
+    : k > 1 ? Math.round(k) + " km" : Math.round(m) + " m";
+}
+function navSpeed(v) {
+  return v > 1e6 ? (v / 1e6).toFixed(2) + " Mm/s" : v > 1000 ? (v / 1000).toFixed(1) + " km/s"
+    : Math.round(v) + " m/s";
+}
+
+/* The map. The solar system spans eleven orders of magnitude of distance, so
+   a map drawn to scale is a dot and some empty paper. The radius here is the
+   LOGARITHM of range, which puts the Moon and Neptune on the same sheet and
+   still gets the directions right — and direction is the thing you actually
+   need. Bearing around the circle is where to turn; the ring you are on is
+   how far. */
+function drawMap() {
+  if (!NAV.map || typeof BODIES === "undefined") return;
+  const u = UI, P = PLANE;
+  const R = Math.min(W, H) * .40, cx = CX, cy = CY;
+  ctx.save();
+  ctx.fillStyle = "rgba(4,8,14,.88)"; ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+
+  // range rings, one per decade of kilometres
+  ctx.strokeStyle = "rgba(120,170,215,.22)"; ctx.lineWidth = 1 * u;
+  const L0 = 3, L1 = 10;                       // 1e3 km .. 1e10 km
+  const rr = lk => R * clamp((lk - L0) / (L1 - L0), 0, 1);
+  for (let lk = L0; lk <= L1; lk++) {
+    ctx.beginPath(); ctx.arc(cx, cy, rr(lk), 0, TAU); ctx.stroke();
+    hudFont(9 * u, 600); ctx.fillStyle = "rgba(150,190,225,.55)";
+    const lbl = lk >= 9 ? (10 ** (lk - 9)) + " Gm" : lk >= 6 ? (10 ** (lk - 6)) + " Mm" : (10 ** lk) + " km";
+    ctx.fillText(lbl, cx, cy - rr(lk) - 7 * u);
+  }
+  // you, in the middle, pointing where the nose points
+  const e = eulerOf(PLANE.m);
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(0);
+  ctx.fillStyle = "rgba(126,232,154,.95)";
+  ctx.beginPath(); ctx.moveTo(0, -9 * u); ctx.lineTo(6 * u, 7 * u); ctx.lineTo(0, 3 * u); ctx.lineTo(-6 * u, 7 * u);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+
+  for (const b of BODIES) {
+    const dx = b.p.x - P.pos.x, dy = b.p.y - P.pos.y, dz = b.p.z - P.pos.z;
+    const d = Math.hypot(dx, dy, dz);
+    const km = Math.max(d, 1) / 1000;
+    const r = rr(Math.log10(km));
+    /* Bearing is measured from the NOSE, so straight up the map is straight
+       ahead: turn the way the dot lies and you are pointing at it. */
+    const m2 = PLANE.m;
+    const fx = m2[6] * dx + m2[7] * dy + m2[8] * dz;   // ahead
+    const rx = m2[0] * dx + m2[1] * dy + m2[2] * dz;   // right
+    const ang = Math.atan2(rx, fx);
+    const px = cx + Math.sin(ang) * r, py = cy - Math.cos(ang) * r;
+    const sel = navTarget() === b;
+    const rad = Math.max(3.4 * u, Math.min(11 * u, 3 * u + Math.log10(b.r / 1e5) * 2.6 * u));
+    ctx.fillStyle = "rgb(" + (b.col[0] | 0) + "," + (b.col[1] | 0) + "," + (b.col[2] | 0) + ")";
+    ctx.beginPath(); ctx.arc(px, py, rad, 0, TAU); ctx.fill();
+    if (sel) {
+      ctx.strokeStyle = "rgba(126,232,154,.95)"; ctx.lineWidth = 1.8 * u;
+      ctx.beginPath(); ctx.arc(px, py, rad + 5 * u, 0, TAU); ctx.stroke();
+    }
+    hudFont(10 * u, sel ? 700 : 600);
+    ctx.fillStyle = sel ? "rgba(126,232,154,.95)" : "rgba(214,232,248,.85)";
+    ctx.fillText(b.name, px, py - rad - 9 * u);
+    hudFont(9 * u, 600); ctx.fillStyle = "rgba(160,190,216,.75)";
+    ctx.fillText(navRange(Math.max(d - b.r, 0)), px, py + rad + 9 * u);
+  }
+  hudFont(13 * u, 700); ctx.fillStyle = "rgba(226,244,255,.95)";
+  ctx.fillText("SOLAR SYSTEM \u00b7 up is where the nose points", cx, 34 * u);
+  hudFont(10.5 * u, 600); ctx.fillStyle = "rgba(160,190,216,.8)";
+  ctx.fillText("J cycles the target \u00b7 N closes the map \u00b7 rings are decades of distance", cx, H - 30 * u);
+  ctx.restore();
 }
 
 /* ============================================================= audio ==== */
@@ -4789,6 +5044,9 @@ const KEYMAP = {
     ["W S", "throttle up / down (also Shift / Ctrl)"],
     ["Drag slider", "throttle, past 80% lights the afterburners"],
     ["Z", "autopilot on / off"],
+    ["O", "speed hold &mdash; throttle then sets the speed"],
+    ["J", "cycle nav target &mdash; Moon, planets, Sun"],
+    ["N", "solar system map"],
     ["Space", "wheel brakes"],
     ["B", "parking brake"],
     ["G", "landing gear"],
@@ -4854,6 +5112,9 @@ function onKeyPress(k) {
   if (lk === "b") { P.park = !P.park; toast(P.park ? "PARKING BRAKE SET" : "BRAKES RELEASED", 1.4); }
   if (lk === "m") { if (audio.ok) { audio.master.gain.value = audio.master.gain.value > .01 ? 0 : .55; toast(audio.master.gain.value > .01 ? "SOUND ON" : "MUTED", 1.2); } }
   if (lk === "z") { toggleAP(); }
+  if (lk === "o") { toggleSpeedHold(); }
+  if (lk === "j") { cycleNav(1); }
+  if (lk === "n") { NAV.map = !NAV.map; }
   if (lk === "x") {
     if (P.chuteCmd) { P.chuteCmd = 0; toast("CHUTE JETTISONED", 1.4); }
     else if (P.ias * 1.94384 > CHUTE_LIMIT) toast("TOO FAST FOR THE CHUTE", 1.6);
@@ -4913,7 +5174,14 @@ function applyInput(dt) {
   let tdir = 0;
   if (K.w || K.shift) tdir += 1;
   if (K.s || K.ctrl) tdir -= 1;
-  if (tdir) { P.thr = clamp(P.thr + tdir * .5 * dt, 0, 1); if (P.thr > .02) P.park = false; }
+  if (tdir) {
+    if (SPD.on) {
+      // the lever is a speed now: a proportional nudge, so it is usable from
+      // a taxi speed to a hundred kilometres a second
+      SPD.tgt = clamp(SPD.tgt * (1 + tdir * .55 * dt) + tdir * 22 * dt, 0, 4e8);
+      SPD.auto = false;
+    } else { P.thr = clamp(P.thr + tdir * .5 * dt, 0, 1); if (P.thr > .02) P.park = false; }
+  }
   // trim (the autopilot owns trim while it is engaged)
   if (!AP.on) {
     if (K[","] || K.home) P.trim = clamp(P.trim + .30 * dt, -.8, .8);
@@ -5036,7 +5304,7 @@ function frame(now) {
   drawLandmarks();
   drawGlare();
   if (Q.q.vig && vignette) { ctx.fillStyle = vignette; ctx.fillRect(0, 0, W, H); }
-  if (GAME.started && !GAME.paused) { drawGEffect(PLANE); drawHUD(dt); }
+  if (GAME.started && !GAME.paused) { drawGEffect(PLANE); drawHUD(dt); drawNavMarker(); drawMap(); }
   tuneQuality(dt, performance.now() - work0);
   requestAnimationFrame(frame);
 }
