@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
 <title>Updraft</title>
-<meta name="description" content="Keep the balloon rising. Deflect everything in its way." />
+<meta name="description" content="Hold the line. Forty-five levels of it, and a mission from Launch Complex 39A to the heliopause." />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -383,6 +383,15 @@
   body.mission .brief-stage i{background:transparent;border-color:var(--accent)}
   body.mission .brief-stage i svg{stroke:var(--accent)}
   body.mission .lvl{background:var(--glass);border:1px solid var(--hair);color:var(--ink)}
+  /* the loose ends of the light theme that were still showing through */
+  body.mission #reviveBtn{
+    background:linear-gradient(180deg,rgba(255,196,84,.92),rgba(255,150,60,.86)) !important;
+    color:#241200;border-color:rgba(255,220,160,.7);
+    box-shadow:0 6px 26px rgba(255,180,80,.28);
+  }
+  body.mission #gemChip svg{fill:#38dcff !important}
+  .hint b{color:var(--ink)}
+  body.mission .hint b{color:#bfe9ff}
   body.mission .skin{background:var(--glass);border:1px solid var(--hair)}
   body.mission .play-btn{background:rgba(20,40,70,.3);border-color:rgba(120,220,255,.7);
     box-shadow:0 0 50px rgba(56,220,255,.28)}
@@ -516,7 +525,7 @@
     </div>
     <div class="row">
       <button class="btn ghost" id="toLevels">Levels</button>
-      <button class="btn ghost" id="toEndless">Endless</button>
+      <button class="btn ghost" id="toEndless">Mission</button>
     </div>
     <div class="row">
       <button class="btn ghost" id="toSkins">Balloons</button>
@@ -584,10 +593,7 @@
   <!-- ================= PAUSE ================= -->
   <div class="screen veil" id="scr-pause">
     <h2 class="title" style="font-size:clamp(28px,9vw,44px)">Paused</h2>
-    <p class="hint">The balloon climbs on its own and cannot dodge. The
-       arrangements ahead hang still until your shield touches them — clear
-       the balloon's line before it arrives. Anything marked red is in that
-       line. Sweep the shield over gems to collect them.</p>
+    <p class="hint" id="pauseHint"></p>
     <div class="row" style="flex-direction:column">
       <button class="btn primary wide" id="resumeBtn">Resume</button>
       <button class="btn wide" id="restartBtn">Restart</button>
@@ -598,12 +604,12 @@
   <!-- ================= GAME OVER ================= -->
   <div class="screen veil" id="scr-over">
     <p class="sub" id="overWhy">The balloon popped</p>
-    <h2 class="title" style="font-size:clamp(30px,10vw,50px)">So close</h2>
+    <h2 class="title" id="overTitle" style="font-size:clamp(30px,10vw,50px)">So close</h2>
     <p class="big-num" id="overScore">0</p>
     <div class="stat-row">
-      <div class="stat"><b id="overBest">0</b><span>Best</span></div>
-      <div class="stat"><b id="overGems">0</b><span>Gems</span></div>
-      <div class="stat"><b id="overFar">0%</b><span>Climbed</span></div>
+      <div class="stat"><b id="overBest">0</b><span id="overLbl1">Best</span></div>
+      <div class="stat"><b id="overGems">0</b><span id="overLbl2">Gems</span></div>
+      <div class="stat"><b id="overFar">0%</b><span id="overLbl3">Climbed</span></div>
     </div>
     <div class="row" style="flex-direction:column">
       <button class="btn wide" id="reviveBtn" style="background:#ffd166;display:none">
@@ -754,7 +760,7 @@ function persist(){
 /* --------------------------------------------------------------- audio */
 const Audio2 = (() => {
   let ctx = null, master = null, musicGain = null, sfxGain = null;
-  let musicTimer = null, step = 0, started = false;
+  let musicTimer = null, step = 0, started = false, rumbleBuf = null;
   function ensure(){
     if (ctx) return ctx;
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -811,21 +817,69 @@ const Audio2 = (() => {
     power(){ [0, 4, 7, 12].forEach((s, i) => tone(440 * Math.pow(2, s / 12), 0.16, "triangle", 0.2, null, i * 0.05)); },
     win(){ [0, 4, 7, 12, 16].forEach((s, i) => tone(523.25 * Math.pow(2, s / 12), 0.34, "triangle", 0.22, null, i * 0.09)); },
     ui(){ tone(520, 0.07, "sine", 0.13); },
-    warn(){ tone(140, 0.1, "square", 0.1); }
+    warn(){ tone(140, 0.1, "square", 0.1); },
+    /* Five F-1s at full thrust moved enough air to be heard three miles away.
+       This is filtered noise with a slow swell on it, started once at ignition
+       and left to run itself out as the vehicle climbs away from its own
+       sound. */
+    rumble(dur){
+      if (!save.opts.sfx || !ensure()) return;
+      const t0 = ctx.currentTime;
+      const src = ctx.createBufferSource();
+      // one two-second bed, made once and looped. Building nine fresh seconds
+      // of it on every launch is a couple of megabytes a run that nothing ever
+      // hands back.
+      if (!rumbleBuf){
+        const n = Math.ceil(ctx.sampleRate * 2);
+        rumbleBuf = ctx.createBuffer(1, n, ctx.sampleRate);
+        const d = rumbleBuf.getChannelData(0);
+        let last = 0;
+        for (let i = 0; i < n; i++){               // brown noise: weight low
+          last = (last + (Math.random() * 2 - 1) * 0.06) * 0.996;
+          d[i] = last * 3.2;
+        }
+        // ease the seam so the loop does not tick
+        const f = Math.ceil(ctx.sampleRate * 0.05);
+        for (let i = 0; i < f; i++) d[i] *= i / f;
+        for (let i = 0; i < f; i++) d[n - 1 - i] *= i / f;
+      }
+      src.buffer = rumbleBuf;
+      src.loop = true;
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass"; lp.frequency.setValueAtTime(320, t0);
+      lp.frequency.exponentialRampToValueAtTime(90, t0 + dur);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.55, t0 + 0.9);
+      g.gain.setValueAtTime(0.55, t0 + dur * 0.35);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      src.connect(lp); lp.connect(g); g.connect(sfxGain);
+      src.start(t0); src.stop(t0 + dur);
+    },
+    // a hull failure: a hit, then the low end going out from under it
+    boom(){
+      noise(0.5, 0.75, 1800, 60);
+      tone(120, 0.9, "sawtooth", 0.22, 34);
+      tone(62, 1.3, "sine", 0.28, 28, 0.04);
+    }
   };
   // gentle generative pad — four chords, slow, never in the way
   const CHORDS = [[0, 7, 12, 16], [-3, 4, 9, 12], [-5, 2, 7, 11], [2, 7, 11, 14]];
+  // out past the atmosphere the pad drops a fifth, opens out and loses its
+  // top voice: same instrument, colder room
+  const CHORDS_M = [[0, 7, 14, 19], [-5, 2, 9, 16], [-7, 0, 7, 12], [-3, 4, 12, 16]];
   function musicStep(){
     if (!ctx || !save.opts.music) return;
-    const root = 220;
-    const ch = CHORDS[step % CHORDS.length];
+    const deep = isMission() && missionNow().ph.kind !== "pad" && missionNow().ph.kind !== "air";
+    const root = deep ? 146.83 : 220;
+    const ch = (deep ? CHORDS_M : CHORDS)[step % CHORDS.length];
     const t0 = ctx.currentTime;
     ch.forEach((s, i) => {
       const o = ctx.createOscillator(), g = ctx.createGain();
-      o.type = i === 0 ? "sine" : "triangle";
+      o.type = i === 0 ? "sine" : (deep ? "sine" : "triangle");
       o.frequency.value = root * Math.pow(2, s / 12) * (i === 0 ? 0.5 : 1);
       g.gain.setValueAtTime(0.0001, t0);
-      g.gain.linearRampToValueAtTime(0.08 / (i + 1), t0 + 1.6);
+      g.gain.linearRampToValueAtTime((deep ? 0.065 : 0.08) / (i + 1), t0 + (deep ? 2.4 : 1.6));
       g.gain.linearRampToValueAtTime(0.0001, t0 + 5.4);
       o.connect(g); g.connect(musicGain);
       o.start(t0); o.stop(t0 + 5.6);
@@ -1121,10 +1175,9 @@ function biomeOfPhase(ph, out){
   return out;
 }
 
-/* While the game is still being worked on, the five levels ahead of the one
-   you have reached stay open, so you can go straight to whatever needs
-   looking at instead of earning your way back to it each time. */
-const PEEK_AHEAD = 5;
+/* One level ahead of the furthest you have reached stays open, so a level you
+   cannot beat never walls the game off. */
+const PEEK_AHEAD = 1;
 const LEVELS_PER_BIOME = 5;
 const TOTAL_LEVELS = BIOMES.length * LEVELS_PER_BIOME; // 45
 
@@ -2012,7 +2065,7 @@ const MDESIGNS = [
       // a solar wing, snapped off and still turning
       const n = 2 + (g.rng() * 2 | 0);
       for (let i = 0; i < n; i++){
-        const len = 42 + g.d * 24;
+        const len = 28 + g.d * 36;
         piece(g, 44 + g.rng() * (VW - 88), g.y - 60 - i * 104 - g.rng() * 60,
               [{ x1: -len, y1: 0, x2: len, y2: 0, r: 12 },
                { x1: -len * 0.45, y1: -13, x2: len * 0.45, y2: -13, r: 4 }],
@@ -2562,10 +2615,27 @@ function popBalloon(){
   G.bal.alive = false;
   G.state = "dead";
   G.overT = 0;
-  burstParts(G.bal.x, G.bal.y, 26, SKIN_BY_ID(save.skin).body, 260, "shard");
-  burstParts(G.bal.x, G.bal.y, 12, "#ffffff", 160, "dot");
-  G.cam.shake = save.opts.calm ? 4 : 14;
-  Audio2.SFX.pop(); buzz([18, 40, 24]);
+  const b = G.bal;
+  if (isMission()){
+    /* A balloon pops: one bang, one colour, done. A vehicle comes apart, and
+       it comes apart in the order the pieces were bolted on — the hull goes
+       out fast and hot, the structure follows slower and colder, and the
+       atmosphere it was carrying goes last and furthest. */
+    const S = shipSpec();
+    const hull = mix("#eef1f6", "#59688f", S.hull);
+    burstParts(b.x, b.y, save.opts.calm ? 10 : 26, "#fff4d0", 340, "dot");
+    burstParts(b.x, b.y, save.opts.calm ? 12 : 30, hull, 240, "shard");
+    burstParts(b.x, b.y, save.opts.calm ? 6 : 16, mix("#c9ced9", "#7cf0ff", S.hull), 150, "shard");
+    G.cam.shake = save.opts.calm ? 6 : 22;
+    Audio2.SFX.boom(); Audio2.duck(true);
+    setTimeout(() => Audio2.duck(false), 1400);
+    buzz([26, 50, 30, 60, 40]);
+  } else {
+    burstParts(b.x, b.y, 26, SKIN_BY_ID(save.skin).body, 260, "shard");
+    burstParts(b.x, b.y, 12, "#ffffff", 160, "dot");
+    G.cam.shake = save.opts.calm ? 4 : 14;
+    Audio2.SFX.pop(); buzz([18, 40, 24]);
+  }
 }
 function takeHit(o, nx, ny){
   if (G.bal.inv > 0) return;
@@ -2899,6 +2969,7 @@ function missionEvents(){
     if (want > G.padCall){
       G.padCall = want;
       UI.callout(want === 1 ? "IGNITION SEQUENCE START · FIVE F-1 ENGINES" : "LIFT-OFF · THE CLOCK IS RUNNING");
+      if (want === 1){ Audio2.SFX.rumble(9); buzz([40, 30, 80]); }
       if (want === 2){ Audio2.SFX.power(); buzz([30, 20, 60]); }
     }
     if (want < 2) return;
@@ -3355,7 +3426,7 @@ function drawCoast(m){
   // the curve of the planet, opening up as the air thins
   const bulge = 44 + f * 330;
   const limb = (xx) => 40 - bulge * (1 - (xx / VW) * (xx / VW));
-  ctx.fillStyle = mix("#16314f", "#1b4d86", f);
+  ctx.fillStyle = mix("#1d4a77", "#2b6aa8", f);
   ctx.beginPath();
   ctx.moveTo(-VW * 1.2, 40);
   ctx.quadraticCurveTo(0, 40 - bulge, VW * 1.2, 40);
@@ -3364,13 +3435,13 @@ function drawCoast(m){
   const landA = 1 - f * 0.75;
   if (landA > 0.03){
     ctx.globalAlpha = landA;
-    ctx.fillStyle = "#2f4a3a";
+    ctx.fillStyle = "#4a6b45";
     ctx.beginPath();
     ctx.moveTo(-VW, 52);
     ctx.quadraticCurveTo(-VW * 0.3, 44 - bulge * 0.7, VW * 0.08, 56 - bulge * 0.42);
     ctx.quadraticCurveTo(VW * 0.02, 96, -VW * 0.22, 128);
     ctx.lineTo(-VW, 150); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = "#24455c";                          // the Banana River
+    ctx.fillStyle = "#2d6088";                          // the Banana River
     ctx.beginPath();
     ctx.moveTo(-VW * 0.34, 60 - bulge * 0.5);
     ctx.quadraticCurveTo(-VW * 0.26, 96, -VW * 0.4, 132);
@@ -3812,11 +3883,17 @@ function capsuleRing(x1, y1, x2, y2, r, col, w, inner){
   capsule(x1, y1, x2, y2, r, col);
   if (r > w) capsule(x1, y1, x2, y2, r - w, inner);
 }
-// the edge can never eat more than half of the smallest part it is drawn on
-function w0edge(o){
-  let r = 99;
-  for (const w of o.wp) r = Math.min(r, w.r);
-  return Math.max(2, r * 0.5);
+/* How heavy the dark edge is on one piece of one body.
+
+   It used to be a single figure for the whole body, floored at two units so
+   it would always show. That was fine while everything was a similar-sized
+   ball. It is not fine now: a rock lobe three and a half units across with a
+   two-unit edge is eighty per cent outline, and a field of small debris
+   turned into a field of ink blobs. So the edge is a fraction of the radius
+   of the piece it is drawn on, with a floor low enough that the smallest
+   thing in the sky is still white in the middle. */
+function edgeOf(r, hc){
+  return clamp(r * 0.30, 0.9, 4.5) * hc;
 }
 function drawObstacles(){
   const ink = inkNow();
@@ -3825,25 +3902,36 @@ function drawObstacles(){
     if (o.y + o.rad < top || o.y - o.rad > bot) continue;
     const heavy = o.mass >= 3.2;
     const hc = save.opts.contrast ? 1.45 : 1;
-    const edgeW = Math.min(w0edge(o) * hc, (heavy ? 6 : 4.5) * hc);
+    let edgeW = 0;                       // the widest of them, for the markings
+    for (const w of o.wp) edgeW = Math.max(edgeW, edgeOf(w.r, hc));
 
     // a shadow with enough weight to lift the body off a pale sky
     ctx.globalAlpha = 0.2;
     for (const w of o.wp) capsule(w.x1 + 1, w.y1 + 5, w.x2 + 1, w.y2 + 5, w.r, "#0a1030");
     ctx.globalAlpha = 1;
 
-    /* Body first, every piece of it, and only then the edges. A block is
-       several overlapping runs, and edging each one as it lands draws seams
-       through the middle of a thing that is supposed to be solid. */
-    ctx.fillStyle = "#ffffff";
-    for (const w of o.wp) capsule(w.x1, w.y1, w.x2, w.y2, w.r, "#ffffff");
-    for (const w of o.wp) capsuleRing(w.x1, w.y1, w.x2, w.y2, w.r, ink, edgeW, "#ffffff");
+    /* Outline the body, not each piece of it. Drawing [edge, then fill] once
+       per capsule works while a body is one capsule and fails the moment it
+       is several: every capsule lays its dark ring over its neighbours'
+       interiors, and a rock built from six overlapping lobes comes out almost
+       solid ink with a white speck in the middle. So the silhouette goes down
+       dark in one pass, and the whole of it is filled back in white one edge
+       inside in a second. What is left dark is the boundary of the union,
+       which is the only line that was ever meant to be there. */
+    for (const w of o.wp) capsule(w.x1, w.y1, w.x2, w.y2, w.r, ink);
+    for (const w of o.wp){
+      const e = edgeOf(w.r, hc);
+      if (w.r > e) capsule(w.x1, w.y1, w.x2, w.y2, w.r - e, "#ffffff");
+    }
 
     // struck this instant: the edge lights up, still inside the radius
     if (o.flash > 0.01){
       const hot = mix("#ffd166", "#ff8a3d", o.flash);
-      for (const w of o.wp)
-        capsuleRing(w.x1, w.y1, w.x2, w.y2, w.r, hot, Math.min(edgeW * 1.6, w.r * 0.6), "#ffffff");
+      for (const w of o.wp) capsule(w.x1, w.y1, w.x2, w.y2, w.r, hot);
+      for (const w of o.wp){
+        const e = Math.min(edgeOf(w.r, hc) * 1.7, w.r * 0.55);
+        if (w.r > e) capsule(w.x1, w.y1, w.x2, w.y2, w.r - e, "#ffffff");
+      }
     }
     // a thin dark edge goes back on last, so a warning or a flash never eats
     // the outline that tells you where the thing actually ends
@@ -3880,7 +3968,7 @@ function drawObstacles(){
       const sd = o.seed;
       for (let wi = 0; wi < o.wp.length; wi++){
         const w = o.wp[wi];
-        const R = w.r, inner = Math.max(1.2, R - edgeW - 1.2);
+        const R = w.r, inner = Math.max(1.2, R - edgeOf(R, hc) - 1.2);
         if (inner < 2.2) continue;
         const mx = (w.x1 + w.x2) / 2, my = (w.y1 + w.y2) / 2;
         const len = Math.hypot(w.x2 - w.x1, w.y2 - w.y1);
@@ -4069,7 +4157,27 @@ function drawPickups(){
     const bobY = Math.sin(p.t * 2.4) * 3;
     ctx.save();
     ctx.translate(p.x, p.y + bobY);
-    if (p.kind === "gem"){
+    if (p.kind === "gem" && isMission()){
+      /* A purple gem in low Earth orbit is somebody else's game. Out here the
+         same pick-up is a sample canister: a capped cylinder with a status
+         light on it, drawn to the same radius so nothing about collecting it
+         has changed. */
+      ctx.rotate(Math.sin(p.t * 1.1) * 0.35);
+      ctx.fillStyle = "#e8eef7";
+      ctx.beginPath();
+      ctx.roundRect ? ctx.roundRect(-R * 0.52, -R * 0.86, R * 1.04, R * 1.72, R * 0.3)
+                    : ctx.rect(-R * 0.52, -R * 0.86, R * 1.04, R * 1.72);
+      ctx.fill();
+      ctx.strokeStyle = "#1b2450"; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = "#1b2450";
+      ctx.fillRect(-R * 0.52, -R * 0.44, R * 1.04, R * 0.2);
+      ctx.fillRect(-R * 0.52, R * 0.26, R * 1.04, R * 0.2);
+      ctx.fillStyle = "#38dcff";
+      ctx.beginPath(); ctx.arc(0, -R * 0.02, R * 0.19, 0, TAU); ctx.fill();
+      ctx.globalAlpha = 0.35 + Math.sin(p.t * 5) * 0.25;
+      ctx.beginPath(); ctx.arc(0, -R * 0.02, R * 0.36, 0, TAU); ctx.fill();
+      ctx.globalAlpha = 1;
+    } else if (p.kind === "gem"){
       ctx.rotate(Math.sin(p.t * 1.6) * 0.2);
       // the diamond's points sit exactly on the pick-up radius
       ctx.beginPath();
@@ -4161,9 +4269,9 @@ const FONT = '"Nunito",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
    the balloon had, so nothing about what can hit it has moved.             */
 const SHIPS = [
   // name                    les  fins  taper roll wings rad ring glow hull plume len  nose
-  { n:"Saturn V · AS-506",   les:1, fin:1.00, tap:1.00, roll:1.0, wing:0,   rad:0, ring:0, glow:0,    hull:0.00, plume:0.00, len:1.00, nose:1.00, vane:0 },
-  { n:"S-IC · first stage",  les:1, fin:0.92, tap:0.94, roll:1.0, wing:0,   rad:0, ring:0, glow:0,    hull:0.02, plume:0.02, len:1.00, nose:1.00, vane:0 },
-  { n:"S-II · second stage", les:0, fin:0.22, tap:0.80, roll:0.7, wing:0,   rad:0, ring:0, glow:0,    hull:0.06, plume:0.08, len:0.88, nose:0.92, vane:0 },
+  { n:"Saturn V · AS-506",   les:1, fin:1.00, tap:1.00, roll:1.0, wing:0,   rad:0, ring:0, glow:0,    hull:0.00, plume:0.00, len:1.00, nose:1.00, vane:0, diam:0 },
+  { n:"S-IC · supersonic",   les:1, fin:0.92, tap:0.94, roll:1.0, wing:0,   rad:0, ring:0, glow:0,    hull:0.02, plume:0.02, len:1.00, nose:1.00, vane:0, diam:1 },
+  { n:"S-II · second stage", les:0, fin:0.22, tap:0.80, roll:0.7, wing:0,   rad:0, ring:0, glow:0,    hull:0.06, plume:0.08, len:0.88, nose:0.92, vane:0, diam:0.5 },
   { n:"S-IVB and spacecraft",les:0, fin:0.06, tap:0.62, roll:0.4, wing:0,   rad:0, ring:0, glow:0,    hull:0.10, plume:0.16, len:0.80, nose:0.80, vane:0 },
   { n:"CSM and Eagle",       les:0, fin:0.00, tap:0.46, roll:0.2, wing:0,   rad:0.2, ring:0, glow:0.05,hull:0.16, plume:0.26, len:0.74, nose:0.66, vane:0 },
   { n:"Columbia · CSM",      les:0, fin:0.00, tap:0.34, roll:0.1, wing:0,   rad:0.3, ring:0, glow:0.1, hull:0.24, plume:0.36, len:0.68, nose:0.56, vane:0 },
@@ -4241,6 +4349,25 @@ function drawShip(x, y, r, tech, phase, alpha){
     ctx.moveTo(-W * 0.44, tail);
     ctx.quadraticCurveTo(0, tail + len * 0.5, W * 0.44, tail);
     ctx.closePath(); ctx.fill();
+    /* Shock diamonds. A nozzle tuned for vacuum is over-expanded at sea level
+       and the exhaust keeps re-compressing on its way out, which stacks a row
+       of bright lozenges down the plume once the vehicle is supersonic. They
+       are the difference between the stack leaving the pad and the same stack
+       ten kilometres up, and they are the reason those two look different. */
+    if (S.diam > 0.02 && air){
+      ctx.globalAlpha = A * S.diam * 0.85;
+      ctx.fillStyle = "#fffbe8";
+      const n = 4;
+      for (let i = 0; i < n; i++){
+        const t = (i + 0.9) / (n + 0.6);
+        const yy = tail + len * t;
+        const w = W * 0.30 * (1 - t * 0.55);
+        const h = len * 0.075 * (1 - t * 0.4);
+        ctx.beginPath();
+        ctx.moveTo(0, yy - h); ctx.lineTo(w, yy); ctx.lineTo(0, yy + h); ctx.lineTo(-w, yy);
+        ctx.closePath(); ctx.fill();
+      }
+    }
     ctx.globalAlpha = A;
   }
 
@@ -4601,10 +4728,13 @@ function render(){
     ctx.font = "800 13px " + FONT;
     ctx.textAlign = "center";
     const hy = isMission() ? VH * 0.56 : VH * 0.80;
+    const txt = isMission()
+      ? "Drag anywhere — clear the ship's line before it gets there"
+      : "Drag anywhere — clear the line before you reach it";
     ctx.strokeStyle = "rgba(10,16,36,.55)"; ctx.lineWidth = 3.5; ctx.lineJoin = "round";
-    ctx.strokeText("Drag anywhere — clear the line before you reach it", VW / 2, hy);
+    ctx.strokeText(txt, VW / 2, hy);
     ctx.fillStyle = "#ffffff";
-    ctx.fillText("Drag anywhere — clear the line before you reach it", VW / 2, hy);
+    ctx.fillText(txt, VW / 2, hy);
     ctx.globalAlpha = 1;
   }
 }
@@ -4730,7 +4860,7 @@ function stageGlyph(look){
 }
 const SCREENS = ["scr-title", "scr-levels", "scr-settings", "scr-skins", "scr-pause", "scr-over", "scr-clear", "scr-brief"];
 const UI = {
-  overShown: false,
+  overShown: false, overTitle: "overTitle",
   _score: -1, _gems: -1, _prog: -1, _energy: -1, _pw: "", _combo: -1, _lvl: "",
   show(name){
     for (const id of SCREENS) $(id).classList.toggle("on", id === name);
@@ -4836,8 +4966,27 @@ const UI = {
     });
     this.show("scr-brief");
   },
+  /* The two modes are different games by now and the copy has to know it.
+     Written once, here, so nothing describing the red on-course marking that
+     was taken out two updates ago can survive in the markup. */
+  modeCopy(){
+    const m = isMission();
+    $("pauseHint").innerHTML = m
+      ? "The ship climbs on its own and cannot dodge. Everything ahead hangs "
+      + "still until your shield reaches it — <b>drag anywhere</b> to move the "
+      + "shield and clear the line before the ship arrives. Sweep it over "
+      + "samples to collect them."
+      : "The balloon climbs on its own and cannot dodge. The arrangements "
+      + "ahead hang still until your shield touches them — <b>drag anywhere</b> "
+      + "to clear the balloon's line before it arrives. Sweep the shield over "
+      + "gems to collect them.";
+    $("overLbl1").textContent = m ? "Best" : "Best";
+    $("overLbl2").textContent = m ? "Samples" : "Gems";
+    $("overLbl3").textContent = m ? "Reached" : "Climbed";
+  },
   enterGame(){
     this.overShown = false;
+    this.modeCopy();
     document.body.classList.toggle("mission", isMission());
     $("telem").classList.toggle("on", isMission() && !!save.opts.telem);
     this._score = this._gems = this._prog = this._energy = -1; this._pw = ""; this._lvl = "";
@@ -4941,8 +5090,17 @@ const UI = {
     $("overScore").textContent = G.score;
     $("overBest").textContent = G.def.endless ? save.endlessBest : (save.levels[G.def.n] && save.levels[G.def.n].best) || G.score;
     $("overGems").textContent = G.gems;
-    $("overFar").textContent = G.def.endless ? (Math.floor(G.climbed / 8) + " m") : pct + "%";
-    $("overWhy").textContent = G.def.endless ? "Endless run" : "Level " + G.def.n + " · " + BIOMES[G.def.biome].name;
+    if (isMission()){
+      const m = missionNow();
+      $("overFar").textContent = (PLANETS[m.ph.body] || {}).name || m.ph.name.split(" ")[0].toUpperCase();
+      $("overWhy").textContent = "Lost at " + m.ph.name + " · " + fmtMET(metNow());
+      $(this.overTitle).textContent = m.i >= PHASES.length - 1 ? "Further than anyone"
+        : m.i >= 8 ? "Deep space" : m.i >= 5 ? "Past the Moon" : "Contact";
+    } else {
+      $("overFar").textContent = G.def.endless ? (Math.floor(G.climbed / 8) + " m") : pct + "%";
+      $("overWhy").textContent = G.def.endless ? "Endless run" : "Level " + G.def.n + " · " + BIOMES[G.def.biome].name;
+      $(this.overTitle).textContent = "So close";
+    }
     $("overLevels").style.display = G.def.endless ? "none" : "";
     $("reviveBtn").style.display = canRevive() ? "" : "none";
     // a few tries in and the next level opens up anyway — nobody gets stuck
