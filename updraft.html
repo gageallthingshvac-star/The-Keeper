@@ -2770,7 +2770,15 @@ function step(dt){
 
   // --- threats. Three passes: they fly, they shove each other, then they meet
   // the shield and the balloon.
-  const top = cam.y - 320, bot = cam.y + VH + 200;
+  /* What gets simulated this frame. This used to reach 320 units above the
+     camera, which was fine when nothing left the top of the screen. The
+     shield now throws things hard enough to put them a long way up, and
+     anything past the old bound stopped dead in mid-air and started moving
+     again when the camera caught up with it — the "objects freezing and then
+     coming back to life" that got reported. The window now reaches exactly as
+     far as the cull below does, so every body is either being simulated or
+     gone, and there is no band in between where it can sit frozen. */
+  const top = cam.y - VH * 1.5, bot = cam.y + VH + 240;
   let bumpSound = false;
   const spawned = [];
   LIVE.length = 0;
@@ -2936,22 +2944,32 @@ function step(dt){
     if (G.overT > 1.25 && !UI.overShown) UI.showClear();
   }
 
-  // --- cull anything that has left the picture
-  // once something is safely past the balloon it stops being part of the
-  // picture; keeping it would just crowd the screen you are reading
+  /* --- cull anything that has left the picture.
+
+     Measured against the frame, never against the ship. The old test dropped
+     a body once it was 230 units below the ship, and the ship sits two thirds
+     of the way down — so on any screen taller than about 676 units, which is
+     every phone held upright, the cull line was above the bottom of the
+     frame and things went out like a light with a good part of them still
+     visible. A body is gone when the whole of it is off the frame and not
+     one moment before. */
+  const cullTop = cam.y - VH * 1.5, cullBot = cam.y + VH + 240;
+  const offFrame = o => (o.y - o.rad > cullBot) || (o.y + o.rad < cullTop) ||
+                        (o.x + o.rad < -60) || (o.x - o.rad > VW + 60);
   for (let i = G.obst.length - 1; i >= 0; i--){
-    const o = G.obst[i];
-    if (o.y > b.y + 230 || o.y < cam.y - VH * 2.2 ||
-        o.x < -240 || o.x > VW + 240) G.obst.splice(i, 1);
+    if (offFrame(G.obst[i])) G.obst.splice(i, 1);
   }
-  if (G.obst.length > 80){
-    for (let i = 0; i < G.obst.length && G.obst.length > 80; i++){
-      if (G.obst[i].blocked){ G.obst.splice(i, 1); i--; }
+  // and if the sky is genuinely crowded, thin it by dropping things that are
+  // already behind you, still never something you can see
+  if (G.obst.length > 110){
+    for (let i = G.obst.length - 1; i >= 0 && G.obst.length > 110; i--){
+      const o = G.obst[i];
+      if (o.blocked && o.y - o.rad > cam.y + VH) G.obst.splice(i, 1);
     }
   }
   for (let i = G.picks.length - 1; i >= 0; i--){
     const p = G.picks[i];
-    if (p.dead || p.y > cam.y + VH + 260) G.picks.splice(i, 1);
+    if (p.dead || p.y - (p.r || 11) > cam.y + VH + 60) G.picks.splice(i, 1);
   }
 
   UI.tick();
@@ -3897,7 +3915,7 @@ function edgeOf(r, hc){
 }
 function drawObstacles(){
   const ink = inkNow();
-  const top = G.cam.y - 120, bot = G.cam.y + VH + 140;
+  const top = G.cam.y - 160, bot = G.cam.y + VH + 200;
   for (const o of G.obst){
     if (o.y + o.rad < top || o.y - o.rad > bot) continue;
     const heavy = o.mass >= 3.2;
