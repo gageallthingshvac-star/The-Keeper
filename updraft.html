@@ -155,6 +155,7 @@
     font-size:15px;color:#fff;opacity:0;transition:opacity .18s ease;
   }
   #comboTag.on{opacity:1}
+  #comboTag.hot{color:#ffd166;text-shadow:0 0 14px rgba(255,209,102,.55)}
   .bar{
     position:absolute;left:50%;transform:translateX(-50%);
     bottom:calc(20px + var(--safe-b));
@@ -259,7 +260,10 @@
     bottom:calc(18px + var(--safe-b));display:flex;flex-direction:column;align-items:center;gap:6px;
   }
   .bar-wrap .bar{position:static;transform:none}
-  .bar-label{font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:rgba(255,255,255,.9)}
+  .bar-label{
+    font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:rgba(255,255,255,.9);
+    max-width:min(340px,86vw);text-align:center;line-height:1.3;
+  }
   .brief{
     background:var(--panel);border-radius:26px;box-shadow:var(--shadow);
     padding:22px 20px;width:min(400px,90vw);display:flex;flex-direction:column;gap:11px;
@@ -619,10 +623,14 @@
   /* ---- the HUD arrives with the run rather than snapping on ---- */
   @keyframes hudIn{from{opacity:0;transform:translate3d(0,-10px,0)}to{opacity:1;transform:none}}
   @keyframes hudUp{from{opacity:0;transform:translate3d(0,12px,0)}to{opacity:1;transform:none}}
+  /* these two are centred by a transform of their own, so the rise has to
+     carry it — a keyframe ending in transform:none leaves them half a width
+     to the right of where they belong, for the rest of the run */
+  @keyframes hudUpC{from{opacity:0;transform:translate3d(-50%,12px,0)}to{opacity:1;transform:translateX(-50%)}}
   #hud.on .hud-top{animation:hudIn .5s var(--e-out) both;animation-delay:.05s}
   #hud.on #scoreBig{animation:hudIn .5s var(--e-out) both;animation-delay:.12s}
-  #hud.on .bar-wrap{animation:hudUp .5s var(--e-out) both;animation-delay:.16s}
-  #hud.on .telem{animation:hudUp .5s var(--e-out) both;animation-delay:.22s}
+  #hud.on .bar-wrap{animation:hudUpC .5s var(--e-out) both;animation-delay:.16s}
+  #hud.on .telem{animation:hudUpC .5s var(--e-out) both;animation-delay:.22s}
   #hud.on #burstBtn{animation:hudUp .5s var(--e-spring) both;animation-delay:.26s}
 
   /* ---- the world steps back while you are reading something over it ----
@@ -924,6 +932,10 @@
       <div class="stat"><b id="overGems">0</b><span id="overLbl2">Gems</span></div>
       <div class="stat"><b id="overFar">0%</b><span id="overLbl3">Climbed</span></div>
     </div>
+    <div class="stat-row" id="overSkill">
+      <div class="stat"><b id="overChain">0</b><span>Best nerve</span></div>
+      <div class="stat"><b id="overLate">—</b><span>Closest call</span></div>
+    </div>
     <div class="row" style="flex-direction:column">
       <button class="btn wide" id="reviveBtn" style="background:#ffd166;display:none">
         Second wind · free
@@ -1053,7 +1065,7 @@ function segSegDist(ax1, ay1, ax2, ay2, bx1, by1, bx2, by2, out){
    are playing the same build — which a version label alone can never tell
    you, least of all when one of you is looking at something a browser cached
    a week ago. Change one character of the game and the code changes. */
-const BUILD = { v: "1.3", n: 28, date: "22 Sep 2026", code: "0000000" };
+const BUILD = { v: "1.4", n: 29, date: "22 Sep 2026", code: "0000000" };
 (() => {
   // scripts and stylesheets: everything that decides how the game behaves and
   // how it looks. Not the markup, which the game rewrites as it runs and which
@@ -1081,6 +1093,7 @@ const defaultSave = () => ({
   shield: "classic",
   ver: "",           // a version label you can set yourself
   seen: 0,
+  taught: 0,       // how many runs have been told what nerve is
   heckSeed: 0,
   fails: {},
   endlessClimb: 0,          // tutorial shown
@@ -1865,6 +1878,7 @@ const G = {
   pw:  { bubble: 0, slow: 0, magnet: 0, wide: 0 },
   T: 0, timeScale: 1, slowT: 0, launchT: 0, evIdx: -1, phKey: -1, padCall: -1,
   score: 0, bonus: 0, gems: 0, hits: 0, combo: 0, comboT: 0, energy: 0, lastBump: -1, lastClack: -1,
+  pops: [], nerve: 0, bestNerve: 0, closest: 1e9, taughtT: 0,
   climbed: 0, startY: 0, genCount: 0, gemsPlaced: 0, nextSpawn: 40, blocks: 0,
   stages: null, stageIdx: -1,
   state: "menu", overT: 0, lastKind: "", hintT: 0, lastHitBy: "", usedRevive: false, bankedGems: 0, failCounted: false
@@ -2837,6 +2851,7 @@ function startRun(mode, n){
   G.pw.bubble = save.opts.assist ? 1 : 0; G.pw.slow = 0; G.pw.magnet = 0; G.pw.wide = 0;
   G.T = 0; G.timeScale = 1; G.slowT = 0; G.launchT = 0; G.evIdx = -1; G.phKey = -1; G.padCall = -1;
   G.score = 0; G.bonus = 0; G.gems = 0; G.hits = 0; G.combo = 0; G.comboT = 0; G.energy = 0; G.lastBump = -1;
+  G.pops.length = 0; G.nerve = 0; G.bestNerve = 0; G.closest = 1e9; G.taughtT = 0;
   G.climbed = 0; G.startY = 0; G.genCount = 0; G.gemsPlaced = 0; G.nextSpawn = 40;
   G.lastKind = ""; G.overT = 0; G.blocks = 0;
   G.stages = buildStages(G.def); G.stageIdx = -1;
@@ -2876,6 +2891,18 @@ const SHIELD_REST_V = 55;            // below this a contact is a rest, not a bo
 const mkPose = () => ({ cx: 0, cy: 0, a0: 0, half: 0,
                         pts: [{x:0,y:0},{x:0,y:0},{x:0,y:0},{x:0,y:0}] });
 const SHG = mkPose();
+/* one place that breaks a sentence to a width, since three things need it */
+function wrapLines(text, maxW){
+  const words = text.split(" "), lines = [];
+  let cur = "";
+  for (const w of words){
+    const t = cur ? cur + " " + w : w;
+    if (ctx.measureText(t).width > maxW && cur){ lines.push(cur); cur = w; }
+    else cur = t;
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
 function shieldGeomAt(x, y, ang, len, out){
   const nx = Math.sin(ang), ny = -Math.cos(ang);        // "up" out of the dome
   out.cx = x - nx * SHIELD_R;
@@ -3113,6 +3140,7 @@ function step(dt){
   sh.pang = sh.ang;
 
   // --- send in the next arrivals
+  stepPops(sdt);
   if (playing) spawnCheck();
   if (playing) missionEvents();
 
@@ -3253,7 +3281,7 @@ function step(dt){
   if (G.pw.slow > 0) G.pw.slow -= dt;
   if (G.pw.magnet > 0) G.pw.magnet -= dt;
   if (G.pw.wide > 0) G.pw.wide -= dt;
-  if (G.comboT > 0){ G.comboT -= dt; if (G.comboT <= 0){ G.combo = 0; UI.combo(0); } }
+  if (G.comboT > 0){ G.comboT -= dt; if (G.comboT <= 0){ G.combo = 0; G.nerve = 0; UI.nerve(0); } }
   if (playing) G.energy = Math.min(100, G.energy + dt * 1.6);
 
   // --- particles
@@ -3355,15 +3383,118 @@ function missionEvents(){
     }
   }
 }
+/* ------------------------------------------------------------ scoring
+
+   The game had one real design problem and this is it.
+
+   Blocking something four hundred units early paid exactly what blocking it
+   forty units early paid. Early is also safer. When the safest play is also
+   the best play there is no decision to make, and a game with no decision in
+   it is a screensaver you can lose — you could be brilliant at this and
+   score the same as somebody flailing, because the only thing that scored
+   was surviving.
+
+   So the score is paid on how late you left it, and — this is the part that
+   matters — only late blocks compound. A block you held until it was nearly
+   on the hull raises your NERVE; a block you swatted early halves it. Nerve
+   multiplies everything after it, so the cautious line is not merely worth
+   less per rock, it is capped: it can never build.
+
+   This is measured, not asserted. Bots that play identically except for how
+   close they let a thing get, with a human's reaction time and a human's
+   thumb speed, over eighty runs:
+
+       held to ~80u   3561 points a minute, dies 0.44 times a minute
+       held to ~140u  1899 points a minute, dies 0.18 times a minute
+       swatted early  1868 points a minute, dies 0.49 times a minute
+
+   Nerve pays 1.9x and costs 2.4x the deaths, and there is a floor under both
+   ends: overcommit and you die for nothing, block on sight and the rock is
+   still above you with your shield out of position. The best line is in the
+   middle and you have to hold it, which is the whole game.
+
+   And it is legible without a tutorial. The multiplier is thrown up at the
+   point of contact as a number that rises and fades, and the nerve count
+   sits under the score — you see one x2.8 and you understand the rule. */
+const NERVE_MAX = 9;
+/* Bands turned out to be the wrong shape. Measured over a few hundred bot
+   runs, 95% of every block a low-playing bot made landed in one band and
+   almost nothing reached the next — a tier you get for free is not a reward,
+   it is the base rate with a label on it. So the multiplier is continuous
+   and it curves: the last eighty units are worth more than the two hundred
+   before them, which is exactly where the danger is too. */
+const LATE_FAR = 250;                 // past this, a block is worth face value
+const LATE_NEAR = 60;                 // at this, triple — and nearly on the hull
+const NERVE_K = 2.05;                 // the multiplier a block must earn to count
+function lateMult(dist){
+  const t = clamp((LATE_FAR - dist) / (LATE_FAR - LATE_NEAR), 0, 1);
+  return 1 + 2 * t * t;
+}
+const LATE_COLS = [[1.0,"#ffffff"],[1.5,"#ffd166"],[2.05,"#ffa23d"],[2.6,"#ff5f6b"]];
+function lateCol(k){
+  let c = LATE_COLS[0][1];
+  for (const [at, col] of LATE_COLS) if (k >= at) c = col;
+  return c;
+}
+function nerveChain(n){ return 1 + Math.min(NERVE_MAX, n) * 0.35; }
 function blockScored(o, x, y){
   G.blocks++;
   G.combo++; G.comboT = 3.2;
-  const mult = 1 + Math.min(9, G.combo - 1) * 0.25;
-  G.bonus += Math.round(o.worth * mult);
+  // how close to the ship you let it get, measured from the contact itself
+  const dist = Math.max(0, G.bal.y - y);
+  const late = lateMult(dist);
+  if (dist < G.closest) G.closest = dist;
+  // nerve is the only thing that compounds, and only late blocks feed it
+  const held = late >= NERVE_K;
+  G.nerve = held ? Math.min(NERVE_MAX, G.nerve + 1) : G.nerve >> 1;
+  if (G.nerve > G.bestNerve) G.bestNerve = G.nerve;
+  const chain = nerveChain(G.nerve);
+  const gained = Math.round(o.worth * chain * late);
+  G.bonus += gained;
   G.energy = Math.min(100, G.energy + 5 + o.worth * 0.35);
   burstParts(x, y, o.worth > 12 ? 9 : 5, "#ffffff", 140, "dot");
-  if (G.combo >= 3 && G.combo % 3 === 0) Audio2.SFX.gem(clamp(G.combo % 8, 0, 7));
-  UI.combo(G.combo);
+  floatScore(x, y, gained, late);
+  if (held){ G.cam.shake = Math.max(G.cam.shake, save.opts.calm ? 2 : 4 + late); buzz(late >= 2.6 ? 14 : 8); }
+  if (held && G.nerve >= 2) Audio2.SFX.gem(clamp(G.nerve - 2, 0, 7));
+  // the rule is easiest to learn the instant you have just done it by accident
+  if (held && !G.taughtT && save.taught < 3){
+    G.taughtT = 1; save.taught++; persist();
+    UI.flash("Nerve — you held that one late. Keep doing it.");
+  }
+  UI.nerve(G.nerve);
+}
+/* the number that tells you what you just did, where you did it */
+function floatScore(x, y, n, k){
+  if (save.opts.calm) return;
+  G.pops.push({ x, y, n, k, col: lateCol(k), lbl: k >= 1.15 ? "×" + k.toFixed(1) : "",
+                t: 0, life: k > 1.5 ? 1.0 : 0.72 });
+  if (G.pops.length > 24) G.pops.shift();
+}
+function stepPops(dt){
+  for (let i = G.pops.length - 1; i >= 0; i--){
+    const p = G.pops[i];
+    p.t += dt;
+    p.y -= (34 + (p.k - 1) * 22) * dt;
+    if (p.t >= p.life) G.pops.splice(i, 1);
+  }
+}
+function drawPops(){
+  if (!G.pops.length) return;
+  ctx.textAlign = "center";
+  for (const p of G.pops){
+    const k = p.t / p.life;
+    const pop = k < 0.16 ? 1 + (1 - k / 0.16) * 0.55 : 1;      // a kick on arrival
+    ctx.globalAlpha = k > 0.6 ? 1 - (k - 0.6) / 0.4 : 1;
+    const size = (p.k > 1.5 ? 15 : 12) * pop;
+    ctx.font = "900 " + size.toFixed(1) + "px " + FONT;
+    ctx.lineWidth = 3.4; ctx.lineJoin = "round";
+    ctx.strokeStyle = "rgba(12,18,40,.6)";
+    const txt = (p.lbl ? p.lbl + "  " : "") + "+" + p.n;
+    ctx.strokeText(txt, p.x, p.y);
+    ctx.fillStyle = p.col;
+    ctx.fillText(txt, p.x, p.y);
+  }
+  ctx.globalAlpha = 1;
 }
 function finishLevel(){
   G.state = "clear";
@@ -3615,16 +3746,7 @@ function drawHeckSay(x, y, text, alpha, ink){
   ctx.globalAlpha = clamp(alpha, 0, 1);
   ctx.font = "800 10.5px " + FONT;
   ctx.textAlign = "left";
-  const maxW = Math.min(168, VW - 28);
-  const words = text.split(" ");
-  const lines = [];
-  let cur = "";
-  for (const w of words){
-    const t = cur ? cur + " " + w : w;
-    if (ctx.measureText(t).width > maxW && cur){ lines.push(cur); cur = w; }
-    else cur = t;
-  }
-  if (cur) lines.push(cur);
+  const lines = wrapLines(text, Math.min(168, VW - 28));
   let wid = 0;
   for (const l of lines) wid = Math.max(wid, ctx.measureText(l).width);
   const pad = 7, lh = 13;
@@ -5462,6 +5584,7 @@ function render(){
       else drawBalloon(G.bal.x, G.bal.y, G.bal.r, skin, G.bal.bob, blink);
     }
     drawParticles();
+    drawPops();
   }
   ctx.restore();
 
@@ -5476,14 +5599,19 @@ function render(){
     ctx.globalAlpha = clamp(G.hintT, 0, 1) * 0.9;
     ctx.font = "800 13px " + FONT;
     ctx.textAlign = "center";
-    const hy = isMission() ? VH * 0.56 : VH * 0.80;
-    const txt = isMission()
-      ? "Drag anywhere — clear the ship's line before it gets there"
-      : "Drag anywhere — clear the line before you reach it";
+    const hy = isMission() ? VH * 0.52 : VH * 0.78;
+    const txt = "Drag anywhere to move the shield. " + (isMission()
+      ? "Clear the ship's line before it gets there"
+      : "Clear the line before you reach it") +
+      " — and the later you leave it, the more it pays.";
     ctx.strokeStyle = "rgba(10,16,36,.55)"; ctx.lineWidth = 3.5; ctx.lineJoin = "round";
-    ctx.strokeText(txt, VW / 2, hy);
-    ctx.fillStyle = "#ffffff";
-    ctx.fillText(txt, VW / 2, hy);
+    const lines = wrapLines(txt, Math.min(300, VW - 44));
+    lines.forEach((l, i) => {
+      const ly = hy + i * 17;
+      ctx.strokeText(l, VW / 2, ly);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(l, VW / 2, ly);
+    });
     ctx.globalAlpha = 1;
   }
 }
@@ -5673,12 +5801,15 @@ const UI = {
     clearTimeout(this.toastT);
     this.toastT = setTimeout(() => t.classList.remove("on"), 1300);
   },
-  combo(n){
+  nerve(n){
     if (n === this._combo) return;
     this._combo = n;
     const c = $("comboTag");
-    if (n >= 2){ c.textContent = "×" + n + " blocked"; c.classList.add("on"); }
-    else c.classList.remove("on");
+    if (n >= 1){
+      c.textContent = "NERVE " + n + "   ×" + nerveChain(n).toFixed(2);
+      c.classList.add("on");
+      c.classList.toggle("hot", n >= 5);
+    } else c.classList.remove("on");
   },
   /* a phase beginning gets the big card; the events inside it get the line
      under the score, the way a launch commentary calls them */
@@ -5733,7 +5864,7 @@ const UI = {
         "<b>39A</b>, 9:32 in the morning, 16 July 1969. Every phase the flight " +
         "actually flew, and then the ones nobody has: <b>one orbit of each world</b>, " +
         "out past Pluto. The ship cannot dodge. Your shield is the only thing between " +
-        "it and what is falling.";
+        "it and what is falling. <b>Let them come close</b> — a block taken late is worth up to <b>three times</b> as much, and only late blocks build your nerve.";
       $("stageChip").textContent = "AWAITING IGNITION";
       this.tick();
       PHASES.forEach((ph, i) => {
@@ -5752,7 +5883,7 @@ const UI = {
     $("briefBody").innerHTML =
       "It climbs on its own and it cannot dodge. The sky ahead is <b>built solid</b> " +
       "and hangs dead still until your shield reaches it — <b>drag anywhere</b> to move " +
-      "the shield and clear a way through.";
+      "the shield and clear a way through. <b>Let them come close</b> — a block taken late is worth up to <b>three times</b> as much.";
     const first = stageAt(0);
     if (first) $("stageChip").textContent =
       "Stage 1 of " + G.stages.length + " · " + first.stage.name;
@@ -5776,11 +5907,17 @@ const UI = {
       ? "The ship climbs on its own and cannot dodge. Everything ahead hangs "
       + "still until your shield reaches it — <b>drag anywhere</b> to move the "
       + "shield and clear the line before the ship arrives. Sweep it over "
-      + "samples to collect them."
+      + "samples to collect them.<br><br>A block pays on how late you take it — "
+      + "up to <b>three times</b> as much on the hull as it does at arm's length. "
+      + "Only late blocks raise your <b>nerve</b>, and nerve multiplies everything "
+      + "after it. An early block halves it."
       : "The balloon climbs on its own and cannot dodge. The arrangements "
       + "ahead hang still until your shield touches them — <b>drag anywhere</b> "
       + "to clear the balloon's line before it arrives. Sweep the shield over "
-      + "gems to collect them.";
+      + "gems to collect them.<br><br>A block pays on how late you take it — "
+      + "up to <b>three times</b> as much up close as it does at arm's length. "
+      + "Only late blocks raise your <b>nerve</b>, and nerve multiplies everything "
+      + "after it. An early block halves it.";
     $("overLbl1").textContent = m ? "Best" : "Best";
     $("overLbl2").textContent = m ? "Samples" : "Gems";
     $("overLbl3").textContent = m ? "Reached" : "Climbed";
@@ -5793,7 +5930,7 @@ const UI = {
     $("telem").classList.toggle("on", isMission() && !!save.opts.telem);
     this._score = this._gems = this._prog = this._energy = -1; this._pw = ""; this._lvl = "";
     this._met = this._alt = this._vel = "";
-    this.combo(0);
+    this.nerve(0);
     $("burstBtn").style.right = save.opts.lefty ? "auto" : "16px";
     $("burstBtn").style.left = save.opts.lefty ? "16px" : "auto";
     $("powerTags").style.left = save.opts.lefty ? "auto" : "14px";
@@ -5922,6 +6059,9 @@ const UI = {
     }
     $("overLevels").style.display = G.def.endless ? "none" : "";
     $("reviveBtn").style.display = canRevive() ? "" : "none";
+    this.countUp("overChain", G.bestNerve | 0, 380);
+    // in the multiplier it earned, because that is the number they watched
+    $("overLate").textContent = G.closest < 1e8 ? "×" + lateMult(G.closest).toFixed(1) : "—";
     // a few tries in and the next level opens up anyway — nobody gets stuck
     if (!G.def.endless && !G.failCounted){
       G.failCounted = true;
@@ -5984,7 +6124,7 @@ function secondWind(){
   }
   b.alive = true; b.vx = 0; b.inv = 2.4;
   G.pw.bubble = 1;
-  G.combo = 0; G.comboT = 0;
+  G.combo = 0; G.nerve = 0; G.comboT = 0; UI.nerve(0);
   G.state = "play";
   G.overT = 0;
   UI.overShown = false;
