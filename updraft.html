@@ -296,6 +296,27 @@
   .hint{font-size:13px;color:var(--ink-soft);max-width:300px;line-height:1.45;font-weight:800}
   a.link{color:var(--ink-soft);font-size:12px;text-decoration:none;border-bottom:1px dotted}
   .fine{font-size:11px;color:var(--ink-soft);letter-spacing:.6px}
+  .build{
+    margin:2px 0 0;font-family:var(--mono);font-size:10px;letter-spacing:.6px;
+    color:var(--ink-soft);opacity:.72;font-weight:600;
+  }
+  body.mission .build{color:rgba(150,200,235,.7)}
+  .verin{
+    flex:0 0 auto;width:112px;font-family:var(--mono);font-size:13px;font-weight:600;
+    text-align:center;padding:7px 8px;border-radius:9px;
+    border:1px solid rgba(47,52,117,.18);background:rgba(255,255,255,.7);
+    color:var(--ink);-webkit-appearance:none;appearance:none;
+  }
+  .verin:focus{outline:2px solid var(--accent);outline-offset:1px}
+  body.mission .verin{
+    background:rgba(120,200,255,.10);border-color:var(--hair);color:var(--ink);
+  }
+  .buildcode{
+    flex:0 0 auto;font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:1.4px;
+    padding:7px 10px;border-radius:9px;
+    background:rgba(47,52,117,.08);color:var(--ink);
+  }
+  body.mission .buildcode{background:rgba(120,200,255,.12);color:#9fe8ff}
 
   /* ================================================================
      The mission dress.
@@ -532,6 +553,7 @@
       <button class="btn ghost" id="toSettings">Settings</button>
     </div>
     <p class="fine">Every level free. No ads. No timers.</p>
+    <p class="build" id="titleBuild"></p>
   </div>
 
   <!-- ================= LEVELS ================= -->
@@ -561,6 +583,26 @@
           <div class="opt"><span class="opt-label">High contrast<small>Heavier outlines on everything you can hit</small></span> <button class="switch" data-opt="contrast"><i></i></button></div>
           <div class="opt"><span class="opt-label">Glow<small>Bloom on the ship, the shield and the readouts</small></span> <button class="switch" data-opt="glow"><i></i></button></div>
           <div class="opt"><span class="opt-label">Flight readout<small>Elapsed time, altitude and speed, in mission mode</small></span> <button class="switch" data-opt="telem"><i></i></button></div>
+        </div>
+      </div>
+      <div class="opt-group">
+        <h3>Build</h3>
+        <div class="panel">
+          <div class="opt"><span class="opt-label">Version<small>Your own label for this build</small></span>
+            <input id="verInput" class="verin" type="text" inputmode="text" maxlength="14"
+                   spellcheck="false" autocomplete="off" placeholder="1.0" />
+          </div>
+          <div class="opt"><span class="opt-label">Running<small id="buildWhat">build 25 · 22 Sep 2026</small></span>
+            <code class="buildcode" id="buildCode">0000000</code>
+          </div>
+        </div>
+        <p class="fine" style="max-width:none;margin:8px 4px 0;line-height:1.5;text-align:left">
+          The code fingerprints the running game and cannot be edited. If someone reports
+          something you have already fixed, compare codes — if theirs differs, their browser
+          is holding an old copy, and <b>Force newest</b> will shake it loose.</p>
+        <div class="row" style="margin-top:8px">
+          <button class="btn ghost" id="reloadBtn">Force newest</button>
+          <button class="btn ghost" id="verReset">Reset label</button>
         </div>
       </div>
       <div class="opt-group">
@@ -726,6 +768,36 @@ function segSegDist(ax1, ay1, ax2, ay2, bx1, by1, bx2, by2, out){
 }
 
 /* ------------------------------------------------------------- storage */
+/* ------------------------------------------------------------- the build
+
+   Two numbers, and they do different jobs.
+
+   `v` is a label. It is yours: Settings lets you type whatever you want over
+   it, and whatever you type is what the title and the settings screen show.
+
+   `code` is not yours and cannot be typed over. It is a fingerprint of the
+   script that is actually running, worked out at load from the text of the
+   page's own script and stylesheet, so two people comparing codes know for
+   certain whether they
+   are playing the same build — which a version label alone can never tell
+   you, least of all when one of you is looking at something a browser cached
+   a week ago. Change one character of the game and the code changes. */
+const BUILD = { v: "1.0", n: 25, date: "22 Sep 2026", code: "0000000" };
+(() => {
+  // scripts and stylesheets: everything that decides how the game behaves and
+  // how it looks. Not the markup, which the game rewrites as it runs and which
+  // would therefore give a different answer depending on when you asked.
+  let t = "";
+  for (const el of document.querySelectorAll("script,style")) t += el.textContent || "";
+  let h = 0x811c9dc5;                                   // FNV-1a, 32-bit
+  for (let i = 0; i < t.length; i++){
+    h ^= t.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  BUILD.code = h.toString(36).toUpperCase().padStart(7, "0").slice(-7);
+})();
+function buildVer(){ return (save && save.ver) || BUILD.v; }
+function buildLine(){ return "v" + buildVer() + " · build " + BUILD.n + " · " + BUILD.code; }
 const SAVE_KEY = "updraft.save.v1";
 const defaultSave = () => ({
   v: 1,
@@ -735,6 +807,7 @@ const defaultSave = () => ({
   unlocked: 1,      // highest level unlocked
   levels: {},       // { "1": {stars, best} }
   skin: "classic",
+  ver: "",           // a version label you can set yourself
   seen: 0,
   fails: {},
   endlessClimb: 0,          // tutorial shown
@@ -4827,6 +4900,9 @@ document.addEventListener("touchmove", e => { if (G.state === "play") e.preventD
 
 const keys = Object.create(null);
 window.addEventListener("keydown", e => {
+  // a field has the keyboard: r, p and space belong to it, not to the game
+  const t = e.target;
+  if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
   const k = e.key.toLowerCase();
   keys[k] = true;
   if (k === " " || k === "spacebar"){ e.preventDefault(); doBurst(); }
@@ -5220,6 +5296,7 @@ function enterMenu(){
   refreshTitle();
 }
 function refreshTitle(){
+  refreshBuild();
   $("tBest").textContent = save.best || 0;
   $("tGems").textContent = save.gems || 0;
   let stars = 0;
@@ -5332,6 +5409,40 @@ document.querySelectorAll(".switch").forEach(sw => {
     if (k === "telem") $("telem").classList.toggle("on", isMission() && !!save.opts.telem);
   });
 });
+/* ---------------------------------------------------------- the build box */
+function refreshBuild(){
+  const line = buildLine();
+  $("titleBuild").textContent = line;
+  $("buildWhat").textContent = "build " + BUILD.n + " · " + BUILD.date;
+  $("buildCode").textContent = BUILD.code;
+  const inp = $("verInput");
+  if (document.activeElement !== inp) inp.value = save.ver || "";
+  inp.placeholder = BUILD.v;
+}
+$("verInput").addEventListener("input", () => {
+  // keep it to something that can be read back over a phone
+  const v = $("verInput").value.replace(/[^\w.\- ]/g, "").slice(0, 14);
+  if (v !== $("verInput").value) $("verInput").value = v;
+  save.ver = v.trim();
+  persist();
+  $("titleBuild").textContent = buildLine();
+});
+$("verInput").addEventListener("keydown", e => e.stopPropagation());
+$("verReset").addEventListener("click", () => {
+  save.ver = ""; persist(); refreshBuild(); Audio2.SFX.ui();
+  UI.flash("Label reset to " + BUILD.v);
+});
+/* The one control that does something a reload normally will not: a browser
+   that has cached the page will happily serve it again, so this asks for the
+   same address with a value on the end it has never seen before. */
+$("reloadBtn").addEventListener("click", () => {
+  Audio2.SFX.ui();
+  try {
+    const u = new URL(location.href);
+    u.searchParams.set("b", Date.now().toString(36));
+    location.replace(u.toString());
+  } catch (e){ location.reload(); }
+});
 document.querySelectorAll("[data-back]").forEach(b => {
   b.addEventListener("click", () => { Audio2.SFX.ui(); enterMenu(); });
 });
@@ -5340,7 +5451,8 @@ $("playBtn").addEventListener("keydown", e => { if (e.key === "Enter" || e.key =
 $("toLevels").addEventListener("click", () => { Audio2.SFX.ui(); buildLevelGrid(); UI.show("scr-levels"); });
 $("toEndless").addEventListener("click", () => { Audio2.unlock(); startRun("endless"); });
 $("toSkins").addEventListener("click", () => { Audio2.SFX.ui(); buildSkinGrid(); UI.show("scr-skins"); });
-$("toSettings").addEventListener("click", () => { Audio2.SFX.ui(); syncSwitches(); UI.show("scr-settings"); });
+$("toSettings").addEventListener("click", () => {
+  refreshBuild(); Audio2.SFX.ui(); syncSwitches(); UI.show("scr-settings"); });
 $("pauseBtn").addEventListener("click", () => UI.pause());
 $("resumeBtn").addEventListener("click", () => UI.resume());
 $("restartBtn").addEventListener("click", () => UI.restart());
