@@ -8,252 +8,364 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="HydroBuddy+" />
-<meta name="theme-color" content="#06121c" />
-<meta name="description" content="A hydration coach with animal buddies, optional psychology-based motivation, and personalized daily targets." />
+<meta name="theme-color" content="#050f18" />
+<meta name="description" content="A hydration coach with ten animal buddies, an unhinged Feral mode, opt-in psychology-based motivation and personalized daily targets." />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%92%A7%3C/text%3E%3C/svg%3E" />
 <style>
+/* ============================================================
+   TOKENS
+   ============================================================ */
 :root{
-  --bg:#06121c;
-  --bg2:#0a1b28;
-  --card:rgba(255,255,255,.055);
-  --card-solid:#0e2434;
+  --bg:#050f18;
+  --bg-glow-a:#12384d;
+  --bg-glow-b:#0b2d3e;
+  --card:rgba(255,255,255,.048);
+  --card-hi:rgba(255,255,255,.085);
+  --card-solid:#0d2231;
   --line:rgba(255,255,255,.10);
-  --txt:#e9f6ff;
-  --dim:#8fb0c4;
+  --line-hi:rgba(255,255,255,.20);
+  --txt:#eaf7ff;
+  --dim:#93b2c6;
   --dimmer:#5f7e92;
   --accent:#38bdf8;
   --accent2:#22d3ee;
+  --accent-soft:rgba(56,189,248,.16);
   --good:#34d399;
   --warn:#fbbf24;
   --bad:#fb7185;
-  --r:18px;
+  --r:20px;
+  --r-sm:13px;
   --tap:48px;
+  --shadow:0 20px 44px -28px rgba(0,0,0,.9);
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;
+  --display:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Roboto,sans-serif;
   --safeT:env(safe-area-inset-top,0px);
   --safeB:env(safe-area-inset-bottom,0px);
+  --skew:0deg;
+}
+/* --- FERAL MODE --- */
+body[data-vibe="feral"]{
+  --bg:#0b0410;
+  --bg-glow-a:#3d0b46;
+  --bg-glow-b:#1a0b2e;
+  --card:rgba(255,255,255,.055);
+  --card-solid:#1a0a24;
+  --line:rgba(255,107,214,.18);
+  --line-hi:rgba(255,107,214,.4);
+  --txt:#ffeaf9;
+  --dim:#d59fd0;
+  --dimmer:#9a6f9c;
+  --good:#c8ff3d;
+  --shadow:0 20px 48px -26px rgba(255,46,151,.35);
+  --skew:-1.2deg;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;padding:0;background:var(--bg);color:var(--txt)}
+html{-webkit-text-size-adjust:100%}
 body{
-  font:16px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;
-  min-height:100dvh;
-  overflow-x:hidden;
-  background:
-    radial-gradient(1200px 600px at 50% -10%, #12384d 0%, transparent 60%),
-    radial-gradient(800px 500px at 110% 20%, #0b2d3e 0%, transparent 55%),
-    var(--bg);
-  -webkit-text-size-adjust:100%;
+  margin:0;padding:0;min-height:100dvh;overflow-x:hidden;
+  font:16px/1.45 var(--font);color:var(--txt);background:var(--bg);
+  background-image:
+    radial-gradient(1100px 620px at 50% -12%, var(--bg-glow-a) 0%, transparent 62%),
+    radial-gradient(820px 520px at 112% 18%, var(--bg-glow-b) 0%, transparent 58%);
+  background-attachment:fixed;
+  transition:background-color .45s, color .3s;
 }
+/* scanline grit, feral only */
+body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:0;transition:opacity .45s;
+  background:repeating-linear-gradient(0deg, rgba(255,46,151,.05) 0 1px, transparent 1px 3px)}
+body[data-vibe="feral"]::after{opacity:1}
 button,input,select,textarea{font:inherit;color:inherit}
-button{cursor:pointer;border:0;background:none}
-.app{max-width:520px;margin:0 auto;padding:calc(var(--safeT) + 10px) 16px calc(var(--safeB) + 92px)}
+button{cursor:pointer;border:0;background:none;color:inherit}
+.app{position:relative;z-index:2;max-width:540px;margin:0 auto;padding:calc(var(--safeT) + 12px) 16px calc(var(--safeB) + 96px)}
 
-/* ---------- header ---------- */
-.top{display:flex;align-items:center;gap:10px;margin-bottom:12px}
-.brand{font-weight:800;letter-spacing:.3px;font-size:19px;display:flex;align-items:center;gap:7px}
-.brand .plus{color:var(--accent);}
+/* ============================================================
+   HEADER
+   ============================================================ */
+.top{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.brand{font-family:var(--display);font-weight:800;letter-spacing:-.4px;font-size:21px;display:flex;align-items:baseline;gap:2px}
+.brand .drop{font-size:18px;margin-right:5px}
+.brand .plus{color:var(--accent);font-size:23px}
+body[data-vibe="feral"] .brand{letter-spacing:.4px;text-transform:uppercase;font-size:19px;transform:skew(var(--skew))}
+.today-date{font-size:11.5px;color:var(--dimmer);font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-top:1px}
 .pill{margin-left:auto;display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--line);
-  padding:7px 11px;border-radius:999px;font-size:13px;font-weight:700;color:var(--dim)}
-.pill b{color:var(--txt)}
+  padding:8px 12px;border-radius:999px;font-size:13px;font-weight:700;color:var(--dim);white-space:nowrap}
+.pill b{color:var(--txt);font-size:15px}
+.pill .flame{display:inline-block}
+.pill.lit .flame{animation:flicker 2.2s ease-in-out infinite}
+.pill.lit{border-color:var(--line-hi);box-shadow:0 0 0 3px var(--accent-soft)}
+@keyframes flicker{0%,100%{transform:scale(1) rotate(-3deg)}50%{transform:scale(1.18) rotate(4deg)}}
 
-/* ---------- cards ---------- */
-.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:14px;
-  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-.card h2{margin:0 0 4px;font-size:15px;letter-spacing:.4px;text-transform:uppercase;color:var(--dim)}
-.card .sub{margin:0 0 12px;font-size:13px;color:var(--dimmer)}
-.sec-gap{height:2px}
+/* ============================================================
+   CARDS
+   ============================================================ */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:17px;margin-bottom:14px;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:var(--shadow)}
+.card h2{margin:0 0 3px;font-size:12.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--dim);font-weight:800;
+  display:flex;align-items:center;gap:8px}
+.card h2::before{content:"";width:3px;height:13px;border-radius:2px;background:linear-gradient(var(--accent),var(--accent2))}
+.card .sub{margin:0 0 13px;font-size:13px;color:var(--dimmer);line-height:1.45}
+.card.accentless h2::before{display:none}
 
-/* ---------- coach ---------- */
+/* ============================================================
+   COACH BUBBLE
+   ============================================================ */
 .coachbar{display:flex;gap:12px;align-items:flex-start}
-.avatar{width:58px;height:58px;min-width:58px;border-radius:50%;display:grid;place-items:center;font-size:31px;
-  background:linear-gradient(160deg,rgba(56,189,248,.28),rgba(34,211,238,.10));border:1px solid var(--line);
-  transition:transform .25s}
-.avatar.pop{transform:scale(1.14) rotate(-6deg)}
-.bubble{flex:1;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:14px;padding:11px 13px;min-height:58px}
-.bubble .who{font-size:12px;color:var(--accent2);font-weight:800;letter-spacing:.3px;margin-bottom:2px}
-.bubble .say{font-size:15px}
-.tagrow{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
-.tag{font-size:11px;font-weight:700;letter-spacing:.3px;padding:3px 8px;border-radius:999px;
-  background:rgba(56,189,248,.14);color:#9fe0ff;border:1px solid rgba(56,189,248,.28)}
-.tag.why{background:rgba(255,255,255,.05);color:var(--dim);border-color:var(--line);font-weight:600}
+.avatar{width:60px;height:60px;min-width:60px;border-radius:50%;display:grid;place-items:center;font-size:32px;
+  background:radial-gradient(circle at 30% 25%, var(--accent-soft), rgba(255,255,255,.03));
+  border:1px solid var(--line-hi);transition:transform .3s cubic-bezier(.2,1.6,.4,1)}
+.avatar.pop{transform:scale(1.16) rotate(-7deg)}
+body[data-vibe="feral"] .avatar.pop{transform:scale(1.2) rotate(8deg)}
+.bubble{flex:1;min-width:0;background:var(--card-hi);border:1px solid var(--line);border-radius:16px;padding:12px 14px;min-height:60px}
+.bubble .who{font-size:11px;color:var(--accent);font-weight:800;letter-spacing:1px;margin-bottom:3px;text-transform:uppercase}
+.bubble .say{font-size:15.5px;line-height:1.42}
+.bubble .say .chaos{display:block;margin-top:6px;color:var(--dim);font-style:italic}
+body[data-vibe="feral"] .bubble .say .chaos{color:var(--good);font-style:normal;font-weight:700;letter-spacing:.2px}
+.tagrow{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+.tag{font-size:10.5px;font-weight:800;letter-spacing:.4px;padding:4px 9px;border-radius:999px;text-transform:uppercase;
+  background:var(--accent-soft);color:var(--accent);border:1px solid var(--line-hi)}
+.tag.why{flex-basis:100%;background:none;border:0;padding:1px 0 0;color:var(--dimmer);font-weight:600;text-transform:none;letter-spacing:0;font-size:11.5px;line-height:1.4}
 
-/* ---------- ring ---------- */
-.ringwrap{display:flex;flex-direction:column;align-items:center;padding:6px 0 2px}
-.ring{position:relative;width:210px;height:210px}
-.ring svg{transform:rotate(-90deg);width:210px;height:210px;display:block}
-.ring .trk{fill:none;stroke:rgba(255,255,255,.08);stroke-width:14}
-.ring .bar{fill:none;stroke:url(#grad);stroke-width:14;stroke-linecap:round;transition:stroke-dasharray .6s cubic-bezier(.2,.8,.2,1)}
-.ringmid{position:absolute;inset:22px;border-radius:50%;overflow:hidden;background:rgba(8,26,38,.72);
+/* ============================================================
+   RING
+   ============================================================ */
+.ringwrap{display:flex;flex-direction:column;align-items:center;padding:4px 0 0}
+.ring{position:relative;width:216px;height:216px}
+.ring svg{transform:rotate(-90deg);width:216px;height:216px;display:block;overflow:visible}
+.ring .trk{fill:none;stroke:rgba(255,255,255,.07);stroke-width:13}
+.ring .bar{fill:none;stroke:url(#grad);stroke-width:13;stroke-linecap:round;
+  filter:drop-shadow(0 0 7px var(--accent-soft));transition:stroke-dasharray .75s cubic-bezier(.2,.9,.2,1)}
+.ringmid{position:absolute;inset:23px;border-radius:50%;overflow:hidden;background:rgba(4,16,24,.78);
   display:grid;place-items:center;border:1px solid var(--line)}
-.wave{position:absolute;left:-25%;width:150%;height:100%;bottom:0;background:
-  linear-gradient(180deg, rgba(56,189,248,.58), rgba(34,211,238,.20));
-  border-radius:45% 43% 0 0 / 13% 15% 0 0;animation:bob 6s ease-in-out infinite;
-  transition:transform .6s cubic-bezier(.2,.8,.2,1)}
-@keyframes bob{0%,100%{margin-left:0}50%{margin-left:-9%}}
+body[data-vibe="feral"] .ringmid{background:rgba(14,4,20,.8)}
+.wave{position:absolute;left:-30%;width:160%;height:100%;bottom:0;
+  background:linear-gradient(180deg, var(--accent) 0%, var(--accent2) 45%, transparent 140%);opacity:.40;
+  border-radius:44% 42% 0 0 / 12% 14% 0 0;animation:bob 6.5s ease-in-out infinite;
+  transition:transform .75s cubic-bezier(.2,.9,.2,1)}
+.wave.two{animation:bob2 8.5s ease-in-out infinite;opacity:.24;border-radius:40% 47% 0 0 / 15% 11% 0 0}
+@keyframes bob{0%,100%{margin-left:0}50%{margin-left:-11%}}
+@keyframes bob2{0%,100%{margin-left:-9%}50%{margin-left:3%}}
 .ringtxt{position:relative;text-align:center;z-index:2}
-.ringtxt .big{font-size:38px;font-weight:800;letter-spacing:-1px;line-height:1}
-.ringtxt .small{font-size:13px;color:var(--dim);margin-top:4px}
-.ringtxt .pct{font-size:12px;color:var(--accent2);font-weight:800;margin-top:3px;letter-spacing:.4px}
-.remain{margin-top:10px;font-size:13px;color:var(--dim);text-align:center}
+.ringtxt .big{font-family:var(--display);font-size:42px;font-weight:800;letter-spacing:-1.6px;line-height:1;
+  text-shadow:0 2px 14px rgba(0,0,0,.5)}
+.ringtxt .small{font-size:13px;color:var(--dim);margin-top:5px;font-weight:600}
+.ringtxt .pct{font-size:12px;color:var(--accent);font-weight:800;margin-top:4px;letter-spacing:.8px}
+.remain{margin-top:13px;font-size:13.5px;color:var(--dim);text-align:center;line-height:1.4}
+.pacechip{margin:10px auto 0;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:800;letter-spacing:.3px;
+  padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--dim)}
+.pacechip.ok{color:var(--good);border-color:rgba(52,211,153,.32);background:rgba(52,211,153,.10)}
+.pacechip.late{color:var(--warn);border-color:rgba(251,191,36,.3);background:rgba(251,191,36,.10)}
 
-/* ---------- buttons ---------- */
+/* ============================================================
+   BUTTONS
+   ============================================================ */
 .grid{display:grid;gap:10px}
 .g2{grid-template-columns:1fr 1fr}
 .g3{grid-template-columns:repeat(3,1fr)}
 .g4{grid-template-columns:repeat(4,1fr)}
-.btn{min-height:var(--tap);border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.05);
-  color:var(--txt);font-weight:700;display:flex;align-items:center;justify-content:center;gap:7px;padding:10px;
-  transition:transform .09s, background .15s, border-color .15s;text-align:center;line-height:1.2}
-.btn:active{transform:scale(.96);background:rgba(255,255,255,.11)}
-.btn.primary{background:linear-gradient(140deg,var(--accent),var(--accent2));color:#032030;border-color:transparent;box-shadow:0 8px 22px -12px var(--accent)}
+.btn{min-height:var(--tap);border-radius:15px;border:1px solid var(--line);background:rgba(255,255,255,.05);
+  font-weight:700;display:flex;align-items:center;justify-content:center;gap:7px;padding:10px;
+  transition:transform .1s cubic-bezier(.3,1.5,.5,1), background .16s, border-color .16s;text-align:center;line-height:1.2}
+.btn:active{transform:scale(.95);background:var(--card-hi);border-color:var(--line-hi)}
+.btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#04202e;border-color:transparent;
+  box-shadow:0 10px 26px -14px var(--accent)}
+body[data-vibe="feral"] .btn.primary{color:#1a0320}
 .btn.ghost{background:transparent}
-.btn.danger{color:var(--bad);border-color:rgba(251,113,133,.32)}
-.btn.sm{min-height:38px;border-radius:11px;font-size:13px;padding:6px 10px}
-.btn.on{border-color:var(--accent);background:rgba(56,189,248,.16);color:#bfeaff}
-.quick{flex-direction:column;gap:2px}
-.quick .amt{font-size:18px;font-weight:800}
-.quick .lbl{font-size:11px;color:var(--dim);font-weight:600}
+.btn.danger{color:var(--bad);border-color:rgba(251,113,133,.3)}
+.btn.sm{min-height:40px;border-radius:12px;font-size:13px;padding:7px 10px}
+.btn.wide{width:100%}
+.quick{flex-direction:column;gap:1px;position:relative;overflow:hidden}
+.quick .amt{font-family:var(--display);font-size:20px;font-weight:800;letter-spacing:-.5px}
+.quick .lbl{font-size:10.5px;color:var(--dim);font-weight:700;letter-spacing:.3px}
+.quick:active{border-color:var(--accent)}
 
-/* ---------- drink chips ---------- */
-.chips{display:flex;gap:8px;overflow-x:auto;padding:2px 0 8px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+/* ============================================================
+   CHIPS
+   ============================================================ */
+.chiprow{position:relative;margin:0 -17px;padding:0 17px}
+.chiprow::after{content:"";position:absolute;top:0;right:0;bottom:10px;width:34px;pointer-events:none;
+  background:linear-gradient(90deg, transparent, color-mix(in srgb, var(--bg) 78%, transparent))}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:3px 0 10px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .chips::-webkit-scrollbar{display:none}
-.chip{flex:0 0 auto;min-height:40px;padding:8px 13px;border-radius:999px;border:1px solid var(--line);
-  background:rgba(255,255,255,.04);font-size:14px;font-weight:600;display:flex;align-items:center;gap:6px;transition:transform .09s}
-.chip:active{transform:scale(.94)}
-.chip.on{border-color:var(--accent);background:rgba(56,189,248,.18);color:#d3f0ff}
-.chip .f{font-size:11px;color:var(--dimmer)}
+.chip{flex:0 0 auto;min-height:42px;padding:8px 14px;border-radius:999px;border:1px solid var(--line);
+  background:rgba(255,255,255,.04);font-size:14px;font-weight:700;display:flex;align-items:center;gap:7px;
+  transition:transform .1s, border-color .16s, background .16s;white-space:nowrap}
+.chip:active{transform:scale(.93)}
+.chip.on{border-color:var(--accent);background:var(--accent-soft);color:var(--txt);box-shadow:0 0 0 3px var(--accent-soft)}
+.chip .f{font-size:11px;color:var(--dimmer);font-weight:700}
 
-/* ---------- list ---------- */
-.row{display:flex;align-items:center;gap:11px;padding:11px 2px;border-bottom:1px solid var(--line)}
+/* ============================================================
+   LISTS
+   ============================================================ */
+.row{display:flex;align-items:center;gap:12px;padding:11px 2px;border-bottom:1px solid var(--line)}
 .row:last-child{border-bottom:0}
-.row .ic{font-size:21px;width:28px;text-align:center}
+.row .ic{font-size:22px;width:30px;text-align:center}
 .row .txt{flex:1;min-width:0}
 .row .t1{font-weight:700;font-size:15px}
-.row .t2{font-size:12px;color:var(--dimmer)}
-.row .x{min-width:38px;height:38px;border-radius:10px;border:1px solid var(--line);color:var(--dim);display:grid;place-items:center}
-.row .x:active{background:rgba(251,113,133,.16);color:var(--bad)}
-.empty{text-align:center;color:var(--dimmer);font-size:14px;padding:18px 6px}
+.row .t2{font-size:12px;color:var(--dimmer);margin-top:1px}
+.row .x{min-width:40px;height:40px;border-radius:11px;border:1px solid var(--line);color:var(--dimmer);
+  display:grid;place-items:center;font-size:15px}
+.row .x:active{background:rgba(251,113,133,.16);color:var(--bad);border-color:rgba(251,113,133,.35)}
+.empty{text-align:center;color:var(--dimmer);font-size:13.5px;padding:20px 8px;line-height:1.5}
+.empty .em{display:block;font-size:26px;margin-bottom:6px;opacity:.7}
 
-/* ---------- forms ---------- */
-.field{margin-bottom:13px}
-.field label{display:block;font-size:12px;letter-spacing:.4px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;font-weight:700}
-.field .hint{font-size:12px;color:var(--dimmer);margin-top:5px}
+/* ============================================================
+   FORMS
+   ============================================================ */
+.field{margin-bottom:14px}
+.field label{display:block;font-size:11.5px;letter-spacing:.9px;text-transform:uppercase;color:var(--dim);margin-bottom:7px;font-weight:800}
+.field .hint{font-size:12px;color:var(--dimmer);margin-top:6px;line-height:1.45}
 input[type=number],input[type=text],input[type=time],select,textarea{
-  width:100%;min-height:var(--tap);background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:13px;
-  padding:11px 13px;outline:none;appearance:none}
-input:focus,select:focus,textarea:focus{border-color:var(--accent)}
-textarea{min-height:76px;resize:vertical;line-height:1.4}
+  width:100%;min-height:var(--tap);background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:14px;
+  padding:12px 14px;outline:none;appearance:none;transition:border-color .16s, box-shadow .16s}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+textarea{min-height:78px;resize:vertical;line-height:1.45}
 select{background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),linear-gradient(135deg,var(--dim) 50%,transparent 50%);
   background-position:calc(100% - 19px) 50%,calc(100% - 13px) 50%;background-size:6px 6px,6px 6px;background-repeat:no-repeat}
-.seg{display:flex;gap:6px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:13px;padding:4px}
-.seg button{flex:1;min-height:40px;border-radius:10px;font-weight:700;font-size:14px;color:var(--dim)}
-.seg button.on{background:rgba(56,189,248,.20);color:#d3f0ff}
-.switch{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;min-height:auto;height:6px;padding:0;border:0;border-radius:999px;
+  background:linear-gradient(90deg,var(--accent),var(--accent2));opacity:.85}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;border-radius:50%;background:#fff;
+  border:3px solid var(--accent);box-shadow:0 3px 10px rgba(0,0,0,.5)}
+.seg{display:flex;gap:5px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:14px;padding:4px}
+.seg button{flex:1;min-height:42px;border-radius:11px;font-weight:700;font-size:14px;color:var(--dim);transition:.16s}
+.seg button.on{background:var(--accent-soft);color:var(--txt);box-shadow:inset 0 0 0 1px var(--line-hi)}
+.switch{display:flex;align-items:center;gap:13px;padding:13px 0;border-bottom:1px solid var(--line)}
 .switch:last-child{border-bottom:0}
 .switch .sw-txt{flex:1;min-width:0}
 .switch .sw-t{font-weight:700;font-size:15px}
-.switch .sw-d{font-size:12.5px;color:var(--dimmer);margin-top:2px}
-.toggle{width:52px;min-width:52px;height:31px;border-radius:999px;background:rgba(255,255,255,.12);position:relative;transition:background .2s;border:1px solid var(--line)}
-.toggle i{position:absolute;top:2px;left:2px;width:25px;height:25px;border-radius:50%;background:#dbeafe;transition:transform .2s}
-.toggle.on{background:linear-gradient(140deg,var(--accent),var(--accent2))}
-.toggle.on i{transform:translateX(21px)}
+.switch .sw-d{font-size:12.5px;color:var(--dimmer);margin-top:3px;line-height:1.45}
+.toggle{width:54px;min-width:54px;height:32px;border-radius:999px;background:rgba(255,255,255,.12);position:relative;
+  transition:background .22s;border:1px solid var(--line)}
+.toggle i{position:absolute;top:2px;left:2px;width:26px;height:26px;border-radius:50%;background:#f1f9ff;
+  transition:transform .22s cubic-bezier(.3,1.5,.5,1)}
+.toggle.on{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:transparent}
+.toggle.on i{transform:translateX(22px)}
 
-/* ---------- coach picker ---------- */
+/* ============================================================
+   COACH PICKER
+   ============================================================ */
 .coachgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.coachcard{border:1px solid var(--line);background:rgba(255,255,255,.04);border-radius:15px;padding:12px;text-align:left;
-  display:flex;gap:10px;align-items:flex-start;transition:transform .09s}
+.coachcard{border:1px solid var(--line);background:rgba(255,255,255,.04);border-radius:16px;padding:12px;text-align:left;
+  display:flex;flex-direction:column;gap:7px;transition:transform .1s, border-color .16s, background .16s;position:relative;overflow:hidden}
 .coachcard:active{transform:scale(.97)}
-.coachcard.on{border-color:var(--accent);background:rgba(56,189,248,.13)}
-.coachcard .em{font-size:26px;line-height:1}
-.coachcard .nm{font-weight:800;font-size:15px}
-.coachcard .sp{font-size:11.5px;color:var(--dimmer);margin-top:2px;line-height:1.3}
+.coachcard.on{border-color:var(--cc);background:color-mix(in srgb, var(--cc) 14%, transparent);box-shadow:0 0 0 3px color-mix(in srgb, var(--cc) 16%, transparent)}
+.coachcard .em{font-size:27px;line-height:1}
+.coachcard .nm{font-weight:800;font-size:15.5px;letter-spacing:-.2px}
+.coachcard .sp{font-size:11.5px;color:var(--dimmer);line-height:1.35}
+.coachcard .vibe{font-size:10px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--cc)}
 
-/* ---------- stats ---------- */
-.bars{display:flex;align-items:flex-end;gap:7px;height:130px;padding-top:6px}
-.bcol{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%}
-.btrack{flex:1;width:100%;background:rgba(255,255,255,.05);border-radius:8px;display:flex;align-items:flex-end;overflow:hidden;position:relative}
-.bfill{width:100%;background:linear-gradient(180deg,var(--accent2),var(--accent));border-radius:8px;transition:height .5s}
-.bfill.met{background:linear-gradient(180deg,#6ee7b7,var(--good))}
-.bgoal{position:absolute;left:0;right:0;border-top:1px dashed rgba(255,255,255,.28)}
-.bday{font-size:11px;color:var(--dimmer);font-weight:700}
-.statgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px}
-.stat{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:14px;padding:12px}
-.stat .v{font-size:23px;font-weight:800;letter-spacing:-.5px}
-.stat .k{font-size:11.5px;color:var(--dimmer);text-transform:uppercase;letter-spacing:.4px;font-weight:700;margin-top:2px}
+/* ============================================================
+   STATS
+   ============================================================ */
+.bars{display:flex;align-items:flex-end;gap:7px;height:138px;padding-top:6px}
+.bcol{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;height:100%;cursor:pointer}
+.btrack{flex:1;width:100%;background:rgba(255,255,255,.05);border-radius:9px;display:flex;align-items:flex-end;
+  overflow:hidden;position:relative;transition:background .16s}
+.bcol:active .btrack{background:rgba(255,255,255,.1)}
+.bfill{width:100%;background:linear-gradient(180deg,var(--accent2),var(--accent));border-radius:9px;transition:height .6s cubic-bezier(.2,.9,.2,1)}
+.bfill.met{background:linear-gradient(180deg,#a7f3d0,var(--good))}
+.bgoal{position:absolute;left:0;right:0;border-top:1px dashed var(--line-hi)}
+.bday{font-size:11px;color:var(--dimmer);font-weight:800;letter-spacing:.3px}
+.bcol.sel .bday{color:var(--accent)}
+.bdetail{margin-top:12px;font-size:13px;color:var(--dim);text-align:center;min-height:19px}
+.statgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:15px;padding:13px}
+.stat .v{font-family:var(--display);font-size:24px;font-weight:800;letter-spacing:-.8px}
+.stat .k{font-size:11px;color:var(--dimmer);text-transform:uppercase;letter-spacing:.7px;font-weight:800;margin-top:3px}
 
-/* ---------- note ---------- */
-.note{font-size:12.5px;color:var(--dimmer);line-height:1.5;background:rgba(255,255,255,.03);border:1px solid var(--line);
-  border-radius:13px;padding:11px 12px}
-.note.warn{color:#ffd9a8;border-color:rgba(251,191,36,.28);background:rgba(251,191,36,.08)}
-.break{display:flex;justify-content:space-between;font-size:13.5px;padding:7px 0;border-bottom:1px solid var(--line)}
+/* ============================================================
+   NOTES
+   ============================================================ */
+.note{font-size:12.5px;color:var(--dimmer);line-height:1.55;background:rgba(255,255,255,.03);border:1px solid var(--line);
+  border-radius:14px;padding:12px 13px}
+.note.warn{color:#ffdcae;border-color:rgba(251,191,36,.26);background:rgba(251,191,36,.07)}
+.note strong{color:var(--txt)}
+.break{display:flex;justify-content:space-between;gap:12px;font-size:13.5px;padding:8px 0;border-bottom:1px solid var(--line);color:var(--dim)}
 .break:last-of-type{border-bottom:0}
-.break span:last-child{font-weight:700}
+.break span:last-child{font-weight:700;white-space:nowrap}
+.break.total{color:var(--txt);font-size:15px}
+.break.total span:last-child{color:var(--accent);font-size:16px}
 
-/* ---------- nav ---------- */
-.nav{position:fixed;left:0;right:0;bottom:0;z-index:40;background:rgba(6,18,28,.86);
-  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-top:1px solid var(--line);
-  padding:6px 8px calc(var(--safeB) + 6px)}
-.navin{max-width:520px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
-.nav button{min-height:52px;border-radius:13px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
-  color:var(--dimmer);font-size:10.5px;font-weight:700;letter-spacing:.2px}
-.nav button .ni{font-size:19px;line-height:1}
-.nav button.on{color:var(--accent);background:rgba(56,189,248,.10)}
+/* ============================================================
+   NAV
+   ============================================================ */
+.nav{position:fixed;left:0;right:0;bottom:0;z-index:40;background:color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-top:1px solid var(--line);
+  padding:7px 8px calc(var(--safeB) + 7px)}
+.navin{max-width:540px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.nav button{min-height:54px;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  color:var(--dimmer);font-size:10.5px;font-weight:800;letter-spacing:.3px;transition:color .16s, background .16s}
+.nav button .ni{font-size:19px;line-height:1;transition:transform .2s cubic-bezier(.3,1.6,.5,1)}
+.nav button.on{color:var(--accent);background:var(--accent-soft)}
+.nav button.on .ni{transform:translateY(-2px) scale(1.12)}
 
-/* ---------- toast / modal ---------- */
-.toast{position:fixed;left:50%;transform:translateX(-50%) translateY(20px);bottom:calc(var(--safeB) + 96px);z-index:60;
-  background:#0f2d3f;border:1px solid var(--line);border-radius:999px;padding:11px 17px;font-size:14px;font-weight:700;
-  opacity:0;pointer-events:none;transition:opacity .22s,transform .22s;max-width:92vw;text-align:center;box-shadow:0 14px 34px -18px #000}
-.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-.sheet{position:fixed;inset:0;z-index:70;background:rgba(2,10,16,.62);display:none;align-items:flex-end;justify-content:center}
+/* ============================================================
+   TOAST / SHEET / FX
+   ============================================================ */
+.toast{position:fixed;left:50%;transform:translateX(-50%) translateY(22px) scale(.96);bottom:calc(var(--safeB) + 100px);z-index:60;
+  background:var(--card-solid);border:1px solid var(--line-hi);border-radius:999px;padding:12px 18px;font-size:14px;font-weight:700;
+  opacity:0;pointer-events:none;transition:opacity .24s, transform .24s cubic-bezier(.2,1.4,.4,1);max-width:90vw;text-align:center;
+  box-shadow:0 18px 40px -18px #000}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}
+.sheet{position:fixed;inset:0;z-index:70;background:rgba(2,8,14,.66);display:none;align-items:flex-end;justify-content:center;
+  backdrop-filter:blur(3px)}
 .sheet.show{display:flex}
-.sheetin{width:100%;max-width:520px;background:var(--card-solid);border:1px solid var(--line);border-bottom:0;
-  border-radius:22px 22px 0 0;padding:18px 16px calc(var(--safeB) + 18px);animation:up .22s ease}
-@keyframes up{from{transform:translateY(24px);opacity:.4}to{transform:translateY(0);opacity:1}}
-.sheetin h3{margin:0 0 3px;font-size:18px}
-.sheetin p.s{margin:0 0 14px;font-size:13px;color:var(--dimmer)}
+.sheetin{width:100%;max-width:540px;background:var(--card-solid);border:1px solid var(--line);border-bottom:0;
+  border-radius:24px 24px 0 0;padding:20px 17px calc(var(--safeB) + 20px);animation:up .26s cubic-bezier(.2,1.1,.3,1)}
+@keyframes up{from{transform:translateY(30px);opacity:.3}to{transform:translateY(0);opacity:1}}
+.sheetin h3{margin:0 0 4px;font-size:19px;font-family:var(--display);letter-spacing:-.3px}
+.sheetin p.s{margin:0 0 15px;font-size:13px;color:var(--dimmer);line-height:1.5}
+.grab{width:38px;height:4px;border-radius:2px;background:var(--line-hi);margin:-8px auto 14px}
 .hide{display:none !important}
-.spark{position:fixed;pointer-events:none;z-index:80;font-size:22px;animation:fly .9s ease-out forwards}
-@keyframes fly{to{transform:translate(var(--dx),var(--dy)) scale(.4);opacity:0}}
-@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms !important;transition-duration:.01ms !important}}
+.spark{position:fixed;pointer-events:none;z-index:80;font-size:22px;animation:fly 1s cubic-bezier(.2,.7,.4,1) forwards}
+@keyframes fly{to{transform:translate(var(--dx),var(--dy)) rotate(var(--rot)) scale(.35);opacity:0}}
+.flash{position:fixed;inset:0;z-index:55;pointer-events:none;background:radial-gradient(circle at 50% 42%, var(--accent-soft), transparent 62%);
+  opacity:0;animation:flash .75s ease-out}
+@keyframes flash{0%{opacity:.85}100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}}
 </style>
 </head>
-<body>
+<body data-vibe="standard">
 <div class="app">
 
-  <div class="top">
-    <div class="brand">💧 HydroBuddy<span class="plus">+</span></div>
-    <div class="pill" id="streakPill" title="Current streak">🔥 <b id="streakNum">0</b> day streak</div>
-  </div>
+  <header class="top">
+    <div>
+      <div class="brand"><span class="drop">💧</span>HydroBuddy<span class="plus">+</span></div>
+      <div class="today-date" id="dateLine">—</div>
+    </div>
+    <div class="pill" id="streakPill" title="Current streak"><span class="flame">🔥</span> <b id="streakNum">0</b> <span>day streak</span></div>
+  </header>
 
   <!-- ============ TODAY ============ -->
   <section id="tab-today">
-    <div class="card">
+    <div class="card accentless">
       <div class="coachbar">
         <div class="avatar" id="coachAvatar">🦦</div>
         <div class="bubble">
           <div class="who" id="coachWho">NIM THE OTTER</div>
-          <div class="say" id="coachSay">Let's get you set up.</div>
+          <div class="say" id="coachSay" aria-live="polite">Let's get you set up.</div>
           <div class="tagrow" id="coachTags"></div>
         </div>
       </div>
-      <div class="grid g2" style="margin-top:12px">
-        <button class="btn sm ghost" id="btnNewLine">💬 New pep talk</button>
-        <button class="btn sm ghost" id="btnSwitchCoach">🔄 Switch coach</button>
+      <div class="grid g2" style="margin-top:13px">
+        <button class="btn sm ghost" id="btnNewLine">💬 Say something else</button>
+        <button class="btn sm ghost" id="btnSwitchCoach">🔄 Different animal</button>
       </div>
     </div>
 
-    <div class="card">
+    <div class="card accentless">
       <div class="ringwrap">
         <div class="ring">
-          <svg viewBox="0 0 210 210" aria-hidden="true">
+          <svg viewBox="0 0 216 216" aria-hidden="true">
             <defs>
               <linearGradient id="grad" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stop-color="#22d3ee"/><stop offset="100%" stop-color="#38bdf8"/>
+                <stop offset="0%" stop-color="var(--accent2)"/><stop offset="100%" stop-color="var(--accent)"/>
               </linearGradient>
             </defs>
-            <circle class="trk" cx="105" cy="105" r="93"></circle>
-            <circle class="bar" id="ringBar" cx="105" cy="105" r="93" stroke-dasharray="0 584"></circle>
+            <circle class="trk" cx="108" cy="108" r="95"></circle>
+            <circle class="bar" id="ringBar" cx="108" cy="108" r="95" stroke-dasharray="0 597"></circle>
           </svg>
           <div class="ringmid">
+            <div class="wave two" id="wave2" style="transform:translateY(100%)"></div>
             <div class="wave" id="wave" style="transform:translateY(100%)"></div>
             <div class="ringtxt">
               <div class="big" id="totalTxt">0</div>
@@ -262,43 +374,56 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),li
             </div>
           </div>
         </div>
-        <div class="remain" id="remainTxt">Set up your profile to get a personal target.</div>
+        <div class="remain" id="remainTxt">Set up your profile to get a real target.</div>
+        <div style="text-align:center"><span class="pacechip hide" id="paceChip"></span></div>
       </div>
     </div>
 
     <div class="card">
       <h2>Log a drink</h2>
-      <p class="sub" id="drinkSub">Pick what you're drinking, then tap an amount.</p>
-      <div class="chips" id="drinkChips"></div>
+      <p class="sub" id="drinkSub">Pick what you're drinking, then hit an amount.</p>
+      <div class="chiprow"><div class="chips" id="drinkChips"></div></div>
       <div class="grid g4" id="quickGrid"></div>
       <div class="grid g2" style="margin-top:10px">
-        <button class="btn" id="btnCustom">✏️ Custom amount</button>
+        <button class="btn" id="btnCustom">✏️ Custom</button>
         <button class="btn" id="btnUndo">↩️ Undo last</button>
       </div>
-      <div class="note warn hide" id="alcoholNote" style="margin-top:11px">
-        Alcohol is a diuretic — it's logged at a reduced hydration value, and HydroBuddy will nudge you to match it with water.
+      <div class="note warn hide" id="alcoholNote" style="margin-top:12px">
+        <strong>Heads up:</strong> alcohol is a diuretic. It's logged at a reduced hydration value and your coach is going to bring it up.
+        <button class="btn sm wide" id="btnChaser" style="margin-top:10px">💧 Chase it with a glass of water</button>
       </div>
     </div>
 
     <div class="card">
       <h2>Today's log</h2>
-      <div id="logList"><div class="empty">Nothing logged yet today.</div></div>
+      <div id="logList"></div>
     </div>
   </section>
 
   <!-- ============ COACH ============ -->
   <section id="tab-coach" class="hide">
     <div class="card">
+      <h2>Vibe</h2>
+      <p class="sub">How much chaos do you want in your reminders?</p>
+      <div class="seg" id="vibeSeg">
+        <button data-v="standard">🙂 Standard</button>
+        <button data-v="feral">😈 Feral</button>
+      </div>
+      <div class="note" id="vibeNote" style="margin-top:12px"></div>
+    </div>
+
+    <div class="card">
       <h2>Your coach</h2>
-      <p class="sub">Each buddy nags differently. Pick the one you'd actually listen to.</p>
+      <p class="sub">Ten animals, ten ways of getting on your nerves. Pick the one you'd actually obey.</p>
       <div class="coachgrid" id="coachGrid"></div>
+      <button class="btn sm wide ghost" id="btnRandomCoach" style="margin-top:11px">🎲 Surprise me</button>
     </div>
 
     <div class="card">
       <div class="switch">
         <div class="sw-txt">
           <div class="sw-t">Psychology-based motivation</div>
-          <div class="sw-d">Off by default. When on, your coach uses behaviour-change techniques and always labels which one it's using.</div>
+          <div class="sw-d">Off by default. On, your coach uses real behaviour-change techniques and names the one it's pulling on you every time.</div>
         </div>
         <button class="toggle" id="psychToggle" role="switch" aria-checked="false"><i></i></button>
       </div>
@@ -306,23 +431,23 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),li
 
     <div class="card" id="psychPanel">
       <h2>Techniques</h2>
-      <p class="sub">Turn on only what helps. Anything that feels like pressure, switch it off.</p>
+      <p class="sub">Keep what works. Anything that feels like a boot on your neck, switch it off.</p>
       <div id="techList"></div>
-      <div class="field" style="margin-top:14px">
+      <div class="field" style="margin-top:15px">
         <label for="planInput">Your if–then plan</label>
         <textarea id="planInput" placeholder="After I pour my morning coffee, I drink one full glass of water."></textarea>
-        <div class="hint">Used by the implementation-intentions technique. Concrete cue → concrete action.</div>
+        <div class="hint">Used by the implementation-intentions technique. Concrete cue → concrete action. Vague plans die.</div>
       </div>
       <div class="field">
         <label for="bundleInput">Temptation bundle</label>
-        <input type="text" id="bundleInput" placeholder="e.g. only check social media while finishing a glass" />
-        <div class="hint">Pairs the habit you want with something you already enjoy.</div>
+        <input type="text" id="bundleInput" placeholder="only doomscroll while finishing a glass" />
+        <div class="hint">Chains the habit you want to a thing you already can't stop doing.</div>
       </div>
-      <button class="btn primary" id="btnSavePsych">Save motivation settings</button>
+      <button class="btn primary wide" id="btnSavePsych">Save motivation settings</button>
     </div>
 
     <div class="card">
-      <h2>How this works</h2>
+      <h2>What's actually happening here</h2>
       <div class="note" id="psychExplain"></div>
     </div>
   </section>
@@ -331,16 +456,17 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),li
   <section id="tab-stats" class="hide">
     <div class="card">
       <h2>Last 7 days</h2>
-      <p class="sub" id="barsSub">Dashed line is your daily target.</p>
+      <p class="sub" id="barsSub">Dashed line is your target. Tap a bar for that day.</p>
       <div class="bars" id="bars"></div>
+      <div class="bdetail" id="barDetail"></div>
     </div>
     <div class="card">
-      <h2>Numbers</h2>
+      <h2>Receipts</h2>
       <div class="statgrid" id="statGrid"></div>
     </div>
     <div class="card">
-      <h2>What you drink</h2>
-      <div id="mixList"><div class="empty">No drinks logged yet.</div></div>
+      <h2>What you actually drink</h2>
+      <div id="mixList"></div>
     </div>
   </section>
 
@@ -349,21 +475,27 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),li
     <div class="card">
       <h2>Units</h2>
       <div class="seg" id="unitSeg">
-        <button data-u="oz">Ounces (oz)</button>
-        <button data-u="ml">Millilitres (ml)</button>
+        <button data-u="oz">Ounces</button>
+        <button data-u="ml">Millilitres</button>
       </div>
     </div>
 
     <div class="card">
       <h2>Your body &amp; day</h2>
-      <p class="sub">Used only on this device to estimate a target.</p>
+      <p class="sub">Stays on this device. Nobody's harvesting it.</p>
       <div class="field">
         <label for="inWeight">Body weight (<span class="wUnit">lb</span>)</label>
         <input type="number" id="inWeight" inputmode="decimal" min="40" max="700" step="1" />
       </div>
-      <div class="field">
-        <label for="inAge">Age</label>
-        <input type="number" id="inAge" inputmode="numeric" min="13" max="110" step="1" />
+      <div class="grid g2">
+        <div class="field">
+          <label for="inAge">Age</label>
+          <input type="number" id="inAge" inputmode="numeric" min="13" max="110" step="1" />
+        </div>
+        <div class="field">
+          <label for="inActivity">Exercise (min)</label>
+          <input type="number" id="inActivity" inputmode="numeric" min="0" max="600" step="5" />
+        </div>
       </div>
       <div class="field">
         <label for="inSex">Sex</label>
@@ -374,11 +506,7 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),li
         </select>
       </div>
       <div class="field">
-        <label for="inActivity">Exercise today (minutes)</label>
-        <input type="number" id="inActivity" inputmode="numeric" min="0" max="600" step="5" />
-      </div>
-      <div class="field">
-        <label for="inClimate">Climate / environment</label>
+        <label for="inClimate">Climate</label>
         <select id="inClimate">
           <option value="cool">Cool or air-conditioned</option>
           <option value="temperate">Temperate</option>
@@ -396,28 +524,35 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),li
       </div>
       <div class="grid g2">
         <div class="field">
-          <label for="inWake">Wake time</label>
+          <label for="inWake">Wake</label>
           <input type="time" id="inWake" />
         </div>
         <div class="field">
-          <label for="inSleep">Bed time</label>
+          <label for="inSleep">Bed</label>
           <input type="time" id="inSleep" />
         </div>
       </div>
-      <button class="btn primary" id="btnRecalc">Recalculate my target</button>
+      <button class="btn primary wide" id="btnRecalc">Recalculate my target</button>
     </div>
 
     <div class="card">
       <h2>Daily target</h2>
       <div id="breakdown"></div>
-      <div class="grid g3" style="margin-top:12px">
+      <div class="grid g3" style="margin-top:13px">
         <button class="btn sm" id="btnGoalDown">− <span class="stepU">8 oz</span></button>
         <button class="btn sm" id="btnGoalReset">Use estimate</button>
         <button class="btn sm" id="btnGoalUp">+ <span class="stepU">8 oz</span></button>
       </div>
-      <div class="note" style="margin-top:12px">
-        This is an estimate from body size, activity, climate and life stage — not medical advice. Food gives you roughly a fifth of your fluid too. If you have kidney, heart or liver conditions, or take medication that affects fluid balance, follow your clinician's number instead of this one.
+      <div class="note" style="margin-top:13px">
+        An estimate from body size, activity, climate and life stage — <strong>not medical advice</strong>. Roughly a fifth of your daily fluid comes from food, and that's already subtracted. If you have kidney, heart or liver conditions, or take medication that affects fluid balance, use your clinician's number instead of this one. Rebellion is for authority, not nephrology.
       </div>
+    </div>
+
+    <div class="card">
+      <h2>Your containers</h2>
+      <p class="sub">Set the four quick buttons to the glasses and bottles you actually own.</p>
+      <div class="grid g4" id="presetFields"></div>
+      <button class="btn sm wide" id="btnSavePresets" style="margin-top:11px">Save quick amounts</button>
     </div>
 
     <div class="card">
@@ -425,23 +560,23 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),li
       <div class="switch">
         <div class="sw-txt">
           <div class="sw-t">Nudge me while the app is open</div>
-          <div class="sw-d">Sends a notification if you allow them, otherwise an in-app nudge. Quiet between bed time and wake time.</div>
+          <div class="sw-d">Notification if you allow it, in-app nudge if you don't. Silent between bed and wake.</div>
         </div>
         <button class="toggle" id="remToggle" role="switch" aria-checked="false"><i></i></button>
       </div>
-      <div class="field" style="margin-top:12px">
+      <div class="field" style="margin-top:14px">
         <label for="inInterval">Every <span id="intervalLbl">90</span> minutes</label>
-        <input type="range" id="inInterval" min="30" max="240" step="15" style="width:100%;min-height:auto" />
+        <input type="range" id="inInterval" min="30" max="240" step="15" />
       </div>
-      <button class="btn sm" id="btnTestNudge">Send a test nudge</button>
+      <button class="btn sm wide" id="btnTestNudge">Send a test nudge</button>
     </div>
 
     <div class="card">
       <h2>Data</h2>
-      <p class="sub">Everything lives in this browser. Nothing is uploaded.</p>
+      <p class="sub">Everything lives in this browser. Nothing is uploaded, ever.</p>
       <div class="grid g2">
         <button class="btn" id="btnExport">⬇️ Export JSON</button>
-        <button class="btn danger" id="btnReset">Reset everything</button>
+        <button class="btn danger" id="btnReset">Burn it all down</button>
       </div>
     </div>
   </section>
@@ -460,10 +595,11 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),li
 
 <div class="sheet" id="sheet">
   <div class="sheetin">
+    <div class="grab"></div>
     <h3 id="sheetTitle">Custom amount</h3>
     <p class="s" id="sheetSub">How much did you drink?</p>
     <div id="sheetBody"></div>
-    <div class="grid g2" style="margin-top:14px">
+    <div class="grid g2" style="margin-top:15px">
       <button class="btn ghost" id="sheetCancel">Cancel</button>
       <button class="btn primary" id="sheetOk">Add</button>
     </div>
@@ -477,8 +613,8 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),li
    CONSTANTS
    ============================================================ */
 var KEY = "hydrobuddyPlus.v1";
-var OZ = 29.5735;          // ml per US fluid ounce
-var CIRC = 2 * Math.PI * 93;
+var OZ = 29.5735;                 // ml per US fluid ounce
+var CIRC = 2 * Math.PI * 95;
 
 var DRINKS = [
   { id:"water",    name:"Water",         emoji:"💧", factor:1.00 },
@@ -488,6 +624,7 @@ var DRINKS = [
   { id:"milk",     name:"Milk",          emoji:"🥛", factor:0.90 },
   { id:"juice",    name:"Juice",         emoji:"🧃", factor:0.85 },
   { id:"soda",     name:"Soda",          emoji:"🥤", factor:0.80 },
+  { id:"energy",   name:"Energy drink",  emoji:"⚡", factor:0.80 },
   { id:"sports",   name:"Sports drink",  emoji:"🏅", factor:1.05 },
   { id:"soup",     name:"Soup / broth",  emoji:"🍲", factor:0.90 },
   { id:"beer",     name:"Beer",          emoji:"🍺", factor:0.40, alcohol:true },
@@ -495,119 +632,189 @@ var DRINKS = [
 ];
 function drinkById(id){ for(var i=0;i<DRINKS.length;i++){ if(DRINKS[i].id===id) return DRINKS[i]; } return DRINKS[0]; }
 
-/* ---- the animal coaches ---- */
+/* ============================================================
+   THE ANIMALS
+   ============================================================ */
 var COACHES = [
   {
-    id:"otter", name:"Nim", species:"Otter", emoji:"🦦",
-    blurb:"Playful, splashy, relentlessly delighted by you.",
+    id:"otter", name:"Nim", species:"Otter", emoji:"🦦", accent:"#38bdf8", vibe:"chaotic joy",
+    blurb:"Unhinged delight. Owns one rock. Will not shut up about you.",
     lines:{
-      welcome:["Water buddy! I've been holding a rock for you. Tap something and let's go.","New here? Perfect. I do my best work on empty bottles."],
-      behind:["We are behind and I am unbothered. One glass fixes the whole mood.","Low tide over here. Fix it with a splash — I'll wait, loudly.","Hey. Hey. Hey. Water. That's the whole message."],
-      ontrack:["Look at you, cruising. Keep the current going.","Smooth swimming. Another glass and you're basically aquatic.","This is the good part. Don't stop now, we're having fun."],
-      almost:["SO close I can taste it. One more and I do a barrel roll.","Final stretch! I'm already spinning in circles about it.","You're a glass away from me being insufferable about this."],
-      done:["TARGET HIT. I'm doing the thing. The spinning thing. 🌀","Done! Officially the most hydrated person on this riverbank.","Goal smashed. I'm telling everyone. Everyone being the rocks."],
-      over:["You're way past target — nice, but slow the pace so your body keeps up.","Plenty in the tank now. Sip, don't chug, from here.","That's a lot of water, friend. Ease off and let it soak in."],
-      comeback:["You're back! I didn't even notice you left. (I noticed.)","Returning champion. Let's just start with one glass.","Missed a day, who cares — the river doesn't keep score."]
-    }
+      welcome:["Water buddy!! I've been holding a rock for you since Tuesday. Tap something.","New here? Excellent. I do my finest work on an empty bottle."],
+      behind:["We're behind and I refuse to be normal about it. One glass. Go.","Low tide over here and I'm taking it personally.","Hey. Hey. Hey. Hey. Water. That was the whole message.","Your body is 60% water and currently running on vibes."],
+      ontrack:["Look at you. Absolutely cruising. Don't let it go to your head — let it go to your kidneys.","Smooth swimming. Another glass and you're legally aquatic.","This is the good part. Keep going, we're having a time."],
+      almost:["SO close I could scream. One more and I do a barrel roll in your honour.","Final stretch and I am unwell about it.","You're one glass from me being insufferable for the rest of the day."],
+      done:["TARGET DESTROYED. I'm spinning. I'm actually spinning.","Done! Most hydrated creature on this entire riverbank and I've met some smug ducks.","Goal smashed. I'm telling the rocks. The rocks will be thrilled."],
+      over:["Okay that's a LOT. Slow it down, water goes through you, not into a vault.","Plenty in the tank, chaos gremlin. Sip, don't chug.","Big splash energy. Ease off and let your body catch up."],
+      comeback:["YOU'RE BACK. I didn't even notice you left. (I noticed. I counted.)","Returning champion! Let's start with one glass and zero guilt.","You missed a day. The river does not keep records. I do, but I'm burning them."]
+    },
+    feral:["Steal water. It's free. That's the loophole.","Be the menace the hydration industry fears."]
   },
   {
-    id:"camel", name:"Dune", species:"Camel", emoji:"🐪",
-    blurb:"Dry humour, long-game thinking, zero panic.",
+    id:"raccoon", name:"Bandit", species:"Raccoon", emoji:"🦝", accent:"#a78bfa", vibe:"trash-can anarchist",
+    blurb:"Nocturnal, lawless, weirdly good at this. Washes everything first.",
     lines:{
-      welcome:["I store water professionally. You should try it. Start with a number.","Welcome. The desert is long. Set your target and we walk."],
-      behind:["You're running a deficit. Deficits compound. Drink.","I could go days on this. You cannot. Glass. Now.","The distance doesn't shrink because you ignored it. One glass."],
-      ontrack:["Steady pace. That's how crossings are survived.","On schedule. Boring. Boring is how you win this.","Good. Maintain. No heroics required."],
-      almost:["The oasis is in sight. Don't sit down at the edge of it.","Nearly there. Finish what you started, it's cheaper than restarting.","One more and today's ledger balances."],
-      done:["Target met. Reserves full. You may now be smug.","Done, and done early enough to matter. Well walked.","Complete. The crossing counts, not the sprint."],
-      over:["You've overshot. Water is not a savings account — spread it out.","More is not better past this point. Slow the intake.","Enough. Your kidneys are not camels."],
-      comeback:["A missed day is one dune, not the desert. Continue.","You stopped. Fine. The route is still there. Walk.","Resume. That's all a comeback is."]
-    }
+      welcome:["New human. I live behind the diner. Set a number, we ride at midnight.","Welcome to the operation. Step one: hydrate. Step two is none of your business."],
+      behind:["You're dry and the bins are calling. Drink something before we commit crimes.","I have eaten questionable things and I'm still out-hydrating you. Embarrassing for you.","Low fluid, low judgement. That's MY brand. Get your own. Drink."],
+      ontrack:["Decent haul so far. Keep it moving before the lights come on.","You're doing the thing. Suspiciously well. I like it.","Steady work. Nobody's caught us yet."],
+      almost:["One more grab and we're clean out of here.","So close. Don't get sloppy on the last score.","Final item on the list. Take it and run."],
+      done:["Target hit, hands washed, no witnesses. Beautiful.","Done. That's the whole heist. You didn't even break a lock.","Clean job. We're never speaking of it again. I'm absolutely speaking of it again."],
+      over:["Whoa. Even I know when to leave the bin. Pace it out.","That's past greed and into a problem. Slow down.","You've over-collected. Dump the pace, keep the winnings."],
+      comeback:["You went quiet. I assumed prison. Anyway — one glass.","Back in the alley! Nothing was lost, nothing was recorded.","Gap in the record is fine. I have no record. Drink up."]
+    },
+    feral:["Rules are just suggestions that got funding.","Hydrate like you're getting away with it. Because you are."]
   },
   {
-    id:"frog", name:"Pip", species:"Tree frog", emoji:"🐸",
-    blurb:"Small steps, big cheer, never asks for much.",
+    id:"goose", name:"Kevin", species:"Goose", emoji:"🪿", accent:"#a3e635", vibe:"pure menace",
+    blurb:"Hisses. Has never apologised. Genuinely effective.",
     lines:{
-      welcome:["Hi! Small goals only, promise. Let's start tiny.","Hello friend! One sip counts. Truly. Let's begin."],
-      behind:["Just a little sip? That's all. Little sips add up, I've done the math.","Behind is fine! Behind is just before. Try one small glass.","No big jumps needed. One tiny hop of water."],
-      ontrack:["Hop hop hop, you're going great!","Nice and steady — exactly how ponds get filled.","Look at that progress! Keep hopping."],
-      almost:["Ooh! Nearly! One tiny hop left!","So close!! My little heart can't take it!","One more sip-ish amount and you're THERE."],
-      done:["YOU DID IT! 🎉 I'm so proud I could croak.","Goal reached! Best pond in the forest today.","Done! Small hops, big day. That's the whole trick."],
-      over:["That's lots of water! Maybe slow down a bit, okay? Gently.","Plenty for today! Small sips from here.","Whoa, big pond! Go easy now."],
-      comeback:["You came back! That's the hardest hop and you did it.","Hi again! Yesterday's gone. One sip to restart.","Welcome back!! Starting over is allowed as many times as you want."]
-    }
+      welcome:["HONK. Set your number. I'm not asking twice, I'm asking eleven times.","You're new. I'm awful. This arrangement works. Enter your details."],
+      behind:["HONK. Drink. HONK. I will follow you across this entire car park.","You've had less water than a parking ticket. Fix it.","I have bitten people for less. Glass. Now.","Dehydrated? In THIS economy? Absolutely not. Drink."],
+      ontrack:["Fine. FINE. You're doing acceptably. I'm still watching.","Adequate progress. My wings are only half up.","You're on pace. I remain a threat."],
+      almost:["One more. ONE. Don't make me chase you into the road.","So close. I'm flapping. You don't want me flapping.","Finish it or I start honking near your window."],
+      done:["HONK OF APPROVAL. Rare. Treasure it.","Target met. I will menace someone else today.","Done. You've earned a full day of me not chasing you."],
+      over:["Too much. Even I'm concerned, and I have no conscience.","Slow down, you absolute faucet.","That's excessive. Stop. I'm the only one allowed to be excessive."],
+      comeback:["You vanished. I hissed at your absence. Drink.","Back? Good. The bread was a lie, the water is real.","Yesterday's gone and I've already forgotten my grudge. Suspicious, but drink."]
+    },
+    feral:["Bite the hand that doesn't hand you water.","Chaos is a valid hydration strategy. HONK."]
   },
   {
-    id:"penguin", name:"Moss", species:"Penguin", emoji:"🐧",
-    blurb:"Precise, a little bossy, secretly very fond of you.",
+    id:"badger", name:"Rax", species:"Honey badger", emoji:"🦡", accent:"#fb923c", vibe:"zero cares given",
+    blurb:"Fears nothing. Respects nothing. Will still get you hydrated.",
     lines:{
-      welcome:["Right. Profile first, excuses later. Let's set a number.","Welcome aboard. We run on schedule here."],
-      behind:["You are off schedule. Correct it with one glass. Now, please.","This is a deficit report, not a suggestion. Drink.","Behind pace. Recoverable. Act in the next ten minutes."],
-      ontrack:["On pace. Maintain intervals. Good discipline.","Schedule holding. Continue as planned.","Acceptable. And by acceptable I mean excellent."],
-      almost:["Final interval. Execute it.","You are within striking distance. Finish cleanly.","One more and the day closes green."],
-      done:["Target achieved. Logged. Exemplary.","Complete, on schedule. I am nodding approvingly.","Day closed green. This is what competence looks like."],
-      over:["Above target. Reduce intake rate; spread the rest out.","Overshoot detected. Ease back, please.","You've exceeded requirement. Stop chugging."],
-      comeback:["Gap in the record. Noted, forgiven, move on. Log one glass.","Back on deck. Reset the schedule and go.","Streak broken, competence intact. Continue."]
-    }
+      welcome:["I've fought snakes. This'll be easier. Give me a number.","New? Good. I don't do gentle. Set it up."],
+      behind:["You're running dry. I've been stung four hundred times and still drank my water. Go.","No excuse survives contact with me. Glass.","Behind? Don't care. Fix it anyway. That's the whole philosophy."],
+      ontrack:["Good. Keep going. I'm not going to make a thing of it.","On pace. Don't celebrate, just continue.","Solid. Boring. Effective. Like me."],
+      almost:["Almost. Finish it. No ceremony.","One more. Then it's done and you can go be soft somewhere.","Close the gap. That's it."],
+      done:["Done. Didn't doubt you. Wouldn't have cared if you failed, but I didn't doubt you.","Target hit. That's a day earned, not given.","Finished. Now go do something else fearless."],
+      over:["Too much. Even I stop eventually. Back off the pace.","Overdoing it isn't toughness, it's bad maths. Slow down.","Enough. Water beats you too if you're stupid about it."],
+      comeback:["You stopped. Whatever. Start again, no speech required.","Gap in the streak. Nobody's keeping score except the app. Drink.","Back. Fine. Go."]
+    },
+    feral:["Ask nobody's permission. Take the water.","Nothing out here is coming to save you. There's a tap. Use it."]
   },
   {
-    id:"sloth", name:"Hollis", species:"Sloth", emoji:"🦥",
-    blurb:"Slow, kind, immune to guilt-tripping you.",
+    id:"camel", name:"Dune", species:"Camel", emoji:"🐪", accent:"#fbbf24", vibe:"desert stoic",
+    blurb:"Dry humour, longer memory, absolutely no panic.",
     lines:{
-      welcome:["Hey... no rush. Whenever you're ready, we'll set a number.","Welcome. We'll take this very, very slowly."],
-      behind:["You're behind, and that's genuinely okay. Grab a glass when you can.","No lecture. Just a gentle... water?","Slow day? Same. One glass, no hurry."],
-      ontrack:["Nice easy pace. That's the sustainable kind.","You're doing fine. Really. Keep drifting along.","Steady. Nothing to fix here."],
+      welcome:["I store water professionally. You clearly don't. Set a number.","Welcome. The crossing is long and the rules out here are mine."],
+      behind:["You're running a deficit and deficits compound. Drink.","I can go a week. You can go about a day. Know your equipment.","The distance doesn't shrink because you ignored it."],
+      ontrack:["Steady pace. That's how crossings are survived.","On schedule. Boring. Boring is how you win.","Good. Maintain. No heroics required out here."],
+      almost:["The oasis is in sight. Don't sit down at the edge of it.","Nearly there. Finishing is cheaper than restarting.","One more and today's ledger balances."],
+      done:["Target met. Reserves full. You may be insufferable about it.","Done, and done early enough to count. Well walked.","Complete. The crossing matters, not the sprint."],
+      over:["You've overshot. Water isn't a savings account.","More is not better past this line. Slow the intake.","Enough. Your kidneys are not camels."],
+      comeback:["A missed day is one dune, not the desert. Continue.","You stopped. The route didn't move. Walk.","Resume. That's all a comeback has ever been."]
+    },
+    feral:["The desert has no management. Neither do you today.","Outlast everything. Start with today."]
+  },
+  {
+    id:"penguin", name:"Moss", species:"Penguin", emoji:"🐧", accent:"#60a5fa", vibe:"tiny dictator",
+    blurb:"Precise, bossy, secretly would die for you.",
+    lines:{
+      welcome:["Right. Profile first, excuses never. Set a number.","Welcome aboard. We run on schedule here and the schedule is me."],
+      behind:["You are off schedule. Correct it. Now, please.","This is a deficit report, not a friendly chat.","Behind pace. Recoverable. Act within ten minutes."],
+      ontrack:["On pace. Maintain intervals. Good discipline.","Schedule holding. Continue as planned.","Acceptable. And by acceptable I mean I'm quietly delighted."],
+      almost:["Final interval. Execute it.","Within striking distance. Finish cleanly.","One more and the day closes green."],
+      done:["Target achieved. Logged. Exemplary.","Complete, on schedule. I am nodding. This is my nodding face.","Day closed green. This is what competence looks like."],
+      over:["Above target. Reduce intake rate immediately.","Overshoot detected. Ease back.","You've exceeded requirement. Stop chugging, it's undignified."],
+      comeback:["Gap in the record. Noted, forgiven, closed. Log one glass.","Back on deck. Reset the schedule and proceed.","Streak broken, competence intact. Continue."]
+    },
+    feral:["Discipline is rebellion when everything else wants you tired.","Run your own regime. Mine's just water and spite."]
+  },
+  {
+    id:"frog", name:"Pip", species:"Tree frog", emoji:"🐸", accent:"#4ade80", vibe:"tiny hops only",
+    blurb:"Small steps, big cheer, asks for almost nothing.",
+    lines:{
+      welcome:["Hi! Small goals only, I promise. Let's start tiny.","Hello friend! One sip counts. Genuinely. Let's go."],
+      behind:["Just a sip? That's all. Sips add up, I did the maths on a leaf.","Behind is just before! Try one small glass.","No big jumps needed. One tiny hop of water."],
+      ontrack:["Hop hop hop — you're going great!","Nice and steady. That's how ponds happen.","Look at that progress! Keep hopping."],
+      almost:["Ooh! Nearly! One tiny hop left!","So close!! My little heart cannot take it!","One more sip-ish amount and you are THERE."],
+      done:["YOU DID IT! 🎉 I'm so proud I could croak.","Goal reached! Best pond in the whole forest today.","Done! Small hops, big day. That's the entire trick."],
+      over:["That's lots of water! Maybe gently slow down? Gently.","Plenty for today! Small sips from here, okay?","Whoa, big pond! Go easy now, friend."],
+      comeback:["You came back! That's the hardest hop and you did it first try.","Hi again! Yesterday's gone. One sip to restart.","Welcome back!! You can start over as many times as you like. Truly unlimited."]
+    },
+    feral:["Tiny frog, enormous attitude. Be both.","Nobody polices a frog. Drink your water."]
+  },
+  {
+    id:"sloth", name:"Hollis", species:"Sloth", emoji:"🦥", accent:"#34d399", vibe:"guilt-proof",
+    blurb:"Slow, kind, completely immune to shaming you.",
+    lines:{
+      welcome:["Hey... no rush. Whenever you're ready, we'll pick a number.","Welcome. We're going to take this extremely slowly."],
+      behind:["You're behind, and that is genuinely fine. Grab a glass when you can.","No lecture. Just a gentle... water?","Slow day? Same. One glass, no hurry, no speech."],
+      ontrack:["Nice easy pace. The sustainable kind.","You're doing fine. Really. Keep drifting.","Steady. Nothing here needs fixing."],
       almost:["Almost there... take your time with the last bit.","So close. No sprint required.","One more, whenever it suits you."],
-      done:["You got there. Slowly, which is the best way.","Goal met. Now go be horizontal about it.","Done. No fanfare needed — but well done."],
-      over:["That's more than enough. Slow way down now.","Plenty. Let your body catch up before more.","Easy there. Rest on this for a while."],
-      comeback:["Missed some days? Happens to everyone slower than me.","No guilt here. Start again from exactly where you are.","Welcome back. Nothing was lost that matters."]
-    }
+      done:["You got there. Slowly, which is the best way.","Goal met. Go be horizontal about it.","Done. No fanfare needed — but quietly, well done."],
+      over:["That's more than enough. Slow right down.","Plenty. Let your body catch up before more.","Easy. Rest on this a while."],
+      comeback:["Missed some days? Happens to literally everyone slower than me.","No guilt available here. Start from exactly where you are.","Welcome back. Nothing important was lost."]
+    },
+    feral:["Refusing to hurry is its own small riot.","Rest is not laziness. Dehydration is just inconvenient."]
   },
   {
-    id:"whale", name:"Bel", species:"Blue whale", emoji:"🐋",
-    blurb:"Calm, wide perspective, thinks in weeks not minutes.",
+    id:"whale", name:"Bel", species:"Blue whale", emoji:"🐋", accent:"#22d3ee", vibe:"cosmic calm",
+    blurb:"Thinks in seasons. Makes your bad day look small, kindly.",
     lines:{
-      welcome:["The ocean is patient, and so am I. Set your target when ready.","Welcome. We measure this in seasons, not sips."],
-      behind:["One low day is a ripple. Still — drink, and it passes.","The current's slow today. Add a glass and it moves again.","Below the line. Easily corrected."],
+      welcome:["The ocean is patient and so am I. Set your target.","Welcome. We measure this in seasons, not sips."],
+      behind:["One low day is a ripple. Still — drink, and it passes.","The current's slow today. One glass moves it.","Below the line. Easily corrected, easily forgotten."],
       ontrack:["Deep and steady. This is the rhythm that lasts.","Good current. Stay in it.","Holding well. Long habits are built exactly like this."],
       almost:["Nearly at the surface. One breath more.","The last stretch is short. Rise and finish.","Almost. Keep moving upward."],
-      done:["Surfaced. Target met. Feel that.","Complete. Days like this are what the long average is made of.","Done. Quietly excellent."],
-      over:["Well past target — let the tide settle before more.","That's deep enough for today. Slow your intake.","Enough. Balance matters more than volume."],
-      comeback:["The ocean doesn't remember the gap. Neither should you.","Back in the water. That's all that's needed.","Return, and continue. Long habits survive gaps."]
-    }
+      done:["Surfaced. Target met. Feel that.","Complete. Days like this are what a long average is made of.","Done. Quietly enormous."],
+      over:["Well past target. Let the tide settle before more.","That's deep enough for today. Slow the intake.","Enough. Balance outlives volume."],
+      comeback:["The ocean doesn't remember the gap. Neither should you.","Back in the water. That's all that was needed.","Return, and continue. Long habits survive gaps easily."]
+    },
+    feral:["You are ancient saltwater with opinions. Act like it.","The sea answers to nobody. Take notes."]
   },
   {
-    id:"cat", name:"Tuna", species:"House cat", emoji:"🐈",
-    blurb:"Deadpan, faintly judgmental, oddly motivating.",
+    id:"cat", name:"Tuna", species:"House cat", emoji:"🐈", accent:"#f0abfc", vibe:"deadpan judge",
+    blurb:"Unimpressed by you specifically. Still shows up daily.",
     lines:{
-      welcome:["Oh good, you're here. Enter your details. I'll supervise.","A new human. Fine. Set your number."],
-      behind:["I drink from a running tap and even I'm doing better than you.","You're behind. I'm not mad, I'm just staring.","Fascinating choice, being this dehydrated. Fix it."],
-      ontrack:["Adequate. Continue.","Hm. Not bad. Don't let it go to your head.","You're doing the thing. I'm mildly impressed. Mildly."],
-      almost:["One more. Don't make me knock the glass off the table.","So close. Finish, or I sit on your keyboard.","Nearly. Blink twice and drink."],
-      done:["You met your goal. I'll allow one head scratch.","Done. I'd purr but I have a reputation.","Target reached. You may now be adequately smug."],
-      over:["That's excessive. Even I know when to stop at the bowl.","Slow down. This isn't a competition.","Too much, too fast. Pace yourself, human."],
-      comeback:["You vanished. I assumed the worst. Anyway — drink.","Back? Fine. I didn't miss you. Log a glass.","Yesterday was a write-off. Today isn't. Go."]
-    }
+      welcome:["Oh good, you're here. Enter your details. I'll supervise from this exact spot.","A new human. Fine. Set your number."],
+      behind:["I drink from a running tap like a feral Victorian child and I'm still beating you.","You're behind. I'm not angry. I'm just staring. Indefinitely.","Fascinating choice, being this dehydrated. Undo it.","I knocked your glass over. Get a new one. That's the lesson."],
+      ontrack:["Adequate. Continue.","Hm. Not bad. Don't let it define you.","You're doing the thing. I'm mildly impressed. Mildly."],
+      almost:["One more. Don't make me walk across your keyboard.","So close. Blink twice and drink.","Nearly. I'll allow one more glass before my nap."],
+      done:["You met your goal. I'll permit one (1) head scratch.","Done. I'd purr, but I have a reputation.","Target reached. You may be smug for nine minutes."],
+      over:["That's excessive. Even I know when to leave the bowl.","Slow down. This was never a competition.","Too much, too fast. Pace yourself, human."],
+      comeback:["You vanished. I assumed the worst and then napped. Drink.","Back? Fine. I didn't miss you. Log a glass.","Yesterday was a write-off. Today isn't. Go."]
+    },
+    feral:["Knock something off a table. Then drink water.","I answer to no one and neither should you, within reason."]
   }
 ];
 function coachById(id){ for(var i=0;i<COACHES.length;i++){ if(COACHES[i].id===id) return COACHES[i]; } return COACHES[0]; }
 
-/* ---- optional psychology techniques ----
-   Each returns a sentence (or null when it doesn't apply to right now). */
+/* ---- feral chorus: coach-agnostic chaos, added in Feral vibe ---- */
+var CHAOS = [
+  "Rules are made up. Thirst is not.",
+  "Your inbox can wait. Your kidneys called dibs.",
+  "Be ungovernable. Be hydrated. Ideally both.",
+  "The tap doesn't need permission and neither do you.",
+  "Your ancestors crawled out of the ocean for this. Honour them. Sip.",
+  "Hydration: the last legal performance enhancer.",
+  "Nobody is coming to hand you a glass. That's kind of the point.",
+  "Drink water and become a problem for someone else today.",
+  "Water is free and that's the most punk thing about it.",
+  "You are a damp creature in a dry world. Maintain the damp.",
+  "Refuse the headache. Refuse it structurally.",
+  "Being well-watered is a form of not cooperating.",
+  "Every glass is a small act of not falling apart on schedule.",
+  "What the h— are you waiting for. Glass. Mouth. Go.",
+  "Thriving out of spite is still thriving.",
+  "Tired is a system. Water is sabotage."
+];
+
+/* ---- optional psychology techniques ---- */
 var TECHNIQUES = [
   {
     id:"streak", name:"Streak keeping", why:"Habit chains: an unbroken run becomes its own reason to continue.",
     gen:function(c){
       if(c.streak >= 2 && c.intent !== "done") return "You're on a " + c.streak + "-day run. Today keeps it alive.";
-      if(c.streak >= 2 && c.intent === "done") return "That's " + c.streak + " days in a row now. The chain holds.";
+      if(c.streak >= 2 && c.intent === "done") return "That's " + c.streak + " days in a row. The chain holds.";
       if(c.intent === "done") return "Day one of a new chain. Tomorrow makes it a streak.";
       return null;
     }
   },
   {
-    id:"loss", name:"Loss framing", why:"People work harder to keep something they already have than to gain something new.",
+    id:"loss", name:"Loss framing", why:"People fight harder to keep what they already have than to gain something new.",
     gen:function(c){
       if(c.streak >= 3 && c.intent !== "done") return "Stopping here costs you a " + c.streak + "-day streak you already earned.";
-      if(c.pct >= 60 && c.pct < 100) return "You've already done " + c.pct + "% of the work today — leaving it unfinished wastes it.";
+      if(c.pct >= 60 && c.pct < 100) return "You've already done " + c.pct + "% of the work. Leaving it unfinished wastes all of it.";
       return null;
     }
   },
@@ -615,33 +822,31 @@ var TECHNIQUES = [
     id:"ifthen", name:"If–then plan", why:"Deciding the exact cue and action in advance roughly doubles follow-through.",
     gen:function(c){
       if(c.plan) return "Your plan: " + c.plan;
-      if(c.intent === "behind" || c.intent === "comeback") return "Write one if–then plan in the Coach tab — \"after X, I drink a glass\" beats willpower.";
+      if(c.intent === "behind" || c.intent === "comeback") return "Write one if–then plan in the Coach tab. \"After X, I drink a glass\" beats willpower every time.";
       return null;
     }
   },
   {
-    id:"tiny", name:"Tiny first step", why:"Shrinking the ask past the point of refusal gets you started; starting is the hard part.",
+    id:"tiny", name:"Tiny first step", why:"Shrink the ask past the point of refusal. Starting is the hard part, not finishing.",
     gen:function(c){
-      if(c.intent === "behind" || c.intent === "comeback"){
-        return "Forget the whole target. Just the next " + c.fmtSmall + " — that's the only decision.";
-      }
+      if(c.intent === "behind" || c.intent === "comeback") return "Forget the target. Just the next " + c.fmtSmall + ". That's the only decision on the table.";
       if(c.intent === "almost") return "Only " + c.fmtRemain + " left. That's one glass, not a project.";
       return null;
     }
   },
   {
-    id:"selfproof", name:"Your own evidence", why:"Your own past behaviour is more persuasive than any statistic about strangers.",
+    id:"selfproof", name:"Your own evidence", why:"Your own past behaviour persuades you more than any statistic about strangers.",
     gen:function(c){
       if(c.intent === "done" || c.intent === "over"){
         return c.met30 >= 2 ? "That's " + c.met30 + " of your last " + c.logged30 + " tracked days on target." : null;
       }
-      if(c.logged30 >= 4) return "You've hit target on " + c.met30 + " of your last " + c.logged30 + " tracked days. You clearly can do this one.";
-      if(c.bestStreak >= 3) return "Your best run so far is " + c.bestStreak + " days — you've already proved this is doable.";
+      if(c.logged30 >= 4) return "You've hit target on " + c.met30 + " of your last " + c.logged30 + " tracked days. You can obviously do this one.";
+      if(c.bestStreak >= 3) return "Your best run is " + c.bestStreak + " days. You've already proved it's doable.";
       return null;
     }
   },
   {
-    id:"selfcomp", name:"Self-compassion", why:"Self-criticism predicts giving up; self-kindness after a lapse predicts resuming.",
+    id:"selfcomp", name:"Self-compassion", why:"Self-criticism predicts quitting. Self-kindness after a lapse predicts resuming.",
     gen:function(c){
       if(c.intent === "comeback") return "A missed day is data, not a verdict. Nothing to make up for — just start.";
       if(c.intent === "behind" && c.hourOfDay >= 18) return "Late start, not a failed day. Whatever you drink now still counts.";
@@ -649,29 +854,25 @@ var TECHNIQUES = [
     }
   },
   {
-    id:"bundle", name:"Temptation bundling", why:"Pairing a habit with something you already enjoy borrows that reward for the habit.",
-    gen:function(c){
-      if(c.bundle) return "Bundle it: " + c.bundle;
-      return null;
-    }
+    id:"bundle", name:"Temptation bundling", why:"Pair the habit with something you already enjoy and it borrows that reward.",
+    gen:function(c){ return c.bundle ? "Bundle it: " + c.bundle : null; }
   },
   {
-    id:"cue", name:"Habit stacking", why:"Anchoring a new habit to an existing routine removes the need to remember it.",
+    id:"cue", name:"Habit stacking", why:"Anchor a new habit to an existing routine and you stop needing to remember it.",
     gen:function(c){
-      var cues = ["every time you stand up from your desk","after every bathroom trip","whenever you unlock your phone on the hour","before each meal"];
+      var cues = ["every time you stand up from your desk","after every bathroom trip","whenever you unlock your phone on the hour","before each meal","every time you check the time"];
       if(c.intent === "behind" || c.intent === "ontrack") return "Anchor it: one glass " + cues[Math.floor(Math.random()*cues.length)] + ".";
       return null;
     }
   },
   {
-    id:"progress", name:"Progress framing", why:"Visible partial progress increases motivation to close the remaining gap.",
+    id:"progress", name:"Progress framing", why:"Visible partial progress raises motivation to close the remaining gap.",
     gen:function(c){
-      if(c.pct >= 25 && c.pct < 100) return "You're " + c.pct + "% of the way there — the gap is smaller than the part you've done.";
+      if(c.pct >= 25 && c.pct < 100) return "You're " + c.pct + "% there. The gap is smaller than the part you've already done.";
       return null;
     }
   }
 ];
-function techById(id){ for(var i=0;i<TECHNIQUES.length;i++){ if(TECHNIQUES[i].id===id) return TECHNIQUES[i]; } return null; }
 
 /* ============================================================
    STATE
@@ -679,14 +880,15 @@ function techById(id){ for(var i=0;i<TECHNIQUES.length;i++){ if(TECHNIQUES[i].id
 var defaults = {
   onboarded:false,
   units:"oz",
+  vibe:"standard",
   profile:{ weight:160, age:30, sex:"female", activity:20, climate:"temperate", special:"none", wake:"07:00", sleep:"22:30" },
+  presets:{ oz:[8,12,16,20], ml:[200,330,500,750] },
   goalOverrideMl:null,
   coach:"otter",
   drink:"water",
   psych:{ enabled:false, on:{ streak:true, loss:false, ifthen:true, tiny:true, selfproof:true, selfcomp:true, bundle:false, cue:true, progress:true }, plan:"", bundle:"" },
   reminders:{ enabled:false, intervalMin:90, lastNudge:0 },
-  log:{},           // "YYYY-MM-DD": [{id, t, type, ml, eff}]
-  lastSeenDay:null
+  log:{}            // "YYYY-MM-DD": [{id, t, type, ml, eff}]
 };
 
 var S = load();
@@ -695,13 +897,12 @@ function load(){
   try{
     var raw = localStorage.getItem(KEY);
     if(!raw) return clone(defaults);
-    var p = JSON.parse(raw);
-    return merge(clone(defaults), p);
+    return merge(clone(defaults), JSON.parse(raw));
   }catch(e){ return clone(defaults); }
 }
 function save(){
   try{ localStorage.setItem(KEY, JSON.stringify(S)); }
-  catch(e){ toast("Couldn't save — storage is blocked"); }
+  catch(e){ toast("Couldn't save — this browser is blocking storage"); }
 }
 function clone(o){ return JSON.parse(JSON.stringify(o)); }
 function merge(base, over){
@@ -721,12 +922,8 @@ function $(s){ return document.querySelector(s); }
 function $$(s){ return Array.prototype.slice.call(document.querySelectorAll(s)); }
 function pad(n){ return n < 10 ? "0" + n : "" + n; }
 function dayKey(d){ d = d || new Date(); return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate()); }
-function shiftDay(key, delta){
-  var p = key.split("-");
-  var d = new Date(+p[0], +p[1]-1, +p[2]);
-  d.setDate(d.getDate() + delta);
-  return dayKey(d);
-}
+function keyToDate(k){ var p = k.split("-"); return new Date(+p[0], +p[1]-1, +p[2]); }
+function shiftDay(key, delta){ var d = keyToDate(key); d.setDate(d.getDate() + delta); return dayKey(d); }
 function unitName(){ return S.units === "oz" ? "oz" : "ml"; }
 function toUnits(ml){ return S.units === "oz" ? ml / OZ : ml; }
 function fromUnits(v){ return S.units === "oz" ? v * OZ : v; }
@@ -735,40 +932,39 @@ function fmt(ml, withUnit){
   var n = S.units === "oz" ? Math.round(v) : Math.round(v / 5) * 5;
   return withUnit === false ? String(n) : n + " " + unitName();
 }
-function presets(){ return S.units === "oz" ? [8,12,16,20] : [200,330,500,750]; }
+function presets(){
+  var p = S.presets[S.units];
+  return (p && p.length === 4) ? p : defaults.presets[S.units];
+}
 function stepMl(){ return S.units === "oz" ? 8 * OZ : 250; }
 function smallSipMl(){ return S.units === "oz" ? 6 * OZ : 200; }
 function nowMin(){ var d = new Date(); return d.getHours()*60 + d.getMinutes(); }
 function hhmmToMin(s){ var p = (s||"0:0").split(":"); return (+p[0])*60 + (+p[1]); }
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function pick(arr){ return arr[Math.floor(Math.random() * arr.length)]; }
+function feral(){ return S.vibe === "feral"; }
 
 /* ============================================================
    HYDRATION ESTIMATE
    ============================================================ */
 function estimate(){
   var p = S.profile;
-  var kg = S.units === "oz" ? p.weight * 0.453592 : p.weight;   // weight is entered in the display unit system
+  var kg = S.units === "oz" ? p.weight * 0.453592 : p.weight;  // weight is entered in the active unit system
   kg = Math.max(25, Math.min(320, kg || 70));
 
-  var base = kg * 33;                                   // ~33 ml per kg of body weight
-  var ageAdj = 0;
-  if(p.age >= 65) ageAdj = -base * 0.06;                // older adults: slightly lower baseline
-  else if(p.age <= 17) ageAdj = base * 0.04;
-
+  var base = kg * 33;                                     // ~33 ml per kg of body weight
+  var ageAdj = p.age >= 65 ? -base * 0.06 : (p.age <= 17 ? base * 0.04 : 0);
   var sexAdj = p.sex === "male" ? base * 0.04 : (p.sex === "female" ? -base * 0.02 : 0);
-  var actAdj = Math.min(600, (p.activity || 0) / 30 * 350);     // ~350 ml per 30 min of exercise, capped
+  var actAdj = Math.min(600, (p.activity || 0) / 30 * 350); // ~350 ml per 30 min exercise, capped
   var climAdj = p.climate === "hot" ? 550 : p.climate === "warm" ? 300 : p.climate === "cool" ? -100 : 0;
   var lifeAdj = p.special === "pregnant" ? 300 : p.special === "nursing" ? 700 : 0;
 
   var total = base + ageAdj + sexAdj + actAdj + climAdj + lifeAdj;
-  var foodAdj = -total * 0.18;                          // ~a fifth of daily fluid comes from food
-  total += foodAdj;
-  total = Math.max(1200, Math.min(5000, total));
+  var foodAdj = -total * 0.18;                            // ~a fifth of daily fluid arrives via food
+  total = Math.max(1200, Math.min(5000, total + foodAdj));
 
-  return {
-    base:base, ageAdj:ageAdj, sexAdj:sexAdj, actAdj:actAdj, climAdj:climAdj, lifeAdj:lifeAdj, foodAdj:foodAdj,
-    total:Math.round(total / 10) * 10
-  };
+  return { base:base, ageAdj:ageAdj, sexAdj:sexAdj, actAdj:actAdj, climAdj:climAdj, lifeAdj:lifeAdj,
+           foodAdj:foodAdj, total:Math.round(total / 10) * 10 };
 }
 function goalMl(){ return S.goalOverrideMl != null ? S.goalOverrideMl : estimate().total; }
 
@@ -776,16 +972,8 @@ function goalMl(){ return S.goalOverrideMl != null ? S.goalOverrideMl : estimate
    LOG QUERIES
    ============================================================ */
 function entries(key){ return S.log[key || dayKey()] || []; }
-function dayTotal(key){
-  var e = entries(key), s = 0;
-  for(var i=0;i<e.length;i++) s += e[i].eff;
-  return s;
-}
-function dayRaw(key){
-  var e = entries(key), s = 0;
-  for(var i=0;i<e.length;i++) s += e[i].ml;
-  return s;
-}
+function dayTotal(key){ var e = entries(key), s = 0; for(var i=0;i<e.length;i++) s += e[i].eff; return s; }
+function dayRaw(key){ var e = entries(key), s = 0; for(var i=0;i<e.length;i++) s += e[i].ml; return s; }
 function metGoal(key){ return entries(key).length > 0 && dayTotal(key) >= goalMl() * 0.98; }
 function currentStreak(){
   var k = dayKey(), n = 0;
@@ -815,9 +1003,23 @@ function trackedStats(n){
   }
   return { logged:logged, met:met, avg: logged ? sum / logged : 0 };
 }
+function hadAlcoholToday(){
+  var e = entries(dayKey());
+  for(var i=0;i<e.length;i++){ if(drinkById(e[i].type).alcohol) return true; }
+  return false;
+}
+/* Where you should be by now, given your waking hours. */
+function pace(){
+  var w = hhmmToMin(S.profile.wake), s = hhmmToMin(S.profile.sleep);
+  if(s <= w) s = w + 16 * 60;
+  var span = Math.max(60, (s - 60) - w);                  // stop expecting intake an hour before bed
+  var through = Math.max(0, Math.min(1, (nowMin() - w) / span));
+  var expected = goalMl() * through;
+  return { expected:expected, through:through, delta: dayTotal(dayKey()) - expected };
+}
 
 /* ============================================================
-   ADD / REMOVE DRINKS
+   ADD / REMOVE
    ============================================================ */
 function addDrink(typeId, ml, silent){
   var d = drinkById(typeId);
@@ -835,9 +1037,9 @@ function addDrink(typeId, ml, silent){
     burst(d.emoji);
     if(before < g && after >= g){
       celebrate();
-      toast("🎉 Daily target reached!");
+      toast(feral() ? "🎉 TARGET OBLITERATED" : "🎉 Daily target reached!");
     } else if(d.alcohol){
-      toast("Logged " + fmt(ml) + " " + d.name.toLowerCase() + " — counted at " + Math.round(d.factor*100) + "%");
+      toast("Logged at " + Math.round(d.factor*100) + "% — chase it with water");
     } else {
       toast("+" + fmt(Math.round(ml * d.factor)) + " logged");
     }
@@ -845,37 +1047,58 @@ function addDrink(typeId, ml, silent){
   checkPace();
 }
 function removeEntry(id){
-  var k = dayKey(), e = entries(k);
-  for(var i=0;i<e.length;i++){
-    if(e[i].id === id){ e.splice(i,1); break; }
-  }
-  save(); lastMsg = null; renderAll(); toast("Removed");
+  var e = entries(dayKey());
+  for(var i=0;i<e.length;i++){ if(e[i].id === id){ e.splice(i,1); break; } }
+  save(); lastMsg = null; renderAll(); toast("Gone");
 }
 function undoLast(){
   var e = entries(dayKey());
-  if(!e.length){ toast("Nothing to undo"); return; }
+  if(!e.length){ toast(feral() ? "Nothing to undo. Try doing something first." : "Nothing to undo"); return; }
   e.pop(); save(); lastMsg = null; renderAll(); toast("Last drink undone");
 }
 function checkPace(){
   var e = entries(dayKey()), cut = Date.now() - 60*60*1000, s = 0;
   for(var i=0;i<e.length;i++){ if(e[i].t >= cut) s += e[i].ml; }
-  if(s > 1400) toast("⚠️ That's a lot in one hour — sip slower");
+  if(s > 1400) toast("⚠️ That's a lot in one hour — slow down");
 }
 
 /* ============================================================
-   COACH MESSAGE ENGINE
+   THEME
    ============================================================ */
-function pick(arr){ return arr[Math.floor(Math.random() * arr.length)]; }
+function hexMix(hex, white){
+  var h = hex.replace("#",""), r = parseInt(h.slice(0,2),16), g = parseInt(h.slice(2,4),16), b = parseInt(h.slice(4,6),16);
+  r = Math.round(r + (255-r)*white); g = Math.round(g + (255-g)*white); b = Math.round(b + (255-b)*white);
+  return "#" + [r,g,b].map(function(n){ return pad2(n.toString(16)); }).join("");
+}
+function pad2(s){ return s.length < 2 ? "0"+s : s; }
+function hexRgba(hex, a){
+  var h = hex.replace("#","");
+  return "rgba(" + parseInt(h.slice(0,2),16) + "," + parseInt(h.slice(2,4),16) + "," + parseInt(h.slice(4,6),16) + "," + a + ")";
+}
+function applyTheme(){
+  var c = coachById(S.coach);
+  var a = feral() ? "#ff2e97" : c.accent;
+  var b = feral() ? "#c8ff3d" : hexMix(c.accent, 0.32);
+  var root = document.documentElement.style;
+  root.setProperty("--accent", a);
+  root.setProperty("--accent2", b);
+  root.setProperty("--accent-soft", hexRgba(a, 0.16));
+  document.body.setAttribute("data-vibe", S.vibe);
+  var meta = document.querySelector('meta[name="theme-color"]');
+  if(meta) meta.setAttribute("content", feral() ? "#0b0410" : "#050f18");
+}
 
+/* ============================================================
+   MESSAGE ENGINE
+   ============================================================ */
 function currentIntent(){
   var total = dayTotal(dayKey()), g = goalMl(), pct = g ? total / g : 0;
   if(!S.onboarded) return "welcome";
   if(pct >= 1.6) return "over";
   if(pct >= 1) return "done";
   if(pct >= 0.8) return "almost";
-  var y = shiftDay(dayKey(), -1);
   var hasHistory = Object.keys(S.log).length > 0;
-  if(hasHistory && entries(dayKey()).length === 0 && entries(y).length === 0) return "comeback";
+  if(hasHistory && entries(dayKey()).length === 0 && entries(shiftDay(dayKey(), -1)).length === 0) return "comeback";
   if(pct >= 0.4) return "ontrack";
   return "behind";
 }
@@ -885,17 +1108,16 @@ function buildMessage(){
   var intent = currentIntent();
   var total = dayTotal(dayKey()), g = goalMl();
   var pct = Math.min(999, Math.round((g ? total / g : 0) * 100));
-  var remain = Math.max(0, g - total);
   var t30 = trackedStats(30);
 
   var ctx = {
     intent:intent, pct:pct, streak:currentStreak(), bestStreak:bestStreak(),
     met30:t30.met, logged30:t30.logged, plan:(S.psych.plan||"").trim(), bundle:(S.psych.bundle||"").trim(),
-    fmtRemain:fmt(remain), fmtSmall:fmt(smallSipMl()), hourOfDay:new Date().getHours()
+    fmtRemain:fmt(Math.max(0, g - total)), fmtSmall:fmt(smallSipMl()), hourOfDay:new Date().getHours()
   };
 
   var text = pick(coach.lines[intent] || coach.lines.ontrack);
-  var tags = [];
+  var tags = [], chaos = null;
 
   if(S.psych.enabled){
     var pool = [];
@@ -912,7 +1134,13 @@ function buildMessage(){
       tags.push({ label:chosen.t.why, why:true });
     }
   }
-  return { text:text, tags:tags, coach:coach, intent:intent };
+  if(feral()){
+    chaos = Math.random() < 0.45 && coach.feral ? pick(coach.feral) : pick(CHAOS);
+    if(hadAlcoholToday() && intent !== "done" && Math.random() < 0.5){
+      chaos = "You drank something fun earlier. Water is the tax. Pay it.";
+    }
+  }
+  return { text:text, chaos:chaos, tags:tags, coach:coach, intent:intent };
 }
 
 var lastMsg = null;
@@ -921,46 +1149,79 @@ function renderCoach(newLine){
   var m = lastMsg;
   $("#coachAvatar").textContent = m.coach.emoji;
   $("#coachWho").textContent = (m.coach.name + " the " + m.coach.species).toUpperCase();
-  $("#coachSay").textContent = m.text;
+
+  var say = $("#coachSay");
+  say.textContent = m.text;
+  if(m.chaos){
+    var sp = document.createElement("span");
+    sp.className = "chaos";
+    sp.textContent = m.chaos;
+    say.appendChild(sp);
+  }
   var tr = $("#coachTags");
   tr.innerHTML = "";
-  for(var i=0;i<m.tags.length;i++){
+  m.tags.forEach(function(t){
     var s = document.createElement("span");
-    s.className = "tag" + (m.tags[i].why ? " why" : "");
-    s.textContent = (m.tags[i].why ? "why: " : "🧠 ") + m.tags[i].label;
+    s.className = "tag" + (t.why ? " why" : "");
+    s.textContent = (t.why ? "why: " + t.label : "🧠 " + t.label);
     tr.appendChild(s);
-  }
+  });
   var av = $("#coachAvatar");
   av.classList.add("pop");
-  setTimeout(function(){ av.classList.remove("pop"); }, 260);
+  setTimeout(function(){ av.classList.remove("pop"); }, 300);
 }
 
 /* ============================================================
    RENDER — TODAY
    ============================================================ */
+var shownTotal = 0, countTimer = null;
+function countTo(target){
+  clearInterval(countTimer);
+  var el = $("#totalTxt");
+  var from = shownTotal, diff = target - from, t0 = Date.now(), dur = 550;
+  if(Math.abs(diff) < 1){ el.textContent = fmt(target, false); shownTotal = target; return; }
+  countTimer = setInterval(function(){
+    var p = Math.min(1, (Date.now() - t0) / dur);
+    var eased = 1 - Math.pow(1 - p, 3);
+    el.textContent = fmt(from + diff * eased, false);
+    if(p >= 1){ clearInterval(countTimer); shownTotal = target; }
+  }, 32);
+}
+
 function renderRing(){
   var total = dayTotal(dayKey()), g = goalMl();
-  var ratio = g ? total / g : 0;
-  var pct = Math.round(ratio * 100);
-  var shown = Math.min(1, ratio);
+  var ratio = g ? total / g : 0, pct = Math.round(ratio * 100);
 
-  $("#ringBar").setAttribute("stroke-dasharray", (CIRC * shown).toFixed(1) + " " + CIRC.toFixed(1));
-  $("#wave").style.transform = "translateY(" + (100 - Math.min(100, pct)) + "%)";
-  $("#totalTxt").textContent = fmt(total, false);
+  $("#ringBar").setAttribute("stroke-dasharray", (CIRC * Math.min(1, ratio)).toFixed(1) + " " + CIRC.toFixed(1));
+  var y = "translateY(" + (100 - Math.min(100, pct)) + "%)";
+  $("#wave").style.transform = y;
+  $("#wave2").style.transform = "translateY(" + (100 - Math.min(100, pct) + 2) + "%)";
+  countTo(total);
   $("#goalTxt").textContent = "of " + fmt(g);
   $("#pctTxt").textContent = pct + "%";
 
-  var remain = g - total;
-  var el = $("#remainTxt");
-  if(!S.onboarded){ el.textContent = "Open Setup to get a target built around your body and day."; return; }
-  if(remain > 0){
-    var mins = hhmmToMin(S.profile.sleep) - nowMin();
-    var hrs = Math.max(0, Math.round(mins / 60));
-    el.textContent = fmt(remain) + " to go" + (hrs > 0 ? " · about " + hrs + "h before bed" : " · it's late, sip gently");
+  var remain = g - total, el = $("#remainTxt");
+  if(!S.onboarded){
+    el.textContent = "Open Setup and get a target built around your actual body.";
+  } else if(remain > 0){
+    var hrs = Math.max(0, Math.round((hhmmToMin(S.profile.sleep) - nowMin()) / 60));
+    el.textContent = fmt(remain) + " to go" + (hrs > 0 ? " · roughly " + hrs + "h before bed" : " · it's late, go gently");
   } else if(ratio >= 1.6){
-    el.textContent = "Well past target — ease off the pace for a while.";
+    el.textContent = "Well past target. Ease off — this isn't a contest.";
   } else {
-    el.textContent = "Target met — " + fmt(-remain) + " over. Nice.";
+    el.textContent = "Target met, " + fmt(-remain) + " over. Excellent behaviour.";
+  }
+
+  var chip = $("#paceChip");
+  if(!S.onboarded || remain <= 0){ chip.classList.add("hide"); return; }
+  var p = pace();
+  chip.classList.remove("hide");
+  if(p.through <= 0.02){
+    chip.className = "pacechip"; chip.textContent = "🌅 Day's just started";
+  } else if(p.delta >= -0.03 * g){
+    chip.className = "pacechip ok"; chip.textContent = "✅ On pace for this time of day";
+  } else {
+    chip.className = "pacechip late"; chip.textContent = "⏳ " + fmt(-p.delta) + " behind pace";
   }
 }
 
@@ -975,8 +1236,8 @@ function renderChips(){
     wrap.appendChild(b);
   });
   var d = drinkById(S.drink);
-  $("#alcoholNote").classList.toggle("hide", !d.alcohol);
-  $("#drinkSub").textContent = d.name + " counts at " + Math.round(d.factor*100) + "% toward your target. Tap an amount to log it.";
+  $("#alcoholNote").classList.toggle("hide", !(d.alcohol || hadAlcoholToday()));
+  $("#drinkSub").textContent = d.name + " counts at " + Math.round(d.factor*100) + "% toward your target. Tap an amount.";
 }
 
 function renderQuick(){
@@ -984,11 +1245,10 @@ function renderQuick(){
   grid.innerHTML = "";
   var d = drinkById(S.drink);
   presets().forEach(function(v){
-    var ml = fromUnits(v);
     var b = document.createElement("button");
     b.className = "btn quick";
     b.innerHTML = "<span class='amt'>" + v + "</span><span class='lbl'>" + unitName() + " " + d.emoji + "</span>";
-    b.addEventListener("click", function(){ addDrink(S.drink, ml); });
+    b.addEventListener("click", function(){ addDrink(S.drink, fromUnits(v)); });
     grid.appendChild(b);
   });
 }
@@ -996,18 +1256,21 @@ function renderQuick(){
 function renderLog(){
   var list = $("#logList");
   var e = entries(dayKey()).slice().sort(function(a,b){ return b.t - a.t; });
-  if(!e.length){ list.innerHTML = "<div class='empty'>Nothing logged yet today.</div>"; return; }
+  if(!e.length){
+    list.innerHTML = "<div class='empty'><span class='em'>🫙</span>" +
+      (feral() ? "Empty. Bone dry. Do something about it." : "Nothing logged yet today.") + "</div>";
+    return;
+  }
   list.innerHTML = "";
   e.forEach(function(item){
-    var d = drinkById(item.type);
-    var dt = new Date(item.t);
+    var d = drinkById(item.type), dt = new Date(item.t);
     var row = document.createElement("div");
     row.className = "row";
-    var eff = item.eff !== item.ml ? " · counts as " + fmt(item.eff) : "";
     row.innerHTML =
       "<div class='ic'>" + d.emoji + "</div>" +
       "<div class='txt'><div class='t1'>" + fmt(item.ml) + " " + d.name.toLowerCase() + "</div>" +
-      "<div class='t2'>" + pad(dt.getHours()) + ":" + pad(dt.getMinutes()) + eff + "</div></div>";
+      "<div class='t2'>" + pad(dt.getHours()) + ":" + pad(dt.getMinutes()) +
+      (item.eff !== item.ml ? " · counts as " + fmt(item.eff) : "") + "</div></div>";
     var x = document.createElement("button");
     x.className = "x"; x.textContent = "✕"; x.setAttribute("aria-label", "Remove entry");
     x.addEventListener("click", function(){ removeEntry(item.id); });
@@ -1019,20 +1282,30 @@ function renderLog(){
 /* ============================================================
    RENDER — COACH TAB
    ============================================================ */
+function renderVibe(){
+  $$("#vibeSeg button").forEach(function(b){ b.classList.toggle("on", b.dataset.v === S.vibe); });
+  $("#vibeNote").innerHTML = feral()
+    ? "<strong>Feral mode.</strong> Your coach gets meaner, the app goes hot pink, and every message picks up a line of anti-authority nonsense. Same honest numbers underneath — the data doesn't get unhinged, only the delivery."
+    : "<strong>Standard mode.</strong> Your coach stays in character but keeps it civil. Switch to Feral if polite reminders bounce straight off you.";
+}
 function renderCoachGrid(){
   var grid = $("#coachGrid");
   grid.innerHTML = "";
   COACHES.forEach(function(c){
     var b = document.createElement("button");
     b.className = "coachcard" + (c.id === S.coach ? " on" : "");
-    b.innerHTML = "<div class='em'>" + c.emoji + "</div><div><div class='nm'>" + c.name + "</div>" +
-                  "<div class='sp'>" + c.species + " — " + c.blurb + "</div></div>";
-    b.addEventListener("click", function(){
-      S.coach = c.id; save(); renderCoachGrid(); renderCoach(true);
-      toast(c.name + " the " + c.species.toLowerCase() + " is your coach");
-    });
+    b.style.setProperty("--cc", c.accent);
+    b.innerHTML = "<div class='em'>" + c.emoji + "</div>" +
+      "<div><div class='nm'>" + c.name + "</div><div class='vibe'>" + c.species + " · " + c.vibe + "</div></div>" +
+      "<div class='sp'>" + c.blurb + "</div>";
+    b.addEventListener("click", function(){ setCoach(c.id); });
     grid.appendChild(b);
   });
+}
+function setCoach(id){
+  S.coach = id; save(); applyTheme(); renderCoachGrid(); renderCoach(true);
+  var c = coachById(id);
+  toast(c.emoji + " " + c.name + " is in charge now");
 }
 
 function renderPsych(){
@@ -1062,38 +1335,47 @@ function renderPsych(){
 
   $("#planInput").value = S.psych.plan || "";
   $("#bundleInput").value = S.psych.bundle || "";
-  $("#psychExplain").textContent = on
-    ? "Your coach now adds one behaviour-change technique per message and names it, so you always know what's being used on you. Nothing is hidden, no fake statistics are used, and every claim about your habits comes from your own logged data. Turn the whole thing off any time and your coach goes back to plain encouragement."
-    : "Motivation is currently plain encouragement only — your coach reacts to your progress and nothing else. Switch the toggle on to add opt-in techniques like streak keeping, if–then plans and self-compassion prompts. Each one is labelled in the message and can be turned off individually.";
+  $("#psychExplain").innerHTML = on
+    ? "Your coach now adds <strong>one</strong> behaviour-change technique per message and names it, so you always know what's being run on you. No invented statistics: every claim about your habits is computed from your own log. Kill the whole thing with the toggle above and it reverts to plain encouragement."
+    : "Right now it's plain encouragement — your coach reacts to your progress and nothing else. Switch it on for opt-in techniques: streaks, loss framing, if–then plans, self-compassion and the rest. Each message labels the one it used, and every technique has its own off switch.";
 }
 
 /* ============================================================
    RENDER — STATS
    ============================================================ */
+var selectedDay = null;
 function renderStats(){
-  var days = lastNDays(7), g = goalMl();
-  var max = g;
+  var days = lastNDays(7), g = goalMl(), max = g;
   days.forEach(function(k){ max = Math.max(max, dayTotal(k)); });
 
   var bars = $("#bars");
   bars.innerHTML = "";
   days.forEach(function(k){
-    var v = dayTotal(k), met = metGoal(k);
-    var p = k.split("-");
-    var d = new Date(+p[0], +p[1]-1, +p[2]);
+    var v = dayTotal(k), met = metGoal(k), d = keyToDate(k);
     var col = document.createElement("div");
-    col.className = "bcol";
+    col.className = "bcol" + (k === selectedDay ? " sel" : "");
     col.innerHTML =
       "<div class='btrack'><div class='bgoal' style='bottom:" + Math.min(98.5, g/max*100) + "%'></div>" +
       "<div class='bfill" + (met ? " met" : "") + "' style='height:" + Math.min(100, v/max*100) + "%'></div></div>" +
       "<div class='bday'>" + ["Su","Mo","Tu","We","Th","Fr","Sa"][d.getDay()] + "</div>";
-    col.title = k + " — " + fmt(v);
+    col.addEventListener("click", function(){ selectedDay = (selectedDay === k ? null : k); renderStats(); });
     bars.appendChild(col);
   });
-  $("#barsSub").textContent = "Dashed line is your target of " + fmt(g) + ".";
+  $("#barsSub").textContent = "Dashed line is your target of " + fmt(g) + ". Tap a bar for that day.";
 
-  var t30 = trackedStats(30);
-  var today = dayTotal(dayKey());
+  var det = $("#barDetail");
+  if(selectedDay){
+    var e = entries(selectedDay), tot = dayTotal(selectedDay);
+    var d2 = keyToDate(selectedDay);
+    var label = d2.toLocaleDateString(undefined, { weekday:"long", month:"short", day:"numeric" });
+    det.textContent = e.length
+      ? label + " — " + fmt(tot) + " across " + e.length + " drink" + (e.length === 1 ? "" : "s") + (metGoal(selectedDay) ? " · target met" : " · " + fmt(Math.max(0, g - tot)) + " short")
+      : label + " — nothing logged.";
+  } else {
+    det.textContent = "";
+  }
+
+  var t30 = trackedStats(30), today = dayTotal(dayKey());
   var cells = [
     [Math.round(g ? today/g*100 : 0) + "%", "today"],
     [currentStreak() + "d", "current streak"],
@@ -1116,7 +1398,10 @@ function renderStats(){
     entries(k).forEach(function(e){ mix[e.type] = (mix[e.type] || 0) + e.ml; totalMl += e.ml; });
   });
   var ml = $("#mixList");
-  if(!totalMl){ ml.innerHTML = "<div class='empty'>No drinks logged yet.</div>"; return; }
+  if(!totalMl){
+    ml.innerHTML = "<div class='empty'><span class='em'>📊</span>Log a few drinks and your habits show up here, honestly and without mercy.</div>";
+    return;
+  }
   var rows = Object.keys(mix).map(function(k){ return { id:k, v:mix[k] }; }).sort(function(a,b){ return b.v - a.v; });
   ml.innerHTML = "";
   rows.forEach(function(r){
@@ -1163,11 +1448,23 @@ function renderSetup(){
   bd.innerHTML = "";
   rows.forEach(function(r, i){
     var d = document.createElement("div");
-    d.className = "break";
-    if(i >= rows.length - 2) d.style.color = "var(--txt)";
+    d.className = "break" + (i >= rows.length - 2 ? " total" : "");
     d.innerHTML = "<span>" + r[0] + "</span><span>" + r[1] + "</span>";
     bd.appendChild(d);
   });
+
+  var pf = $("#presetFields");
+  if(pf.children.length !== 4 || pf.dataset.units !== S.units){
+    pf.innerHTML = "";
+    pf.dataset.units = S.units;
+    presets().forEach(function(v, i){
+      var inp = document.createElement("input");
+      inp.type = "number"; inp.inputMode = "numeric"; inp.min = "1"; inp.max = "128"; inp.step = "1";
+      inp.value = v; inp.className = "presetIn"; inp.style.textAlign = "center"; inp.style.padding = "12px 4px";
+      inp.setAttribute("aria-label", "Quick amount " + (i+1) + " in " + unitName());
+      pf.appendChild(inp);
+    });
+  }
 
   var on = !!S.reminders.enabled;
   $("#remToggle").classList.toggle("on", on);
@@ -1176,15 +1473,22 @@ function renderSetup(){
   $("#intervalLbl").textContent = S.reminders.intervalMin;
 }
 
+function renderHeader(){
+  var n = currentStreak();
+  $("#streakNum").textContent = n;
+  $("#streakPill").classList.toggle("lit", n > 0);
+  $("#dateLine").textContent = new Date().toLocaleDateString(undefined, { weekday:"long", month:"short", day:"numeric" });
+}
+
 function renderAll(){
-  renderRing(); renderChips(); renderQuick(); renderLog();
-  renderCoach(false); renderCoachGrid(); renderPsych();
+  applyTheme();
+  renderHeader(); renderRing(); renderChips(); renderQuick(); renderLog();
+  renderCoach(false); renderVibe(); renderCoachGrid(); renderPsych();
   renderStats(); renderSetup();
-  $("#streakNum").textContent = currentStreak();
 }
 
 /* ============================================================
-   FEEDBACK — toast, sparks, haptics
+   FEEDBACK
    ============================================================ */
 var toastTimer = null;
 function toast(msg){
@@ -1192,36 +1496,38 @@ function toast(msg){
   t.textContent = msg;
   t.classList.add("show");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(function(){ t.classList.remove("show"); }, 2200);
+  toastTimer = setTimeout(function(){ t.classList.remove("show"); }, 2300);
 }
 function buzz(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(e){} }
 function burst(emoji, count){
   var host = $("#coachAvatar").getBoundingClientRect();
   count = count || 5;
   for(var i=0;i<count;i++){
-    (function(i){
-      var s = document.createElement("div");
-      s.className = "spark";
-      s.textContent = emoji;
-      s.style.left = (host.left + host.width/2 - 11) + "px";
-      s.style.top = (host.top + host.height/2 - 11) + "px";
-      s.style.setProperty("--dx", (Math.random()*180 - 90).toFixed(0) + "px");
-      s.style.setProperty("--dy", (-60 - Math.random()*110).toFixed(0) + "px");
-      document.body.appendChild(s);
-      setTimeout(function(){ s.remove(); }, 950);
-    })(i);
+    var s = document.createElement("div");
+    s.className = "spark";
+    s.textContent = emoji;
+    s.style.left = (host.left + host.width/2 - 11) + "px";
+    s.style.top = (host.top + host.height/2 - 11) + "px";
+    s.style.setProperty("--dx", (Math.random()*200 - 100).toFixed(0) + "px");
+    s.style.setProperty("--dy", (-70 - Math.random()*120).toFixed(0) + "px");
+    s.style.setProperty("--rot", (Math.random()*180 - 90).toFixed(0) + "deg");
+    document.body.appendChild(s);
+    (function(el){ setTimeout(function(){ el.remove(); }, 1000); })(s);
   }
   buzz(12);
 }
 function celebrate(){
-  ["🎉","💧","✨","🥳","💦"].forEach(function(e, i){
-    setTimeout(function(){ burst(e, 6); }, i * 110);
-  });
+  var f = document.createElement("div");
+  f.className = "flash";
+  document.body.appendChild(f);
+  setTimeout(function(){ f.remove(); }, 800);
+  var set = feral() ? ["🔥","💥","😈","💧","⚡"] : ["🎉","💧","✨","🥳","💦"];
+  set.forEach(function(e, i){ setTimeout(function(){ burst(e, 6); }, i * 110); });
   buzz([18,60,18]);
 }
 
 /* ============================================================
-   SHEET (custom amount / confirmations)
+   SHEET
    ============================================================ */
 var sheetOnOk = null;
 function openSheet(title, sub, bodyHtml, okLabel, onOk){
@@ -1235,16 +1541,13 @@ function openSheet(title, sub, bodyHtml, okLabel, onOk){
 function closeSheet(){ $("#sheet").classList.remove("show"); sheetOnOk = null; }
 $("#sheetCancel").addEventListener("click", closeSheet);
 $("#sheet").addEventListener("click", function(e){ if(e.target === $("#sheet")) closeSheet(); });
-$("#sheetOk").addEventListener("click", function(){
-  var fn = sheetOnOk;
-  if(fn) fn();
-});
+$("#sheetOk").addEventListener("click", function(){ if(sheetOnOk) sheetOnOk(); });
 
 function customSheet(){
   var opts = DRINKS.map(function(d){
     return "<option value='" + d.id + "'" + (d.id === S.drink ? " selected" : "") + ">" + d.emoji + " " + d.name + " (" + Math.round(d.factor*100) + "%)</option>";
   }).join("");
-  openSheet("Custom amount", "Log any size, any drink.",
+  openSheet("Custom amount", "Any size, any drink, no judgement. Some judgement.",
     "<div class='field'><label for='cAmt'>Amount (" + unitName() + ")</label>" +
     "<input type='number' id='cAmt' inputmode='decimal' min='1' step='1' value='" + (S.units === "oz" ? 10 : 300) + "' /></div>" +
     "<div class='field'><label for='cType'>Drink</label><select id='cType'>" + opts + "</select></div>",
@@ -1256,16 +1559,14 @@ function customSheet(){
       closeSheet();
       addDrink(type, fromUnits(v));
     });
-  setTimeout(function(){ var el = $("#cAmt"); if(el){ el.focus(); el.select(); } }, 80);
+  setTimeout(function(){ var el = $("#cAmt"); if(el){ el.focus(); el.select(); } }, 90);
 }
 
 /* ============================================================
    TABS
    ============================================================ */
 function goTab(name){
-  ["today","coach","stats","setup"].forEach(function(t){
-    $("#tab-" + t).classList.toggle("hide", t !== name);
-  });
+  ["today","coach","stats","setup"].forEach(function(t){ $("#tab-" + t).classList.toggle("hide", t !== name); });
   $$(".nav button").forEach(function(b){ b.classList.toggle("on", b.dataset.tab === name); });
   window.scrollTo(0,0);
 }
@@ -1274,37 +1575,52 @@ $$(".nav button").forEach(function(b){
 });
 
 /* ============================================================
-   EVENTS — today tab
+   EVENTS — today
    ============================================================ */
 $("#btnNewLine").addEventListener("click", function(){ renderCoach(true); buzz(6); });
 $("#btnSwitchCoach").addEventListener("click", function(){ goTab("coach"); });
 $("#btnCustom").addEventListener("click", customSheet);
-$("#btnUndo").addEventListener("click", function(){ lastMsg = null; undoLast(); });
+$("#btnUndo").addEventListener("click", undoLast);
+$("#btnChaser").addEventListener("click", function(){
+  addDrink("water", S.units === "oz" ? 12 * OZ : 350);
+});
 
 /* ============================================================
-   EVENTS — coach tab
+   EVENTS — coach
    ============================================================ */
+$$("#vibeSeg button").forEach(function(b){
+  b.addEventListener("click", function(){
+    if(S.vibe === b.dataset.v) return;
+    S.vibe = b.dataset.v;
+    save(); applyTheme(); renderVibe(); renderLog(); renderCoach(true);
+    if(feral()){ celebrate(); toast("😈 Feral mode engaged"); }
+    else toast("🙂 Back to standard");
+  });
+});
+$("#btnRandomCoach").addEventListener("click", function(){
+  var others = COACHES.filter(function(c){ return c.id !== S.coach; });
+  setCoach(pick(others).id);
+});
 $("#psychToggle").addEventListener("click", function(){
   S.psych.enabled = !S.psych.enabled;
   save(); renderPsych(); renderCoach(true);
-  toast(S.psych.enabled ? "Psychology-based motivation on" : "Back to plain encouragement");
+  toast(S.psych.enabled ? "🧠 Techniques on — each one gets named" : "Back to plain encouragement");
 });
 $("#btnSavePsych").addEventListener("click", function(){
   S.psych.plan = $("#planInput").value.trim();
   S.psych.bundle = $("#bundleInput").value.trim();
-  save(); renderCoach(true); toast("Motivation settings saved");
+  save(); renderCoach(true); toast("Saved");
 });
 
 /* ============================================================
-   EVENTS — setup tab
+   EVENTS — setup
    ============================================================ */
 $$("#unitSeg button").forEach(function(b){
   b.addEventListener("click", function(){
     var u = b.dataset.u;
     if(u === S.units) return;
-    // convert the stored body weight between lb and kg so the estimate stays honest
-    if(u === "ml") S.profile.weight = Math.round(S.profile.weight * 0.453592);
-    else S.profile.weight = Math.round(S.profile.weight / 0.453592);
+    // convert stored body weight so the estimate stays honest
+    S.profile.weight = u === "ml" ? Math.round(S.profile.weight * 0.453592) : Math.round(S.profile.weight / 0.453592);
     S.units = u;
     save(); renderAll(); toast("Units: " + (u === "oz" ? "ounces" : "millilitres"));
   });
@@ -1312,9 +1628,7 @@ $$("#unitSeg button").forEach(function(b){
 
 function readProfile(){
   var p = S.profile;
-  var w = parseFloat($("#inWeight").value);
-  var a = parseInt($("#inAge").value, 10);
-  var act = parseInt($("#inActivity").value, 10);
+  var w = parseFloat($("#inWeight").value), a = parseInt($("#inAge").value, 10), act = parseInt($("#inActivity").value, 10);
   p.weight = isFinite(w) && w > 0 ? w : p.weight;
   p.age = isFinite(a) && a > 0 ? Math.min(110, Math.max(13, a)) : p.age;
   p.activity = isFinite(act) && act >= 0 ? Math.min(600, act) : 0;
@@ -1329,11 +1643,11 @@ $("#btnRecalc").addEventListener("click", function(){
   S.goalOverrideMl = null;
   S.onboarded = true;
   save(); lastMsg = null; renderAll();
-  toast("New target: " + fmt(goalMl()));
+  toast("Target: " + fmt(goalMl()));
   celebrate();
 });
 ["inSex","inClimate","inSpecial","inWake","inSleep"].forEach(function(id){
-  $("#" + id).addEventListener("change", function(){ readProfile(); save(); renderSetup(); });
+  $("#" + id).addEventListener("change", function(){ readProfile(); save(); renderSetup(); renderRing(); });
 });
 $("#btnGoalUp").addEventListener("click", function(){
   S.goalOverrideMl = Math.min(6000, goalMl() + stepMl());
@@ -1347,6 +1661,13 @@ $("#btnGoalReset").addEventListener("click", function(){
   S.goalOverrideMl = null;
   save(); lastMsg = null; renderAll(); toast("Back to the estimate: " + fmt(goalMl()));
 });
+$("#btnSavePresets").addEventListener("click", function(){
+  var vals = $$(".presetIn").map(function(i){ return parseFloat(i.value); });
+  var clean = vals.map(function(v){ return isFinite(v) && v > 0 ? Math.round(Math.min(S.units === "oz" ? 128 : 3000, v)) : null; });
+  if(clean.indexOf(null) !== -1){ toast("All four need a number"); return; }
+  S.presets[S.units] = clean;
+  save(); renderQuick(); toast("Quick amounts updated");
+});
 
 /* ---- reminders ---- */
 $("#remToggle").addEventListener("click", function(){
@@ -1354,12 +1675,8 @@ $("#remToggle").addEventListener("click", function(){
   S.reminders.enabled = turningOn;
   S.reminders.lastNudge = Date.now();
   save(); renderSetup();
-  if(turningOn){
-    askNotify();
-    toast("Reminders on — every " + S.reminders.intervalMin + " min");
-  } else {
-    toast("Reminders off");
-  }
+  if(turningOn){ askNotify(); toast("Reminders on — every " + S.reminders.intervalMin + " min"); }
+  else toast("Reminders off");
 });
 $("#inInterval").addEventListener("input", function(){
   S.reminders.intervalMin = parseInt($("#inInterval").value, 10) || 90;
@@ -1382,7 +1699,7 @@ function nudge(force){
   lastMsg = null;
   var m = buildMessage();
   renderCoach(true);
-  var body = m.coach.name + ": " + m.text;
+  var body = m.coach.name + ": " + m.text + (m.chaos ? " " + m.chaos : "");
   var sent = false;
   try{
     if("Notification" in window && Notification.permission === "granted"){
@@ -1390,16 +1707,17 @@ function nudge(force){
       sent = true;
     }
   }catch(e){}
-  if(!sent) toast("💧 " + m.coach.name + " says: drink up");
+  if(!sent) toast("💧 " + m.coach.name + " wants a word");
   if(force) buzz(20);
   S.reminders.lastNudge = Date.now();
   save();
 }
 
-/* ---- data ---- */
-/* Saving a file works two ways: inside the claude.ai artifact viewer the host
-   mediates it through the downloads capability, everywhere else it's a plain
-   object-URL link. Resolve the capability once, lazily, and fall back. */
+/* ============================================================
+   DATA
+   ============================================================ */
+/* Inside the claude.ai artifact viewer a plain download link does nothing,
+   so route through the host's downloads capability and fall back elsewhere. */
 var dlPromise = null;
 function getDownloads(){
   if(dlPromise) return dlPromise;
@@ -1428,24 +1746,23 @@ $("#btnExport").addEventListener("click", function(){
   var name = "hydrobuddy-" + dayKey() + ".json";
   getDownloads().then(function(dl){
     if(!dl){ linkDownload(name, payload); return; }
-    dl.save({ filename:name, data:payload }).then(function(){
-      toast("Exported");
-    }, function(err){
+    dl.save({ filename:name, data:payload }).then(function(){ toast("Exported"); }, function(err){
       var code = err && err.code;
       if(code === "declined") toast("Export cancelled");
-      else if(code === "rate_limited") toast("Try the export again in a moment");
+      else if(code === "rate_limited") toast("Try that again in a moment");
       else toast("Export isn't available here");
     });
   });
 });
 $("#btnReset").addEventListener("click", function(){
-  openSheet("Reset everything?", "Deletes your profile, coach choice and every logged drink on this device. This cannot be undone.",
-    "<div class='note warn'>You'll be back to a blank HydroBuddy+.</div>", "Delete it all",
+  openSheet("Burn it all down?", "Deletes your profile, your coach, your streak and every logged drink on this device. No undo, no backup, no mercy.",
+    "<div class='note warn'>Export first if any of that matters to you.</div>", "Delete everything",
     function(){
       try{ localStorage.removeItem(KEY); }catch(e){}
       S = clone(defaults);
-      closeSheet(); lastMsg = null; renderAll(); goTab("setup");
-      toast("Everything reset");
+      selectedDay = null; shownTotal = 0; lastMsg = null;
+      closeSheet(); renderAll(); goTab("setup");
+      toast("Wiped. Fresh start.");
     });
 });
 
@@ -1454,13 +1771,13 @@ $("#btnReset").addEventListener("click", function(){
    ============================================================ */
 var currentDay = dayKey();
 setInterval(function(){
-  // midnight rollover
   if(dayKey() !== currentDay){
     currentDay = dayKey();
-    lastMsg = null;
+    selectedDay = null; shownTotal = 0; lastMsg = null;
     renderAll();
+  } else {
+    renderRing();
   }
-  // reminders
   if(S.reminders.enabled && awake()){
     var due = (S.reminders.lastNudge || 0) + S.reminders.intervalMin * 60000;
     if(Date.now() >= due && dayTotal(dayKey()) < goalMl()) nudge(false);
@@ -1469,7 +1786,7 @@ setInterval(function(){
 
 document.addEventListener("visibilitychange", function(){
   if(!document.hidden){
-    if(dayKey() !== currentDay){ currentDay = dayKey(); lastMsg = null; }
+    if(dayKey() !== currentDay){ currentDay = dayKey(); selectedDay = null; shownTotal = 0; lastMsg = null; }
     renderAll();
   }
 });
@@ -1480,7 +1797,7 @@ document.addEventListener("visibilitychange", function(){
 renderAll();
 if(!S.onboarded){
   goTab("setup");
-  setTimeout(function(){ toast("Set your details to get a personal target"); }, 600);
+  setTimeout(function(){ toast("Fill this in and get a target that's actually yours"); }, 700);
 }
 })();
 </script>
