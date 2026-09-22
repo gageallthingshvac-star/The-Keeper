@@ -65,7 +65,6 @@
     text-align:center;
     z-index:20;
   }
-  .screen.on{display:flex;animation:fade .22s ease both}
   .screen.veil{background:linear-gradient(180deg,rgba(143,210,234,.55),rgba(143,210,234,.8))}
   @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
   @keyframes pop{from{opacity:0;transform:scale(.86)}to{opacity:1;transform:none}}
@@ -503,6 +502,151 @@
 
   /* ---- the play button, a size down: it was taking the whole middle of
          the title screen and the eye had nowhere else to go ------------ */
+
+  /* ================================================================
+     Motion.
+
+     One vocabulary, used everywhere, so the app moves like one thing
+     rather than like a pile of screens that each had a nice idea.
+
+     Three curves and three durations. `--e-out` is the one that does
+     almost all the work: it leaves fast and arrives slowly, which is how
+     a real object that has been pushed behaves and is why it reads as
+     weight rather than as a fade. `--e-in` is its opposite and is only
+     ever used on things leaving, because something going away should not
+     linger. `--e-spring` overshoots a little and is kept for the few
+     places where a small object needs to feel eager.
+
+     Everything animated here is transform and opacity and nothing else,
+     so none of it can cost a frame.
+     ================================================================ */
+  :root{
+    --e-out:cubic-bezier(.22,1,.36,1);
+    --e-in:cubic-bezier(.55,.06,.68,.19);
+    --e-spring:cubic-bezier(.34,1.56,.64,1);
+    --t-fast:.16s; --t-base:.34s; --t-slow:.52s;
+    --stagger:38ms;
+  }
+
+  /* ---- screens: forward goes in and up, back comes out and down ---- */
+  .screen{will-change:transform,opacity}
+  .screen.on{display:flex}
+  @keyframes scrInFwd{
+    from{opacity:0;transform:translate3d(0,18px,0) scale(.975)}
+    to{opacity:1;transform:none}
+  }
+  @keyframes scrOutFwd{
+    from{opacity:1;transform:none}
+    to{opacity:0;transform:translate3d(0,-14px,0) scale(1.018)}
+  }
+  @keyframes scrInBack{
+    from{opacity:0;transform:translate3d(0,-14px,0) scale(1.03)}
+    to{opacity:1;transform:none}
+  }
+  @keyframes scrOutBack{
+    from{opacity:1;transform:none}
+    to{opacity:0;transform:translate3d(0,22px,0) scale(.97)}
+  }
+  .screen.in-fwd{animation:scrInFwd var(--t-base) var(--e-out) both}
+  .screen.in-back{animation:scrInBack var(--t-base) var(--e-out) both}
+  .screen.out-fwd{animation:scrOutFwd var(--t-fast) var(--e-in) both;pointer-events:none}
+  .screen.out-back{animation:scrOutBack var(--t-fast) var(--e-in) both;pointer-events:none}
+
+  /* ---- and their contents arrive in order, not all at once ---- */
+  @keyframes riseIn{
+    from{opacity:0;transform:translate3d(0,16px,0)}
+    to{opacity:1;transform:none}
+  }
+  .screen.in-fwd > *, .screen.in-back > *{
+    animation:riseIn var(--t-slow) var(--e-out) both;
+  }
+  .screen.in-fwd > :nth-child(1),.screen.in-back > :nth-child(1){animation-delay:calc(var(--stagger) * 1)}
+  .screen.in-fwd > :nth-child(2),.screen.in-back > :nth-child(2){animation-delay:calc(var(--stagger) * 2)}
+  .screen.in-fwd > :nth-child(3),.screen.in-back > :nth-child(3){animation-delay:calc(var(--stagger) * 3)}
+  .screen.in-fwd > :nth-child(4),.screen.in-back > :nth-child(4){animation-delay:calc(var(--stagger) * 4)}
+  .screen.in-fwd > :nth-child(5),.screen.in-back > :nth-child(5){animation-delay:calc(var(--stagger) * 5)}
+  .screen.in-fwd > :nth-child(6),.screen.in-back > :nth-child(6){animation-delay:calc(var(--stagger) * 6)}
+  .screen.in-fwd > :nth-child(7),.screen.in-back > :nth-child(7){animation-delay:calc(var(--stagger) * 7)}
+  .screen.in-fwd > :nth-child(8),.screen.in-back > :nth-child(8){animation-delay:calc(var(--stagger) * 8)}
+  .screen.in-fwd > :nth-child(n+9),.screen.in-back > :nth-child(n+9){animation-delay:calc(var(--stagger) * 9)}
+
+  /* the play button is the one thing that gets to overshoot */
+  #scr-title.in-fwd .play-btn, #scr-title.in-back .play-btn{
+    animation:playIn var(--t-slow) var(--e-spring) both;
+    animation-delay:calc(var(--stagger) * 4);
+  }
+  @keyframes playIn{
+    from{opacity:0;transform:rotate(45deg) scale(.7)}
+    to{opacity:1;transform:rotate(45deg) scale(1)}
+  }
+
+  /* ---- grids: each cell lands a beat after the one before it ---- */
+  @keyframes cellIn{
+    from{opacity:0;transform:translate3d(0,10px,0) scale(.9)}
+    to{opacity:1;transform:none}
+  }
+  .lvl, .skin, .theme, .shieldpick{animation:cellIn .38s var(--e-out) both}
+
+  /* ---- rows inside a panel ---- */
+  @keyframes rowIn{from{opacity:0;transform:translate3d(0,8px,0)}to{opacity:1;transform:none}}
+  .screen.in-fwd .opt, .screen.in-back .opt{animation:rowIn .40s var(--e-out) both}
+  .screen.in-fwd .opt:nth-child(1),.screen.in-back .opt:nth-child(1){animation-delay:.10s}
+  .screen.in-fwd .opt:nth-child(2),.screen.in-back .opt:nth-child(2){animation-delay:.15s}
+  .screen.in-fwd .opt:nth-child(3),.screen.in-back .opt:nth-child(3){animation-delay:.20s}
+  .screen.in-fwd .opt:nth-child(n+4),.screen.in-back .opt:nth-child(n+4){animation-delay:.24s}
+
+  /* ---- controls: the small feedback that makes a thing feel real ---- */
+  .btn{transition:transform var(--t-fast) var(--e-out), box-shadow var(--t-fast) var(--e-out),
+                 background var(--t-fast) linear, filter var(--t-fast) linear}
+  .btn:active{transform:translateY(2px) scale(.975)}
+  .icon-btn{transition:transform var(--t-fast) var(--e-spring), background var(--t-fast) linear}
+  .icon-btn:active{transform:scale(.88)}
+  .switch{transition:background .2s var(--e-out)}
+  .switch i{transition:transform .28s var(--e-spring)}
+  .seg button{transition:background var(--t-fast) var(--e-out), color var(--t-fast) linear,
+                         transform var(--t-fast) var(--e-out)}
+  .seg button:active{transform:scale(.94)}
+  .theme, .skin, .shieldpick, .lvl{transition:transform var(--t-fast) var(--e-spring),
+                                              outline-color var(--t-fast) linear}
+  .play-btn{transition:transform var(--t-base) var(--e-spring), background var(--t-base) var(--e-out),
+                       box-shadow var(--t-base) var(--e-out)}
+  .play-btn:active{transform:rotate(45deg) scale(.92)}
+
+  /* ---- the toast and the flash, on the same curves ---- */
+  .toast{transition:opacity var(--t-base) var(--e-out), transform var(--t-base) var(--e-out)}
+  .stage-banner{transition:opacity var(--t-base) var(--e-out), transform var(--t-base) var(--e-out)}
+
+  /* ---- the HUD arrives with the run rather than snapping on ---- */
+  @keyframes hudIn{from{opacity:0;transform:translate3d(0,-10px,0)}to{opacity:1;transform:none}}
+  @keyframes hudUp{from{opacity:0;transform:translate3d(0,12px,0)}to{opacity:1;transform:none}}
+  #hud.on .hud-top{animation:hudIn .5s var(--e-out) both;animation-delay:.05s}
+  #hud.on #scoreBig{animation:hudIn .5s var(--e-out) both;animation-delay:.12s}
+  #hud.on .bar-wrap{animation:hudUp .5s var(--e-out) both;animation-delay:.16s}
+  #hud.on .telem{animation:hudUp .5s var(--e-out) both;animation-delay:.22s}
+  #hud.on #burstBtn{animation:hudUp .5s var(--e-spring) both;animation-delay:.26s}
+
+  /* ---- the world steps back while you are reading something over it ----
+     A menu that simply covers the game leaves the game sitting there at full
+     size and full attention, competing. Pulling the canvas back a hair and
+     taking the edge off it puts the two in the right order without a single
+     extra pixel of chrome — and it runs on the compositor, so it is free. */
+  #cv{transition:transform var(--t-slow) var(--e-out), filter var(--t-slow) var(--e-out);
+      transform-origin:50% 46%}
+  body.veiled #cv{transform:scale(.955);filter:saturate(.82) brightness(.9)}
+  body.calm #cv{transition:none}
+  body.calm.veiled #cv{transform:none;filter:none}
+
+  /* ---- and none of it happens if you asked for stillness ---- */
+  body.calm .screen.in-fwd, body.calm .screen.in-back,
+  body.calm .screen.out-fwd, body.calm .screen.out-back,
+  body.calm .screen.in-fwd > *, body.calm .screen.in-back > *,
+  body.calm .lvl, body.calm .skin, body.calm .theme, body.calm .shieldpick,
+  body.calm .screen.in-fwd .opt, body.calm .screen.in-back .opt,
+  body.calm #hud.on .hud-top, body.calm #hud.on #scoreBig, body.calm #hud.on .bar-wrap,
+  body.calm #hud.on .telem, body.calm #hud.on #burstBtn{
+    animation-duration:.01s !important;animation-delay:0s !important;
+  }
+
   /* ---------- the look and protector pickers ---------- */
   .themes{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;padding:2px 0 8px}
   .theme{min-width:0}
@@ -909,7 +1053,7 @@ function segSegDist(ax1, ay1, ax2, ay2, bx1, by1, bx2, by2, out){
    are playing the same build — which a version label alone can never tell
    you, least of all when one of you is looking at something a browser cached
    a week ago. Change one character of the game and the code changes. */
-const BUILD = { v: "1.2", n: 27, date: "22 Sep 2026", code: "0000000" };
+const BUILD = { v: "1.3", n: 28, date: "22 Sep 2026", code: "0000000" };
 (() => {
   // scripts and stylesheets: everything that decides how the game behaves and
   // how it looks. Not the markup, which the game rewrites as it runs and which
@@ -5472,9 +5616,54 @@ const SCREENS = ["scr-title", "scr-levels", "scr-settings", "scr-skins", "scr-pa
 const UI = {
   overShown: false, overTitle: "overTitle",
   _score: -1, _gems: -1, _prog: -1, _energy: -1, _pw: "", _combo: -1, _lvl: "",
+  /* Screens know how deep they are, and the direction of a move is the
+     difference between where you were and where you are going. Going deeper
+     pushes up and in; coming back pulls down and out. It is the one piece of
+     information that makes a set of screens feel like a place rather than a
+     slideshow, and it costs a lookup. */
+  _depth: { "scr-title": 0, "scr-levels": 1, "scr-settings": 1, "scr-skins": 1,
+            "scr-brief": 2, "scr-pause": 2, "scr-over": 2, "scr-clear": 2 },
+  _at: "scr-title", _navTok: 0,
   show(name){
-    for (const id of SCREENS) $(id).classList.toggle("on", id === name);
+    const from = this._at, to = name;
+    this._at = to;
+    const calm = !!save.opts.calm;
+    const dFrom = this._depth[from] === undefined ? 0 : this._depth[from];
+    const dTo = this._depth[to] === undefined ? 0 : this._depth[to];
+    const back = dTo < dFrom;
+    const inCls = back ? "in-back" : "in-fwd";
+    const outCls = back ? "out-back" : "out-fwd";
+    for (const id of SCREENS){
+      const el = $(id);
+      el.classList.remove("in-fwd", "in-back", "out-fwd", "out-back");
+      if (id === to){
+        el._exitTok = -1;                 // it is arriving, not leaving
+        el.classList.add("on");
+        // restart the animation cleanly even when the same screen is re-shown
+        void el.offsetWidth;
+        el.classList.add(inCls);
+      } else if (el.classList.contains("on")){
+        if (calm){ el.classList.remove("on"); continue; }
+        el.classList.add(outCls);
+        /* Stamp the exit. Navigate faster than the animation runs and a
+           screen can be on its way out, be asked back in, and then have the
+           first exit's callback arrive and take it off again — which is how
+           you end up looking at no screen at all. The token means a callback
+           can only ever finish the exit it was started for. */
+        const tok = ++this._navTok;
+        el._exitTok = tok;
+        const kill = () => {
+          if (el._exitTok !== tok || UI._at === id) return;
+          el.classList.remove("on", outCls);
+        };
+        // whichever lands first: the animation finishing, or a safety net for
+        // a tab that was in the background while it was meant to be running
+        el.addEventListener("animationend", kill, { once: true });
+        setTimeout(kill, 360);
+      }
+    }
     $("hud").classList.toggle("on", name === null || name === "scr-pause" || name === "scr-brief");
+    document.body.classList.toggle("veiled", !!name);
   },
   toastT: 0,
   flash(msg){
@@ -5552,6 +5741,7 @@ const UI = {
         row.className = "brief-stage";
         row.innerHTML = "<i>" + stageGlyph(ph.kind === "orbit" ? "ring" : ph.kind === "pad" ? "cross" : "chevron") +
                         "</i><b>" + ph.name + "</b><span>" + ph.sub.split(" · ")[0] + "</span>";
+        row.style.animationDelay = (0.06 + i * 0.03) + "s";
         host.appendChild(row);
       });
       this.show("scr-brief");
@@ -5572,6 +5762,7 @@ const UI = {
       row.className = "brief-stage";
       row.innerHTML = "<i>" + stageGlyph(s.stage.look) + "</i><b>" + s.stage.name +
                       "</b><span>Stage " + (i + 1) + "</span>";
+      row.style.animationDelay = (0.06 + i * 0.045) + "s";
       host.appendChild(row);
     });
     this.show("scr-brief");
@@ -5694,13 +5885,30 @@ const UI = {
     Audio2.duck(false);
     enterMenu();
   },
+  /* A number that is simply written into the page has no weight. Rolling it
+     up takes a third of a second and makes the same number feel earned — and
+     because it is driven off a frame clock rather than a timer, it lands on
+     the real value however long the browser took to get there. */
+  countUp(id, to, ms){
+    const el = $(id);
+    if (save.opts.calm || !to){ el.textContent = to; return; }
+    const t0 = performance.now(), from = 0;
+    const tick = now => {
+      const k = clamp((now - t0) / (ms || 460), 0, 1);
+      const e = 1 - Math.pow(1 - k, 3);
+      el.textContent = Math.round(from + (to - from) * e);
+      if (k < 1) requestAnimationFrame(tick);
+      else el.textContent = to;
+    };
+    requestAnimationFrame(tick);
+  },
   showOver(){
     this.overShown = true;
     bankRun();
     const pct = G.def.endless ? 100 : Math.round(clamp(G.climbed / G.def.lengthU, 0, 1) * 100);
-    $("overScore").textContent = G.score;
+    this.countUp("overScore", G.score | 0, 620);
     $("overBest").textContent = G.def.endless ? save.endlessBest : (save.levels[G.def.n] && save.levels[G.def.n].best) || G.score;
-    $("overGems").textContent = G.gems;
+    this.countUp("overGems", G.gems | 0, 420);
     if (isMission()){
       const m = missionNow();
       $("overFar").textContent = (PLANETS[m.ph.body] || {}).name || m.ph.name.split(" ")[0].toUpperCase();
@@ -5743,7 +5951,7 @@ const UI = {
     persist();
     $("clearSub").textContent = "Level " + n + " · " + BIOMES[G.def.biome].name;
     $("clearStars").innerHTML = [0, 1, 2].map(i => i < stars ? "<b>★</b>" : "★").join("");
-    $("clearScore").textContent = G.score;
+    this.countUp("clearScore", G.score | 0, 620);
     $("clearGems").textContent = G.gems + " / " + G.gemsPlaced;
     $("clearBest").textContent = rec.best;
     $("clearNo").textContent = G.hits === 0 ? "Yes" : "No";
@@ -5924,6 +6132,7 @@ document.querySelectorAll(".switch").forEach(sw => {
     persist(); syncSwitches(); Audio2.SFX.ui();
     if (k === "music"){ Audio2.unlock(); Audio2.setMusic(!!save.opts.music); }
     if (k === "haptics" && save.opts.haptics) buzz(18);
+    if (k === "calm") applyCalm();
     if (k === "telem") $("telem").classList.toggle("on", isMission() && !!save.opts.telem);
   });
 });
@@ -5946,6 +6155,7 @@ const THEMES = [
 function themeNow(){ return THEMES[clamp(save.opts.theme | 0, 0, THEMES.length - 1)]; }
 /* Auto is the only one that answers to where you are: dark for the mission,
    light for the levels, which is what the game did before there was a choice. */
+function applyCalm(){ document.body.classList.toggle("calm", !!save.opts.calm); }
 function applyTheme(){
   const t = themeNow();
   const cls = t.id === "auto" ? (isMission() ? "pal-dark" : "") : t.cls;
@@ -5963,6 +6173,7 @@ function buildThemeGrid(){
     b.className = "theme" + (i === (save.opts.theme | 0) ? " on" : "");
     b.innerHTML = '<i style="background:linear-gradient(140deg,' + t.sw[0] + ' 0 46%,' +
                   t.sw[1] + ' 46% 76%,' + t.sw[2] + ' 76% 100%)"></i><b>' + t.name + '</b>';
+    b.style.animationDelay = (i * 0.045) + "s";
     b.addEventListener("click", () => {
       save.opts.theme = i; persist(); applyTheme(); buildThemeGrid(); Audio2.SFX.ui();
     });
@@ -6003,6 +6214,7 @@ function buildShieldGrid(){
                '" stroke-width="4" opacity=".5"/><path d="' + D +
                '" fill="none" stroke="' + sk.trim + '" stroke-width="3.4" opacity=".8"/>';
     b.innerHTML = '<svg viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg">' + inner + '</svg>';
+    b.style.animationDelay = (SHIELDS.indexOf(sk) * 0.04) + "s";
     b.addEventListener("click", () => {
       save.shield = sk.id; persist(); buildShieldGrid();
       $("shieldWhat").textContent = sk.name;
@@ -6096,6 +6308,7 @@ $("heckName").textContent = "Today " + Heck.name + " is on the roof.";
 G.hintT = save.seen ? 0 : 6;
 if (!save.seen){ save.seen = 1; persist(); }
 syncSwitches();
+applyCalm();
 enterMenu();
 setTimeout(() => { if (save.opts.music) Audio2.setMusic(true); }, 100);
 </script>
