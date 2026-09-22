@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
 <title>Updraft</title>
-<meta name="description" content="Hold the line. Forty-five levels of it, and a mission from Launch Complex 39A to the heliopause." />
+<meta name="description" content="Hold the line. Forty-five levels of it, and an endless climb from Launch Complex 39A to the heliopause." />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -658,7 +658,7 @@
     </div>
     <div class="row">
       <button class="btn ghost" id="toLevels">Levels</button>
-      <button class="btn ghost" id="toEndless">Mission</button>
+      <button class="btn ghost" id="toEndless">Endless</button>
     </div>
     <div class="row">
       <button class="btn ghost" id="toSkins">Balloons</button>
@@ -666,6 +666,7 @@
     </div>
     <p class="fine">Every level free. No ads. No timers.</p>
     <p class="build" id="titleBuild"></p>
+    <p class="fine" id="heckName" style="margin-top:-2px;opacity:.85"></p>
   </div>
 
   <!-- ================= LEVELS ================= -->
@@ -908,7 +909,7 @@ function segSegDist(ax1, ay1, ax2, ay2, bx1, by1, bx2, by2, out){
    are playing the same build — which a version label alone can never tell
    you, least of all when one of you is looking at something a browser cached
    a week ago. Change one character of the game and the code changes. */
-const BUILD = { v: "1.1", n: 26, date: "22 Sep 2026", code: "0000000" };
+const BUILD = { v: "1.2", n: 27, date: "22 Sep 2026", code: "0000000" };
 (() => {
   // scripts and stylesheets: everything that decides how the game behaves and
   // how it looks. Not the markup, which the game rewrites as it runs and which
@@ -936,6 +937,7 @@ const defaultSave = () => ({
   shield: "classic",
   ver: "",           // a version label you can set yourself
   seen: 0,
+  heckSeed: 0,
   fails: {},
   endlessClimb: 0,          // tutorial shown
   opts: { sfx: 1, music: 1, haptics: 1, calm: 0, lefty: 0, assist: 0,
@@ -2023,8 +2025,8 @@ function clearLine(fresh, raw){
   // raw runs past 1 on the laps, which is where the last of the pressure
   // comes from once there is nothing further out to fly to
   const d = Math.min(1.7, raw);
-  const budget = 2.4 + d * 6.0;        // mass allowed to stand in the line
-  const maxCost = 4.2 + d * 5.4;       // and how much of the line it may cover
+  const budget = 2.7 + d * 6.6;        // mass allowed to stand in the line
+  const maxCost = 4.6 + d * 6.0;       // and how much of the line it may cover
   /* A piece's cost is not one. Since the shapes stopped being balls, a plate
      three times the ship's width standing in the line is a different problem
      from a pebble, and counting them the same is how a debris field turns
@@ -2052,7 +2054,7 @@ function clearLine(fresh, raw){
   const left = inLane().sort((a, b) => b.y - a.y);
   // the gap between arrivals closes as the journey goes on: at the pad you get
   // a second and a half to deal with each piece, out past Pluto barely one
-  const GAPV = Math.max(50, 86 - d * 30);
+  const GAPV = Math.max(46, 82 - d * 32);
   for (let i = 1; i < left.length; i++){
     const cap = left[i - 1].y - GAPV;
     if (left[i].y > cap){ left[i].y = cap; rebuildParts(left[i]); }
@@ -2666,9 +2668,9 @@ function spawnWave(){
   // Room between arrangements. It closes steadily with the journey rather
   // than with distance, and the laps close it further, to a floor that still
   // leaves one clean sweep between one thing and the next.
-  const space = isMission() ? Math.max(120, lerp(330, 136, d) * (1 - Math.min(0.24, over * 0.13)))
+  const space = isMission() ? Math.max(112, lerp(308, 126, d) * (1 - Math.min(0.26, over * 0.14)))
               : endless ? Math.max(160, 380 - G.climbed / 70)
-              : lerp(420 - d * 120, 340 - d * 130, t);
+              : lerp(392 - d * 126, 312 - d * 132, t);
   G.nextSpawn = G.climbed + reach + space * (0.9 + rng() * 0.25);
 }
 function spawnCheck(){
@@ -2695,6 +2697,7 @@ function startRun(mode, n){
   G.lastKind = ""; G.overT = 0; G.blocks = 0;
   G.stages = buildStages(G.def); G.stageIdx = -1;
   G.usedRevive = false; G.bankedGems = 0; G.failCounted = false;
+  Heck.reset();
   G.state = "brief";
   document.body.classList.toggle("mission", isMission());
   applyTheme();
@@ -3245,6 +3248,311 @@ const SKINS = [
 function SKIN_BY_ID(id){
   for (const s of SKINS) if (s.id === id) return s;
   return SKINS[0];
+}
+
+/* =========================================================== the neighbour
+
+   Somebody lives on the other side of the wall.
+
+   On the title screen he wanders about doing nothing in particular. In a run
+   he is mostly not there at all — and then a hatch bangs open in the side of
+   the sky, he leans out, says something perfectly reasonable in the wrong
+   way, and drops something on you.
+
+   His name is generated once, from a seed stored with your save, so he is
+   the same character every time you open the game and a different one from
+   the next person's. Everything he throws is a real body with a real
+   collider: the shield turns it away like anything else, and it is always
+   released far enough above you to be met.                                */
+const HECK_TITLE = ["", "", "", "Dr.", "Mr.", "Chief", "Inspector", "Deputy", "Professor"];
+const HECK_FIRST = ["Gorbo", "Nubbins", "Klemp", "Wexley", "Snoot", "Fibb", "Dorbus", "Hax",
+                    "Tunk", "Pilbert", "Mim", "Grunk", "Yex", "Bramble", "Oddwin", "Squint",
+                    "Feek", "Morv", "Plib", "Zank", "Hedley", "Ovid", "Trundle", "Bix"];
+const HECK_LAST  = ["Flinchwick", "Nettlebore", "Grimsby", "Crumb", "Fickett", "Vole",
+                    "Thundermop", "Prattle", "Sockworth", "Hazzard", "Muddle", "Quill",
+                    "Pinchbeck", "Stubbs", "Wickham", "Dregg", "Tonk", "Marrow", "Skelp",
+                    "Yarrow", "Bellows", "Gaunt", "Pocklington", "Snide"];
+
+/* Two voices, and the difference between them is the joke. Idle, he is a man
+   with too much time. Working, he is entirely methodical about something no
+   methodical person would be doing. */
+const HECK_IDLE = [
+  "I have a clipboard. It is mine.",
+  "Third Tuesday. Always the worst one.",
+  "I alphabetised the gravel.",
+  "Nobody has asked me what the lever does.",
+  "I am not supposed to be up here.",
+  "Everything is fine and I have checked twice.",
+  "My hat is regulation. The head is not.",
+  "I counted the clouds. There are enough.",
+  "The manual is in my other coat.",
+  "I have been awake for one excellent week.",
+  "Someone left a door where a wall should be.",
+  "I am the one who writes it all down.",
+  "This is my favourite part of the sky.",
+  "I fixed the thing. It is worse now.",
+  "Ask me about drag coefficients. Go on.",
+  "I brought sandwiches. They are also for science.",
+  "The rules did not say I could not.",
+  "I have opinions about ballast.",
+  "Do not look directly at the bucket.",
+  "I am on a break. This is my break.",
+  "Two of everything, in case one of them leaves.",
+  "I have named all of the rocks."
+];
+const HECK_DROP = [
+  "Dropping this for science. Mostly science.",
+  "Hypothesis: you cannot catch this. Testing.",
+  "I filled out the correct form for this one.",
+  "Subject still airborne. Escalating.",
+  "This one is heavier. I weighed it. Twice.",
+  "Control group gets nothing. You are not the control group.",
+  "Recording. Please react normally.",
+  "Trial forty-one. Same as forty, but sideways.",
+  "I have calculated where you will be. Do not move.",
+  "Peer review begins now.",
+  "For the record: you were warned in writing.",
+  "Rounding up. Rounding is standard practice.",
+  "This is the smallest one. I want that noted.",
+  "Sample released. Kindly do not catch it politely.",
+  "Methodology: hatch, arm, release, observe.",
+  "I ran out of small ones an hour ago.",
+  "Results pending. Results always pending.",
+  "Two variables today. Try to keep up.",
+  "I labelled this. You cannot read it from there.",
+  "Statistically, one of these lands.",
+  "Please hold still for the measurement.",
+  "Reproducibility is important. So, again.",
+  "I am legally required to say 'heads up'. Heads up.",
+  "Conclusion drafted. Just need the data."
+];
+
+const Heck = {
+  name: "", seed: 0,
+  // title screen
+  x: 0, y: 0, vx: 0, face: 1, bob: 0, act: "walk", actT: 0, say: "", sayT: 0,
+  // the hatch
+  live: false, side: 1, hy: 0, open: 0, hold: 0, next: 0, thrown: 0, hsay: "", hsayT: 0,
+  init(){
+    if (!save.heckSeed){ save.heckSeed = 1 + ((Math.random() * 1e9) | 0); persist(); }
+    this.seed = save.heckSeed;
+    const r = mulberry32(this.seed);
+    const t = HECK_TITLE[(r() * HECK_TITLE.length) | 0];
+    this.name = (t ? t + " " : "") + HECK_FIRST[(r() * HECK_FIRST.length) | 0] +
+                " " + HECK_LAST[(r() * HECK_LAST.length) | 0];
+    this.x = VW * 0.3; this.y = 0; this.next = 26 + Math.random() * 30;
+  },
+  line(list){ return list[(Math.random() * list.length) | 0]; },
+
+  /* ---- the title screen: he has nowhere to be ---- */
+  menu(dt){
+    this.bob += dt;
+    this.actT -= dt;
+    if (this.sayT > 0) this.sayT -= dt;
+    if (this.actT <= 0){
+      const pick = Math.random();
+      this.act = pick < 0.42 ? "walk" : pick < 0.58 ? "stand" : pick < 0.72 ? "jump"
+               : pick < 0.84 ? "spin" : pick < 0.93 ? "sit" : "trip";
+      this.actT = this.act === "walk" ? 1.6 + Math.random() * 2.6 : 0.8 + Math.random() * 1.6;
+      if (this.act === "walk") this.face = Math.random() < 0.5 ? -1 : 1;
+      if (Math.random() < 0.45){ this.say = this.line(HECK_IDLE); this.sayT = 3.4; }
+    }
+    this.vx = this.act === "walk" ? this.face * 26 : 0;
+    this.x += this.vx * dt;
+    if (this.x < 34){ this.x = 34; this.face = 1; }
+    if (this.x > VW - 34){ this.x = VW - 34; this.face = -1; }
+    this.y = this.act === "jump" ? -Math.abs(Math.sin(this.actT * 6)) * 16
+           : this.act === "trip" ? Math.min(10, (0.8 - this.actT) * 40)
+           : 0;
+  },
+
+  /* ---- in a run: rarely, and never to a schedule you could learn ---- */
+  tick(dt){
+    if (G.state !== "play"){ this.live = false; return; }
+    if (this.hsayT > 0) this.hsayT -= dt;
+    if (!this.live){
+      this.next -= dt;
+      if (this.next <= 0 && G.climbed > 380){
+        this.live = true; this.open = 0; this.hold = 0; this.thrown = 0;
+        this.side = Math.random() < 0.5 ? -1 : 1;
+        /* High enough to give you three or four seconds of warning, low
+           enough that the hatch and what he says through it are both inside
+           the frame rather than jammed against the top of it. */
+        this.hy = G.bal.y - VH * (0.30 + Math.random() * 0.16);
+        this.hsay = this.line(HECK_DROP); this.hsayT = 4.2;
+        Audio2.SFX.tap();
+      }
+      return;
+    }
+    this.open = Math.min(1, this.open + dt * 3.2);
+    this.hold += dt;
+    // he throws one, sometimes a second, then thinks better of it and shuts up
+    const want = this.hold > 0.7 ? 1 : 0;
+    const more = this.hold > 1.9 && Math.random() < 0.5 ? 2 : want;
+    if (this.open >= 1 && this.thrown < more && this.thrown < 2){
+      this.thrown++;
+      this.drop();
+    }
+    if (this.hold > 3.6){
+      this.open -= dt * 3.2;
+      if (this.open <= 0){
+        this.live = false;
+        this.next = 24 + Math.random() * 46;       // never the same gap twice
+      }
+    }
+  },
+  drop(){
+    const x = this.side < 0 ? 4 : VW - 4;
+    const rng = Math.random;
+    const R = 13 + rng() * 9;
+    const parts = rockParts(rng, R);
+    const o = mkObst(x, this.hy + 6, parts, {
+      mass: clamp(0.7 * (0.5 + R / 30), 0.4, 2.2), style: "orb", worth: 26, look: "hull",
+      ang: rng() * TAU, spin: (rng() - 0.5) * 1.2
+    });
+    o.pid = "heck";
+    // lobbed toward the line the ship is climbing, not straight at it: it has
+    // to be something you can read coming and get under
+    const dx = (VW / 2 - x) * (0.55 + rng() * 0.4);
+    o.vx = dx * 0.7;
+    o.vy = 18 + rng() * 26;
+    rebuildParts(o);
+    G.obst.push(o);
+    Audio2.SFX.bump(); buzz(10);
+  },
+  reset(){ this.live = false; this.next = 22 + Math.random() * 40; this.hsayT = 0; }
+};
+
+/* ---- how he is drawn. Three shapes and a hat. ---- */
+function drawHeckBody(x, y, s, face, blink, arm){
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(face * s, s);
+  // legs
+  ctx.strokeStyle = "#2b3150"; ctx.lineWidth = 2.6; ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-3.4, 7); ctx.lineTo(-3.4, 12);
+  ctx.moveTo(3.4, 7); ctx.lineTo(3.4, 12);
+  ctx.stroke();
+  // body
+  ctx.fillStyle = "#ffd166";
+  ctx.beginPath();
+  ctx.ellipse(0, 1, 9, 9.5, 0, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = "#2b3150"; ctx.lineWidth = 2; ctx.stroke();
+  // arms
+  ctx.lineWidth = 2.4; ctx.strokeStyle = "#2b3150";
+  ctx.beginPath();
+  ctx.moveTo(-7, 1); ctx.lineTo(-11, 3 + arm * -6);
+  ctx.moveTo(7, 1);  ctx.lineTo(11, 3 + arm * -6);
+  ctx.stroke();
+  // face
+  ctx.fillStyle = "#2b3150";
+  if (blink){
+    ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(-5, -1); ctx.lineTo(-1.6, -1);
+    ctx.moveTo(1.6, -1); ctx.lineTo(5, -1); ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.arc(-3.3, -1.4, 1.7, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(3.3, -1.4, 1.7, 0, TAU); ctx.fill();
+  }
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(0, 2.6, 3.2, 0.25, Math.PI - 0.25); ctx.stroke();
+  // hard hat
+  ctx.fillStyle = "#ff7a2f";
+  ctx.beginPath(); ctx.arc(0, -6.2, 6.4, Math.PI, TAU); ctx.fill();
+  ctx.fillRect(-8.4, -6.6, 16.8, 2.1);
+  ctx.restore();
+}
+/* a speech bubble that wraps, sized to what is in it */
+function drawHeckSay(x, y, text, alpha, ink){
+  if (!text || alpha <= 0.01) return;
+  ctx.save();
+  ctx.globalAlpha = clamp(alpha, 0, 1);
+  ctx.font = "800 10.5px " + FONT;
+  ctx.textAlign = "left";
+  const maxW = Math.min(168, VW - 28);
+  const words = text.split(" ");
+  const lines = [];
+  let cur = "";
+  for (const w of words){
+    const t = cur ? cur + " " + w : w;
+    if (ctx.measureText(t).width > maxW && cur){ lines.push(cur); cur = w; }
+    else cur = t;
+  }
+  if (cur) lines.push(cur);
+  let wid = 0;
+  for (const l of lines) wid = Math.max(wid, ctx.measureText(l).width);
+  const pad = 7, lh = 13;
+  const bw = wid + pad * 2, bh = lines.length * lh + pad * 1.6;
+  let bx = clamp(x - bw / 2, 6, VW - bw - 6);
+  const by = clamp(y - bh - 10, 6, VH - bh - 20);
+  ctx.fillStyle = "rgba(255,255,255,.94)";
+  ctx.strokeStyle = ink; ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 9);
+  else ctx.rect(bx, by, bw, bh);
+  ctx.fill(); ctx.stroke();
+  ctx.beginPath();                                    // the tail
+  ctx.moveTo(clamp(x - 5, bx + 6, bx + bw - 16), by + bh - 1);
+  ctx.lineTo(clamp(x, bx + 8, bx + bw - 8), by + bh + 7);
+  ctx.lineTo(clamp(x + 5, bx + 16, bx + bw - 6), by + bh - 1);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(255,255,255,.94)"; ctx.fill();
+  ctx.fillStyle = ink;
+  lines.forEach((l, i) => ctx.fillText(l, bx + pad, by + pad + 9 + i * lh));
+  ctx.restore();
+}
+function drawHeckMenu(){
+  const gy = VH * 0.885 + 22;
+  const blink = Math.sin(Heck.bob * 1.7) > 0.96;
+  const spin = Heck.act === "spin" ? Heck.bob * 7 : 0;
+  ctx.save();
+  if (spin){ ctx.translate(Heck.x, gy + Heck.y - 12); ctx.rotate(spin); ctx.translate(-Heck.x, -(gy + Heck.y - 12)); }
+  const sit = Heck.act === "sit" ? 5 : 0;
+  drawHeckBody(Heck.x, gy + Heck.y - 10 + sit, 1.7, Heck.face, blink,
+               Heck.act === "jump" ? 1 : Math.sin(Heck.bob * 3) * 0.25);
+  ctx.restore();
+  drawHeckSay(Heck.x, gy + Heck.y - 40, Heck.say, Heck.sayT > 0 ? Math.min(1, Heck.sayT) : 0, "#2b3150");
+}
+/* the hatch, in screen space, hanging in the side of the sky */
+function drawHeckHatch(){
+  if (!Heck.live || Heck.open <= 0.01) return;
+  const sy = Heck.hy - G.cam.y;
+  if (sy < -60 || sy > VH + 60) return;
+  const left = Heck.side < 0;
+  const x = left ? 0 : VW;
+  const w = 44, h = 56;
+  const o = Heck.open;
+  ctx.save();
+  // the frame, set into the edge
+  ctx.fillStyle = "rgba(18,22,38,.9)";
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(left ? -10 : VW - w + 10, sy - h / 2, w, h, 7);
+  else ctx.rect(left ? -10 : VW - w + 10, sy - h / 2, w, h);
+  ctx.fill();
+  // the flap: hinged along the top of the opening and swung up out of the
+  // way, so it never ends up drawn across the man leaning through it
+  ctx.save();
+  ctx.translate(left ? w - 10 : VW - w + 10, sy - h / 2);
+  ctx.rotate((left ? -1 : 1) * o * 1.25);
+  ctx.fillStyle = "#8a93a6";
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(left ? 0 : -w * 0.82, -h * 0.9, w * 0.82, h * 0.9, 5);
+  else ctx.rect(left ? 0 : -w * 0.82, -h * 0.9, w * 0.82, h * 0.9);
+  ctx.fill();
+  ctx.strokeStyle = "#2b3150"; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = "#6f7889";                       // a handle on the outside
+  ctx.fillRect(left ? w * 0.52 : -w * 0.62, -h * 0.5, w * 0.2, 3.4);
+  ctx.restore();
+  // and him, leaning out of it
+  ctx.globalAlpha = o;
+  drawHeckBody(left ? 17 : VW - 17, sy + 6, 1.15, left ? 1 : -1,
+               Math.sin(G.T * 2.4) > 0.94, 0.7);
+  ctx.globalAlpha = 1;
+  ctx.restore();
+  drawHeckSay(left ? 46 : VW - 46, sy - 18, Heck.hsay,
+              Heck.hsayT > 0 ? Math.min(1, Heck.hsayT) : 0, "#2b3150");
 }
 
 /* ------------------------------------------------------------ backdrop */
@@ -5016,7 +5324,9 @@ function render(){
   if (G.state === "menu"){
     drawBalloon(VW * 0.5, VH * 0.885 + Math.sin(G.T * 1.1) * 7, 22, SKIN_BY_ID(save.skin), G.T, 1);
     drawParticles();
+    drawHeckMenu();
   }
+  if (G.state === "play") drawHeckHatch();
   // first-run hint
   if (G.state === "play" && G.hintT > 0){
     ctx.globalAlpha = clamp(G.hintT, 0, 1) * 0.9;
@@ -5044,11 +5354,13 @@ function frame(now){
   if (dt <= 0) return;
   if (G.state === "play" || G.state === "dead" || G.state === "clear"){
     if (G.hintT > 0) G.hintT -= dt;
+    Heck.tick(dt);
     step(dt);
   } else if (G.state === "brief"){
     G.T += dt;
   } else if (G.state === "menu"){
     G.T += dt;
+    Heck.menu(dt);
     G.cam.y = -0.66 * VH + Math.sin(G.T * 0.4) * 7;
     for (let i = G.parts.length - 1; i >= 0; i--){
       const p = G.parts[i];
@@ -5769,9 +6081,9 @@ $("wipeBtn").addEventListener("click", () => {
     setTimeout(() => { wipeArmed = false; $("wipeBtn").textContent = "Reset progress"; }, 3000);
     return;
   }
-  const opts = save.opts;
+  const opts = save.opts, seed = save.heckSeed;
   save = defaultSave();
-  save.opts = opts;
+  save.opts = opts; save.heckSeed = seed;
   persist(); wipeArmed = false;
   $("wipeBtn").textContent = "Reset progress";
   UI.flash("Progress reset");
@@ -5779,6 +6091,8 @@ $("wipeBtn").addEventListener("click", () => {
 });
 
 /* -------------------------------------------------------------- boot */
+Heck.init();
+$("heckName").textContent = "Today " + Heck.name + " is on the roof.";
 G.hintT = save.seen ? 0 : 6;
 if (!save.seen){ save.seen = 1; persist(); }
 syncSwitches();
