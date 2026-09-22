@@ -1397,20 +1397,46 @@ function nudge(force){
 }
 
 /* ---- data ---- */
-$("#btnExport").addEventListener("click", function(){
+/* Saving a file works two ways: inside the claude.ai artifact viewer the host
+   mediates it through the downloads capability, everywhere else it's a plain
+   object-URL link. Resolve the capability once, lazily, and fall back. */
+var dlPromise = null;
+function getDownloads(){
+  if(dlPromise) return dlPromise;
+  dlPromise = new Promise(function(resolve){
+    try{
+      if(window.claude && typeof window.claude.use === "function"){
+        window.claude.use("downloads").then(resolve, function(){ resolve(null); });
+      } else resolve(null);
+    }catch(e){ resolve(null); }
+  });
+  return dlPromise;
+}
+function linkDownload(name, payload){
   try{
-    var payload = JSON.stringify({ app:"HydroBuddy+", exported:new Date().toISOString(), data:S }, null, 2);
     var blob = new Blob([payload], { type:"application/json" });
     var url = URL.createObjectURL(blob);
     var a = document.createElement("a");
-    a.href = url;
-    a.download = "hydrobuddy-" + dayKey() + ".json";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
     toast("Exported");
-  }catch(e){ toast("Export failed on this browser"); }
+  }catch(e){ toast("Export isn't available in this browser"); }
+}
+$("#btnExport").addEventListener("click", function(){
+  var payload = JSON.stringify({ app:"HydroBuddy+", exported:new Date().toISOString(), data:S }, null, 2);
+  var name = "hydrobuddy-" + dayKey() + ".json";
+  getDownloads().then(function(dl){
+    if(!dl){ linkDownload(name, payload); return; }
+    dl.save({ filename:name, data:payload }).then(function(){
+      toast("Exported");
+    }, function(err){
+      var code = err && err.code;
+      if(code === "declined") toast("Export cancelled");
+      else if(code === "rate_limited") toast("Try the export again in a moment");
+      else toast("Export isn't available here");
+    });
+  });
 });
 $("#btnReset").addEventListener("click", function(){
   openSheet("Reset everything?", "Deletes your profile, coach choice and every logged drink on this device. This cannot be undone.",
