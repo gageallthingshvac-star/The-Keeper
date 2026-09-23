@@ -1167,7 +1167,7 @@ function segSegDist(ax1, ay1, ax2, ay2, bx1, by1, bx2, by2, out){
    are playing the same build — which a version label alone can never tell
    you, least of all when one of you is looking at something a browser cached
    a week ago. Change one character of the game and the code changes. */
-const BUILD = { v: "1.7", n: 32, date: "23 Sep 2026", code: "0000000" };
+const BUILD = { v: "1.8", n: 33, date: "23 Sep 2026", code: "0000000" };
 (() => {
   // scripts and stylesheets: everything that decides how the game behaves and
   // how it looks. Not the markup, which the game rewrites as it runs and which
@@ -4113,6 +4113,204 @@ function drawClipboard(x, y, s, ang){
   ctx.stroke();
   ctx.restore();
 }
+/* ---------------------------------------------------------------- the cat
+
+   Under the title card he is not a man in a hard hat, he is a very small
+   lanky pink cat in a hard hat, which is a different joke and a better one.
+
+   This is its own animal and deliberately so: round white eyes rather than
+   almonds, a button muzzle rather than a long droopy snout, no arched brow,
+   ears set wide, and it is wearing site safety equipment and carrying a
+   clipboard. What it borrows is the thing that is nobody's property — the
+   proportion. Everything is long: the body is a tall narrow capsule, the
+   limbs are thin and reach well past it, and the tail is longer than he is.
+   A lanky silhouette moving slowly is most of what reads at this size.
+
+   The act vocabulary is the same as the man's, so nothing above here has to
+   know which one is on the roof today. */
+const CAT = { skin: "#f7a3cd", pale: "#ffd9ec", ink: "#43243a" };
+function drawHeckAny(x, y, s, face, blink, arm, act, t){
+  (isPanther() ? drawHeckCat : drawHeckBody)(x, y, s, face, blink, arm, act, t);
+}
+function drawHeckCat(x, y, s, face, blink, arm, act, t){
+  act = act || "stand"; t = t || 0;
+  const nap = act === "nap";
+  const front = act === "stare" || act === "shrug" || act === "wave" || act === "froze";
+  s *= 0.74;                                        // taller frame, same footprint
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(face * s, s);
+
+  // ---- tail: longer than he is, and it says as much as the face does
+  const sway = Math.sin(t * (act === "creep" ? 1.1 : 2.1)) * (act === "froze" ? 0 : 1);
+  const up = act === "creep" ? 1 : act === "froze" ? -0.4 : act === "jump" ? 1.2 : 0.35;
+  const tail = () => {
+    ctx.beginPath();
+    ctx.moveTo(-3.5, 6);
+    ctx.bezierCurveTo(-15, 8 - up * 3, -25 + sway * 3, 2 - up * 8,
+                      -24 + sway * 7, -9 - up * 9);
+    ctx.stroke();
+  };
+  ctx.lineCap = "round";
+  ctx.strokeStyle = CAT.ink; ctx.lineWidth = 3.4; tail();
+  ctx.strokeStyle = CAT.skin; ctx.lineWidth = 2.1; tail();
+  ctx.strokeStyle = CAT.ink; ctx.lineWidth = 2.4;      // a tuft on the end
+  ctx.beginPath(); ctx.arc(-24 + sway * 7, -9 - up * 9, 1.9, 0, TAU);
+  ctx.fillStyle = CAT.skin; ctx.fill(); ctx.stroke();
+
+  // ---- legs: thin, long, and they carry the walk
+  ctx.strokeStyle = CAT.ink; ctx.lineWidth = 2.4;
+  const foot = [];
+  ctx.beginPath();
+  if (nap){ ctx.moveTo(-1, 7); ctx.lineTo(8, 12); ctx.moveTo(2, 7); ctx.lineTo(12, 10);
+            foot.push([8,12],[12,10]); }
+  else if (act === "creep"){
+    const sw = Math.sin(((t * 0.42) % 1) * TAU);
+    const a = [17 + sw * 5, 19 - Math.max(0, sw) * 7], b = [-15 + sw * 5, 19];
+    ctx.moveTo(2, 6); ctx.lineTo(a[0], a[1]);
+    ctx.moveTo(-2, 6); ctx.lineTo(b[0], b[1]);
+    foot.push(a, b);
+  } else if (act === "walk" || act === "chase"){
+    const k = Math.sin(t * (act === "chase" ? 17 : 8)) * 6;
+    const a = [2.5 + k, 19], b = [-2.5 - k, 19];
+    ctx.moveTo(2.5, 6); ctx.lineTo(a[0], a[1]);
+    ctx.moveTo(-2.5, 6); ctx.lineTo(b[0], b[1]);
+    foot.push(a, b);
+  } else if (act === "dance"){
+    const k = Math.sin(t * 9) * 5;
+    const a = [4 - k, 19], b = [-4 - k, 19];
+    ctx.moveTo(2.5, 6); ctx.lineTo(a[0], a[1]);
+    ctx.moveTo(-2.5, 6); ctx.lineTo(b[0], b[1]);
+    foot.push(a, b);
+  } else if (act === "sit"){
+    const a = [7, 14], b = [-7, 14];
+    ctx.moveTo(2.5, 7); ctx.lineTo(a[0], a[1]);
+    ctx.moveTo(-2.5, 7); ctx.lineTo(b[0], b[1]);
+    foot.push(a, b);
+  } else if (act === "froze"){
+    const a = [1.6, 19], b = [-1.6, 19];
+    ctx.moveTo(1.6, 6); ctx.lineTo(a[0], a[1]);
+    ctx.moveTo(-1.6, 6); ctx.lineTo(b[0], b[1]);
+    foot.push(a, b);
+  } else {
+    const a = [2.8, 19], b = [-2.8, 19];
+    ctx.moveTo(2.8, 6); ctx.lineTo(a[0], a[1]);
+    ctx.moveTo(-2.8, 6); ctx.lineTo(b[0], b[1]);
+    foot.push(a, b);
+  }
+  ctx.stroke();
+  ctx.fillStyle = CAT.ink;
+  for (const f of foot){ ctx.beginPath(); ctx.ellipse(f[0], f[1] + 0.6, 2.6, 1.7, 0, 0, TAU); ctx.fill(); }
+
+  // ---- the lean lives above the hips, the same as it does on the man
+  if (act === "creep"){ ctx.rotate(-0.24); ctx.translate(0, 2); }
+
+  // ---- body: a tall narrow capsule, with a pale front
+  ctx.fillStyle = CAT.skin; ctx.strokeStyle = CAT.ink; ctx.lineWidth = 1.7;
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(-5.8, -7.5, 11.6, 15, 5.4);
+  else ctx.ellipse(0, 0, 5.8, 7.5, 0, 0, TAU);
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = CAT.pale;
+  ctx.beginPath(); ctx.ellipse(0, 2, 2.1, 4.2, 0, 0, TAU); ctx.fill();
+
+  // ---- arms: the longest thing on him apart from the tail
+  let lx = -15, ly = 2, rx = 15, ry = 2;
+  if (act === "shrug"){ ly = -8; ry = -8; }
+  else if (act === "wave"){ ly = 5; rx = 12 + Math.sin(t * 11) * 4; ry = -14; }
+  else if (act === "dance"){ const w = Math.sin(t * 9) * 9; ly = -w; ry = w; }
+  else if (act === "write"){ lx = -12; ly = 5; rx = 11; ry = -5 + Math.sin(t * 16) * 2.4; }
+  else if (act === "stare"){ lx = -10; ly = 7; rx = 10; ry = 7; }
+  else if (act === "froze"){ lx = -7; ly = 8; rx = 7; ry = 8; }
+  else if (act === "creep"){ lx = 11; ly = -9; rx = 19; ry = -4; }
+  else if (act === "measure"){ lx = -18; ly = -3; rx = 18; ry = -3; }
+  else if (act === "chase"){ ly = -8; ry = -11; }
+  else if (nap){ lx = -11; ly = 7; rx = 10; ry = 8; }
+  else { ly = 2 + arm * -8; ry = 2 + arm * -8; }
+  ctx.strokeStyle = CAT.ink; ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.moveTo(-3.6, -4); ctx.lineTo(lx, ly);
+  ctx.moveTo(3.6, -4);  ctx.lineTo(rx, ry);
+  ctx.stroke();
+  ctx.fillStyle = CAT.ink;
+  ctx.beginPath(); ctx.arc(lx, ly, 1.9, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.arc(rx, ry, 1.9, 0, TAU); ctx.fill();
+
+  // ---- head
+  const hy = -14;
+  ctx.fillStyle = CAT.skin; ctx.strokeStyle = CAT.ink; ctx.lineWidth = 2;
+  ctx.beginPath();                                   // ears, wide and upright
+  ctx.moveTo(-6.4, hy - 3); ctx.lineTo(-7.4, hy - 9.6); ctx.lineTo(-1.8, hy - 6);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(6.4, hy - 3); ctx.lineTo(7.4, hy - 9.6); ctx.lineTo(1.8, hy - 6);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(0, hy, 7, 6.4, 0, 0, TAU); ctx.fill(); ctx.stroke();
+
+  // ---- eyes: round and white, with the lids at half mast unless he is caught
+  const wide = front || blink;
+  ctx.fillStyle = "#fff";
+  ctx.beginPath(); ctx.arc(-2.7, hy - 1, 2.5, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.arc(2.7, hy - 1, 2.5, 0, TAU); ctx.fill();
+  ctx.fillStyle = CAT.ink;
+  if (nap || blink){
+    ctx.lineWidth = 1.5; ctx.strokeStyle = CAT.ink;
+    ctx.beginPath();
+    ctx.moveTo(-4.7, hy - 1); ctx.lineTo(-0.7, hy - 1);
+    ctx.moveTo(0.7, hy - 1);  ctx.lineTo(4.7, hy - 1);
+    ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.arc(-2.5, hy - 0.6, 1.35, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(2.9, hy - 0.6, 1.35, 0, TAU); ctx.fill();
+    if (!wide){                                      // already seen everything
+      ctx.fillStyle = CAT.skin;
+      ctx.beginPath(); ctx.ellipse(-2.7, hy - 3.1, 2.7, 1.9, 0, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(2.7, hy - 3.1, 2.7, 1.9, 0, 0, TAU); ctx.fill();
+      ctx.strokeStyle = CAT.ink; ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.moveTo(-5.1, hy - 1.7); ctx.lineTo(-0.4, hy - 2.1);
+      ctx.moveTo(0.4, hy - 2.1);  ctx.lineTo(5.1, hy - 1.7);
+      ctx.stroke();
+    }
+  }
+  // ---- muzzle: a button, not a snout
+  ctx.fillStyle = CAT.pale;
+  ctx.beginPath(); ctx.ellipse(0, hy + 3.2, 3.4, 2.5, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = CAT.ink;
+  ctx.beginPath(); ctx.ellipse(0, hy + 2.1, 1.25, 0.95, 0, 0, TAU); ctx.fill();
+  ctx.lineWidth = 1.1; ctx.strokeStyle = CAT.ink;
+  ctx.beginPath();
+  ctx.moveTo(0, hy + 2.9); ctx.lineTo(0, hy + 4);
+  ctx.moveTo(0, hy + 4); ctx.bezierCurveTo(-0.6, hy + 4.9, -2, hy + 4.7, -2.3, hy + 3.9);
+  ctx.moveTo(0, hy + 4); ctx.bezierCurveTo(0.6, hy + 4.9, 2, hy + 4.7, 2.3, hy + 3.9);
+  ctx.stroke();
+  ctx.lineWidth = 0.9;                               // whiskers
+  ctx.beginPath();
+  for (const d of [-1, 1]) for (let i = 0; i < 3; i++){
+    ctx.moveTo(d * 3.2, hy + 2.2 + i * 1.1);
+    ctx.lineTo(d * 10.5, hy + 0.7 + i * 1.9);
+  }
+  ctx.stroke();
+
+  // ---- and the hat, which is the part that is still Heck
+  ctx.fillStyle = isPanther() ? "#ff7ab8" : (Heck.hat || "#ff7a2f");
+  const hb = act === "creep" ? -1.6 : 0;
+  ctx.beginPath(); ctx.arc(0, hy - 5.4 + hb, 5.6, Math.PI, TAU); ctx.fill();
+  ctx.fillRect(-7.6, hy - 5.8 + hb, 15.2, 1.9);
+  ctx.restore();
+
+  if (nap){
+    ctx.save();
+    ctx.fillStyle = CAT.ink; ctx.textAlign = "left";
+    for (let i = 0; i < 3; i++){
+      const k = (t * 0.5 + i * 0.33) % 1;
+      ctx.globalAlpha = 0.6 * (1 - k);
+      ctx.font = "900 " + (7 + i * 2).toFixed(0) + "px " + FONT;
+      ctx.fillText("z", x + 9 * s + k * 7, y - 16 * s - k * 16);
+    }
+    ctx.restore();
+  }
+}
 function drawHeckBody(x, y, s, face, blink, arm, act, t){
   act = act || "stand"; t = t || 0;
   const nap = act === "nap", front = act === "stare" || act === "shrug" || act === "wave" || act === "froze";
@@ -4280,7 +4478,7 @@ function drawHeckMenu(){
   else if (act === "nap") drawClipboard(Heck.x + 22, gy + 17, 1.4, 1.3);
   ctx.save();
   if (spin){ ctx.translate(Heck.x, gy + Heck.y - 12); ctx.rotate(spin); ctx.translate(-Heck.x, -(gy + Heck.y - 12)); }
-  drawHeckBody(Heck.x, by, 1.9, Heck.face, blink,
+  drawHeckAny(Heck.x, by, 1.9, Heck.face, blink,
                act === "jump" ? 1 : Math.sin(Heck.bob * 3) * 0.25, act, Heck.bob);
   if (act !== "chase" && act !== "nap" && act !== "spin")
     drawClipboard(Heck.x + Heck.face * (act === "write" ? 15 : act === "creep" ? 40 : 19),
@@ -4368,7 +4566,7 @@ function drawHeckHatch(){
   ctx.globalAlpha = o;
   const lean = Heck.peek ? 12 : 19;
   const slip = Heck.slip * 7;                      // the moment he nearly goes with it
-  drawHeckBody(left ? lean : VW - lean, sy + 5 + slip, 1.35, left ? 1 : -1,
+  drawHeckAny(left ? lean : VW - lean, sy + 5 + slip, 1.35, left ? 1 : -1,
                Math.sin(G.T * 2.4) > 0.94, Heck.peek ? 0.1 : 0.7,
                Heck.peek ? "stare" : "stand", G.T);
   if (Heck.peek) drawClipboard(left ? lean + 15 : VW - lean - 15, sy + 12, 1.1, left ? 0.2 : -0.2);
