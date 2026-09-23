@@ -66,3 +66,42 @@ text, so a filename never moves when the pools are reordered — but it does
 change if the wording changes. Re-extract after editing the pools in
 `updraft.html`, then render only what is new; `pack.py` skips nothing and
 `render-*` skips everything already on disk.
+
+## From a phone
+
+Three routes that need nothing but the phone in your hand.
+
+**Upgrade the voice the game already uses.** Settings › Accessibility ›
+Spoken Content › Voices › English, pick a name, and download the one marked
+*Enhanced* or *Premium*. Free, about a minute, and it lifts the game's
+spoken tier immediately — nothing to send me, it just works next time you
+open it.
+
+**Render the clips with Shortcuts.** The Shortcuts app has a *Make Spoken
+Audio from Text* action that writes a file using whichever system voice you
+installed above. A six-action shortcut does the whole set:
+
+1. **Text** — paste all 139 lines, one per line
+2. **Split Text** — by New Lines
+3. **Repeat with Each**
+4. &nbsp;&nbsp;**Make Spoken Audio from Text** — Repeat Item
+5. &nbsp;&nbsp;**Save File** — to a folder in Files, ask for name off
+6. End Repeat
+
+Then share that folder back and it gets packed. The files arrive named by
+line rather than by id, which is fine: they are in order, and `split.py`
+understands order.
+
+**Or read them yourself, which sounds better than any of this.** Open Voice
+Memos, read the lines with a clear pause between each, send the single
+recording, and:
+
+```sh
+python3 voice/split.py recording.m4a
+```
+
+It finds the silences, cuts on them, normalises each piece and writes them
+out in order. If the number of takes does not match the number of lines it
+refuses to write anything rather than shifting every line into the wrong
+place — so a miscount costs a re-run, never a silent mess. Record in
+batches with `--from 40` if 139 in one sitting is too many.
