@@ -940,6 +940,7 @@
           <div class="opt"><span class="opt-label">Sound effects</span> <button class="switch" data-opt="sfx"><i></i></button></div>
           <div class="opt"><span class="opt-label">Music</span> <button class="switch" data-opt="music"><i></i></button></div>
           <div class="opt"><span class="opt-label">Vibration</span> <button class="switch" data-opt="haptics"><i></i></button></div>
+          <div class="opt"><span class="opt-label">Speak his cards<small id="speakWhat">Reads them aloud in your device's voice</small></span> <button class="switch" data-opt="speak"><i></i></button></div>
         </div>
       </div>
       <div class="opt-group">
@@ -1167,7 +1168,7 @@ function segSegDist(ax1, ay1, ax2, ay2, bx1, by1, bx2, by2, out){
    are playing the same build — which a version label alone can never tell
    you, least of all when one of you is looking at something a browser cached
    a week ago. Change one character of the game and the code changes. */
-const BUILD = { v: "1.9", n: 34, date: "23 Sep 2026", code: "0000000" };
+const BUILD = { v: "2.0", n: 35, date: "23 Sep 2026", code: "0000000" };
 (() => {
   // scripts and stylesheets: everything that decides how the game behaves and
   // how it looks. Not the markup, which the game rewrites as it runs and which
@@ -1200,7 +1201,7 @@ const defaultSave = () => ({
   heckSeed: 0,
   fails: {},
   endlessClimb: 0,          // tutorial shown
-  opts: { sfx: 1, music: 1, haptics: 1, calm: 0, lefty: 0, assist: 0,
+  opts: { sfx: 1, music: 1, haptics: 1, calm: 0, lefty: 0, assist: 0, speak: 1,
           contrast: 0, glow: 1, telem: 1, shield: 1, theme: 0 }
 });
 let save = defaultSave();
@@ -3135,6 +3136,7 @@ function grantPower(kind){
 }
 function popBalloon(){
   if (!G.bal.alive) return;
+  Voice.hush();
   G.bal.alive = false;
   G.state = "dead";
   G.overT = 0;
@@ -4001,6 +4003,7 @@ const Heck = {
     if (a === "chase") this.bvx = this.face * 90;
     if (a !== "nap" && Math.random() < this.mood.chat){
       this.say = this.voice(HECK_IDLE, HECK_MOOD_IDLE); this.sayT = 3.4;
+      Voice.say(this.say);
     }
   },
 
@@ -4059,6 +4062,7 @@ const Heck = {
       this.hsay = this.board ? "Wait — no — that is not a rock—"
                              : this.voice(HECK_DROP, HECK_MOOD_DROP);
       this.hsayT = 4.2;
+      Voice.say(this.hsay);
       Audio2.SFX.tap();
     }
   },
@@ -4073,6 +4077,7 @@ const Heck = {
     this.heckleT = 11 + Math.random() * 10;
     if (!this.live) this.arrive(true);
     this.hsay = this.line(pool); this.hsayT = 4.4;
+    Voice.say(this.hsay);
     if (this.mood.id === "rattled") this.slip = 1;
   },
   drop(){
@@ -4094,7 +4099,8 @@ const Heck = {
     o.vy = 18 + rng() * 26;
     rebuildParts(o);
     G.obst.push(o);
-    if (board){ this.slip = 1; this.hsay = this.line(HECK_REACT.board); this.hsayT = 4.4; }
+    if (board){ this.slip = 1; this.hsay = this.line(HECK_REACT.board); this.hsayT = 4.4;
+                Voice.say(this.hsay); }
     Audio2.SFX.bump(); buzz(board ? 18 : 10);
   },
   reset(){
@@ -4140,6 +4146,94 @@ function drawClipboard(x, y, s, ang){
 
    He is teal, because the room is drained rose-grey and the accent is pink,
    and one cool saturated note in a warm drained frame is the whole picture. */
+/* ============================================================== the voice
+
+   He is silent by design and holds up cards. Underneath those cards there
+   is now a voice, and it is built in three tiers because the honest answer
+   to "make it sound real" is that the best tier is not something a single
+   HTML file can carry:
+
+     1. RECORDED — a line rendered in advance by a proper neural voice and
+        dropped into VOICE_CLIPS as a data URI. Indistinguishable from a
+        person, and the only tier that is. Nothing is shipped in it yet:
+        the whole path below is built and waiting, so adding one is adding
+        one entry to a table.
+     2. SPOKEN — the device's own speech engine reads the card. Free,
+        offline, no bytes, and on a phone with an enhanced voice installed
+        it is very close. On a phone without one it is plainly a machine.
+     3. HORN — a muted trombone with the shape of the sentence and none of
+        its words. Always available, never wrong, and the fallback when the
+        other two are missing or switched off.
+
+   It degrades down that list on its own, so the game is correct today and
+   improves the moment a clip exists. */
+const VOICE_CLIPS = {};            // line text -> data: URI, filled in as they arrive
+const Voice = {
+  el: null, ready: false, best: null, spoke: 0,
+  /* The recipe, not a voice: which to prefer, in what order. The device
+     decides what it actually has, and the tiers are worth far more than
+     any pitch or rate setting, so they dominate the ranking. */
+  BEST:  /neural|natural|premium|enhanced|wavenet|studio|siri/i,
+  WORST: /compact|eloquence|espeak|pico/i,
+  LOWER: /daniel|arthur|alex|oliver|gordon|reed|aaron|eddy|tom|james|david|guy|ryan|george|brian|male/i,
+  HIGHER:/female|samantha|victoria|karen|moira|tessa|fiona|zira|serena|ava|susan|zoe|jenny|aria/i,
+  rank(v){
+    const n = (v.name || "") + " " + (v.voiceURI || "");
+    let s = this.BEST.test(n) ? 300 : !v.localService ? 200 : this.WORST.test(n) ? 0 : 100;
+    if (this.LOWER.test(n)) s += 26;
+    if (this.HIGHER.test(n)) s -= 40;
+    if (/^en/i.test(v.lang || "")) s += 12;
+    if (/en-GB/i.test(v.lang || "")) s += 5;
+    return s;
+  },
+  init(){
+    const S = window.speechSynthesis;
+    if (!S) return;
+    const pick = () => {
+      const all = S.getVoices();
+      if (!all.length) return;
+      this.best = all.slice().sort((a, b) => this.rank(b) - this.rank(a))[0];
+      this.ready = true;
+    };
+    pick();
+    try { S.addEventListener("voiceschanged", pick); } catch (e){}
+  },
+  /* One utterance for the whole line, pitch and rate left alone. Every
+     deviation from 1.0 is resampling, and resampling is the thing that
+     sounds synthetic — the depth belongs to the voice, not to a shift. */
+  say(text){
+    if (!save.opts.speak || !text) return false;
+    const clip = VOICE_CLIPS[text];
+    if (clip){
+      try {
+        if (!this.el){ this.el = new Audio(); this.el.preload = "auto"; }
+        this.el.src = clip; this.el.currentTime = 0;
+        this.el.volume = save.opts.sfx ? 1 : 0.7;
+        this.el.play().catch(() => {});
+        return true;
+      } catch (e){ /* fall through to the engine */ }
+    }
+    const S = window.speechSynthesis;
+    if (!S || !this.ready) return false;
+    // two cards in quick succession should not stack into a queue
+    const now = performance.now();
+    if (now - this.spoke < 300) return false;
+    this.spoke = now;
+    try {
+      S.cancel();
+      const u = new SpeechSynthesisUtterance(text.replace(/—/g, ","));
+      if (this.best){ u.voice = this.best; if (this.best.lang) u.lang = this.best.lang; }
+      u.pitch = 1; u.rate = 0.95; u.volume = 1;
+      S.speak(u);
+      return true;
+    } catch (e){ return false; }
+  },
+  hush(){
+    try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e){}
+    if (this.el){ try { this.el.pause(); } catch (e){} }
+  }
+};
+
 const HERON_TITLE = ["", "", "", "Monsieur", "Signor", "the Hon.", "Maestro",
                      "Sir", "Comte", "Herr Doktor"];
 const HERON_FIRST = ["Lysander", "Aurelio", "Bartram", "Cosmo", "Desmond", "Ferrand",
@@ -6535,9 +6629,9 @@ window.addEventListener("keyup", e => { keys[e.key.toLowerCase()] = false; });
 })();
 
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden && G.state === "play") UI.pause();
+  if (document.hidden){ Voice.hush(); if (G.state === "play") UI.pause(); }
 });
-window.addEventListener("blur", () => { if (G.state === "play") UI.pause(); });
+window.addEventListener("blur", () => { Voice.hush(); if (G.state === "play") UI.pause(); });
 
 /* ------------------------------------------------------------------ UI */
 const $ = id => document.getElementById(id);
@@ -7295,6 +7389,17 @@ $("wipeBtn").addEventListener("click", () => {
 
 /* -------------------------------------------------------------- boot */
 Heck.init();
+Voice.init();
+setTimeout(() => {
+  const el = $("speakWhat");
+  if (!el) return;
+  if (!window.speechSynthesis) { el.textContent = "This browser has no speech engine — he stays on the horn"; return; }
+  const v = Voice.best;
+  if (!v) { el.textContent = "No voices installed — he stays on the horn"; return; }
+  el.textContent = Voice.BEST.test(v.name || "")
+    ? "Using " + v.name + " — the good tier, which is what this wants"
+    : "Using " + v.name + ". A better voice is usually a free download in your device's accessibility settings.";
+}, 900);
 $("heckName").textContent = "Today " + Heck.who + " is on the roof.";
 G.hintT = save.seen ? 0 : 6;
 if (!save.seen){ save.seen = 1; persist(); }
