@@ -1167,7 +1167,7 @@ function segSegDist(ax1, ay1, ax2, ay2, bx1, by1, bx2, by2, out){
    are playing the same build — which a version label alone can never tell
    you, least of all when one of you is looking at something a browser cached
    a week ago. Change one character of the game and the code changes. */
-const BUILD = { v: "1.8", n: 33, date: "23 Sep 2026", code: "0000000" };
+const BUILD = { v: "1.9", n: 34, date: "23 Sep 2026", code: "0000000" };
 (() => {
   // scripts and stylesheets: everything that decides how the game behaves and
   // how it looks. Not the markup, which the game rewrites as it runs and which
@@ -3899,7 +3899,8 @@ const HECK_REACT = {
 };
 
 const Heck = {
-  name: "", seed: 0, mood: HECK_MOODS[0], sign: "",
+  name: "", heronName: "", seed: 0, mood: HECK_MOODS[0], sign: "",
+  get who(){ return isPanther() ? this.heronName : this.name; },
   // title screen
   x: 0, y: 0, vx: 0, face: 1, bob: 0, act: "walk", actT: 0, act0: 1, say: "", sayT: 0,
   spot: -200, spotV: 1, froze: 0,
@@ -3915,6 +3916,9 @@ const Heck = {
     this.name = (t ? t + " " : "") + HECK_FIRST[(r() * HECK_FIRST.length) | 0] +
                 " " + HECK_LAST[(r() * HECK_LAST.length) | 0];
     this.mood = HECK_MOODS[(r() * HECK_MOODS.length) | 0];
+    const ht = HERON_TITLE[(r() * HERON_TITLE.length) | 0];
+    this.heronName = (ht ? ht + " " : "") + HERON_FIRST[(r() * HERON_FIRST.length) | 0] +
+                     " " + HERON_LAST[(r() * HERON_LAST.length) | 0];
     this.hat  = ["#ff7a2f", "#ffd166", "#5fd2a0", "#7c5cff", "#ff5f6b"][(r() * 5) | 0];
     this.x = VW * 0.3; this.y = 0; this.bx = this.x + 16;
     this.next = 20 + Math.random() * 26;
@@ -3922,6 +3926,8 @@ const Heck = {
   line(list){ return list[(Math.random() * list.length) | 0]; },
   /* his own lines first, the common ones underneath */
   voice(common, byMood){
+    if (isPanther() && Math.random() < 0.40)
+      return this.line(common === HECK_IDLE ? HERON_IDLE : HERON_DROP);
     const mine = byMood[this.mood.id] || [];
     return Math.random() < 0.42 && mine.length ? this.line(mine) : this.line(common);
   },
@@ -4113,203 +4119,237 @@ function drawClipboard(x, y, s, ang){
   ctx.stroke();
   ctx.restore();
 }
-/* ---------------------------------------------------------------- the cat
+/* -------------------------------------------------------------- the heron
 
-   Under the title card he is not a man in a hard hat, he is a very small
-   lanky pink cat in a hard hat, which is a different joke and a better one.
+   Under the title card the roof belongs to somebody else entirely.
 
-   This is its own animal and deliberately so: round white eyes rather than
-   almonds, a button muzzle rather than a long droopy snout, no arched brow,
-   ears set wide, and it is wearing site safety equipment and carrying a
-   clipboard. What it borrows is the thing that is nobody's property — the
-   proportion. Everything is long: the body is a tall narrow capsule, the
-   limbs are thin and reach well past it, and the tail is longer than he is.
-   A lanky silhouette moving slowly is most of what reads at this size.
+   What makes that kind of comedy work is not the animal, it is the timing:
+   total stillness, then one enormous deliberate movement, then stillness
+   again, and never a word about any of it. A heron already does this for a
+   living. It will stand on one leg in a river for a minute and a half and
+   then move once, precisely, and go back to standing. So he is a heron:
+   absurd legs with the knee bending the wrong way, a neck that folds into
+   an S and unfolds when something interests him, a dagger of a beak, two
+   plumes off the back of his head, and the eyelids of somebody who has
+   already read the report you are about to hand him.
 
-   The act vocabulary is the same as the man's, so nothing above here has to
-   know which one is on the roof today. */
-const CAT = { skin: "#f7a3cd", pale: "#ffd9ec", ink: "#43243a" };
-function drawHeckAny(x, y, s, face, blink, arm, act, t){
-  (isPanther() ? drawHeckCat : drawHeckBody)(x, y, s, face, blink, arm, act, t);
-}
-function drawHeckCat(x, y, s, face, blink, arm, act, t){
+   He does not talk. He holds up cards. Everything the man on the roof would
+   have said, he has written out in advance on the clipboard and simply
+   shows you, which is funnier and which is why he can be silent without
+   losing a single line of the writing.
+
+   He is teal, because the room is drained rose-grey and the accent is pink,
+   and one cool saturated note in a warm drained frame is the whole picture. */
+const HERON_TITLE = ["", "", "", "Monsieur", "Signor", "the Hon.", "Maestro",
+                     "Sir", "Comte", "Herr Doktor"];
+const HERON_FIRST = ["Lysander", "Aurelio", "Bartram", "Cosmo", "Desmond", "Ferrand",
+                     "Gaspard", "Hollis", "Ignatius", "Percival", "Quillon", "Remy",
+                     "Thaddeus", "Valentin", "Orlando", "Ambrose", "Sable", "Peregrine",
+                     "Lucien", "Barnaby", "Emile", "Horatio"];
+const HERON_LAST  = ["Vane", "Dray", "Lisle", "Quist", "Faversham", "Plume", "Stilt",
+                     "Wick", "Rakes", "Fennimore", "Longbotham", "Marchetti", "Crane",
+                     "Delacroix", "Pallister", "Sorrel", "Wading", "Ombre", "Beaumont",
+                     "Tallow", "Sandpiper", "Greaves"];
+/* A handful in his own register, on top of everything the man already had.
+   Same joke, grander delivery, and still nobody has heard him speak. */
+const HERON_IDLE = [
+  "I have been standing here since Tuesday.",
+  "One leg is sufficient. Two would be showing off.",
+  "I do not hurry. Hurrying is for the unprepared.",
+  "There was a fish. There is no longer a fish.",
+  "My plumage is regulation. Reluctantly.",
+  "I have read the manual. It is beneath me.",
+  "Elegance is simply not moving for long enough.",
+  "The hat was not my idea. The hat is mandatory.",
+  "I was here before the roof.",
+  "Do not mistake stillness for patience."
+];
+const HERON_DROP = [
+  "I have selected this one personally.",
+  "Observe the arc. I will not repeat it.",
+  "A gift. Do not thank me.",
+  "This has been weighed, labelled, and released.",
+  "I could have chosen a larger one. I did.",
+  "Kindly do not flinch. It spoils the record."
+];
+const HERON = { skin: "#5fc9c4", pale: "#dff7f4", ink: "#16403f", plume: "#2f7f7d" };
+function drawHeron(x, y, s, face, blink, arm, act, t){
   act = act || "stand"; t = t || 0;
   const nap = act === "nap";
   const front = act === "stare" || act === "shrug" || act === "wave" || act === "froze";
-  s *= 0.74;                                        // taller frame, same footprint
+  /* The proportion is the whole character, so it is worth being explicit
+     about it: legs are roughly half of him, neck and head another third,
+     and the body is what is left. Anything fatter or shorter and he stops
+     being lanky and starts being a duck. */
+  s *= 0.60;
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(face * s, s);
 
-  // ---- tail: longer than he is, and it says as much as the face does
-  const sway = Math.sin(t * (act === "creep" ? 1.1 : 2.1)) * (act === "froze" ? 0 : 1);
-  const up = act === "creep" ? 1 : act === "froze" ? -0.4 : act === "jump" ? 1.2 : 0.35;
-  const tail = () => {
+  /* ---- legs. The knee bends backwards, which is the single detail that
+     makes a bird's leg read as a bird's leg rather than a stick. */
+  const stride = act === "creep" ? Math.sin(((t * 0.42) % 1) * TAU)
+               : act === "walk" || act === "chase" ? Math.sin(t * (act === "chase" ? 15 : 6))
+               : act === "dance" ? Math.sin(t * 9) : 0;
+  const oneLeg = act === "stand" || act === "stare" || act === "measure";
+  ctx.strokeStyle = HERON.ink; ctx.lineCap = "round"; ctx.lineJoin = "round";
+  const leg = (hipX, footX, lift) => {
+    const kneeX = hipX - 5, kneeY = 14;
+    const fx = footX, fy = 31 - lift;
     ctx.beginPath();
-    ctx.moveTo(-3.5, 6);
-    ctx.bezierCurveTo(-15, 8 - up * 3, -25 + sway * 3, 2 - up * 8,
-                      -24 + sway * 7, -9 - up * 9);
+    ctx.moveTo(hipX, 2); ctx.lineTo(kneeX, kneeY); ctx.lineTo(fx, fy);
+    ctx.lineWidth = 2.3; ctx.stroke();
+    ctx.beginPath();                                 // three toes, splayed
+    ctx.moveTo(fx - 3.4, fy); ctx.lineTo(fx, fy);
+    ctx.lineTo(fx + 4.2, fy); ctx.moveTo(fx, fy); ctx.lineTo(fx + 1.2, fy + 1.8);
+    ctx.lineWidth = 1.7; ctx.stroke();
+  };
+  if (nap){ leg(1, 6, 0); }
+  else if (oneLeg){
+    // the other one is folded up under him, which is what they actually do
+    ctx.beginPath();
+    ctx.moveTo(-1.5, 2); ctx.lineTo(-7, 12); ctx.lineTo(-1, 15);
+    ctx.lineWidth = 2.3; ctx.stroke();
+    leg(1.5, 1.5, 0);
+  } else if (act === "creep"){
+    leg(2, 16 + stride * 6, Math.max(0, stride) * 9);
+    leg(-2, -12 + stride * 6, 0);
+  } else if (act === "sit"){ leg(2, 9, 16); leg(-2, -7, 16); }
+  else if (act === "froze"){ leg(1.4, 1.4, 0); leg(-1.4, -1.4, 0); }
+  else { leg(2, 2 + stride * 8, 0); leg(-2, -2 - stride * 8, 0); }
+
+  // ---- body: a compact teardrop, with the tail feathers behind
+  if (act === "creep"){ ctx.rotate(-0.2); ctx.translate(0, 2); }
+  ctx.strokeStyle = HERON.ink; ctx.lineWidth = 1.7;
+  ctx.fillStyle = HERON.plume;
+  ctx.beginPath();                                   // wing coverts, hanging behind
+  ctx.moveTo(1, -9); ctx.quadraticCurveTo(-10, -7, -16, 5);
+  ctx.quadraticCurveTo(-8, 0, -1, 1);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = HERON.skin;
+  ctx.beginPath(); ctx.ellipse(0, -4, 5.4, 7.2, 0.08, 0, TAU); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = HERON.pale;                        // the pale front
+  ctx.beginPath(); ctx.ellipse(2, -2.5, 2.7, 4.8, 0.08, 0, TAU); ctx.fill();
+
+  /* ---- neck: an S when he is idle, drawn out straight when he is not.
+     A heron that has noticed something is a heron a foot taller. */
+  const up = act === "creep" || act === "stare" || act === "chase" || act === "froze" ? 1
+           : act === "jump" || act === "wave" ? 0.8 : 0;
+  const hx = 3 + up * 4, hy = -31 - up * 8;
+  const neck = () => {
+    ctx.beginPath();
+    ctx.moveTo(1, -10);
+    ctx.bezierCurveTo(-4 + up * 4, -16 - up * 4, 6 + up * 2, -21 - up * 7, hx, hy + 3.4);
     ctx.stroke();
   };
-  ctx.lineCap = "round";
-  ctx.strokeStyle = CAT.ink; ctx.lineWidth = 3.4; tail();
-  ctx.strokeStyle = CAT.skin; ctx.lineWidth = 2.1; tail();
-  ctx.strokeStyle = CAT.ink; ctx.lineWidth = 2.4;      // a tuft on the end
-  ctx.beginPath(); ctx.arc(-24 + sway * 7, -9 - up * 9, 1.9, 0, TAU);
-  ctx.fillStyle = CAT.skin; ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = HERON.ink; ctx.lineWidth = 4.2; neck();
+  ctx.strokeStyle = HERON.skin; ctx.lineWidth = 2.7; neck();
 
-  // ---- legs: thin, long, and they carry the walk
-  ctx.strokeStyle = CAT.ink; ctx.lineWidth = 2.4;
-  const foot = [];
+  /* ---- wings, standing in for arms so every pose still reads */
+  let lx = -13, ly = -1, rx = 13, ry = -1;
+  if (act === "shrug"){ lx = -15; ly = -9; rx = 15; ry = -9; }
+  else if (act === "wave"){ ly = 3; rx = 13 + Math.sin(t * 11) * 4; ry = -13; }
+  else if (act === "dance"){ const w = Math.sin(t * 9) * 9; ly = -1 - w; ry = -1 + w; }
+  else if (act === "write"){ lx = -11; ly = 3; rx = 11; ry = -6 + Math.sin(t * 16) * 2.4; }
+  else if (act === "stare" || act === "froze"){ lx = -6; ly = 5; rx = 6; ry = 5; }
+  else if (act === "creep"){ lx = 9; ly = -9; rx = 17; ry = -5; }
+  else if (act === "measure"){ lx = -17; ly = -4; rx = 17; ry = -4; }
+  else if (act === "chase"){ ly = -9; ry = -12; }
+  else if (nap){ lx = -10; ly = 4; rx = 9; ry = 5; }
+  else { ly = -1 + arm * -8; ry = -1 + arm * -8; }
+  ctx.strokeStyle = HERON.ink; ctx.lineWidth = 2.2;
   ctx.beginPath();
-  if (nap){ ctx.moveTo(-1, 7); ctx.lineTo(8, 12); ctx.moveTo(2, 7); ctx.lineTo(12, 10);
-            foot.push([8,12],[12,10]); }
-  else if (act === "creep"){
-    const sw = Math.sin(((t * 0.42) % 1) * TAU);
-    const a = [17 + sw * 5, 19 - Math.max(0, sw) * 7], b = [-15 + sw * 5, 19];
-    ctx.moveTo(2, 6); ctx.lineTo(a[0], a[1]);
-    ctx.moveTo(-2, 6); ctx.lineTo(b[0], b[1]);
-    foot.push(a, b);
-  } else if (act === "walk" || act === "chase"){
-    const k = Math.sin(t * (act === "chase" ? 17 : 8)) * 6;
-    const a = [2.5 + k, 19], b = [-2.5 - k, 19];
-    ctx.moveTo(2.5, 6); ctx.lineTo(a[0], a[1]);
-    ctx.moveTo(-2.5, 6); ctx.lineTo(b[0], b[1]);
-    foot.push(a, b);
-  } else if (act === "dance"){
-    const k = Math.sin(t * 9) * 5;
-    const a = [4 - k, 19], b = [-4 - k, 19];
-    ctx.moveTo(2.5, 6); ctx.lineTo(a[0], a[1]);
-    ctx.moveTo(-2.5, 6); ctx.lineTo(b[0], b[1]);
-    foot.push(a, b);
-  } else if (act === "sit"){
-    const a = [7, 14], b = [-7, 14];
-    ctx.moveTo(2.5, 7); ctx.lineTo(a[0], a[1]);
-    ctx.moveTo(-2.5, 7); ctx.lineTo(b[0], b[1]);
-    foot.push(a, b);
-  } else if (act === "froze"){
-    const a = [1.6, 19], b = [-1.6, 19];
-    ctx.moveTo(1.6, 6); ctx.lineTo(a[0], a[1]);
-    ctx.moveTo(-1.6, 6); ctx.lineTo(b[0], b[1]);
-    foot.push(a, b);
-  } else {
-    const a = [2.8, 19], b = [-2.8, 19];
-    ctx.moveTo(2.8, 6); ctx.lineTo(a[0], a[1]);
-    ctx.moveTo(-2.8, 6); ctx.lineTo(b[0], b[1]);
-    foot.push(a, b);
+  ctx.moveTo(-3, -4); ctx.lineTo(lx, ly);
+  ctx.moveTo(3, -4);  ctx.lineTo(rx, ry);
+  ctx.stroke();
+  ctx.fillStyle = HERON.skin; ctx.lineWidth = 1.4;
+  for (const [px, py] of [[lx, ly], [rx, ry]]){       // a small hand at each tip
+    ctx.beginPath(); ctx.ellipse(px, py, 2.3, 1.8, 0, 0, TAU); ctx.fill(); ctx.stroke();
   }
-  ctx.stroke();
-  ctx.fillStyle = CAT.ink;
-  for (const f of foot){ ctx.beginPath(); ctx.ellipse(f[0], f[1] + 0.6, 2.6, 1.7, 0, 0, TAU); ctx.fill(); }
 
-  // ---- the lean lives above the hips, the same as it does on the man
-  if (act === "creep"){ ctx.rotate(-0.24); ctx.translate(0, 2); }
-
-  // ---- body: a tall narrow capsule, with a pale front
-  ctx.fillStyle = CAT.skin; ctx.strokeStyle = CAT.ink; ctx.lineWidth = 1.7;
+  // ---- head, beak, plumes
+  ctx.strokeStyle = HERON.ink; ctx.lineWidth = 1.7;
+  ctx.beginPath();                                   // two plumes off the back
+  ctx.moveTo(hx - 2.6, hy - 1.4);
+  ctx.quadraticCurveTo(hx - 11, hy - 3.6, hx - 15, hy + 1.4);
+  ctx.moveTo(hx - 2.6, hy - 0.2);
+  ctx.quadraticCurveTo(hx - 10, hy + 1.6, hx - 14, hy + 5.4);
+  ctx.strokeStyle = HERON.plume; ctx.lineWidth = 1.9; ctx.stroke();
+  ctx.fillStyle = HERON.skin; ctx.strokeStyle = HERON.ink; ctx.lineWidth = 1.7;
+  ctx.beginPath(); ctx.ellipse(hx, hy, 4.1, 3.5, 0, 0, TAU); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = "#f2c85a";                          // the dagger
   ctx.beginPath();
-  if (ctx.roundRect) ctx.roundRect(-5.8, -7.5, 11.6, 15, 5.4);
-  else ctx.ellipse(0, 0, 5.8, 7.5, 0, 0, TAU);
-  ctx.fill(); ctx.stroke();
-  ctx.fillStyle = CAT.pale;
-  ctx.beginPath(); ctx.ellipse(0, 2, 2.1, 4.2, 0, 0, TAU); ctx.fill();
-
-  // ---- arms: the longest thing on him apart from the tail
-  let lx = -15, ly = 2, rx = 15, ry = 2;
-  if (act === "shrug"){ ly = -8; ry = -8; }
-  else if (act === "wave"){ ly = 5; rx = 12 + Math.sin(t * 11) * 4; ry = -14; }
-  else if (act === "dance"){ const w = Math.sin(t * 9) * 9; ly = -w; ry = w; }
-  else if (act === "write"){ lx = -12; ly = 5; rx = 11; ry = -5 + Math.sin(t * 16) * 2.4; }
-  else if (act === "stare"){ lx = -10; ly = 7; rx = 10; ry = 7; }
-  else if (act === "froze"){ lx = -7; ly = 8; rx = 7; ry = 8; }
-  else if (act === "creep"){ lx = 11; ly = -9; rx = 19; ry = -4; }
-  else if (act === "measure"){ lx = -18; ly = -3; rx = 18; ry = -3; }
-  else if (act === "chase"){ ly = -8; ry = -11; }
-  else if (nap){ lx = -11; ly = 7; rx = 10; ry = 8; }
-  else { ly = 2 + arm * -8; ry = 2 + arm * -8; }
-  ctx.strokeStyle = CAT.ink; ctx.lineWidth = 2.2;
-  ctx.beginPath();
-  ctx.moveTo(-3.6, -4); ctx.lineTo(lx, ly);
-  ctx.moveTo(3.6, -4);  ctx.lineTo(rx, ry);
-  ctx.stroke();
-  ctx.fillStyle = CAT.ink;
-  ctx.beginPath(); ctx.arc(lx, ly, 1.9, 0, TAU); ctx.fill();
-  ctx.beginPath(); ctx.arc(rx, ry, 1.9, 0, TAU); ctx.fill();
-
-  // ---- head
-  const hy = -14;
-  ctx.fillStyle = CAT.skin; ctx.strokeStyle = CAT.ink; ctx.lineWidth = 2;
-  ctx.beginPath();                                   // ears, wide and upright
-  ctx.moveTo(-6.4, hy - 3); ctx.lineTo(-7.4, hy - 9.6); ctx.lineTo(-1.8, hy - 6);
+  ctx.moveTo(hx + 2.6, hy - 1.1); ctx.lineTo(hx + 14.5, hy + 0.6);
+  ctx.lineTo(hx + 2.6, hy + 2.2);
   ctx.closePath(); ctx.fill(); ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(6.4, hy - 3); ctx.lineTo(7.4, hy - 9.6); ctx.lineTo(1.8, hy - 6);
-  ctx.closePath(); ctx.fill(); ctx.stroke();
-  ctx.beginPath(); ctx.ellipse(0, hy, 7, 6.4, 0, 0, TAU); ctx.fill(); ctx.stroke();
 
-  // ---- eyes: round and white, with the lids at half mast unless he is caught
-  const wide = front || blink;
+  // ---- the eye, and the lid that is never fully open
   ctx.fillStyle = "#fff";
-  ctx.beginPath(); ctx.arc(-2.7, hy - 1, 2.5, 0, TAU); ctx.fill();
-  ctx.beginPath(); ctx.arc(2.7, hy - 1, 2.5, 0, TAU); ctx.fill();
-  ctx.fillStyle = CAT.ink;
+  ctx.beginPath(); ctx.arc(hx + 1.1, hy - 0.9, 2.3, 0, TAU); ctx.fill();
+  ctx.fillStyle = HERON.ink;
   if (nap || blink){
-    ctx.lineWidth = 1.5; ctx.strokeStyle = CAT.ink;
-    ctx.beginPath();
-    ctx.moveTo(-4.7, hy - 1); ctx.lineTo(-0.7, hy - 1);
-    ctx.moveTo(0.7, hy - 1);  ctx.lineTo(4.7, hy - 1);
-    ctx.stroke();
+    ctx.lineWidth = 1.3; ctx.strokeStyle = HERON.ink;
+    ctx.beginPath(); ctx.moveTo(hx - 1, hy - 0.9); ctx.lineTo(hx + 3.2, hy - 0.9); ctx.stroke();
   } else {
-    ctx.beginPath(); ctx.arc(-2.5, hy - 0.6, 1.35, 0, TAU); ctx.fill();
-    ctx.beginPath(); ctx.arc(2.9, hy - 0.6, 1.35, 0, TAU); ctx.fill();
-    if (!wide){                                      // already seen everything
-      ctx.fillStyle = CAT.skin;
-      ctx.beginPath(); ctx.ellipse(-2.7, hy - 3.1, 2.7, 1.9, 0, 0, TAU); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(2.7, hy - 3.1, 2.7, 1.9, 0, 0, TAU); ctx.fill();
-      ctx.strokeStyle = CAT.ink; ctx.lineWidth = 1.3;
-      ctx.beginPath();
-      ctx.moveTo(-5.1, hy - 1.7); ctx.lineTo(-0.4, hy - 2.1);
-      ctx.moveTo(0.4, hy - 2.1);  ctx.lineTo(5.1, hy - 1.7);
-      ctx.stroke();
+    ctx.beginPath(); ctx.arc(hx + 1.6, hy - 0.6, 1.25, 0, TAU); ctx.fill();
+    if (!front){
+      ctx.fillStyle = HERON.skin;
+      ctx.beginPath(); ctx.ellipse(hx + 1.1, hy - 2.7, 2.5, 1.7, 0, 0, TAU); ctx.fill();
+      ctx.strokeStyle = HERON.ink; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(hx - 1.2, hy - 1.4); ctx.lineTo(hx + 3.5, hy - 1.7); ctx.stroke();
     }
   }
-  // ---- muzzle: a button, not a snout
-  ctx.fillStyle = CAT.pale;
-  ctx.beginPath(); ctx.ellipse(0, hy + 3.2, 3.4, 2.5, 0, 0, TAU); ctx.fill();
-  ctx.fillStyle = CAT.ink;
-  ctx.beginPath(); ctx.ellipse(0, hy + 2.1, 1.25, 0.95, 0, 0, TAU); ctx.fill();
-  ctx.lineWidth = 1.1; ctx.strokeStyle = CAT.ink;
-  ctx.beginPath();
-  ctx.moveTo(0, hy + 2.9); ctx.lineTo(0, hy + 4);
-  ctx.moveTo(0, hy + 4); ctx.bezierCurveTo(-0.6, hy + 4.9, -2, hy + 4.7, -2.3, hy + 3.9);
-  ctx.moveTo(0, hy + 4); ctx.bezierCurveTo(0.6, hy + 4.9, 2, hy + 4.7, 2.3, hy + 3.9);
-  ctx.stroke();
-  ctx.lineWidth = 0.9;                               // whiskers
-  ctx.beginPath();
-  for (const d of [-1, 1]) for (let i = 0; i < 3; i++){
-    ctx.moveTo(d * 3.2, hy + 2.2 + i * 1.1);
-    ctx.lineTo(d * 10.5, hy + 0.7 + i * 1.9);
-  }
-  ctx.stroke();
-
-  // ---- and the hat, which is the part that is still Heck
+  // ---- and the hat, which he resents
   ctx.fillStyle = isPanther() ? "#ff7ab8" : (Heck.hat || "#ff7a2f");
-  const hb = act === "creep" ? -1.6 : 0;
-  ctx.beginPath(); ctx.arc(0, hy - 5.4 + hb, 5.6, Math.PI, TAU); ctx.fill();
-  ctx.fillRect(-7.6, hy - 5.8 + hb, 15.2, 1.9);
+  ctx.beginPath(); ctx.arc(hx, hy - 3.2, 4.4, Math.PI, TAU); ctx.fill();
+  ctx.fillRect(hx - 6, hy - 3.6, 12, 1.6);
   ctx.restore();
 
   if (nap){
     ctx.save();
-    ctx.fillStyle = CAT.ink; ctx.textAlign = "left";
+    ctx.fillStyle = HERON.ink; ctx.textAlign = "left";
     for (let i = 0; i < 3; i++){
       const k = (t * 0.5 + i * 0.33) % 1;
       ctx.globalAlpha = 0.6 * (1 - k);
       ctx.font = "900 " + (7 + i * 2).toFixed(0) + "px " + FONT;
-      ctx.fillText("z", x + 9 * s + k * 7, y - 16 * s - k * 16);
+      ctx.fillText("z", x + 9 * s + k * 7, y - 26 * s - k * 16);
     }
     ctx.restore();
   }
+}
+/* He does not speak, so what would have been a speech bubble is a card he
+   wrote out earlier and is now holding up. Same words, no voice. */
+function drawHeronCard(x, y, text, alpha){
+  if (!text || alpha <= 0.01) return;
+  ctx.save();
+  ctx.globalAlpha = clamp(alpha, 0, 1);
+  ctx.font = "800 10.5px " + FONT;
+  ctx.textAlign = "left";
+  const lines = wrapLines(text, Math.min(150, VW - 40));
+  let wid = 0;
+  for (const l of lines) wid = Math.max(wid, ctx.measureText(l).width);
+  const pad = 8, lh = 13;
+  const bw = wid + pad * 2, bh = lines.length * lh + pad * 1.8;
+  const bx = clamp(x - bw / 2, 8, VW - bw - 8), by = clamp(y - bh - 8, 6, VH - bh - 20);
+  ctx.translate(bx + bw / 2, by + bh / 2);
+  ctx.rotate(-0.035);                                 // held, not printed
+  ctx.translate(-bw / 2, -bh / 2);
+  ctx.fillStyle = "rgba(20,16,20,.22)";
+  ctx.fillRect(2.5, 3, bw, bh);
+  ctx.fillStyle = "#f6efe2"; ctx.strokeStyle = HERON.ink; ctx.lineWidth = 1.4;
+  ctx.fillRect(0, 0, bw, bh); ctx.strokeRect(0, 0, bw, bh);
+  ctx.strokeStyle = "rgba(22,64,63,.30)"; ctx.lineWidth = 0.8;
+  ctx.strokeRect(3, 3, bw - 6, bh - 6);               // a ruled border
+  ctx.fillStyle = HERON.ink;
+  lines.forEach((l, i) => ctx.fillText(l, pad, pad + 8 + i * lh));
+  ctx.fillStyle = HERON.skin; ctx.strokeStyle = HERON.ink; ctx.lineWidth = 1.2;
+  ctx.beginPath();                                    // the hand holding it
+  ctx.ellipse(bw * 0.5, bh + 1.5, 4.4, 2.6, 0, 0, TAU);
+  ctx.fill(); ctx.stroke();
+  ctx.restore();
+}
+function drawHeckAny(x, y, s, face, blink, arm, act, t){
+  (isPanther() ? drawHeron : drawHeckBody)(x, y, s, face, blink, arm, act, t);
 }
 function drawHeckBody(x, y, s, face, blink, arm, act, t){
   act = act || "stand"; t = t || 0;
@@ -4434,6 +4474,7 @@ function drawHeckBody(x, y, s, face, blink, arm, act, t){
 }
 /* a speech bubble that wraps, sized to what is in it */
 function drawHeckSay(x, y, text, alpha, ink){
+  if (isPanther()) return drawHeronCard(x, y, text, alpha);
   if (!text || alpha <= 0.01) return;
   ctx.save();
   ctx.globalAlpha = clamp(alpha, 0, 1);
@@ -6838,8 +6879,10 @@ const UI = {
     // in the multiplier it earned, because that is the number they watched
     $("overLate").textContent = G.closest < 1e8 ? "×" + lateMult(G.closest).toFixed(1) : "—";
     // and the man on the roof gets the last word on it
-    $("overHeck").innerHTML = "&ldquo;" + Heck.line(HECK_REACT.dead) + "&rdquo;<br>— " +
-      Heck.name + ", " + Heck.mood.tag;
+    // he does not say it, he writes it on a card and holds it up
+    $("overHeck").innerHTML = (isPanther() ? "" : "&ldquo;") +
+      Heck.line(HECK_REACT.dead) + (isPanther() ? "" : "&rdquo;") + "<br>— " +
+      Heck.who + ", " + Heck.mood.tag;
     // a few tries in and the next level opens up anyway — nobody gets stuck
     if (!G.def.endless && !G.failCounted){
       G.failCounted = true;
@@ -7252,7 +7295,7 @@ $("wipeBtn").addEventListener("click", () => {
 
 /* -------------------------------------------------------------- boot */
 Heck.init();
-$("heckName").textContent = "Today " + Heck.name + " is on the roof.";
+$("heckName").textContent = "Today " + Heck.who + " is on the roof.";
 G.hintT = save.seen ? 0 : 6;
 if (!save.seen){ save.seen = 1; persist(); }
 syncSwitches();
