@@ -818,7 +818,7 @@
     </div>
     <p class="fine">Every level free. No ads. No timers.</p>
     <p class="build" id="titleBuild"></p>
-    <p class="fine" id="heckName" style="margin-top:-2px;opacity:.85"></p>
+    <p class="fine" id="heckName" style="margin-top:-2px;opacity:.85;max-width:86vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></p>
   </div>
 
   <!-- ================= LEVELS ================= -->
@@ -944,6 +944,7 @@
       <button class="btn ghost wide" id="overLevels">Levels</button>
       <button class="btn ghost wide" id="overMenu">Main menu</button>
     </div>
+    <p class="fine" id="overHeck" style="max-width:min(340px,86vw);line-height:1.45;opacity:.8"></p>
   </div>
 
   <!-- ================= LEVEL CLEAR ================= -->
@@ -1065,7 +1066,7 @@ function segSegDist(ax1, ay1, ax2, ay2, bx1, by1, bx2, by2, out){
    are playing the same build — which a version label alone can never tell
    you, least of all when one of you is looking at something a browser cached
    a week ago. Change one character of the game and the code changes. */
-const BUILD = { v: "1.4", n: 29, date: "22 Sep 2026", code: "0000000" };
+const BUILD = { v: "1.5", n: 30, date: "23 Sep 2026", code: "0000000" };
 (() => {
   // scripts and stylesheets: everything that decides how the game behaves and
   // how it looks. Not the markup, which the game rewrites as it runs and which
@@ -1093,6 +1094,7 @@ const defaultSave = () => ({
   shield: "classic",
   ver: "",           // a version label you can set yourself
   seen: 0,
+  heckMet: 0,      // how many times he has watched you come back
   taught: 0,       // how many runs have been told what nerve is
   heckSeed: 0,
   fails: {},
@@ -3025,6 +3027,7 @@ function takeHit(o, nx, ny){
     burstParts(G.bal.x, G.bal.y, 16, "#bff3ff", 200, "dot");
     Audio2.SFX.bump(); buzz(26);
     UI.flash("Shield used");
+    Heck.heckle("hurt");
   } else {
     popBalloon();
   }
@@ -3456,6 +3459,11 @@ function blockScored(o, x, y){
   floatScore(x, y, gained, late);
   if (held){ G.cam.shake = Math.max(G.cam.shake, save.opts.calm ? 2 : 4 + late); buzz(late >= 2.6 ? 14 : 8); }
   if (held && G.nerve >= 2) Audio2.SFX.gem(clamp(G.nerve - 2, 0, 7));
+  // the man on the roof watches all of this and is not gracious about it
+  if (o.pid === "heckboard") Heck.heckle("board");
+  else if (o.pid === "heck") Heck.heckle("mine");
+  else if (G.nerve === 5) Heck.heckle("nerve");
+  else if (late >= 2.7) Heck.heckle("close");
   // the rule is easiest to learn the instant you have just done it by accident
   if (held && !G.taughtT && save.taught < 3){
     G.taughtT = 1; save.taught++; persist();
@@ -3539,18 +3547,47 @@ function SKIN_BY_ID(id){
    the next person's. Everything he throws is a real body with a real
    collider: the shield turns it away like anything else, and it is always
    released far enough above you to be met.                                */
-const HECK_TITLE = ["", "", "", "Dr.", "Mr.", "Chief", "Inspector", "Deputy", "Professor"];
+const HECK_TITLE = ["", "", "", "Dr.", "Mr.", "Chief", "Inspector", "Deputy", "Professor",
+                    "Acting", "Sgt.", "Warden", "Auditor"];
 const HECK_FIRST = ["Gorbo", "Nubbins", "Klemp", "Wexley", "Snoot", "Fibb", "Dorbus", "Hax",
                     "Tunk", "Pilbert", "Mim", "Grunk", "Yex", "Bramble", "Oddwin", "Squint",
-                    "Feek", "Morv", "Plib", "Zank", "Hedley", "Ovid", "Trundle", "Bix"];
+                    "Feek", "Morv", "Plib", "Zank", "Hedley", "Ovid", "Trundle", "Bix",
+                    "Wobb", "Nim", "Crake", "Pell", "Dunty", "Vosk", "Arbo", "Shrim"];
 const HECK_LAST  = ["Flinchwick", "Nettlebore", "Grimsby", "Crumb", "Fickett", "Vole",
                     "Thundermop", "Prattle", "Sockworth", "Hazzard", "Muddle", "Quill",
                     "Pinchbeck", "Stubbs", "Wickham", "Dregg", "Tonk", "Marrow", "Skelp",
-                    "Yarrow", "Bellows", "Gaunt", "Pocklington", "Snide"];
+                    "Yarrow", "Bellows", "Gaunt", "Pocklington", "Snide",
+                    "Tremble", "Oxfoot", "Winch", "Rasp", "Bodkin", "Scattergood"];
 
-/* Two voices, and the difference between them is the joke. Idle, he is a man
-   with too much time. Working, he is entirely methodical about something no
-   methodical person would be doing. */
+/* ============================================================== the man
+
+   He was a random line generator standing on a roof, which is a costume,
+   not a character. Three things were missing and all three are here now.
+
+   He has a temperament. One of five, drawn from the same seed as his name,
+   so your man is your man: a smug one preens, a rattled one paces and
+   startles, a bored one naps through the whole launch. It changes how often
+   he speaks, how fast he moves, what he does with his hands, and it gives
+   him his own private set of lines on top of the common ones.
+
+   He watches. Nerve chains, near misses, the rocks he threw that you sent
+   back, the hit that finished you — each has something he says about it,
+   and if the hatch is shut he will crack it open purely to say so and then
+   shut it again. Those peeks never drop anything: he is commentary, not
+   difficulty, and the difference has to be legible at a glance.
+
+   He carries the clipboard everywhere, which is the joke, and once in a
+   while he drops it by accident instead of a rock. It is worth a fortune
+   and he would very much like it back. */
+const HECK_MOODS = [
+  { id: "smug",    pace: 1.05, chat: 0.55, nap: 0.02, tag: "insufferably pleased" },
+  { id: "rattled", pace: 1.55, chat: 0.66, nap: 0.00, tag: "not coping" },
+  { id: "bored",   pace: 0.62, chat: 0.34, nap: 0.26, tag: "profoundly unbothered" },
+  { id: "keen",    pace: 1.35, chat: 0.62, nap: 0.00, tag: "far too keen" },
+  { id: "grave",   pace: 0.82, chat: 0.48, nap: 0.04, tag: "taking this seriously" }
+];
+
+/* Idle, he is a man with too much time and one clipboard. */
 const HECK_IDLE = [
   "I have a clipboard. It is mine.",
   "Third Tuesday. Always the worst one.",
@@ -3573,8 +3610,52 @@ const HECK_IDLE = [
   "Do not look directly at the bucket.",
   "I am on a break. This is my break.",
   "Two of everything, in case one of them leaves.",
-  "I have named all of the rocks."
+  "I have named all of the rocks.",
+  "There is a second roof under this roof.",
+  "I signed for the sky. Nobody stopped me.",
+  "My shadow gets its own line on the form.",
+  "I have never once been struck by anything I threw.",
+  "Weather is just a rumour that got organised."
 ];
+const HECK_MOOD_IDLE = {
+  smug: [
+    "I was right about the wind. Again.",
+    "Somebody should be writing this down. I am somebody.",
+    "They gave me a hat. Think about what that means.",
+    "I have never been wrong in a way that counted.",
+    "Modesty is for people with smaller clipboards."
+  ],
+  rattled: [
+    "Did you hear that? I heard that.",
+    "It was not like this yesterday. It was not.",
+    "I am going to pretend the roof did not move.",
+    "Everything is fine. Everything is fine. Everything is—",
+    "I have three plans and I hate all of them."
+  ],
+  bored: [
+    "Mm.",
+    "Something will happen eventually.",
+    "I am going to sit down for a geological era.",
+    "Wake me when the sky does something.",
+    "This is the most interesting wall I have seen today."
+  ],
+  keen: [
+    "I have four more experiments and one afternoon!",
+    "Do you want to see the chart? I have the chart.",
+    "I got here early. I get here early every day.",
+    "New idea. Terrible idea. Writing it down anyway.",
+    "I love it up here. I love it up here!"
+  ],
+  grave: [
+    "We are not going to speak about the third trial.",
+    "The paperwork will outlive both of us.",
+    "Somebody has to take the sky seriously.",
+    "I have read the incident report. I wrote it.",
+    "There are rules. I am the reason there are rules."
+  ]
+};
+/* Working, he is entirely methodical about something no methodical
+   person would be doing. */
 const HECK_DROP = [
   "Dropping this for science. Mostly science.",
   "Hypothesis: you cannot catch this. Testing.",
@@ -3601,13 +3682,84 @@ const HECK_DROP = [
   "I am legally required to say 'heads up'. Heads up.",
   "Conclusion drafted. Just need the data."
 ];
+const HECK_MOOD_DROP = {
+  smug:    ["Watch the arc on this one. That is craft.",
+            "I could do this left-handed. I am doing this left-handed.",
+            "You will want to remember how this was thrown."],
+  rattled: ["I did not mean to pick this one up. Too late!",
+            "Sorry! Sorry. Not sorry enough to stop.",
+            "This is fine. This is a normal amount of rock."],
+  bored:   ["Here.", "Rock. Down. Whatever.",
+            "I am doing this so the form has a line in it."],
+  keen:    ["Oh, this is a GOOD one, you will love this—",
+            "Wait wait wait watch watch watch—",
+            "Trial! Fresh trial! Brand new trial!"],
+  grave:   ["Released at my discretion. Noted and signed.",
+            "This is not personal. It is procedural.",
+            "Observe. Do not interpret. That is my job."]
+};
+
+/* What he says about things you did. This is the part that makes him feel
+   like he is actually up there watching. */
+const HECK_REACT = {
+  hello: [
+    "You again. I kept the seat warm.",
+    "Back for more measurements. Good.",
+    "I have the forms ready this time.",
+    "Ah. The recurring variable."
+  ],
+  nerve: [
+    "You are doing that on purpose. Stop enjoying it.",
+    "That was needlessly close and I am noting the word NEEDLESSLY.",
+    "Hold on. Are you good at this?",
+    "I am revising my estimate. Upward. Grudgingly."
+  ],
+  close: [
+    "That was a paint thickness. I measured.",
+    "I felt that from up here.",
+    "Do that again and I will need a bigger form.",
+    "Unacceptable margin. Magnificent, but unacceptable."
+  ],
+  mine: [
+    "That one was MINE and you know it.",
+    "Returned to sender. I did not consent to that.",
+    "Fine. FINE. I have others.",
+    "I threw that with intent. You had no right."
+  ],
+  board: [
+    "THAT WAS THE CLIPBOARD.",
+    "Everything I know was on there!",
+    "Six years of notes. Six.",
+    "I want it back and I want it in order."
+  ],
+  hurt: [
+    "Ha! Write that down. Oh — I am the one who writes it down.",
+    "Contact confirmed. Lovely. Beautiful.",
+    "The data is coming along nicely now.",
+    "See, this is what I have been saying."
+  ],
+  dead: [
+    "Trial concluded. I will file it under 'ouch'.",
+    "Noted, timed, and slightly enjoyed.",
+    "I will put the kettle on for the next one.",
+    "Thank you for your participation in the sky."
+  ],
+  far: [
+    "You have gone further than the form allows.",
+    "I am running out of roof to stand on.",
+    "At this rate I will need a longer ladder.",
+    "Nobody told me it went up this far."
+  ]
+};
 
 const Heck = {
-  name: "", seed: 0,
+  name: "", seed: 0, mood: HECK_MOODS[0], sign: "",
   // title screen
-  x: 0, y: 0, vx: 0, face: 1, bob: 0, act: "walk", actT: 0, say: "", sayT: 0,
+  x: 0, y: 0, vx: 0, face: 1, bob: 0, act: "walk", actT: 0, act0: 1, say: "", sayT: 0,
+  bx: 0, bvx: 0,                      // the clipboard, when it gets away from him
   // the hatch
-  live: false, side: 1, hy: 0, open: 0, hold: 0, next: 0, thrown: 0, hsay: "", hsayT: 0,
+  live: false, peek: false, side: 1, hy: 0, open: 0, hold: 0, next: 0,
+  thrown: 0, board: false, slip: 0, hsay: "", hsayT: 0, heckleT: 0, seen: {},
   init(){
     if (!save.heckSeed){ save.heckSeed = 1 + ((Math.random() * 1e9) | 0); persist(); }
     this.seed = save.heckSeed;
@@ -3615,77 +3767,153 @@ const Heck = {
     const t = HECK_TITLE[(r() * HECK_TITLE.length) | 0];
     this.name = (t ? t + " " : "") + HECK_FIRST[(r() * HECK_FIRST.length) | 0] +
                 " " + HECK_LAST[(r() * HECK_LAST.length) | 0];
-    this.x = VW * 0.3; this.y = 0; this.next = 26 + Math.random() * 30;
+    this.mood = HECK_MOODS[(r() * HECK_MOODS.length) | 0];
+    this.hat  = ["#ff7a2f", "#ffd166", "#5fd2a0", "#7c5cff", "#ff5f6b"][(r() * 5) | 0];
+    this.x = VW * 0.3; this.y = 0; this.bx = this.x + 16;
+    this.next = 20 + Math.random() * 26;
   },
   line(list){ return list[(Math.random() * list.length) | 0]; },
+  /* his own lines first, the common ones underneath */
+  voice(common, byMood){
+    const mine = byMood[this.mood.id] || [];
+    return Math.random() < 0.42 && mine.length ? this.line(mine) : this.line(common);
+  },
 
   /* ---- the title screen: he has nowhere to be ---- */
   menu(dt){
     this.bob += dt;
     this.actT -= dt;
     if (this.sayT > 0) this.sayT -= dt;
-    if (this.actT <= 0){
-      const pick = Math.random();
-      this.act = pick < 0.42 ? "walk" : pick < 0.58 ? "stand" : pick < 0.72 ? "jump"
-               : pick < 0.84 ? "spin" : pick < 0.93 ? "sit" : "trip";
-      this.actT = this.act === "walk" ? 1.6 + Math.random() * 2.6 : 0.8 + Math.random() * 1.6;
-      if (this.act === "walk") this.face = Math.random() < 0.5 ? -1 : 1;
-      if (Math.random() < 0.45){ this.say = this.line(HECK_IDLE); this.sayT = 3.4; }
-    }
-    this.vx = this.act === "walk" ? this.face * 26 : 0;
+    if (this.actT <= 0) this.pickAct();
+    this.vx = (this.act === "walk" ? this.face * 26
+            : this.act === "chase" ? this.face * 62 : 0) * this.mood.pace;
     this.x += this.vx * dt;
     if (this.x < 34){ this.x = 34; this.face = 1; }
     if (this.x > VW - 34){ this.x = VW - 34; this.face = -1; }
-    this.y = this.act === "jump" ? -Math.abs(Math.sin(this.actT * 6)) * 16
-           : this.act === "trip" ? Math.min(10, (0.8 - this.actT) * 40)
+    /* how far through the current act he is, so a hop goes up and comes
+       down once rather than being driven off a clock that has no idea how
+       long the act was meant to last */
+    const k = clamp(1 - this.actT / Math.max(0.01, this.act0), 0, 1);
+    this.y = this.act === "jump"  ? -Math.sin(k * Math.PI) * 17
+           : this.act === "trip"  ? Math.sin(k * Math.PI) * 9
+           : this.act === "dance" ? -Math.abs(Math.sin(this.bob * 9)) * 4
            : 0;
+    // the clipboard: normally in his hand, and occasionally three feet ahead
+    // of it going the other way
+    if (this.act === "chase"){
+      this.bvx += (this.face * 74 - this.bvx) * dt * 1.4;
+      this.bx = clamp(this.bx + this.bvx * dt, 20, VW - 20);
+    } else {
+      this.bx = this.x + this.face * 13; this.bvx = 0;
+    }
+  },
+  pickAct(){
+    const m = this.mood, p = Math.random();
+    let a;
+    if (p < m.nap) a = "nap";
+    else {
+      const pool = m.id === "bored"  ? ["stand","sit","stand","nap","walk","stare","shrug"]
+                 : m.id === "keen"   ? ["walk","jump","dance","write","chase","jump","wave"]
+                 : m.id === "rattled"? ["walk","trip","spin","chase","stare","walk","shrug"]
+                 : m.id === "smug"   ? ["stand","write","wave","stare","walk","spin"]
+                 :                     ["write","stand","walk","measure","stare","sit"];
+      a = pool[(Math.random() * pool.length) | 0];
+    }
+    this.act = a;
+    this.act0 = this.actT = a === "walk" ? 1.6 + Math.random() * 2.6
+              : a === "nap"  ? 3.5 + Math.random() * 5
+              : a === "chase"? 1.1 + Math.random() * 1.2
+              : 0.8 + Math.random() * 1.6;
+    if (a === "walk" || a === "chase") this.face = Math.random() < 0.5 ? -1 : 1;
+    if (a === "chase") this.bvx = this.face * 90;
+    if (a !== "nap" && Math.random() < this.mood.chat){
+      this.say = this.voice(HECK_IDLE, HECK_MOOD_IDLE); this.sayT = 3.4;
+    }
   },
 
   /* ---- in a run: rarely, and never to a schedule you could learn ---- */
   tick(dt){
-    if (G.state !== "play"){ this.live = false; return; }
+    if (G.state !== "play"){ this.live = false; this.peek = false; return; }
     if (this.hsayT > 0) this.hsayT -= dt;
+    if (this.heckleT > 0) this.heckleT -= dt;
+    const mile = (G.climbed / 4200) | 0;               // he notices how far you got
+    if (mile > 0 && !this.seen["m" + mile]){ this.seen["m" + mile] = 1; this.heckle("far"); }
     if (!this.live){
       this.next -= dt;
-      if (this.next <= 0 && G.climbed > 380){
-        this.live = true; this.open = 0; this.hold = 0; this.thrown = 0;
-        this.side = Math.random() < 0.5 ? -1 : 1;
-        /* High enough to give you three or four seconds of warning, low
-           enough that the hatch and what he says through it are both inside
-           the frame rather than jammed against the top of it. */
-        this.hy = G.bal.y - VH * (0.30 + Math.random() * 0.16);
-        this.hsay = this.line(HECK_DROP); this.hsayT = 4.2;
-        Audio2.SFX.tap();
-      }
+      if (this.next <= 0 && G.climbed > 380) this.arrive(false);
       return;
     }
-    this.open = Math.min(1, this.open + dt * 3.2);
     this.hold += dt;
-    // he throws one, sometimes a second, then thinks better of it and shuts up
-    const want = this.hold > 0.7 ? 1 : 0;
-    const more = this.hold > 1.9 && Math.random() < 0.5 ? 2 : want;
-    if (this.open >= 1 && this.thrown < more && this.thrown < 2){
-      this.thrown++;
-      this.drop();
-    }
-    if (this.hold > 3.6){
+    if (this.slip > 0) this.slip = Math.max(0, this.slip - dt * 1.6);
+    /* The swing has to be one way at a time. Winding `open` back up at the
+       top of the frame and then taking the same amount off at the bottom
+       leaves it pinned just under one for ever, which is how the hatch came
+       to open once and then hang there for the rest of the run. */
+    const stay = this.peek ? 3.2 : 4.2;
+    if (this.hold <= stay){
+      this.open = Math.min(1, this.open + dt * 3.2);
+      if (!this.peek){
+        // he throws one, sometimes a second, then thinks better of it and shuts up
+        const want = this.hold > 0.7 ? 1 : 0;
+        const more = this.hold > 1.9 && Math.random() < 0.5 ? 2 : want;
+        if (this.open >= 1 && this.thrown < more && this.thrown < 2){
+          this.thrown++;
+          this.drop();
+        }
+      }
+    } else {
       this.open -= dt * 3.2;
       if (this.open <= 0){
-        this.live = false;
-        this.next = 24 + Math.random() * 46;       // never the same gap twice
+        this.open = 0; this.live = false; this.peek = false;
+        this.next = 20 + Math.random() * 34;       // never the same gap twice
       }
     }
+  },
+  /* open the hatch. A peek is commentary and never drops anything, which is
+     why it is allowed to happen far more often than a visit. */
+  arrive(peek){
+    this.live = true; this.peek = !!peek;
+    this.open = 0; this.hold = 0; this.thrown = 0; this.slip = 0;
+    this.side = Math.random() < 0.5 ? -1 : 1;
+    /* High enough to give you three or four seconds of warning, low enough
+       that the hatch and what he says through it are both inside the frame
+       rather than jammed against the top of it. */
+    this.hy = G.bal.y - VH * (peek ? 0.16 + Math.random() * 0.12
+                                   : 0.30 + Math.random() * 0.16);
+    if (!peek){
+      // the clipboard goes over the edge roughly one visit in seven
+      this.board = Math.random() < 0.14;
+      this.hsay = this.board ? "Wait — no — that is not a rock—"
+                             : this.voice(HECK_DROP, HECK_MOOD_DROP);
+      this.hsayT = 4.2;
+      Audio2.SFX.tap();
+    }
+  },
+  /* he saw what you did and has something to say about it */
+  heckle(kind){
+    if (G.state !== "play" || this.heckleT > 0) return;
+    const pool = HECK_REACT[kind];
+    if (!pool) return;
+    // the loud ones always land; the rest have to get lucky
+    const sure = kind === "board" || kind === "mine";
+    if (!sure && Math.random() > 0.5) return;
+    this.heckleT = 11 + Math.random() * 10;
+    if (!this.live) this.arrive(true);
+    this.hsay = this.line(pool); this.hsayT = 4.4;
+    if (this.mood.id === "rattled") this.slip = 1;
   },
   drop(){
     const x = this.side < 0 ? 4 : VW - 4;
     const rng = Math.random;
-    const R = 13 + rng() * 9;
-    const parts = rockParts(rng, R);
+    const board = this.board && this.thrown === 1;
+    const R = board ? 12 : 13 + rng() * 9;
+    const parts = board ? shPlate(13, rng) : rockParts(rng, R);
     const o = mkObst(x, this.hy + 6, parts, {
-      mass: clamp(0.7 * (0.5 + R / 30), 0.4, 2.2), style: "orb", worth: 26, look: "hull",
-      ang: rng() * TAU, spin: (rng() - 0.5) * 1.2
+      mass: board ? 0.5 : clamp(0.7 * (0.5 + R / 30), 0.4, 2.2),
+      style: "orb", worth: board ? 90 : 26, look: board ? "panel" : "hull",
+      ang: rng() * TAU, spin: (rng() - 0.5) * (board ? 3.4 : 1.2)
     });
-    o.pid = "heck";
+    o.pid = board ? "heckboard" : "heck";
     // lobbed toward the line the ship is climbing, not straight at it: it has
     // to be something you can read coming and get under
     const dx = (VW / 2 - x) * (0.55 + rng() * 0.4);
@@ -3693,21 +3921,54 @@ const Heck = {
     o.vy = 18 + rng() * 26;
     rebuildParts(o);
     G.obst.push(o);
-    Audio2.SFX.bump(); buzz(10);
+    if (board){ this.slip = 1; this.hsay = this.line(HECK_REACT.board); this.hsayT = 4.4; }
+    Audio2.SFX.bump(); buzz(board ? 18 : 10);
   },
-  reset(){ this.live = false; this.next = 22 + Math.random() * 40; this.hsayT = 0; }
+  reset(){
+    this.live = false; this.peek = false; this.heckleT = 6;
+    this.next = 18 + Math.random() * 30; this.hsayT = 0; this.seen = {};
+  }
 };
 
-/* ---- how he is drawn. Three shapes and a hat. ---- */
-function drawHeckBody(x, y, s, face, blink, arm){
+/* ---- how he is drawn. Three shapes, a hat, and the clipboard. ---- */
+function drawClipboard(x, y, s, ang){
+  ctx.save();
+  ctx.translate(x, y); ctx.rotate(ang || 0); ctx.scale(s, s);
+  ctx.fillStyle = "#e9e2cf"; ctx.strokeStyle = "#2b3150"; ctx.lineWidth = 1.7;
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(-4.6, -6, 9.2, 12, 1.4);
+  else ctx.rect(-4.6, -6, 9.2, 12);
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = "#8a93a6"; ctx.fillRect(-2.6, -7.4, 5.2, 2.4);   // the clip
+  ctx.strokeStyle = "rgba(43,49,80,.45)"; ctx.lineWidth = 0.9;      // the notes
+  ctx.beginPath();
+  for (let i = 0; i < 4; i++){ ctx.moveTo(-3.2, -2.6 + i * 2.2); ctx.lineTo(2.6, -2.6 + i * 2.2); }
+  ctx.stroke();
+  ctx.restore();
+}
+function drawHeckBody(x, y, s, face, blink, arm, act, t){
+  act = act || "stand"; t = t || 0;
+  const nap = act === "nap", front = act === "stare" || act === "shrug" || act === "wave";
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(face * s, s);
-  // legs
+  /* Legs and arms have to clear the body or none of this reads: he is a
+     nine-unit ball and a limb that stops at ten units is a limb nobody can
+     see. Everything below reaches well past the edge, and every hand and
+     foot gets a dot on the end of it so the pose has a silhouette. */
   ctx.strokeStyle = "#2b3150"; ctx.lineWidth = 2.6; ctx.lineCap = "round";
   ctx.beginPath();
-  ctx.moveTo(-3.4, 7); ctx.lineTo(-3.4, 12);
-  ctx.moveTo(3.4, 7); ctx.lineTo(3.4, 12);
+  if (nap){ ctx.moveTo(-2, 8); ctx.lineTo(6, 13); ctx.moveTo(3, 8); ctx.lineTo(11, 12); }
+  else if (act === "dance"){
+    const k = Math.sin(t * 9) * 4;
+    ctx.moveTo(-3.4, 7); ctx.lineTo(-4.4 - k, 16);
+    ctx.moveTo(3.4, 7);  ctx.lineTo(4.4 - k, 16);
+  } else if (act === "walk" || act === "chase"){
+    const k = Math.sin(t * (act === "chase" ? 17 : 9)) * 4;
+    ctx.moveTo(-3.4, 7); ctx.lineTo(-3.4 + k, 16);
+    ctx.moveTo(3.4, 7);  ctx.lineTo(3.4 - k, 16);
+  } else if (act === "sit"){ ctx.moveTo(-3.4, 8); ctx.lineTo(-7, 13); ctx.moveTo(3.4, 8); ctx.lineTo(7, 13); }
+  else { ctx.moveTo(-3.4, 7); ctx.lineTo(-3.4, 16); ctx.moveTo(3.4, 7); ctx.lineTo(3.4, 16); }
   ctx.stroke();
   // body
   ctx.fillStyle = "#ffd166";
@@ -3715,29 +3976,64 @@ function drawHeckBody(x, y, s, face, blink, arm){
   ctx.ellipse(0, 1, 9, 9.5, 0, 0, TAU);
   ctx.fill();
   ctx.strokeStyle = "#2b3150"; ctx.lineWidth = 2; ctx.stroke();
-  // arms
+  // arms — where they are is most of what he is doing
+  let lx = -15, ly = 4, rx = 15, ry = 4;
+  if (act === "shrug"){ lx = -15; ly = -9; rx = 15; ry = -9; }
+  else if (act === "wave"){ ly = 5; rx = 13 + Math.sin(t * 11) * 4; ry = -13; }
+  else if (act === "dance"){ const w = Math.sin(t * 9) * 9; ly = 1 - w; ry = 1 + w; }
+  else if (act === "write"){ lx = -13; ly = 6; rx = 12; ry = -3 + Math.sin(t * 16) * 2.4; }
+  else if (act === "stare"){ lx = -12; ly = 7; rx = 12; ry = 7; }
+  else if (act === "measure"){ lx = -17; ly = -2; rx = 17; ry = -2; }
+  else if (act === "chase"){ ly = -6; ry = -9; }
+  else if (nap){ lx = -13; ly = 7; rx = 12; ry = 8; }
+  else { ly = 4 + arm * -8; ry = 4 + arm * -8; }
   ctx.lineWidth = 2.4; ctx.strokeStyle = "#2b3150";
   ctx.beginPath();
-  ctx.moveTo(-7, 1); ctx.lineTo(-11, 3 + arm * -6);
-  ctx.moveTo(7, 1);  ctx.lineTo(11, 3 + arm * -6);
+  ctx.moveTo(-6.5, 0); ctx.lineTo(lx, ly);
+  ctx.moveTo(6.5, 0);  ctx.lineTo(rx, ry);
   ctx.stroke();
+  ctx.fillStyle = "#2b3150";                        // hands, so the pose has ends
+  ctx.beginPath(); ctx.arc(lx, ly, 1.9, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.arc(rx, ry, 1.9, 0, TAU); ctx.fill();
   // face
   ctx.fillStyle = "#2b3150";
-  if (blink){
+  if (nap || blink){
     ctx.lineWidth = 1.6;
     ctx.beginPath(); ctx.moveTo(-5, -1); ctx.lineTo(-1.6, -1);
     ctx.moveTo(1.6, -1); ctx.lineTo(5, -1); ctx.stroke();
+  } else if (front){
+    ctx.beginPath(); ctx.arc(-3.6, -1.4, 2.2, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(3.6, -1.4, 2.2, 0, TAU); ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.beginPath(); ctx.arc(-3.2, -1.9, 0.8, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(4.0, -1.9, 0.8, 0, TAU); ctx.fill();
+    ctx.fillStyle = "#2b3150";
   } else {
     ctx.beginPath(); ctx.arc(-3.3, -1.4, 1.7, 0, TAU); ctx.fill();
     ctx.beginPath(); ctx.arc(3.3, -1.4, 1.7, 0, TAU); ctx.fill();
   }
   ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.arc(0, 2.6, 3.2, 0.25, Math.PI - 0.25); ctx.stroke();
+  ctx.beginPath();
+  if (act === "shrug") ctx.arc(0, 4.4, 3.2, Math.PI + 0.3, TAU - 0.3);  // an upside-down smile
+  else ctx.arc(0, 2.6, 3.2, 0.25, Math.PI - 0.25);
+  ctx.stroke();
   // hard hat
-  ctx.fillStyle = "#ff7a2f";
+  ctx.fillStyle = Heck.hat || "#ff7a2f";
   ctx.beginPath(); ctx.arc(0, -6.2, 6.4, Math.PI, TAU); ctx.fill();
   ctx.fillRect(-8.4, -6.6, 16.8, 2.1);
   ctx.restore();
+  if (nap){                                        // the universal sign for it
+    ctx.save();
+    ctx.globalAlpha = 0.65; ctx.fillStyle = "#2b3150";
+    ctx.textAlign = "left";
+    for (let i = 0; i < 3; i++){
+      const k = (t * 0.5 + i * 0.33) % 1;
+      ctx.globalAlpha = 0.6 * (1 - k);
+      ctx.font = "900 " + (7 + i * 2).toFixed(0) + "px " + FONT;
+      ctx.fillText("z", x + 9 * s + k * 7, y - 10 * s - k * 16);
+    }
+    ctx.restore();
+  }
 }
 /* a speech bubble that wraps, sized to what is in it */
 function drawHeckSay(x, y, text, alpha, ink){
@@ -3770,16 +4066,26 @@ function drawHeckSay(x, y, text, alpha, ink){
   ctx.restore();
 }
 function drawHeckMenu(){
-  const gy = VH * 0.885 + 22;
+  // low enough that a two-line bubble still clears the text under the title
+  const gy = VH * 0.905 + 26;
+  const act = Heck.act;
   const blink = Math.sin(Heck.bob * 1.7) > 0.96;
-  const spin = Heck.act === "spin" ? Heck.bob * 7 : 0;
+  const spin = act === "spin" ? Heck.bob * 7 : 0;
+  const sit = act === "sit" ? 5 : act === "nap" ? 7 : 0;
+  const by = gy + Heck.y - 10 + sit;
+  // the clipboard: on the ground when he is asleep, skittering away when it
+  // has had enough of him, otherwise in the hand he is not gesturing with
+  if (act === "chase") drawClipboard(Heck.bx, gy + 16, 1.5, Math.sin(Heck.bob * 14) * 0.5);
+  else if (act === "nap") drawClipboard(Heck.x + 22, gy + 17, 1.4, 1.3);
   ctx.save();
   if (spin){ ctx.translate(Heck.x, gy + Heck.y - 12); ctx.rotate(spin); ctx.translate(-Heck.x, -(gy + Heck.y - 12)); }
-  const sit = Heck.act === "sit" ? 5 : 0;
-  drawHeckBody(Heck.x, gy + Heck.y - 10 + sit, 1.7, Heck.face, blink,
-               Heck.act === "jump" ? 1 : Math.sin(Heck.bob * 3) * 0.25);
+  drawHeckBody(Heck.x, by, 1.9, Heck.face, blink,
+               act === "jump" ? 1 : Math.sin(Heck.bob * 3) * 0.25, act, Heck.bob);
+  if (act !== "chase" && act !== "nap" && act !== "spin")
+    drawClipboard(Heck.x + Heck.face * (act === "write" ? 15 : 19), by + (act === "write" ? -2 : 4),
+                  1.5, Heck.face * (act === "write" ? -0.25 : 0.12));
   ctx.restore();
-  drawHeckSay(Heck.x, gy + Heck.y - 40, Heck.say, Heck.sayT > 0 ? Math.min(1, Heck.sayT) : 0, "#2b3150");
+  drawHeckSay(Heck.x, by - 34, Heck.say, Heck.sayT > 0 ? Math.min(1, Heck.sayT) : 0, "#2b3150");
 }
 /* the hatch, in screen space, hanging in the side of the sky */
 function drawHeckHatch(){
@@ -3791,12 +4097,21 @@ function drawHeckHatch(){
   const w = 44, h = 56;
   const o = Heck.open;
   ctx.save();
-  // the frame, set into the edge
-  ctx.fillStyle = "rgba(18,22,38,.9)";
+  // the frame, set into the edge, with a lit rim: on a night sky a dark
+  // hole in a dark wall is nothing at all
+  ctx.fillStyle = "rgba(18,22,38,.92)";
+  ctx.strokeStyle = "rgba(226,238,255,.8)"; ctx.lineWidth = 2.2;
   ctx.beginPath();
   if (ctx.roundRect) ctx.roundRect(left ? -10 : VW - w + 10, sy - h / 2, w, h, 7);
   else ctx.rect(left ? -10 : VW - w + 10, sy - h / 2, w, h);
-  ctx.fill();
+  ctx.fill(); ctx.stroke();
+  ctx.save();                                        // the light spilling out of it
+  ctx.globalAlpha = 0.5 * o;
+  const gl = ctx.createRadialGradient(left ? 8 : VW - 8, sy, 2, left ? 8 : VW - 8, sy, 58);
+  gl.addColorStop(0, "rgba(255,228,160,.85)"); gl.addColorStop(1, "rgba(255,228,160,0)");
+  ctx.fillStyle = gl;
+  ctx.beginPath(); ctx.arc(left ? 8 : VW - 8, sy, 58, 0, TAU); ctx.fill();
+  ctx.restore();
   // the flap: hinged along the top of the opening and swung up out of the
   // way, so it never ends up drawn across the man leaning through it
   ctx.save();
@@ -3811,16 +4126,20 @@ function drawHeckHatch(){
   ctx.fillStyle = "#6f7889";                       // a handle on the outside
   ctx.fillRect(left ? w * 0.52 : -w * 0.62, -h * 0.5, w * 0.2, 3.4);
   ctx.restore();
-  // and him, leaning out of it
+  // and him, leaning out of it — a peek is only his head and the clipboard,
+  // a visit is the whole man with an arm already cocked
   ctx.globalAlpha = o;
-  drawHeckBody(left ? 17 : VW - 17, sy + 6, 1.15, left ? 1 : -1,
-               Math.sin(G.T * 2.4) > 0.94, 0.7);
+  const lean = Heck.peek ? 12 : 19;
+  const slip = Heck.slip * 7;                      // the moment he nearly goes with it
+  drawHeckBody(left ? lean : VW - lean, sy + 5 + slip, 1.35, left ? 1 : -1,
+               Math.sin(G.T * 2.4) > 0.94, Heck.peek ? 0.1 : 0.7,
+               Heck.peek ? "stare" : "stand", G.T);
+  if (Heck.peek) drawClipboard(left ? lean + 15 : VW - lean - 15, sy + 12, 1.1, left ? 0.2 : -0.2);
   ctx.globalAlpha = 1;
   ctx.restore();
   drawHeckSay(left ? 46 : VW - 46, sy - 18, Heck.hsay,
               Heck.hsayT > 0 ? Math.min(1, Heck.hsayT) : 0, "#2b3150");
 }
-
 /* ------------------------------------------------------------ backdrop */
 function progressNow(){
   // in the mission this is how far round the current phase you are, which for
@@ -6062,6 +6381,9 @@ const UI = {
     this.countUp("overChain", G.bestNerve | 0, 380);
     // in the multiplier it earned, because that is the number they watched
     $("overLate").textContent = G.closest < 1e8 ? "×" + lateMult(G.closest).toFixed(1) : "—";
+    // and the man on the roof gets the last word on it
+    $("overHeck").innerHTML = "&ldquo;" + Heck.line(HECK_REACT.dead) + "&rdquo;<br>— " +
+      Heck.name + ", " + Heck.mood.tag;
     // a few tries in and the next level opens up anyway — nobody gets stuck
     if (!G.def.endless && !G.failCounted){
       G.failCounted = true;
@@ -6160,6 +6482,9 @@ function enterMenu(){
   UI.show("scr-title");
   $("hud").classList.remove("on");
   refreshTitle();
+  // he has been waiting, and he would like you to know he has been waiting
+  if (save.heckMet){ Heck.say = Heck.line(HECK_REACT.hello); Heck.sayT = 4.2; Heck.actT = 2.4; }
+  save.heckMet = (save.heckMet | 0) + 1; persist();
 }
 function refreshTitle(){
   refreshBuild();
