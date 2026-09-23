@@ -2,696 +2,835 @@
  {
   "pool": "HECK_DROP",
   "text": "Dropping this for science. Mostly science.",
-  "id": "893485c3"
+  "id": "893485c3",
+  "set": "core"
  },
  {
   "pool": "HECK_DROP",
   "text": "Hypothesis: you cannot catch this. Testing.",
-  "id": "0664bd4e"
+  "id": "0664bd4e",
+  "set": "core"
  },
  {
   "pool": "HECK_DROP",
   "text": "I filled out the correct form for this one.",
-  "id": "4ca840ea"
+  "id": "4ca840ea",
+  "set": "core"
  },
  {
   "pool": "HECK_DROP",
   "text": "Subject still airborne. Escalating.",
-  "id": "b9b9afe8"
+  "id": "b9b9afe8",
+  "set": "core"
  },
  {
   "pool": "HECK_DROP",
   "text": "This one is heavier. I weighed it. Twice.",
-  "id": "fe1384a6"
+  "id": "fe1384a6",
+  "set": "core"
  },
  {
   "pool": "HECK_DROP",
   "text": "Control group gets nothing. You are not the control group.",
-  "id": "da13b284"
+  "id": "da13b284",
+  "set": "core"
  },
  {
   "pool": "HECK_DROP",
   "text": "Recording. Please react normally.",
-  "id": "c83d8fd3"
+  "id": "c83d8fd3",
+  "set": "core"
  },
  {
   "pool": "HECK_DROP",
   "text": "Trial forty-one. Same as forty, but sideways.",
-  "id": "993344b6"
+  "id": "993344b6",
+  "set": "core"
  },
  {
   "pool": "HECK_DROP",
   "text": "I have calculated where you will be. Do not move.",
-  "id": "e12cf73b"
+  "id": "e12cf73b",
+  "set": "core"
  },
  {
   "pool": "HECK_DROP",
   "text": "Peer review begins now.",
-  "id": "9da186c7"
+  "id": "9da186c7",
+  "set": "core"
  },
  {
   "pool": "HECK_DROP",
   "text": "For the record: you were warned in writing.",
-  "id": "cd02d20d"
+  "id": "cd02d20d",
+  "set": "core"
  },
  {
   "pool": "HECK_DROP",
   "text": "Rounding up. Rounding is standard practice.",
-  "id": "155fa788"
+  "id": "155fa788",
+  "set": "core"
  },
  {
   "pool": "HECK_DROP",
   "text": "This is the smallest one. I want that noted.",
-  "id": "aa543fe4"
+  "id": "aa543fe4",
+  "set": "core"
  },
  {
   "pool": "HECK_DROP",
   "text": "Sample released. Kindly do not catch it politely.",
-  "id": "6f3bb5a7"
+  "id": "6f3bb5a7",
+  "set": "core"
  },
  {
   "pool": "HECK_DROP",
   "text": "Methodology: hatch, arm, release, observe.",
-  "id": "9e7c6419"
+  "id": "9e7c6419",
+  "set": "core"
  },
  {
   "pool": "HECK_DROP",
   "text": "I ran out of small ones an hour ago.",
-  "id": "46e41374"
+  "id": "46e41374",
+  "set": "core"
  },
  {
   "pool": "HECK_DROP",
   "text": "Results pending. Results always pending.",
-  "id": "c774508c"
+  "id": "c774508c",
+  "set": "core"
  },
  {
   "pool": "HECK_DROP",
   "text": "Two variables today. Try to keep up.",
-  "id": "eb0d121c"
+  "id": "eb0d121c",
+  "set": "core"
  },
  {
   "pool": "HECK_DROP",
   "text": "I labelled this. You cannot read it from there.",
-  "id": "8d6bc7d6"
+  "id": "8d6bc7d6",
+  "set": "core"
  },
  {
   "pool": "HECK_DROP",
   "text": "Statistically, one of these lands.",
-  "id": "c864d1a8"
+  "id": "c864d1a8",
+  "set": "core"
  },
  {
   "pool": "HECK_DROP",
   "text": "Please hold still for the measurement.",
-  "id": "37878599"
+  "id": "37878599",
+  "set": "core"
  },
  {
   "pool": "HECK_DROP",
   "text": "Reproducibility is important. So, again.",
-  "id": "01547f88"
+  "id": "01547f88",
+  "set": "core"
  },
  {
   "pool": "HECK_DROP",
   "text": "I am legally required to say 'heads up'. Heads up.",
-  "id": "6922c493"
+  "id": "6922c493",
+  "set": "core"
  },
  {
   "pool": "HECK_DROP",
   "text": "Conclusion drafted. Just need the data.",
-  "id": "f58fa7fb"
+  "id": "f58fa7fb",
+  "set": "core"
  },
  {
   "pool": "HECK_IDLE",
   "text": "I have a clipboard. It is mine.",
-  "id": "8a75e967"
+  "id": "8a75e967",
+  "set": "extra"
  },
  {
   "pool": "HECK_IDLE",
   "text": "Third Tuesday. Always the worst one.",
-  "id": "48f952ab"
+  "id": "48f952ab",
+  "set": "extra"
  },
  {
   "pool": "HECK_IDLE",
   "text": "I alphabetised the gravel.",
-  "id": "148a7acf"
+  "id": "148a7acf",
+  "set": "extra"
  },
  {
   "pool": "HECK_IDLE",
   "text": "Nobody has asked me what the lever does.",
-  "id": "b137816f"
+  "id": "b137816f",
+  "set": "extra"
  },
  {
   "pool": "HECK_IDLE",
   "text": "I am not supposed to be up here.",
-  "id": "90905dcd"
+  "id": "90905dcd",
+  "set": "extra"
  },
  {
   "pool": "HECK_IDLE",
   "text": "Everything is fine and I have checked twice.",
-  "id": "36c5a32d"
+  "id": "36c5a32d",
+  "set": "extra"
  },
  {
   "pool": "HECK_IDLE",
   "text": "My hat is regulation. The head is not.",
-  "id": "2eec7630"
+  "id": "2eec7630",
+  "set": "extra"
  },
  {
   "pool": "HECK_IDLE",
   "text": "I counted the clouds. There are enough.",
-  "id": "69b92f43"
+  "id": "69b92f43",
+  "set": "extra"
  },
  {
   "pool": "HECK_IDLE",
   "text": "The manual is in my other coat.",
-  "id": "f1e41d01"
+  "id": "f1e41d01",
+  "set": "extra"
  },
  {
   "pool": "HECK_IDLE",
   "text": "I have been awake for one excellent week.",
-  "id": "e384a3e6"
+  "id": "e384a3e6",
+  "set": "extra"
  },
  {
   "pool": "HECK_IDLE",
   "text": "Someone left a door where a wall should be.",
-  "id": "80fbb001"
+  "id": "80fbb001",
+  "set": "extra"
  },
  {
   "pool": "HECK_IDLE",
   "text": "I am the one who writes it all down.",
-  "id": "b734c8cc"
+  "id": "b734c8cc",
+  "set": "extra"
  },
  {
   "pool": "HECK_IDLE",
   "text": "This is my favourite part of the sky.",
-  "id": "96df3c14"
+  "id": "96df3c14",
+  "set": "extra"
  },
  {
   "pool": "HECK_IDLE",
   "text": "I fixed the thing. It is worse now.",
-  "id": "e5c41485"
+  "id": "e5c41485",
+  "set": "extra"
  },
  {
   "pool": "HECK_IDLE",
   "text": "Ask me about drag coefficients. Go on.",
-  "id": "49647e61"
+  "id": "49647e61",
+  "set": "extra"
  },
  {
   "pool": "HECK_IDLE",
   "text": "I brought sandwiches. They are also for science.",
-  "id": "529ef491"
+  "id": "529ef491",
+  "set": "extra"
  },
  {
   "pool": "HECK_IDLE",
   "text": "The rules did not say I could not.",
-  "id": "ce39ff0a"
+  "id": "ce39ff0a",
+  "set": "extra"
  },
  {
   "pool": "HECK_IDLE",
   "text": "I have opinions about ballast.",
-  "id": "6cba0300"
+  "id": "6cba0300",
+  "set": "extra"
  },
  {
   "pool": "HECK_IDLE",
   "text": "Do not look directly at the bucket.",
-  "id": "6acba6ab"
+  "id": "6acba6ab",
+  "set": "extra"
  },
  {
   "pool": "HECK_IDLE",
   "text": "I am on a break. This is my break.",
-  "id": "6df74e74"
+  "id": "6df74e74",
+  "set": "extra"
  },
  {
   "pool": "HECK_IDLE",
   "text": "Two of everything, in case one of them leaves.",
-  "id": "8199385a"
+  "id": "8199385a",
+  "set": "extra"
  },
  {
   "pool": "HECK_IDLE",
   "text": "I have named all of the rocks.",
-  "id": "3f57692b"
+  "id": "3f57692b",
+  "set": "extra"
  },
  {
   "pool": "HECK_IDLE",
   "text": "There is a second roof under this roof.",
-  "id": "ffc48f6c"
+  "id": "ffc48f6c",
+  "set": "extra"
  },
  {
   "pool": "HECK_IDLE",
   "text": "I signed for the sky. Nobody stopped me.",
-  "id": "10252c02"
+  "id": "10252c02",
+  "set": "extra"
  },
  {
   "pool": "HECK_IDLE",
   "text": "My shadow gets its own line on the form.",
-  "id": "4b6cea64"
+  "id": "4b6cea64",
+  "set": "extra"
  },
  {
   "pool": "HECK_IDLE",
   "text": "I have never once been struck by anything I threw.",
-  "id": "f20d4def"
+  "id": "f20d4def",
+  "set": "extra"
  },
  {
   "pool": "HECK_IDLE",
   "text": "Weather is just a rumour that got organised.",
-  "id": "cf1899b6"
+  "id": "cf1899b6",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_DROP_bored",
   "text": "Here.",
-  "id": "f17d0b20"
+  "id": "f17d0b20",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_DROP_bored",
   "text": "Rock. Down. Whatever.",
-  "id": "2c1f9fda"
+  "id": "2c1f9fda",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_DROP_bored",
   "text": "I am doing this so the form has a line in it.",
-  "id": "a63e33b5"
+  "id": "a63e33b5",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_DROP_grave",
   "text": "Released at my discretion. Noted and signed.",
-  "id": "b0f9d5e7"
+  "id": "b0f9d5e7",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_DROP_grave",
   "text": "This is not personal. It is procedural.",
-  "id": "29284190"
+  "id": "29284190",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_DROP_grave",
   "text": "Observe. Do not interpret. That is my job.",
-  "id": "1c1b814e"
+  "id": "1c1b814e",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_DROP_keen",
   "text": "Oh, this is a GOOD one, you will love this\u2014",
-  "id": "5fbdacd4"
+  "id": "5fbdacd4",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_DROP_keen",
   "text": "Wait wait wait watch watch watch\u2014",
-  "id": "6f536f2d"
+  "id": "6f536f2d",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_DROP_keen",
   "text": "Trial! Fresh trial! Brand new trial!",
-  "id": "1257e200"
+  "id": "1257e200",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_DROP_rattled",
   "text": "I did not mean to pick this one up. Too late!",
-  "id": "0ad83141"
+  "id": "0ad83141",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_DROP_rattled",
   "text": "Sorry! Sorry. Not sorry enough to stop.",
-  "id": "c8833ea1"
+  "id": "c8833ea1",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_DROP_rattled",
   "text": "This is fine. This is a normal amount of rock.",
-  "id": "ea266b1a"
+  "id": "ea266b1a",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_DROP_smug",
   "text": "Watch the arc on this one. That is craft.",
-  "id": "cc43fcd9"
+  "id": "cc43fcd9",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_DROP_smug",
   "text": "I could do this left-handed. I am doing this left-handed.",
-  "id": "562abed2"
+  "id": "562abed2",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_DROP_smug",
   "text": "You will want to remember how this was thrown.",
-  "id": "8d0bac57"
+  "id": "8d0bac57",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_IDLE_bored",
   "text": "Mm.",
-  "id": "7307d442"
+  "id": "7307d442",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_IDLE_bored",
   "text": "Something will happen eventually.",
-  "id": "48aee4c8"
+  "id": "48aee4c8",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_IDLE_bored",
   "text": "I am going to sit down for a geological era.",
-  "id": "b3105729"
+  "id": "b3105729",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_IDLE_bored",
   "text": "Wake me when the sky does something.",
-  "id": "13c0ffaa"
+  "id": "13c0ffaa",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_IDLE_bored",
   "text": "This is the most interesting wall I have seen today.",
-  "id": "d7f9ffe9"
+  "id": "d7f9ffe9",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_IDLE_grave",
   "text": "We are not going to speak about the third trial.",
-  "id": "7a485296"
+  "id": "7a485296",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_IDLE_grave",
   "text": "The paperwork will outlive both of us.",
-  "id": "d846d3e3"
+  "id": "d846d3e3",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_IDLE_grave",
   "text": "Somebody has to take the sky seriously.",
-  "id": "1b7a622c"
+  "id": "1b7a622c",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_IDLE_grave",
   "text": "I have read the incident report. I wrote it.",
-  "id": "8ede067e"
+  "id": "8ede067e",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_IDLE_grave",
   "text": "There are rules. I am the reason there are rules.",
-  "id": "dd0b3ade"
+  "id": "dd0b3ade",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_IDLE_keen",
   "text": "I have four more experiments and one afternoon!",
-  "id": "898724f5"
+  "id": "898724f5",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_IDLE_keen",
   "text": "Do you want to see the chart? I have the chart.",
-  "id": "0b2c2915"
+  "id": "0b2c2915",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_IDLE_keen",
   "text": "I got here early. I get here early every day.",
-  "id": "8703dcf3"
+  "id": "8703dcf3",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_IDLE_keen",
   "text": "New idea. Terrible idea. Writing it down anyway.",
-  "id": "8ec954c5"
+  "id": "8ec954c5",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_IDLE_keen",
   "text": "I love it up here. I love it up here!",
-  "id": "7d45ac2d"
+  "id": "7d45ac2d",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_IDLE_rattled",
   "text": "Did you hear that? I heard that.",
-  "id": "62094211"
+  "id": "62094211",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_IDLE_rattled",
   "text": "It was not like this yesterday. It was not.",
-  "id": "d56b2bf9"
+  "id": "d56b2bf9",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_IDLE_rattled",
   "text": "I am going to pretend the roof did not move.",
-  "id": "438fd10d"
+  "id": "438fd10d",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_IDLE_rattled",
   "text": "Everything is fine. Everything is fine. Everything is\u2014",
-  "id": "31bcf03e"
+  "id": "31bcf03e",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_IDLE_rattled",
   "text": "I have three plans and I hate all of them.",
-  "id": "42427d75"
+  "id": "42427d75",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_IDLE_smug",
   "text": "I was right about the wind. Again.",
-  "id": "07da6e06"
+  "id": "07da6e06",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_IDLE_smug",
   "text": "Somebody should be writing this down. I am somebody.",
-  "id": "ab068c2f"
+  "id": "ab068c2f",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_IDLE_smug",
   "text": "They gave me a hat. Think about what that means.",
-  "id": "e540f9bf"
+  "id": "e540f9bf",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_IDLE_smug",
   "text": "I have never been wrong in a way that counted.",
-  "id": "19bdfe87"
+  "id": "19bdfe87",
+  "set": "extra"
  },
  {
   "pool": "HECK_MOOD_IDLE_smug",
   "text": "Modesty is for people with smaller clipboards.",
-  "id": "69f11da5"
+  "id": "69f11da5",
+  "set": "extra"
  },
  {
   "pool": "HERON_DROP",
   "text": "I have selected this one personally.",
-  "id": "1faf4cd3"
+  "id": "1faf4cd3",
+  "set": "core"
  },
  {
   "pool": "HERON_DROP",
   "text": "Observe the arc. I will not repeat it.",
-  "id": "38a48acf"
+  "id": "38a48acf",
+  "set": "core"
  },
  {
   "pool": "HERON_DROP",
   "text": "A gift. Do not thank me.",
-  "id": "9d954220"
+  "id": "9d954220",
+  "set": "core"
  },
  {
   "pool": "HERON_DROP",
   "text": "This has been weighed, labelled, and released.",
-  "id": "4c42fade"
+  "id": "4c42fade",
+  "set": "core"
  },
  {
   "pool": "HERON_DROP",
   "text": "I could have chosen a larger one. I did.",
-  "id": "57f4d95e"
+  "id": "57f4d95e",
+  "set": "core"
  },
  {
   "pool": "HERON_DROP",
   "text": "Kindly do not flinch. It spoils the record.",
-  "id": "362d169f"
+  "id": "362d169f",
+  "set": "core"
  },
  {
   "pool": "HERON_IDLE",
   "text": "I have been standing here since Tuesday.",
-  "id": "1a8e9873"
+  "id": "1a8e9873",
+  "set": "extra"
  },
  {
   "pool": "HERON_IDLE",
   "text": "One leg is sufficient. Two would be showing off.",
-  "id": "5d59859d"
+  "id": "5d59859d",
+  "set": "extra"
  },
  {
   "pool": "HERON_IDLE",
   "text": "I do not hurry. Hurrying is for the unprepared.",
-  "id": "99e1d9a9"
+  "id": "99e1d9a9",
+  "set": "extra"
  },
  {
   "pool": "HERON_IDLE",
   "text": "There was a fish. There is no longer a fish.",
-  "id": "bd5af2f0"
+  "id": "bd5af2f0",
+  "set": "extra"
  },
  {
   "pool": "HERON_IDLE",
   "text": "My plumage is regulation. Reluctantly.",
-  "id": "366bf31e"
+  "id": "366bf31e",
+  "set": "extra"
  },
  {
   "pool": "HERON_IDLE",
   "text": "I have read the manual. It is beneath me.",
-  "id": "f301d9ad"
+  "id": "f301d9ad",
+  "set": "extra"
  },
  {
   "pool": "HERON_IDLE",
   "text": "Elegance is simply not moving for long enough.",
-  "id": "dafc0314"
+  "id": "dafc0314",
+  "set": "extra"
  },
  {
   "pool": "HERON_IDLE",
   "text": "The hat was not my idea. The hat is mandatory.",
-  "id": "aeb86973"
+  "id": "aeb86973",
+  "set": "extra"
  },
  {
   "pool": "HERON_IDLE",
   "text": "I was here before the roof.",
-  "id": "e84bc5ff"
+  "id": "e84bc5ff",
+  "set": "extra"
  },
  {
   "pool": "HERON_IDLE",
   "text": "Do not mistake stillness for patience.",
-  "id": "c6ed318a"
+  "id": "c6ed318a",
+  "set": "extra"
  },
  {
   "pool": "REACT_board",
   "text": "THAT WAS THE CLIPBOARD.",
-  "id": "5ae8b80a"
+  "id": "5ae8b80a",
+  "set": "core"
  },
  {
   "pool": "REACT_board",
   "text": "Everything I know was on there!",
-  "id": "dedc0f38"
+  "id": "dedc0f38",
+  "set": "core"
  },
  {
   "pool": "REACT_board",
   "text": "Six years of notes. Six.",
-  "id": "c6321a6c"
+  "id": "c6321a6c",
+  "set": "core"
  },
  {
   "pool": "REACT_board",
   "text": "I want it back and I want it in order.",
-  "id": "0b8aa775"
+  "id": "0b8aa775",
+  "set": "core"
  },
  {
   "pool": "REACT_close",
   "text": "That was a paint thickness. I measured.",
-  "id": "03d79b16"
+  "id": "03d79b16",
+  "set": "core"
  },
  {
   "pool": "REACT_close",
   "text": "I felt that from up here.",
-  "id": "0bb2b729"
+  "id": "0bb2b729",
+  "set": "core"
  },
  {
   "pool": "REACT_close",
   "text": "Do that again and I will need a bigger form.",
-  "id": "0c1dd525"
+  "id": "0c1dd525",
+  "set": "core"
  },
  {
   "pool": "REACT_close",
   "text": "Unacceptable margin. Magnificent, but unacceptable.",
-  "id": "bbd6a120"
+  "id": "bbd6a120",
+  "set": "core"
  },
  {
   "pool": "REACT_dead",
   "text": "Trial concluded. I will file it under 'ouch'.",
-  "id": "9ea9ffc6"
+  "id": "9ea9ffc6",
+  "set": "core"
  },
  {
   "pool": "REACT_dead",
   "text": "Noted, timed, and slightly enjoyed.",
-  "id": "eb75067d"
+  "id": "eb75067d",
+  "set": "core"
  },
  {
   "pool": "REACT_dead",
   "text": "I will put the kettle on for the next one.",
-  "id": "dff87d71"
+  "id": "dff87d71",
+  "set": "core"
  },
  {
   "pool": "REACT_dead",
   "text": "Thank you for your participation in the sky.",
-  "id": "8aa31bc2"
+  "id": "8aa31bc2",
+  "set": "core"
  },
  {
   "pool": "REACT_far",
   "text": "You have gone further than the form allows.",
-  "id": "125bb3ac"
+  "id": "125bb3ac",
+  "set": "core"
  },
  {
   "pool": "REACT_far",
   "text": "I am running out of roof to stand on.",
-  "id": "c53ecbe9"
+  "id": "c53ecbe9",
+  "set": "core"
  },
  {
   "pool": "REACT_far",
   "text": "At this rate I will need a longer ladder.",
-  "id": "706d778f"
+  "id": "706d778f",
+  "set": "core"
  },
  {
   "pool": "REACT_far",
   "text": "Nobody told me it went up this far.",
-  "id": "5b1a3f0a"
+  "id": "5b1a3f0a",
+  "set": "core"
  },
  {
   "pool": "REACT_hello",
   "text": "You again. I kept the seat warm.",
-  "id": "48fcf774"
+  "id": "48fcf774",
+  "set": "core"
  },
  {
   "pool": "REACT_hello",
   "text": "Back for more measurements. Good.",
-  "id": "dd708d4d"
+  "id": "dd708d4d",
+  "set": "core"
  },
  {
   "pool": "REACT_hello",
   "text": "I have the forms ready this time.",
-  "id": "d87f16ff"
+  "id": "d87f16ff",
+  "set": "core"
  },
  {
   "pool": "REACT_hello",
   "text": "Ah. The recurring variable.",
-  "id": "d9e7a63b"
+  "id": "d9e7a63b",
+  "set": "core"
  },
  {
   "pool": "REACT_hurt",
   "text": "Ha! Write that down. Oh \u2014 I am the one who writes it down.",
-  "id": "ee4e6fb7"
+  "id": "ee4e6fb7",
+  "set": "core"
  },
  {
   "pool": "REACT_hurt",
   "text": "Contact confirmed. Lovely. Beautiful.",
-  "id": "b67e533e"
+  "id": "b67e533e",
+  "set": "core"
  },
  {
   "pool": "REACT_hurt",
   "text": "The data is coming along nicely now.",
-  "id": "badcf602"
+  "id": "badcf602",
+  "set": "core"
  },
  {
   "pool": "REACT_hurt",
   "text": "See, this is what I have been saying.",
-  "id": "95870125"
+  "id": "95870125",
+  "set": "core"
  },
  {
   "pool": "REACT_mine",
   "text": "That one was MINE and you know it.",
-  "id": "b7a59b64"
+  "id": "b7a59b64",
+  "set": "core"
  },
  {
   "pool": "REACT_mine",
   "text": "Returned to sender. I did not consent to that.",
-  "id": "310c2c7b"
+  "id": "310c2c7b",
+  "set": "core"
  },
  {
   "pool": "REACT_mine",
   "text": "Fine. FINE. I have others.",
-  "id": "8259ef8d"
+  "id": "8259ef8d",
+  "set": "core"
  },
  {
   "pool": "REACT_mine",
   "text": "I threw that with intent. You had no right.",
-  "id": "c7cc01d1"
+  "id": "c7cc01d1",
+  "set": "core"
  },
  {
   "pool": "REACT_nerve",
   "text": "You are doing that on purpose. Stop enjoying it.",
-  "id": "2305fc89"
+  "id": "2305fc89",
+  "set": "core"
  },
  {
   "pool": "REACT_nerve",
   "text": "That was needlessly close and I am noting the word NEEDLESSLY.",
-  "id": "c8c881f4"
+  "id": "c8c881f4",
+  "set": "core"
  },
  {
   "pool": "REACT_nerve",
   "text": "Hold on. Are you good at this?",
-  "id": "6eaf3d7e"
+  "id": "6eaf3d7e",
+  "set": "core"
  },
  {
   "pool": "REACT_nerve",
   "text": "I am revising my estimate. Upward. Grudgingly.",
-  "id": "7cf376d5"
+  "id": "7cf376d5",
+  "set": "core"
  }
 ]
