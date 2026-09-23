@@ -29,7 +29,24 @@ brew install ffmpeg
 VOICE="Daniel (Premium)" ./voice/render-macos.sh
 ```
 
-**A neural API** — the tier that is genuinely indistinguishable:
+**Google Cloud Text-to-Speech** — the tier that is genuinely
+indistinguishable, and the only API host reachable from the session
+sandbox (`api.openai.com` and `api.elevenlabs.io` are both refused by the
+egress policy, so `render-api.py` only runs somewhere with open network):
+
+```sh
+export GOOGLE_TTS_KEY=...
+python3 voice/render-google.py --list        # every English voice, best tier first
+python3 voice/render-google.py --audition    # one line in each of the top ten
+python3 voice/render-google.py --voice en-GB-Chirp3-HD-Charon
+```
+
+Pick by ear rather than by name — `--audition` writes one line in each of
+the ten best candidates into `voice/audition/`. The key is read from the
+environment, never written to a file, never logged, and redacted out of any
+error before it is printed.
+
+**Or another neural API**, from a machine with open network:
 
 ```sh
 ELEVEN_KEY=... ELEVEN_VOICE=<voice id>  python3 voice/render-api.py eleven
