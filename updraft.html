@@ -1168,7 +1168,7 @@ function segSegDist(ax1, ay1, ax2, ay2, bx1, by1, bx2, by2, out){
    are playing the same build — which a version label alone can never tell
    you, least of all when one of you is looking at something a browser cached
    a week ago. Change one character of the game and the code changes. */
-const BUILD = { v: "2.1", n: 36, date: "23 Sep 2026", code: "0000000" };
+const BUILD = { v: "2.1", n: 37, date: "23 Sep 2026", code: "0000000" };
 (() => {
   // scripts and stylesheets: everything that decides how the game behaves and
   // how it looks. Not the markup, which the game rewrites as it runs and which
@@ -3921,8 +3921,10 @@ const Heck = {
   x: 0, y: 0, vx: 0, face: 1, bob: 0, act: "walk", actT: 0, act0: 1, say: "", sayT: 0,
   spot: -200, spotV: 1, froze: 0,
   bx: 0, bvx: 0,                      // the clipboard, when it gets away from him
-  // the hatch
-  live: false, peek: false, side: 1, hy: 0, open: 0, hold: 0, next: 0,
+  // the door: how far it has swung, how far he has leaned out of it, and
+  // which of the five things a door does it is currently doing
+  live: false, peek: false, side: 1, hy: 0, open: 0, lean: 0, settle: 0,
+  ph: "", pend: "", hold: 0, next: 0,
   thrown: 0, board: false, slip: 0, hsay: "", hsayT: 0, heckleT: 0, seen: {},
   init(){
     if (!save.heckSeed){ save.heckSeed = 1 + ((Math.random() * 1e9) | 0); persist(); }
@@ -4035,35 +4037,59 @@ const Heck = {
     }
     this.hold += dt;
     if (this.slip > 0) this.slip = Math.max(0, this.slip - dt * 1.6);
-    /* The swing has to be one way at a time. Winding `open` back up at the
-       top of the frame and then taking the same amount off at the bottom
-       leaves it pinned just under one for ever, which is how the hatch came
-       to open once and then hang there for the rest of the run. */
-    const stay = this.peek ? 3.2 : 4.2;
-    if (this.hold <= stay){
-      this.open = Math.min(1, this.open + dt * 3.2);
-      if (!this.peek){
-        // he throws one, sometimes a second, then thinks better of it and shuts up
-        const want = this.hold > 0.7 ? 1 : 0;
-        const more = this.hold > 1.9 && Math.random() < 0.5 ? 2 : want;
-        if (this.open >= 1 && this.thrown < more && this.thrown < 2){
-          this.thrown++;
-          this.drop();
+    if (this.open >= 1) this.settle += dt;
+    /* A door gets used in an order: it swings, he comes out through it, he
+       does what he came to do, he goes back in, and it shuts behind him.
+       Each of those is its own phase moving one value one way, which is
+       also the only reliable way to stop a swing winding up at the top of
+       a frame and back down at the bottom of it — that bug is what left
+       the hatch hanging open for a whole run. */
+    const stay = this.peek ? 2.8 : 3.8;
+    switch (this.ph){
+      case "swing":                                  // it comes open
+        this.open = Math.min(1, this.open + dt * 2.1);
+        if (this.open >= 1) this.ph = "out";
+        break;
+      case "out":                                    // and he leans through it
+        this.open = Math.min(1, this.open + dt * 2.6);
+        this.lean = Math.min(1, this.lean + dt * 2.7);
+        if (this.lean >= 1 && this.open >= 1){ this.ph = "hold"; this.hold = 0; this.speak(); }
+        break;
+      case "hold":                                   // says his piece, throws his rock
+        if (!this.peek){
+          const want = this.hold > 0.5 ? 1 : 0;
+          const more = this.hold > 1.6 && Math.random() < 0.5 ? 2 : want;
+          if (this.thrown < more && this.thrown < 2){ this.thrown++; this.drop(); }
         }
-      }
-    } else {
-      this.open -= dt * 3.2;
-      if (this.open <= 0){
-        this.open = 0; this.live = false; this.peek = false;
-        this.next = 20 + Math.random() * 34;       // never the same gap twice
-      }
+        if (this.hold >= stay) this.ph = "back";
+        break;
+      case "back":                                   // steps back inside
+        this.lean = Math.max(0, this.lean - dt * 2.3);
+        if (this.lean <= 0){ this.lean = 0; this.ph = "shut"; }
+        break;
+      default:                                       // and pulls the door to
+        this.open = Math.max(0, this.open - dt * 2.5);
+        if (this.open <= 0){
+          this.open = 0; this.live = false; this.peek = false; this.ph = "";
+          Audio2.SFX.clack();                        // the latch
+          this.next = 20 + Math.random() * 34;       // never the same gap twice
+        }
+        break;
     }
+  },
+  /* What he came to say waits until he is actually out of the door. A line
+     delivered to the inside of a closed door is a line nobody hears. */
+  speak(){
+    if (!this.pend) return;
+    this.hsay = this.pend; this.pend = ""; this.hsayT = 4.2;
+    Voice.say(this.hsay);
   },
   /* open the hatch. A peek is commentary and never drops anything, which is
      why it is allowed to happen far more often than a visit. */
   arrive(peek){
     this.live = true; this.peek = !!peek;
-    this.open = 0; this.hold = 0; this.thrown = 0; this.slip = 0;
+    this.open = 0; this.lean = 0; this.settle = 0; this.ph = "swing";
+    this.hold = 0; this.thrown = 0; this.slip = 0;
     this.side = Math.random() < 0.5 ? -1 : 1;
     /* High enough to give you three or four seconds of warning, low enough
        that the hatch and what he says through it are both inside the frame
@@ -4073,12 +4099,10 @@ const Heck = {
     if (!peek){
       // the clipboard goes over the edge roughly one visit in seven
       this.board = Math.random() < 0.14;
-      this.hsay = this.board ? "Wait — no — that is not a rock—"
+      this.pend = this.board ? "Wait — no — that is not a rock—"
                              : this.voice(HECK_DROP, HECK_MOOD_DROP);
-      this.hsayT = 4.2;
-      Voice.say(this.hsay);
-      Audio2.SFX.tap();
     }
+    Audio2.SFX.tap();                                // the latch going over
   },
   /* he saw what you did and has something to say about it */
   heckle(kind){
@@ -4089,13 +4113,18 @@ const Heck = {
     const sure = kind === "board" || kind === "mine";
     if (!sure && Math.random() > 0.5) return;
     this.heckleT = 11 + Math.random() * 10;
+    const line = this.line(pool);
     if (!this.live) this.arrive(true);
-    this.hsay = this.line(pool); this.hsayT = 4.4;
-    Voice.say(this.hsay);
+    else if (this.ph === "back" || this.ph === "shut" || this.ph === ""){
+      // halfway back inside, and out he comes again to add one more thing
+      this.ph = "out"; this.hold = 0;
+    }
+    if (this.ph === "hold"){ this.hsay = line; this.hsayT = 4.4; Voice.say(line); }
+    else this.pend = line;
     if (this.mood.id === "rattled") this.slip = 1;
   },
   drop(){
-    const x = this.side < 0 ? 4 : VW - 4;
+    const x = this.side < 0 ? 52 : VW - 52;          // out of his hand, clear of the door
     const rng = Math.random;
     const board = this.board && this.thrown === 1;
     const R = board ? 12 : 13 + rng() * 9;
@@ -4119,6 +4148,7 @@ const Heck = {
   },
   reset(){
     this.live = false; this.peek = false; this.heckleT = 6;
+    this.open = 0; this.lean = 0; this.ph = ""; this.pend = "";
     this.next = 18 + Math.random() * 30; this.hsayT = 0; this.seen = {};
   }
 };
@@ -4732,58 +4762,173 @@ function drawSearchlight(gy){
     ctx.restore();
   }
 }
-/* the hatch, in screen space, hanging in the side of the sky */
+/* ---------------------------------------------------------------- the door
+
+   He does not simply appear at the edge of the screen, he comes through a
+   door, and most of what makes that funny is the door behaving like one.
+   It swings on hinges, it has a thickness and a frame and a lit landing on
+   the other side of it, he leans out past the jamb to say his piece, and
+   when he is done he steps back inside and pulls it shut behind him.
+
+   All of it is laid out in u-space, where u is the distance inward from
+   whichever edge he turned up at, and X() mirrors it on the way out. One
+   set of coordinates, both sides, no sign soup. */
 function drawHeckHatch(){
-  if (!Heck.live || Heck.open <= 0.01) return;
+  const o = Heck.open, L = Heck.lean;
+  if (!Heck.live || (o <= 0.004 && L <= 0.004)) return;
   const sy = Heck.hy - G.cam.y;
-  if (sy < -60 || sy > VH + 60) return;
+  if (sy < -70 || sy > VH + 70) return;
   const left = Heck.side < 0;
-  const x = left ? 0 : VW;
-  const w = 44, h = 56;
-  const o = Heck.open;
+  const X = u => left ? u : VW - u;
+  const box = (ua, ub, ya, yb, r) => {
+    const x = Math.min(X(ua), X(ub)), w = Math.abs(X(ub) - X(ua));
+    ctx.beginPath();
+    if (r && ctx.roundRect) ctx.roundRect(x, ya, w, yb - ya, r); else ctx.rect(x, ya, w, yb - ya);
+  };
+  const poly = p => {
+    ctx.beginPath();
+    for (let i = 0; i < p.length; i++) i ? ctx.lineTo(X(p[i][0]), p[i][1]) : ctx.moveTo(X(p[i][0]), p[i][1]);
+    ctx.closePath();
+  };
+
+  const W = 40, H = 78, C = 7, TH = 5;          // opening, casing, wall thickness
+  const y0 = sy - H / 2, y1 = sy + H / 2;
+  /* You are looking at this from the middle of the screen, so you can see
+     into the hole: the jamb nearest the edge always, and then either the
+     underside of its head or the top of its sill depending on whether the
+     thing turned up above you or below you. */
+  const up = clamp((VH * 0.52 - sy) / (VH * 0.5), -1, 1);
+  const pX = TH * 1.2, pY = up * TH * 0.85;     // where the far rim of the hole lands
+
   ctx.save();
-  // the frame, set into the edge, with a lit rim: on a night sky a dark
-  // hole in a dark wall is nothing at all
-  ctx.fillStyle = "rgba(18,22,38,.92)";
-  ctx.strokeStyle = "rgba(226,238,255,.8)"; ctx.lineWidth = 2.2;
+  ctx.lineJoin = "round";
+
+  /* ---- the casing, bolted into the edge of the world ---- */
+  ctx.fillStyle = "#161b2b";
+  box(-18, W + C, y0 - C, y1 + C, 2.5); ctx.fill();
+  const cg = ctx.createLinearGradient(X(0), 0, X(W + C), 0);
+  cg.addColorStop(0, "#666e7e"); cg.addColorStop(0.45, "#99a2b3"); cg.addColorStop(1, "#525966");
+  ctx.fillStyle = cg;
+  box(-18, W + C - 1.7, y0 - C + 1.7, y1 + C - 1.7, 2); ctx.fill();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(255,255,255,.3)";
+  ctx.beginPath(); ctx.moveTo(X(-18), y0 - C + 2.6); ctx.lineTo(X(W + C - 3.6), y0 - C + 2.6); ctx.stroke();
+  ctx.strokeStyle = "rgba(0,0,0,.34)";
+  ctx.beginPath(); ctx.moveTo(X(-18), y1 + C - 2.6); ctx.lineTo(X(W + C - 3.6), y1 + C - 2.6); ctx.stroke();
+  ctx.fillStyle = "rgba(20,25,40,.72)";
+  [[-8, y0 - C + 3.5], [W + C - 4, y0 - C + 3.5], [-8, y1 + C - 3.5], [W + C - 4, y1 + C - 3.5]]
+    .forEach(b => { ctx.beginPath(); ctx.arc(X(b[0]), b[1], 1.4, 0, TAU); ctx.fill(); });
+
+  /* ---- the hole, the landing behind it, and him standing in it ---- */
+  ctx.save();
+  box(-26, W + 44 * L, y0, y1, 1.5); ctx.clip();     // he leans out of it, not in it
+  const ig = ctx.createLinearGradient(0, y0, 0, y1);
+  ig.addColorStop(0, "#080a12"); ig.addColorStop(0.55, "#141828"); ig.addColorStop(1, "#33291d");
+  ctx.fillStyle = ig; ctx.fillRect(Math.min(X(0), X(W)), y0, W, H);
+  const rg = ctx.createRadialGradient(X(W * 0.55), y1 - 3, 1, X(W * 0.55), y1 - 3, 42);
+  rg.addColorStop(0, "rgba(255,196,116,.5)"); rg.addColorStop(1, "rgba(255,196,116,0)");
+  ctx.fillStyle = rg; ctx.fillRect(Math.min(X(0), X(W)), y0, W, H);
+
+  /* He starts the visit standing in the doorway in the dark and ends it
+     leaning well out of it, so the lean carries him outward, brings him
+     nearer, and lifts him out of the shadow of the opening all at once. */
+  const hu2 = lerp(W * 0.72, Heck.peek ? 43 : 46, L);
+  const hs = lerp(1.06, 1.34, L);               // nearer as he comes out, so bigger
+  const slip = Heck.slip * 7;                   // the moment he nearly goes with the rock
+  const hfy = y1 - 16 * hs - 2 + slip;          // and his feet stay on the threshold
+  drawHeckAny(X(hu2), hfy, hs, left ? 1 : -1,
+              Math.sin(G.T * 2.4) > 0.94, Heck.peek ? 0.1 : lerp(0.15, 0.7, L),
+              Heck.peek ? "stare" : "stand", G.T);
+  if (Heck.peek && L > 0.4)
+    drawClipboard(X(hu2 + 15), hfy + 6, 1.1 * L, left ? 0.2 : -0.2);
+  // and the doorway is a dark place until he is out of it
+  ctx.fillStyle = "rgba(9,11,20," + (0.66 * (1 - L)).toFixed(3) + ")";
+  ctx.fillRect(Math.min(X(0), X(W)), y0, W, H);
+
+  /* ---- the wall has a thickness, and from here you can see it ---- */
+  ctx.fillStyle = "#6e7686";                                          // the jamb
+  poly([[0, y0], [pX, y0 + pY], [pX, y1 + pY], [0, y1]]); ctx.fill();
+  ctx.fillStyle = up > 0 ? "#565e6d" : "#8a92a1";                     // head, or sill
+  poly(up > 0 ? [[0, y0], [W, y0], [W + pX, y0 + pY], [pX, y0 + pY]]
+              : [[0, y1], [W, y1], [W + pX, y1 + pY], [pX, y1 + pY]]); ctx.fill();
+  ctx.strokeStyle = "rgba(0,0,0,.5)"; ctx.lineWidth = 0.9;            // the far rim
   ctx.beginPath();
-  if (ctx.roundRect) ctx.roundRect(left ? -10 : VW - w + 10, sy - h / 2, w, h, 7);
-  else ctx.rect(left ? -10 : VW - w + 10, sy - h / 2, w, h);
-  ctx.fill(); ctx.stroke();
-  ctx.save();                                        // the light spilling out of it
-  ctx.globalAlpha = 0.5 * o;
-  const gl = ctx.createRadialGradient(left ? 8 : VW - 8, sy, 2, left ? 8 : VW - 8, sy, 58);
-  gl.addColorStop(0, "rgba(255,228,160,.85)"); gl.addColorStop(1, "rgba(255,228,160,0)");
-  ctx.fillStyle = gl;
-  ctx.beginPath(); ctx.arc(left ? 8 : VW - 8, sy, 58, 0, TAU); ctx.fill();
+  ctx.moveTo(X(pX), y0 + pY); ctx.lineTo(X(pX), y1 + pY);
+  ctx.lineTo(X(W + pX), y1 + pY);
+  ctx.stroke();
+  ctx.fillStyle = "#7d8593";                                          // the threshold
+  poly([[0, y1 - 2.4], [W, y1 - 2.4], [W + pX, y1 + pY], [pX, y1 + pY]]); ctx.fill();
+  const sg = ctx.createLinearGradient(X(0), 0, X(20), 0);             // the leaf's shadow
+  sg.addColorStop(0, "rgba(6,8,16,.55)"); sg.addColorStop(1, "rgba(6,8,16,0)");
+  ctx.globalAlpha = o; ctx.fillStyle = sg;
+  ctx.fillRect(Math.min(X(0), X(20)), y0, 20, H); ctx.globalAlpha = 1;
   ctx.restore();
-  // the flap: hinged along the top of the opening and swung up out of the
-  // way, so it never ends up drawn across the man leaning through it
-  ctx.save();
-  ctx.translate(left ? w - 10 : VW - w + 10, sy - h / 2);
-  ctx.rotate((left ? -1 : 1) * o * 1.25);
-  ctx.fillStyle = "#8a93a6";
-  ctx.beginPath();
-  if (ctx.roundRect) ctx.roundRect(left ? 0 : -w * 0.82, -h * 0.9, w * 0.82, h * 0.9, 5);
-  else ctx.rect(left ? 0 : -w * 0.82, -h * 0.9, w * 0.82, h * 0.9);
+
+  /* ---- the door, hinged at the edge and swung out toward you ----
+
+     A door does not translate, it rotates, so the panel is a trapezoid:
+     the far stile has come some way toward you and is therefore both
+     taller and thrown a little further out than the hinged one. */
+  const A = 1.02;                                    // how far it swings, in radians
+  const e = Heck.ph === "shut" ? 1 - (1 - o) * (1 - o) : o * o * (3 - 2 * o);
+  const wob = o >= 1 ? Math.sin(Heck.settle * 13) * 0.045 * Math.exp(-Heck.settle * 2.6) : 0;
+  const th = A * e + wob;
+  const ca = Math.cos(th), sa = Math.sin(th);
+  const hu = 1.5, PW = W + 2, PH = H + 4;
+  const fs = 1 + 0.32 * sa;                          // the far stile is nearer to you
+  const fu = hu + PW * ca - PW * 0.16 * sa * sa;
+  const fc = sy + (sy - VH * 0.5) * 0.09 * sa;
+  const hy0 = sy - PH / 2, hy1 = sy + PH / 2;
+  const ft = fc - PH / 2 * fs, fb = fc + PH / 2 * fs;
+  const at = a => ({ u: lerp(hu, fu, a), t: lerp(hy0, ft, a), b: lerp(hy1, fb, a) });
+  const face = (a0, a1, v0, v1) => {
+    const p = at(a0), q = at(a1);
+    return [[p.u, lerp(p.t, p.b, v0)], [q.u, lerp(q.t, q.b, v0)],
+            [q.u, lerp(q.t, q.b, v1)], [p.u, lerp(p.t, p.b, v1)]];
+  };
+  // the slab seen end-on, just past the far stile
+  ctx.fillStyle = "#2c3343";
+  poly([[fu, ft], [fu - 3.4 * sa, ft + 1.2], [fu - 3.4 * sa, fb - 1.2], [fu, fb]]);
   ctx.fill();
-  ctx.strokeStyle = "#2b3150"; ctx.lineWidth = 2; ctx.stroke();
-  ctx.fillStyle = "#6f7889";                       // a handle on the outside
-  ctx.fillRect(left ? w * 0.52 : -w * 0.62, -h * 0.5, w * 0.2, 3.4);
+  const dg = ctx.createLinearGradient(X(hu), 0, X(fu), 0);
+  dg.addColorStop(0, "#3d4557"); dg.addColorStop(0.55, "#6e7787"); dg.addColorStop(1, "#909aaa");
+  ctx.fillStyle = dg;
+  poly([[hu, hy0], [fu, ft], [fu, fb], [hu, hy1]]);
+  ctx.fill();
+  ctx.strokeStyle = "#141a2a"; ctx.lineWidth = 1.4; ctx.stroke();
+  // two recessed panels, which is most of what makes a rectangle a door
+  ctx.lineWidth = 0.8;
+  [[0.1, 0.47], [0.53, 0.9]].forEach(v => {
+    ctx.fillStyle = "rgba(12,16,28,.22)";
+    poly(face(0.2, 0.84, v[0], v[1])); ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,.2)"; ctx.stroke();
+  });
+  ctx.fillStyle = "rgba(226,232,242,.3)";            // the kick plate
+  poly(face(0.13, 0.9, 0.9, 0.975)); ctx.fill();
+  ctx.strokeStyle = "rgba(12,16,28,.35)"; ctx.stroke();
+  ctx.fillStyle = "#39404f";                         // hinges
+  [0.2, 0.8].forEach(v => {
+    const yv = lerp(hy0, hy1, v);
+    box(hu - 3.5, hu + 5, yv - 4.2, yv + 4.2, 1.4); ctx.fill();
+  });
+  const hp = at(0.79), hv = lerp(hp.t, hp.b, 0.52);  // and a lever to pull it by
+  ctx.fillStyle = "#c6ccd8";
+  ctx.beginPath(); ctx.arc(X(hp.u), hv, 2.2, 0, TAU); ctx.fill();
+  ctx.strokeStyle = "#c6ccd8"; ctx.lineWidth = 2; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(X(hp.u), hv); ctx.lineTo(X(hp.u - 6), hv + 1.6); ctx.stroke();
+
+  /* ---- the light it lets out ---- */
+  ctx.save();
+  ctx.globalAlpha = 0.46 * Math.min(1, o * 1.4);
+  const gl = ctx.createRadialGradient(X(10), sy, 2, X(10), sy, 64);
+  gl.addColorStop(0, "rgba(255,226,158,.85)"); gl.addColorStop(1, "rgba(255,226,158,0)");
+  ctx.fillStyle = gl;
+  ctx.beginPath(); ctx.arc(X(10), sy, 64, 0, TAU); ctx.fill();
   ctx.restore();
-  // and him, leaning out of it — a peek is only his head and the clipboard,
-  // a visit is the whole man with an arm already cocked
-  ctx.globalAlpha = o;
-  const lean = Heck.peek ? 12 : 19;
-  const slip = Heck.slip * 7;                      // the moment he nearly goes with it
-  drawHeckAny(left ? lean : VW - lean, sy + 5 + slip, 1.35, left ? 1 : -1,
-               Math.sin(G.T * 2.4) > 0.94, Heck.peek ? 0.1 : 0.7,
-               Heck.peek ? "stare" : "stand", G.T);
-  if (Heck.peek) drawClipboard(left ? lean + 15 : VW - lean - 15, sy + 12, 1.1, left ? 0.2 : -0.2);
-  ctx.globalAlpha = 1;
   ctx.restore();
-  drawHeckSay(left ? 46 : VW - 46, sy - 18, Heck.hsay,
-              Heck.hsayT > 0 ? Math.min(1, Heck.hsayT) : 0, "#2b3150");
+
+  drawHeckSay(X(78), sy - 26, Heck.hsay,
+              Heck.hsayT > 0 ? Math.min(1, Heck.hsayT) * (0.25 + 0.75 * L) : 0, "#2b3150");
 }
 /* ------------------------------------------------------------ backdrop */
 function progressNow(){
