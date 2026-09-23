@@ -1168,7 +1168,7 @@ function segSegDist(ax1, ay1, ax2, ay2, bx1, by1, bx2, by2, out){
    are playing the same build — which a version label alone can never tell
    you, least of all when one of you is looking at something a browser cached
    a week ago. Change one character of the game and the code changes. */
-const BUILD = { v: "2.0", n: 35, date: "23 Sep 2026", code: "0000000" };
+const BUILD = { v: "2.1", n: 36, date: "23 Sep 2026", code: "0000000" };
 (() => {
   // scripts and stylesheets: everything that decides how the game behaves and
   // how it looks. Not the markup, which the game rewrites as it runs and which
@@ -1272,15 +1272,24 @@ const Audio2 = (() => {
     src.start(t0);
   }
   const SFX = {
-    gem(pitch){ tone(660 * Math.pow(1.06, pitch || 0), 0.13, "triangle", 0.22, 1320 * Math.pow(1.06, pitch || 0)); },
-    tap(){ tone(300, 0.06, "sine", 0.14); },
-    bump(){ noise(0.09, 0.16, 700, 200); },
-    pop(){ noise(0.22, 0.5, 2600, 180); tone(220, 0.28, "sawtooth", 0.16, 60); },
-    burst(){ noise(0.4, 0.32, 3200, 300); tone(180, 0.4, "sine", 0.2, 720); },
-    power(){ [0, 4, 7, 12].forEach((s, i) => tone(440 * Math.pow(2, s / 12), 0.16, "triangle", 0.2, null, i * 0.05)); },
-    win(){ [0, 4, 7, 12, 16].forEach((s, i) => tone(523.25 * Math.pow(2, s / 12), 0.34, "triangle", 0.22, null, i * 0.09)); },
+    /* Each of these asks the foley for a recording first and synthesises
+       only if there is not one. That way the game is correct with no clips
+       at all, better with some, and nothing has to be swapped over. */
+    gem(pitch){ if (Foley.play("gem", Math.pow(1.06, pitch || 0))) return;
+                tone(660 * Math.pow(1.06, pitch || 0), 0.13, "triangle", 0.22, 1320 * Math.pow(1.06, pitch || 0)); },
+    tap(){ if (Foley.play("hatch")) return; tone(300, 0.06, "sine", 0.14); },
+    bump(){ if (Foley.play("block")) return; noise(0.09, 0.16, 700, 200); },
+    clack(){ if (Foley.play("clack") || Foley.play("block")) return; noise(0.07, 0.12, 900, 260); },
+    close(){ if (Foley.play("close")) return; tone(880, 0.09, "sine", 0.12, 1320); },
+    pop(){ if (Foley.play("pop")) return; noise(0.22, 0.5, 2600, 180); tone(220, 0.28, "sawtooth", 0.16, 60); },
+    dead(){ Foley.play("dead"); },
+    burst(){ if (Foley.play("burst")) return; noise(0.4, 0.32, 3200, 300); tone(180, 0.4, "sine", 0.2, 720); },
+    power(){ if (Foley.play("power")) return;
+             [0, 4, 7, 12].forEach((s, i) => tone(440 * Math.pow(2, s / 12), 0.16, "triangle", 0.2, null, i * 0.05)); },
+    win(){ if (Foley.play("win")) return;
+           [0, 4, 7, 12, 16].forEach((s, i) => tone(523.25 * Math.pow(2, s / 12), 0.34, "triangle", 0.22, null, i * 0.09)); },
     ui(){ tone(520, 0.07, "sine", 0.13); },
-    warn(){ tone(140, 0.1, "square", 0.1); },
+    warn(){ if (Foley.play("warn")) return; tone(140, 0.1, "square", 0.1); },
     /* Five F-1s at full thrust moved enough air to be heard three miles away.
        This is filtered noise with a slow swell on it, started once at ignition
        and left to run itself out as the vehicle climbs away from its own
@@ -1396,6 +1405,8 @@ const Audio2 = (() => {
   }
   return {
     resume, SFX,
+    ctx(){ return ensure(); },
+    sfxBus(){ ensure(); return sfxGain; },
     unlock(){
       resume();
       if (!started && ctx){
@@ -1841,7 +1852,7 @@ function solidPair(a, b, withImpulse){
     // each takes a turn out of the exchange
     a.spin -= j * 0.0012 * ia * ((_pair.ax - a.x) * ny - (_pair.ay - a.y) * nx) / Math.max(12, a.rad);
     b.spin += j * 0.0012 * ib * ((_pair.bx - b.x) * ny - (_pair.by - b.y) * nx) / Math.max(12, b.rad);
-    if (-vn > 120 && G.T - (G.lastClack || -1) > 0.11){ G.lastClack = G.T; Audio2.SFX.bump(); }
+    if (-vn > 120 && G.T - (G.lastClack || -1) > 0.11){ G.lastClack = G.T; Audio2.SFX.clack(); }
     if (-vn > 90 && Math.random() < 0.4)
       pAdd((a.x + b.x) / 2, (a.y + b.y) / 2, 0, -30, 0.25, 2.5, "#ffffff", "dot");
   }
@@ -3153,6 +3164,7 @@ function popBalloon(){
     burstParts(b.x, b.y, save.opts.calm ? 6 : 16, mix("#c9ced9", "#7cf0ff", S.hull), 150, "shard");
     G.cam.shake = save.opts.calm ? 6 : 22;
     Audio2.SFX.boom(); Audio2.duck(true);
+    setTimeout(() => Audio2.SFX.dead(), 900);
     setTimeout(() => Audio2.duck(false), 1400);
     buzz([26, 50, 30, 60, 40]);
   } else {
@@ -3160,6 +3172,7 @@ function popBalloon(){
     burstParts(b.x, b.y, 12, "#ffffff", 160, "dot");
     G.cam.shake = save.opts.calm ? 4 : 14;
     Audio2.SFX.pop(); buzz([18, 40, 24]);
+    setTimeout(() => Audio2.SFX.dead(), 420);
   }
 }
 function takeHit(o, nx, ny){
@@ -3606,6 +3619,7 @@ function blockScored(o, x, y){
   burstParts(x, y, o.worth > 12 ? 9 : 5, "#ffffff", 140, "dot");
   floatScore(x, y, gained, late);
   if (held){ G.cam.shake = Math.max(G.cam.shake, save.opts.calm ? 2 : 4 + late); buzz(late >= 2.6 ? 14 : 8); }
+  if (late >= 2.6) Audio2.SFX.close();
   if (held && G.nerve >= 2) Audio2.SFX.gem(clamp(G.nerve - 2, 0, 7));
   // the man on the roof watches all of this and is not gracious about it
   if (o.pid === "heckboard") Heck.heckle("board");
@@ -4167,6 +4181,67 @@ function drawClipboard(x, y, s, ang){
 
    It degrades down that list on its own, so the game is correct today and
    improves the moment a clip exists. */
+/* ============================================================== the foley
+
+   Recorded sound effects, which are funnier than anything synthesised and
+   cost almost nothing at the sizes these run to.
+
+   The rule that matters: the frequent sounds come in sets. A deflection
+   fires hundreds of times a run, and one clip played hundreds of times is
+   not a sound effect, it is a woodpecker. So each slot holds several takes,
+   a take is never played twice running, and every playback gets a touch of
+   pitch either side of true. Between them that is enough variation that the
+   ear stops noticing there is a loop at all.
+
+   Everything decodes once into an AudioBuffer and plays through the same
+   gain the synthesised effects use, so the volume setting and the mission
+   ducking keep working and nothing has to wait on an <audio> element. */
+const SFX_CLIPS = {};              // slot -> [ data: URI, ... ]
+const Foley = {
+  buf: {}, last: {}, decoding: {},
+  /* Decode on first use rather than at boot: a run that never sees the hatch
+     should never spend anything on the hatch creak. */
+  want(slot){
+    const set = SFX_CLIPS[slot];
+    if (!set || !set.length) return null;
+    if (this.buf[slot]) return this.buf[slot];
+    if (this.decoding[slot]) return null;
+    const ctx = Audio2.ctx();
+    if (!ctx) return null;
+    this.decoding[slot] = 1;
+    this.buf[slot] = [];
+    set.forEach((uri, i) => {
+      try {
+        const b64 = uri.slice(uri.indexOf(",") + 1);
+        const raw = atob(b64), n = raw.length, bytes = new Uint8Array(n);
+        for (let k = 0; k < n; k++) bytes[k] = raw.charCodeAt(k);
+        ctx.decodeAudioData(bytes.buffer,
+          d => { this.buf[slot][i] = d; },
+          () => {});
+      } catch (e){ /* a bad clip just falls back to the synth */ }
+    });
+    return null;
+  },
+  play(slot, rate){
+    if (!save.opts.sfx) return false;
+    const set = this.want(slot);
+    if (!set) return false;
+    const ready = set.filter(Boolean);
+    if (!ready.length) return false;
+    let i = (Math.random() * ready.length) | 0;
+    if (ready.length > 1 && i === this.last[slot]) i = (i + 1) % ready.length;
+    this.last[slot] = i;
+    const ctx = Audio2.ctx();
+    const src = ctx.createBufferSource();
+    src.buffer = ready[i];
+    // a little either side of true, so even one take never sounds identical
+    src.playbackRate.value = (rate || 1) * (0.94 + Math.random() * 0.12);
+    src.connect(Audio2.sfxBus());
+    src.start();
+    return true;
+  }
+};
+
 const VOICE_CLIPS = {};            // line text -> data: URI, filled in as they arrive
 const Voice = {
   el: null, ready: false, best: null, spoke: 0,
