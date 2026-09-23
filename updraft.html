@@ -471,6 +471,106 @@
   body.pal-bold .telem b{text-shadow:none;color:#f4f6f8}
   body.pal-bold .stage-chip{color:rgba(255,178,120,.95);text-shadow:none}
 
+  /* ---- Panther: a 1960s title card. Everything that was colour is one
+         colour, the corners go sharp, the type spreads out, and the light
+         comes from a single hot source somewhere off to the left. The joke
+         of the era's animation was that almost nothing happened, very
+         slowly, with enormous style — so this palette is mostly rules,
+         spacing and one pink. --------------------------------------------- */
+  body.pal-panther{
+    --ink:#ffe6f2;
+    --ink-soft:rgba(255,168,214,.66);
+    --accent:#ff2e92;
+    --accent-2:#f7c873;
+    --danger:#ff4f6f;
+    --panel:rgba(20,5,16,.84);
+    --panel-line:rgba(255,46,146,.34);
+    --glass:rgba(20,5,16,.7);
+    --hair:rgba(255,110,180,.32);
+    --shadow:0 16px 44px rgba(50,0,28,.62);
+    --r:3px;
+  }
+  body.pal-panther #stage{
+    background:
+      radial-gradient(70% 55% at 12% 6%, rgba(255,46,146,.30) 0%, rgba(255,46,146,0) 62%),
+      linear-gradient(180deg,#1a0512 0%,#12030d 55%,#070105 100%);
+  }
+  body.pal-panther #frame{box-shadow:0 0 80px rgba(120,0,60,.55)}
+  body.pal-panther .screen.veil{
+    background:linear-gradient(180deg,rgba(14,3,11,.86),rgba(6,1,5,.96));
+    backdrop-filter:blur(2px);
+  }
+  body.pal-panther .btn{
+    border-radius:3px;letter-spacing:3.2px;font-weight:900;font-size:13px;
+    background:transparent;border:1.5px solid var(--hair);color:var(--ink);
+  }
+  body.pal-panther .btn.primary{
+    background:var(--accent);color:#1a0210;border-color:var(--accent);
+    box-shadow:0 0 30px rgba(255,46,146,.38);
+  }
+  body.pal-panther .btn.ghost{background:rgba(14,3,11,.55);border-color:rgba(255,110,180,.5)}
+  body.pal-panther .panel{border-radius:4px;border:1px solid var(--panel-line)}
+  body.pal-panther .chip{border-radius:2px;border:1px solid var(--hair);background:rgba(20,5,16,.7)}
+  body.pal-panther .icon-btn{border-radius:2px;background:rgba(20,5,16,.7);border:1px solid var(--hair)}
+  body.pal-panther .title{
+    letter-spacing:6px;font-weight:900;text-transform:uppercase;
+    font-size:clamp(28px,10vw,54px);
+    text-shadow:0 0 34px rgba(255,46,146,.5);
+  }
+  body.pal-panther .sub{letter-spacing:4px;text-transform:uppercase;font-size:11px}
+  body.pal-panther #scoreBig{
+    color:var(--accent);letter-spacing:4px;
+    text-shadow:0 0 26px rgba(255,46,146,.55);
+  }
+  body.pal-panther .bar{height:2px;border-radius:0;background:rgba(255,110,180,.20);border:0}
+  body.pal-panther .bar > i{background:var(--accent);border-radius:0}
+  body.pal-panther .bar-label{letter-spacing:3.4px;color:rgba(255,178,216,.8)}
+  body.pal-panther .stage-chip{color:var(--accent);text-shadow:0 0 16px rgba(255,46,146,.5)}
+  body.pal-panther .stage-banner b{color:var(--accent);letter-spacing:6px}
+  body.pal-panther .stage-banner span{letter-spacing:3px;text-transform:uppercase}
+  body.pal-panther .switch.on{background:var(--accent);box-shadow:0 0 14px rgba(255,46,146,.55)}
+  body.pal-panther .seg button.on{background:var(--accent);color:#1a0210}
+  body.pal-panther .lvl,body.pal-panther .skin{border-radius:3px}
+  body.pal-panther .telem b{color:var(--ink);text-shadow:0 0 12px rgba(255,46,146,.4)}
+  body.pal-panther #burstBtn{
+    border-radius:2px;
+    background:conic-gradient(var(--accent) calc(var(--e,0) * 1%), rgba(255,110,180,.12) 0);
+  }
+  body.pal-panther #burstBtn::after{background:rgba(14,3,11,.9);border-radius:1px}
+  body.pal-panther #burstBtn svg{fill:var(--accent)}
+  body.pal-panther .play-btn{
+    border-radius:2px;border-color:var(--accent);background:rgba(255,46,146,.10);
+    box-shadow:0 0 60px rgba(255,46,146,.32);
+  }
+  body.pal-panther .play-btn svg{fill:var(--accent)}
+  body.pal-panther .buildcode{background:rgba(255,46,146,.14);color:#ffa8d6}
+
+  /* The title card itself. Two hairlines cross the screen behind the name,
+     drawn out from opposite edges on the long ease, and the name sits on
+     them. It costs two pseudo-elements and it is the whole era. */
+  body.pal-panther #scr-title{position:absolute;overflow:hidden}
+  body.pal-panther #scr-title::before,
+  body.pal-panther #scr-title::after{
+    content:"";position:absolute;left:0;right:0;height:1.5px;
+    background:linear-gradient(90deg,transparent,var(--accent) 10%,var(--accent) 90%,transparent);
+    opacity:.85;pointer-events:none;z-index:-1;
+    box-shadow:0 0 16px rgba(255,46,146,.6);
+  }
+  body.pal-panther #scr-title::before{top:26.5%;transform-origin:left center;animation:ruleL 1.5s var(--e-out) both .1s}
+  body.pal-panther #scr-title::after{top:73%;transform-origin:right center;animation:ruleR 1.5s var(--e-out) both .26s}
+  body.pal-panther #scr-title .title span{display:inline-block;will-change:transform,opacity}
+  body.pal-panther #scr-title.in-fwd .title span,
+  body.pal-panther #scr-title.in-back .title span{animation:letterIn .8s var(--e-out) both}
+  @keyframes letterIn{
+    from{opacity:0;transform:translate3d(0,30px,0) rotate(-10deg)}
+    to{opacity:1;transform:none}
+  }
+  body.calm.pal-panther #scr-title .title span{animation-duration:.01s !important;animation-delay:0s !important}
+  @keyframes ruleL{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+  @keyframes ruleR{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+  body.calm.pal-panther #scr-title::before,
+  body.calm.pal-panther #scr-title::after{animation-duration:.01s}
+
   /* ---- Blossom: the light shell, warmed right through. Softer corners,
          lower contrast, no hard black anywhere in it. ------------------ */
   body.pal-blossom{
@@ -656,7 +756,7 @@
   }
 
   /* ---------- the look and protector pickers ---------- */
-  .themes{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;padding:2px 0 8px}
+  .themes{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;padding:2px 0 8px}
   .theme{min-width:0}
   .theme{
     border:0;padding:0;cursor:pointer;border-radius:12px;overflow:hidden;
@@ -667,8 +767,9 @@
   .theme:active{transform:scale(.93)}
   .theme i{position:absolute;inset:0;display:block}
   .theme b{
-    position:absolute;left:0;right:0;bottom:0;font-size:8px;font-weight:900;
-    letter-spacing:.6px;padding:3px 0;background:rgba(0,0,0,.42);color:#fff;
+    position:absolute;left:0;right:0;bottom:0;font-size:7.5px;font-weight:900;
+    letter-spacing:.2px;padding:3px 1px;background:rgba(0,0,0,.48);color:#fff;
+    white-space:nowrap;overflow:hidden;text-overflow:clip;
   }
   .theme.on{outline:2.5px solid var(--accent);outline-offset:1.5px}
   .shields{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;padding:2px 0 8px}
@@ -1066,7 +1167,7 @@ function segSegDist(ax1, ay1, ax2, ay2, bx1, by1, bx2, by2, out){
    are playing the same build — which a version label alone can never tell
    you, least of all when one of you is looking at something a browser cached
    a week ago. Change one character of the game and the code changes. */
-const BUILD = { v: "1.5", n: 30, date: "23 Sep 2026", code: "0000000" };
+const BUILD = { v: "1.6", n: 31, date: "23 Sep 2026", code: "0000000" };
 (() => {
   // scripts and stylesheets: everything that decides how the game behaves and
   // how it looks. Not the markup, which the game rewrites as it runs and which
@@ -1229,8 +1330,53 @@ const Audio2 = (() => {
   // out past the atmosphere the pad drops a fifth, opens out and loses its
   // top voice: same instrument, colder room
   const CHORDS_M = [[0, 7, 14, 19], [-5, 2, 9, 16], [-7, 0, 7, 12], [-3, 4, 12, 16]];
+  /* ---- the title-card groove -------------------------------------------
+     The pad is a room tone; this is a piece of music, and it has to be,
+     because the whole era being borrowed from here is carried by the bass
+     line. Eight beats at ninety-two, a walking figure that climbs the minor
+     third to the flat five and slinks back down, a snap on two and four,
+     and one muted stab leaning on the off-beat. Nothing plays on the one
+     except the bass, which is what makes it sound like it is sneaking. */
+  const WALK = [0, 3, 5, 6, 7, 6, 5, 3];
+  function voiceAt(freq, at, dur, type, vol, filt){
+    const o = ctx.createOscillator(), g = ctx.createGain(), f = ctx.createBiquadFilter();
+    o.type = type; o.frequency.value = freq;
+    f.type = "lowpass"; f.frequency.value = filt || 1200;
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(vol, at + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    o.connect(f); f.connect(g); g.connect(musicGain);
+    o.start(at); o.stop(at + dur + 0.02);
+  }
+  function snapAt(at){
+    const n = Math.floor(ctx.sampleRate * 0.09);
+    const buf = ctx.createBuffer(1, n, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3);
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const f = ctx.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = 2400; f.Q.value = 1.4;
+    const g = ctx.createGain(); g.gain.value = 0.26;
+    src.connect(f); f.connect(g); g.connect(musicGain);
+    src.start(at);
+  }
+  function jazzStep(){
+    const beat = 0.65, t0 = ctx.currentTime + 0.05;
+    const root = 82.41;                                   // E1, where a bass lives
+    for (let i = 0; i < 8; i++){
+      const at = t0 + i * beat;
+      voiceAt(root * Math.pow(2, WALK[(step * 8 + i) % 8] / 12), at, beat * 0.9, "triangle", 0.19, 520);
+      if (i % 2 === 1) snapAt(at);
+    }
+    // two stabs, both landing off the beat, a minor ninth apart
+    for (const i of [1.5, 5.5]){
+      const at = t0 + i * beat;
+      voiceAt(root * 4 * Math.pow(2, 3 / 12), at, 0.24, "sawtooth", 0.07, 1500);
+      voiceAt(root * 4 * Math.pow(2, 13 / 12), at, 0.24, "sawtooth", 0.05, 1500);
+    }
+  }
   function musicStep(){
     if (!ctx || !save.opts.music) return;
+    if (typeof isPanther === "function" && isPanther()){ jazzStep(); step++; return; }
     const deep = isMission() && missionNow().ph.kind !== "pad" && missionNow().ph.kind !== "air";
     const root = deep ? 146.83 : 220;
     const ch = (deep ? CHORDS_M : CHORDS)[step % CHORDS.length];
@@ -3756,6 +3902,7 @@ const Heck = {
   name: "", seed: 0, mood: HECK_MOODS[0], sign: "",
   // title screen
   x: 0, y: 0, vx: 0, face: 1, bob: 0, act: "walk", actT: 0, act0: 1, say: "", sayT: 0,
+  spot: -200, spotV: 1, froze: 0,
   bx: 0, bvx: 0,                      // the clipboard, when it gets away from him
   // the hatch
   live: false, peek: false, side: 1, hy: 0, open: 0, hold: 0, next: 0,
@@ -3782,10 +3929,23 @@ const Heck = {
   /* ---- the title screen: he has nowhere to be ---- */
   menu(dt){
     this.bob += dt;
+    /* The searchlight. It rakes across the roof and back, and the one thing
+       everybody knows about being caught in a light is that you stop dead
+       and wait for it to go away. He does exactly that, mid-stride, and
+       then carries on as though nothing happened. */
+    const lit = isPanther();
+    if (lit){
+      this.spot += this.spotV * 46 * dt;
+      if (this.spot > VW + 90){ this.spot = VW + 90; this.spotV = -1; }
+      if (this.spot < -90){ this.spot = -90; this.spotV = 1; }
+      this.froze = Math.abs(this.spot - this.x) < 46 ? Math.min(1, this.froze + dt * 6)
+                                                     : Math.max(0, this.froze - dt * 3);
+    } else { this.spot = -200; this.froze = 0; }
+    if (this.froze > 0.5){ if (this.sayT > 0) this.sayT -= dt; return; }
     this.actT -= dt;
     if (this.sayT > 0) this.sayT -= dt;
     if (this.actT <= 0) this.pickAct();
-    this.vx = (this.act === "walk" ? this.face * 26
+    this.vx = (this.act === "walk" || this.act === "creep" ? this.face * (this.act === "creep" ? 15 : 26)
             : this.act === "chase" ? this.face * 62 : 0) * this.mood.pace;
     this.x += this.vx * dt;
     if (this.x < 34){ this.x = 34; this.face = 1; }
@@ -3812,6 +3972,13 @@ const Heck = {
     let a;
     if (p < m.nap) a = "nap";
     else {
+      if (isPanther() && Math.random() < 0.55){
+        // under the title card he does not walk anywhere, he creeps there
+        this.act = "creep"; this.act0 = this.actT = 2.6 + Math.random() * 2.4;
+        this.face = Math.random() < 0.5 ? -1 : 1;
+        if (Math.random() < this.mood.chat * 0.6){ this.say = this.voice(HECK_IDLE, HECK_MOOD_IDLE); this.sayT = 3.4; }
+        return;
+      }
       const pool = m.id === "bored"  ? ["stand","sit","stand","nap","walk","stare","shrug"]
                  : m.id === "keen"   ? ["walk","jump","dance","write","chase","jump","wave"]
                  : m.id === "rattled"? ["walk","trip","spin","chase","stare","walk","shrug"]
@@ -3948,7 +4115,7 @@ function drawClipboard(x, y, s, ang){
 }
 function drawHeckBody(x, y, s, face, blink, arm, act, t){
   act = act || "stand"; t = t || 0;
-  const nap = act === "nap", front = act === "stare" || act === "shrug" || act === "wave";
+  const nap = act === "nap", front = act === "stare" || act === "shrug" || act === "wave" || act === "froze";
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(face * s, s);
@@ -3967,9 +4134,21 @@ function drawHeckBody(x, y, s, face, blink, arm, act, t){
     const k = Math.sin(t * (act === "chase" ? 17 : 9)) * 4;
     ctx.moveTo(-3.4, 7); ctx.lineTo(-3.4 + k, 16);
     ctx.moveTo(3.4, 7);  ctx.lineTo(3.4 - k, 16);
-  } else if (act === "sit"){ ctx.moveTo(-3.4, 8); ctx.lineTo(-7, 13); ctx.moveTo(3.4, 8); ctx.lineTo(7, 13); }
+  } else if (act === "creep"){
+    /* One enormous step at a time, with the front foot held in the air for
+       a beat at the top of it. Nothing else in this game moves this slowly
+       and that is the entire joke. */
+    const sw = Math.sin(((t * 0.42) % 1) * TAU);
+    ctx.moveTo(2.5, 7);  ctx.lineTo(19 + sw * 4, 17 - Math.max(0, sw) * 6);   // reaching
+    ctx.moveTo(-2.5, 7); ctx.lineTo(-17 + sw * 4, 17);                        // trailing
+  } else if (act === "froze"){ ctx.moveTo(-2.2, 7); ctx.lineTo(-2.2, 16); ctx.moveTo(2.2, 7); ctx.lineTo(2.2, 16); }
+  else if (act === "sit"){ ctx.moveTo(-3.4, 8); ctx.lineTo(-7, 13); ctx.moveTo(3.4, 8); ctx.lineTo(7, 13); }
   else { ctx.moveTo(-3.4, 7); ctx.lineTo(-3.4, 16); ctx.moveTo(3.4, 7); ctx.lineTo(3.4, 16); }
   ctx.stroke();
+  /* The lean belongs to the top half only. Rotating the whole man tips his
+     front foot off the roof and buries the back one, which is how a tiptoe
+     turns into a spider. */
+  if (act === "creep"){ ctx.rotate(-0.30); ctx.translate(0, 3); }
   // body
   ctx.fillStyle = "#ffd166";
   ctx.beginPath();
@@ -3983,6 +4162,8 @@ function drawHeckBody(x, y, s, face, blink, arm, act, t){
   else if (act === "dance"){ const w = Math.sin(t * 9) * 9; ly = 1 - w; ry = 1 + w; }
   else if (act === "write"){ lx = -13; ly = 6; rx = 12; ry = -3 + Math.sin(t * 16) * 2.4; }
   else if (act === "stare"){ lx = -12; ly = 7; rx = 12; ry = 7; }
+  else if (act === "creep"){ lx = 12; ly = -11; rx = 22; ry = -6; }
+  else if (act === "froze"){ lx = -8.5; ly = 9; rx = 8.5; ry = 9; }
   else if (act === "measure"){ lx = -17; ly = -2; rx = 17; ry = -2; }
   else if (act === "chase"){ ly = -6; ry = -9; }
   else if (nap){ lx = -13; ly = 7; rx = 12; ry = 8; }
@@ -4018,9 +4199,10 @@ function drawHeckBody(x, y, s, face, blink, arm, act, t){
   else ctx.arc(0, 2.6, 3.2, 0.25, Math.PI - 0.25);
   ctx.stroke();
   // hard hat
-  ctx.fillStyle = Heck.hat || "#ff7a2f";
-  ctx.beginPath(); ctx.arc(0, -6.2, 6.4, Math.PI, TAU); ctx.fill();
-  ctx.fillRect(-8.4, -6.6, 16.8, 2.1);
+  ctx.fillStyle = isPanther() ? "#ff2e92" : (Heck.hat || "#ff7a2f");
+  const hb = act === "creep" ? -2.4 : 0;           // the lean tips it over his eyes otherwise
+  ctx.beginPath(); ctx.arc(0, -6.2 + hb, 6.4, Math.PI, TAU); ctx.fill();
+  ctx.fillRect(-8.4, -6.6 + hb, 16.8, 2.1);
   ctx.restore();
   if (nap){                                        // the universal sign for it
     ctx.save();
@@ -4068,7 +4250,9 @@ function drawHeckSay(x, y, text, alpha, ink){
 function drawHeckMenu(){
   // low enough that a two-line bubble still clears the text under the title
   const gy = VH * 0.905 + 26;
-  const act = Heck.act;
+  const lit = isPanther();
+  if (lit) drawSearchlight(gy);
+  const act = Heck.froze > 0.5 ? "froze" : Heck.act;
   const blink = Math.sin(Heck.bob * 1.7) > 0.96;
   const spin = act === "spin" ? Heck.bob * 7 : 0;
   const sit = act === "sit" ? 5 : act === "nap" ? 7 : 0;
@@ -4082,10 +4266,46 @@ function drawHeckMenu(){
   drawHeckBody(Heck.x, by, 1.9, Heck.face, blink,
                act === "jump" ? 1 : Math.sin(Heck.bob * 3) * 0.25, act, Heck.bob);
   if (act !== "chase" && act !== "nap" && act !== "spin")
-    drawClipboard(Heck.x + Heck.face * (act === "write" ? 15 : 19), by + (act === "write" ? -2 : 4),
-                  1.5, Heck.face * (act === "write" ? -0.25 : 0.12));
+    drawClipboard(Heck.x + Heck.face * (act === "write" ? 15 : act === "creep" ? 40 : 19),
+                  by + (act === "write" ? -2 : act === "creep" ? -13 : 4),
+                  1.5, Heck.face * (act === "write" ? -0.25 : act === "creep" ? -0.55 : 0.12));
   ctx.restore();
-  drawHeckSay(Heck.x, by - 34, Heck.say, Heck.sayT > 0 ? Math.min(1, Heck.sayT) : 0, "#2b3150");
+  drawHeckSay(Heck.x, by - 34, Heck.say, Heck.sayT > 0 ? Math.min(1, Heck.sayT) : 0,
+              lit ? "#4a0a2c" : "#2b3150");
+}
+/* A beam raking across the roof, and the long shadow it throws off him. The
+   beam is drawn in `lighter` so it adds light rather than painting over the
+   sky, which is the difference between a searchlight and a grey triangle. */
+function drawSearchlight(gy){
+  /* It starts halfway down and it is faint. A beam bright enough to be
+     obvious is a beam that makes the menu underneath it unreadable, and the
+     thing being borrowed here was always more shadow than light. */
+  const sx = Heck.spot, topY = gy - 250, baseY = gy + 12;
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  const g = ctx.createLinearGradient(0, topY, 0, baseY);
+  g.addColorStop(0, "rgba(255,130,195,0)");
+  g.addColorStop(0.55, "rgba(255,110,185,.055)");
+  g.addColorStop(1, "rgba(255,80,170,.10)");
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(sx - 13, topY); ctx.lineTo(sx + 13, topY);
+  ctx.lineTo(sx + 50, baseY); ctx.lineTo(sx - 50, baseY);
+  ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(sx, baseY, 50, 13, 0, 0, TAU);
+  ctx.fillStyle = "rgba(255,90,175,.12)"; ctx.fill();
+  ctx.restore();
+  const dx = Heck.x - sx;
+  if (Math.abs(dx) < 150){
+    ctx.save();
+    ctx.globalAlpha = 0.34 * (1 - Math.abs(dx) / 150);
+    ctx.fillStyle = "#1a0210";
+    ctx.beginPath();
+    ctx.ellipse(Heck.x + clamp(dx * 0.6, -58, 58), gy + 15,
+                20 + Math.abs(dx) * 0.16, 5.5, 0, 0, TAU);
+    ctx.fill();
+    ctx.restore();
+  }
 }
 /* the hatch, in screen space, hanging in the side of the sky */
 function drawHeckHatch(){
@@ -4198,7 +4418,16 @@ function inkNow(){
 /* the theme's wash, laid over whatever the sky turned out to be */
 function themeWash(){
   const t = typeof THEMES !== "undefined" ? themeNow() : null;
-  if (!t || !t.wash) return;
+  if (!t) return;
+  if (t.mono){
+    ctx.save();
+    ctx.globalCompositeOperation = "color";        // hue from here, value from the sky
+    ctx.globalAlpha = 0.92;
+    ctx.fillStyle = t.mono;
+    ctx.fillRect(0, 0, VW, VH);
+    ctx.restore();
+  }
+  if (!t.wash) return;
   ctx.fillStyle = t.wash;
   ctx.fillRect(0, 0, VW, VH);
 }
@@ -6615,17 +6844,40 @@ const THEMES = [
   { id:"light",   name:"Day",   cls:"",                  wash:"rgba(255,246,214,.10)", sw:["#8fd2ea","#7c5cff","#ffd166"] },
   { id:"dark",    name:"Night", cls:"pal-dark",          wash:"rgba(6,14,34,.46)",     sw:["#0d1b33","#38dcff","#8f7bff"] },
   { id:"bold",    name:"Bold",  cls:"pal-dark pal-bold", wash:"rgba(18,14,10,.50)",    sw:["#1a1c20","#ff7a2f","#ffc93c"] },
-  { id:"blossom", name:"Bloom", cls:"pal-blossom",       wash:"rgba(255,158,198,.26)", sw:["#ffe2ee","#f0619a","#ffc861"] }
+  { id:"blossom", name:"Bloom", cls:"pal-blossom",       wash:"rgba(255,158,198,.26)", sw:["#ffe2ee","#f0619a","#ffc861"] },
+  /* `mono` is the one that does the heavy lifting here: painted over the
+     finished sky in the "color" blend it keeps every value the sky already
+     had and throws away its hue, so the whole backdrop becomes one pink
+     poster while the debris and the ship, drawn afterwards, stay graphic
+     black and white on top of it. */
+  { id:"panther", name:"Panther", cls:"pal-dark pal-panther",
+    wash:"rgba(20,2,13,.52)", mono:"#ff2e92", sw:["#12030d","#ff2e92","#f7c873"] }
 ];
 function themeNow(){ return THEMES[clamp(save.opts.theme | 0, 0, THEMES.length - 1)]; }
+/* one question asked in four places: is the whole app being a title card? */
+function isPanther(){ return typeof THEMES !== "undefined" && themeNow().id === "panther"; }
 /* Auto is the only one that answers to where you are: dark for the mission,
    light for the levels, which is what the game did before there was a choice. */
 function applyCalm(){ document.body.classList.toggle("calm", !!save.opts.calm); }
 function applyTheme(){
   const t = themeNow();
   const cls = t.id === "auto" ? (isMission() ? "pal-dark" : "") : t.cls;
-  document.body.classList.remove("pal-dark", "pal-bold", "pal-blossom");
+  document.body.classList.remove("pal-dark", "pal-bold", "pal-blossom", "pal-panther");
   for (const c of cls.split(" ")) if (c) document.body.classList.add(c);
+  const h = document.querySelector("#scr-title .title");
+  if (h){
+    const want = t.id === "panther";
+    if (want && !h.dataset.split){
+      const txt = h.textContent;
+      h.dataset.split = txt;
+      h.innerHTML = [...txt].map((c, i) =>
+        '<span style="animation-delay:' + (0.26 + i * 0.055).toFixed(3) + 's">' +
+        (c === " " ? "&nbsp;" : c) + '</span>').join("");
+    } else if (!want && h.dataset.split){
+      h.textContent = h.dataset.split;
+      delete h.dataset.split;
+    }
+  }
   const th = $("themeWhat");
   if (th) th.textContent = t.id === "auto" ? "Follows the mode — day in levels, night on the mission"
                                            : t.name;
