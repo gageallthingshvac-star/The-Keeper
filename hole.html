@@ -28,6 +28,9 @@
   #bar{margin-top:8px;height:6px;border-radius:4px;background:rgba(255,255,255,.15);overflow:hidden}
   #fill{height:100%;width:0;background:linear-gradient(90deg,var(--accent2),var(--accent));transition:width .2s}
   #next{margin-top:5px;font-size:12px;opacity:.75;text-align:right}
+  #cmp{margin-top:6px;font-size:13px;color:#ffd98a;text-align:right;max-width:240px;margin-left:auto;line-height:1.3}
+  #fade{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity 1.2s;z-index:8}
+  #fade.on{opacity:1}
   #toast{position:fixed;top:30%;left:50%;transform:translate(-50%,-50%) scale(.9);font-weight:900;font-size:clamp(22px,5vw,40px);color:#fff;text-shadow:0 3px 0 #000,0 0 20px rgba(0,0,0,.5);opacity:0;transition:opacity .3s,transform .3s;pointer-events:none;text-align:center;z-index:6}
   #toast.on{opacity:1;transform:translate(-50%,-50%) scale(1)}
   .pop{position:fixed;font-weight:800;font-size:15px;color:#fff;text-shadow:0 2px 0 #000;pointer-events:none;z-index:4;white-space:nowrap;will-change:transform,opacity}
@@ -55,10 +58,12 @@
 <div id="stats" class="panel">
   <div class="stat"><span>Size:</span><b id="size">1.8 m</b></div>
   <div class="stat"><span>Score:</span><b id="score">0</b></div>
+  <div id="cmp">About the size of a person</div>
   <div id="bar"><div id="fill"></div></div>
   <div id="next">Next: benches</div>
 </div>
 <div id="toast"></div>
+<div id="fade"></div>
 <div id="joy"><i class="u"></i><i class="d"></i><i class="l"></i><i class="r"></i><div id="knob"></div></div>
 <div id="hint" class="panel"><svg viewBox="0 0 64 56" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="6" width="30" height="15" rx="3" transform="rotate(-32 25 13.5)"/><path d="M52 10v22M45 26l7 7 7-7"/><path d="M8 38c0 7 11 12 24 12s24-5 24-12"/><path d="M8 38c0-4 5-7 12-8"/></svg><span>Move under objects to make them fall in.</span></div>
 <div id="btns"><button id="rotL" title="Rotate (Q)">&#10226;</button><button id="view" title="Camera angle (V)">View 45&deg;</button><button id="rotR" title="Rotate (E)">&#10227;</button><button id="mute">&#128266;</button><button id="hq" title="Graphics quality">HQ</button></div>
@@ -96,7 +101,7 @@ const SW = 3;            // sidewalk width
 const SH = 0.12;         // sidewalk / lot height above asphalt
 const LOT0 = RW + SW, LOT1 = C - RW - SW;   // lot interior bounds (local)
 const R0 = 0.9;          // starting hole radius
-const GROW_K = 0.32;     // growth per unit of eaten size^2
+const GROW_K = 0.5;      // growth per unit of eaten size^2
 const EAT_RATIO = 0.92;  // object size must be <= r * this to fit
 const MAX_CHUNK_RADIUS = 6;
 
@@ -1020,10 +1025,21 @@ const $ = id => document.getElementById(id);
 const hudSize = $('size'), hudScore = $('score'), hudClock = $('clock'), hintEl = $('hint'), hudFill = $('fill'), hudNext = $('next'), toastEl = $('toast');
 let toastTimer = 0;
 function toast(msg) { toastEl.textContent = msg; toastEl.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove('on'), 1800); }
+const hudCmp = $('cmp'), fadeEl = $('fade');
 function updateHud() {
-  hudSize.textContent = (hole.r * 2).toFixed(hole.r < 5 ? 1 : 0) + ' m';
   if (hole.eaten >= 12) hintEl.classList.add('gone');
-  hudScore.textContent = hole.score;
+  hudScore.textContent = hole.score.toLocaleString('en-US');
+  if (cosmos.on) {
+    const Ld = cLogR() + Math.log10(2), c = compare(Ld);
+    hudSize.textContent = fmtLen(Ld);
+    hudCmp.textContent = c.text;
+    hudFill.style.width = (Math.max(0, Math.min(1, c.p)) * 100).toFixed(1) + '%';
+    hudNext.textContent = c.next ? 'Next: bigger than ' + c.next[0] : (cosmos.stage === 'space' ? 'Past everything we have names for' : '');
+    return;
+  }
+  const Ld = Math.log10(hole.r * 2), c = compare(Ld);
+  hudSize.textContent = fmtLen(Ld);
+  hudCmp.textContent = c.text;
   const can = hole.targetR * EAT_RATIO;
   while (tierIdx + 1 < TIERS.length && can >= TIERS[tierIdx + 1][0]) { tierIdx++; if (tierIdx > 1) toast('Now eating: ' + TIERS[tierIdx][1]); }
   const cur = TIERS[tierIdx][0], nxt = TIERS[Math.min(tierIdx + 1, TIERS.length - 1)];
@@ -1034,18 +1050,18 @@ function updateHud() {
 
 // floating popups
 const pops = [];
-function popText(text, wx, wz, big) {
+function popText(text, wx, wz, big, cam, wy) {
   if (pops.length > 10) { const o = pops.shift(); o.el.remove(); }
   const el = document.createElement('div'); el.className = 'pop'; el.textContent = text;
   if (big) { el.style.fontSize = '22px'; el.style.color = '#ffcc00'; }
   document.body.appendChild(el);
-  pops.push({ el, x: wx, z: wz, t: 0 });
+  pops.push({ el, x: wx, z: wz, t: 0, cam: cam || camera, y: wy });
 }
 function updatePops(dt) {
   for (let i = pops.length - 1; i >= 0; i--) {
     const p = pops[i]; p.t += dt;
     if (p.t > 1.1) { p.el.remove(); pops.splice(i, 1); continue; }
-    tmpV.set(p.x, 1 + hole.r * 0.5, p.z).project(camera);
+    tmpV.set(p.x, p.y != null ? p.y : 1 + hole.r * 0.5, p.z).project(p.cam);
     const sx = (tmpV.x * 0.5 + 0.5) * innerWidth, sy = (-tmpV.y * 0.5 + 0.5) * innerHeight - p.t * 60;
     p.el.style.transform = `translate(${sx}px,${sy}px) translate(-50%,-50%)`;
     p.el.style.opacity = String(1 - Math.max(0, p.t - 0.6) / 0.5);
@@ -1120,7 +1136,7 @@ function startFall(o) {
   hole.score += pts;
   hole.mass += o.size * o.size;
   hole.targetR = Math.sqrt(R0 * R0 + GROW_K * hole.mass);
-  if (o.size >= Math.max(1.5, hole.r * 0.45)) popText(o.name + '! +' + pts, o.x, o.z, true);
+  if (o.size >= Math.max(1.5, hole.r * 0.45)) popText(o.name + (o.t.key === 'bldg' ? ' · ' + Math.round(o.h) + ' m tall' : '') + ' +' + pts, o.x, o.z, true);
   else if (o.size >= hole.r * 0.25) popText('+' + pts, o.x, o.z, false);
   blip(o.size);
   if (o.size > hole.r * 0.45) shake = Math.min(1.2, shake + o.size / hole.r * 0.5);
@@ -1219,6 +1235,573 @@ function streamChunks(budgetMs) {
   for (const [, cx, cz] of need) { genChunk(cx, cz); if (performance.now() - t0 > budgetMs) break; }
 }
 
+// ================================================================ sizes you know
+// real lengths (metres) of familiar things, used to tell you how big the hole is
+const COMP = [
+  ['a manhole cover', 0.6], ['a person', 1.75], ['a car', 4.5], ['a city bus', 12], ['a blue whale', 30], ['a Boeing 747', 70.7],
+  ['a soccer pitch', 105], ['the Titanic', 269], ['the Eiffel Tower', 330], ['the Empire State Building', 443], ['the Burj Khalifa', 828],
+  ['the Golden Gate Bridge', 2737], ['Central Park', 4000], ['Mount Everest', 8849], ['Manhattan', 21600], ['Greater London', 50000],
+  ['the Grand Canyon', 446000], ['Great Britain', 970000], ['the Moon', 3474800], ['the USA', 4.5e6], ['Earth', 1.2742e7],
+  ['Jupiter', 1.3982e8], ['the Sun', 1.3927e9], ["Earth's orbit", 2.992e11], ['Betelgeuse', 1.06e12], ['the Solar System', 9.0e12],
+  ['the Oort Cloud', 3e16], ['the Orion Nebula', 2.27e17], ['the Milky Way', 9.46e20], ['Andromeda', 2.08e21],
+  ['the Local Group', 9.5e22], ['the Laniakea Supercluster', 4.9e24], ['the observable universe', 8.8e26],
+].map(([n, m]) => [n, Math.log10(m)]);
+const SUP = { '-': '⁻', 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹' };
+const sup = n => String(n).split('').map(c => SUP[c] || c).join('');
+const sig = v => v < 10 ? v.toFixed(1) : Math.round(v).toLocaleString('en-US');
+const sci = L => { const e = Math.floor(L), m = Math.pow(10, L - e); return m.toFixed(1) + '×10' + sup(e); };
+// L is log10 of a length in metres
+function fmtLen(L) {
+  if (L < 3) return sig(Math.pow(10, L)) + ' m';
+  if (L < 9) return sig(Math.pow(10, L - 3)) + ' km';
+  if (L < 11.17) return sig(Math.pow(10, L - 9)) + ' million km';
+  if (L < 14.98) return sig(Math.pow(10, L) / 1.496e11) + ' AU';
+  const ly = L - Math.log10(9.461e15);
+  if (ly < 3) return sig(Math.pow(10, ly)) + ' light-years';
+  if (ly < 6) return sig(Math.pow(10, ly - 3)) + ' thousand ly';
+  if (ly < 9) return sig(Math.pow(10, ly - 6)) + ' million ly';
+  if (ly < 12) return sig(Math.pow(10, ly - 9)) + ' billion ly';
+  return sci(ly) + ' ly';
+}
+function compare(L) {
+  let i = -1; for (let k = 0; k < COMP.length; k++) if (COMP[k][1] <= L) i = k;
+  if (i < 0) return { text: 'Smaller than ' + COMP[0][0], next: COMP[0], p: 0 };
+  const [name, l] = COMP[i], d = L - l, next = COMP[i + 1];
+  const text = d < 0.06 ? 'About the size of ' + name : d < 3 ? sig(Math.pow(10, d)) + '× ' + name : sci(d) + '× ' + name;
+  return { text, next, p: next ? d / (next[1] - l) : 1 };
+}
+
+// ================================================================ cosmic mode: past the city, forever
+// Everything is kept relative to the hole in "local units"; real metres = local × 10^E.
+// E jumps by 6 whenever the numbers get large, so the game never runs out of precision.
+const CITY_EXIT_R = 45;            // hole radius (m) at which you outgrow the city
+const LOG_EARTH = Math.log10(6.371e6 / EAT_RATIO);
+const RR = 10;                     // hole radius in render units
+const KC = 0.55;                   // growth per swallowed size² in cosmic mode
+const cosmos = { on: false, leaving: 0, E: 0, r: CITY_EXIT_R, targetR: CITY_EXIT_R, hx: 0, hz: 0, stage: 'surface', objs: [], stageFade: 0 };
+const cLogR = () => Math.log10(cosmos.r) + cosmos.E;
+
+const cScene = new THREE.Scene();
+const SKY_SURF = new THREE.Color(0xa9bfd0), SKY_SPACE = new THREE.Color(0x020308);
+cScene.background = SKY_SURF.clone();
+cScene.environment = scene.environment;
+cScene.fog = new THREE.Fog(SKY_SURF, 260, 700);
+const cCam = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 1, 30000);
+addEventListener('resize', () => { cCam.aspect = innerWidth / innerHeight; cCam.updateProjectionMatrix(); cComposer.setPixelRatio(pixelRatio()); cComposer.setSize(innerWidth, innerHeight); });
+const cSunL = new THREE.DirectionalLight(0xfff0dd, 3.4); cSunL.position.set(-70, 90, 50); cScene.add(cSunL);
+cScene.add(new THREE.HemisphereLight(0xcfe0ff, 0x3a3226, 0.5));
+const cComposer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(innerWidth, innerHeight, { type: THREE.HalfFloatType, samples: 4 }));
+cComposer.addPass(new RenderPass(cScene, cCam));
+const cBloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.15, 0.6, 0.8);
+cComposer.addPass(cBloom);
+cComposer.addPass(new OutputPass());
+cComposer.setPixelRatio(pixelRatio()); cComposer.setSize(innerWidth, innerHeight);
+
+// ---- small textures
+function radialTex(stops) {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d'), gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  for (const [o, col] of stops) gr.addColorStop(o, col);
+  g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+const GLOW = radialTex([[0, 'rgba(255,255,255,1)'], [0.2, 'rgba(255,255,255,0.55)'], [0.5, 'rgba(255,255,255,0.12)'], [1, 'rgba(255,255,255,0)']]);
+const DOT = radialTex([[0, 'rgba(255,255,255,1)'], [0.35, 'rgba(255,255,255,0.6)'], [1, 'rgba(255,255,255,0)']]);
+const CLOUD = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
+  for (let i = 0; i < 60; i++) {
+    const x = 128 + (Math.random() - 0.5) * 140, y = 128 + (Math.random() - 0.5) * 140, r = 20 + Math.random() * 60;
+    const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(255,255,255,0.10)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 256, 256);
+  }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+})();
+const ringTex = (() => {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 4; const g = c.getContext('2d');
+  for (let x = 0; x < 256; x++) { const a = (0.35 + 0.65 * Math.abs(Math.sin(x * 0.21) * Math.sin(x * 0.047))) * (x > 20 && x < 240 ? 1 : 0.2); g.fillStyle = `rgba(222,205,170,${a.toFixed(3)})`; g.fillRect(x, 0, 1, 4); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+})();
+const glowSprite = (hex, s = 4, op = 1) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: GLOW, color: hex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: op })); sp.scale.setScalar(s); return sp; };
+
+// ---- procedural planet / star surfaces (object-space 3D noise)
+const NOISE3 = `
+  float h13(vec3 p) { p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }
+  float n3(vec3 p) { vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(mix(h13(i), h13(i + vec3(1,0,0)), f.x), mix(h13(i + vec3(0,1,0)), h13(i + vec3(1,1,0)), f.x), f.y),
+               mix(mix(h13(i + vec3(0,0,1)), h13(i + vec3(1,0,1)), f.x), mix(h13(i + vec3(0,1,1)), h13(i + vec3(1,1,1)), f.x), f.y), f.z); }
+  float f3(vec3 p) { float a = 0.5, s = 0.0; for (int i = 0; i < 5; i++) { s += a * n3(p); p = p * 2.02 + 7.3; a *= 0.5; } return s; }
+`;
+function bodyMat(kind, a, b, c) {
+  const m = new THREE.MeshStandardMaterial({ roughness: kind === 3 ? 1 : 0.85, metalness: 0 });
+  const u = { cA: { value: new THREE.Color(a) }, cB: { value: new THREE.Color(b) }, cC: { value: new THREE.Color(c) }, kind: { value: kind }, seed: { value: Math.random() * 50 }, uTime: timeU };
+  m.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, u);
+    sh.vertexShader = 'varying vec3 vOP;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvOP = position;');
+    sh.fragmentShader = 'uniform vec3 cA, cB, cC; uniform float kind, seed, uTime; varying vec3 vOP;\n' + NOISE3 + sh.fragmentShader
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        vec3 p = normalize(vOP), col; vec3 bodyEmit = vec3(0.0);
+        if (kind < 0.5) {
+          col = mix(cA, cB, f3(p * 2.5 + seed));
+          float cr = n3(p * 11.0 + seed); col *= 0.75 + 0.35 * smoothstep(0.25, 0.75, cr);
+          col = mix(col, cC, smoothstep(0.72, 0.8, n3(p * 5.0 + seed * 1.7)) * 0.6);
+        } else if (kind < 1.5) {
+          float land = smoothstep(0.5, 0.53, f3(p * 1.8 + seed));
+          col = mix(cA, mix(cB, cC, smoothstep(0.45, 0.65, f3(p * 4.0 + seed + 3.0))), land);
+          col = mix(col, vec3(0.93), smoothstep(0.82, 0.9, abs(p.y)));
+          col = mix(col, vec3(0.97), smoothstep(0.55, 0.72, f3(p * 3.0 + vec3(uTime * 0.01, 0.0, 0.0) + seed * 2.0)) * 0.85);
+        } else if (kind < 2.5) {
+          float t = p.y * 9.0 + (f3(p * 3.0 + seed) - 0.5) * 3.5;
+          col = mix(cA, cB, 0.5 + 0.5 * sin(t)); col = mix(col, cC, smoothstep(0.6, 0.85, f3(p * 6.0 + seed)) * 0.5);
+        } else {
+          float g = f3(p * 6.0 + seed + uTime * 0.05);
+          col = mix(cA, cB, g); bodyEmit = col * (2.2 + 1.5 * g);
+        }
+        diffuseColor.rgb = col;`)
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += bodyEmit;');
+  };
+  m.customProgramCacheKey = () => 'cosmic-body';
+  return m;
+}
+
+// ---- mesh kit for cosmic objects; every visual has radius 1 (surface ones sit on y=0)
+const cMats = new Map();
+const cm = (hex, rough = 0.9, extra = {}) => { const k = hex + ':' + rough + JSON.stringify(extra); if (!cMats.has(k)) { const m = new THREE.MeshStandardMaterial(Object.assign({ color: hex, roughness: rough }, extra)); m.userData.shared = true; cMats.set(k, m); } return cMats.get(k); };
+const vcMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 });
+vcMat.userData.shared = true;
+function blobShape(seed, amp = 0.28, n = 64) {
+  const s = new THREE.Shape();
+  for (let i = 0; i <= n; i++) {
+    const a = i / n * Math.PI * 2;
+    const r = 1 - amp + amp * (0.5 + 0.3 * Math.sin(a * 3 + seed) + 0.2 * Math.sin(a * 7 + seed * 2.3) + 0.12 * Math.sin(a * 13 + seed * 5.1));
+    const x = Math.cos(a) * r, y = Math.sin(a) * r;
+    i ? s.lineTo(x, y) : s.moveTo(x, y);
+  }
+  return s;
+}
+function plate(seed, hex, h = 0.02, amp = 0.28, rough = 0.9) {
+  const g = new THREE.ExtrudeGeometry(blobShape(seed, amp), { depth: h, bevelEnabled: false, curveSegments: 4 });
+  g.rotateX(-Math.PI / 2);
+  return new THREE.Mesh(g, cm(hex, rough));
+}
+function lumpy(det, amt, seed) {
+  const g = new THREE.IcosahedronGeometry(1, det), pos = g.attributes.position;
+  for (let i = 0; i < pos.count; i++) { tmpV.fromBufferAttribute(pos, i); const k = 1 + amt * (Math.sin(tmpV.x * 3.1 + seed) * Math.sin(tmpV.y * 2.7 + seed * 2) * Math.sin(tmpV.z * 3.3 + seed * 3) + 0.4 * Math.sin(tmpV.x * 9 + tmpV.z * 7 + seed)); tmpV.multiplyScalar(k); pos.setXYZ(i, tmpV.x, tmpV.y, tmpV.z); }
+  g.computeVertexNormals(); return g;
+}
+function mountainGeo(h, seed) {
+  const g = new THREE.ConeGeometry(1, h, 28, 6), pos = g.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    tmpV.fromBufferAttribute(pos, i);
+    const t = (tmpV.y + h / 2) / h, a = Math.atan2(tmpV.z, tmpV.x);
+    const k = 1 + 0.22 * Math.sin(a * 5 + seed + t * 4) + 0.12 * Math.sin(a * 11 + seed * 2);
+    pos.setXYZ(i, tmpV.x * k, tmpV.y + h / 2, tmpV.z * k);
+  }
+  g.computeVertexNormals(); return g;
+}
+function cityGeo(n, hMin, hMax, spread, seed) {
+  const rnd = mulberry(seed * 9973 + 1), parts = [];
+  const cols = [0xb9b2a6, 0x9aa3ad, 0xc9bca6, 0x8f969e, 0xa4583f, 0xd9d4ca, 0x6f7c8f];
+  for (let i = 0; i < n; i++) {
+    const a = rnd() * Math.PI * 2, d = Math.sqrt(rnd()) * spread;
+    const w = 0.05 + rnd() * 0.09, core = 1 - d / spread;
+    const h = hMin + (hMax - hMin) * Math.pow(rnd(), 2) * (0.3 + core);
+    parts.push(box(w, h, w * (0.7 + rnd() * 0.6), cols[Math.floor(rnd() * cols.length)], Math.cos(a) * d, 0.015, Math.sin(a) * d));
+  }
+  return merge(parts);
+}
+function pointsBall(n, shell, col, seed) {
+  const rnd = mulberry(seed), p = new Float32Array(n * 3), c = new Float32Array(n * 3), cc = new THREE.Color();
+  for (let i = 0; i < n; i++) {
+    const u = rnd() * 2 - 1, a = rnd() * Math.PI * 2, r = shell ? 0.85 + rnd() * 0.15 : Math.pow(rnd(), 1.8);
+    const s = Math.sqrt(1 - u * u);
+    p[i * 3] = Math.cos(a) * s * r; p[i * 3 + 1] = u * r * (shell ? 1 : 0.9); p[i * 3 + 2] = Math.sin(a) * s * r;
+    cc.set(col).offsetHSL((rnd() - 0.5) * 0.08, 0, (rnd() - 0.3) * 0.25); c[i * 3] = cc.r; c[i * 3 + 1] = cc.g; c[i * 3 + 2] = cc.b;
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3)); g.setAttribute('color', new THREE.BufferAttribute(c, 3)); return g;
+}
+function spiralGeo(n, arms, seed, flat = 0.06) {
+  const rnd = mulberry(seed), p = new Float32Array(n * 3), c = new Float32Array(n * 3), cc = new THREE.Color();
+  for (let i = 0; i < n; i++) {
+    const r = Math.pow(rnd(), 0.8), arm = Math.floor(rnd() * arms), a = arm / arms * Math.PI * 2 + r * 5.5 + (rnd() - 0.5) * (0.5 + (1 - r) * 1.4);
+    const j = (rnd() - 0.5) * 0.08;
+    p[i * 3] = Math.cos(a) * r + j; p[i * 3 + 1] = (rnd() - 0.5) * flat * (1.2 - r); p[i * 3 + 2] = Math.sin(a) * r + j;
+    cc.setHSL(r < 0.2 ? 0.11 : 0.6 + (rnd() - 0.5) * 0.08, r < 0.2 ? 0.6 : 0.55, 0.55 + rnd() * 0.3);
+    if (rnd() < 0.05) cc.setHSL(0.93, 0.8, 0.6);
+    c[i * 3] = cc.r; c[i * 3 + 1] = cc.g; c[i * 3 + 2] = cc.b;
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3)); g.setAttribute('color', new THREE.BufferAttribute(c, 3)); return g;
+}
+function webGeo(n, seed, hue) {
+  const rnd = mulberry(seed), nodes = [], p = [], c = [], cc = new THREE.Color();
+  for (let i = 0; i < 14; i++) { const v = new V3(rnd() * 2 - 1, (rnd() * 2 - 1) * 0.5, rnd() * 2 - 1); if (v.length() < 1) nodes.push(v); }
+  for (let i = 0; i < n; i++) {
+    const A = nodes[Math.floor(rnd() * nodes.length)], B = nodes[Math.floor(rnd() * nodes.length)], t = rnd();
+    const q = A.clone().lerp(B, t).addScaledVector(new V3(rnd() - 0.5, rnd() - 0.5, rnd() - 0.5), 0.07 + (rnd() < 0.2 ? 0.2 : 0));
+    p.push(q.x, q.y, q.z); cc.setHSL(hue + (rnd() - 0.5) * 0.1, 0.6, 0.5 + rnd() * 0.35); c.push(cc.r, cc.g, cc.b);
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(c, 3)); return g;
+}
+const ptsMat = (size = 0.03, op = 1) => new THREE.PointsMaterial({ size, map: DOT, vertexColors: true, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true });
+const sphereG = new THREE.SphereGeometry(1, 48, 32);
+sphereG.userData.shared = true;
+const GEO_CACHE = new Map();
+const cached = (k, f) => { if (!GEO_CACHE.has(k)) { const g = f(); g.userData.shared = true; GEO_CACHE.set(k, g); } return GEO_CACHE.get(k); };
+
+function makeVisual(kind, seed) {
+  const g = new THREE.Group(), rnd = mulberry(seed * 7919 + 3), v = seed % 4;
+  const add = m => { m.castShadow = m.receiveShadow = true; g.add(m); return m; };
+  const star = (a, b, glow) => { add(new THREE.Mesh(sphereG, bodyMat(3, a, b, b))); g.add(glowSprite(glow, 5.5, 0.9)); };
+  switch (kind) {
+    case 'park': add(plate(seed, 0x4f7a34)); for (let i = 0; i < 14; i++) { const a = rnd() * 6.28, d = Math.sqrt(rnd()) * 0.75; const t = add(new THREE.Mesh(cached('lumpS', () => lumpy(1, 0.2, 2)), cm(0x355f25))); t.scale.setScalar(0.06 + rnd() * 0.05); t.position.set(Math.cos(a) * d, 0.08, Math.sin(a) * d); } { const p = add(new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.012, 0.06), cm(0xb9ad99))); p.position.y = 0.02; p.rotation.y = rnd() * 3; } break;
+    case 'stadium': { const t = add(new THREE.Mesh(cached('stad', () => new THREE.TorusGeometry(0.78, 0.2, 12, 48).rotateX(Math.PI / 2).scale(1, 0.55, 1)), cm(0xcfd2d6, 0.6))); t.position.y = 0.1; const f = add(new THREE.Mesh(cached('field', () => new THREE.CylinderGeometry(0.6, 0.6, 0.03, 40)), cm(0x3f8a3a))); f.position.y = 0.02; f.scale.set(1, 1, 0.7); } break;
+    case 'blockH': add(plate(seed, 0x6f8a4a)); add(new THREE.Mesh(cached('cityH' + v, () => cityGeo(45, 0.04, 0.09, 0.8, v)), vcMat)); break;
+    case 'blockN': add(plate(seed, 0x8c8a82)); add(new THREE.Mesh(cached('cityN' + v, () => cityGeo(70, 0.04, 0.16, 0.85, v + 10)), vcMat)); break;
+    case 'blockD': add(plate(seed, 0x7c7a74)); add(new THREE.Mesh(cached('cityD' + v, () => cityGeo(55, 0.1, 0.9, 0.75, v + 20)), vcMat)); break;
+    case 'blockC': add(plate(seed, 0x86837b, 0.02, 0.35)); add(new THREE.Mesh(cached('cityC' + v, () => cityGeo(160, 0.01, 0.22, 0.85, v + 30)), vcMat)); break;
+    case 'airport': { const b = add(new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.02, 1.0), cm(0x8d9a7a))); b.position.y = 0.01; for (const [z, r] of [[-0.2, 0.1], [0.25, -0.15]]) { const rw = add(new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.012, 0.09), cm(0x2e3033, 0.7))); rw.position.set(0, 0.025, z); rw.rotation.y = r; } const tm = add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, 0.14), cm(0xd8dbe0, 0.4))); tm.position.set(0.3, 0.05, 0.42); } break;
+    case 'lake': add(plate(seed + 1, 0xc9b98f, 0.012, 0.25)).scale.setScalar(1.04); { const w = add(plate(seed + 1, 0x1f5a78, 0.02, 0.25, 0.08)); w.material = cm(0x1f5a78, 0.06, { metalness: 0.1 }); } break;
+    case 'sea': { const w = add(plate(seed, 0x14435e, 0.02, 0.35)); w.material = cm(0x14435e, 0.06, { metalness: 0.1 }); } break;
+    case 'forest': add(plate(seed, 0x2f4f22)); for (let i = 0; i < 60; i++) { const a = rnd() * 6.28, d = Math.sqrt(rnd()) * 0.85; const t = add(new THREE.Mesh(cached('pineC', () => new THREE.ConeGeometry(1, 2.4, 7).translate(0, 1.2, 0)), cm(rnd() < 0.5 ? 0x24401e : 0x2f5226))); t.scale.setScalar(0.035 + rnd() * 0.03); t.position.set(Math.cos(a) * d, 0.02, Math.sin(a) * d); } break;
+    case 'hill': add(new THREE.Mesh(cached('hill' + v, () => mountainGeo(0.28, v)), cm(0x5f7a3a))); break;
+    case 'mountain': add(new THREE.Mesh(cached('mtn' + v, () => mountainGeo(0.75, v + 3)), cm(0x6e675e))); { const s = add(new THREE.Mesh(cached('snow', () => new THREE.ConeGeometry(0.3, 0.24, 24).translate(0, 0.63, 0)), cm(0xf2f4f6, 0.5))); s.rotation.y = seed; } break;
+    case 'range': for (let i = 0; i < 6; i++) { const m = add(new THREE.Mesh(cached('mtn' + (i % 4), () => mountainGeo(0.75, i + 3)), cm(0x6e675e))); const s = 0.25 + rnd() * 0.18; m.scale.set(s, s * (0.8 + rnd() * 0.5), s); m.position.set(-0.75 + i * 0.3, 0, (rnd() - 0.5) * 0.3); const c = add(new THREE.Mesh(cached('snow', () => new THREE.ConeGeometry(0.3, 0.24, 24).translate(0, 0.63, 0)), cm(0xf2f4f6, 0.5))); c.scale.copy(m.scale); c.position.copy(m.position); } break;
+    case 'island': { const w = add(plate(seed, 0x2a7f9a, 0.01, 0.2)); w.material = cm(0x2a7f9a, 0.06); } add(plate(seed + 2, 0xd8c79a, 0.02, 0.3)).scale.set(0.78, 1, 0.78); add(plate(seed + 3, 0x4f7a34, 0.03, 0.3)).scale.set(0.62, 1, 0.62); { const h = add(new THREE.Mesh(cached('hill0', () => mountainGeo(0.28, 0)), cm(0x5f7a3a))); h.scale.set(0.4, 0.8, 0.4); } break;
+    case 'country': add(plate(seed, 0x2c2c2a, 0.02, 0.32)).scale.setScalar(1.01); add(plate(seed, [0x6f8a4a, 0x8d8a5a, 0x5f7a3a, 0x9a8a62][v], 0.03, 0.32)); for (let i = 0; i < 5; i++) { const m = add(new THREE.Mesh(cached('mtn' + (i % 4), () => mountainGeo(0.75, i + 3)), cm(0x6e675e))); m.scale.setScalar(0.07 + rnd() * 0.06); m.position.set((rnd() - 0.5) * 1.1, 0.03, (rnd() - 0.5) * 1.1); } for (let i = 0; i < 4; i++) { const c = add(new THREE.Mesh(cached('cityC0', () => cityGeo(160, 0.01, 0.22, 0.85, 30)), vcMat)); c.scale.setScalar(0.08); c.position.set((rnd() - 0.5) * 1.1, 0.03, (rnd() - 0.5) * 1.1); } break;
+    case 'continent': add(plate(seed, 0x7a6e52, 0.03, 0.4)); add(plate(seed + 5, 0x4f7034, 0.04, 0.45)).scale.set(0.8, 1, 0.75); add(plate(seed + 9, 0xa08c62, 0.05, 0.4)).scale.set(0.4, 1, 0.45); for (let i = 0; i < 4; i++) { const m = add(new THREE.Mesh(cached('mtn' + i, () => mountainGeo(0.75, i + 3)), cm(0x6e675e))); m.scale.set(0.12, 0.2, 0.12); m.position.set(-0.45 + i * 0.25, 0.04, -0.3 + rnd() * 0.15); } break;
+    // ---- space
+    case 'asteroid': add(new THREE.Mesh(cached('ast' + v, () => lumpy(3, 0.3, v * 5 + 1)), cm([0x6b6258, 0x857a6c, 0x5a5550, 0x7a6a5a][v], 0.95))); break;
+    case 'comet': add(new THREE.Mesh(cached('ast' + v, () => lumpy(3, 0.3, v * 5 + 1)), cm(0x9ab0bf, 0.6))); { const t = new THREE.Mesh(cached('tail', () => new THREE.ConeGeometry(0.9, 9, 20, 1, true).rotateZ(Math.PI / 2).translate(-4.5, 0, 0)), new THREE.MeshBasicMaterial({ color: 0x9fd8ff, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })); g.add(t); g.add(glowSprite(0xbfe6ff, 4, 0.8)); } break;
+    case 'dwarf': add(new THREE.Mesh(sphereG, bodyMat(0, 0xb8a58c, 0x8a7560, 0xe8dcc8))); break;
+    case 'moon': add(new THREE.Mesh(sphereG, bodyMat(0, 0x9a9690, 0x6e6a66, 0xc8c4bc))); break;
+    case 'rocky': { const p = [[0xa0522d, 0x6b3a22, 0xd08a5a], [0x8a8078, 0x5e5650, 0xb0a89e], [0xd8b27a, 0xa88450, 0xf0d8a8]][v % 3]; add(new THREE.Mesh(sphereG, bodyMat(0, ...p))); } break;
+    case 'earthy': add(new THREE.Mesh(sphereG, bodyMat(1, 0x123a6a, 0x3f6b2a, 0xa8905a))); g.add(glowSprite(0x6fb2ff, 2.6, 0.35)); break;
+    case 'ice': add(new THREE.Mesh(sphereG, bodyMat(2, 0x7fc6d8, 0x5aa6c4, 0xbfe8f0))); break;
+    case 'gas': add(new THREE.Mesh(sphereG, bodyMat(2, 0xc9a97a, 0x8a6040, 0xe8dcc0))); if (v < 2) { const r = new THREE.Mesh(cached('ring', () => { const rg = new THREE.RingGeometry(1.35, 2.3, 96, 1); const uv = rg.attributes.uv, pos = rg.attributes.position; for (let i = 0; i < uv.count; i++) { const d = Math.hypot(pos.getX(i), pos.getY(i)); uv.setXY(i, (d - 1.35) / 0.95, 0.5); } return rg.rotateX(-Math.PI / 2); }), new THREE.MeshStandardMaterial({ map: ringTex, transparent: true, side: THREE.DoubleSide, depthWrite: false, roughness: 1 })); r.rotation.z = 0.35; g.add(r); } break;
+    case 'brown': add(new THREE.Mesh(sphereG, bodyMat(2, 0x5a2e22, 0x3a1c16, 0x8a4a30))); g.add(glowSprite(0xff5a2a, 2.4, 0.3)); break;
+    case 'starR': star(0xff5a2a, 0xffa060, 0xff6a3a); break;
+    case 'starY': star(0xffd27a, 0xfff2c8, 0xffd9a0); break;
+    case 'starB': star(0x9ac8ff, 0xeaf4ff, 0x9fc8ff); break;
+    case 'starRG': star(0xff6a2a, 0xffb070, 0xff7a3a); break;
+    case 'starRSG': star(0xe0401a, 0xff8a4a, 0xff5a2a); break;
+    case 'bh': { add(new THREE.Mesh(sphereG, new THREE.MeshBasicMaterial({ color: 0x000000 }))).scale.setScalar(0.35); const d = new THREE.Mesh(cached('bhdisk', () => new THREE.RingGeometry(0.45, 1.0, 96).rotateX(-Math.PI / 2)), diskMat(0xffa040)); g.add(d); g.add(glowSprite(0xffb070, 2.5, 0.6)); } break;
+    case 'system': { g.add(glowSprite(0xffe0a0, 0.5, 1)); const s = new THREE.Mesh(sphereG, bodyMat(3, 0xffd27a, 0xfff2c8, 0xfff2c8)); s.scale.setScalar(0.05); g.add(s); for (let i = 0; i < 7; i++) { const r = 0.15 + i * 0.12; const o = new THREE.Mesh(cached('orb' + i, () => new THREE.RingGeometry(r - 0.002, r + 0.002, 128).rotateX(-Math.PI / 2)), new THREE.MeshBasicMaterial({ color: 0x8aa0c0, transparent: true, opacity: 0.35, side: THREE.DoubleSide })); g.add(o); const p = new THREE.Mesh(sphereG, cm([0xa0522d, 0xd8b27a, 0x3f6b9a, 0xc97a4a, 0xc9a97a, 0xd8c49a, 0x7fc6d8][i], 0.8)); const a = rnd() * 6.28; p.position.set(Math.cos(a) * r, 0, Math.sin(a) * r); p.scale.setScalar(i > 3 ? 0.025 : 0.014); g.add(p); } } break;
+    case 'oort': { const p = new THREE.Points(cached('oortG' + v, () => pointsBall(1800, true, 0xbfd8ff, v)), ptsMat(0.02, 0.8)); g.add(p); g.add(glowSprite(0xffe0a0, 0.25, 1)); } break;
+    case 'nebula': { const hues = [[0xff4a8a, 0x4a8aff], [0x3affb0, 0xff6a3a], [0xb04aff, 0xffb04a], [0x4ac8ff, 0xff4a4a]][v]; for (let i = 0; i < 9; i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: CLOUD, color: hues[i % 2], blending: THREE.AdditiveBlending, transparent: true, opacity: 0.55, depthWrite: false })); s.scale.setScalar(1.2 + rnd() * 1.2); s.position.set((rnd() - 0.5) * 1.1, (rnd() - 0.5) * 0.3, (rnd() - 0.5) * 1.1); s.material.rotation = rnd() * 6; g.add(s); } const p = new THREE.Points(cached('nebS' + v, () => pointsBall(300, false, 0xffffff, v + 40)), ptsMat(0.03)); g.add(p); } break;
+    case 'scluster': g.add(new THREE.Points(cached('scl' + v, () => pointsBall(900, false, 0xcfe0ff, v + 50)), ptsMat(0.035))); g.add(glowSprite(0xbfd8ff, 1.6, 0.5)); break;
+    case 'galaxyD': g.add(new THREE.Points(cached('gd' + v, () => pointsBall(900, false, 0xbfd0ff, v + 60)), ptsMat(0.03))); g.add(glowSprite(0xd0dcff, 1.2, 0.4)); break;
+    case 'galaxy': { const p = new THREE.Points(cached('gal' + v, () => spiralGeo(4000, 2 + (v % 3), v + 70)), ptsMat(0.025)); p.rotation.x = (rnd() - 0.5) * 0.8; g.add(p); g.add(glowSprite(0xffe8c0, 0.9, 0.9)); } break;
+    case 'ggroup': case 'gcluster': { const n = kind === 'ggroup' ? 6 : 16; for (let i = 0; i < n; i++) { const p = new THREE.Points(cached('gal' + (i % 4), () => spiralGeo(4000, 2 + (i % 3), (i % 4) + 70)), ptsMat(0.02)); const s = 0.1 + rnd() * (kind === 'ggroup' ? 0.25 : 0.15); p.scale.setScalar(s); const a = rnd() * 6.28, d = Math.sqrt(rnd()) * 0.85; p.position.set(Math.cos(a) * d, (rnd() - 0.5) * 0.2, Math.sin(a) * d); p.rotation.set(rnd() * 2, rnd() * 6, 0); g.add(p); const gl = glowSprite(0xffe8c0, s * 0.8, 0.8); gl.position.copy(p.position); g.add(gl); } if (kind === 'gcluster') g.add(glowSprite(0x9f7aff, 2.4, 0.25)); } break;
+    case 'web': g.add(new THREE.Points(cached('web' + v, () => webGeo(6000, v + 80, [0.62, 0.8, 0.55, 0.95][v])), ptsMat(0.018))); break;
+    case 'universe': { const hue = (seed * 0.137) % 1; const shell = new THREE.Mesh(sphereG, new THREE.MeshBasicMaterial({ color: new THREE.Color().setHSL(hue, 0.7, 0.55), transparent: true, opacity: 0.08, blending: THREE.AdditiveBlending, depthWrite: false })); g.add(shell); g.add(new THREE.Points(cached('web' + v, () => webGeo(6000, v + 80, [0.62, 0.8, 0.55, 0.95][v])), ptsMat(0.018))); g.add(glowSprite(new THREE.Color().setHSL(hue, 0.8, 0.6).getHex(), 3.2, 0.35)); } break;
+  }
+  return g;
+}
+function diskMat(hex) {
+  return new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    uniforms: { uTime: timeU, col: { value: new THREE.Color(hex) } },
+    vertexShader: 'varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+    fragmentShader: NOISE + `uniform float uTime; uniform vec3 col; varying vec3 vP;
+      void main(){ float r = length(vP.xz); float a = atan(vP.z, vP.x);
+        float s = fbm(vec2(a * 3.0 + uTime * 1.5 / (r + 0.2), r * 8.0 - uTime * 0.5));
+        float inner = smoothstep(0.42, 0.55, r) * (1.0 - smoothstep(0.7, 1.0, r));
+        vec3 c = mix(col, vec3(1.0, 0.95, 0.85), smoothstep(0.7, 0.45, r)) * (0.5 + 1.2 * s);
+        gl_FragColor = vec4(c * inner * 1.6, inner); }`,
+  });
+}
+
+// ---- catalogue: [name, visual kind, stage, log10 radius min, max]
+const CAT = [
+  ['Block of houses', 'blockH', 'surface', 1.2, 1.9], ['City park', 'park', 'surface', 1.3, 2.4], ['Stadium', 'stadium', 'surface', 2.0, 2.3],
+  ['Neighbourhood', 'blockN', 'surface', 2.0, 2.9], ['Business district', 'blockD', 'surface', 2.4, 3.1], ['Hill', 'hill', 'surface', 2.3, 3.3],
+  ['Airport', 'airport', 'surface', 3.0, 3.5], ['Lake', 'lake', 'surface', 2.6, 4.0], ['Forest', 'forest', 'surface', 2.9, 4.1],
+  ['Mountain', 'mountain', 'surface', 3.3, 3.95], ['City', 'blockC', 'surface', 3.6, 4.6], ['Island', 'island', 'surface', 3.5, 5.2],
+  ['Megacity', 'blockC', 'surface', 4.4, 4.9], ['Mountain range', 'range', 'surface', 4.7, 5.7], ['Sea', 'sea', 'surface', 5.0, 6.0],
+  ['Country', 'country', 'surface', 5.3, 6.3], ['Continent', 'continent', 'surface', 6.1, 6.8],
+  ['Asteroid', 'asteroid', 'space', 2.5, 5.8], ['Comet', 'comet', 'space', 3.0, 4.6], ['Dwarf planet', 'dwarf', 'space', 5.6, 6.1],
+  ['Moon', 'moon', 'space', 6.0, 6.43], ['Rocky planet', 'rocky', 'space', 6.38, 6.85], ['Earth-like planet', 'earthy', 'space', 6.7, 7.0],
+  ['Super-Earth', 'rocky', 'space', 6.9, 7.15], ['Ice giant', 'ice', 'space', 7.1, 7.5], ['Gas giant', 'gas', 'space', 7.45, 7.9],
+  ['Brown dwarf', 'brown', 'space', 7.8, 7.95], ['Red dwarf', 'starR', 'space', 7.9, 8.6], ['Star', 'starY', 'space', 8.5, 9.3],
+  ['Blue giant', 'starB', 'space', 9.2, 10.2], ['Red giant', 'starRG', 'space', 10.1, 11.3], ['Red supergiant', 'starRSG', 'space', 11.2, 12.1],
+  ['Black hole', 'bh', 'space', 10.0, 13.6], ['Planetary system', 'system', 'space', 12.2, 13.3], ['Oort cloud', 'oort', 'space', 13.3, 16.3],
+  ['Nebula', 'nebula', 'space', 15.5, 17.9], ['Star cluster', 'scluster', 'space', 16.5, 18.6], ['Dwarf galaxy', 'galaxyD', 'space', 18.4, 20.1],
+  ['Galaxy', 'galaxy', 'space', 20.0, 21.3], ['Galaxy group', 'ggroup', 'space', 21.2, 23.0], ['Galaxy cluster', 'gcluster', 'space', 22.6, 23.7],
+  ['Supercluster', 'web', 'space', 23.6, 24.8], ['Cosmic filament', 'web', 'space', 24.4, 25.6], ['Great Wall', 'web', 'space', 25.3, 26.5],
+];
+const NAMED = {
+  moon: [['the Moon', 6.24], ['Europa', 6.19], ['Io', 6.26], ['Titan', 6.41], ['Ganymede', 6.42], ['Callisto', 6.38], ['Triton', 6.13]],
+  dwarf: [['Pluto', 6.07], ['Eris', 6.06], ['Ceres', 5.67], ['Haumea', 5.9]],
+  rocky: [['Mercury', 6.39], ['Mars', 6.53], ['Venus', 6.78]],
+  ice: [['Uranus', 7.41], ['Neptune', 7.39]], gas: [['Saturn', 7.76], ['Jupiter', 7.84]],
+  starY: [['the Sun', 8.84], ['Alpha Centauri A', 8.93], ['Sirius A', 9.08]], starB: [['Rigel', 10.4], ['Vega', 9.21]],
+  starRG: [['Aldebaran', 10.49], ['Arcturus', 10.19]], starRSG: [['Betelgeuse', 11.73], ['Antares', 11.72]],
+  nebula: [['the Orion Nebula', 17.05], ['the Crab Nebula', 16.7], ['the Eagle Nebula', 17.3]],
+  galaxy: [['the Milky Way', 20.68], ['Andromeda', 21.0], ['the Triangulum Galaxy', 20.45], ['the Whirlpool Galaxy', 20.55]],
+  galaxyD: [['the Large Magellanic Cloud', 19.9], ['the Small Magellanic Cloud', 19.6]],
+  ggroup: [['the Local Group', 22.68]], gcluster: [['the Virgo Cluster', 22.9], ['the Coma Cluster', 23.1]], web: [['Laniakea', 24.39]],
+};
+// beyond the observable universe the catalogue keeps going on its own
+const BEYOND = ['Observable universe', 'Twin universes', 'Universe cluster', 'Multiverse', 'Multiverse chain', 'Omniverse', 'Megaverse', 'Outerverse', 'Hyperverse', 'Xenoverse', 'The Box', 'The Room the Box is in'];
+function beyondEntry(L) {
+  const i = Math.max(0, Math.floor((L - 26.4) / 1.3));
+  const name = i < BEYOND.length ? BEYOND[i] : 'Layer ' + (i - BEYOND.length + 2).toLocaleString('en-US') + ' of Everything';
+  return [name, 'universe', 'space', 26.4 + i * 1.3, 26.4 + (i + 1) * 1.3];
+}
+function pickEntry(stage, L, rnd) {
+  if (stage === 'space' && L > 26.4) { const e = beyondEntry(L); return { name: e[0], kind: e[1], L }; }
+  let hits = CAT.filter(e => e[2] === stage && L >= e[3] && L <= e[4]);
+  let e;
+  if (hits.length) e = hits[Math.floor(rnd() * hits.length)];
+  else {
+    let best = null, bd = 1e9;
+    for (const c of CAT) if (c[2] === stage) { const d = L < c[3] ? c[3] - L : L - c[4]; if (d < bd) { bd = d; best = c; } }
+    if (bd > 1) return { name: stage === 'space' ? 'Rogue rock' : 'Hill', kind: stage === 'space' ? 'asteroid' : 'hill', L };
+    e = best; L = Math.min(e[4], Math.max(e[3], L));
+  }
+  let name = e[0];
+  const named = NAMED[e[1]];
+  if (named && rnd() < 0.6) { const n = named.filter(([, l]) => Math.abs(l - L) < 0.3); if (n.length) { const k = n[Math.floor(rnd() * n.length)]; name = k[0]; L = k[1]; } }
+  return { name, kind: e[1], L };
+}
+
+// ---- the ground you're on until you swallow Earth: an endlessly zooming procedural landscape
+const cGround = new THREE.Mesh(new THREE.PlaneGeometry(1600, 1600).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, transparent: true }));
+const gU = { uO0: { value: new THREE.Vector2() }, uO1: { value: new THREE.Vector2() }, uK0: { value: 1 }, uK1: { value: 1 }, uT: { value: 0 }, uRR: { value: RR } };
+cGround.receiveShadow = true;
+cGround.material.onBeforeCompile = sh => {
+  Object.assign(sh.uniforms, gU);
+  sh.vertexShader = 'varying vec2 vGP;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvGP = (modelMatrix * vec4(transformed, 1.0)).xz;');
+  sh.fragmentShader = `uniform vec2 uO0, uO1; uniform float uK0, uK1, uT, uRR; varying vec2 vGP;
+    float th(vec2 p) { p = mod(p, 256.0); vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+    float tn(vec2 p) { vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
+      return mix(mix(th(i), th(i + vec2(1, 0)), u.x), mix(th(i + vec2(0, 1)), th(i + vec2(1, 1)), u.x), u.y); }
+    float tf(vec2 p) { float a = 0.5, s = 0.0; for (int i = 0; i < 5; i++) { s += a * tn(p); p = p * 2.0 + 17.0; a *= 0.5; } return s; }
+    vec3 land(vec2 q) {
+      float h = tf(q * 0.35), m = tf(q * 1.3 + 40.0), fld = th(floor(q * 3.0));
+      vec3 c = mix(vec3(0.24, 0.33, 0.15), vec3(0.42, 0.44, 0.22), fld);
+      c = mix(c, vec3(0.56, 0.5, 0.34), step(0.8, fld) * 0.7);
+      c = mix(c, vec3(0.15, 0.24, 0.1), smoothstep(0.55, 0.62, m));
+      c = mix(c, vec3(0.45, 0.43, 0.4), smoothstep(0.66, 0.74, h));
+      c = mix(c, vec3(0.08, 0.2, 0.28), smoothstep(0.34, 0.3, h));
+      float grid = (1.0 - step(0.03, fract(q.x * 3.0))) + (1.0 - step(0.03, fract(q.y * 3.0)));
+      return c * (1.0 - 0.12 * clamp(grid, 0.0, 1.0));
+    }
+  ` + sh.fragmentShader
+    .replace('void main() {', 'void main() {\nif (length(vGP) < uRR) discard;')
+    .replace('#include <color_fragment>', `#include <color_fragment>
+      diffuseColor.rgb = mix(land(uO0 + vGP * uK0), land(uO1 + vGP * uK1), uT);`);
+};
+cScene.add(cGround);
+
+// ---- the hole, in its two forms
+const cHoleSurf = new THREE.Group();
+{
+  const w = new THREE.Mesh(holeWall.geometry, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false }));
+  w.scale.set(RR, RR * 12, RR); w.position.y = 0.05;
+  const f = new THREE.Mesh(holeFloor.geometry, new THREE.MeshBasicMaterial({ color: 0x000000, fog: false }));
+  f.scale.set(RR, 1, RR); f.position.y = -RR * 12;
+  const rim = new THREE.Mesh(holeRim.geometry, holeRim.material); rim.scale.set(RR, 1, RR); rim.position.y = 0.06;
+  cHoleSurf.add(w, f, rim);
+}
+cScene.add(cHoleSurf);
+const cHoleSpace = new THREE.Group();
+{
+  cHoleSpace.add(new THREE.Mesh(sphereG, new THREE.MeshBasicMaterial({ color: 0x000000 })));
+  cHoleSpace.children[0].scale.setScalar(RR);
+  const d = new THREE.Mesh(new THREE.RingGeometry(0.45, 1.0, 128).rotateX(-Math.PI / 2), diskMat(0xff8a30)); d.scale.setScalar(RR * 2.6); d.rotation.x = 0.25; cHoleSpace.add(d);
+  const halo = glowSprite(0xffa050, RR * 5, 0.35); cHoleSpace.add(halo);
+  cHoleSpace.visible = false;
+}
+cScene.add(cHoleSpace);
+
+// ---- starfield (far, fixed) and drifting dust (near, shows motion)
+const stars = (() => {
+  const n = 5000, p = new Float32Array(n * 3), c = new Float32Array(n * 3), cc = new THREE.Color();
+  for (let i = 0; i < n; i++) { const u = Math.random() * 2 - 1, a = Math.random() * 6.283, s = Math.sqrt(1 - u * u); p[i * 3] = Math.cos(a) * s * 9000; p[i * 3 + 1] = u * 9000; p[i * 3 + 2] = Math.sin(a) * s * 9000; cc.setHSL(0.55 + Math.random() * 0.12 - (Math.random() < 0.2 ? 0.5 : 0), 0.4, 0.6 + Math.random() * 0.4); c[i * 3] = cc.r; c[i * 3 + 1] = cc.g; c[i * 3 + 2] = cc.b; }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3)); g.setAttribute('color', new THREE.BufferAttribute(c, 3));
+  const m = new THREE.Points(g, new THREE.PointsMaterial({ size: 2.2, sizeAttenuation: false, vertexColors: true, map: DOT, transparent: true, depthWrite: false, fog: false }));
+  m.visible = false; m.frustumCulled = false; return m;
+})();
+cScene.add(stars);
+const drift = (() => {
+  const n = 700, p = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { p[i * 3] = (Math.random() - 0.5) * 800; p[i * 3 + 1] = -20 - Math.random() * 60; p[i * 3 + 2] = (Math.random() - 0.5) * 800; }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+  const m = new THREE.Points(g, new THREE.PointsMaterial({ size: 1.2, color: 0x9fb8ff, map: DOT, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending }));
+  m.visible = false; m.frustumCulled = false; return m;
+})();
+cScene.add(drift);
+
+// ---- objects
+let cSeed = 1;
+function cSpawn(dMin, dMax, moveDir) {
+  const rnd = Math.random, r = cosmos.r;
+  for (let tries = 0; tries < 6; tries++) {
+    let a = rnd() * Math.PI * 2;
+    if (moveDir != null && rnd() < 0.65) a = moveDir + (rnd() - 0.5) * 2.2;
+    const d = r * (dMin + rnd() * (dMax - dMin));
+    const x = Math.cos(a) * d, z = Math.sin(a) * d;
+    const rel = rnd() < 0.72 ? Math.exp(Math.log(0.1) + rnd() * Math.log(0.85 / 0.1)) : Math.exp(Math.log(0.95) + rnd() * Math.log(3.2 / 0.95));
+    const pe = pickEntry(cosmos.stage, cLogR() + Math.log10(rel), rnd);
+    const size = Math.pow(10, pe.L - cosmos.E);
+    if (cosmos.objs.some(o => Math.hypot(o.x - x, o.z - z) < (o.size + size) * 0.85)) continue;
+    const mesh = makeVisual(pe.kind, cSeed++);
+    mesh.rotation.y = rnd() * 6.28;
+    cScene.add(mesh);
+    const o = { name: pe.name, kind: pe.kind, L: pe.L, x, z, size, mesh, state: 0, t: 0, spin: (rnd() - 0.5) * 0.3, surf: cosmos.stage === 'surface' };
+    cosmos.objs.push(o);
+    return o;
+  }
+  return null;
+}
+function cRemove(o) {
+  cScene.remove(o.mesh);
+  o.mesh.traverse(m => {
+    if (m.material && !m.material.userData.shared) m.material.dispose();
+    if (m.geometry && !m.geometry.userData.shared) m.geometry.dispose();
+  });
+}
+function cFill() { for (let i = 0; i < 60; i++) cSpawn(1.4, 13, null); }
+function cRescale() {
+  while (cosmos.r > 1e6) {
+    const k = 1e-6;
+    cosmos.r *= k; cosmos.targetR *= k; cosmos.hx *= k; cosmos.hz *= k; cosmos.E += 6;
+    for (const o of cosmos.objs) { o.x *= k; o.z *= k; o.size *= k; if (o.sx != null) { o.sx *= k; o.sz *= k; } }
+  }
+}
+function cEat(o) {
+  o.state = 1; o.t = 0; o.sx = o.x; o.sz = o.z; o.ang = Math.atan2(o.z, o.x); o.d0 = Math.hypot(o.x, o.z);
+  const rel = o.size / cosmos.r;
+  cosmos.targetR = Math.sqrt(cosmos.targetR * cosmos.targetR + KC * o.size * o.size);
+  const pts = Math.round(25 + 250 * rel * rel);
+  hole.score += pts; hole.eaten++;
+  const f = RR / cosmos.r;
+  if (rel > 0.3) popText(o.name + ' · ' + fmtLen(o.L + Math.log10(2)), o.x * f, o.z * f, rel > 0.55, cCam, o.surf ? RR * 0.4 : RR * 0.2);
+  blip(Math.min(6, 1 + rel * 5));
+  if (rel > 0.45) shake = Math.min(1.2, shake + rel * 0.6);
+  updateHud();
+}
+function cEnterSpace() {
+  cosmos.stage = 'space';
+  toast('You swallowed the Earth');
+  for (const o of cosmos.objs) if (o.state === 0 && o.surf) { o.state = 1; o.t = 0; o.sx = o.x; o.sz = o.z; o.ang = Math.atan2(o.z, o.x); o.d0 = Math.hypot(o.x, o.z); }
+  // the Earth itself goes down the hole
+  const earth = makeVisual('earthy', 7); cScene.add(earth);
+  const e = { name: 'Earth', kind: 'earthy', L: Math.log10(6.371e6), x: 0, z: 0, size: Math.pow(10, Math.log10(6.371e6) - cosmos.E), mesh: earth, state: 1, t: 0, sx: 0, sz: 0, ang: 0, d0: 0, spin: 0.2, surf: false };
+  cosmos.objs.push(e);
+  const moon = cSpawn(3, 5, null);
+  if (moon) { cRemove(moon); cosmos.objs.pop(); }
+  const m = makeVisual('moon', 3); cScene.add(m);
+  cosmos.objs.push({ name: 'the Moon', kind: 'moon', L: 6.24, x: cosmos.r * 3, z: -cosmos.r * 1.5, size: Math.pow(10, 6.24 - cosmos.E), mesh: m, state: 0, t: 0, spin: 0.1, surf: false });
+}
+function beginCosmos() {
+  if (cosmos.on || cosmos.leaving) return;
+  cosmos.leaving = 1.6;
+  toast("You've outgrown the city");
+  fadeEl.classList.add('on');
+}
+function startCosmos() {
+  cosmos.on = true; cosmos.leaving = 0;
+  cosmos.E = 0; cosmos.r = cosmos.targetR = hole.r; cosmos.hx = hole.x; cosmos.hz = hole.z;
+  cosmos.stage = 'surface';
+  cFill();
+  scene.visible = false;
+  setTimeout(() => fadeEl.classList.remove('on'), 150);
+  updateHud();
+}
+function jumpCosmos(L) {           // test hook: jump straight to a given log10 hole radius
+  if (!cosmos.on) startCosmos();
+  for (const o of cosmos.objs) cRemove(o);
+  cosmos.objs.length = 0;
+  cosmos.E = Math.max(0, Math.floor(L) - 2); cosmos.r = cosmos.targetR = Math.pow(10, L - cosmos.E);
+  cosmos.stage = L >= LOG_EARTH ? 'space' : 'surface';
+  cFill(); updateHud();
+}
+
+function cosmicFrame(dt, now) {
+  const surf = cosmos.stage === 'surface';
+  // move: everything slides past the hole, which stays at the origin
+  let mx = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0) + stick.x;
+  let mz = (keys.KeyS || keys.ArrowDown ? 1 : 0) - (keys.KeyW || keys.ArrowUp ? 1 : 0) + stick.y;
+  const len = Math.hypot(mx, mz); if (len > 1) { mx /= len; mz /= len; }
+  const cy = Math.cos(view.yaw), sy = Math.sin(view.yaw);
+  const wx = mx * cy + mz * sy, wz = -mx * sy + mz * cy;
+  const sp = 2.4 * cosmos.r * dt;
+  const dx = wx * sp, dz = wz * sp;
+  cosmos.hx += dx; cosmos.hz += dz;
+  for (const o of cosmos.objs) { if (o.state === 0) { o.x -= dx; o.z -= dz; } else { o.sx -= dx * (1 - o.t); o.sz -= dz * (1 - o.t); } }
+  cosmos.r += (cosmos.targetR - cosmos.r) * Math.min(1, dt * 2.5);
+  cRescale();
+  if (surf && cLogR() >= LOG_EARTH) cEnterSpace();
+
+  const f = RR / cosmos.r, moveDir = len > 0.1 ? Math.atan2(wz, wx) : null;
+  // eat, fall, cull
+  for (let i = cosmos.objs.length - 1; i >= 0; i--) {
+    const o = cosmos.objs[i];
+    if (o.state === 0) {
+      const d = Math.hypot(o.x, o.z);
+      if (o.size <= cosmos.r * EAT_RATIO && d < cosmos.r - o.size * 0.35) cEat(o);
+      else if (d > cosmos.r * 24 || o.size < cosmos.r * 0.025) { cRemove(o); cosmos.objs.splice(i, 1); continue; }
+    }
+    let s = o.size * f, y = 0, px = o.x * f, pz = o.z * f;
+    if (o.state === 1) {
+      o.t += dt * (o.surf ? 1.3 : 1.0);
+      if (o.t >= 1) { cRemove(o); cosmos.objs.splice(i, 1); continue; }
+      const e = o.t * o.t, ang = o.ang + o.t * (o.surf ? 1.5 : 7);
+      const d = o.d0 * (1 - e) * f;
+      px = Math.cos(ang) * d; pz = Math.sin(ang) * d;
+      s *= o.surf ? 1 - 0.3 * o.t : Math.pow(1 - o.t, 0.8);
+      y = o.surf ? -e * RR * 6 : 0;
+      o.mesh.rotation.x = o.surf ? o.t * 1.2 : o.mesh.rotation.x;
+      if (!o.surf) o.mesh.scale.set(s * (1 + o.t * 1.5), s, s * (1 - o.t * 0.6));
+    }
+    o.mesh.position.set(px, o.surf ? y : y, pz);
+    if (!(o.state === 1 && !o.surf)) o.mesh.scale.setScalar(s);
+    o.mesh.rotation.y += o.spin * dt;
+    o.mesh.traverse(m => { if (m.isPoints) m.material.size = 0.03 * s; });
+  }
+  let live = 0; for (const o of cosmos.objs) if (o.state === 0) live++;
+  for (let k = 0; live < (surf ? 55 : 48) && k < 4; k++) if (cSpawn(10, 18, moveDir)) live++;
+
+  // look
+  const space = !surf;
+  cosmos.stageFade += ((space ? 1 : 0) - cosmos.stageFade) * Math.min(1, dt * 1.2);
+  const sf = cosmos.stageFade;
+  cScene.background.copy(SKY_SURF).lerp(SKY_SPACE, sf);
+  cScene.fog.color.copy(cScene.background);
+  cScene.fog.near = 260 + sf * 5000; cScene.fog.far = 700 + sf * 20000;
+  cGround.material.opacity = 1 - sf; cGround.visible = sf < 0.99;
+  cHoleSurf.visible = sf < 0.5; cHoleSpace.visible = sf >= 0.5;
+  stars.visible = drift.visible = sf > 0.2;
+  stars.material.opacity = sf;
+  cHoleSpace.children[1].rotation.y += dt * 0.4;
+  cBloom.strength = 0.12 + sf * 0.75;
+  if (surf) {
+    const Lr = cLogR(), D = Math.floor(Lr), tt = Lr - D;
+    const mPerUnit = Math.pow(10, Lr) / RR;                    // metres per render unit
+    const hxm = cosmos.hx * Math.pow(10, cosmos.E), hzm = cosmos.hz * Math.pow(10, cosmos.E);
+    const s0 = Math.pow(10, D - 1), s1 = s0 * 10;
+    const wrap = v => ((v % 256) + 256) % 256;
+    gU.uK0.value = mPerUnit / s0; gU.uK1.value = mPerUnit / s1;
+    gU.uO0.value.set(wrap(hxm / s0), wrap(hzm / s0)); gU.uO1.value.set(wrap(hxm / s1), wrap(hzm / s1));
+    gU.uT.value = tt;
+  }
+  const dp = drift.geometry.attributes.position;
+  for (let i = 0; i < dp.count; i++) {
+    let x = dp.getX(i) - dx * f * 0.6, z = dp.getZ(i) - dz * f * 0.6;
+    if (x < -400) x += 800; if (x > 400) x -= 800; if (z < -400) z += 800; if (z > 400) z -= 800;
+    dp.setX(i, x); dp.setZ(i, z);
+  }
+  dp.needsUpdate = true;
+
+  const D = RR * 15;
+  cCam.position.set(Math.sin(view.yaw) * Math.cos(view.pitch) * D, Math.sin(view.pitch) * D, Math.cos(view.yaw) * Math.cos(view.pitch) * D);
+  cCam.lookAt(0, 0, 0);
+  if (shake > 0.001) { const a = shake * 1.2; cCam.position.x += (Math.random() - 0.5) * a; cCam.position.y += (Math.random() - 0.5) * a; shake *= Math.exp(-dt * 6); }
+  stars.position.copy(cCam.position);
+  if (HQ) cComposer.render(dt); else renderer.render(cScene, cCam);
+}
+
 // ---------------------------------------------------------------- main loop
 let started = false, last = performance.now(), elapsed = 0, shownSec = -1, shake = 0;
 const camTarget = new V3(hole.x, 0, hole.z);
@@ -1241,6 +1824,18 @@ function frame(now) {
     const sec = Math.floor(elapsed);
     if (sec !== shownSec) { shownSec = sec; hudClock.textContent = String(Math.floor(sec / 60)).padStart(2, '0') + ':' + String(sec % 60).padStart(2, '0'); }
   }
+  timeU.value = now / 1000;
+  if (cosmos.on) {
+    view.yawT += (view.rot + (keys.KeyE ? 1 : 0) - (keys.KeyQ ? 1 : 0)) * 1.6 * dt;
+    view.yaw += (view.yawT - view.yaw) * Math.min(1, dt * 8);
+    view.pitch += (PITCHES[pitchIdx] * Math.PI / 180 - view.pitch) * Math.min(1, dt * 5);
+    cosmicFrame(dt, now);
+    updatePops(dt);
+    if (Math.floor(now / 250) !== Math.floor((now - dt * 1000) / 250)) updateHud();
+    return;
+  }
+  if (started && !cosmos.leaving && hole.targetR >= CITY_EXIT_R) beginCosmos();
+  if (cosmos.leaving) { cosmos.leaving -= dt; if (cosmos.leaving <= 0) { startCosmos(); return; } }
   updateHoleMesh();
 
   // camera
@@ -1317,7 +1912,7 @@ $('start').addEventListener('pointerdown', e => {
   started = true;
   try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (_) { }
 });
-window.__game = { hole, chunks, dyn, falling, TYPES, start: () => $('start').dispatchEvent(new PointerEvent('pointerdown')) };
+window.__game = { hole, chunks, dyn, falling, TYPES, cosmos, jumpCosmos, start: () => $('start').dispatchEvent(new PointerEvent('pointerdown')) };
 </script>
 </body>
 </html>
