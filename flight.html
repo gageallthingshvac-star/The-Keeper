@@ -2692,7 +2692,7 @@ function resetPlane(scen) {
      are. A reset moves the aeroplane without flying it there, so leaving the
      old point in place hands the test a segment tens of millions of
      kilometres long that skewers half the solar system. */
-  P.prev = null; P.qbar = 0; P.gload = 0; P.alpha = 0; P.beta = 0; P.aoaCap = false; P.cmdG = 1;
+  P.prev = null; P.onBody = null; P.bodyRef = null; P.bodyAlt = 0; P.qbar = 0; P.gload = 0; P.alpha = 0; P.beta = 0; P.aoaCap = false; P.cmdG = 1;
   P.chute = P.chuteCmd = 0; P.mach = 0; P.overQ = 0; P.gMax = 1; P.gMin = 1; P.gStress = 0; P.gRed = 0; P.heat = 0; P.burn = 0; P.ab = 0; P.abSm = 0; P.unstart = 0; P.apAlt = undefined; P.apHdg = undefined;
   P.q = qAxis(0, 1, 0, Math.PI);            // runway 18: heading south
   P.thr = 0;
@@ -3653,31 +3653,110 @@ function physics(P, dt) {
     P.overQ = (P.overQ || 0) + dt;
     cam.shake = Math.max(cam.shake, clamp(P.overQ * .22, 0, .65));
   } else P.overQ = Math.max(0, (P.overQ || 0) - dt * .6);
-  /* They are solid. Fly into one and that is the end of the flight, the same
-     as flying into a hill. */
+  /* They are places, not walls. Arrive slowly, wings level, on the wheels,
+     and you have landed on the Moon; arrive any other way and you have
+     arrived the way every unmanned probe before Luna 9 did. */
   if (!P.crashed && typeof BODIES !== "undefined" && P.prev) {
-    /* Swept, not a point test. At a million metres a second a substep is
-       twenty kilometres long and a point test walks straight through a moon
-       without touching it. This asks how close the SEGMENT travelled this
-       step came to the centre. */
+    /* First the swept test, for speeds where a substep is longer than the
+       planet. It asks how close the SEGMENT travelled this step came to the
+       centre, against a radius no surface can rise above — so it never fires
+       on a valley floor, and it always fires on a body you flew through. */
     const ax = P.prev.x, ay = P.prev.y, az = P.prev.z;
     const mx = P.pos.x - ax, my = P.pos.y - ay, mz = P.pos.z - az;
     const mm = mx * mx + my * my + mz * mz;
-    for (let i = 0; i < BODIES.length; i++) {
+    for (let i = 0; i < BODIES.length && !P.crashed; i++) {
       const b = BODIES[i];
       if (b.noHit) continue;
+      const S = SURF[b.name];
+      const rIn = b.r - (S && S.amp ? S.amp * 2.2 : 0);
       const cx = b.p.x - ax, cy = b.p.y - ay, cz = b.p.z - az;
       let t = mm > 1e-9 ? (cx * mx + cy * my + cz * mz) / mm : 0;
       t = t < 0 ? 0 : t > 1 ? 1 : t;
       const ex = cx - mx * t, ey = cy - my * t, ez = cz - mz * t;
-      if (ex * ex + ey * ey + ez * ez < b.r * b.r) { crash("IMPACT \u00b7 " + b.name.toUpperCase()); break; }
+      if (ex * ex + ey * ey + ez * ez < rIn * rIn) crash("IMPACT \u00b7 " + b.name.toUpperCase());
     }
+    if (!P.crashed) bodyContact(P, dt);
   }
   P.prev = v3(P.pos.x, P.pos.y, P.pos.z);
 
   // never let the aircraft sink through the world
   const gh = groundH(P.pos.x, P.pos.z);
   if (P.pos.y < gh + 1.2) { P.pos.y = gh + 1.2; if (P.vel.y < 0) P.vel.y *= -.05; }
+}
+
+/* ---- standing on another world ------------------------------------------
+
+   The undercarriage sits a couple of metres under the datum, and the ground
+   is wherever bodyRelief puts it — the SAME function the renderer draws, at
+   full detail, so the wheels touch the surface you can see rather than a
+   sphere somewhere underneath it. */
+const gearDrop = P => 1.9 + (P.gear || 0) * 2.4;
+function bodyContact(P, dt) {
+  P.bodyRef = null; P.bodyAlt = 0;
+  let touching = null;
+  for (let i = 0; i < BODIES.length; i++) {
+    const b = BODIES[i];
+    if (b.noHit) continue;
+    const S = SURF[b.name];
+    const dx = P.pos.x - b.p.x, dy = P.pos.y - b.p.y, dz = P.pos.z - b.p.z;
+    const d = Math.hypot(dx, dy, dz) || 1;
+    // the shell within which the ground can possibly be, plus a little reading room
+    if (d > b.r + (S && S.amp ? S.amp * 2.6 : 0) + 120000) continue;
+    const nx = dx / d, ny = dy / d, nz = dz / d;
+    const surf = b.r + (S && S.amp ? bodyRelief(b, nx, ny, nz, 0) : 0);
+    const clear = d - surf - gearDrop(P);
+    if (!P.bodyRef || clear < P.bodyAlt) { P.bodyRef = b; P.bodyAlt = clear; }
+    /* Sticky. Resting on the ground puts the wheels exactly at zero, and a
+       test for "below zero" then flickers in and out of contact on floating
+       point alone — which re-judges the landing, and re-announces it, several
+       times a second. Once down, you stay down until you are three metres up. */
+    if (clear > (P.onBody === b ? 3 : 0)) continue;
+    touching = { b: b, S: S, nx: nx, ny: ny, nz: nz, d: d, surf: surf };
+    break;
+  }
+  if (!touching) { P.onBody = null; return; }
+
+  const b = touching.b, S = touching.S;
+  const nx = touching.nx, ny = touching.ny, nz = touching.nz;
+  const vr = P.vel.x * nx + P.vel.y * ny + P.vel.z * nz;        // + is climbing away
+  const tx = P.vel.x - vr * nx, ty = P.vel.y - vr * ny, tz = P.vel.z - vr * nz;
+  const vt = Math.hypot(tx, ty, tz);
+  const m = P.m;
+  const lev = m[3] * nx + m[4] * ny + m[5] * nz;                // canopy vs local up
+  const L = (S && S.land) || { vs: 8, vt: 160, g: .4 };
+
+  if (!P.onBody) {                        // the moment of arrival, judged once
+    const why = (-vr) > L.vs ? "TOO FAST DOWN"
+      : vt > L.vt ? "TOO FAST ACROSS"
+      : lev < .74 ? "NOT WINGS LEVEL"
+      : P.gear < .9 ? "GEAR UP" : null;
+    if (why) { crash(why + " · " + b.name.toUpperCase()); return; }
+    P.onBody = b;
+    const g = b.gm / (touching.surf * touching.surf);
+    toast("DOWN ON " + b.name.toUpperCase() + " · " + (g / 9.81).toFixed(2) + " g · "
+      + Math.round(vt) + " m/s", 3.4);
+    audio.beep(300, .30, .18);
+  }
+
+  // sit on it: no sinking in, and the descent stops here
+  const rest = touching.surf + gearDrop(P) - .04;
+  P.pos.x = b.p.x + nx * rest;
+  P.pos.y = b.p.y + ny * rest;
+  P.pos.z = b.p.z + nz * rest;
+  let newR = vr > 0 ? vr : 0;
+  /* Rolling, and braking. There is no air out here to slow anything down, so
+     the wheels are the only thing that will, and they work against whatever
+     gravity this world happens to have. */
+  const gl = b.gm / (touching.surf * touching.surf);
+  const mu = (P.brake > .4 ? .62 : .035) + (P.park ? .8 : 0);
+  const dec = mu * Math.max(gl, .05) * dt;
+  const k = vt > 1e-6 ? Math.max(vt - dec, 0) / vt : 0;
+  P.vel.x = nx * newR + tx * k;
+  P.vel.y = ny * newR + ty * k;
+  P.vel.z = nz * newR + tz * k;
+  // and the airframe settles level rather than pivoting on a wingtip
+  P.w.x *= .90; P.w.y *= .92; P.w.z *= .86;
+  P.bodyAlt = 0;
 }
 
 /* wind & turbulence */
@@ -4330,6 +4409,148 @@ function drawBodyAir(b, c, d, rp, fade, cosPh, ux, uy) {
     img, clamp(lim * (.24 + t * .22), 0, 1));
 }
 
+/* ---- the ground on another world ----------------------------------------
+
+   Value noise in three dimensions, sampled on the unit sphere, so a surface
+   height is a property of the DIRECTION and nothing else: it wraps with no
+   seam, it is the same from orbit and from ten metres up, and the number the
+   renderer draws is the number the undercarriage lands on. */
+function hash3(i, j, k) {
+  let n = (i * 374761393 + j * 668265263 + k * 1442695041) | 0;
+  n = (n ^ (n >> 13)) | 0; n = Math.imul(n, 1274126177);
+  n = (n ^ (n >> 15)) | 0; n = Math.imul(n, 2246822519);
+  return ((n ^ (n >> 16)) >>> 0) / 4294967295;
+}
+function vnoise3(x, y, z) {
+  const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
+  const u = smooth(x - xi), v = smooth(y - yi), w = smooth(z - zi);
+  const a0 = lerp(hash3(xi, yi, zi), hash3(xi + 1, yi, zi), u);
+  const a1 = lerp(hash3(xi, yi + 1, zi), hash3(xi + 1, yi + 1, zi), u);
+  const b0 = lerp(hash3(xi, yi, zi + 1), hash3(xi + 1, yi, zi + 1), u);
+  const b1 = lerp(hash3(xi, yi + 1, zi + 1), hash3(xi + 1, yi + 1, zi + 1), u);
+  return lerp(lerp(a0, a1, v), lerp(b0, b1, v), w);
+}
+function fbm3(x, y, z, oct) {
+  let s = 0, a = .5, f = 1, n = 0;
+  for (let i = 0; i < oct; i++) { s += a * vnoise3(x * f, y * f, z * f); n += a; a *= .5; f *= 2.07; }
+  return s / n;
+}
+/* What each world is made of. `amp` is the full relief in metres, `freq` how
+   many noise cells wrap the sphere, and `kind` decides the shape of it: bowls
+   on the cratered ones, ridges and canyons on the rocky ones, rolling banks
+   on a cloud deck. `land` is what the undercarriage has to cope with. */
+const SURF = {
+  Moon:    { kind: "crater", amp: 2800, freq: 2.6, lo: [ 88,  86,  82], hi: [208, 204, 194], land: { vs: 13, vt: 220, g: .30 } },
+  Mercury: { kind: "crater", amp: 3200, freq: 3.0, lo: [ 80,  76,  70], hi: [190, 184, 172], land: { vs: 13, vt: 220, g: .30 } },
+  Mars:    { kind: "rock",   amp: 7600, freq: 2.2, lo: [126,  66,  42], hi: [234, 178, 142], land: { vs: 12, vt: 200, g: .50 } },
+  Venus:   { kind: "rock",   amp: 3000, freq: 2.4, lo: [150, 116,  66], hi: [250, 232, 190], land: { vs: 12, vt: 200, g: .50 } },
+  Earth:   { kind: "earth",  amp: 0,    freq: 0,                                              land: null },
+  Jupiter: { kind: "cloud",  amp: 4200, freq: 1.8, lo: [176, 142, 108], hi: [250, 236, 212], land: { vs: 22, vt: 500, g: .80 } },
+  Saturn:  { kind: "cloud",  amp: 3600, freq: 1.8, lo: [186, 166, 118], hi: [252, 242, 212], land: { vs: 22, vt: 500, g: .80 } },
+  Uranus:  { kind: "cloud",  amp: 2400, freq: 1.6, lo: [132, 186, 196], hi: [220, 248, 250], land: { vs: 22, vt: 500, g: .80 } },
+  Neptune: { kind: "cloud",  amp: 2600, freq: 1.6, lo: [ 70,  98, 176], hi: [172, 204, 250], land: { vs: 22, vt: 500, g: .80 } }
+};
+const SURF_LAC = 2.07;
+/* Ground is not described by how TALL it is, it is described by how STEEP it
+   is. A body with eight kilometres of relief spread over a wavelength of four
+   million photographs as a flat grey sheet, which is exactly what the first
+   attempt at this looked like.
+
+   So the broad shape comes from a handful of noise octaves, and everything
+   you can actually SEE from a few kilometres up comes from craters: eight
+   sizes of them, from two and a half thousand kilometres across down to one
+   and a half, each about a tenth as deep as it is wide until the body runs
+   out of relief to give. They are sparse — most of the ground at any one
+   scale is untouched — so twelve layers of them add up to a surface rather
+   than to a hole. The last few are metres across and cost nothing from orbit,
+   because the level of detail has already switched them off; they only turn
+   up when there is a wheel about to arrive. */
+const SURF_OCT = 7;
+const SURF_PITS = [1.6, 4.6, 13.4, 39, 113, 328, 950, 2760, 8000, 23200, 67300, 195000];
+/* The spin axis, whatever else has or has not been drawn yet. The cloud decks
+   are shaped around it, and the ground the undercarriage lands on cannot be
+   allowed to move eight hundred metres the first time the renderer gets round
+   to working the pole out — which is exactly what it did. */
+function bodyAxis(b) {
+  if (b.ax) return b.ax;
+  const art = typeof BODYART !== "undefined" ? BODYART[b.name] : null;
+  const p = art && art.pole ? art.pole : [0, 1, 0];
+  const l = Math.hypot(p[0], p[1], p[2]) || 1;
+  b.ax = [p[0] / l, p[1] / l, p[2] / l];
+  return b.ax;
+}
+function bodyRelief(b, nx, ny, nz, cell) {
+  const S = SURF[b.name];
+  if (!S || !S.amp) return 0;
+  const lam0 = TAU * b.r / S.freq;             // octave 0 wavelength, metres
+  /* An octave finer than the sample spacing cannot be drawn, only aliased, so
+     its weight fades out BEFORE it becomes invisible — smoothly, as a
+     function of position, which is what stops the level of detail showing up
+     as terraces at the ring joins. Every term is centred on zero, so dropping
+     one changes the shape without moving the mean. cell = 0 asks for
+     everything, which is what the undercarriage wants. */
+  const oct = lam => cell > 0 ? clamp(lam / (cell * 2.6) - .35, 0, 1) : 1;
+  let h = 0, f = 1, a = 1;
+  for (let i = 0; i < SURF_OCT; i++, f *= SURF_LAC, a *= .5) {
+    const w = oct(lam0 / f);
+    if (w < .004) break;
+    h += S.amp * a * w * (vnoise3(nx * S.freq * f, ny * S.freq * f, nz * S.freq * f) - .5) * 1.4;
+  }
+  const cloud = S.kind === "cloud";
+  if (cloud) {
+    // banks, drawn out along the latitude circles by the body's own rotation
+    const ax = bodyAxis(b);
+    h += Math.sin((nx * ax[0] + ny * ax[1] + nz * ax[2]) * 34) * S.amp * .30;
+  }
+  const dig = S.kind === "crater";
+  for (let i = 0; i < SURF_PITS.length; i++) {
+    const sc = SURF_PITS[i], lam = lam0 / sc;
+    const w = oct(lam);
+    if (w < .004) break;
+    /* A shallower ratio and a much wider ramp than the first attempt, which
+       built walls at two to one and dropped the ground out from under a
+       descent faster than the aeroplane could fall. */
+    const dep = Math.min(lam * (cloud ? .030 : .055), S.amp * 1.15) * w;
+    const q = vnoise3(nx * S.freq * sc + 17.7, ny * S.freq * sc - 9.1, nz * S.freq * sc + 4.3);
+    const rim = clamp((1 - Math.abs(q * 2 - 1) - .40) / .60, 0, 1);
+    if (rim <= 0) continue;
+    // the floor, and the ring of ejecta thrown up around the edge of it
+    const bowl = Math.pow(rim, 2.4) - Math.pow(clamp(rim - .86, 0, 1) / .14, 2) * .35;
+    h += (dig ? -bowl : bowl * (cloud ? .6 : .8)) * dep;
+  }
+  return h;
+}
+/* The ground's own colour, before any light falls on it. */
+function bodyTint(b, S, nx, ny, nz, h, slope) {
+  /* Height decides the broad albedo — basins are dark, highlands are bright —
+     but gently, because a hard mapping turns every quad boundary into a step
+     you can see. What carries the small-scale variety is slope: ground steep
+     enough to shed its dust is the bare rock underneath. */
+  const k = clamp(h / Math.max(S.amp * 6, 1) + .5, 0, 1);
+  let grit = (vnoise3(nx * 74, ny * 74, nz * 74) * .14 + .93) * (1 - clamp(slope || 0, 0, 1) * .30);
+  if (S.kind === "cloud") {
+    // the same belts and zones the disc draws, so close up agrees with far off
+    const art = BODYART[b.name], ax = bodyAxis(b);
+    const la = Math.asin(clamp(nx * ax[0] + ny * ax[1] + nz * ax[2], -1, 1));
+    const idx = Math.floor(clamp((la + 1.36) / 2.72, 0, .999) * (art ? art.bands : 6));
+    grit *= idx % 2 ? 1.12 : .88;
+  }
+  return [clamp(lerp(S.lo[0], S.hi[0], k) * grit, 0, 255),
+          clamp(lerp(S.lo[1], S.hi[1], k) * grit, 0, 255),
+          clamp(lerp(S.lo[2], S.hi[2], k) * grit, 0, 255)];
+}
+/* Cities, after dark. The night side of a world with people on it is not
+   black, and this is the one place the simulator already knows where every
+   city on Earth is — so it may as well switch the lights on. */
+function earthNight(nx, ny, nz, fr) {
+  const sinLat = clamp(nx * fr.P[0] + ny * fr.P[1] + nz * fr.P[2], -1, 1);
+  const lat = Math.asin(sinLat) / DEG;
+  const lon = Math.atan2(nx * fr.eas[0] + ny * fr.eas[1] + nz * fr.eas[2],
+                         nx * fr.ref[0] + ny * fr.ref[1] + nz * fr.ref[2]) / DEG + ORIGIN.lon;
+  if (worldElev(lon, lat) <= 0) return 0;
+  return cityAt((lon - ORIGIN.lon) * M_PER_DEG_LON, (lat - ORIGIN.lat) * M_PER_DEG_LAT);
+}
+
 /* ---- a world you are close to -------------------------------------------
 
    The flat-disc path projects the centre and draws a circle round it. That
@@ -4342,7 +4563,7 @@ function drawBodyAir(b, c, d, rp, fade, cosPh, ux, uy) {
    pushed through the same near-plane clip every other surface uses, and lit
    per quad. It costs a few hundred polygons and it is the difference between
    orbit and a black screen. */
-const NEARBODY = 4.2;                 // switch over inside this many radii
+const NEARBODY = 2.6;                 // switch over inside this many radii
 function bodyFrame(b) {
   /* The home planet's surface has to agree with the ground you took off from:
      +Y is up at the runway, +Z is north, +X is east, so the pole sits at
@@ -4392,24 +4613,45 @@ function drawBodyNear(b, d, fade) {
   let e1 = [upv[1] * vz - upv[2] * vy, upv[2] * vx - upv[0] * vz, upv[0] * vy - upv[1] * vx];
   const el = Math.hypot(e1[0], e1[1], e1[2]) || 1; e1 = [e1[0] / el, e1[1] / el, e1[2] / el];
   const e2 = [vy * e1[2] - vz * e1[1], vz * e1[0] - vx * e1[2], vx * e1[1] - vy * e1[0]];
-  const amax = Math.acos(clamp(r / d, 0, 1));
+  /* The horizon is worked out against a radius the camera is definitely
+     outside of, so sitting in a crater does not collapse the whole cap to a
+     point. Shrinking it by the body's relief budget rather than by a fixed
+     fraction is what keeps the cap reaching past the real horizon when you
+     are low: a fraction of the radius is thousands of metres up high and a
+     handful down low, which is precisely backwards. The vertices still go
+     out to the real ground. */
+  const SR = typeof SURF !== "undefined" ? SURF[b.name] : null;
+  const rH = Math.max(Math.min(r, d - (SR && SR.amp ? SR.amp * 1.3 : 2)), r * .5);
+  const amax = Math.acos(clamp(rH / d, 0, 1));
   const home = !!b.home, fr = home ? bodyFrame(b) : null;
   const atm = art && art.atm;
-  const fine = Q.i >= 2;
-  const NR = fine ? 24 : 14, NS = fine ? 68 : 34;
+  /* Enough rings and sectors to keep a quad down to a couple of dozen pixels,
+     however big the thing is on the glass. A fixed count is a mosaic when the
+     planet fills the screen and wasted work when it does not. */
+  const scr = clamp(F * Math.tan(Math.asin(clamp(r / d, 0, .9999))), 40, 40000);
+  const fine = Q.i >= 2, px = fine ? 23 : 34;
+  let NR = clamp(Math.round(scr / px), 12, fine ? 32 : 20);
+  let NS = clamp(Math.round(TAU * scr / (px * 1.5)), 26, fine ? 96 : 48);
   /* Rings even on the SCREEN, not on the sphere. From four hundred kilometres
      up the visible cap is twenty degrees of surface and a hundred and forty
      degrees of sky: spaced evenly in surface angle, nine rings out of ten
      land in the middle of the picture and the whole horizon is one enormous
      quad. Inverting for the look-down angle costs an asin per ring.
        r sin(theta + psi) = d sin(psi)  =>  theta = asin(d sin psi / r) - psi */
-  const psiMax = Math.asin(clamp(r / d, 0, 1));
+  const psiMax = Math.asin(clamp(rH / d, 0, 1));
   const th = new Float64Array(NR + 1);
   for (let j = 0; j <= NR; j++) {
     const psi = psiMax * (j / NR);
-    th[j] = Math.asin(clamp(d * Math.sin(psi) / r, -1, 1)) - psi;
+    th[j] = Math.asin(clamp(d * Math.sin(psi) / rH, -1, 1)) - psi;
   }
   th[NR] = amax;
+  /* How far apart the samples land on the ground, ring by ring. It is what
+     decides how much of the surface detail is worth asking for out there. */
+  const cellR = new Float64Array(NR + 1);
+  for (let j = 0; j <= NR; j++) {
+    const dth = j === 0 ? th[1] - th[0] : j === NR ? th[NR] - th[NR - 1] : (th[j + 1] - th[j - 1]) * .5;
+    cellR[j] = Math.max(r * Math.abs(dth), r * Math.abs(th[j]) * TAU / NS, .5);
+  }
   const nrm = (t, k) => {
     const ct = Math.cos(t), st = Math.sin(t), ph = k / NS * TAU;
     const cf = Math.cos(ph) * st, sf = Math.sin(ph) * st;
@@ -4417,20 +4659,42 @@ function drawBodyNear(b, d, fade) {
             vy * ct + e1[1] * cf + e2[1] * sf,
             vz * ct + e1[2] * cf + e2[2] * sf];
   };
-  const ring = [];
+  if (!b.ax && art) bodyFeatures(b, art);          // the pole, for the belts
+  const S = SURF[b.name];
+  // every vertex of a world with a surface costs a terrain sample, so the
+  // mesh is coarser there than it is on a bare sphere
+  if (S && S.amp > 0 && (d - r) < r * 1.6) {
+    NR = Math.min(NR, fine ? 22 : 14); NS = Math.min(NS, fine ? 58 : 32);
+  }
+  /* Relief is only worth the noise once it is more than a pixel deep. From
+     far off the sphere is smooth and this is all wasted work. */
+  const relief = !!(S && S.amp > 0 && (d - r) < r * 1.6);
+  const ring = [], rad = [];
   for (let j = 0; j <= NR; j++) {
-    const row = [];
-    for (let k = 0; k <= NS; k++) row.push(nrm(th[j], k));
-    ring.push(row);
+    const row = [], rw = [];
+    for (let k = 0; k <= NS; k++) {
+      const n = nrm(th[j], k);
+      row.push(n);
+      rw.push(relief ? r + bodyRelief(b, n[0], n[1], n[2], cellR[j]) : r);
+    }
+    ring.push(row); rad.push(rw);
   }
   const base = b.col;
+  /* Nothing in space is lit from one side only. Starlight, the glow of the
+     planet you are orbiting, sunlight bounced off the air — the night side of
+     a world is dim, cold and blue, and it is NOT invisible. */
+  /* Close in, the aeroplane brings its own light, and whatever the sky is
+     throwing back off the ground is doing it from a few kilometres rather
+     than from orbit. You can land on the night side. */
+  const amb = (atm ? .32 : .27) + clamp(1 - (d - r) / 40000, 0, 1) * .17;
   for (let j = 0; j < NR; j++) {
     for (let k = 0; k < NS; k++) {
       const q = [ring[j][k], ring[j][k + 1], ring[j + 1][k + 1], ring[j + 1][k]];
+      const rq = [rad[j][k], rad[j][k + 1], rad[j + 1][k + 1], rad[j + 1][k]];
       let ok = false;
       for (let i = 0; i < 4; i++) {
-        const n = q[i];
-        const px = b.p.x + n[0] * r - cp.x, py = b.p.y + n[1] * r - cp.y, pz = b.p.z + n[2] * r - cp.z;
+        const n = q[i], rr2 = rq[i];
+        const px = b.p.x + n[0] * rr2 - cp.x, py = b.p.y + n[1] * rr2 - cp.y, pz = b.p.z + n[2] * rr2 - cp.z;
         const w = m[6] * px + m[7] * py + m[8] * pz;
         _vp[i * 3] = m[0] * px + m[1] * py + m[2] * pz;
         _vp[i * 3 + 1] = m[3] * px + m[4] * py + m[5] * pz;
@@ -4446,20 +4710,64 @@ function drawBodyNear(b, d, fade) {
       const cz2 = (q[0][2] + q[1][2] + q[2][2] + q[3][2]) * .25;
       const nl = Math.hypot(cx2, cy2, cz2) || 1;
       const ux2 = cx2 / nl, uy2 = cy2 / nl, uz2 = cz2 / nl;
-      const li = ux2 * sx + uy2 * sy + uz2 * sz;
-      // terminator with a little softness, and a floor so the night side is
-      // dark rather than absent
-      const k2 = clamp(li * 1.5 + .06, .05, 1);
+      /* Two different normals do two different jobs. The RADIAL one says
+         whether this patch of ground is in daylight at all — that is the
+         terminator, and it must stay a clean circle. The FACET one says which
+         way this particular slope is tilted, and that is what makes a crater
+         wall bright on one side and dark on the other. */
+      let fnx = ux2, fny = uy2, fnz = uz2;
+      if (relief) {
+        const ex = q[2][0] * rq[2] - q[0][0] * rq[0], ey = q[2][1] * rq[2] - q[0][1] * rq[0],
+              ez = q[2][2] * rq[2] - q[0][2] * rq[0];
+        const gx = q[3][0] * rq[3] - q[1][0] * rq[1], gy = q[3][1] * rq[3] - q[1][1] * rq[1],
+              gz = q[3][2] * rq[3] - q[1][2] * rq[1];
+        let ax2 = ey * gz - ez * gy, ay2 = ez * gx - ex * gz, az2 = ex * gy - ey * gx;
+        const al = Math.hypot(ax2, ay2, az2);
+        if (al > 1e-9) {
+          ax2 /= al; ay2 /= al; az2 /= al;
+          if (ax2 * ux2 + ay2 * uy2 + az2 * uz2 < 0) { ax2 = -ax2; ay2 = -ay2; az2 = -az2; }
+          fnx = ax2; fny = ay2; fnz = az2;
+        }
+      }
+      const sun = ux2 * sx + uy2 * sy + uz2 * sz;
+      const day = clamp(sun * 3.4, 0, 1);
+      /* Flat fills cannot interpolate a normal across a quad, so a facet
+         normal taken straight off the corners reads as a mosaic. Leaning it
+         a third of the way back toward the radial keeps the relief shading
+         and takes the patchwork out of it. */
+      if (relief) {
+        fnx = fnx * .84 + ux2 * .16; fny = fny * .84 + uy2 * .16; fnz = fnz * .84 + uz2 * .16;
+        const fl2 = Math.hypot(fnx, fny, fnz) || 1; fnx /= fl2; fny /= fl2; fnz /= fl2;
+      }
+      /* Airless ground has no haze to soften it, so the difference between a
+         slope facing the sun and one facing away is the whole picture. The
+         response is stretched about the flat-ground value to put that
+         difference where the eye can see it. */
+      let direct = clamp(fnx * sx + fny * sy + fnz * sz, 0, 1);
+      if (relief) direct = clamp((direct - sun) * (atm ? 1.5 : 2.4) + direct, 0, 1.35);
+      const k2 = amb + (1 - amb) * day * (.26 + .74 * direct);
+      const slope = relief ? 1 - clamp(fnx * ux2 + fny * uy2 + fnz * uz2, 0, 1) : 0;
       let col;
       if (home) col = earthCap(ux2, uy2, uz2, fr);
+      else if (S) col = bodyTint(b, S, ux2, uy2, uz2, (rq[0] + rq[2]) * .5 - r, slope * 2.4);
       else {
         const mot = hash2((ux2 * 340) | 0, (uy2 * 340 + uz2 * 91) | 0) * .34 + .83;
         col = [base[0] * mot, base[1] * mot, base[2] * mot];
       }
       let cr = col[0] * k2, cg = col[1] * k2, cb = col[2] * k2;
+      if (day < .999) {                 // night: cold, blue, and still there
+        const nf = (1 - day) * .7;
+        cr = lerp(cr, cr * .66, nf); cg = lerp(cg, cg * .84, nf); cb = lerp(cb, cb * 1.34, nf);
+        if (home && day < .82) {        // and the lights are on
+          const u2 = earthNight(ux2, uy2, uz2, fr) * (1 - day) * fade;
+          if (u2 > .01) {
+            cr += 210 * u2; cg += 168 * u2; cb += 96 * u2;
+          }
+        }
+      }
       if (atm) {                       // air thickens toward the limb
         const graze = 1 - clamp(ux2 * vx + uy2 * vy + uz2 * vz, 0, 1);
-        const gk = Math.pow(graze, 2.4) * clamp(li * 2, 0, 1) * (.35 + atm[3] * .3);
+        const gk = Math.pow(graze, 2.4) * clamp(day, 0, 1) * (.35 + atm[3] * .3);
         cr = lerp(cr, atm[0], gk); cg = lerp(cg, atm[1], gk); cb = lerp(cb, atm[2], gk);
       }
       grow(mm, SEAM_PX);
@@ -4522,21 +4830,28 @@ function drawBody(b) {
   if (fade < .01) return;
   const dx = b.p.x - cam.pos.x, dy = b.p.y - cam.pos.y, dz = b.p.z - cam.pos.z;
   const d = Math.hypot(dx, dy, dz);
-  if (d < b.r * .999) return;                       // inside it: nothing to draw
+  /* A basin floor is BELOW the mean radius, so flying in one is not the same
+     as being inside the body. Only the deepest relief the surface can hold
+     counts as inside. */
+  const SB = typeof SURF !== "undefined" ? SURF[b.name] : null;
+  if (d < b.r - (SB && SB.amp ? SB.amp * 2.6 : 1)) return;
   /* Close enough that the disc would break down — and, past a certain point,
      vanish entirely as its centre swings behind the camera. Draw the surface. */
-  if (!b.sun && d < b.r * NEARBODY) {
+  const c = projectRaw(b.p);
+  /* The surface renderer, when the disc would be wrong: either the body is
+     big enough in the sky that a flat circle stops being one, or its centre
+     has swung behind the camera and there is nothing left to project. */
+  if (!b.sun && (d < b.r * NEARBODY || !c)) {
     drawBodyNear(b, d, b.home ? clamp((LIGHT.far || 0) * 2, 0, 1) : fade);
     return;
   }
-  const c = projectRaw(b.p);
   if (!c) return;
   /* The silhouette of a sphere subtends asin(r/d) and projects to F*tan of
      that, not F*sin — identical while a body is far away and increasingly
      wrong as you close on it, which is exactly when it matters. */
   const sinT = clamp(b.r / Math.max(d, b.r), 0, .999);
   const rp = F * sinT / Math.sqrt(1 - sinT * sinT);   // = F * tan(asin(r/d))
-  if (rp < .25) {                                   // far enough to be a star
+  if (rp < .25 && !(b.home && (LIGHT.far || 0) > 0)) {   // far enough to be a star
     if (c.x < 0 || c.x > W || c.y < 0 || c.y > H) return;
     DL.sprite(d, c.x, c.y, Math.max(1.4, rp * 4), sprite(b.col[0], b.col[1], b.col[2], 3), .85);
     return;
@@ -4571,8 +4886,12 @@ function drawBody(b) {
 
   drawBodyAir(b, c, d, rp, fade, cosPh, ux, uy);
 
-  // the whole disc, in shadow
-  const dark = [b.col[0] * .10 * fade, b.col[1] * .10 * fade, b.col[2] * .13 * fade];
+  /* The disc, in shadow. Not black: starlight, the glow of whatever it is
+     orbiting and sunlight bounced off its own air all fall on the night side,
+     and a world you can only see half of is a world you cannot navigate by.
+     Cold and blue, a fifth of daylight, and legible. */
+  const nk = b.sun ? .10 : .27;
+  const dark = [b.col[0] * nk * .62 * fade, b.col[1] * nk * .82 * fade, b.col[2] * nk * 1.30 * fade];
   /* Tessellation by how big it actually is. A fixed 44-gon is invisible at
      arm's length and a hexagon-ish mess when the planet fills the screen. */
   const NS = clamp(Math.round(rp * .55) * 2, BODY_N, 160);
@@ -5608,7 +5927,15 @@ function drawHUDFull() {
       if (n2 && n2.body && !n2.body.home) nb = n2;
     }
   }
-  if (nb && nb.body && !nb.body.home) {
+  if (P.bodyRef && P.bodyAlt < 140000) {
+    // close enough to land on: height above the ground right under you
+    hudFont(12 * U); ctx.fillStyle = GD;
+    ctx.fillText(P.bodyRef.name.toUpperCase().slice(0, 8) + (P.onBody ? " DOWN" : " AGL"),
+      rx + 8 * U, CY - 4 * U);
+    hudFont(16 * U, 600);
+    ctx.fillStyle = P.onBody ? "rgba(126,232,154,.95)" : P.bodyAlt < 3000 ? "rgba(255,170,90,.95)" : G;
+    ctx.fillText(P.onBody ? "LANDED" : navRange(Math.max(P.bodyAlt, 0)), rx + 8 * U, CY + 16 * U);
+  } else if (nb && nb.body && !nb.body.home) {
     hudFont(12 * U); ctx.fillStyle = GD;
     ctx.fillText(nb.body.name.toUpperCase().slice(0, 8), rx + 8 * U, CY - 4 * U);
     hudFont(16 * U, 600); ctx.fillStyle = nb.alt < 2e6 ? "rgba(255,170,90,.95)" : G;
@@ -6008,6 +6335,15 @@ function objectiveLine() {
      nowhere on it. Say what there is instead — how far out, and what is
      nearest. */
   if (!onPlanet() || Math.hypot(P.pos.x, P.pos.z) > 2e7) {
+    if (P.bodyRef && P.bodyAlt < 140000) {
+      const b = P.bodyRef, S = typeof SURF !== "undefined" ? SURF[b.name] : null;
+      const g = b.gm / (b.r * b.r) / 9.81;
+      return (P.onBody ? "DOWN ON " : "APPROACHING ") + b.name.toUpperCase()
+        + "   " + (P.onBody ? "surface" : navRange(Math.max(P.bodyAlt, 0)) + " AGL")
+        + "   " + g.toFixed(2) + " g"
+        + (S && S.kind === "cloud" ? "   cloud deck" : "")
+        + "   " + navSpeed(vlen(P.vel));
+    }
     let s = "EARTH " + navRange(Math.max(P.pos.y, 0));
     const nb = typeof nearestBody === "function" ? nearestBody() : null;
     if (nb && nb.body && !nb.body.home)
