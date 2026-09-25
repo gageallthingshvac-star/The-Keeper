@@ -2605,7 +2605,12 @@ const SPECS = {
   ],
   // oleo rates scaled to the airframe: about 180 mm of static compression
   // ballistic control thrusters, in newton-metres
-  rcsP: 340000, rcsY: 300000, rcsR: 260000,
+  /* Ballistic control thrusters, in newton-metres. Sized so that out of the
+     air the aeroplane points where you ask inside a second or so rather than
+     four: with nothing to push against, the thrusters ARE the controls, and
+     an airframe crossing the solar system at two hundred thousand kilometres
+     a second that takes four seconds to roll is not a thing anyone can fly. */
+  rcsP: 1100000, rcsY: 1600000, rcsR: 840000,
   gearK: 950000, gearC: 190000,
   hard: [v3(-8.40, -.10, -9.60), v3(8.40, -.10, -9.60), v3(0, -.20, 18.20),
          v3(0, .25, -14.10), v3(0, -1.05, 0), v3(-4.65, -1.02, -2), v3(4.65, -1.02, -2)]
@@ -2664,7 +2669,7 @@ function cycleNav(d) {
    SELECTOR, logarithmic, ten metres a second at the bottom of its travel and
    twenty thousand kilometres a second at the top. Nothing else in the
    aeroplane can ask for a speed. */
-const SPD_LO = 10, SPD_SPAN = 2e6;         // top of travel = 10 * span
+const SPD_LO = 10, SPD_SPAN = 2e7;         // top of travel = 10 * span = 200,000 km/s
 const spdOfLever = t => SPD_LO * Math.pow(SPD_SPAN, clamp(t, 0, 1));
 const leverOfSpd = v => clamp(Math.log(Math.max(v, SPD_LO) / SPD_LO) / Math.log(SPD_SPAN), 0, 1);
 function toggleSpeedHold() {
@@ -2895,7 +2900,11 @@ function flightControl(P, dt, e, cE, cA, cR) {
   // low-speed / ground law: the stick asks for a pitch rate instead, so that
   // rotation on the runway is the same positive, controllable thing at any
   // speed rather than a snap into a loop
-  const qCmd = -sE * FBW.qMax * (P.onGround ? .62 : 1);
+  /* Out of the air the rate limit comes off. In air the pitch rate is capped
+     by what the wing will survive; in vacuum there is no wing loading to
+     respect and the only reason to be slow is the thrusters, which are now
+     quick. */
+  const qCmd = -sE * FBW.qMax * (1 + 1.6 * rcsAuth) * (P.onGround ? .62 : 1);
   const gearQ = clamp(FBW.qRef / Math.max(qbar, 500), .03, 1);
   let dEq = clamp(sE * gearQ + (P.w.x - qCmd) * 2.4 / qPer, -1, 1);
 
@@ -2927,7 +2936,7 @@ function flightControl(P, dt, e, cE, cA, cR) {
      w.z. The command is eased rather than stepped: with a loop this quick,
      feeding it a square edge rolls the aeroplane off its wing in a tenth of
      a second, which is accurate and horrible to fly. */
-  P.pCmdS = approach(P.pCmdS === undefined ? 0 : P.pCmdS, -sA * FBW.pMax, FBW.pSmooth, dt);
+  P.pCmdS = approach(P.pCmdS === undefined ? 0 : P.pCmdS, -sA * FBW.pMax * (1 + .7 * rcsAuth), FBW.pSmooth, dt);
   const pCmd = P.pCmdS;
   /* A wing resists rolling in proportion to how fast it is already rolling,
      so a purely proportional loop settles wherever its gain happens to
@@ -2956,10 +2965,10 @@ function flightControl(P, dt, e, cE, cA, cR) {
      is +sR. The sideslip command above is -sR because beta runs the other
      way (negative beta IS nose right), and carrying that sign across to the
      rate command reversed the rudder everywhere there was no air. */
-  const yRate = sR * 0.45 * rcsAuth;
+  const yRate = sR * 0.45 * rcsAuth * (1 + 1.4 * rcsAuth);
   let dR = clamp(
     aero * (((P.beta || 0) - bCmd) * FBW.kBeta / Math.max(rPer, .01) * .12)
-    + (P.w.y - yRate) * FBW.kYawD / Math.max(rPer, .01) * -.10, -1, 1);
+    + (P.w.y - yRate) * FBW.kYawD / Math.max(rPer, .01) * -(.10 + .16 * rcsAuth), -1, 1);
   // on the ground the pedals are the nosewheel, and the computer keeps the
   // roll straight rather than trying to hold a sideslip that means nothing
   if (gnd > .5 && P.onGround) {
@@ -3018,7 +3027,7 @@ function transferAP(P, dt) {
   const togo = Math.max(range - park, 0);
   const V = vlen(P.vel);
   const close = P.vel.x * lx + P.vel.y * ly + P.vel.z * lz;
-  const aMax = 80000 * .55;                                // headroom for gravity
+  const aMax = 800000 * .55;                               // headroom for gravity
 
   /* Steer the VELOCITY VECTOR, not the nose.
 
@@ -3054,7 +3063,7 @@ function transferAP(P, dt) {
      faster than the thrusters can follow it, and the aeroplane goes past on a
      hyperbola. Twenty thousand kilometres a second is quick enough to put the
      Moon three minutes away and slow enough that the geometry stays still. */
-  const VMAX = 2.0e7;
+  const VMAX = 2.0e8;
   const vProf = Math.min(togo / TURN + 150, VMAX);
   const wx = lx * vProf - P.vel.x, wy = ly * vProf - P.vel.y, wz = lz * vProf - P.vel.z;
   const wl = Math.hypot(wx, wy, wz) || 1;
@@ -3093,7 +3102,7 @@ function transferAP(P, dt) {
     AP.ramp = 0;
     AP.accel = clamp(wl * .9, 0, Math.max(V / 2.5, 3000));
   } else {
-    AP.ramp = Math.min((AP.ramp || 0) + dt * 4000, aMax);
+    AP.ramp = Math.min((AP.ramp || 0) + dt * 40000, aMax);
     AP.accel = clamp(Math.min(wl * .9, AP.ramp), 0, aMax);
   }
   AP.mode = mode; AP.togo = range; AP.close = close;
@@ -3411,15 +3420,15 @@ function physics(P, dt) {
          seconds, from any speed, because waiting out a deceleration is not
          flying and because it is what makes arriving somewhere possible: the
          distance needed to stop collapses from megametres to almost nothing. */
-      const aMax = thinAir ? 80000 : 400;
+      const aMax = thinAir ? 800000 : 400;
       const err = SPD.tgt - V;
       let aCmd;
       if (err >= 0) {
-        SPD.ramp = Math.min((SPD.ramp || 0) + dt * (thinAir ? 4000 : 55), aMax);
+        SPD.ramp = Math.min((SPD.ramp || 0) + dt * (thinAir ? 40000 : 55), aMax);
         aCmd = Math.min(err * 2.4, SPD.ramp);
       } else {
         SPD.ramp = 0;
-        const stop = Math.max(V / 2.5, thinAir ? 1200 : 45);
+        const stop = Math.max(V / 2.5, thinAir ? 12000 : 45);
         aCmd = -Math.min(-err * 2.4, stop);
       }
       const along = thrust * vd.z - D;            // what the engine is already doing
@@ -3441,7 +3450,7 @@ function physics(P, dt) {
          thousand puts the Moon a couple of minutes out on a burn-and-brake
          and Mars in the half hour it deserves to be. */
       const aAir = 12 + 26 * Math.log10(1 + Math.max(P.mach, 0));
-      const push = SPECS.mass * abSm * lerp(aAir, Math.max(aAir, 80000), vac);
+      const push = SPECS.mass * abSm * lerp(aAir, Math.max(aAir, 800000), vac);
       const net = thrust - D;
       if (net < push) fb.z += push - net;
     }
@@ -3673,7 +3682,7 @@ function physics(P, dt) {
       let t = mm > 1e-9 ? (cx * mx + cy * my + cz * mz) / mm : 0;
       t = t < 0 ? 0 : t > 1 ? 1 : t;
       const ex = cx - mx * t, ey = cy - my * t, ez = cz - mz * t;
-      if (ex * ex + ey * ey + ez * ez < rIn * rIn) crash("IMPACT \u00b7 " + b.name.toUpperCase());
+      if (ex * ex + ey * ey + ez * ez < rIn * rIn) { bodyBounce(P, b, "IMPACT"); break; }
     }
     if (!P.crashed) bodyContact(P, dt);
   }
@@ -3691,7 +3700,39 @@ function physics(P, dt) {
    full detail, so the wheels touch the surface you can see rather than a
    sphere somewhere underneath it. */
 const gearDrop = P => 1.9 + (P.gear || 0) * 2.4;
+/* A planet cannot break this aeroplane.
+
+   Hitting a world at speed used to end the flight. It no longer does: the
+   airframe takes it, the energy goes into the ground, and you are left
+   sitting on the surface being told what you just did. The Earth is the one
+   exception — its runway and its hills are the game, and they still bite. */
+function bodyBounce(P, b, why) {
+  let dx = P.pos.x - b.p.x, dy = P.pos.y - b.p.y, dz = P.pos.z - b.p.z;
+  let d = Math.hypot(dx, dy, dz);
+  if (d < 1) { dx = 0; dy = 1; dz = 0; d = 1; }   // dead centre: pick a way out
+  const nx = dx / d, ny = dy / d, nz = dz / d;
+  const S = SURF[b.name];
+  const surf = b.r + (S && S.amp ? bodyRelief(b, nx, ny, nz, 0) : 0);
+  const out = surf + gearDrop(P) + 1.5;
+  P.pos.x = b.p.x + nx * out; P.pos.y = b.p.y + ny * out; P.pos.z = b.p.z + nz * out;
+  const vr = P.vel.x * nx + P.vel.y * ny + P.vel.z * nz;
+  const tx = P.vel.x - vr * nx, ty = P.vel.y - vr * ny, tz = P.vel.z - vr * nz;
+  const keep = .22;                               // most of it goes into the dust
+  P.vel.x = nx * Math.max(vr, 0) * .1 + tx * keep;
+  P.vel.y = ny * Math.max(vr, 0) * .1 + ty * keep;
+  P.vel.z = nz * Math.max(vr, 0) * .1 + tz * keep;
+  P.w.x *= .25; P.w.y *= .25; P.w.z *= .25;
+  P.prev = null;                                  // the swept test starts again from here
+  cam.shake = Math.max(cam.shake || 0, 1.8);
+  if ((P.hardT || 0) <= 0) {
+    toast(why + " \u00b7 " + b.name.toUpperCase() + " \u00b7 AIRFRAME HELD", 3.2);
+    audio.beep(110, .45, .30);
+  }
+  P.hardT = 2.6;
+  P.onBody = b;
+}
 function bodyContact(P, dt) {
+  P.hardT = Math.max(0, (P.hardT || 0) - dt);
   P.bodyRef = null; P.bodyAlt = 0;
   let touching = null;
   for (let i = 0; i < BODIES.length; i++) {
@@ -3730,7 +3771,7 @@ function bodyContact(P, dt) {
       : vt > L.vt ? "TOO FAST ACROSS"
       : lev < .74 ? "NOT WINGS LEVEL"
       : P.gear < .9 ? "GEAR UP" : null;
-    if (why) { crash(why + " · " + b.name.toUpperCase()); return; }
+    if (why) { bodyBounce(P, b, why); return; }
     P.onBody = b;
     const g = b.gm / (touching.surf * touching.surf);
     toast("DOWN ON " + b.name.toUpperCase() + " · " + (g / 9.81).toFixed(2) + " g · "
