@@ -727,7 +727,9 @@ const CITY_CELL = 120000, CITY_GRID = new Map();
       }
   }
 })();
+let _cityPop = 0;                     // how big the place is that won the sample
 function cityAt(x, z) {
+  _cityPop = 0;
   const a = CITY_GRID.get(Math.round(x / CITY_CELL) + "," + Math.round(z / CITY_CELL));
   if (!a) return 0;
   let u = 0;
@@ -736,7 +738,8 @@ function cityAt(x, z) {
     const d = Math.sqrt(dx * dx + dz * dz);
     if (d > c.r * 2.1) continue;
     // dense core, thinning suburbs
-    u = Math.max(u, (1 - sstep(c.r * .45, c.r * 2.1, d)) * clamp(.35 + c.pop / 900, .4, 1));
+    const v = (1 - sstep(c.r * .45, c.r * 2.1, d)) * clamp(.35 + c.pop / 900, .4, 1);
+    if (v > u) { u = v; _cityPop = c.pop; }
   }
   return clamp(u, 0, 1);
 }
@@ -944,10 +947,15 @@ function groundH(x, z) {
 /* cityAt, memoised on the last query: terrainColor asks for it twice per
    sample and the grid walk is not free. */
 let _uX = 1e9, _uZ = 1e9, _uV = 0;
+let _uP = 0;
 function urbanShare(x, z) {
-  if (x !== _uX || z !== _uZ) { _uX = x; _uZ = z; _uV = cityAt(x, z); }
+  if (x !== _uX || z !== _uZ) { _uX = x; _uZ = z; _uV = cityAt(x, z); _uP = _cityPop; }
   return _uV;
 }
+/* The population of whatever won the last urbanShare call — which is what
+   decides how tall the tall bit is. Density alone cannot: a dense village and
+   a dense city centre look identical to it, and they are not. */
+const urbanPop = () => _uP;
 function terrainColor(h, slope, x, z, cell) {
   const lat = Math.abs(worldToLat(z));
   const rock = sstep(.30, .60, slope);
@@ -2382,31 +2390,61 @@ function drawCities() {
     if (budget <= 0) continue;
     const near = c.r * 5.5 + 24000;
     if (d > near || camY > 62000) continue;
-    // block grid: size and height scale with the real population
-    const blocks = clamp(Math.round(4 + Math.pow(c.pop, .34) * 3), 4, 26);
-    const spacing = (c.r * 1.7) / blocks;
-    const maxH = clamp(9 + Math.pow(c.pop, .52) * 2.4, 9, 260);
-    for (let j = -blocks; j <= blocks && budget > 0; j++) {
-      for (let i = -blocks; i <= blocks && budget > 0; i++) {
-        const rr = Math.hypot(i, j) / blocks;
-        if (rr > 1) continue;
-        const h1 = hash2((c.x | 0) + i * 7, (c.z | 0) + j * 13);
-        if (h1 > 1 - rr * .75) continue;                    // thins toward the edge
-        const bx = c.x + i * spacing + (h1 - .5) * spacing * .4;
-        const bz = c.z + j * spacing + (hash2(i * 3, j * 5) - .5) * spacing * .4;
-        const bd = Math.hypot(bx - camX, bz - camZ);
-        if (bd > near) continue;
-        const gy = terrainH(bx, bz);
-        if (gy < 2) continue;
-        const h2 = hash2(i * 17 + 3, j * 29 + 7);
-        const hgt = (4 + h2 * h2 * maxH) * (1 - rr * .62);
-        const wid = spacing * (.32 + h1 * .26);
-        budget--;
-        const tone = 92 + h2 * 46;
-        boxOnGround(bx, gy, bz, wid, hgt, wid * (.7 + h2 * .6), [tone * .92, tone * .95, tone], bd);
+    /* The structures, before the grid, so they are never the thing the budget
+       runs out on. A place is recognisable by its tall bits. */
+    {
+      const gy0 = terrainH(c.x, c.z);
+      const hs = (i, j) => hash2((c.x | 0) + i, (c.z | 0) + j);
+      if (gy0 > 2) {
+        if (c.pop > 260) {                              // the spire downtown
+          const hh = clamp(70 + Math.pow(c.pop, .47) * 3.4, 70, 470);
+          towerOnGround(c.x + c.r * .06, gy0, c.z - c.r * .05, hh,
+            clamp(hh * .11, 12, 34), [172, 176, 184], d, hh > 120);
+          budget -= 4;
+        }
+        if (c.pop > 1600) {                             // and the second one
+          const hh = clamp(60 + Math.pow(c.pop, .44) * 2.6, 60, 360);
+          towerOnGround(c.x - c.r * .10, gy0, c.z + c.r * .08, hh,
+            clamp(hh * .12, 10, 28), [160, 166, 176], d, true);
+          budget -= 4;
+        }
+        if (c.pop > 45) for (let k = 0; k < 2; k++) {   // masts on the edge
+          const a = hs(k * 11, 3) * TAU, rr = c.r * (.85 + hs(k, 9) * .5);
+          const mx = c.x + Math.cos(a) * rr, mz = c.z + Math.sin(a) * rr;
+          const gy = terrainH(mx, mz);
+          if (gy < 2) continue;
+          const hh = 70 + hs(k, 21) * 110;
+          boxOnGround(mx, gy, mz, 3.4, hh, 3.4, [196, 128, 96], d);
+          boxOnGround(mx, gy + hh * .55, mz, 13, 2.6, 13, [176, 116, 88], d);
+          const sp = projectPoint(v3(mx, gy + hh + 2, mz));
+          if (sp) DL.sprite(sp.z - 2, sp.x, sp.y, Math.max(1.6, 26 * sp.s), sprite(255, 66, 56, 3),
+            .30 + .55 * (.5 + .5 * Math.sin(GAME.t * 2.1 + k * 2.4 + c.lon)));
+          budget -= 2;
+        }
+        if (c.pop > 700) {                              // the stadium
+          const a0 = hs(5, 5) * TAU, rr = c.r * .62;
+          const sx = c.x + Math.cos(a0) * rr, sz = c.z + Math.sin(a0) * rr;
+          const gy = terrainH(sx, sz);
+          if (gy > 2) {
+            const R = clamp(c.r * .045, 40, 130);
+            for (let i = 0; i < 12; i++) {
+              const a = i / 12 * TAU;
+              boxOnGround(sx + Math.cos(a) * R, gy, sz + Math.sin(a) * R,
+                R * .55, 22 + hs(i, 13) * 8, R * .40, [148, 150, 146], d);
+            }
+            budget -= 12;
+          }
+        }
+        if (c.pop <= 45) {                              // small town: water tower
+          const hh = 26 + hs(2, 2) * 10;
+          boxOnGround(c.x + 60, gy0, c.z + 40, 2.6, hh, 2.6, [186, 190, 196], d);
+          boxOnGround(c.x + 60, gy0 + hh, c.z + 40, 14, 11, 14, [214, 218, 224], d);
+          budget -= 2;
+        }
       }
     }
   }
+  budget = drawUrban(budget);
   // names, nearest last so the closest wins the overlap
   labels.sort((a, b) => b.d - a.d);
   const u = UI;
@@ -2432,6 +2470,91 @@ function drawCities() {
   ctx.restore();
 }
 
+/* The built-up ground, on a lattice pinned to the world rather than a grid
+   stretched across each city.
+
+   New York is thirty-seven kilometres across. Spreading twenty-six blocks
+   over that made every "building" a kilometre wide and eighty metres tall,
+   which from any height at all reads as a grey plate lying in a field. A
+   lattice at about a hundred metres puts real streets under the aeroplane,
+   and it costs no more, because what bounds the work is not how big the city
+   is — it is how much of it is near enough to see.
+
+   The pitch doubles with altitude, so climbing thins the buildings out to the
+   big ones instead of drawing a hundred thousand of them. Doubling means each
+   coarser level is a SUBSET of the one below, so nothing shuffles as you
+   climb; the small ones simply stop being drawn. */
+function drawUrban(budget) {
+  const camX = cam.pos.x, camZ = cam.pos.z, camY = cam.pos.y;
+  if (budget <= 0 || camY > 30000) return budget;
+  const lvl = clamp(Math.floor(Math.log2(Math.max(camY, 400) / 400)), 0, 4);
+  const PITCH = 96 * (1 << lvl);
+  // a phone draws a smaller circle of it, which costs less than drawing the
+  // same circle worse
+  const reach = Math.min(2700 * (1 << lvl), 26000) * (Q.q.buildings < 700 ? .74 : 1);
+  const fx = cam.m[6], fz = cam.m[8];
+  const cell = (i, j) => {
+    const bx = i * PITCH, bz = j * PITCH;
+    const dx = bx - camX, dz = bz - camZ;
+    const bd = Math.hypot(dx, dz);
+    if (bd > reach) return;
+    // nothing behind the aeroplane is worth a slot out of the budget
+    if (bd > PITCH && (dx * fx + dz * fz) / bd < -.30) return;
+    const u = urbanShare(bx, bz);
+    if (u < .05) return;
+    const h1 = hash2(i * 7, j * 13);
+    if (h1 > u * 1.35) return;                         // thins with the density
+    const gy = terrainH(bx, bz);
+    if (gy < 2) return;
+    const h2 = hash2(i * 17 + 3, j * 29 + 7);
+    /* How tall depends on TWO things: how big the place is, and how near this
+       is to the middle of it. Density on its own cannot tell a dense village
+       from a city centre, and the difference is a hundred metres. */
+    const coreH = clamp(16 + Math.pow(urbanPop(), .50) * 3.0, 16, 340);
+    const maxH = lerp(11, coreH, Math.pow(u, 1.25));
+    const hgt = (6 + (.25 + h2 * h2 * .75) * maxH) * (.6 + .4 * u);
+    const wid = PITCH * (.24 + h1 * .20) * (lvl ? 1.18 : 1);
+    budget--;
+    const tone = 88 + h2 * 52 + u * 14;
+    boxOnGround(bx + (h1 - .5) * PITCH * .22, gy, bz + (h2 - .5) * PITCH * .22,
+      wid, hgt, wid * (.72 + h2 * .5), [tone * .92, tone * .95, tone], bd);
+  };
+  /* Outward from the aeroplane in rings, because the budget runs out and what
+     it must not run out on is the ground you are directly over. Scanning the
+     lattice corner-first spent every slot on the far side of the city and put
+     nothing at all in the window. */
+  const ci = Math.round(camX / PITCH), cj = Math.round(camZ / PITCH);
+  const RN = Math.ceil(reach / PITCH);
+  cell(ci, cj);
+  for (let ring = 1; ring <= RN && budget > 0; ring++) {
+    for (let k = -ring; k <= ring && budget > 0; k++) {
+      cell(ci + k, cj - ring); cell(ci + k, cj + ring);
+    }
+    for (let k = -ring + 1; k <= ring - 1 && budget > 0; k++) {
+      cell(ci - ring, cj + k); cell(ci + ring, cj + k);
+    }
+  }
+  return budget;
+}
+/* A tower: boxes stacked and stepped in, with a beacon on top if it is tall
+   enough to need one. A block grid tells you there is a city there; the spire,
+   the masts, the stadium and the water tower are what tell you WHICH city. */
+function towerOnGround(x, gy, z, h, w, col, dist, beacon) {
+  const seg = h > 200 ? 4 : h > 90 ? 3 : 2;
+  let base = gy, bw = w;
+  for (let i = 0; i < seg; i++) {
+    const hh = h / seg;
+    boxOnGround(x, base, z, bw, hh, bw, shade(col, 1 - i * .045), dist);
+    base += hh; bw *= .66;
+  }
+  if (beacon) {
+    const sp = projectPoint(v3(x, gy + h + 3, z));
+    if (sp) {
+      const blink = .34 + .52 * (.5 + .5 * Math.sin(GAME.t * 2.6 + x * .013));
+      DL.sprite(sp.z - 2, sp.x, sp.y, Math.max(1.8, 30 * sp.s), sprite(255, 66, 56, 3), blink);
+    }
+  }
+}
 /* one building, as a shaded box standing on the ground */
 /* Unit box: five faces (the underside never shows), each four corners given as
    multipliers of half-width, height and half-depth, then the outward normal.
@@ -5000,6 +5123,254 @@ function drawBodies() {
   for (const b of BODIES) drawBody(b);
 }
 
+/* ==================================================== outposts ========== */
+/* One station at every world, and every one of them built out of what that
+   world actually has. A place that mines regolith looks nothing like a place
+   that skims helium-3 out of a gas giant or one that catches ice off Saturn's
+   rings, and the difference is the point: you should be able to tell where
+   you are from the shape of the thing in the window.
+
+   Panels shrink with the inverse square, because that is what sunlight does:
+   Mercury's foundry is mostly mirror, Neptune's relay has almost no panel at
+   all and runs on stored cryogens instead. */
+const STATION_SPEC = [
+  { body: "Earth",   kind: "yard",     name: "Keeper Gateway",
+    res: "orbital yard · water · silicon",       alt: 620000,  size: 340,
+    hull: [178, 184, 192], acc: [ 96, 150, 210], panel: 210 },
+  { body: "Moon",    kind: "mine",     name: "Regolith Works",
+    res: "regolith · sintered block · oxygen",    alt: 90000,   size: 300,
+    hull: [172, 168, 158], acc: [214, 196, 150], panel: 190 },
+  { body: "Mercury", kind: "mirror",   name: "Sunward Foundry",
+    res: "sunlight · iron · refractory metal",    alt: 160000,  size: 330,
+    hull: [206, 200, 188], acc: [255, 222, 150], panel:  70 },
+  { body: "Venus",   kind: "aerostat", name: "Aphrodite Skydock",
+    res: "carbon dioxide · sulphur · nitrogen",   alt: 300000,  size: 340,
+    hull: [214, 190, 132], acc: [246, 226, 158], panel: 150 },
+  { body: "Mars",    kind: "tanks",    name: "Tharsis Yard",
+    res: "water ice · CO₂ · methalox",        alt: 230000,  size: 320,
+    hull: [190, 160, 140], acc: [206, 112,  78], panel: 250 },
+  { body: "Jupiter", kind: "scoop",    name: "Galilean Scoop",
+    res: "helium-3 · hydrogen · deuterium",       alt: 2600000, size: 900,
+    hull: [186, 176, 160], acc: [236, 208, 170], panel: 120 },
+  { body: "Saturn",  kind: "nets",     name: "Ring Harvest",
+    res: "ring ice · water · ammonia",            alt: 2400000, size: 860,
+    hull: [200, 196, 176], acc: [212, 236, 248], panel: 100 },
+  { body: "Uranus",  kind: "cryo",     name: "Deuterium Rig",
+    res: "deuterium · methane · helium",          alt: 1400000, size: 640,
+    hull: [164, 192, 198], acc: [190, 234, 240], panel:  60 },
+  { body: "Neptune", kind: "relay",    name: "Triton Relay",
+    res: "nitrogen ice · deep-space relay",            alt: 1300000, size: 620,
+    hull: [150, 168, 200], acc: [176, 208, 246], panel:  46 }
+];
+function buildStationMesh(S) {
+  const m = MB(), H = S.hull, A = S.acc, D = [72, 78, 88], W = [232, 236, 240];
+  const T2 = { two: true }, SP = { two: true, spec: .9 };
+  const lit = [255, 214, 130];
+  // ---- the spine every one of them is built along
+  m.box(0, 0, 0, 34, 34, 560, H, T2);
+  for (let i = -2; i <= 2; i++) m.box(0, 0, i * 112, 54, 54, 11, D, T2);
+  // ---- crew drum forward, and the ring you dock against
+  m.box(0, 0, 250, 118, 118, 118, shade(H, 1.07), SP);
+  m.box(0, 0, 316, 88, 88, 24, A, SP);
+  for (let i = 0; i < 8; i++) {
+    const a = i / 8 * TAU;
+    m.box(Math.cos(a) * 44, Math.sin(a) * 44, 330, 9, 9, 7, lit, T2);
+  }
+  // ---- machinery aft
+  m.box(0, 0, -252, 104, 104, 136, shade(H, .93), SP);
+  // ---- radiators, edge on to the sun
+  for (const s of [-1, 1]) m.box(s * 128, 0, -110, 186, 5, 204, W, T2);
+  // ---- solar wings, what is left of them this far out
+  if (S.panel > 24) for (const s of [-1, 1]) {
+    const pw = S.panel;
+    m.box(s * (78 + pw / 2), 0, 64, pw, 7, 196, [28, 54, 104], SP);
+    for (let k = 1; k < 4; k++) m.box(s * (78 + pw * k / 4), 0, 64, 5, 9, 198, [126, 146, 176], T2);
+    m.box(s * 60, 0, 64, 36, 12, 12, D, T2);
+  }
+
+  if (S.kind === "yard") {
+    // a hull on the slip, half plated, and the gantry holding it
+    m.box(0, 150, -40, 48, 48, 300, [120, 128, 138], T2);
+    for (let i = 0; i < 5; i++) m.box(0, 150, -160 + i * 62, 74, 74, 9, [150, 158, 168], T2);
+    for (const s of [-1, 1]) m.box(s * 96, 92, -40, 8, 190, 8, D, T2);
+    m.box(0, 196, -40, 200, 8, 8, D, T2);
+  } else if (S.kind === "mine") {
+    // the mass driver: a rail longer than the station, and the ore it throws
+    m.box(0, -96, 0, 22, 22, 900, [138, 134, 126], T2);
+    m.box(0, -96, 0, 60, 8, 900, [104, 100, 94], T2);
+    for (let i = 0; i < 7; i++) m.box(0, -96, -400 + i * 133, 46, 46, 10, A, T2);
+    // hoppers of sintered block
+    for (const s of [-1, 1]) for (const z of [-90, 40]) {
+      m.box(s * 92, -40, z, 56, 62, 56, shade(A, .82), T2);
+      m.box(s * 92, -74, z, 40, 16, 40, [96, 90, 82], T2);
+    }
+  } else if (S.kind === "mirror") {
+    // mirrors, because at Mercury the resource IS the sunlight
+    for (const s of [-1, 1]) for (const z of [150, -60]) {
+      m.disc(s * 210, 0, z, 130, 18, 0, [246, 244, 230], { two: true, spec: 1.6 });
+      m.box(s * 120, 0, z, 170, 8, 8, D, T2);
+    }
+    // smelter, running hot
+    m.box(0, -108, -40, 96, 96, 180, [116, 74, 54], T2);
+    m.box(0, -108, 58, 62, 62, 20, [255, 156, 70], T2);
+    m.box(0, -170, -40, 30, 30, 120, [90, 60, 46], T2);
+  } else if (S.kind === "aerostat") {
+    // it floats: envelopes above, acid crackers slung underneath, gold foil
+    for (const s of [-1, 1]) for (const z of [140, -80]) {
+      m.disc(s * 150, 120, z, 108, 16, 2, [248, 236, 196], { two: true, spec: .6 });
+      m.disc(s * 150, 120, z, 108, 16, 0, [238, 224, 180], { two: true, spec: .6 });
+      m.box(s * 150, 40, z, 12, 120, 12, D, T2);
+    }
+    m.box(0, -104, 40, 220, 58, 150, [212, 176, 96], SP);
+    for (let i = 0; i < 4; i++) m.box(-80 + i * 54, -104, 130, 26, 26, 60, [176, 142, 74], T2);
+  } else if (S.kind === "tanks") {
+    // propellant made out of the air and the ice: a tank farm and a drill
+    for (const s of [-1, 1]) for (let i = 0; i < 3; i++) {
+      m.box(s * 108, -30, -140 + i * 140, 74, 74, 112, i === 1 ? [212, 222, 230] : W, SP);
+      m.box(s * 108, 18, -140 + i * 140, 40, 24, 40, D, T2);
+    }
+    m.box(0, -150, 120, 26, 220, 26, [150, 120, 104], T2);
+    m.box(0, -262, 120, 58, 24, 58, A, T2);
+    m.box(0, -96, -160, 130, 40, 130, shade(A, .8), T2);
+  } else if (S.kind === "scoop") {
+    // the intake mouth, and a shield slab between it and Jupiter's belts
+    for (let i = 0; i < 14; i++) {
+      const a0 = i / 14 * TAU, a1 = (i + 1) / 14 * TAU, r0 = 70, r1 = 280, z0 = 330, z1 = 560;
+      m.quad([Math.cos(a0) * r0, Math.sin(a0) * r0, z0], [Math.cos(a1) * r0, Math.sin(a1) * r0, z0],
+             [Math.cos(a1) * r1, Math.sin(a1) * r1, z1], [Math.cos(a0) * r1, Math.sin(a0) * r1, z1],
+             shade(A, .78 + (i % 2) * .22), { two: true, spec: .5 });
+    }
+    m.box(0, 0, -400, 460, 460, 26, [92, 96, 104], T2);
+    m.box(0, 0, -386, 380, 380, 8, [150, 156, 166], T2);
+    for (const s of [-1, 1]) m.box(s * 140, 0, -140, 96, 96, 180, [206, 222, 232], SP);
+  } else if (S.kind === "nets") {
+    // a catcher, facing the rings, and the ice it has already caught
+    for (let k = 0; k < 2; k++) {
+      const z = 300 + k * 150, r = 250 + k * 60;
+      for (let i = 0; i < 12; i++) {
+        const a = i / 12 * TAU, b = (i + 1) / 12 * TAU;
+        m.box((Math.cos(a) + Math.cos(b)) * r / 2, (Math.sin(a) + Math.sin(b)) * r / 2, z,
+          r * .55, 9, 9, [190, 200, 208], T2);
+      }
+      for (let i = 0; i < 6; i++) {
+        const a = i / 6 * TAU;
+        m.box(Math.cos(a) * r / 2, Math.sin(a) * r / 2, z, r, 5, 5, [160, 176, 188], T2);
+      }
+    }
+    for (const s of [-1, 1]) m.box(s * 118, 0, 40, 88, 88, 190, [206, 232, 244], SP);
+  } else if (S.kind === "cryo") {
+    // cryogens: fat insulated drums and a wall of condenser fins
+    for (const s of [-1, 1]) for (let i = 0; i < 2; i++) {
+      m.box(s * 112, 0, -110 + i * 200, 96, 96, 160, [196, 226, 232], SP);
+      m.box(s * 112, 0, -110 + i * 200, 108, 20, 20, [136, 168, 176], T2);
+    }
+    for (let i = 0; i < 9; i++) m.box(0, -130, -200 + i * 50, 300, 66, 7, [214, 238, 242], T2);
+    m.box(0, -130, 0, 30, 76, 460, [132, 160, 170], T2);
+  } else if (S.kind === "relay") {
+    // out here the product is the signal: dishes, and enough tank to wait
+    for (const s of [-1, 1]) for (const z of [200, -40]) {
+      m.disc(s * 200, 40, z, 120, 18, 2, [214, 230, 250], { two: true, spec: 1.1 });
+      m.box(s * 200, 40, z + 40, 10, 10, 80, D, T2);
+      m.box(s * 110, 20, z, 180, 10, 10, D, T2);
+    }
+    m.box(0, 150, -180, 14, 300, 14, D, T2);
+    m.box(0, 302, -180, 26, 14, 26, [255, 120, 110], T2);
+    for (const s of [-1, 1]) m.box(s * 74, -96, -120, 62, 62, 200, [198, 216, 240], SP);
+  }
+  return m.done();
+}
+/* Where each one sits: on the daylight side, up off the terminator so it is
+   lit and not lost against its own planet. */
+const STATIONS = (() => {
+  const out = [];
+  for (const S of STATION_SPEC) {
+    const b = BODIES.find(x => x.name === S.body);
+    if (!b) continue;
+    let dir;
+    if (b.home) {
+      const l = Math.hypot(.26, 1, .16); dir = [.26 / l, 1 / l, .16 / l];
+    } else {
+      let sx = SUNBODY.p.x - b.p.x, sy = SUNBODY.p.y - b.p.y, sz = SUNBODY.p.z - b.p.z;
+      const sl = Math.hypot(sx, sy, sz) || 1; sx /= sl; sy /= sl; sz /= sl;
+      const ax = bodyAxis(b);
+      let tx = sy * ax[2] - sz * ax[1], ty = sz * ax[0] - sx * ax[2], tz = sx * ax[1] - sy * ax[0];
+      const tl = Math.hypot(tx, ty, tz) || 1; tx /= tl; ty /= tl; tz /= tl;
+      const c = Math.cos(.62), s2 = Math.sin(.62);
+      dir = [sx * c + tx * s2, sy * c + ty * s2, sz * c + tz * s2];
+    }
+    const R = b.r + S.alt;
+    const pos = v3(b.p.x + dir[0] * R, b.p.y + dir[1] * R, b.p.z + dir[2] * R);
+    // local frame: +Y away from the planet, +Z along the way it would orbit
+    const Y = dir;
+    const tmp = Math.abs(Y[1]) > .92 ? [1, 0, 0] : [0, 1, 0];
+    let X = [Y[1] * tmp[2] - Y[2] * tmp[1], Y[2] * tmp[0] - Y[0] * tmp[2], Y[0] * tmp[1] - Y[1] * tmp[0]];
+    const xl = Math.hypot(X[0], X[1], X[2]) || 1; X = [X[0] / xl, X[1] / xl, X[2] / xl];
+    const Z = [X[1] * Y[2] - X[2] * Y[1], X[2] * Y[0] - X[0] * Y[2], X[0] * Y[1] - X[1] * Y[0]];
+    const k = S.size / 340;                       // the mesh is drawn at 340 m
+    out.push({
+      spec: S, body: b, pos: pos, size: S.size,
+      m: new Float32Array([X[0] * k, X[1] * k, X[2] * k,
+                           Y[0] * k, Y[1] * k, Y[2] * k,
+                           Z[0] * k, Z[1] * k, Z[2] * k]),
+      mesh: null
+    });
+  }
+  return out;
+})();
+function drawStations() {
+  const cp = cam.pos;
+  for (const st of STATIONS) {
+    const dx = st.pos.x - cp.x, dy = st.pos.y - cp.y, dz = st.pos.z - cp.z;
+    const d = Math.hypot(dx, dy, dz);
+    st.d = d;
+    if (d > st.size * 2600) continue;
+    const scr = F * st.size / d;
+    if (scr < 1.6) {                     // a light on the panel, nothing more
+      const sp = projectRaw(st.pos);
+      if (sp && sp.x > 0 && sp.x < W && sp.y > 0 && sp.y < H)
+        DL.sprite(d, sp.x, sp.y, Math.max(2.2, scr * 6), sprite(210, 236, 255, 3), .75);
+      continue;
+    }
+    if (!st.mesh) st.mesh = buildStationMesh(st.spec);
+    /* Lit by ITS sun, not by the one over the runway in Tennessee. */
+    const keep = LIGHT.sun;
+    let lx = SUNBODY.p.x - st.pos.x, ly = SUNBODY.p.y - st.pos.y, lz = SUNBODY.p.z - st.pos.z;
+    const ll = Math.hypot(lx, ly, lz) || 1;
+    LIGHT.sun = v3(lx / ll, ly / ll, lz / ll);
+    drawMesh(st.mesh, st.pos, st.m, null);
+    LIGHT.sun = keep;
+    const sp = projectRaw(st.pos);
+    if (sp) DL.sprite(d - 4, sp.x, sp.y, Math.max(3, scr * .18), sprite(255, 150, 130, 3), .8);
+  }
+}
+/* The tag on the glass: what it is, how far, and what it is there to dig up. */
+function drawStationTags() {
+  if (!GAME.started || GAME.paused || NAV.map) return;
+  const u = UI;
+  ctx.save(); ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  for (const st of STATIONS) {
+    const d = st.d;
+    if (!d || d > st.size * 2600) continue;
+    const sp = projectRaw(st.pos);
+    if (!sp || sp.x < 30 * u || sp.x > W - 30 * u || sp.y < 30 * u || sp.y > H - 30 * u) continue;
+    const close = d < st.size * 260;
+    const a = clamp(1 - d / (st.size * 2600), .30, .95);
+    const scr = F * st.size / d;
+    const off = Math.max(scr * 1.25, 14 * u);
+    hudFont(10.5 * u, 700); ctx.fillStyle = "rgba(150,226,255," + a.toFixed(2) + ")";
+    ctx.fillText(st.spec.name.toUpperCase(), sp.x, sp.y - off);
+    hudFont(9 * u, 600); ctx.fillStyle = "rgba(170,200,224," + (a * .85).toFixed(2) + ")";
+    ctx.fillText(navRange(Math.max(d - st.size, 0)), sp.x, sp.y - off + 12 * u);
+    if (close) ctx.fillText(st.spec.res, sp.x, sp.y + off);
+    if (!close) {
+      ctx.strokeStyle = "rgba(150,226,255," + (a * .7).toFixed(2) + ")";
+      ctx.lineWidth = 1.3 * u;
+      ctx.strokeRect(sp.x - off * .55, sp.y - off * .55, off * 1.1, off * 1.1);
+    }
+  }
+  ctx.restore();
+}
+
 /* The nav marker. Where the thing you picked is, and if it is not on the
    glass, which way to turn to bring it there. Everything a pilot needs to
    point an aeroplane at something is in these two facts. */
@@ -6727,6 +7098,7 @@ function frame(now) {
   drawSky();
   DL.reset();
   drawBodies();
+  drawStations();
   drawTerrain();
   // the airfield was gated on horizontal distance alone, so it stayed in
   // view all the way to the Moon if you climbed straight up off the runway
@@ -6745,7 +7117,7 @@ function frame(now) {
   drawLandmarks();
   drawGlare();
   if (Q.q.vig && vignette) { ctx.fillStyle = vignette; ctx.fillRect(0, 0, W, H); }
-  if (GAME.started && !GAME.paused) { drawGEffect(PLANE); drawHUD(dt); drawNavMarker(); drawMap(); }
+  if (GAME.started && !GAME.paused) { drawGEffect(PLANE); drawHUD(dt); drawStationTags(); drawNavMarker(); drawMap(); }
   tuneQuality(dt, performance.now() - work0);
   requestAnimationFrame(frame);
 }
