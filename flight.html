@@ -91,10 +91,10 @@
 
       <h2>Flight</h2>
       <div class="row" id="scenRow">
-        <button class="opt on" data-scen="free"><b>FREE FLIGHT</b><i>Cold on runway 18 at Keeper Field. Brakes set, engines at idle. There is no top end and no ceiling: hold the burners in and it never stops accelerating. Orbit is 7.8 km/s, the Moon is a two-minute burn past that, and everything you gain comes back as heat on the way down.</i></button>
+        <button class="opt on" data-scen="free"><b>FREE FLIGHT</b><i>Cold on runway 18 at Keeper Field, on the Highland Rim in Lewis County, Tennessee. Brakes set, engines at idle. There is no top end and no ceiling: hold the burners in and it never stops accelerating. Orbit is 7.8 km/s, the Moon is a two-minute burn past that, and everything you gain comes back as heat on the way down.</i></button>
         <button class="opt" data-scen="air"><b>AIRBORNE START</b><i>Airborne at 23,000 ft and already supersonic. Climb and accelerate.</i></button>
         <button class="opt" data-scen="rings"><b>RING RACE</b><i>12 gates strung across 120 km of sky, against the clock.</i></button>
-        <button class="opt" data-scen="hohenwald"><b>HOHENWALD, TN</b><i>Low and slow over Lewis County, Tennessee. Fifty miles of it are built out properly: the Highland Rim and its creek valleys, the Buffalo and the Duck, the Natchez Trace, every town and community, and the monument at Grinder's Stand.</i></button>
+        <button class="opt" data-scen="hohenwald"><b>HOHENWALD, TN</b><i>Low and slow over the country the field sits in. Fifty miles of it are built out properly: the Highland Rim and its creek valleys, the Buffalo and the Duck, the Natchez Trace, every town and community, and the monument at Grinder's Stand.</i></button>
         <button class="opt" data-scen="land"><b>LANDING CHALLENGE</b><i>9 km final, gear and flaps set. Stream the chute with <kbd>X</kbd> after touchdown. Scored on centreline, sink rate and touchdown point.</i></button>
       </div>
 
@@ -218,33 +218,134 @@ function fbm(x, y, oct) {
    time the sim runs. Roughly 40 km per sample — coarse on the ground, but from
    80,000 ft the continents are the right shape, which is the point. */
 const GEO = {
-  // [lon, lat] pairs, one array per landmass, walked in order
+  /* [lon, lat] pairs, one array per landmass, walked in order. Traced from the
+     real coastlines at roughly one to three degrees — about the finest the
+     1024 x 512 elevation grid can hold, which works out at forty kilometres a
+     sample. Coarse on the ground; from eighty thousand feet the continents
+     are the right shape, and that is the whole point of having them. */
   lands: [
-    // North America
-    [-168,65.5,-165,60,-162,58,-158,57,-153,58,-148,60,-140,60,-133,55,-128,51,-124,46,-124,40,-120,34,-117,32.5,-114,30,-110,24,-106,22,-97,22,-97,18,-91,18.5,-87,21,-90,19,-94,18,-96,15.5,-104,18,-110,24,-114,30,-117,32.5,-114,32,-110,31,-103,29,-97,26,-93,29,-89,29,-85,30,-82,25,-80,26,-81,31,-76,35,-74,39,-70,42,-67,45,-64,46,-60,47,-56,51,-64,54,-68,58,-78,62,-85,66,-80,70,-95,69,-105,68,-115,70,-125,70,-140,70,-155,71,-165,68,-168,65.5],
-    // Greenland
-    [-45,60,-52,65,-55,70,-60,76,-55,82,-40,83,-25,80,-20,74,-25,70,-35,66,-45,60],
-    // South America
-    [-81,-4,-79,-2,-80,2,-77,8,-72,12,-62,10,-52,5,-50,0,-44,-2,-38,-6,-35,-8,-39,-14,-41,-22,-48,-25,-53,-34,-58,-38,-62,-40,-65,-45,-68,-50,-70,-54,-74,-52,-73,-45,-72,-38,-71,-30,-70,-22,-71,-18,-75,-14,-79,-8,-81,-4],
-    // Africa
-    [-17,15,-16,21,-12,28,-6,35,0,36,10,37,20,32,32,31,35,28,39,21,43,12,51,12,48,5,42,-1,40,-8,40,-15,35,-22,32,-26,26,-33,18,-34,14,-22,12,-14,9,-2,3,6,9,4,9,10,3,6,-7,5,-13,10,-17,15],
-    // Eurasia
-    [-9,43,-9,39,-6,36,0,39,4,43,10,44,16,41,19,40,24,38,28,41,33,42,37,45,40,43,49,41,50,37,48,30,44,29,35,32,34,36,36,36,44,39,50,30,57,26,62,25,68,23,72,20,73,16,78,9,80,13,85,20,90,22,92,17,97,17,100,13,105,10,109,11,107,21,110,21,117,24,122,31,122,37,126,40,130,43,135,48,142,53,140,58,160,60,170,66,180,66,175,71,150,72,130,74,110,74,90,76,75,73,65,70,55,70,45,68,35,66,28,70,20,70,10,64,5,58,10,55,3,51,2,51,-2,48,-5,43,-2,43,-9,43],
-    // British Isles
-    [-6,50,-5,53,-3,55,-2,58,0,58,1,53,1,51,-6,50],
-    [-10,52,-6,55,-6,54,-10,52],
-    // Japan
-    [130,31,134,34,138,35,141,39,141,45,145,44,140,41,137,37,133,33,130,31],
-    // Madagascar
-    [43,-16,48,-13,50,-15,48,-25,45,-25,43,-21,43,-16],
-    // Australia
-    [114,-22,113,-26,115,-32,118,-35,123,-34,129,-32,135,-35,138,-35,141,-38,146,-39,150,-37,153,-31,153,-25,146,-19,142,-11,136,-12,130,-11,126,-14,122,-17,114,-22],
-    // New Zealand
-    [166,-46,170,-43,173,-41,175,-37,177,-38,174,-41,172,-44,168,-47,166,-46],
-    // Indonesia / New Guinea
-    [95,5,100,1,104,-2,106,-6,114,-8,118,-9,124,-9,131,-8,141,-9,147,-9,150,-10,145,-5,138,-2,132,-2,125,1,118,5,110,2,102,6,95,5],
-    // Antarctica
-    [-180,-70,-150,-75,-120,-74,-90,-72,-60,-64,-30,-70,0,-70,30,-68,60,-67,90,-66,120,-66,150,-72,180,-70,180,-90,-180,-90,-180,-70]
+    // ---- North America ----
+    [-168,65.5,-166,68.3,-163,69.7,-156,71.3,-148,70.4,-141,69.6,-133,69.4,-128,70.2,
+     -124,70.1,-117,69.9,-115,68.9,-110,68.4,-106,68.9,-101,68.0,-96,68.5,-94,66.0,
+     -90,68.4,-86,67.0,-82,69.5,-78,71.5,-74,68.0,-71,63.5,-78,62.5,-79,59.5,-77,56.5,
+     -79,54.0,-79,51.5,-82,52.8,-79,47.6,-72,50.3,-68,49.2,-64,49.0,-66,44.8,-70,43.5,
+     -71,41.3,-74,40.5,-75,39.0,-76,37.0,-76,34.9,-81,32.0,-80,26.9,-81,25.1,-83,29.7,
+     -87,30.3,-89,29.1,-91,29.1,-94,29.4,-97,26.0,-97,22.5,-95,18.6,-91,18.6,-87,21.4,
+     -87,18.2,-89,15.9,-92,14.6,-96,15.8,-101,17.0,-105,20.5,-109,23.5,-112,26.5,
+     -114,28.0,-117,32.5,-120,34.5,-122,37.0,-124,40.4,-124,46.3,-126,49.0,-131,53.0,
+     -136,57.5,-142,60.0,-150,59.5,-153,57.5,-158,56.0,-162,58.4,-165,60.5,-168,65.5],
+    // Baja, so the Gulf of California reads as a gulf
+    [-114,31.7,-114,29.5,-112,27.0,-110,24.0,-110,23.0,-112,24.5,-114,27.5,-115,29.5,-117,32.4,-114,31.7],
+    // ---- Greenland ----
+    [-45,60,-48,61.5,-52,65,-53,67.5,-55,70,-57,72.5,-60,76,-65,78.5,-62,81,-55,82.5,
+     -40,83.5,-30,82.5,-22,80,-19,76,-22,72,-27,69,-33,67,-38,65.5,-42,62.5,-45,60],
+    // ---- South America ----
+    [-81,-4,-80.5,-2.2,-80,0.5,-78,1.2,-77,3.5,-75.5,9.3,-71.5,11.8,-68,11.0,-63,10.6,
+     -60,8.6,-58,6.8,-54,5.6,-51,4.2,-50,0.0,-48,-1.0,-44,-2.5,-40,-3.0,-37,-5.2,
+     -35,-7.0,-35,-9.0,-38,-12.5,-39,-15.5,-40,-20.5,-43,-23.0,-48,-25.5,-50,-29.0,
+     -52,-32.0,-57,-35.0,-57,-38.5,-62,-39.0,-63,-42.0,-65,-45.0,-66,-48.5,-68,-51.0,
+     -69,-52.5,-71,-54.0,-74,-53.0,-75,-50.0,-74,-46.0,-73,-42.5,-73,-38.0,-71.5,-33.0,
+     -70.5,-25.0,-70.5,-19.0,-71.5,-17.5,-76,-14.5,-79,-8.0,-81,-6.0,-81,-4],
+    // Tierra del Fuego
+    [-68,-52.5,-65,-54.5,-68,-55.2,-71,-54.5,-70,-53.2,-68,-52.5],
+    // ---- Africa ----
+    [-17,15,-16.5,19,-14.5,22,-13,25,-11,28,-9.5,31,-6,35.5,-1,35.8,3,36.8,8,37.2,
+     11,33.8,15,32.3,19,30.6,25,31.5,31,31.4,33,31.2,34,28.0,35,24.0,37,21.0,
+     39,18.0,40,15.5,43,12.5,45,11.0,49,11.5,51,11.8,50,7.5,47,3.0,43,-1.0,
+     40,-4.5,40,-8.5,40,-12.5,37,-17.5,35,-21.0,33,-26.0,30,-31.0,27,-33.5,
+     22,-34.5,18,-34.5,17,-31.0,15,-27.0,13,-23.0,12,-18.0,12,-14.0,13,-10.0,
+     12,-6.0,9,-1.0,9,3.5,4,6.0,0,5.5,-3,5.0,-7,4.5,-11,5.5,-13,9.0,-16,12.0,-17,15],
+    // ---- Eurasia ----
+    [-9.5,43,-9.0,39.5,-9,37,-6,36,-2,36.7,3,41.9,6,43.5,10,44.0,13,45.6,16,41.9,
+     19,40.5,23,38.0,26,38.4,28,41.0,30,41.3,34,42.2,38,44.3,40,43.5,44,42.2,
+     49,40.5,51,37.5,49,30.0,48,29.5,44,29.8,39,21.5,36,24.0,35,28.5,34,31.3,
+     34.8,35.9,36,36.5,40,37.0,44,39.5,48,30.0,50,28.0,54,25.0,57,25.5,60,25.0,
+     62,25.0,66,25.0,68,23.5,72,21.0,73,16.0,76,8.5,80,10.0,80,13.5,82,17.0,
+     85,19.5,88,21.7,90,22.0,92,17.5,94,16.0,97,16.5,99,13.5,100,10.5,101,7.0,
+     104,10.0,106,10.5,108,11.0,109,15.0,107,20.5,110,21.5,113,22.5,117,23.5,
+     120,26.0,122,30.5,122,34.0,120,37.5,122,39.5,126,40.0,129,35.5,127,34.5,
+     126,37.5,125,39.5,122,40.5,124,43.0,128,43.0,131,43.5,135,48.0,138,54.0,
+     141,53.0,143,53.5,141,59.0,151,59.0,156,51.5,162,56.0,163,61.0,170,60.0,
+     180,65.5,180,68.8,172,69.8,164,70.0,160,70.5,152,72.0,146,72.5,140,73.5,
+     133,73.5,128,73.0,122,73.5,113,74.0,106,77.0,100,76.5,94,75.0,88,75.5,
+     80,74.0,72,72.5,69,73.5,62,71.5,57,70.0,53,69.5,48,68.5,44,68.5,41,66.5,
+     38,66.0,33,66.5,29,69.5,24,71.0,20,70.0,16,68.5,13,65.5,11,63.5,8,58.0,
+     5,60.5,8,63.0,5,62.0,7,58.0,10,58.5,12,56.5,10,54.5,7,53.5,4,52.0,2,51.0,
+     -1,49.5,-4,48.5,-1,46.0,-1,43.5,-6,43.5,-9.5,43],
+    // ---- British Isles, Ireland, Iceland ----
+    [-5.5,50.1,-3,51.5,-5,53.4,-3.2,54.7,-4.8,55.4,-5.8,57.8,-3.0,58.6,-2,57.5,
+     0,53.5,1.7,52.7,1.4,51.3,-1.3,50.6,-5.5,50.1],
+    [-10.4,51.6,-9.5,53.4,-10,54.3,-8,55.4,-6,55.2,-6.0,53.4,-7.0,52.1,-10.4,51.6],
+    [-24.5,65.5,-22,66.5,-18,66.2,-15,66.4,-13.6,65.4,-14.2,64.3,-18,63.4,-22.7,63.8,-24.5,65.5],
+    // ---- Japan, Sakhalin, Kurils, Taiwan, Hainan ----
+    [130.9,31.0,131.4,32.6,132.0,33.5,134.0,33.5,135.0,34.0,137.0,34.6,139.6,35.2,
+     140.9,35.7,141.0,38.3,141.5,41.4,140.4,41.5,140.0,39.5,139.5,37.0,137.0,36.8,
+     135.0,35.5,132.5,34.4,131.0,34.0,130.9,31.0],
+    [141.0,45.5,143.0,44.3,145.5,43.4,145.0,41.7,141.5,41.6,140.0,42.5,140.0,45.4,141.0,45.5],
+    [142.0,54.3,143.5,53.3,143.3,49.5,142.0,46.0,141.7,48.5,141.9,52.0,142.0,54.3],
+    [120.1,22.0,120.9,25.0,122.0,25.1,121.5,23.0,120.9,21.9,120.1,22.0],
+    [108.6,19.9,110.6,20.0,111.0,18.7,109.0,18.2,108.6,19.9],
+    // ---- Madagascar, Sri Lanka ----
+    [43.3,-16,46,-15.7,49.8,-12.4,50.5,-15.5,49.5,-19.5,47.5,-24.9,45,-25.6,43.5,-22,43.3,-16],
+    [79.8,9.5,81.2,8.5,81.9,7.2,80.5,5.9,79.8,7.5,79.8,9.5],
+    // ---- Australia and Tasmania ----
+    [113.2,-22.3,113.8,-26.0,115.0,-30.0,115.5,-33.5,118.0,-35.1,122.0,-33.9,
+     126.0,-32.3,129.0,-31.7,133.0,-32.2,135.5,-34.9,137.5,-35.6,140.0,-37.9,
+     143.5,-38.8,146.5,-39.0,149.9,-37.5,152.0,-32.5,153.6,-28.6,153.0,-25.0,
+     151.0,-22.5,149.0,-21.0,146.5,-19.0,145.5,-15.0,142.5,-10.7,141.0,-12.5,
+     139.5,-17.5,137.0,-16.0,136.0,-12.0,132.5,-11.2,130.8,-12.4,129.0,-14.8,
+     127.0,-13.8,124.0,-16.3,121.5,-19.0,118.0,-20.4,114.9,-21.4,113.2,-22.3],
+    [144.5,-40.7,148.3,-40.7,148.3,-42.8,146.8,-43.6,145.2,-42.8,144.5,-40.7],
+    // ---- New Zealand ----
+    [172.7,-34.4,174.4,-35.9,176.2,-37.6,178.5,-37.6,177.0,-39.2,175.0,-41.3,
+     173.0,-41.3,174.3,-40.3,173.0,-38.9,172.7,-34.4],
+    [172.0,-40.5,174.3,-41.4,174.0,-42.5,171.5,-44.5,170.8,-45.9,168.4,-46.6,
+     166.5,-45.9,168.0,-44.0,171.0,-42.2,172.0,-40.5],
+    // ---- the Indonesian arc ----
+    [95.3,5.6,98.0,4.0,100.3,0.5,102.5,-1.5,105.9,-5.9,104.0,-5.9,101.5,-2.5,
+     98.5,1.0,95.3,5.6],                                                   // Sumatra
+    [105.2,-6.4,110.0,-6.9,114.6,-8.2,114.3,-8.7,110.5,-8.2,105.6,-7.1,105.2,-6.4], // Java
+    [109.0,2.0,113.0,3.2,117.2,4.2,119.0,1.0,117.5,-3.6,114.5,-3.3,110.0,-3.0,
+     109.0,-1.0,108.8,0.9,109.0,2.0],                                       // Borneo
+    [119.8,-0.9,121.5,0.5,125.2,1.5,125.0,-1.8,123.4,-4.6,121.0,-5.5,120.5,-3.0,
+     119.4,-2.0,119.8,-0.9],                                                // Sulawesi
+    [131.0,-1.0,134.5,-2.5,138.0,-1.5,141.0,-2.6,144.5,-4.3,147.5,-6.0,150.9,-10.2,
+     147.0,-8.0,143.0,-8.5,138.0,-8.4,134.0,-7.0,131.5,-4.0,131.0,-1.0],     // New Guinea
+    [120.9,18.6,122.3,18.5,122.0,14.5,124.0,12.5,126.6,9.8,125.5,6.0,121.9,6.4,
+     120.0,9.5,120.5,13.5,119.8,16.4,120.9,18.6],                            // Philippines
+    // ---- the Caribbean ----
+    [-84.9,21.9,-80.4,23.2,-74.1,20.2,-77.7,19.9,-82.0,21.8,-84.9,21.9],      // Cuba
+    [-74.5,18.2,-71.6,19.9,-68.3,19.0,-69.0,18.0,-72.0,18.2,-74.5,18.2],      // Hispaniola
+    // ---- the Arctic islands ----
+    [-63,66,-68,70,-73,71.5,-79,73.5,-85,73.0,-80,70.0,-72,67.0,-63,66],      // Baffin
+    [-70,76,-78,78,-88,78.5,-85,81.5,-70,83,-62,82,-64,79,-70,76],            // Ellesmere
+    [-104,68,-115,70,-118,73,-110,74,-102,72.5,-100,70,-104,68],              // Victoria
+    [11,77,20,78,28,78.5,25,80.5,17,80,11,79,11,77],                          // Svalbard
+    [52,70.5,56,71.5,60,73,68,73.5,69,76,62,76.5,56,73.5,52,70.5],            // Novaya Zemlya
+    // ---- Antarctica ----
+    [-180,-71,-160,-77,-150,-78,-135,-74,-120,-73,-105,-74,-90,-72,-75,-72,
+     -62,-64,-58,-63,-45,-70,-30,-71,-15,-71,0,-70,15,-70,30,-68,45,-67,
+     60,-67,75,-67,90,-66,105,-66,120,-66,135,-66,150,-71,165,-77,180,-71,
+     180,-90,-180,-90,-180,-71]
+  ],
+  /* Water inside the outlines. Painted out after the land, so the enclosed
+     and marginal seas read as sea rather than as more continent. */
+  seas: [
+    [-5.5,36,-2,36.5,4,42,9,44,13,46,16,42,19,40.5,23,38,27,40.5,32,36.5,
+     35,36,36,35,33,31.5,25,31.5,20,31,15,32,11,34,6,37,0,36,-5.5,36],       // Mediterranean
+    [28,41,31,45,34,46,38,46.5,41,43.5,40,43,37,45,33,42,29,41,28,41],        // Black Sea
+    [47,37,49,41,48,44,51,46,52,44,53,41,54,38,51,37,47,37],                  // Caspian
+    [43,12.6,38,18,35,24,34,28,36,28,38,22,42,15,43.4,12.6,43,12.6],          // Red Sea
+    [48,30,50,27,56,25,57,25.5,52,28,49,30.5,48,30],                          // Persian Gulf
+    [-95,68,-90,68.5,-85,66.5,-82,62,-78,59.5,-79,56.5,-84,55,-88,57,-93,58,
+     -95,63,-95,68],                                                          // Hudson Bay
+    [11,54.5,14,55,19,56,21,59,24,60,21,63,17,63.5,17,60.5,14,55.5,11,54.5],  // Baltic
+    [-92,47,-87,46.8,-84,46.5,-82,45.5,-83,43,-80,43,-77,43.5,-79,45.5,
+     -84,48,-89,48.5,-92,47],                                                 // the Great Lakes
+    [-114,31,-112,28,-109,24.5,-110,23.5,-112,26,-114,29,-114.5,31.5,-114,31], // Gulf of California
+    [58,45,61,45,61,43.5,58,43.5,58,45],                                       // Aral
+    [104,52,108,54.5,110,54,107,51.5,104,52],                                  // Baikal
+    [31.7,-1,34.1,-1,34.1,-2.8,31.7,-2.8,31.7,-1]                              // Victoria
   ],
   /* The dry places, as polygons. Aridity is not a latitude band: Tennessee and
      the Mojave sit at the same one. */
@@ -258,37 +359,80 @@ const GEO = {
     [115,-22,126,-19,140,-21,142,-29,134,-33,120,-33,114,-27],                  // Australian interior
     [75,38,90,43,105,45,113,40,100,35,84,34],                                   // Taklamakan / Gobi
     [59,31,70,28,75,25,70,22,61,26],                                            // Thar / Iranian
-    [-106,48,-98,46,-99,33,-105,31,-108,38]                                     // High Plains
+    [-106,48,-98,46,-99,33,-105,31,-108,38],                                    // High Plains
+    [18,-24,26,-22,30,-26,26,-30,19,-29]                                        // Karoo
   ],
   /* mountain ranges: [height in metres, line width in degrees, lon,lat, ...] */
   ranges: [
+    [2400, 3.4, -160,68, -152,68, -145,68],                                           // Brooks
     [3900, 3.2, -152,63, -147,62, -141,61],                                           // Alaska Range
     [3200, 3.0, -137,60, -130,57, -124,53, -119,50],                                  // Coast Mountains
     [3600, 3.0, -115,49, -112,45, -108,41, -106,37, -107,33],                         // Rockies
     [3000, 1.8, -121,48, -121,44, -121,41],                                           // Cascades
     [3300, 1.6, -120,39, -119,37, -118,36],                                           // Sierra Nevada
+    [2100, 5.0, -111,40, -110,37, -109,35],                                           // Colorado Plateau
+    [2600, 2.4, -105,26, -104,22, -100,19, -97,17],                                   // Sierra Madre Oriental
+    [2600, 2.4, -108,28, -105,24, -103,20, -101,19,                                   // Sierra Madre Occidental
+                -99,19, -96,17],
     [1600, 3.0, -84,34, -80,37, -76,40, -72,44],                                      // Appalachians
     [5200, 3.2, -71,-18, -70,-24, -70,-32, -71,-40, -72,-48],                         // Andes south
     [5600, 3.6, -77,2, -76,-6, -72,-14, -70,-18],                                     // Andes north
+    [3600, 5.0, -68,-16, -66,-19, -66,-22],                                           // Altiplano
+    [1400, 6.0, -60,3, -62,5, -58,4],                                                 // Guiana Shield
+    [1100, 7.0, -48,-18, -43,-20, -40,-22],                                           // Brazilian Highlands
     [2600, 3.0, -8,32, 0,31, 6,34, 10,35],                                            // Atlas
     [3400, 2.2, 6,46, 10,47, 14,47, 18,46],                                           // Alps
+    [2400, 1.6, -2,43, 1,42.7, 3,42.4],                                               // Pyrenees
+    [2000, 1.8, 12,44, 14,42, 16,40],                                                 // Apennines
+    [2200, 2.2, 20,49, 23,48, 25,46, 23,45],                                          // Carpathians
+    [2100, 2.0, 19,42, 21,43, 24,42                             ],                    // Balkans
     [2200, 3.4, 60,58, 60,64, 62,68],                                                 // Urals
     [4300, 2.4, 42,43, 46,42, 50,40],                                                 // Caucasus
+    [3400, 3.6, 30,39, 35,38, 40,39],                                                 // Anatolian plateau
     [3800, 3.4, 48,34, 54,32, 60,30],                                                 // Zagros
+    [4200, 2.6, 50,36, 54,36, 58,37],                                                 // Elburz / Kopet Dag
+    [6200, 2.6, 70,37, 73,38, 76,39],                                                 // Pamir
     [7200, 3.4, 72,35, 78,32, 84,29, 90,28, 95,29],                                   // Himalaya
+    [5400, 4.4, 76,36, 84,36, 92,36],                                                 // Kunlun
     [5800, 4.0, 74,40, 80,42, 86,44, 92,45],                                          // Tien Shan / Altai
-    [4200, 4.2, 92,32, 98,32, 103,31],                                                // Tibet east
+    [4600, 6.0, 82,32, 88,32, 94,31, 100,31],                                         // Tibet
+    [1400, 6.0, 76,18, 78,15, 77,12],                                                 // Deccan
+    [2100, 2.4, 73,17, 75,14, 77,10],                                                 // Western Ghats
     [2400, 3.0, 8,60, 12,64, 16,68],                                                  // Scandes
+    [2200, 3.0, 128,62, 133,66, 140,68],                                              // Verkhoyansk
+    [1800, 3.0, 158,56, 160,60, 163,62],                                              // Kamchatka
     [3600, 3.2, 37,9, 39,13, 42,10],                                                  // Ethiopian highlands
+    [2600, 2.0, 29,-2, 30,1, 32,3],                                                   // East African rift
+    [2600, 2.2, 28,-29, 30,-27, 31,-25],                                              // Drakensberg
     [1900, 2.2, 147,-20, 150,-26, 152,-31, 149,-36],                                  // Great Dividing
-    [3000, 1.8, 137,36, 139,36, 141,38]                                               // Japanese Alps
+    [2800, 1.4, 168,-45, 170,-43.5, 173,-42],                                         // Southern Alps
+    [3000, 1.8, 137,36, 139,36, 141,38],                                              // Japanese Alps
+    [2600, 2.0, 2300,0, 2300,0]                                                       // (unused tail)
   ]
 };
-
-/* Where the runway sits in the real world: Edwards, in the Mojave, which is
-   where this aeroplane actually lived. World x is east, z is north. */
-const ORIGIN = { lon: -117.884, lat: 34.905 };
-const M_PER_DEG_LAT = 110574, M_PER_DEG_LON = 111320;
+GEO.ranges.pop();
+/* Where the runway sits in the real world: Lewis County, Tennessee, on the
+   Western Highland Rim a few miles west of Hohenwald — the one patch of the
+   planet this simulator models properly, down to the creek valleys and the
+   Natchez Trace. World x is east, z is north, and every city, river, road and
+   landmark in the file is placed relative to this point. */
+const ORIGIN = { lon: -87.5980, lat: 35.5410 };
+/* A degree of longitude is 111 km at the equator and 90 km at the field,
+   because the meridians converge. Using the equatorial figure everywhere
+   stretched the whole planet twenty-three per cent east-west from where this
+   aeroplane flies: New York came out sixteen hundred kilometres away instead
+   of thirteen. The scale is set at the field's own latitude, which makes
+   distances true where you actually are and keeps the world a rectangular
+   grid — a tangent plane, which is the honest projection for a flat earth. */
+const M_PER_DEG_LAT = 110574;
+const M_PER_DEG_LON = 111320 * Math.cos(ORIGIN.lat * DEG);
+/* And longitude wraps. Tokyo is 227 degrees east of Tennessee the long way
+   round and 133 degrees west the short way; without the wrap it was placed
+   twenty-five thousand kilometres out, on the far side of a world that only
+   goes round once. */
+const wrapLon = d => { const w = ((d + 180) % 360 + 360) % 360 - 180; return w; };
+const lonToX = lon => wrapLon(lon - ORIGIN.lon) * M_PER_DEG_LON;
+const latToZ = lat => (lat - ORIGIN.lat) * M_PER_DEG_LAT;
 const worldToLon = x => ORIGIN.lon + x / M_PER_DEG_LON;
 const worldToLat = z => ORIGIN.lat + z / M_PER_DEG_LAT;
 
@@ -305,6 +449,17 @@ const ARID = new Uint8Array(GW * GH);
   // land in red, mountains in green, so one read-back gets both
   g0.fillStyle = "#f00";
   for (const pts of GEO.lands) {
+    g0.beginPath();
+    g0.moveTo(px(pts[0]), py(pts[1]));
+    for (let i = 2; i < pts.length; i += 2) g0.lineTo(px(pts[i]), py(pts[i + 1]));
+    g0.closePath(); g0.fill();
+  }
+  /* Water inside the outlines, painted back out. The Mediterranean, the
+     Caspian, Hudson Bay and the Great Lakes are enclosed by their own
+     coastlines, so filling the continent solid buries them; this puts them
+     back before anything reads the field. */
+  g0.fillStyle = "#000";
+  for (const pts of GEO.seas) {
     g0.beginPath();
     g0.moveTo(px(pts[0]), py(pts[1]));
     for (let i = 2; i < pts.length; i += 2) g0.lineTo(px(pts[i]), py(pts[i + 1]));
@@ -341,20 +496,40 @@ const ARID = new Uint8Array(GW * GH);
     const d = gs.getImageData(0, 0, w, h).data;
     return { w, h, d };
   };
-  const m8 = mip(8), m32 = mip(32), m96 = mip(96);
+  const m4 = mip(4), m8 = mip(8), m32 = mip(32), m96 = mip(96);
+  /* Bilinear, and wrapping in longitude. Nearest-neighbour into a mip that is
+     ten cells wide turns the whole ocean into a chessboard of depth steps, and
+     that is exactly what the sea floor looked like. */
   const samp = (m, ch, x, y) => {
-    const xi = clamp((x / GW * m.w) | 0, 0, m.w - 1), yi = clamp((y / GH * m.h) | 0, 0, m.h - 1);
-    return m.d[(yi * m.w + xi) * 4 + ch] / 255;
+    let u = x / GW * m.w - .5;
+    const v = clamp(y / GH * m.h - .5, 0, m.h - 1.001);
+    u = ((u % m.w) + m.w) % m.w;
+    const x0 = Math.floor(u), y0 = Math.floor(v);
+    const fx = u - x0, fy = v - y0;
+    const x1 = (x0 + 1) % m.w, y1 = Math.min(y0 + 1, m.h - 1);
+    const a = m.d[(y0 * m.w + x0) * 4 + ch], b = m.d[(y0 * m.w + x1) * 4 + ch];
+    const c2 = m.d[(y1 * m.w + x0) * 4 + ch], d2 = m.d[(y1 * m.w + x1) * 4 + ch];
+    return lerp(lerp(a, b, fx), lerp(c2, d2, fx), fy) / 255;
   };
   for (let y = 0; y < GH; y++) {
     for (let x = 0; x < GW; x++) {
       const i = y * GW + x;
       const land = base[i * 4] > 110;
-      const f = samp(m8, 0, x, y) * .40 + samp(m32, 0, x, y) * .36 + samp(m96, 0, x, y) * .24;
+      // how far inside the coast this is, at four scales
+      const near = samp(m4, 0, x, y);
+      const f = samp(m8, 0, x, y) * .34 + samp(m32, 0, x, y) * .34 + samp(m96, 0, x, y) * .32;
       const ridge = Math.max(base[i * 4 + 1] / 255, samp(m8, 1, x, y) * 1.25, samp(m32, 1, x, y) * .9);
       let h;
       if (land) h = 18 + Math.pow(clamp(f, 0, 1), 1.75) * 680;
-      else h = -90 - Math.pow(clamp(1 - f, 0, 1), 1.6) * 4600;
+      else {
+        /* A continental shelf, then the drop. Water within a couple of hundred
+           kilometres of a coast is a hundred metres deep, not four thousand;
+           going straight to the abyssal plain at the shoreline is what made
+           every coast a cliff edge. */
+        const shelf = clamp(near * 2.2, 0, 1);
+        const deep = Math.pow(clamp(1 - f, 0, 1), 1.9);
+        h = lerp(-140 - deep * 4700, -60, shelf);
+      }
       if (ridge > .02) h += Math.pow(clamp(ridge, 0, 1), 1.45) * 7200 * (land ? 1 : .25);
       ELEV[i] = clamp(h, -9000, 9000) | 0;
       // aridity, softened at the edges so deserts fade into what surrounds them
@@ -587,7 +762,7 @@ const FEATURES = {
    the country actually looks like from the air, and it is far finer than the
    world elevation field can carry, so it is built here instead. */
 const HOH = { lon: -87.5528, lat: 35.5492 };
-HOH.x = (HOH.lon - ORIGIN.lon) * M_PER_DEG_LON;
+HOH.x = lonToX(HOH.lon);
 HOH.z = (HOH.lat - ORIGIN.lat) * M_PER_DEG_LAT;
 const HOH_R = 80467;            // fifty miles
 function hohWeight(x, z) {
@@ -611,7 +786,7 @@ const RIV_X0 = () => HOH.x - RIV_SPAN * .5, RIV_Z0 = () => HOH.z - RIV_SPAN * .5
   for (const f of FEATURES.rivers) {
     let px = 0, pz = 0, have = false;
     for (let i = 1; i < f.length; i += 2) {
-      const X = (f[i] - ORIGIN.lon) * M_PER_DEG_LON, Z = (f[i + 1] - ORIGIN.lat) * M_PER_DEG_LAT;
+      const X = lonToX(f[i]), Z = latToZ(f[i + 1]);
       if (have) {
         const lo = Math.min(px, X), hi = Math.max(px, X);
         const lo2 = Math.min(pz, Z), hi2 = Math.max(pz, Z);
@@ -663,7 +838,7 @@ const LAKES = [
   { name: "Woods Reservoir", lon: -86.0900, lat: 35.3600, rx: 2200, rz: 3000, h: 288, rot: 0 }
 ];
 for (const L of LAKES) {
-  L.x = (L.lon - ORIGIN.lon) * M_PER_DEG_LON;
+  L.x = lonToX(L.lon);
   L.z = (L.lat - ORIGIN.lat) * M_PER_DEG_LAT;
 }
 
@@ -689,7 +864,7 @@ const LANDMARKS = [
   ["Frankfurt EDDF", 8.5706, 50.0333]
 ];
 for (const L of LANDMARKS) {
-  L.push((L[1] - ORIGIN.lon) * M_PER_DEG_LON, (L[2] - ORIGIN.lat) * M_PER_DEG_LAT);
+  L.push(lonToX(L[1]), latToZ(L[2]));
 }
 
 const CITIES = [];
@@ -701,7 +876,7 @@ const CITIES = [];
     const lon = +f[1], lat = +f[2], pop = +f[3];
     CITIES.push({
       name: f[0], lon, lat, pop,
-      x: (lon - ORIGIN.lon) * M_PER_DEG_LON, z: (lat - ORIGIN.lat) * M_PER_DEG_LAT,
+      x: lonToX(lon), z: latToZ(lat),
       // Built-up radius. Urban area scales close to pop^0.85, so radius goes as
       // pop^0.42; the constant is fitted to real extents at both ends — about
       // 1.1 km for a town of 3,700 and 50 km across a metropolis of 37 million.
@@ -747,7 +922,7 @@ function cityAt(x, z) {
 /* ================================================================ world == */
 const WORLD = {
   sea: 0,                       // water surface height (m)
-  fieldElev: 705,               // Edwards sits at 2,300 ft in the Mojave
+  fieldElev: 272,               // 892 ft, which is what the field there really is
   fieldR: 2400,                 // radius of flattened airport basin
   rwyLen: 1900, rwyW: 46,       // runway 18/36, aligned with the Z (north) axis
   sun: vnorm(v3(-.38, .70, .60)),
@@ -2248,7 +2423,7 @@ function drawRoadsRivers() {
       const wid = f[0] * widthK;
       let prev = null;
       for (let i = 1; i < f.length; i += 2) {
-        const x = (f[i] - ORIGIN.lon) * M_PER_DEG_LON, z = (f[i + 1] - ORIGIN.lat) * M_PER_DEG_LAT;
+        const x = lonToX(f[i]), z = latToZ(f[i + 1]);
         const pt = { x, z };
         if (prev) {
           const mx = (prev.x + x) * .5, mz = (prev.z + z) * .5;
@@ -2836,7 +3011,7 @@ function resetPlane(scen) {
     P.gear = P.gearCmd = 0;
   } else if (scen === "hohenwald") {
     // 6 km up and a little north-west of the town, running in toward it
-    const cx = (-87.62 - ORIGIN.lon) * M_PER_DEG_LON, cz = (35.72 - ORIGIN.lat) * M_PER_DEG_LAT;
+    const cx = lonToX(-87.62), cz = latToZ(35.72);
     P.pos = v3(cx, terrainH(cx, cz) + 5200, cz);
     P.q = qAxis(0, 1, 0, Math.PI * .86);
     P.vel = mRot(qMat(P.q, new Float32Array(9)), v3(0, 0, 240));
@@ -4712,7 +4887,7 @@ function earthNight(nx, ny, nz, fr) {
   const lon = Math.atan2(nx * fr.eas[0] + ny * fr.eas[1] + nz * fr.eas[2],
                          nx * fr.ref[0] + ny * fr.ref[1] + nz * fr.ref[2]) / DEG + ORIGIN.lon;
   if (worldElev(lon, lat) <= 0) return 0;
-  return cityAt((lon - ORIGIN.lon) * M_PER_DEG_LON, (lat - ORIGIN.lat) * M_PER_DEG_LAT);
+  return cityAt(lonToX(lon), latToZ(lat));
 }
 
 /* ---- a world you are close to -------------------------------------------
