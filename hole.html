@@ -48,11 +48,11 @@
 </div></div>
 <div id="toast"></div>
 <div id="stick"><div id="knob"></div></div>
-<div id="btns"><button id="mute">Sound: on</button></div>
+<div id="btns"><button id="rotL" title="Rotate (Q)">&#10226;</button><button id="view" title="Camera angle (V)">View 45&deg;</button><button id="rotR" title="Rotate (E)">&#10227;</button><button id="mute">Sound: on</button></div>
 <div id="start">
   <h1>HOLE CITY</h1>
   <p>You are a hole in the ground. Swallow anything smaller than you: cones, people, cars, buses, houses, then whole towers. The city doesn't end.</p>
-  <p style="opacity:.75;font-size:14px">Drag anywhere (touch or mouse) or use WASD / arrow keys.</p>
+  <p style="opacity:.75;font-size:14px">Drag anywhere (touch or mouse) or use WASD / arrow keys.<br>Q / E rotate the view, V changes the camera angle.</p>
   <div class="go">Tap to start</div>
 </div>
 <div id="err"></div>
@@ -124,14 +124,25 @@ groundMat.onBeforeCompile = sh => {
 // anything below street level fades to black as it drops into the hole
 function sinkShade(sh) {
   sh.uniforms.uHole = holeU;
-  sh.vertexShader = 'varying float vWY;\n' + sh.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
+  sh.vertexShader = 'varying vec3 vWP;\n' + sh.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
     vec4 wy4 = vec4(transformed, 1.0);
     #ifdef USE_INSTANCING
       wy4 = instanceMatrix * wy4;
     #endif
-    vWY = (modelMatrix * wy4).y;`);
-  sh.fragmentShader = 'uniform vec3 uHole;\nvarying float vWY;\n' + sh.fragmentShader.replace('#include <opaque_fragment>',
-    'outgoingLight *= clamp(1.0 + min(vWY, 0.0) / (0.8 + uHole.z * 0.9), 0.0, 1.0);\n#include <opaque_fragment>');
+    vWP = (modelMatrix * wy4).xyz;`);
+  sh.fragmentShader = 'uniform vec3 uHole;\nvarying vec3 vWP;\n' + sh.fragmentShader
+    .replace('void main() {', `void main() {
+      // see-through: tall stuff standing between the camera and the hole gets dithered out
+      {
+        vec3 hc = vec3(uHole.x, 0.0, uHole.y);
+        vec3 dir = hc - cameraPosition; float L = length(dir); dir /= L;
+        vec3 rel = vWP - cameraPosition; float t = dot(rel, dir);
+        float perp = length(rel - dir * t);
+        if (vWP.y > 1.2 + uHole.z * 0.25 && t > 0.0 && t < L - uHole.z * 0.6 && perp < uHole.z * 1.4 + 2.5
+            && mod(floor(gl_FragCoord.x) + floor(gl_FragCoord.y), 2.0) < 1.0) discard;
+      }`)
+    .replace('#include <opaque_fragment>',
+    'outgoingLight *= clamp(1.0 + min(vWP.y, 0.0) / (0.8 + uHole.z * 0.9), 0.0, 1.0);\n#include <opaque_fragment>');
 }
 
 // props: vertex colours; pure-white vertices take the per-instance tint
@@ -777,7 +788,26 @@ const endStick = e => { if (e.pointerId !== stick.id) return; stick.on = false; 
 addEventListener('pointerup', endStick); addEventListener('pointercancel', endStick);
 
 // ---------------------------------------------------------------- streaming
-let loadRange = 120, camH = 20;
+let loadRange = 120, camD = 25;
+const PITCHES = [22, 30, 45, 60, 75];
+let pitchIdx = 2;
+try { const v = +localStorage.getItem('holecity.pitch'); if (PITCHES.includes(v)) pitchIdx = PITCHES.indexOf(v); } catch (_) { }
+const view = { yaw: 0, yawT: 0, pitch: PITCHES[pitchIdx] * Math.PI / 180, rot: 0 };
+const viewBtn = $('view');
+function setPitch(i) {
+  pitchIdx = (i + PITCHES.length) % PITCHES.length;
+  viewBtn.innerHTML = 'View ' + PITCHES[pitchIdx] + '&deg;';
+  try { localStorage.setItem('holecity.pitch', PITCHES[pitchIdx]); } catch (_) { }
+}
+setPitch(pitchIdx);
+const noStick = el => { el.addEventListener('pointerdown', e => e.stopPropagation()); };
+viewBtn.onclick = () => setPitch(pitchIdx + 1); noStick(viewBtn);
+for (const [id, d] of [['rotL', -1], ['rotR', 1]]) {
+  const el = $(id); noStick(el);
+  el.addEventListener('pointerdown', () => { view.rot = d; });
+  for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) el.addEventListener(ev, () => { if (view.rot === d) view.rot = 0; });
+}
+addEventListener('keydown', e => { if (e.code === 'KeyV' && !e.repeat) setPitch(pitchIdx + 1); });
 function streamChunks(budgetMs) {
   const rad = Math.min(MAX_CHUNK_RADIUS, Math.max(2, Math.ceil(loadRange / C)));
   const hcx = Math.floor(hole.x / C), hcz = Math.floor(hole.z / C);
@@ -796,7 +826,7 @@ function streamChunks(budgetMs) {
 
 // ---------------------------------------------------------------- main loop
 let started = false, last = performance.now();
-const camPos = new V3();
+const camTarget = new V3(hole.x, 0, hole.z);
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
@@ -807,24 +837,33 @@ function frame(now) {
     let mz = (keys.KeyS || keys.ArrowDown ? 1 : 0) - (keys.KeyW || keys.ArrowUp ? 1 : 0) + stick.y;
     const len = Math.hypot(mx, mz); if (len > 1) { mx /= len; mz /= len; }
     const speed = 7 + hole.r * 1.6;
-    hole.x += mx * speed * dt; hole.z += mz * speed * dt;
+    const cy = Math.cos(view.yaw), sy = Math.sin(view.yaw);
+    hole.x += (mx * cy + mz * sy) * speed * dt; hole.z += (-mx * sy + mz * cy) * speed * dt;
   }
   hole.r += (hole.targetR - hole.r) * Math.min(1, dt * 3);
   updateHoleMesh();
 
   // camera
-  camH = Math.min(320, 13 + hole.r * 7.5);
-  loadRange = camH * 3.4 + 30;
-  camPos.set(hole.x, camH, hole.z + camH * 0.78);
-  camera.position.lerp(camPos, Math.min(1, dt * 6));
-  camera.lookAt(camera.position.x, 0, camera.position.z - camH * 0.86);
-  camera.near = Math.max(0.3, camH * 0.04); camera.far = loadRange * 2.2 + 100; camera.updateProjectionMatrix();
-  scene.fog.near = camH * 1.6; scene.fog.far = loadRange * 1.05;
+  const rotIn = view.rot + (keys.KeyE ? 1 : 0) - (keys.KeyQ ? 1 : 0);
+  view.yawT += rotIn * 1.6 * dt;
+  view.yaw += (view.yawT - view.yaw) * Math.min(1, dt * 8);
+  view.pitch += (PITCHES[pitchIdx] * Math.PI / 180 - view.pitch) * Math.min(1, dt * 5);
+  const low = Math.max(0, (45 * Math.PI / 180 - view.pitch) / (23 * Math.PI / 180));   // 0 at 45°, 1 at 22°
+  camD = Math.min(420, (16 + hole.r * 9.5) * (1 - low * 0.12));
+  loadRange = camD * (2.8 + low * 1.4) + 30;
+  camTarget.x += (hole.x - camTarget.x) * Math.min(1, dt * 8);
+  camTarget.z += (hole.z - camTarget.z) * Math.min(1, dt * 8);
+  const cp = Math.cos(view.pitch), spp = Math.sin(view.pitch);
+  const lookY = hole.r * 0.3 * low;
+  camera.position.set(camTarget.x + Math.sin(view.yaw) * cp * camD, lookY + spp * camD, camTarget.z + Math.cos(view.yaw) * cp * camD);
+  camera.lookAt(camTarget.x, lookY, camTarget.z);
+  camera.near = Math.max(0.3, camD * 0.03); camera.far = loadRange * 2.4 + 100; camera.updateProjectionMatrix();
+  scene.fog.near = camD * (1.3 - low * 0.3); scene.fog.far = loadRange * 1.05;
 
   // sun + shadow frustum follow the hole
-  const sh = sun.shadow.camera, ext = Math.max(30, camH * 1.7);
+  const sh = sun.shadow.camera, ext = Math.max(30, camD * (1.3 + low * 0.6));
   sh.left = -ext; sh.right = ext; sh.top = ext; sh.bottom = -ext; sh.near = 1; sh.far = ext * 6 + 200; sh.updateProjectionMatrix();
-  sun.target.position.set(hole.x, 0, hole.z - camH * 0.3);
+  sun.target.position.set(hole.x - Math.sin(view.yaw) * ext * 0.35, 0, hole.z - Math.cos(view.yaw) * ext * 0.35);
   sun.position.copy(sun.target.position).addScaledVector(SUN_DIR, ext * 2 + 100);
 
   streamChunks(started ? 6 : 30);
@@ -859,7 +898,6 @@ function frame(now) {
 
 updateHoleMesh();
 updateHud();
-camera.position.set(hole.x, camH, hole.z + camH * 0.78);
 requestAnimationFrame(frame);
 
 $('start').addEventListener('pointerdown', e => {
