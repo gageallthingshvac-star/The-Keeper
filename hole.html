@@ -79,7 +79,8 @@
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+  "@dimforge/rapier3d-compat": "https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.12.0/rapier.es.js"
 } }
 </script>
 <script type="module">
@@ -92,6 +93,8 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import RAPIER from '@dimforge/rapier3d-compat';
+await RAPIER.init();
 
 window.addEventListener('error', e => { const el = document.getElementById('err'); el.style.display = 'block'; el.textContent += (e.message || e) + '\n'; });
 
@@ -571,6 +574,7 @@ for (const k in TYPES) {
   if (!t.raw && !t.noAO) g = bakeAO(g);
   t.pool = new Pool(g, t.mat || propMat, k === 'bldg' ? 256 : 128);
   { const pa = g.attributes.position; let m = 0; for (let i = 0; i < pa.count; i++) m = Math.max(m, Math.hypot(pa.getX(i), pa.getZ(i))); t.fit = m; }
+  g.computeBoundingBox(); t.bb = g.boundingBox.clone();
   t.pool.mesh.castShadow = t.shadow = k === 'bldg' || t.h >= 2.4 || t.s >= 1.8;
   t.poolLo = gl ? new Pool(gl, t.mat || propMat, 256) : t.pool;
   if (gl) t.poolLo.mesh.castShadow = false;
@@ -597,7 +601,6 @@ const pick = (rng, arr) => arr[Math.floor(rng() * arr.length)];
 
 // ---------------------------------------------------------------- world objects
 const eatenIds = new Set();
-const falling = [];
 let nextDynId = 0;
 
 function spawn(typeKey, x, y, z, ry, opt = {}) {
@@ -620,9 +623,13 @@ function spawn(typeKey, x, y, z, ry, opt = {}) {
   writeMatrix(o);
   return o;
 }
+function baseQuat(o, q) {
+  q.setFromAxisAngle(UP, o.ry);
+  if (o.tilt) { tmpQ2.setFromAxisAngle(tmpV.set(o.ax, 0, o.az), o.tilt); q.premultiply(tmpQ2); }
+  return q;
+}
 function writeMatrix(o) {
-  tmpQ.setFromAxisAngle(UP, o.ry);
-  if (o.tilt) { tmpQ2.setFromAxisAngle(tmpV.set(o.ax, 0, o.az), o.tilt); tmpQ.premultiply(tmpQ2); }
+  if (o.q) tmpQ.copy(o.q); else baseQuat(o, tmpQ);
   tmpM.compose(tmpV.set(o.x, o.y, o.z), tmpQ, tmpS.set(o.sx, o.sy, o.sz));
   o.pool.setMatrix(o.slot, tmpM);
   if (o.kids) {
@@ -942,7 +949,10 @@ function genChunk(cx, cz) {
 }
 
 function dropChunk(ch) {
-  for (const o of ch.objs) if (o.state === 0) releaseObj(o);
+  for (const o of ch.objs) {
+    if (o.state === 1) { const k = active.indexOf(o); if (k >= 0) active.splice(k, 1); physWorld.removeRigidBody(o.body); o.body = null; }
+    if (o.state <= 1) releaseObj(o);
+  }
   scene.remove(ch.mesh); ch.mesh.geometry.dispose();
   chunks.delete(ch.key);
 }
@@ -1147,22 +1157,64 @@ function updateDust(dt) {
 }
 
 // ---------------------------------------------------------------- swallowing
-function startFall(o) {
+// ---------------------------------------------------------------- physics: the hole is a real opening
+// The ground near the hole is a physical ring (inner edge = the hole's rim) with a wall going down
+// inside it, both following the hole. Anything close to the hole becomes a rigid body sized to its
+// model's bounding box and rests on that ring. Whether it drops is up to gravity: it tips over the
+// rim, bridges the gap if it's too wide, and only counts once it has actually sunk below the rim.
+const physWorld = new RAPIER.World({ x: 0, y: -14, z: 0 });
+physWorld.timestep = 1 / 60;
+const active = [];
+let ringCol = null, wallCol = null, ringR = -1, ringOuter = 0, physAcc = 0;
+function buildHoleColliders() {
+  const r = hole.r;
+  if (ringCol && Math.abs(r - ringR) < r * 0.01) return;
+  ringR = r; ringOuter = r * 2 + 70;
+  if (ringCol) physWorld.removeCollider(ringCol, true);
+  if (wallCol) physWorld.removeCollider(wallCol, true);
+  const seg = 72, depth = r * 6 + 14;
+  const rv = new Float32Array(seg * 2 * 3), wv = new Float32Array(seg * 2 * 3), ri = [], wi = [];
+  for (let i = 0; i < seg; i++) {
+    const a = i / seg * Math.PI * 2, c = Math.cos(a), sn = Math.sin(a);
+    rv.set([c * r, 0, sn * r, c * ringOuter, 0, sn * ringOuter], i * 6);
+    wv.set([c * r, 0, sn * r, c * r, -depth, sn * r], i * 6);
+    const j = (i + 1) % seg, A = i * 2, B = i * 2 + 1, Cc = j * 2, D = j * 2 + 1;
+    ri.push(A, Cc, B, B, Cc, D); wi.push(A, B, Cc, Cc, B, D);
+  }
+  ringCol = physWorld.createCollider(RAPIER.ColliderDesc.trimesh(rv, new Uint32Array(ri)).setTranslation(hole.x, 0, hole.z).setFriction(0.9));
+  wallCol = physWorld.createCollider(RAPIER.ColliderDesc.trimesh(wv, new Uint32Array(wi)).setTranslation(hole.x, 0, hole.z).setFriction(0.3));
+}
+function activate(o) {
   o.state = 1;
-  let dx = o.x - hole.x, dz = o.z - hole.z, d = Math.hypot(dx, dz);
-  if (d < 1e-3) { const a = Math.random() * 6.28; dx = Math.cos(a); dz = Math.sin(a); d = 1; }
-  // tilt axis so the top leans toward the hole centre
-  o.ax = -dz / d; o.az = dx / d;
-  o.tiltV = 0.5 + Math.random();
-  o.vx = 0; o.vz = 0; o.vy = 0;
-  falling.push(o);
+  if (!o.q) o.q = baseQuat(o, new THREE.Quaternion());
+  const py = o.physY || 0;
+  o.baseY = o.y - py;               // kerbs, water etc.: physics runs on a flat ring, the offset keeps the look
+  const bd = RAPIER.RigidBodyDesc.dynamic().setTranslation(o.x, py, o.z).setRotation({ x: o.q.x, y: o.q.y, z: o.q.z, w: o.q.w })
+    .setLinearDamping(0.05).setAngularDamping(0.4).setCcdEnabled(o.size < 1);
+  if (o.dyn && o.kind === 'car') { const v = o.dyn.speed * o.dyn.dir; bd.setLinvel(o.dyn.alongX ? v : 0, 0, o.dyn.alongX ? 0 : v); }
+  o.body = physWorld.createRigidBody(bd);
+  const bb = o.t.bb, sx = o.sx, sy = o.sy, sz = o.sz;
+  const hx = Math.max(0.03, (bb.max.x - bb.min.x) / 2 * sx), hy = Math.max(0.03, (bb.max.y - bb.min.y) / 2 * sy), hz = Math.max(0.03, (bb.max.z - bb.min.z) / 2 * sz);
+  physWorld.createCollider(RAPIER.ColliderDesc.cuboid(hx, hy, hz)
+    .setTranslation((bb.max.x + bb.min.x) / 2 * sx, (bb.max.y + bb.min.y) / 2 * sy, (bb.max.z + bb.min.z) / 2 * sz)
+    .setFriction(0.8).setDensity(o.t.raw ? 0.25 : 1), o.body);
+  active.push(o);
+}
+function deactivate(o, i) {
+  active.splice(i, 1);
+  physWorld.removeRigidBody(o.body); o.body = null;
+  o.state = 0;
+  if (o.dyn) { o.q = null; o.tilt = 0; o.physY = 0; placeDyn(o, o.kind, false); stepDyn(o, 0); }
+}
+function consume(o) {
+  o.state = 2;
   if (o.id && !o.dyn) eatenIds.add(o.id);
   hole.eaten++;
   const pts = Math.max(1, Math.round(o.size * o.size * 10));
   hole.score += pts;
   hole.mass += o.size * o.size;
   hole.targetR = Math.sqrt(R0 * R0 + GROW_K * hole.mass);
-  if (o.size >= Math.max(1.5, hole.r * 0.45)) popText(o.name + (o.t.key === 'bldg' ? ' · ' + Math.round(o.h) + ' m tall' : '') + ' +' + pts, o.x, o.z, true);
+  if (o.size >= Math.max(1.5, hole.r * 0.45)) popText(o.name + (o.t.raw ? ' · ' + Math.round(o.h) + ' m tall' : '') + ' +' + pts, o.x, o.z, true);
   else if (o.size >= hole.r * 0.25) popText('+' + pts, o.x, o.z, false);
   blip(o.size);
   if (o.size > hole.r * 0.45) shake = Math.min(1.2, shake + o.size / hole.r * 0.5);
@@ -1170,47 +1222,38 @@ function startFall(o) {
   if (navigator.vibrate && o.size > 3) navigator.vibrate(20);
   updateHud();
 }
-const wobbling = new Set();
+// anything near the opening joins the simulation
 function tryEat(o) {
   if (o.state !== 0) return;
-  const dx = o.x - hole.x, dz = o.z - hole.z, d = Math.hypot(dx, dz);
-  if (o.size <= hole.r) { if (d < hole.r) startFall(o); return; }
-  // too big to go through: if it overhangs the opening, it leans toward it
-  const over = hole.r + o.size - d;
-  if (over <= 0 || o.t.raw) return;
-  const k = Math.min(1, over / (o.size * 2)) * Math.min(1, hole.r / o.size);
-  const want = 0.22 * k;
-  if (d > 1e-3) { o.ax = -dz / d; o.az = dx / d; }
-  o.tilt += (want - o.tilt) * 0.2;
-  o.wobF = frameNo; wobbling.add(o);
-  writeMatrix(o);
+  const d = Math.hypot(o.x - hole.x, o.z - hole.z);
+  if (d < hole.r + o.size + 1.5) activate(o);
 }
-function settleWobbles() {
-  for (const o of wobbling) {
-    if (o.state !== 0) { wobbling.delete(o); continue; }
-    if (o.wobF === frameNo) continue;
-    o.tilt *= 0.8;
-    if (o.tilt < 0.002) { o.tilt = 0; wobbling.delete(o); }
+function physicsStep(dt) {
+  buildHoleColliders();
+  ringCol.setTranslation({ x: hole.x, y: 0, z: hole.z });
+  wallCol.setTranslation({ x: hole.x, y: 0, z: hole.z });
+  physAcc += dt;
+  let n = 0;
+  while (physAcc >= physWorld.timestep && n < 3) { physWorld.step(); physAcc -= physWorld.timestep; n++; }
+  if (n === 3) physAcc = 0;
+  for (let i = active.length - 1; i >= 0; i--) {
+    const o = active[i], b = o.body, t = b.translation(), q = b.rotation();
+    o.x = t.x; o.z = t.z; o.physY = t.y; o.y = t.y + o.baseY;
+    o.q.set(q.x, q.y, q.z, q.w);
     writeMatrix(o);
-  }
-}
-function updateFalling(dt) {
-  for (let i = falling.length - 1; i >= 0; i--) {
-    const o = falling[i];
-    const dx = hole.x - o.x, dz = hole.z - o.z;
-    const pull = 5 + 10 / (1 + o.size);
-    o.vx += dx * pull * dt; o.vz += dz * pull * dt;
-    o.vx *= 1 - Math.min(1, dt * 4); o.vz *= 1 - Math.min(1, dt * 4);
-    o.vy -= (18 + hole.r * 2) * dt;
-    o.x += o.vx * dt; o.z += o.vz * dt; o.y += o.vy * dt;
-    o.tiltV += dt * 2.5; o.tilt = Math.min(1.45, o.tilt + o.tiltV * dt);
-    writeMatrix(o);
-    if (o.y < -(o.h * 1.4 + 4 + hole.r * 2)) {
-      falling.splice(i, 1);
+    const d = Math.hypot(o.x - hole.x, o.z - hole.z);
+    if (o.state === 1 && t.y < -(Math.min(o.h, 6) * 0.5 + 0.3) && d < hole.r + 0.5) consume(o);
+    if (t.y < -(o.h + hole.r * 3 + 8)) {
+      active.splice(i, 1); physWorld.removeRigidBody(b); o.body = null;
       releaseObj(o);
-      o.state = 2;
+      o.state = 3;
       if (o.dyn) { const k = dyn.indexOf(o); if (k >= 0) dyn.splice(k, 1); makeDyn(o.kind, false); }
+      continue;
     }
+    if (o.state !== 1) continue;
+    if (d < hole.r + o.size + 1) { b.wakeUp(); continue; }
+    const v = b.linvel();
+    if ((d > hole.r + o.size + 8 && (b.isSleeping() || v.x * v.x + v.y * v.y + v.z * v.z < 0.05)) || d > ringOuter * 0.8) deactivate(o, i);
   }
 }
 
@@ -1943,18 +1986,17 @@ function frame(now) {
 
   // swallow statics near the hole
   if (started) {
-    const reach = hole.r * 2 + 6;
+    const reach = hole.r + 40;
     const cx0 = Math.floor((hole.x - reach) / C), cx1 = Math.floor((hole.x + reach) / C);
     const cz0 = Math.floor((hole.z - reach) / C), cz1 = Math.floor((hole.z + reach) / C);
     for (let cz = cz0; cz <= cz1; cz++) for (let cx = cx0; cx <= cx1; cx++) {
       const ch = chunks.get(cx + ',' + cz); if (!ch) continue;
       let dead = 0;
-      for (const o of ch.objs) { tryEat(o); if (o.state !== 0) dead++; }
-      if (dead > 32) ch.objs = ch.objs.filter(o => o.state === 0);
+      for (const o of ch.objs) { tryEat(o); if (o.state > 1) dead++; }
+      if (dead > 32) ch.objs = ch.objs.filter(o => o.state <= 1);
     }
   }
-  settleWobbles();
-  updateFalling(dt);
+  if (started) physicsStep(dt);
   updatePops(dt);
 
   updateDust(dt);
@@ -1982,7 +2024,7 @@ $('start').addEventListener('pointerdown', e => {
   started = true;
   try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (_) { }
 });
-window.__game = { hole, chunks, dyn, falling, TYPES, cosmos, jumpCosmos, start: () => $('start').dispatchEvent(new PointerEvent('pointerdown')) };
+window.__game = { hole, chunks, dyn, active, TYPES, cosmos, jumpCosmos, start: () => $('start').dispatchEvent(new PointerEvent('pointerdown')) };
 </script>
 </body>
 </html>
