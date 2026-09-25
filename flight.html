@@ -70,6 +70,8 @@
   }
   #touchNote{font-size:11.5px;color:var(--dim);line-height:1.6}
   #touchNote b{color:var(--ink);font-weight:600}
+  #logList{font-size:11.5px;color:var(--dim);line-height:1.8}
+  #logList b{color:var(--ink);font-weight:700}
 </style>
 </head>
 <body>
@@ -98,12 +100,21 @@
         <button class="opt" data-scen="land"><b>LANDING CHALLENGE</b><i>9 km final, gear and flaps set. Stream the chute with <kbd>X</kbd> after touchdown. Scored on centreline, sink rate and touchdown point.</i></button>
       </div>
 
+      <h2>Damage</h2>
+      <div class="row" id="safeRow">
+        <button class="opt on" data-safe="on"><b>AIRFRAME HOLDS</b><i>Nothing writes the aeroplane off. Hit anything and it is set back on its feet. <kbd>K</kbd></i></button>
+        <button class="opt" data-safe="off"><b>REAL DAMAGE</b><i>Structural contact, a hard landing or a gear-up touchdown ends the flight.</i></button>
+      </div>
+
+      <h2>Pilot log</h2>
+      <div id="logList"></div>
+
       <h2 id="keyHead">Keys</h2>
       <div class="keys" id="keyList"></div>
       <div id="touchNote" class="hide"></div>
 
       <button class="go" id="startBtn">BEGIN FLIGHT</button>
-      <div class="foot">Esc pauses &middot; R resets the aircraft &middot; L shows the control card in flight &middot; Z flies the autopilot</div>
+      <div class="foot">Esc pauses &middot; R or the RESET button restarts the flight &middot; K toggles safe mode &middot; L shows the control card in flight &middot; Z flies the autopilot</div>
     </div>
   </div>
 </div>
@@ -1421,6 +1432,17 @@ const DL = {
     this.fill[i] = fill; this.stroke[i] = stroke || null; this.lw[i] = lw || 1;
     for (let k = 0; k < count * 2; k++) this.pts[this.pn++] = sp[k];
   },
+  /* A picture, at a depth, in a rectangle. One entry for something that
+     would otherwise be thousands of quads. */
+  img(depth, src, x, y, w, h, alpha) {
+    if (this.n >= DLMAX || this.pn + 5 > this.pts.length) return;
+    const i = this.n++;
+    this.kind[i] = 2; this.depth[i] = depth; this.off[i] = this.pn; this.cnt[i] = 1;
+    this.fill[i] = src; this.stroke[i] = null;
+    this.pts[this.pn++] = x; this.pts[this.pn++] = y;
+    this.pts[this.pn++] = w; this.pts[this.pn++] = h;
+    this.pts[this.pn++] = alpha === undefined ? 1 : alpha;
+  },
   sprite(depth, x, y, r, img, alpha) {
     if (this.n >= DLMAX || this.pn + 4 > this.pts.length) return;
     const i = this.n++;
@@ -1436,6 +1458,14 @@ const DL = {
     Array.prototype.sort.call(sub, (a, b) => this.depth[b] - this.depth[a]);
     for (let k = 0; k < n; k++) {
       const i = sub[k], o = this.off[i];
+      if (this.kind[i] === 2) {
+        const a = this.pts[o + 4];
+        if (a < .012) continue;
+        ctx.globalAlpha = a > 1 ? 1 : a;
+        ctx.drawImage(this.fill[i], this.pts[o], this.pts[o + 1], this.pts[o + 2], this.pts[o + 3]);
+        ctx.globalAlpha = 1;
+        continue;
+      }
       if (this.kind[i] === 1) {
         const r = this.pts[o + 2], a = this.pts[o + 3];
         if (r < .4 || a < .012) continue;
@@ -4028,7 +4058,7 @@ function physics(P, dt) {
     }
   }
   P.wow = wow;
-  if (wow && !P.onGround) { P.touched = 1.2; P.hardLand = -P.lastVS; }
+  if (wow && !P.onGround) { P.touched = 1.2; P.hardLand = -P.lastVS; if (!P.crashed) logWorld("Earth"); }
   P.onGround = wow > 0;
   if (P.touched > 0) P.touched = Math.max(0, P.touched - dt);
   if (!wow) P.lastVS = P.vel.y;
@@ -4222,6 +4252,7 @@ function bodyContact(P, dt) {
       : P.gear < .9 ? "GEAR UP" : null;
     if (why) { bodyBounce(P, b, why); return; }
     P.onBody = b;
+    logWorld(b.name);
     const g = b.gm / (touching.surf * touching.surf);
     toast("DOWN ON " + b.name.toUpperCase() + " · " + (g / 9.81).toFixed(2) + " g · "
       + Math.round(vt) + " m/s", 3.4);
@@ -4349,15 +4380,62 @@ function showBanner(msg, col) {
 }
 function hideBanner() { banner.style.opacity = 0; }
 
+/* ---- safe mode -----------------------------------------------------------
+
+   A planet's surface already refuses to destroy the aeroplane: hit it badly
+   and bodyBounce puts you back on your feet with a bang and a shake. Safe
+   mode is that same deal applied to the ground at home. It is not really a
+   cheat; it is the difference between a simulator you can learn to land in
+   and one that sends you back to the runway every time you misjudge a flare.
+
+   It is ON by default, and it is a setting, so anyone who wants the airframe
+   to be made of metal can have it back from the menu or with K. */
+let NOCRASH = true;
+function toggleSafe() {
+  NOCRASH = !NOCRASH;
+  toast(NOCRASH ? "SAFE MODE ON \u00b7 THE AIRFRAME HOLDS" : "SAFE MODE OFF \u00b7 REAL DAMAGE", 2.6);
+  audio.beep(NOCRASH ? 720 : 300, .18, .14);
+  syncSafeRow();
+}
+function syncSafeRow() {
+  document.querySelectorAll("#safeRow .opt").forEach(o =>
+    o.classList.toggle("on", (o.dataset.safe === "on") === NOCRASH));
+}
+function saveAirframe(why) {
+  const P = PLANE;
+  if (P.gearCmd < .5) P.gearCmd = 1;          // whatever else went wrong, wheels out
+  /* Off the ground, always, however many of the four tests fired this step.
+     What only happens once per intervention is the cost: the speed you lose,
+     the attitude being put back level, and the message saying so. */
+  const gh = groundH(P.pos.x, P.pos.z);
+  const want = gh + gearDrop(P) + .8;
+  if (P.pos.y < want) P.pos.y = want;
+  if (P.vel.y < 0) P.vel.y = 0;
+  P.touched = 0; P.lastVS = 0; P.prev = null;
+  P.gStress = 0; P.gRed = 0;
+  cam.shake = Math.max(cam.shake || 0, 1.5);
+  if ((P.hardT || 0) <= 0) {
+    P.vel.x *= .55; P.vel.z *= .55;           // most of it goes into the scenery
+    P.w = v3(P.w.x * .2, P.w.y * .2, P.w.z * .2);
+    // wings level, nose on the horizon, pointed wherever it was pointed
+    P.q = qAxis(0, 1, 0, Math.atan2(P.m[6], P.m[8]));
+    toast(why + " \u00b7 AIRFRAME HELD \u00b7 SAFE MODE", 3.0);
+    audio.beep(120, .42, .26);
+    LOG.saves++; LOG.dirty = 1;
+  }
+  P.hardT = 2.4;
+}
+
 function crash(why) {
   const P = PLANE;
   if (P.crashed) return;
+  if (NOCRASH) { saveAirframe(why); return; }
   P.crashed = true; P.crashT = 0; P.msg = why;
   for (let i = 0; i < 34; i++) spawnFire(P.pos);
   for (let i = 0; i < 16; i++) spawnSmoke(P.pos, P.vel);
   cam.shake = 2.2;
   audio.boom();
-  showBanner(why + "  \u00b7  R TO RESET", "#ff6a56");
+  showBanner(why + "  \u00b7  R OR THE RESET BUTTON", "#ff6a56");
   GAME.over = true; GAME.result = why;
 }
 
@@ -4677,6 +4755,7 @@ BODIES.push({
   noHit: true, home: true
 });
 const SUNBODY = BODIES[0];
+const HOMEBODY = BODIES[BODIES.length - 1];      // the Earth entry pushed above
 
 /* Which one you are nearest, and how far off its surface — the navigation
    read-out, and what the gravity and the collision test both key off. */
@@ -5119,6 +5198,11 @@ function drawBodyNear(b, d, fade) {
      however big the thing is on the glass. A fixed count is a mosaic when the
      planet fills the screen and wasted work when it does not. */
   const scr = clamp(F * Math.tan(Math.asin(clamp(r / d, 0, .9999))), 40, 40000);
+  /* The home planet does not come through here any more except in the second
+     or two its texture takes to bake, so it gets the same mesh as everything
+     else: fine enough for a world made of noise, and no more. Throwing six
+     thousand quads at the Earth to resolve geography the raster is about to
+     draw properly cost twenty milliseconds a frame for nothing. */
   const fine = Q.i >= 2, px = fine ? 23 : 34;
   let NR = clamp(Math.round(scr / px), 12, fine ? 32 : 20);
   let NS = clamp(Math.round(TAU * scr / (px * 1.5)), 26, fine ? 96 : 48);
@@ -5314,6 +5398,202 @@ function drawBodyNear(b, d, fade) {
   }
 }
 
+/* ---- the home planet, as a picture rather than a mosaic ------------------
+
+   Flat-shaded quads cannot draw the Earth. Everywhere else in the solar
+   system a mesh is enough, because everywhere else is a shape with noise on
+   it and nobody knows what it is supposed to look like. The Earth is the one
+   world where the answer is already fixed, and a twenty-ring cap turns the
+   Gulf of Mexico into four facets. Getting it down to a few pixels a quad
+   costs twelve thousand polygons, which is the whole frame.
+
+   So the home planet gets its own renderer, and it works the other way
+   round: bake the surface ONCE into a texture, then cast a ray per screen
+   sample and look the answer up. The cost stops depending on how much
+   geography there is and starts depending only on how much of the screen the
+   planet covers, which is the right thing for it to depend on.
+
+   The texture is an octahedral map — the sphere folded flat into a square —
+   because the lookup is then eight lines of arithmetic with no trigonometry
+   in it at all, and an asin and an atan2 per pixel is most of a millisecond
+   a frame. It carries the albedo in its colour and the city lights in its
+   alpha, and it is built a few rows at a time so it never costs a frame. */
+const ETEX = { N: 512, dat: null, row: 0, done: false };
+/* A time budget, not a row count. A row of this thing is half a thousand
+   elevation lookups and it is not cheap; counting rows made the first second
+   of every climb cost twenty milliseconds a frame and the quality tuner
+   noticed. Counting milliseconds spreads it over however many frames the
+   machine needs and nobody sees it at all. */
+function earthTexBuild(ms) {
+  const N = ETEX.N;
+  if (!ETEX.dat) ETEX.dat = new Uint8ClampedArray(N * N * 4);
+  const fr = bodyFrame(HOMEBODY), dat = ETEX.dat;
+  const t0 = performance.now();
+  let end = ETEX.row;
+  while (end < N) {
+    const j = end++;
+    const v = (j + .5) / N * 2 - 1;
+    for (let i = 0; i < N; i++) {
+      const u = (i + .5) / N * 2 - 1;
+      // octahedron -> sphere: the outer corners are the southern hemisphere
+      let x = u, z = v, y = 1 - Math.abs(u) - Math.abs(v);
+      if (y < 0) {
+        const t = x;
+        x = (x >= 0 ? 1 : -1) * (1 - Math.abs(z));
+        z = (z >= 0 ? 1 : -1) * (1 - Math.abs(t));
+      }
+      const l = Math.hypot(x, y, z) || 1; x /= l; y /= l; z /= l;
+      const c = earthCap(x, y, z, fr), o = (j * N + i) * 4;
+      dat[o] = c[0]; dat[o + 1] = c[1]; dat[o + 2] = c[2];
+      dat[o + 3] = clamp(earthNight(x, y, z, fr), 0, 1) * 255;
+    }
+    if (performance.now() - t0 > ms) break;
+  }
+  ETEX.row = end;
+  if (end >= N) ETEX.done = true;
+}
+const ERAS = { cv: null, g: null, im: null, w: 0, h: 0 };
+function drawEarthRaster(b, d, fade) {
+  const r = b.r, m = cam.m, cp = cam.pos, art = BODYART[b.name], atm = art && art.atm;
+  /* Where on the glass it can possibly be. Close in the silhouette is wider
+     than the screen and there is no point working out where its edges are;
+     far off it is worth a tight box, because the cost is the area. */
+  let x0 = 0, y0 = 0, x1 = W, y1 = H;
+  const c = projectRaw(b.p);
+  const sinA = clamp(r / d, 0, .9999);
+  if (c && sinA < .80) {
+    const sr = F * Math.tan(Math.asin(sinA)) * 1.20 + 6;
+    x0 = Math.max(0, Math.floor(c.x - sr)); x1 = Math.min(W, Math.ceil(c.x + sr));
+    y0 = Math.max(0, Math.floor(c.y - sr)); y1 = Math.min(H, Math.ceil(c.y + sr));
+  }
+  const pw = x1 - x0, ph = y1 - y0;
+  if (pw < 2 || ph < 2) return;
+  /* One sample per s screen pixels, with s set by a budget rather than by
+     taste: the picture is drawn small and scaled up, so the planet goes soft
+     when it fills the screen and sharp when it does not, and the frame time
+     does neither. */
+  const MAXS = Q.i >= 3 ? 30000 : Q.i >= 2 ? 21000 : Q.i >= 1 ? 13000 : 8000;
+  const s = Math.max(1, Math.ceil(Math.sqrt(pw * ph / MAXS)));
+  /* Rounded up to a multiple of eight, because resizing a canvas throws its
+     backing store away and the planet's size on the glass changes every
+     frame you are moving toward it. The extra samples fall outside the disc
+     and cost a discriminant each. */
+  const bw = Math.max(8, Math.ceil(pw / s / 8) * 8), bh = Math.max(8, Math.ceil(ph / s / 8) * 8);
+  if (!ERAS.cv) { ERAS.cv = document.createElement("canvas"); ERAS.g = ERAS.cv.getContext("2d"); }
+  if (ERAS.w !== bw || ERAS.h !== bh) {
+    ERAS.cv.width = bw; ERAS.cv.height = bh; ERAS.w = bw; ERAS.h = bh;
+    ERAS.im = ERAS.g.createImageData(bw, bh);
+  }
+  const out = ERAS.im.data, tex = ETEX.dat, N = ETEX.N;
+  // the ray, in world axes: a * camera-right + b * camera-up + camera-forward
+  const rx = m[0], ry = m[1], rz = m[2], ux = m[3], uy = m[4], uz = m[5];
+  const fx = m[6], fy = m[7], fz = m[8];
+  const ox = cp.x - b.p.x, oy = cp.y - b.p.y, oz = cp.z - b.p.z;
+  const OO = ox * ox + oy * oy + oz * oz, CC = OO - r * r, invR = 1 / r;
+  let sx = SUNBODY.p.x - b.p.x, sy = SUNBODY.p.y - b.p.y, sz = SUNBODY.p.z - b.p.z;
+  const sl = Math.hypot(sx, sy, sz) || 1; sx /= sl; sy /= sl; sz /= sl;
+  const vx = ox / d, vy = oy / d, vz = oz / d;              // body -> camera
+  const amb = .27 + clamp(1 - (d - r) / 40000, 0, 1) * .17;
+  const R2 = r * 1.055, aw = R2 - r;                        // the shell of air
+  /* How much the ray's distance from the centre moves per sample. It is what
+     turns the silhouette from a staircase into an edge: a sample straddling
+     the limb gets partial coverage instead of all or nothing, and the scale
+     up afterwards spreads that over the whole gap. */
+  const gpx = Math.max(s * d / F, 1);
+  const ar = atm ? atm[0] : 120, ag = atm ? atm[1] : 160, ab = atm ? atm[2] : 220;
+  const athick = atm ? atm[3] : .6;
+  let o = 0;
+  for (let j = 0; j < bh; j++) {
+    const py = y0 + (j + .5) * s;
+    const bu = -(py - CY) / F;
+    for (let i = 0; i < bw; i++, o += 4) {
+      const px = x0 + (i + .5) * s;
+      const au = (px - CX) / F;
+      const dx = au * rx + bu * ux + fx, dy = au * ry + bu * uy + fy, dz = au * rz + bu * uz + fz;
+      const A = dx * dx + dy * dy + dz * dz;
+      const B = ox * dx + oy * dy + oz * dz;
+      const disc = B * B - A * CC;
+      if (disc > 0 && B < 0) {                              // the ground
+        const t = (-B - Math.sqrt(disc)) / A;
+        const nx = (ox + t * dx) * invR, ny = (oy + t * dy) * invR, nz = (oz + t * dz) * invR;
+        // octahedral lookup — no trigonometry, one texel
+        const l = Math.abs(nx) + Math.abs(ny) + Math.abs(nz);
+        let tu = nx / l, tv = nz / l;
+        if (ny < 0) {
+          const q = tu;
+          tu = (tu >= 0 ? 1 : -1) * (1 - Math.abs(tv));
+          tv = (tv >= 0 ? 1 : -1) * (1 - Math.abs(q));
+        }
+        /* Bilinear, because from low orbit one texel is forty kilometres
+           and nearest-neighbour draws the coastline as a staircase. */
+        const fu = (tu + 1) * .5 * N - .5, fv = (tv + 1) * .5 * N - .5;
+        let i0 = fu < 0 ? 0 : fu >= N - 1 ? N - 2 : fu | 0;
+        let j0 = fv < 0 ? 0 : fv >= N - 1 ? N - 2 : fv | 0;
+        const ax = fu - i0 < 0 ? 0 : fu - i0 > 1 ? 1 : fu - i0;
+        const ay = fv - j0 < 0 ? 0 : fv - j0 > 1 ? 1 : fv - j0;
+        const oa = (j0 * N + i0) * 4, ob = oa + 4, oc2 = oa + N * 4, od = oc2 + 4;
+        const w0 = (1 - ax) * (1 - ay), w1 = ax * (1 - ay), w2 = (1 - ax) * ay, w3 = ax * ay;
+        const tr = tex[oa] * w0 + tex[ob] * w1 + tex[oc2] * w2 + tex[od] * w3;
+        const tg = tex[oa + 1] * w0 + tex[ob + 1] * w1 + tex[oc2 + 1] * w2 + tex[od + 1] * w3;
+        const tb = tex[oa + 2] * w0 + tex[ob + 2] * w1 + tex[oc2 + 2] * w2 + tex[od + 2] * w3;
+        const tn = tex[oa + 3] * w0 + tex[ob + 3] * w1 + tex[oc2 + 3] * w2 + tex[od + 3] * w3;
+        const sun = nx * sx + ny * sy + nz * sz;
+        const day = sun * 3.4 > 1 ? 1 : sun < 0 ? 0 : sun * 3.4;
+        const k = amb + (1 - amb) * day * (.26 + .74 * (sun > 0 ? (sun > 1 ? 1 : sun) : 0));
+        let cr = tr * k, cg = tg * k, cb = tb * k;
+        if (day < .999) {                                   // night, and the lights on it
+          const nf = (1 - day) * .7;
+          cr = cr + (cr * .66 - cr) * nf; cg = cg + (cg * .84 - cg) * nf; cb = cb + (cb * 1.34 - cb) * nf;
+          const lit = tn;
+          if (lit > 2 && day < .82) {
+            const u2 = (lit / 255) * (1 - day);
+            cr += 210 * u2; cg += 168 * u2; cb += 96 * u2;
+          }
+        }
+        if (atm) {                                          // air thickens toward the limb
+          let gz = 1 - (nx * vx + ny * vy + nz * vz);
+          if (gz > 0) {
+            const gk = Math.pow(gz > 1 ? 1 : gz, 2.4) * day * (.35 + athick * .3);
+            cr += (ar - cr) * gk; cg += (ag - cg) * gk; cb += (ab - cb) * gk;
+          }
+        }
+        let al = 255;
+        const pg2 = OO - B * B / A, pg = Math.sqrt(pg2 > 0 ? pg2 : 0);
+        let cov = (r - pg) / gpx + .5;
+        if (cov < .999) {                   // this sample straddles the limb
+          cov = cov < 0 ? 0 : cov;
+          let lt = sun * 1.7 + .10; lt = lt < 0 ? 0 : lt > 1 ? 1 : lt;
+          const ga = (.55 + athick * .35) * lt * (1 - cov);
+          const ta = cov + ga;
+          if (ta > .004) {
+            cr = (cr * cov + ar * ga) / ta; cg = (cg * cov + ag * ga) / ta; cb = (cb * cov + ab * ga) / ta;
+          }
+          al = ta * 255;
+        }
+        out[o] = cr; out[o + 1] = cg; out[o + 2] = cb; out[o + 3] = al;
+        continue;
+      }
+      /* Missed the ground. It may still have gone through the air above the
+         limb, and that sliver is most of what makes the picture read as a
+         planet with weather rather than a painted ball. */
+      out[o] = ar; out[o + 1] = ag; out[o + 2] = ab; out[o + 3] = 0;
+      if (!atm || B >= 0) continue;
+      const per2 = OO - B * B / A;
+      if (per2 >= R2 * R2) continue;
+      const per = Math.sqrt(per2 > 0 ? per2 : 0);
+      if (per <= r) continue;
+      const kk = -B / A;
+      const gx = (ox + kk * dx) / per, gy = (oy + kk * dy) / per, gz2 = (oz + kk * dz) / per;
+      let lit = (gx * sx + gy * sy + gz2 * sz) * 1.7 + .10;
+      lit = lit < 0 ? 0 : lit > 1 ? 1 : lit;
+      const tt = 1 - (per - r) / aw;
+      out[o + 3] = Math.pow(tt, 1.7) * lit * (.55 + athick * .35) * 255;
+    }
+  }
+  ERAS.g.putImageData(ERAS.im, 0, 0);
+  DL.img(d, ERAS.cv, x0, y0, bw * s, bh * s, fade);
+}
+
 function drawBody(b) {
   // the home planet fades in exactly as the sky and the terrain fade out
   const fade = b.home ? (LIGHT.far || 0) : 1;
@@ -5330,8 +5610,21 @@ function drawBody(b) {
   const c = projectRaw(b.p);
   /* The surface renderer, when the disc would be wrong: either the body is
      big enough in the sky that a flat circle stops being one, or its centre
-     has swung behind the camera and there is nothing left to project. */
-  if (!b.sun && (d < b.r * NEARBODY || !c)) {
+     has swung behind the camera and there is nothing left to project.
+
+     The home planet takes it at EVERY range it is more than a few pixels
+     across. The disc path paints continents on out of noise; the near path
+     reads the same elevation map the terrain under the wheels comes from, so
+     Tennessee is where Tennessee is whether you are four hundred kilometres
+     up or out past Neptune. Under a few pixels there is nothing to tell
+     apart and the disc is cheaper. */
+  const scrR = F * b.r / Math.max(d, 1);
+  if (!b.sun && (d < b.r * NEARBODY || !c || (b.home && scrR > 4))) {
+    // the mesh covers the second or two the bake takes, and then never again
+    if (b.home && ETEX.done) {
+      drawEarthRaster(b, d, clamp((LIGHT.far || 0) * 2, 0, 1));
+      return;
+    }
     drawBodyNear(b, d, b.home ? clamp((LIGHT.far || 0) * 2, 0, 1) : fade);
     return;
   }
@@ -5951,6 +6244,15 @@ function drawMap() {
     ctx.fillText(b.name, px, py - rad - 11 * u);
     hudFont(9 * u, 600); ctx.fillStyle = "rgba(160,190,216,.72)";
     ctx.fillText(navRange(Math.max(it.d - b.r, 0)), px, py + rad + 11 * u);
+    /* And what you have already done to it. A map that remembers is worth
+       opening twice. */
+    const been = !!LOG.worlds[b.name];
+    const stn = STATIONS.some(st => st.body === b && LOG.stations[st.spec.name]);
+    if (been || stn) {
+      hudFont(8.5 * u, 700); ctx.fillStyle = "rgba(126,232,154,.85)";
+      ctx.fillText((been ? "\u2713 DOWN" : "") + (been && stn ? "  " : "") + (stn ? "\u25c9 STN" : ""),
+        px, py + rad + 21 * u);
+    }
     mapHit("body", it.i, px - rad, py - rad, rad * 2, rad * 2);
   }
 
@@ -6092,6 +6394,110 @@ const audio = {
 };
 
 /* ========================================================== scenarios === */
+/* ---- the pilot's log ----------------------------------------------------
+
+   Flying somewhere ought to count for something. The log is the only thing in
+   here that survives a reset: fastest, highest, furthest, every world landed
+   on, every station reached, the best landing score, and how many times the
+   airframe was held together for you. Firsts announce themselves; the rest
+   sits on the pause card. It is kept in local storage, which may not exist,
+   so every touch of it is wrapped. */
+const LOG = {
+  spd: 0, alt: 0, dist: 0, flights: 0, saves: 0, land: 0, dirty: 0, save: 0,
+  worlds: {}, stations: {}
+};
+const LOG_KEY = "skyward.log.v1";
+(function logLoad() {
+  try {
+    const o = JSON.parse(localStorage.getItem(LOG_KEY) || "null");
+    if (!o) return;
+    for (const k of ["spd", "alt", "dist", "flights", "saves", "land"])
+      if (typeof o[k] === "number" && isFinite(o[k])) LOG[k] = o[k];
+    if (o.worlds && typeof o.worlds === "object") LOG.worlds = o.worlds;
+    if (o.stations && typeof o.stations === "object") LOG.stations = o.stations;
+  } catch (e) { /* no storage, no history, no problem */ }
+})();
+function logSave() {
+  LOG.dirty = 0;
+  try { localStorage.setItem(LOG_KEY, JSON.stringify(LOG)); } catch (e) {}
+}
+/* The speeds worth being told about. Every one of them is a real number that
+   means something, which is the whole point of a milestone. */
+const SPD_MARKS = [
+  [340, "MACH 1 \u00b7 THE SOUND BARRIER"],
+  [1020, "MACH 3 \u00b7 DESIGN SPEED"],
+  [3400, "MACH 10"],
+  [7800, "ORBITAL VELOCITY"],
+  [11200, "ESCAPE VELOCITY"],
+  [1e5, "100 KM/S"],
+  [1e6, "1,000 KM/S"],
+  [3e7, "A TENTH THE SPEED OF LIGHT"],
+  [1.5e8, "HALF THE SPEED OF LIGHT"]
+];
+const ALT_MARKS = [
+  [24384, "80,000 FT \u00b7 THE FLIGHT LEVELS BEHIND YOU"],
+  [1e5, "THE K\u00c1RM\u00c1N LINE \u00b7 SPACE"],
+  [4e5, "LOW EARTH ORBIT ALTITUDE"],
+  [3.6e7, "GEOSTATIONARY ALTITUDE"],
+  [3.84e8, "LUNAR DISTANCE"]
+];
+function logMark(list, was, now) {
+  for (const mk of list) if (now >= mk[0] && was < mk[0]) {
+    toast("RECORD \u00b7 " + mk[1], 3.6); audio.beep(920, .20, .15); LOG.dirty = 1;
+  }
+}
+function logWorld(name) {
+  if (LOG.worlds[name]) return;
+  LOG.worlds[name] = 1;
+  const n = Object.keys(LOG.worlds).length, of = BODIES.filter(b => !b.sun).length;
+  toast("FIRST LANDING \u00b7 " + name.toUpperCase() + " \u00b7 " + n + " / " + of + " WORLDS", 4.4);
+  audio.beep(680, .32, .18); logSave();
+}
+function logStation(st) {
+  if (LOG.stations[st.spec.name]) return;
+  LOG.stations[st.spec.name] = 1;
+  const n = Object.keys(LOG.stations).length;
+  toast("ON STATION \u00b7 " + st.spec.name.toUpperCase() + " \u00b7 " + n + " / " + STATIONS.length, 4.4);
+  audio.beep(600, .32, .18); logSave();
+}
+function logTick(dt) {
+  const P = PLANE;
+  LOG.save += dt;
+  if (!P.crashed) {
+    const v = Math.hypot(P.vel.x, P.vel.y, P.vel.z);
+    LOG.dist += v * dt;
+    if (v > LOG.spd) { logMark(SPD_MARKS, LOG.spd, v); LOG.spd = v; LOG.dirty = 1; }
+    const hb = HOMEBODY;
+    const a = Math.hypot(P.pos.x - hb.p.x, P.pos.y - hb.p.y, P.pos.z - hb.p.z) - hb.r;
+    if (a > LOG.alt) { logMark(ALT_MARKS, LOG.alt, a); LOG.alt = a; LOG.dirty = 1; }
+    // close enough to read the paint on the hull counts as having been there
+    for (const st of STATIONS) {
+      if (LOG.stations[st.spec.name]) continue;
+      if (Math.hypot(st.pos.x - P.pos.x, st.pos.y - P.pos.y, st.pos.z - P.pos.z) < st.size * 3) logStation(st);
+    }
+  }
+  if (LOG.dirty && LOG.save > 12) { LOG.save = 0; logSave(); }
+}
+const logSpd = v => v > 1e6 ? (v / 1e6).toFixed(1) + " Mm/s" : v > 2e3 ? (v / 1000).toFixed(2) + " km/s"
+  : Math.round(v) + " m/s";
+function fillLog() {
+  const el = document.getElementById("logList");
+  if (!el) return;
+  const of = BODIES.filter(b => !b.sun).length;
+  const w = Object.keys(LOG.worlds), s = Object.keys(LOG.stations);
+  const bit = (v, k) => "<b>" + v + "</b>&nbsp;" + k;
+  el.innerHTML = [
+    bit(logSpd(LOG.spd), "fastest"),
+    bit(navRange(LOG.alt), "highest"),
+    bit(navRange(LOG.dist), "flown"),
+    bit(w.length + "/" + of, "worlds landed on"),
+    bit(s.length + "/" + STATIONS.length, "stations reached"),
+    bit(LOG.land + "/100", "best landing"),
+    bit(LOG.flights, "flights"),
+    bit(LOG.saves, "times the airframe held")
+  ].join(" &middot; ") + (w.length ? "<br>" + w.join(" &middot; ") : "");
+}
+
 const GAME = {
   t: 0, over: false, result: "", started: false, paused: false,
   rings: [], ringIdx: 0, ringT: 0, landScore: null
@@ -6169,6 +6575,7 @@ function checkLanding() {
       sc = Math.max(0, Math.round(sc));
     }
     GAME.landScore = sc;
+    if (sc > LOG.land) { LOG.land = sc; logSave(); }
     GAME.over = true;
     GAME.result = (onRwy ? "TOUCHDOWN — " + sc + " / 100" : "MISSED THE RUNWAY");
     showBanner(GAME.result, onRwy ? (sc > 75 ? "#8bf0a8" : "#ffd27a") : "#ff8c6a");
@@ -6220,6 +6627,12 @@ function layoutTouch() {
   }
   T.thr.w = tw; T.thr.h = th;
   T.btns = [
+    /* RESET and SAFE go at the top of the stack, where nothing else is, and
+       reset asks twice before it throws a flight away. There is no R key on a
+       phone, and a simulator you cannot restart without a keyboard is a
+       simulator you cannot restart. */
+    { k: "reset", x: bx, y: by - (bh + g) * 4, w: bw, h: bh },
+    { k: "safe", x: bx + bw + g, y: by - (bh + g) * 4, w: bw, h: bh },
     { k: "map", x: bx, y: by - (bh + g) * 3, w: bw, h: bh },
     { k: "spd", x: bx + bw + g, y: by - (bh + g) * 3, w: bw, h: bh },
     { k: "ap", x: bx, y: by - (bh + g) * 2, w: bw, h: bh },
@@ -6242,9 +6655,19 @@ function layoutTouch() {
 }
 const inBox = (b, x, y) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h;
 
+let RESET_ARM = 0;
 function touchAct(k) {
   const P = PLANE;
   TOUCH.flash[k] = .18;
+  if (k === "reset") {
+    /* One tap when the flight is already over — there is nothing left to
+       lose. Two taps when it is not. */
+    if (RESET_ARM > 0 || GAME.over || PLANE.crashed) { RESET_ARM = 0; startFlight(); toast("FLIGHT RESET", 1.8); }
+    else { RESET_ARM = 2.8; toast("TAP RESET AGAIN TO RESTART THE FLIGHT", 2.6); audio.beep(430, .12, .1); }
+    return;
+  }
+  if (k === "safe") { toggleSafe(); return; }
+  RESET_ARM = 0;
   if (k === "gear") { P.gearCmd = P.gearCmd > .5 ? 0 : 1; toast(P.gearCmd ? "GEAR DOWN" : "GEAR UP", 1.2); audio.beep(P.gearCmd ? 520 : 400, .18, .12); }
   // clamps at full, like the F key. It used to wrap back to 0%, so one extra
   // tap on a control marked FLAP-DOWN dumped the whole configuration on short final.
@@ -6372,6 +6795,7 @@ function drawTouch(dt) {
   if (!GAME.started) return;
   const T = TOUCH, P = PLANE, u = UI;
   for (const k in T.flash) if (T.flash[k] > 0 && T.flash[k] < 1) T.flash[k] = Math.max(0, T.flash[k] - dt);
+  if (RESET_ARM > 0) RESET_ARM = Math.max(0, RESET_ARM - dt);
   ctx.save();
   if (TOUCH.on) drawStick();
   drawPanel(P, u);
@@ -6436,6 +6860,11 @@ function drawPanel(P, u) {
     else if (b.k === "spd") { on = SPD.on; label = "HOLD"; sub = (SPD.on ? navSpeed(SPD.tgt) : "OFF") + "  O"; }
     else if (b.k === "chute") { on = P.chuteCmd > .5; label = "CHUTE"; sub = "X"; }
     else if (b.k === "flapup") { label = "FLAP \u2191"; sub = "V"; }
+    else if (b.k === "reset") {
+      on = RESET_ARM > 0 || GAME.over || P.crashed;
+      label = "RESET"; sub = RESET_ARM > 0 ? "SURE?" : (GAME.over || P.crashed ? "\u25b8 AGAIN" : "R");
+    }
+    else if (b.k === "safe") { on = NOCRASH; label = "SAFE"; sub = (NOCRASH ? "ON" : "OFF") + "  K"; }
     padBox(b.x, b.y, b.w, b.h, 9 * u, on || T.flash[b.k] > 0, label, sub);
   }
   if (TOUCH.on) for (const b of T.rud.boxes)
@@ -7122,7 +7551,8 @@ const KEYCARD = [
   ["Flaps", "F down / V up", "FLAP \u2193 / FLAP \u2191"],
   ["Elevator trim", ",  .", "\u2014"],
   ["Camera", "C", "VIEW button"],
-  ["Reset aircraft", "R", "\u2014"],
+  ["Reset the flight", "R", "RESET button, twice"],
+  ["Safe mode", "K", "SAFE button"],
   ["Pitch sense", "T", "\u2014"],
   ["Pause", "Esc  or  P", "II button"],
   ["This card", "L", "KEYS button"]
@@ -7187,12 +7617,15 @@ const KEYMAP = {
     [", .", "trim &mdash; shifts the g the system holds hands off"],
     ["C", "cycle camera"],
     ["L", "control reference"],
-    ["R", "reset aircraft"],
+    ["R", "reset the flight"],
+    ["K", "safe mode &mdash; the airframe holds"],
     ["T", "swap pitch sense"],
     ["Esc P", "pause"], ["H", "help"], ["M", "mute"],
     ["Y", "mouse as stick"]
   ]
 };
+fillLog();
+syncSafeRow();
 (function fillKeys() {
   const el = document.getElementById("keyList");
   const rows = KEYMAP.common;
@@ -7236,6 +7669,7 @@ function onKeyPress(k) {
   if (GAME.paused) return;
   if (lk === "c") { camMode = (camMode + 1) % CAMNAMES.length; toast("CAMERA: " + CAMNAMES[camMode], 1.2); }
   if (lk === "r") { startFlight(); }
+  if (lk === "k") { toggleSafe(); }
   if (lk === "g") {
     P.gearCmd = P.gearCmd > .5 ? 0 : 1;
     toast(P.gearCmd ? "GEAR DOWN" : "GEAR UP", 1.2); audio.beep(P.gearCmd ? 520 : 400, .18, .12);
@@ -7341,6 +7775,7 @@ let SHOWKEYS = false;
 function togglePause() {
   if (!GAME.started) return;
   GAME.paused = !GAME.paused;
+  if (GAME.paused) { if (LOG.dirty) logSave(); fillLog(); }
   const m = document.getElementById("menu");
   m.classList.toggle("hide", !GAME.paused);
   document.getElementById("startBtn").textContent = GAME.paused ? (dirty ? "RESTART FLIGHT" : "RESUME FLIGHT") : "BEGIN FLIGHT";
@@ -7348,6 +7783,8 @@ function togglePause() {
 }
 let dirty = false;
 function startFlight(keepMode) {
+  LOG.flights++; logSave(); fillLog();
+  RESET_ARM = 0;
   GAME.t = 0; GAME.over = false; GAME.result = ""; GAME.landScore = null;
   GAME.paused = false; GAME.started = true; dirty = false;
   PARTS.length = 0; cam.shake = 0; cam.init = 0; cam.off = v3();
@@ -7363,6 +7800,10 @@ function startFlight(keepMode) {
 document.querySelectorAll("#pitchRow .opt").forEach(b => b.addEventListener("click", () => {
   PITCH_REAL = b.dataset.pitch === "real";
   document.querySelectorAll("#pitchRow .opt").forEach(o => o.classList.toggle("on", o === b));
+}));
+document.querySelectorAll("#safeRow .opt").forEach(b => b.addEventListener("click", () => {
+  NOCRASH = b.dataset.safe === "on";
+  syncSafeRow();
 }));
 document.querySelectorAll("#scenRow .opt").forEach(b => b.addEventListener("click", () => {
   SCEN = b.dataset.scen; dirty = true;
@@ -7396,6 +7837,12 @@ function frame(now) {
     spawnTrails(dt);
     checkRings(dt);
     checkLanding();
+    logTick(dt);
+    /* Bake the Earth on the way up rather than on arrival: it is wanted the
+       moment the sky goes black, and a few rows a frame from thirty
+       kilometres means it is finished before anyone can look down. */
+    if (!ETEX.done && (PLANE.pos.y > 30000 || (LIGHT.far || 0) > .02))
+      earthTexBuild(Q.work > 9.5 ? 1.5 : Q.work > 7 ? 2.5 : 4);
     if (PLANE.crashed) {
       PLANE.crashT += dt;
       if (PLANE.crashT > 1 && PLANE.crashT < 3.4 && Math.random() < .35) spawnFire(PLANE.pos);
