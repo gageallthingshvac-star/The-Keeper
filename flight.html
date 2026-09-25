@@ -200,6 +200,15 @@ function hash2(i, j) {
   n = (n ^ (n >> 13)) | 0; n = Math.imul(n, 1274126177);
   return ((n ^ (n >> 16)) >>> 0) / 4294967295;
 }
+/* hash2 spans [0, 0.5], not [0, 1]: the final xor folds the sign bit onto
+   itself, which clears the top bit of every result. That is left exactly as
+   it is, because it is the VALUE-NOISE hash and every terrain amplitude in
+   this file is tuned against the field it produces — "fbm runs about .05 to
+   .46" throughout the comments is this, seen from the other end.
+
+   Anything that wants a fair coin, a uniform pick out of a list, or a
+   threshold anywhere above a half has to use this instead. */
+const hashF = (i, j) => hash2(i, j) * 2;
 function vnoise(x, y) {
   const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
   const u = smooth(xf), v = smooth(yf);
@@ -1131,6 +1140,65 @@ function urbanShare(x, z) {
    decides how tall the tall bit is. Density alone cannot: a dense village and
    a dense city centre look identical to it, and they are not. */
 const urbanPop = () => _uP;
+/* ---- farmland ------------------------------------------------------------
+
+   Farm country from the air is not a green rug with noise on it. It is
+   PARCELS: rectangles with hard edges, each one a different crop at a
+   different point in its year, laid out on the section grid, with a tree line
+   in the gaps between them and a farmstead every mile or so. Noise gives you
+   a blurry carpet; this gives you the thing that makes low flying over farm
+   country look like low flying over farm country. */
+const FARM_SEC = 1609;                    // a mile, which is what a section is
+/* How likely this patch of the planet is to be ploughed. Flat enough, wet
+   enough, warm enough, low enough, and not already a town — then broken up at
+   the regional scale, because even the best farm country is a mosaic of field
+   and wood. */
+function farmChance(x, z, h) {
+  if (h < 3 || h > 2400) return 0;
+  const lat = worldToLat(z), al = Math.abs(lat);
+  if (al > 64) return 0;
+  const cold = 1 - sstep(52, 64, al);
+  const dry = 1 - sstep(.42, .78, worldArid(worldToLon(x), lat));
+  const jungle = 1 - sstep(9, 3, al) * .45;
+  const high = 1 - sstep(1300, 2400, h);
+  /* A mosaic at the regional scale, but a gentle one: most ground that CAN
+     be farmed is farmed, and what varies is how completely. Thresholding hard
+     on the noise left ninety per cent of the planet unploughed. */
+  const reg = .45 + .55 * sstep(.32, .60, fbm(x / 42000, z / 42000, 3) * 2);
+  return clamp(cold * dry * jungle * high * reg, 0, 1);
+}
+/* Which parcel this is, how far from its edge, and what is growing on it. */
+/* Ten crops at ten points in their year. The spread has to be wide: a field
+   of ripe wheat next to a ploughed one is the difference between straw and
+   chocolate, and a palette of eight slightly different greens photographs as
+   one green. */
+const CROPS = [
+  [ 74, 112,  48], [ 92, 128,  56], [110, 144,  62], [138, 158,  70],
+  [176, 172,  86], [208, 192, 114], [188, 172, 130], [166, 156, 104],
+  [128, 102,  72], [104,  88,  66]
+];
+const _parc = { col: null, edge: 0, size: 0, sec: 0 };
+function parcelAt(x, z) {
+  const S = FARM_SEC;
+  const si = Math.floor(x / S), sj = Math.floor(z / S);
+  // halves or quarters of a section, which is how they really get split
+  const div = hashF(si * 3 + 1, sj * 7 + 5) > .42 ? 2 : 4;
+  const P = S / div;
+  const pu = x / P, pv = z / P;
+  const pi = Math.floor(pu), pj = Math.floor(pv);
+  const fu = pu - pi, fv = pv - pj;
+  _parc.size = P;
+  _parc.edge = Math.min(fu, 1 - fu, fv, 1 - fv) * P;
+  const su = x / S - si, sv = z / S - sj;
+  _parc.sec = Math.min(su, 1 - su, sv, 1 - sv) * S;
+  /* Both indices mixed into both hash arguments. Walking pi with a small
+     stride correlates badly enough that every field came out one of the first
+     three crops, which is to say every field came out green. */
+  const id = hashF(pi * 1319 + pj * 7919, pj * 2711 - pi * 337);
+  _parc.col = CROPS[Math.min(CROPS.length - 1, (id * CROPS.length) | 0)];
+  return _parc;
+}
+
 function terrainColor(h, slope, x, z, cell) {
   const lat = Math.abs(worldToLat(z));
   const rock = sstep(.30, .60, slope);
@@ -1193,6 +1261,31 @@ function terrainColor(h, slope, x, z, cell) {
     wood = clamp(wood + sstep(.006, .034, slope) * .45, 0, 1);
     const clear = 1 - urbanShare(x, z);
     c = mixc(c, mixc([132, 150, 82], [40, 64, 36], wood), .68 * hw * clear);
+  }
+  /* Fields. Drawn over everything else, because a ploughed parcel covers
+     whatever the biome underneath it would have been — that is the point of
+     ploughing it. */
+  const fP = fade(1500);
+  if (fP > 0 && slope < .34 && h > 3) {
+    const fc = farmChance(x, z, h) * (1 - sstep(.14, .34, slope)) * (1 - urb * .92) * fP;
+    if (fc > .02) {
+      const pa = parcelAt(x, z);
+      const pf = fade(pa.size);
+      if (pf > 0) {
+        // drier country takes the crop colours toward stubble and dust
+        const cr = mixc(pa.col, [196, 176, 132], clamp(arid0 * 1.1, 0, .55));
+        c = mixc(c, cr, fc * pf * .88);
+      }
+      // the tree line and the track between them, which is what draws the grid
+      /* The shelter belt along the boundary and the dirt track on the section
+         line. Drawn a little wider than they really are so the grid still
+         reads at a thousand feet instead of disappearing at two hundred. */
+      const hf = fade(70);
+      if (hf > 0) {
+        if (pa.edge < 13) c = mixc(c, [52, 72, 42], fc * hf * .62 * (1 - pa.edge / 13));
+        if (pa.sec < 7) c = mixc(c, [158, 148, 126], fc * hf * .72 * (1 - pa.sec / 7));
+      }
+    }
   }
   // field-sized patchwork, plus a gentle regional tint
   const fF = fade(190), fR = fade(26000);
@@ -2368,6 +2461,16 @@ function drawTrees() {
       const gy = terrainH(x, z);
       if (gy < 2 || gy > 2600) continue;
       if (Math.abs(x) < 320 && Math.abs(z) < WORLD.rwyLen * .6) continue;   // keep the field clear
+      /* Nobody grows a crop in a wood. Where the ground is ploughed the trees
+         come out, except along the parcel edges — which is exactly where the
+         hedgerows and shelter belts are, and it is those lines that make farm
+         country read as farm country from a thousand feet. */
+      const fm = farmChance(x, z, gy);
+      if (fm > .05) {
+        const pa = parcelAt(x, z);
+        const keep = pa.edge < 18 ? 1 : 1 - fm * .93;
+        if (hash2((gx + i) * 13 + 5, (gz + j) * 23 + 9) > keep) continue;
+      }
       const hgt = 5.5 + (h1 / dens) * (h1 / dens) * 15;
       const base = projectPoint(v3(x, gy, z));
       if (!base) continue;
@@ -2619,6 +2722,10 @@ function drawCities() {
       }
     }
   }
+  /* Farms get their own slice before the towns take the rest, so flying over
+     open country is not flying over nothing. */
+  const farmCap = Math.min(budget, Math.round(Q.q.buildings * .34));
+  budget -= farmCap - drawFarms(farmCap);
   budget = drawUrban(budget);
   // names, nearest last so the closest wins the overlap
   labels.sort((a, b) => b.d - a.d);
@@ -2708,6 +2815,50 @@ function drawUrban(budget) {
     for (let k = -ring + 1; k <= ring - 1 && budget > 0; k++) {
       cell(ci - ring, cj + k); cell(ci + ring, cj + k);
     }
+  }
+  return budget;
+}
+/* A farmstead: a house, a barn, a pair of silos and a machine shed, one to a
+   section or so, standing in the corner of a field. Cities are where the
+   buildings are concentrated; this is where the other ninety per cent of the
+   built world actually is, and without it everything between the towns is
+   empty ground. */
+function drawFarms(budget) {
+  const camX = cam.pos.x, camZ = cam.pos.z, camY = cam.pos.y;
+  if (budget <= 0 || camY > 7000) return budget;
+  const S = FARM_SEC;
+  const reach = clamp(2600 + camY * 1.7, 2600, 11000);
+  const fwx = cam.m[6], fwz = cam.m[8];
+  const one = (i, j) => {
+    if (budget <= 4) return;
+    const h1 = hashF(i * 41 + 13, j * 29 + 7);
+    if (h1 > .58) return;                               // not every section has one
+    const bx = i * S + (hash2(i, j) - .5) * S * .66;
+    const bz = j * S + (hash2(j, i) - .5) * S * .66;
+    const dx = bx - camX, dz = bz - camZ, bd = Math.hypot(dx, dz);
+    if (bd > reach) return;
+    if (bd > S && (dx * fwx + dz * fwz) / bd < -.30) return;
+    const gy = terrainH(bx, bz);
+    if (gy < 3) return;
+    if (farmChance(bx, bz, gy) < .35) return;
+    if (urbanShare(bx, bz) > .22) return;
+    const t = hashF(i * 5 + 2, j * 9 + 4);
+    const flip = hashF(i * 17, j * 13) > .5 ? 1 : -1;
+    budget -= 5;
+    boxOnGround(bx, gy, bz, 13, 6.4 + t * 2, 10, [196, 188, 172], bd);              // house
+    boxOnGround(bx, gy + 6.4 + t * 2, bz, 13.6, 3.2, 10.4, [128, 96, 80], bd);      // roof
+    boxOnGround(bx + flip * 30, gy, bz + 10, 24, 9 + t * 3, 14,
+      t > .45 ? [140, 66, 52] : [166, 160, 148], bd);                                // barn
+    for (let k = 0; k < 2; k++)
+      boxOnGround(bx + flip * (48 + k * 8), gy, bz + 6, 5.5, 12 + k * 4 + t * 4, 5.5,
+        [206, 208, 204], bd);                                                        // silos
+  };
+  const ci = Math.round(camX / S), cj = Math.round(camZ / S);
+  const RN = Math.ceil(reach / S);
+  one(ci, cj);
+  for (let ring = 1; ring <= RN && budget > 4; ring++) {
+    for (let k = -ring; k <= ring && budget > 4; k++) { one(ci + k, cj - ring); one(ci + k, cj + ring); }
+    for (let k = -ring + 1; k <= ring - 1 && budget > 4; k++) { one(ci - ring, cj + k); one(ci + ring, cj + k); }
   }
   return budget;
 }
