@@ -575,6 +575,15 @@ for (const k in TYPES) {
   t.pool = new Pool(g, t.mat || propMat, k === 'bldg' ? 256 : 128);
   { const pa = g.attributes.position; let m = 0; for (let i = 0; i < pa.count; i++) m = Math.max(m, Math.hypot(pa.getX(i), pa.getZ(i))); t.fit = m; }
   g.computeBoundingBox(); t.bb = g.boundingBox.clone();
+  // collision box: the object's real base. Trees, lamps and signs are held up by a trunk or pole,
+  // not their canopy or arm; everything else uses its outline, trimmed slightly so neighbours
+  // that merely touch don't start the simulation overlapping.
+  const trunk = { treeS: 0.14, treeB: 0.26, pine: 0.7, lamp: 0.14, signal: 0.16, stopsign: 0.06, streetsign: 0.06, umbrella: 0.55 }[k];
+  const bb = t.bb;
+  t.col = trunk ? { hx: trunk, hz: trunk, cx: 0, cz: 0 }
+                : { hx: (bb.max.x - bb.min.x) / 2 * 0.92, hz: (bb.max.z - bb.min.z) / 2 * 0.92, cx: (bb.max.x + bb.min.x) / 2, cz: (bb.max.z + bb.min.z) / 2 };
+  t.col.hy = (bb.max.y - bb.min.y) / 2; t.col.cy = (bb.max.y + bb.min.y) / 2;
+  if (!t.raw) t.fit = Math.hypot(t.col.hx, t.col.hz) + Math.hypot(t.col.cx, t.col.cz);
   t.pool.mesh.castShadow = t.shadow = k === 'bldg' || t.h >= 2.4 || t.s >= 1.8;
   t.poolLo = gl ? new Pool(gl, t.mat || propMat, 256) : t.pool;
   if (gl) t.poolLo.mesh.castShadow = false;
@@ -1165,24 +1174,33 @@ function updateDust(dt) {
 const physWorld = new RAPIER.World({ x: 0, y: -14, z: 0 });
 physWorld.timestep = 1 / 60;
 const active = [];
-let ringCol = null, wallCol = null, ringR = -1, ringOuter = 0, physAcc = 0;
-function buildHoleColliders() {
+physWorld.integrationParameters.erp = 0.35;                 // gentle overlap correction: no popping
+physWorld.integrationParameters.numSolverIterations = 6;
+// collision groups: ground | resting objects | objects already dropping through the opening
+const GRP_GROUND = (0x0001 << 16) | 0xffff, GRP_OBJ = (0x0002 << 16) | 0xffff, GRP_DROP = (0x0004 << 16) | 0x0006;
+let groundBody = null, groundR = -1, ringOuter = 0, groundX = NaN, groundZ = NaN, groundMoved = false;
+// ground = rings of thick boxes whose inner faces are tangent to the rim, plus a box wall down the shaft
+function buildHoleGround() {
   const r = hole.r;
-  if (ringCol && Math.abs(r - ringR) < r * 0.01) return;
-  ringR = r; ringOuter = r * 2 + 70;
-  if (ringCol) physWorld.removeCollider(ringCol, true);
-  if (wallCol) physWorld.removeCollider(wallCol, true);
-  const seg = 72, depth = r * 6 + 14;
-  const rv = new Float32Array(seg * 2 * 3), wv = new Float32Array(seg * 2 * 3), ri = [], wi = [];
-  for (let i = 0; i < seg; i++) {
-    const a = i / seg * Math.PI * 2, c = Math.cos(a), sn = Math.sin(a);
-    rv.set([c * r, 0, sn * r, c * ringOuter, 0, sn * ringOuter], i * 6);
-    wv.set([c * r, 0, sn * r, c * r, -depth, sn * r], i * 6);
-    const j = (i + 1) % seg, A = i * 2, B = i * 2 + 1, Cc = j * 2, D = j * 2 + 1;
-    ri.push(A, Cc, B, B, Cc, D); wi.push(A, B, Cc, Cc, B, D);
-  }
-  ringCol = physWorld.createCollider(RAPIER.ColliderDesc.trimesh(rv, new Uint32Array(ri)).setTranslation(hole.x, 0, hole.z).setFriction(0.9));
-  wallCol = physWorld.createCollider(RAPIER.ColliderDesc.trimesh(wv, new Uint32Array(wi)).setTranslation(hole.x, 0, hole.z).setFriction(0.3));
+  if (groundBody && Math.abs(r - groundR) < r * 0.03) return;
+  if (groundBody) physWorld.removeRigidBody(groundBody);
+  groundR = r; ringOuter = r * 2 + 70; groundMoved = true;
+  groundBody = physWorld.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(hole.x, 0, hole.z));
+  groundX = hole.x; groundZ = hole.z;
+  const T = 2, depth = r * 6 + 14, W1 = Math.max(2, r * 0.6);
+  const ring = (rin, rout, n, y0, y1) => {
+    const hw = rout * Math.tan(Math.PI / n) * 1.03;
+    for (let i = 0; i < n; i++) {
+      const a = (i + 0.5) / n * Math.PI * 2, rm = (rin + rout) / 2, ph = -a;
+      physWorld.createCollider(RAPIER.ColliderDesc.cuboid((rout - rin) / 2, (y1 - y0) / 2, hw)
+        .setTranslation(Math.cos(a) * rm, (y0 + y1) / 2, Math.sin(a) * rm)
+        .setRotation({ x: 0, y: Math.sin(ph / 2), z: 0, w: Math.cos(ph / 2) })
+        .setFriction(0.9).setRestitution(0).setCollisionGroups(GRP_GROUND), groundBody);
+    }
+  };
+  ring(r, r + W1, 48, -T, 0);
+  ring(r + W1, ringOuter, 32, -T, 0);
+  ring(r, r + 0.6, 48, -depth, -0.3);       // the shaft wall, just below the surface
 }
 function activate(o) {
   o.state = 1;
@@ -1193,19 +1211,27 @@ function activate(o) {
     .setLinearDamping(0.05).setAngularDamping(0.4).setCcdEnabled(o.size < 1);
   if (o.dyn && o.kind === 'car') { const v = o.dyn.speed * o.dyn.dir; bd.setLinvel(o.dyn.alongX ? v : 0, 0, o.dyn.alongX ? 0 : v); }
   o.body = physWorld.createRigidBody(bd);
-  const bb = o.t.bb, sx = o.sx, sy = o.sy, sz = o.sz;
-  const hx = Math.max(0.03, (bb.max.x - bb.min.x) / 2 * sx), hy = Math.max(0.03, (bb.max.y - bb.min.y) / 2 * sy), hz = Math.max(0.03, (bb.max.z - bb.min.z) / 2 * sz);
-  physWorld.createCollider(RAPIER.ColliderDesc.cuboid(hx, hy, hz)
-    .setTranslation((bb.max.x + bb.min.x) / 2 * sx, (bb.max.y + bb.min.y) / 2 * sy, (bb.max.z + bb.min.z) / 2 * sz)
-    .setFriction(0.8).setDensity(o.t.raw ? 0.25 : 1), o.body);
+  const c = o.t.col, sx = o.sx, sy = o.sy, sz = o.sz;
+  const ex = [Math.max(0.03, c.hx * sx), Math.max(0.03, c.hy * sy), Math.max(0.03, c.hz * sz)];
+  o.col = physWorld.createCollider(RAPIER.ColliderDesc.cuboid(ex[0], ex[1], ex[2])
+    .setTranslation(c.cx * sx, c.cy * sy, c.cz * sz)
+    .setFriction(0.8).setRestitution(0).setDensity(o.t.raw ? 0.25 : 1).setCollisionGroups(GRP_OBJ), o.body);
+  // narrowest way through: the two smallest half-extents
+  ex.sort((a, b) => a - b); o.slim = Math.hypot(ex[0], ex[1]);
+  o.dropping = false;
   active.push(o);
 }
 function deactivate(o, i) {
   active.splice(i, 1);
   physWorld.removeRigidBody(o.body); o.body = null;
   o.state = 0;
-  if (o.dyn) { o.q = null; o.tilt = 0; o.physY = 0; placeDyn(o, o.kind, false); stepDyn(o, 0); }
+  if (o.dyn) {           // a car or pedestrian knocked out of its lane stays put; a new one takes its place
+    const k = dyn.indexOf(o); if (k >= 0) dyn.splice(k, 1);
+    o.dyn = null; o.loose = true; loose.push(o);
+    makeDyn(o.kind, false);
+  }
 }
+const loose = [];
 function consume(o) {
   o.state = 2;
   if (o.id && !o.dyn) eatenIds.add(o.id);
@@ -1229,19 +1255,29 @@ function tryEat(o) {
   if (d < hole.r + o.size + 1.5) activate(o);
 }
 function physicsStep(dt) {
-  buildHoleColliders();
-  ringCol.setTranslation({ x: hole.x, y: 0, z: hole.z });
-  wallCol.setTranslation({ x: hole.x, y: 0, z: hole.z });
-  physAcc += dt;
-  let n = 0;
-  while (physAcc >= physWorld.timestep && n < 3) { physWorld.step(); physAcc -= physWorld.timestep; n++; }
-  if (n === 3) physAcc = 0;
+  groundMoved = false;
+  buildHoleGround();
+  if (Math.abs(hole.x - groundX) > 0.005 || Math.abs(hole.z - groundZ) > 0.005) {
+    groundBody.setTranslation({ x: hole.x, y: 0, z: hole.z }, false);
+    groundX = hole.x; groundZ = hole.z; groundMoved = true;
+  }
+  // step with the real frame time (split long frames) so motion never stutters
+  const n = dt > 1 / 45 ? 2 : 1;
+  physWorld.timestep = Math.max(1 / 240, dt / n);
+  for (let k = 0; k < n; k++) physWorld.step();
   for (let i = active.length - 1; i >= 0; i--) {
     const o = active[i], b = o.body, t = b.translation(), q = b.rotation();
     o.x = t.x; o.z = t.z; o.physY = t.y; o.y = t.y + o.baseY;
     o.q.set(q.x, q.y, q.z, q.w);
     writeMatrix(o);
     const d = Math.hypot(o.x - hole.x, o.z - hole.z);
+    // sinking inside the opening and able to pass edge-on: it stops touching the rim and shaft so a
+    // moving or growing hole can never materialise ground inside it and fling it out
+    if (!o.dropping && t.y < -0.15 && d < hole.r - 0.05 && o.slim <= hole.r) { o.dropping = true; o.col.setCollisionGroups(GRP_DROP); }
+    const v0 = b.linvel(), sp = Math.hypot(v0.x, v0.y, v0.z);
+    if (sp > 30) { const k = 30 / sp; b.setLinvel({ x: v0.x * k, y: v0.y * k, z: v0.z * k }, true); }
+    const w0 = b.angvel(), ws = Math.hypot(w0.x, w0.y, w0.z);
+    if (ws > 12) { const k = 12 / ws; b.setAngvel({ x: w0.x * k, y: w0.y * k, z: w0.z * k }, true); }
     if (o.state === 1 && t.y < -(Math.min(o.h, 6) * 0.5 + 0.3) && d < hole.r + 0.5) consume(o);
     if (t.y < -(o.h + hole.r * 3 + 8)) {
       active.splice(i, 1); physWorld.removeRigidBody(b); o.body = null;
@@ -1251,7 +1287,7 @@ function physicsStep(dt) {
       continue;
     }
     if (o.state !== 1) continue;
-    if (d < hole.r + o.size + 1) { b.wakeUp(); continue; }
+    if (d < hole.r + o.size + 1) { if (groundMoved) b.wakeUp(); continue; }
     const v = b.linvel();
     if ((d > hole.r + o.size + 8 && (b.isSleeping() || v.x * v.x + v.y * v.y + v.z * v.z < 0.05)) || d > ringOuter * 0.8) deactivate(o, i);
   }
@@ -1984,6 +2020,12 @@ function frame(now) {
     if (started) tryEat(o);
   }
 
+  for (let i = loose.length - 1; i >= 0; i--) {
+    const o = loose[i];
+    if (o.state > 1) { loose.splice(i, 1); continue; }
+    if (o.state === 0 && Math.hypot(o.x - hole.x, o.z - hole.z) > loadRange * 1.2) { releaseObj(o); o.state = 3; loose.splice(i, 1); continue; }
+    if (started) tryEat(o);
+  }
   // swallow statics near the hole
   if (started) {
     const reach = hole.r + 40;
@@ -2008,6 +2050,7 @@ function frame(now) {
   timeU.value = now / 1000;
   sky.position.copy(camera.position);
   for (const k in TYPES) { TYPES[k].pool.flush(); if (TYPES[k].poolLo !== TYPES[k].pool) TYPES[k].poolLo.flush(); }
+  if (window.__noRender) return;
   if (HQ) {
     gtao.updateGtaoMaterial({ radius: 0.6 + hole.r * 0.35, distanceExponent: 1.4, thickness: 1 + hole.r * 0.5, scale: 1.1, samples: 8 });
     composer.render(dt);
