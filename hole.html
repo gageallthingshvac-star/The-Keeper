@@ -61,7 +61,7 @@
 <div id="toast"></div>
 <div id="joy"><i class="u"></i><i class="d"></i><i class="l"></i><i class="r"></i><div id="knob"></div></div>
 <div id="hint" class="panel"><svg viewBox="0 0 64 56" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="6" width="30" height="15" rx="3" transform="rotate(-32 25 13.5)"/><path d="M52 10v22M45 26l7 7 7-7"/><path d="M8 38c0 7 11 12 24 12s24-5 24-12"/><path d="M8 38c0-4 5-7 12-8"/></svg><span>Move under objects to make them fall in.</span></div>
-<div id="btns"><button id="rotL" title="Rotate (Q)">&#10226;</button><button id="view" title="Camera angle (V)">View 45&deg;</button><button id="rotR" title="Rotate (E)">&#10227;</button><button id="mute">&#128266;</button></div>
+<div id="btns"><button id="rotL" title="Rotate (Q)">&#10226;</button><button id="view" title="Camera angle (V)">View 45&deg;</button><button id="rotR" title="Rotate (E)">&#10227;</button><button id="mute">&#128266;</button><button id="hq" title="Graphics quality">HQ</button></div>
 <div id="start">
   <h1>HOLE CITY</h1>
   <p>You are a hole in the ground. Swallow anything smaller than you: cones, people, cars, buses, houses, then whole towers. The city doesn't end.</p>
@@ -79,6 +79,13 @@
 <script type="module">
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { Sky } from 'three/addons/objects/Sky.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 window.addEventListener('error', e => { const el = document.getElementById('err'); el.style.display = 'block'; el.textContent += (e.message || e) + '\n'; });
 
@@ -97,46 +104,164 @@ const V3 = THREE.Vector3, tmpV = new V3(), tmpQ = new THREE.Quaternion(), tmpQ2 
 const UP = new V3(0, 1, 0);
 const ZERO_M = new THREE.Matrix4().makeScale(0, 0, 0);
 
+// ---------------------------------------------------------------- quality
+const mobile = matchMedia('(pointer:coarse)').matches;
+let HQ = !mobile;
+try { const q = localStorage.getItem('holecity.hq'); if (q === '1' || q === '0') HQ = q === '1'; } catch (_) { }
+
 // ---------------------------------------------------------------- renderer / scene
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-const mobile = matchMedia('(pointer:coarse)').matches;
-renderer.setPixelRatio(Math.min(devicePixelRatio, mobile ? 1.5 : 2));
+const pixelRatio = () => Math.min(devicePixelRatio, HQ ? 2 : 1.25);
+renderer.setPixelRatio(pixelRatio());
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.15;
+renderer.toneMappingExposure = 0.95;
 document.body.prepend(renderer.domElement);
 
 const scene = new THREE.Scene();
-const SKY = new THREE.Color(0xbcd3e2);
-scene.background = SKY;
-scene.fog = new THREE.Fog(SKY, 60, 200);
+const HAZE = new THREE.Color(0xc4cfd8);
+scene.background = HAZE;
+scene.fog = new THREE.Fog(HAZE, 60, 200);
 
-const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.5, 3000);
-addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.5, 3000);
 
-scene.add(new THREE.HemisphereLight(0xd6e6ff, 0x7a6450, 1.25));
-const sun = new THREE.DirectionalLight(0xffd9a6, 3.1);
+const SUN_DIR = new V3(-0.62, 0.78, 0.42).normalize();
+const hemi = new THREE.HemisphereLight(0xcfe0ff, 0x6b5a48, 0.3);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffd6a8, 4.2);
 sun.castShadow = true;
-sun.shadow.mapSize.set(mobile ? 1024 : 2048, mobile ? 1024 : 2048);
-sun.shadow.bias = -0.0006;
-sun.shadow.normalBias = 0.04;
+sun.shadow.bias = -0.0004;
+sun.shadow.normalBias = 0.035;
 scene.add(sun, sun.target);
-const SUN_DIR = new V3(-0.6, 0.95, 0.35).normalize();
+function applyShadowRes() {
+  const s = HQ ? 4096 : 1024;
+  if (sun.shadow.mapSize.x !== s) { sun.shadow.mapSize.set(s, s); if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; } }
+}
+applyShadowRes();
 
-// ---------------------------------------------------------------- materials
-const holeU = { value: new THREE.Vector3(0, 0, R0) };   // x, z, radius
+// physical sky, also baked into an environment map so glass and paint reflect it
+const sky = new Sky();
+sky.scale.setScalar(4000);
+const skyU = sky.material.uniforms;
+skyU.turbidity.value = 5.5; skyU.rayleigh.value = 1.4; skyU.mieCoefficient.value = 0.004; skyU.mieDirectionalG.value = 0.86;
+skyU.sunPosition.value.copy(SUN_DIR);
+scene.add(sky);
+{
+  const envScene = new THREE.Scene();
+  const s2 = new Sky(); s2.scale.setScalar(1000);
+  for (const k in skyU) if (s2.material.uniforms[k]) s2.material.uniforms[k].value = skyU[k].value;
+  envScene.add(s2);
+  const groundDisc = new THREE.Mesh(new THREE.CircleGeometry(900, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x5c5a55 }));
+  groundDisc.position.y = -20; envScene.add(groundDisc);
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(envScene, 0.02).texture;
+  pmrem.dispose();
+}
 
-// ground: vertex colours, discards fragments inside the hole opening
-const groundMat = new THREE.MeshLambertMaterial({ vertexColors: true });
-groundMat.onBeforeCompile = sh => {
+// post: MSAA HDR target -> ground-truth AO -> gentle bloom -> tone map
+const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(innerWidth, innerHeight, { type: THREE.HalfFloatType, samples: 4 }));
+composer.addPass(new RenderPass(scene, camera));
+const gtao = new GTAOPass(scene, camera, innerWidth, innerHeight);
+gtao.blendIntensity = 1.0;
+gtao.normalMaterial.onBeforeCompile = sh => {
   sh.uniforms.uHole = holeU;
-  sh.vertexShader = 'varying vec3 vHW;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvHW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-  sh.fragmentShader = 'uniform vec3 uHole;\nvarying vec3 vHW;\n' + sh.fragmentShader.replace('void main() {', 'void main() {\nif (distance(vHW.xz, uHole.xy) < uHole.z) discard;');
+  sh.vertexShader = 'varying vec3 vHW;\n' + sh.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
+    vec4 hw4 = vec4(transformed, 1.0);
+    #ifdef USE_INSTANCING
+      hw4 = instanceMatrix * hw4;
+    #endif
+    vHW = (modelMatrix * hw4).xyz;`);
+  sh.fragmentShader = 'uniform vec3 uHole;\nvarying vec3 vHW;\n' + sh.fragmentShader.replace('void main() {', 'void main() {\nif (distance(vHW.xz, uHole.xy) < uHole.z && vHW.y > -0.1 && vHW.y < 0.2) discard;');
+};
+composer.addPass(gtao);
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.16, 0.45, 0.9);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+function resize() {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setPixelRatio(pixelRatio()); renderer.setSize(innerWidth, innerHeight);
+  composer.setPixelRatio(pixelRatio()); composer.setSize(innerWidth, innerHeight);
+}
+addEventListener('resize', resize);
+resize();
+
+// ---------------------------------------------------------------- shared shader bits
+const holeU = { value: new THREE.Vector3(0, 0, R0) };   // x, z, radius
+const timeU = { value: 0 };
+const NOISE = `
+  float hash12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+  float vnoise(vec2 p) { vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash12(i), hash12(i + vec2(1, 0)), u.x), mix(hash12(i + vec2(0, 1)), hash12(i + vec2(1, 1)), u.x), u.y); }
+  float fbm(vec2 p) { float a = 0.5, s = 0.0; for (int i = 0; i < 4; i++) { s += a * vnoise(p); p = p * 2.03 + 17.1; a *= 0.5; } return s; }
+`;
+
+// ground: vertex colours give the base tone, a per-vertex surface id picks the procedural detail
+// (0 asphalt, 1 sidewalk tiles, 2 grass, 3 pavers, 4 water, 5 road paint, 6 concrete slabs, 7 stone)
+const groundMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0, envMapIntensity: 0.3 });
+groundMat.onBeforeCompile = sh => {
+  sh.uniforms.uHole = holeU; sh.uniforms.uTime = timeU;
+  sh.vertexShader = 'attribute float surf;\nvarying float vSurf;\nvarying vec3 vHW;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvHW = (modelMatrix * vec4(transformed, 1.0)).xyz; vSurf = surf;');
+  sh.fragmentShader = 'uniform vec3 uHole;\nuniform float uTime;\nvarying float vSurf;\nvarying vec3 vHW;\n' + NOISE + sh.fragmentShader
+    .replace('void main() {', 'void main() {\nif (distance(vHW.xz, uHole.xy) < uHole.z) discard;')
+    .replace('#include <color_fragment>', `#include <color_fragment>
+      vec2 p = vHW.xz;
+      int sf = int(vSurf + 0.5);
+      float aa = clamp(1.0 - length(fwidth(p)) * 1.5, 0.0, 1.0);
+      float n1 = fbm(p * 0.8), n2 = vnoise(p * 6.0), fine = hash12(floor(p * 40.0));
+      float gR = 0.9; vec3 gN = vec3(0.0);
+      vec3 c = diffuseColor.rgb;
+      if (sf == 0) {
+        c *= 0.82 + 0.3 * n1 + 0.16 * (fine - 0.5) * aa;
+        c = mix(c, c * 0.7, smoothstep(0.6, 0.7, fbm(p * 0.11 + 3.1)));
+        float cr = abs(fbm(p * 0.35 + 7.0) - 0.5);
+        c *= 1.0 - 0.35 * (1.0 - smoothstep(0.0, 0.012, cr)) * aa;
+        gR = 0.9 - 0.12 * n2;
+        gN = vec3(n2 - 0.5, 0.0, vnoise(p * 6.0 + 13.0) - 0.5) * 0.35 * aa;
+      } else if (sf == 1) {
+        vec2 q = p / 1.5, f = fract(q);
+        float joint = (1.0 - step(0.02, f.x) * step(0.02, f.y)) * aa;
+        c *= (0.93 + 0.12 * hash12(floor(q))) * (0.88 + 0.2 * n1) * (1.0 - 0.28 * joint);
+        c *= 1.0 - 0.18 * smoothstep(0.62, 0.8, fbm(p * 0.45 + 5.0));
+        gR = 0.82;
+      } else if (sf == 2) {
+        c = mix(c * 0.72, c * 1.12 * vec3(1.08, 1.0, 0.78), n1);
+        c *= 1.0 - 0.25 * smoothstep(0.55, 0.75, fbm(p * 0.25 + 9.0)) * vec3(0.3, 0.6, 1.0);
+        c *= 0.82 + 0.36 * fine * aa;
+        gR = 0.97;
+        gN = vec3(fine - 0.5, 0.0, hash12(floor(p * 40.0) + 3.0) - 0.5) * 0.8 * aa;
+      } else if (sf == 3) {
+        vec2 q = p / vec2(0.6, 0.3); q.x += floor(q.y) * 0.5; vec2 f = fract(q);
+        float joint = (1.0 - step(0.05, f.x) * step(0.08, f.y)) * aa;
+        c *= (0.86 + 0.24 * hash12(floor(q))) * (0.9 + 0.15 * n1) * (1.0 - 0.3 * joint);
+        gR = 0.78;
+      } else if (sf == 4) {
+        float t = uTime;
+        float wx = sin(p.x * 1.3 + t * 1.1) * 0.5 + sin(p.x * 3.1 - p.y * 1.7 + t * 1.9) * 0.3 + (vnoise(p * 2.0 + t * 0.4) - 0.5);
+        float wz = sin(p.y * 1.1 - t * 0.9) * 0.5 + sin(p.y * 2.7 + p.x * 1.9 + t * 1.6) * 0.3 + (vnoise(p * 2.0 - t * 0.4 + 4.0) - 0.5);
+        gN = vec3(wx, 0.0, wz) * 0.22;
+        c = mix(vec3(0.02, 0.07, 0.1), vec3(0.05, 0.16, 0.2), n1);
+        gR = 0.05;
+      } else if (sf == 5) {
+        c *= 0.9 + 0.12 * n2;
+        c = mix(c, vec3(0.05, 0.05, 0.055), smoothstep(0.5, 0.78, fbm(p * 1.3)) * 0.55);
+        gR = 0.6;
+      } else if (sf == 6) {
+        vec2 f = fract(p / 4.0);
+        float joint = (1.0 - step(0.008, f.x) * step(0.008, f.y)) * aa;
+        c *= (0.82 + 0.28 * n1) * (1.0 - 0.3 * joint) * (0.95 + 0.08 * hash12(floor(p / 4.0)));
+        gR = 0.86;
+      } else {
+        c *= 0.88 + 0.2 * n2; gR = 0.8;
+      }
+      diffuseColor.rgb = c;`)
+    .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nroughnessFactor = gR;')
+    .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nnormal = normalize(normal + (viewMatrix * vec4(gN, 0.0)).xyz);');
 };
 
-// anything below street level fades to black as it drops into the hole
+// anything below street level fades to black as it drops into the hole; tall stuff between
+// the camera and the hole is dithered out so it never hides what you're eating
 function sinkShade(sh) {
   sh.uniforms.uHole = holeU;
   sh.vertexShader = 'varying vec3 vWP;\n' + sh.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
@@ -145,9 +270,8 @@ function sinkShade(sh) {
       wy4 = instanceMatrix * wy4;
     #endif
     vWP = (modelMatrix * wy4).xyz;`);
-  sh.fragmentShader = 'uniform vec3 uHole;\nvarying vec3 vWP;\n' + sh.fragmentShader
+  sh.fragmentShader = 'uniform vec3 uHole;\nvarying vec3 vWP;\n' + NOISE + sh.fragmentShader
     .replace('void main() {', `void main() {
-      // see-through: tall stuff standing between the camera and the hole gets dithered out
       {
         vec3 hc = vec3(uHole.x, 0.0, uHole.y);
         vec3 dir = hc - cameraPosition; float L = length(dir); dir /= L;
@@ -160,22 +284,25 @@ function sinkShade(sh) {
     'outgoingLight *= clamp(1.0 + min(vWP.y, 0.0) / (0.8 + uHole.z * 0.9), 0.0, 1.0);\n#include <opaque_fragment>');
 }
 
-// props: vertex colours; pure-white vertices take the per-instance tint
-const propMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+// props: vertex colours with baked contact AO; per-vertex (roughness, metalness, tintable)
+const propMat = new THREE.MeshStandardMaterial({ vertexColors: true, envMapIntensity: 0.55 });
 propMat.onBeforeCompile = sh => {
   sinkShade(sh);
-  sh.vertexShader = sh.vertexShader.replace('#include <color_vertex>', `
+  sh.vertexShader = 'attribute vec3 rm;\nvarying vec3 vRM;\n' + sh.vertexShader.replace('#include <color_vertex>', `
+    vRM = rm;
     vColor = vec3(1.0);
     #ifdef USE_COLOR
       vColor = color;
     #endif
     #ifdef USE_INSTANCING_COLOR
-      if (color.r > 0.999 && color.g > 0.999 && color.b > 0.999) vColor = instanceColor;
+      if (rm.z > 0.5) vColor *= instanceColor;
     #endif`);
+  sh.fragmentShader = 'varying vec3 vRM;\n' + sh.fragmentShader.replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nroughnessFactor = vRM.x; metalnessFactor = vRM.y;');
 };
 
-// buildings: instance-tinted unit box, windows drawn procedurally in scaled object space
-const bldgMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+// buildings: instance-tinted unit box; facade (brick / stone / curtain wall), windows with frames,
+// sills, blinds and reflective glass, grime and street-level dirt are all procedural
+const bldgMat = new THREE.MeshStandardMaterial({ color: 0xffffff, envMapIntensity: 0.6 });
 bldgMat.onBeforeCompile = sh => {
   sinkShade(sh);
   sh.vertexShader = 'varying vec3 vBP;\nvarying vec3 vBN;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
@@ -186,17 +313,52 @@ bldgMat.onBeforeCompile = sh => {
     #endif
     vBP = position * bsc; vBN = normal;`);
   sh.fragmentShader = 'varying vec3 vBP;\nvarying vec3 vBN;\n' + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+    vec3 base = diffuseColor.rgb;
+    float bR = 0.88, bM = 0.0;
     if (abs(vBN.y) < 0.5) {
-      float u = abs(vBN.x) > 0.5 ? vBP.z : vBP.x;
-      float fu = fract(u / 2.8), fv = fract(vBP.y / 3.3);
-      float win = step(0.18, fu) * step(fu, 0.82) * step(0.28, fv) * step(fv, 0.86) * step(3.3, vBP.y);
-      float shop = step(vBP.y, 3.0) * step(0.6, vBP.y) * step(0.08, fu) * step(fu, 0.92);
-      vec3 glass = vec3(0.16, 0.23, 0.32) + 0.08 * fract(sin(floor(u / 2.8) * 12.9 + floor(vBP.y / 3.3) * 78.2) * 437.5);
-      diffuseColor.rgb = mix(diffuseColor.rgb, glass, max(win, shop) * 0.9);
-      diffuseColor.rgb *= 1.0 - 0.18 * step(fv, 0.06) * step(3.3, vBP.y);
+      float u = (abs(vBN.x) > 0.5 ? vBP.z : vBP.x) + vBN.x * 31.0 + vBN.z * 57.0;
+      float y = vBP.y;
+      float aa = clamp(1.0 - fwidth(y) * 6.0, 0.0, 1.0);
+      float curtain = step(base.r + 0.015, base.b);
+      float brick = step(base.b * 1.35, base.r);
+      float bayW = mix(2.8, 1.6, curtain), flH = 3.4;
+      vec2 cell = vec2(floor(u / bayW), floor(y / flH));
+      float fu = fract(u / bayW), fv = fract(y / flH);
+      float rnd = hash12(cell);
+      vec3 wall = base * (0.8 + 0.34 * fbm(vec2(u * 0.3, y * 0.07)));
+      float bRow = floor(y / 0.3);
+      vec2 bf = vec2(fract(u / 0.9 + bRow * 0.5), fract(y / 0.3));
+      float mortar = clamp((1.0 - step(0.04, bf.x)) + (1.0 - step(0.13, bf.y)), 0.0, 1.0);
+      wall *= mix(1.0, (1.0 - 0.22 * mortar) * (0.88 + 0.22 * hash12(vec2(floor(u / 0.9 + bRow * 0.5), bRow))), brick * aa);
+      wall *= mix(1.0, 1.0 - 0.1 * (1.0 - step(0.015, fract(y / 1.7))), (1.0 - brick) * (1.0 - curtain) * aa);
+      wall *= 1.0 - 0.16 * smoothstep(0.45, 0.85, fbm(vec2(u * 1.2, y * 0.04 + 3.0)));
+      wall *= 0.7 + 0.3 * smoothstep(0.0, 2.2, y);
+      float wx0 = mix(0.2, 0.03, curtain), wx1 = 1.0 - wx0, wy0 = mix(0.27, 0.2, curtain), wy1 = mix(0.86, 0.98, curtain);
+      float upper = step(flH, y);
+      float inWin = step(wx0, fu) * step(fu, wx1) * step(wy0, fv) * step(fv, wy1) * upper;
+      float inner = step(wx0 + 0.035, fu) * step(fu, wx1 - 0.035) * step(wy0 + 0.035, fv) * step(fv, wy1 - 0.035);
+      float mull = (1.0 - curtain) * (1.0 - step(0.012, abs(fu - 0.5)));
+      float frame = inWin * clamp(1.0 - inner + mull, 0.0, 1.0);
+      float sill = (1.0 - curtain) * step(wx0 - 0.03, fu) * step(fu, wx1 + 0.03) * step(wy0 - 0.045, fv) * step(fv, wy0) * upper;
+      float shop = (1.0 - step(3.0, y)) * step(0.45, y) * step(0.05, fu) * step(fu, 0.95);
+      float glassM = max(inWin - frame, shop) * aa + max(inWin - frame, shop) * (1.0 - aa) * 0.7;
+      float wy = clamp((fv - wy0) / (wy1 - wy0), 0.0, 1.0);
+      vec3 interior = vec3(0.03, 0.035, 0.045) + vec3(0.03) * hash12(cell + 5.0);
+      interior = mix(interior, vec3(0.5, 0.48, 0.44), step(0.6, rnd) * step(rnd, 0.82) * step(0.55, wy));
+      interior = mix(interior, vec3(0.55, 0.42, 0.26), step(0.93, rnd));
+      vec3 col = wall;
+      col = mix(col, mix(vec3(0.82, 0.8, 0.76), vec3(0.12, 0.13, 0.14), curtain), frame);
+      col = mix(col, base * 1.25 + 0.06, sill);
+      col = mix(col, wall * 0.55, curtain * (1.0 - inWin) * upper);
+      col = mix(col, interior, glassM);
+      diffuseColor.rgb = col;
+      bR = mix(mix(0.9, 0.55, curtain * (1.0 - glassM)), 0.04, glassM);
+      bM = glassM * 0.35 + frame * curtain * 0.6;
     } else {
-      diffuseColor.rgb *= 0.72;
-    }`);
+      float g = fbm(vBP.xz * 0.7);
+      diffuseColor.rgb = vec3(0.34, 0.33, 0.31) * (0.75 + 0.45 * g) * mix(vec3(1.0), base * 1.4, 0.25);
+      bR = 0.95;
+    }`).replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nroughnessFactor = bR; metalnessFactor = bM;');
 };
 
 // ---------------------------------------------------------------- instanced pools
@@ -230,37 +392,84 @@ class Pool {
 
 // ---------------------------------------------------------------- prop geometry kit
 const TINT = 0xffffff;
+const COL = {
+  asphalt: 0x3a3c3f, asphalt2: 0x424447, sidewalk: 0x9f9a90, curb: 0xb8b3a9, grass: 0x5a8236, grass2: 0x4f7730,
+  concrete: 0x918c83, plaza: 0xa89c88, line: 0xe9e7df, yellow: 0xe2b23a, dirt: 0x8a6d4b, water: 0x2f6f8f,
+  metal: 0x5b6068, dark: 0x222428, glass: 0x1b242d, trunk: 0x5a4331, leaf: 0x3f6b2a, leaf2: 0x557f32, leaf3: 0x6b8f3a, pine: 0x2c5230,
+  wood: 0x8a6240, skin: 0xd7a78a, red: 0xb8261c, orange: 0xf06a14, blue: 0x234e9a, green: 0x2a5a36, tire: 0x161616, chrome: 0xc4c8cc,
+};
+// surface properties by colour: [roughness, metalness]
+const RM = new Map([
+  [COL.glass, [0.04, 0.35]], [0x9fc6d8, [0.05, 0.2]], [0x9fd0ff, [0.1, 0.1]],
+  [COL.metal, [0.45, 0.8]], [0x3a3f45, [0.5, 0.7]], [0x2e3338, [0.45, 0.8]], [0x2a2d31, [0.5, 0.6]], [0x8d949c, [0.4, 0.8]],
+  [COL.chrome, [0.18, 1.0]], [0xdcdcdc, [0.3, 0.9]], [0xc9cdd1, [0.55, 0.5]], [0xaeb3b8, [0.5, 0.6]],
+  [COL.tire, [0.92, 0]], [COL.dark, [0.7, 0.2]], [0x4aa3d9, [0.05, 0]], [0xbfe6ff, [0.1, 0]],
+  [0xfff4c0, [0.2, 0]], [0xf4f1e6, [0.15, 0.2]], [0xb01818, [0.25, 0]], [COL.red, [0.4, 0.1]],
+]);
+let KIT_TINT_RM = [0.7, 0];
 function P(geo, color, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) {
   if (geo.index) geo = geo.toNonIndexed();
-  geo.deleteAttribute('uv');
+  if (geo.attributes.uv) geo.deleteAttribute('uv');
+  if (!geo.attributes.normal) geo.computeVertexNormals();
   geo.applyMatrix4(tmpM.compose(tmpV.set(x, y, z), tmpQ.setFromEuler(new THREE.Euler(rx, ry, rz)), tmpS.set(1, 1, 1)));
-  const c = new THREE.Color(color), n = geo.attributes.position.count, a = new Float32Array(n * 3);
-  for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; }
+  const c = new THREE.Color(color), n = geo.attributes.position.count, a = new Float32Array(n * 3), r = new Float32Array(n * 3);
+  const tint = color === TINT, rm = tint ? KIT_TINT_RM : (RM.get(color) || [0.75, 0]);
+  for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; r[i * 3] = rm[0]; r[i * 3 + 1] = rm[1]; r[i * 3 + 2] = tint ? 1 : 0; }
   geo.setAttribute('color', new THREE.BufferAttribute(a, 3));
+  geo.setAttribute('rm', new THREE.BufferAttribute(r, 3));
   return geo;
 }
 const box = (w, h, d, col, x = 0, y = 0, z = 0, ry = 0) => P(new THREE.BoxGeometry(w, h, d), col, x, y + h / 2, z, 0, ry, 0);
-const cyl = (rt, rb, h, col, x = 0, y = 0, z = 0, seg = 10, rx = 0, rz = 0) => P(new THREE.CylinderGeometry(rt, rb, h, seg), col, x, y + (rx || rz ? 0 : h / 2), z, rx, 0, rz);
-const ball = (r, col, x = 0, y = 0, z = 0, det = 1) => P(new THREE.IcosahedronGeometry(r, det), col, x, y, z);
-const cone = (r, h, col, x = 0, y = 0, z = 0, seg = 8) => P(new THREE.ConeGeometry(r, h, seg), col, x, y + h / 2, z);
+const rbox = (w, h, d, rad, col, x = 0, y = 0, z = 0) => P(new RoundedBoxGeometry(w, h, d, 3, rad), col, x, y + h / 2, z);
+const cyl = (rt, rb, h, col, x = 0, y = 0, z = 0, seg = 12, rx = 0, rz = 0) => P(new THREE.CylinderGeometry(rt, rb, h, seg), col, x, y + (rx || rz ? 0 : h / 2), z, rx, 0, rz);
+const ball = (r, col, x = 0, y = 0, z = 0, det = 2) => P(new THREE.IcosahedronGeometry(r, det), col, x, y, z);
+const cone = (r, h, col, x = 0, y = 0, z = 0, seg = 12) => P(new THREE.ConeGeometry(r, h, seg), col, x, y + h / 2, z);
+const capsule = (r, len, col, x = 0, y = 0, z = 0, sz = 1) => P(new THREE.CapsuleGeometry(r, len, 4, 10).scale(1, 1, sz), col, x, y, z);
 const merge = parts => { const g = mergeGeometries(parts); g.computeBoundingSphere(); return g; };
+// lumpy foliage: continuous displacement (no cracks), lighter on top, darker underneath
+function leaves(r, col, x, y, z, seed) {
+  const g = new THREE.IcosahedronGeometry(r, 2), pos = g.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    tmpV.fromBufferAttribute(pos, i);
+    const k = 1 + 0.16 * Math.sin(tmpV.x * 4.1 + seed) * Math.sin(tmpV.y * 3.7 + seed * 2) * Math.sin(tmpV.z * 4.9 + seed * 3) + 0.07 * Math.sin(tmpV.x * 11 + tmpV.z * 9 + seed);
+    tmpV.multiplyScalar(k); pos.setXYZ(i, tmpV.x, tmpV.y, tmpV.z);
+  }
+  g.computeVertexNormals();
+  const out = P(g, col, x, y, z), cA = out.attributes.color, pA = out.attributes.position;
+  for (let i = 0; i < cA.count; i++) {
+    const t = (pA.getY(i) - y) / r * 0.5 + 0.5;
+    const k = (0.55 + 0.6 * t) * (0.9 + 0.2 * Math.sin(pA.getX(i) * 7 + pA.getZ(i) * 5 + seed));
+    cA.setXYZ(i, cA.getX(i) * k, cA.getY(i) * k, cA.getZ(i) * k);
+  }
+  return out;
+}
+// contact shadow baked into vertex colours: darker toward the base
+function bakeAO(g, strength = 0.35) {
+  g.computeBoundingBox();
+  const y0 = g.boundingBox.min.y, h = Math.max(0.3, g.boundingBox.max.y - y0), cA = g.attributes.color, pA = g.attributes.position;
+  for (let i = 0; i < cA.count; i++) {
+    const t = Math.min(1, (pA.getY(i) - y0) / Math.min(1.2, h * 0.5));
+    const k = 1 - strength * (1 - t * t * (3 - 2 * t));
+    cA.setXYZ(i, cA.getX(i) * k, cA.getY(i) * k, cA.getZ(i) * k);
+  }
+  return g;
+}
 
-const COL = {
-  asphalt: 0x3b3f45, asphalt2: 0x45494f, sidewalk: 0xb9b6ae, curb: 0xd6d3cb, grass: 0x6fae4e, grass2: 0x5f9d42,
-  concrete: 0xa9a59c, plaza: 0xc7bca8, line: 0xf2f2ea, yellow: 0xf2c230, dirt: 0x8a6d4b,
-  metal: 0x5b6068, dark: 0x22252a, glass: 0x2b3a4a, trunk: 0x6b4a2e, leaf: 0x3f8f3a, leaf2: 0x5aa844, pine: 0x2f6d3a,
-  wood: 0x9a6a3c, skin: 0xe0b18f, red: 0xd33a2c, orange: 0xff7a1a, blue: 0x2f5fb3, green: 0x2f6b3d, tire: 0x1a1a1a,
-};
-
-function carGeo(len = 4.2, w = 1.8, h = 1.5) {
-  const wheel = (x, z) => cyl(0.34, 0.34, 0.28, COL.tire, x, 0.34, z, 10, 0, Math.PI / 2);
+function wheel(x, z, r = 0.34, w = 0.24) {
+  return [cyl(r, r, w, COL.tire, x, r, z, 20, 0, Math.PI / 2), cyl(r * 0.62, r * 0.62, w + 0.02, COL.chrome, x, r, z, 12, 0, Math.PI / 2), cyl(r * 0.18, r * 0.18, w + 0.04, COL.dark, x, r, z, 8, 0, Math.PI / 2)];
+}
+function carGeo(len = 4.4, w = 1.84) {
   return merge([
-    box(w, 0.62, len, TINT, 0, 0.3, 0),
-    box(w * 0.88, h - 0.92, len * 0.5, COL.glass, 0, 0.92, -len * 0.05),
-    box(w * 0.9, 0.08, len * 0.46, TINT, 0, h - 0.08, -len * 0.05),
-    box(w * 0.9, 0.12, 0.05, 0xfff4c0, 0, 0.62, len / 2),
-    box(w * 0.9, 0.12, 0.05, 0xb01818, 0, 0.62, -len / 2),
-    wheel(w / 2 - 0.1, len * 0.32), wheel(-w / 2 + 0.1, len * 0.32), wheel(w / 2 - 0.1, -len * 0.32), wheel(-w / 2 + 0.1, -len * 0.32),
+    rbox(w, 0.66, len, 0.22, TINT, 0, 0.26, 0),
+    rbox(w * 0.9, 0.12, len * 0.97, 0.05, TINT, 0, 0.84, 0),
+    rbox(w * 0.84, 0.58, len * 0.5, 0.2, COL.glass, 0, 0.8, -len * 0.05),
+    rbox(w * 0.8, 0.08, len * 0.38, 0.04, TINT, 0, 1.33, -len * 0.07),
+    box(w * 0.94, 0.16, 0.18, 0x1d1e21, 0, 0.24, len / 2 - 0.05), box(w * 0.94, 0.16, 0.18, 0x1d1e21, 0, 0.24, -len / 2 + 0.05),
+    box(0.36, 0.12, 0.05, 0xf4f1e6, w * 0.32, 0.66, len / 2 - 0.01), box(0.36, 0.12, 0.05, 0xf4f1e6, -w * 0.32, 0.66, len / 2 - 0.01),
+    box(0.36, 0.1, 0.05, 0xb01818, w * 0.34, 0.7, -len / 2 + 0.01), box(0.36, 0.1, 0.05, 0xb01818, -w * 0.34, 0.7, -len / 2 + 0.01),
+    box(0.5, 0.14, 0.04, 0x1d1e21, 0, 0.44, len / 2 + 0.02),
+    box(0.16, 0.1, 0.08, TINT, w / 2 + 0.06, 1.02, len * 0.14), box(0.16, 0.1, 0.08, TINT, -w / 2 - 0.06, 1.02, len * 0.14),
+    ...wheel(w / 2 - 0.12, len * 0.31), ...wheel(-w / 2 + 0.12, len * 0.31), ...wheel(w / 2 - 0.12, -len * 0.31), ...wheel(-w / 2 + 0.12, -len * 0.31),
   ]);
 }
 function houseGeo(w, d, wallH, roofCol) {
@@ -270,65 +479,81 @@ function houseGeo(w, d, wallH, roofCol) {
   const roof = new THREE.BufferGeometry();
   roof.setAttribute('position', new THREE.Float32BufferAttribute(tris.flat(), 3));
   roof.computeVertexNormals();
+  const win = (x, z, ry) => [box(1.3, 1.25, 0.1, 0xf0ede6, x, 1.05, z, ry), box(1.12, 1.07, 0.12, COL.glass, x, 1.14, z, ry), box(0.06, 1.07, 0.14, 0xf0ede6, x, 1.14, z, ry)];
   return merge([
-    box(w, wallH, d, TINT, 0, 0, 0),
+    box(w, 0.35, d, 0x8c877d, 0, 0, 0),
+    box(w, wallH - 0.35, d, TINT, 0, 0.35, 0),
     P(roof, roofCol),
-    box(1.1, 2.1, 0.08, 0x5a3a24, w * 0.15, 0.1, d / 2),
-    box(1.3, 1.1, 0.08, COL.glass, -w * 0.25, 1.1, d / 2),
-    box(1.3, 1.1, 0.08, COL.glass, w * 0.36, 1.1, d / 2),
-    box(1.3, 1.1, 0.08, COL.glass, -w * 0.25, 1.1, -d / 2),
-    box(0.08, 1.1, 1.3, COL.glass, w / 2, 1.1, 0),
-    box(0.08, 1.1, 1.3, COL.glass, -w / 2, 1.1, 0),
-    box(0.7, roofH, 0.7, 0x7a5448, w * 0.28, wallH + roofH * 0.2, -d * 0.18),
+    box(w + 0.8, 0.12, 0.25, 0xefece6, 0, wallH - 0.05, oz - 0.1), box(w + 0.8, 0.12, 0.25, 0xefece6, 0, wallH - 0.05, -oz + 0.1),
+    box(1.1, 2.15, 0.1, 0x4a2e1c, w * 0.15, 0.1, d / 2), box(1.4, 0.15, 0.9, 0x9a958c, w * 0.15, 0, d / 2 + 0.45),
+    ...win(-w * 0.25, d / 2, 0), ...win(w * 0.38, d / 2, 0), ...win(-w * 0.25, -d / 2, 0), ...win(w * 0.25, -d / 2, 0),
+    ...win(w / 2, 0, Math.PI / 2), ...win(-w / 2, 0, Math.PI / 2),
+    box(0.8, roofH + 0.4, 0.8, 0x7a4a3a, w * 0.28, wallH + roofH * 0.2, -d * 0.18),
   ]);
 }
+function tree(big, seed) {
+  const s = big ? 1.7 : 1.0, parts = [cyl(0.09 * s, 0.15 * s, 2.0 * s, COL.trunk, 0, 0, 0, 8)];
+  parts.push(P(new THREE.CylinderGeometry(0.04 * s, 0.07 * s, 1.2 * s, 6), COL.trunk, 0.3 * s, 2.0 * s, 0, 0, 0, -0.6));
+  parts.push(P(new THREE.CylinderGeometry(0.04 * s, 0.07 * s, 1.1 * s, 6), COL.trunk, -0.25 * s, 2.1 * s, 0.1 * s, 0.3, 0, 0.6));
+  const cols = [COL.leaf, COL.leaf2, COL.leaf3];
+  const clumps = big ? [[0, 3.1, 0, 1.2], [0.8, 3.4, 0.3, 0.95], [-0.7, 3.3, -0.4, 0.95], [0.1, 3.9, -0.5, 0.85], [-0.3, 3.8, 0.6, 0.85], [0.5, 2.7, -0.6, 0.8], [-0.6, 2.7, 0.5, 0.75]]
+                   : [[0, 2.5, 0, 0.9], [0.45, 2.8, 0.2, 0.7], [-0.4, 2.75, -0.25, 0.7], [0.05, 3.15, 0, 0.6]];
+  clumps.forEach(([x, y, z, r], i) => parts.push(leaves(r * (big ? 1.25 : 1), cols[(i + seed) % 3], x * (big ? 1.2 : 1), y * (big ? 1.18 : 1), z * (big ? 1.2 : 1), seed * 7 + i)));
+  return merge(parts);
+}
 
-// type table: geo, size (radius needed to swallow), height, label
+// type table: geo, size (radius needed to swallow), height, label, tintRM (roughness/metal of tinted parts)
 const TYPES = {
   cone:     { g: () => merge([box(0.45, 0.05, 0.45, COL.orange), cone(0.2, 0.62, COL.orange, 0, 0.05), cyl(0.14, 0.16, 0.1, COL.line, 0, 0.3)]), s: 0.3, h: 0.7, name: 'Cone' },
-  trash:    { g: () => merge([cyl(0.26, 0.22, 0.85, COL.green), cyl(0.29, 0.29, 0.08, COL.dark, 0, 0.85)]), s: 0.35, h: 0.95, name: 'Trash can' },
-  hydrant:  { g: () => merge([cyl(0.15, 0.17, 0.6, COL.red), ball(0.15, COL.red, 0, 0.62), cyl(0.07, 0.07, 0.5, COL.red, 0, 0.4, 0, 6, 0, Math.PI / 2)]), s: 0.3, h: 0.8, name: 'Hydrant' },
-  mailbox:  { g: () => merge([box(0.1, 0.6, 0.1, COL.dark, -0.15, 0, 0), box(0.1, 0.6, 0.1, COL.dark, 0.15, 0, 0), box(0.5, 0.7, 0.45, COL.blue, 0, 0.6, 0), cyl(0.25, 0.25, 0.45, COL.blue, 0, 1.3, 0, 10, Math.PI / 2)]), s: 0.4, h: 1.5, name: 'Mailbox' },
-  newsbox:  { g: () => merge([box(0.5, 0.95, 0.45, TINT), box(0.4, 0.3, 0.05, COL.glass, 0, 0.55, 0.23)]), s: 0.4, h: 1.0, name: 'Newsbox' },
-  person:   { g: () => merge([box(0.16, 0.8, 0.2, 0x2b3550, -0.11, 0, 0), box(0.16, 0.8, 0.2, 0x2b3550, 0.11, 0, 0), box(0.46, 0.62, 0.26, TINT, 0, 0.8, 0), box(0.12, 0.55, 0.14, TINT, -0.3, 0.85, 0), box(0.12, 0.55, 0.14, TINT, 0.3, 0.85, 0), ball(0.16, COL.skin, 0, 1.6, 0, 1), box(0.3, 0.1, 0.3, 0x3a2a1c, 0, 1.7, -0.02)]), s: 0.35, h: 1.8, name: 'Person' },
-  bollard:  { g: () => merge([cyl(0.12, 0.13, 0.9, COL.metal), cyl(0.13, 0.13, 0.08, COL.yellow, 0, 0.72)]), s: 0.25, h: 0.9, name: 'Bollard' },
-  stopsign: { g: () => merge([cyl(0.04, 0.04, 2.3, COL.metal), cyl(0.36, 0.36, 0.05, COL.red, 0, 2.2, 0.04, 8, Math.PI / 2), cyl(0.3, 0.3, 0.06, COL.line, 0, 2.2, 0.03, 8, Math.PI / 2)]), s: 0.45, h: 2.6, name: 'Stop sign' },
-  streetsign: { g: () => merge([cyl(0.04, 0.04, 2.8, COL.metal), box(1.1, 0.22, 0.04, 0x1f7a3a, 0.3, 2.6, 0), box(0.04, 0.22, 1.1, 0x1f7a3a, 0, 2.3, 0.3)]), s: 0.45, h: 2.9, name: 'Street sign' },
-  bench:    { g: () => merge([box(1.7, 0.08, 0.5, COL.wood, 0, 0.45, 0), box(1.7, 0.45, 0.07, COL.wood, 0, 0.55, -0.24), box(0.08, 0.45, 0.45, COL.dark, -0.75, 0, 0), box(0.08, 0.45, 0.45, COL.dark, 0.75, 0, 0)]), s: 0.9, h: 1.0, name: 'Bench' },
-  bush:     { g: () => merge([ball(0.6, COL.leaf2, 0, 0.45, 0), ball(0.45, COL.leaf, 0.35, 0.4, 0.2)]), s: 0.62, h: 1.0, name: 'Bush' },
-  planter:  { g: () => merge([box(1.2, 0.5, 1.2, COL.concrete), ball(0.62, COL.leaf2, 0, 0.9, 0)]), s: 0.8, h: 1.4, name: 'Planter' },
-  lamp:     { g: () => merge([cyl(0.09, 0.12, 5.6, COL.metal), box(1.4, 0.1, 0.12, COL.metal, 0.62, 5.5, 0), box(0.5, 0.14, 0.3, 0xfff4c0, 1.25, 5.38, 0)]), s: 0.8, h: 5.7, name: 'Streetlight' },
-  treeS:    { g: () => merge([cyl(0.1, 0.14, 1.5, COL.trunk), ball(1.0, COL.leaf2, 0, 2.2, 0), ball(0.7, COL.leaf, 0.4, 2.7, 0.2)]), s: 1.0, h: 3.3, name: 'Tree' },
-  treeB:    { g: () => merge([cyl(0.18, 0.26, 2.4, COL.trunk), ball(1.8, COL.leaf, 0, 3.6, 0), ball(1.2, COL.leaf2, 0.9, 4.4, 0.3), ball(1.1, COL.leaf2, -0.8, 4.2, -0.5)]), s: 1.8, h: 5.8, name: 'Big tree' },
-  pine:     { g: () => merge([cyl(0.12, 0.16, 1.0, COL.trunk), cone(1.3, 2.2, COL.pine, 0, 0.8), cone(1.0, 1.8, COL.pine, 0, 1.9), cone(0.65, 1.4, COL.pine, 0, 2.9)]), s: 1.25, h: 4.3, name: 'Pine' },
-  picnic:   { g: () => merge([box(1.9, 0.08, 0.8, COL.wood, 0, 0.75, 0), box(1.9, 0.06, 0.3, COL.wood, 0, 0.42, 0.62), box(1.9, 0.06, 0.3, COL.wood, 0, 0.42, -0.62), box(0.1, 0.75, 1.5, COL.wood, -0.75, 0, 0), box(0.1, 0.75, 1.5, COL.wood, 0.75, 0, 0)]), s: 1.05, h: 0.85, name: 'Picnic table' },
-  umbrella: { g: () => merge([cyl(0.5, 0.5, 0.06, COL.line, 0, 0.72), cyl(0.05, 0.05, 2.2, COL.metal), cone(1.3, 0.5, TINT, 0, 2.0, 0, 8), box(0.4, 0.45, 0.4, COL.metal, 0.8, 0, 0), box(0.4, 0.45, 0.4, COL.metal, -0.8, 0, 0)]), s: 1.25, h: 2.5, name: 'Café table' },
-  vending:  { g: () => merge([box(0.95, 1.9, 0.8, TINT), box(0.6, 1.2, 0.05, COL.glass, -0.1, 0.5, 0.41)]), s: 0.75, h: 1.9, name: 'Vending machine' },
-  dumpster: { g: () => merge([box(2.0, 1.2, 1.2, 0x2f6b4d), box(2.1, 0.1, 1.3, 0x245a3f, 0, 1.2, 0), cyl(0.12, 0.12, 0.1, COL.tire, 0.8, 0.1, 0.5, 6, Math.PI / 2)]), s: 1.3, h: 1.35, name: 'Dumpster' },
-  kiosk:    { g: () => merge([box(2.2, 2.4, 2.2, TINT), box(2.6, 0.2, 2.6, COL.dark, 0, 2.4, 0), box(1.6, 0.8, 0.05, COL.glass, 0, 1.1, 1.11)]), s: 1.5, h: 2.6, name: 'Kiosk' },
-  busstop:  { g: () => merge([box(3.2, 0.12, 1.5, COL.metal, 0, 2.5, 0), box(0.1, 2.5, 0.1, COL.metal, -1.5, 0, -0.6), box(0.1, 2.5, 0.1, COL.metal, 1.5, 0, -0.6), box(0.1, 2.5, 0.1, COL.metal, -1.5, 0, 0.6), box(0.1, 2.5, 0.1, COL.metal, 1.5, 0, 0.6), box(3.0, 1.8, 0.05, 0x9fc6d8, 0, 0.5, -0.65), box(2.4, 0.08, 0.45, COL.wood, 0, 0.45, -0.3)]), s: 1.8, h: 2.7, name: 'Bus stop' },
-  fountain: { g: () => merge([cyl(2.3, 2.4, 0.6, COL.concrete, 0, 0, 0, 16), cyl(2.0, 2.0, 0.05, 0x4aa3d9, 0, 0.5, 0, 16), cyl(0.3, 0.4, 1.4, COL.concrete, 0, 0, 0, 8), cyl(1.0, 0.4, 0.3, COL.concrete, 0, 1.4, 0, 12), cyl(0.8, 0.8, 0.05, 0x4aa3d9, 0, 1.66, 0, 12), cone(0.25, 0.8, 0xbfe6ff, 0, 1.7)]), s: 2.5, h: 2.5, name: 'Fountain' },
-  car:      { g: () => carGeo(), s: 1.9, h: 1.5, name: 'Car' },
-  van:      { g: () => merge([box(2.0, 1.9, 5.0, TINT, 0, 0.3, 0), box(1.9, 0.7, 0.05, COL.glass, 0, 1.3, 2.51), box(0.05, 0.6, 1.2, COL.glass, 1.01, 1.35, 1.6), box(0.05, 0.6, 1.2, COL.glass, -1.01, 1.35, 1.6), ...[[0.9, 1.6], [-0.9, 1.6], [0.9, -1.6], [-0.9, -1.6]].map(([x, z]) => cyl(0.36, 0.36, 0.3, COL.tire, x, 0.36, z, 10, 0, Math.PI / 2))]), s: 2.3, h: 2.2, name: 'Van' },
-  truck:    { g: () => merge([box(2.3, 2.1, 2.2, TINT, 0, 0.4, 2.6), box(2.1, 0.7, 0.05, COL.glass, 0, 1.6, 3.71), box(2.4, 2.8, 5.0, COL.line, 0, 0.5, -1.2), box(2.2, 0.3, 7.2, COL.dark, 0, 0.25, 0), ...[[1.0, 2.6], [-1.0, 2.6], [1.0, -2.2], [-1.0, -2.2], [1.0, -3.0], [-1.0, -3.0]].map(([x, z]) => cyl(0.42, 0.42, 0.32, COL.tire, x, 0.42, z, 10, 0, Math.PI / 2))]), s: 3.3, h: 3.3, name: 'Truck' },
-  bus:      { g: () => merge([box(2.5, 2.6, 11, TINT, 0, 0.35, 0), box(2.54, 0.9, 10.2, COL.glass, 0, 1.5, 0.2), box(2.3, 1.3, 0.05, COL.glass, 0, 1.2, 5.51), box(2.52, 0.1, 10.8, COL.line, 0, 2.95, 0), ...[[1.1, 3.6], [-1.1, 3.6], [1.1, -3.4], [-1.1, -3.4]].map(([x, z]) => cyl(0.5, 0.5, 0.32, COL.tire, x, 0.5, z, 10, 0, Math.PI / 2))]), s: 4.6, h: 3.1, name: 'Bus' },
-  houseA:   { g: () => houseGeo(8, 7, 3.0, 0x8a3b2e), s: 4.6, h: 6.0, name: 'House' },
-  houseB:   { g: () => houseGeo(10, 8, 3.2, 0x4a4f5c), s: 5.6, h: 6.4, name: 'House' },
-  houseC:   { g: () => houseGeo(7, 9, 5.8, 0x5c3d2e), s: 5.0, h: 8.6, name: 'Townhouse' },
-  slab:     { g: () => box(1, 1, 1, TINT), s: 99, h: 1, name: 'Roof' },
-  acunit:   { g: () => merge([box(1.5, 0.9, 1.1, 0xc9cdd1), cyl(0.36, 0.36, 0.05, 0x2d3136, -0.3, 0.9, 0, 12), box(0.5, 0.6, 1.0, 0xaeb3b8, 0.5, 0.9, 0)]), s: 99, h: 1.5, name: 'AC unit' },
-  tank:     { g: () => merge([...[[-0.8, -0.8], [0.8, -0.8], [-0.8, 0.8], [0.8, 0.8]].map(([x, z]) => box(0.15, 1.6, 0.15, COL.dark, x, 0, z)), cyl(1.15, 1.15, 2.0, 0x8a6040, 0, 1.6, 0, 12), cone(1.3, 0.8, 0x5a4030, 0, 3.6, 0, 12)]), s: 99, h: 4.4, name: 'Water tank' },
-  awning:   { g: () => { const parts = []; for (let i = 0; i < 8; i++) { const b = new THREE.BoxGeometry(0.125, 0.05, 1.5); b.rotateX(0.42); parts.push(P(b, i % 2 ? 0xf6f2ea : TINT, -0.4375 + i * 0.125, 0, 0.65)); parts.push(box(0.125, 0.3, 0.04, i % 2 ? 0xf6f2ea : TINT, -0.4375 + i * 0.125, -0.6, 1.33)); } return merge(parts); }, s: 99, h: 1, name: 'Awning' },
-  bladesign:{ g: () => merge([box(0.22, 3.2, 1.0, TINT), ...[0, 1, 2, 3].map(i => box(0.26, 0.45, 0.55, 0xfff6e0, 0, 0.3 + i * 0.72, 0)), box(0.1, 0.1, 0.6, COL.metal, 0, 2.8, -0.75)]), s: 99, h: 3, name: 'Sign' },
-  billboard:{ g: () => merge([box(1, 1, 0.12, TINT), box(1.04, 0.04, 0.16, 0x30343a, 0, 1, 0), box(1.04, 0.04, 0.16, 0x30343a, 0, -0.04, 0), box(0.5, 0.08, 0.02, 0xf4f4f4, -0.15, 0.62, 0.07), box(0.36, 0.08, 0.02, 0xf4f4f4, -0.22, 0.48, 0.07), box(0.16, 0.34, 0.02, 0xdfe8f2, 0.3, 0.12, 0.07)]), s: 99, h: 1, name: 'Billboard' },
-  signal:   { g: () => merge([cyl(0.11, 0.13, 5.6, 0x3a3f45), box(4.2, 0.14, 0.14, 0x3a3f45, 2.1, 5.3, 0), box(0.36, 1.05, 0.34, 0x2a2d31, 3.6, 4.15, 0), box(0.2, 0.2, 0.05, 0xd8322a, 3.6, 4.9, 0.18), box(0.2, 0.2, 0.05, 0xe8b020, 3.6, 4.58, 0.18), box(0.2, 0.2, 0.05, 0x39c05a, 3.6, 4.26, 0.18), box(0.3, 0.8, 0.3, 0x2a2d31, 0.25, 2.4, 0), box(0.16, 0.16, 0.05, 0x39c05a, 0.25, 2.5, 0.16)]), s: 0.9, h: 5.8, name: 'Traffic light' },
-  meter:    { g: () => merge([cyl(0.04, 0.05, 1.1, COL.metal), box(0.24, 0.38, 0.18, 0x8d949c, 0, 1.05, 0), box(0.14, 0.1, 0.02, 0x9fd0ff, 0, 1.25, 0.1)]), s: 0.25, h: 1.45, name: 'Parking meter' },
-  bike:     { g: () => merge([cyl(0.33, 0.33, 0.05, COL.tire, 0, 0.33, 0.55, 14, 0, Math.PI / 2), cyl(0.33, 0.33, 0.05, COL.tire, 0, 0.33, -0.55, 14, 0, Math.PI / 2), box(0.05, 0.05, 1.0, TINT, 0, 0.62, 0), box(0.05, 0.45, 0.05, TINT, 0, 0.35, -0.2), box(0.22, 0.05, 0.25, COL.dark, 0, 0.82, -0.25), box(0.5, 0.04, 0.04, COL.dark, 0, 0.95, 0.5)]), s: 0.6, h: 1.0, name: 'Bike' },
-  railing:  { g: () => merge([box(4, 0.06, 0.06, 0x2e3338, 0, 1.0, 0), box(4, 0.05, 0.05, 0x2e3338, 0, 0.55, 0), ...[-1.95, -0.65, 0.65, 1.95].map(x => box(0.07, 1.05, 0.07, 0x2e3338, x, 0, 0))]), s: 1.3, h: 1.05, name: 'Railing' },
-  sailboat: { g: () => merge([box(2.0, 0.9, 5.4, 0xf4f4f0, 0, 0, 0), cone(1.0, 1.4, 0xf4f4f0, 0, 0, 3.3), box(1.9, 0.12, 5.2, 0x9a6a3c, 0, 0.9, 0), box(2.02, 0.18, 5.42, 0xc0392b, 0, 0.3, 0), cyl(0.07, 0.07, 7.5, 0xdcdcdc, 0, 0.9, 0.6), box(0.05, 6.0, 2.4, 0xfdfdf8, 0, 1.8, -0.7), box(0.05, 4.5, 1.2, 0xfdfdf8, 0, 2.2, 1.4)]), s: 3.0, h: 8.4, name: 'Sailboat' },
-  bldg:     { g: () => { const g = new THREE.BoxGeometry(1, 1, 1); g.translate(0, 0.5, 0); return g; }, mat: bldgMat, s: 0, h: 0, name: 'Building' },
+  trash:    { g: () => merge([cyl(0.26, 0.22, 0.85, COL.green, 0, 0, 0, 16), cyl(0.29, 0.29, 0.08, COL.dark, 0, 0.85, 0, 16), cyl(0.27, 0.27, 0.04, COL.dark, 0, 0.35, 0, 16)]), s: 0.35, h: 0.95, name: 'Trash can' },
+  hydrant:  { g: () => merge([cyl(0.13, 0.15, 0.55, COL.red, 0, 0, 0, 14), cyl(0.18, 0.18, 0.06, COL.red, 0, 0.08, 0, 14), P(new THREE.SphereGeometry(0.14, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), COL.red, 0, 0.55, 0), cyl(0.06, 0.06, 0.42, COL.red, 0, 0.38, 0, 8, 0, Math.PI / 2), cyl(0.07, 0.07, 0.18, COL.red, 0, 0.38, 0.1, 8, Math.PI / 2)]), s: 0.3, h: 0.8, name: 'Hydrant' },
+  mailbox:  { g: () => merge([box(0.1, 0.6, 0.1, COL.dark, -0.15, 0, 0), box(0.1, 0.6, 0.1, COL.dark, 0.15, 0, 0), box(0.5, 0.7, 0.45, COL.blue, 0, 0.6, 0), cyl(0.25, 0.25, 0.45, COL.blue, 0, 1.3, 0, 16, Math.PI / 2), box(0.3, 0.04, 0.06, COL.metal, 0, 1.15, 0.24)]), s: 0.4, h: 1.5, name: 'Mailbox' },
+  newsbox:  { g: () => merge([box(0.5, 0.95, 0.45, TINT), box(0.4, 0.3, 0.05, COL.glass, 0, 0.55, 0.23), box(0.52, 0.04, 0.47, COL.dark, 0, 0.95, 0)]), s: 0.4, h: 1.0, name: 'Newsbox', tintRM: [0.4, 0.3] },
+  person:   { g: () => merge([capsule(0.075, 0.72, 0x2b3550, -0.1, 0.44, 0), capsule(0.075, 0.72, 0x2b3550, 0.1, 0.44, 0), box(0.14, 0.08, 0.26, 0x1a1a1a, -0.1, 0, 0.04), box(0.14, 0.08, 0.26, 0x1a1a1a, 0.1, 0, 0.04), capsule(0.19, 0.36, TINT, 0, 1.16, 0, 0.62), capsule(0.055, 0.52, TINT, -0.26, 1.08, 0), capsule(0.055, 0.52, TINT, 0.26, 1.08, 0), ball(0.045, COL.skin, -0.26, 0.76, 0, 1), ball(0.045, COL.skin, 0.26, 0.76, 0, 1), capsule(0.05, 0.06, COL.skin, 0, 1.47, 0), ball(0.115, COL.skin, 0, 1.62, 0.01), P(new THREE.SphereGeometry(0.122, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), 0x2e2016, 0, 1.635, -0.01)]), s: 0.35, h: 1.8, name: 'Person', tintRM: [0.85, 0] },
+  bollard:  { g: () => merge([cyl(0.11, 0.12, 0.9, COL.metal, 0, 0, 0, 14), P(new THREE.SphereGeometry(0.11, 14, 6, 0, Math.PI * 2, 0, Math.PI / 2), COL.metal, 0, 0.9, 0), cyl(0.121, 0.121, 0.06, COL.yellow, 0, 0.72, 0, 14)]), s: 0.25, h: 1.0, name: 'Bollard' },
+  stopsign: { g: () => merge([cyl(0.035, 0.035, 2.3, COL.metal), cyl(0.36, 0.36, 0.04, COL.red, 0, 2.2, 0.04, 8, Math.PI / 2), cyl(0.31, 0.31, 0.05, 0xf2f2ee, 0, 2.2, 0.03, 8, Math.PI / 2), cyl(0.28, 0.28, 0.06, COL.red, 0, 2.2, 0.03, 8, Math.PI / 2)]), s: 0.45, h: 2.6, name: 'Stop sign' },
+  streetsign: { g: () => merge([cyl(0.035, 0.035, 2.8, COL.metal), box(1.1, 0.22, 0.03, 0x1f6a3a, 0.3, 2.6, 0), box(0.03, 0.22, 1.1, 0x1f6a3a, 0, 2.3, 0.3), box(0.9, 0.04, 0.035, 0xf2f2ee, 0.3, 2.69, 0), box(0.035, 0.04, 0.9, 0xf2f2ee, 0, 2.39, 0.3)]), s: 0.45, h: 2.9, name: 'Street sign' },
+  bench:    { g: () => merge([...[0, 1, 2, 3].map(i => box(1.7, 0.04, 0.1, COL.wood, 0, 0.44, -0.18 + i * 0.12)), ...[0, 1, 2].map(i => box(1.7, 0.09, 0.03, COL.wood, 0, 0.58 + i * 0.13, -0.26 - i * 0.02)), box(0.06, 0.44, 0.5, COL.dark, -0.72, 0, 0), box(0.06, 0.44, 0.5, COL.dark, 0.72, 0, 0), box(0.06, 0.4, 0.06, COL.dark, -0.72, 0.44, -0.27), box(0.06, 0.4, 0.06, COL.dark, 0.72, 0.44, -0.27)]), s: 0.9, h: 1.0, name: 'Bench' },
+  bush:     { g: () => merge([leaves(0.62, COL.leaf2, 0, 0.45, 0, 1), leaves(0.48, COL.leaf, 0.4, 0.38, 0.2, 2), leaves(0.45, COL.leaf3, -0.35, 0.4, -0.2, 3)]), s: 0.65, h: 1.0, name: 'Bush' },
+  planter:  { g: () => merge([box(1.2, 0.5, 1.2, COL.concrete), box(1.08, 0.05, 1.08, 0x3b2a1e, 0, 0.48, 0), leaves(0.55, COL.leaf2, 0, 0.9, 0, 4), leaves(0.3, 0xb04a6a, 0.3, 0.75, 0.3, 5)]), s: 0.8, h: 1.4, name: 'Planter' },
+  lamp:     { g: () => merge([cyl(0.14, 0.16, 0.5, COL.metal, 0, 0, 0, 12), cyl(0.07, 0.11, 5.6, COL.metal, 0, 0, 0, 12), P(new THREE.TorusGeometry(0.5, 0.045, 6, 12, Math.PI / 2), COL.metal, 0.5, 5.6, 0, 0, 0, 0), box(0.8, 0.07, 0.07, COL.metal, 0.9, 6.07, 0), rbox(0.6, 0.14, 0.3, 0.05, COL.metal, 1.4, 5.96, 0), box(0.46, 0.03, 0.2, 0xfff4c0, 1.4, 5.94, 0)]), s: 0.8, h: 6.2, name: 'Streetlight' },
+  treeS:    { g: () => tree(false, 1), s: 1.0, h: 3.6, name: 'Tree' },
+  treeB:    { g: () => tree(true, 2), s: 1.8, h: 6.2, name: 'Big tree' },
+  pine:     { g: () => merge([cyl(0.12, 0.18, 1.2, COL.trunk, 0, 0, 0, 8), ...[[1.4, 2.0, 0.8], [1.15, 1.8, 1.7], [0.9, 1.6, 2.5], [0.6, 1.3, 3.2], [0.3, 0.9, 3.8]].map(([r, h, y]) => cone(r, h, COL.pine, 0, y, 0, 14))]), s: 1.25, h: 4.7, name: 'Pine' },
+  picnic:   { g: () => merge([box(1.9, 0.07, 0.8, COL.wood, 0, 0.75, 0), box(1.9, 0.05, 0.3, COL.wood, 0, 0.42, 0.62), box(1.9, 0.05, 0.3, COL.wood, 0, 0.42, -0.62), box(0.08, 0.75, 1.5, COL.wood, -0.75, 0, 0), box(0.08, 0.75, 1.5, COL.wood, 0.75, 0, 0)]), s: 1.05, h: 0.85, name: 'Picnic table' },
+  umbrella: { g: () => merge([cyl(0.45, 0.45, 0.04, COL.chrome, 0, 0.72, 0, 16), cyl(0.04, 0.04, 0.72, COL.metal), cyl(0.03, 0.03, 2.3, COL.chrome), cone(1.3, 0.45, TINT, 0, 2.0, 0, 16), ...[0, 1, 2, 3].map(i => { const a = i * Math.PI / 2 + 0.4; return merge([box(0.4, 0.04, 0.4, COL.metal, Math.cos(a) * 0.85, 0.45, Math.sin(a) * 0.85), box(0.04, 0.45, 0.04, COL.metal, Math.cos(a) * 0.85, 0, Math.sin(a) * 0.85), box(0.4, 0.4, 0.04, COL.metal, Math.cos(a) * 1.05, 0.45, Math.sin(a) * 1.05, -a + Math.PI / 2)]); })]), s: 1.25, h: 2.5, name: 'Café table', tintRM: [0.9, 0] },
+  vending:  { g: () => merge([rbox(0.95, 1.9, 0.8, 0.04, TINT), box(0.6, 1.2, 0.05, COL.glass, -0.1, 0.5, 0.41), box(0.2, 0.5, 0.04, COL.dark, 0.33, 0.9, 0.41)]), s: 0.75, h: 1.9, name: 'Vending machine', tintRM: [0.35, 0.3] },
+  dumpster: { g: () => merge([box(2.0, 1.2, 1.2, 0x2f5f4a), box(2.1, 0.08, 1.3, 0x244c3a, 0, 1.2, 0), box(2.1, 0.1, 0.1, 0x244c3a, 0, 0.9, 0.62), ...[[-0.8, 0.45], [0.8, 0.45], [-0.8, -0.45], [0.8, -0.45]].map(([x, z]) => cyl(0.1, 0.1, 0.08, COL.tire, x, 0.1, z, 10, Math.PI / 2))]), s: 1.3, h: 1.35, name: 'Dumpster' },
+  kiosk:    { g: () => merge([box(2.2, 2.4, 2.2, TINT), rbox(2.6, 0.22, 2.6, 0.08, COL.dark, 0, 2.4, 0), box(1.6, 0.8, 0.05, COL.glass, 0, 1.1, 1.11), box(1.8, 0.08, 0.4, 0xd8d2c6, 0, 1.0, 1.25)]), s: 1.5, h: 2.6, name: 'Kiosk' },
+  busstop:  { g: () => merge([box(3.2, 0.1, 1.5, COL.metal, 0, 2.5, 0), box(0.08, 2.5, 0.08, COL.metal, -1.5, 0, -0.6), box(0.08, 2.5, 0.08, COL.metal, 1.5, 0, -0.6), box(0.08, 2.5, 0.08, COL.metal, -1.5, 0, 0.6), box(0.08, 2.5, 0.08, COL.metal, 1.5, 0, 0.6), box(3.0, 1.9, 0.03, 0x9fc6d8, 0, 0.45, -0.65), box(0.03, 1.9, 1.2, 0x9fc6d8, 1.5, 0.45, 0), box(0.8, 1.5, 0.05, 0x2e6fb0, -1.0, 0.7, -0.62), box(2.4, 0.06, 0.4, COL.wood, 0, 0.45, -0.35)]), s: 1.8, h: 2.7, name: 'Bus stop' },
+  fountain: { g: () => merge([cyl(2.3, 2.4, 0.6, COL.concrete, 0, 0, 0, 32), cyl(2.05, 2.05, 0.05, 0x4aa3d9, 0, 0.5, 0, 32), cyl(0.3, 0.4, 1.4, COL.concrete, 0, 0, 0, 16), cyl(1.0, 0.4, 0.3, COL.concrete, 0, 1.4, 0, 24), cyl(0.85, 0.85, 0.05, 0x4aa3d9, 0, 1.66, 0, 24), cone(0.18, 0.9, 0xbfe6ff, 0, 1.7, 0, 10)]), s: 2.5, h: 2.6, name: 'Fountain' },
+  car:      { g: () => carGeo(), s: 1.9, h: 1.45, name: 'Car', tintRM: [0.22, 0.45] },
+  van:      { g: () => merge([rbox(2.0, 1.95, 5.0, 0.18, TINT, 0, 0.3, 0), rbox(1.9, 0.8, 0.3, 0.1, COL.glass, 0, 1.25, 2.38), box(0.04, 0.6, 1.3, COL.glass, 1.0, 1.4, 1.6), box(0.04, 0.6, 1.3, COL.glass, -1.0, 1.4, 1.6), box(2.02, 0.2, 0.2, 0x1d1e21, 0, 0.26, 2.45), box(0.3, 0.14, 0.04, 0xf4f1e6, 0.7, 0.8, 2.51), box(0.3, 0.14, 0.04, 0xf4f1e6, -0.7, 0.8, 2.51), ...wheel(0.9, 1.6, 0.36, 0.26), ...wheel(-0.9, 1.6, 0.36, 0.26), ...wheel(0.9, -1.6, 0.36, 0.26), ...wheel(-0.9, -1.6, 0.36, 0.26)]), s: 2.3, h: 2.3, name: 'Van', tintRM: [0.3, 0.3] },
+  truck:    { g: () => merge([rbox(2.3, 2.2, 2.2, 0.15, TINT, 0, 0.4, 2.6), box(2.1, 0.75, 0.05, COL.glass, 0, 1.6, 3.71), rbox(2.4, 2.9, 5.0, 0.06, 0xe8e6e0, 0, 0.5, -1.2), box(2.2, 0.3, 7.2, COL.dark, 0, 0.25, 0), ...wheel(1.0, 2.6, 0.42, 0.3), ...wheel(-1.0, 2.6, 0.42, 0.3), ...wheel(1.0, -2.2, 0.42, 0.3), ...wheel(-1.0, -2.2, 0.42, 0.3), ...wheel(1.0, -3.1, 0.42, 0.3), ...wheel(-1.0, -3.1, 0.42, 0.3)]), s: 3.3, h: 3.4, name: 'Truck', tintRM: [0.3, 0.3] },
+  bus:      { g: () => merge([rbox(2.5, 2.7, 11, 0.2, TINT, 0, 0.35, 0), box(2.54, 1.0, 10.2, COL.glass, 0, 1.5, 0.2), box(2.3, 1.4, 0.05, COL.glass, 0, 1.2, 5.51), rbox(2.3, 0.3, 4, 0.1, 0xd0d4d8, 0, 3.05, -2), box(2.52, 0.3, 10.9, 0x1d1e21, 0, 0.35, 0), ...wheel(1.1, 3.6, 0.5, 0.32), ...wheel(-1.1, 3.6, 0.5, 0.32), ...wheel(1.1, -3.4, 0.5, 0.32), ...wheel(-1.1, -3.4, 0.5, 0.32)]), s: 4.6, h: 3.3, name: 'Bus', tintRM: [0.3, 0.3] },
+  houseA:   { g: () => houseGeo(8, 7, 3.0, 0x6e3a2e), s: 4.6, h: 6.0, name: 'House', tintRM: [0.85, 0] },
+  houseB:   { g: () => houseGeo(10, 8, 3.2, 0x3e434c), s: 5.6, h: 6.4, name: 'House', tintRM: [0.85, 0] },
+  houseC:   { g: () => houseGeo(7, 9, 5.8, 0x4c3428), s: 5.0, h: 8.6, name: 'Townhouse', tintRM: [0.85, 0] },
+  slab:     { g: () => box(1, 1, 1, TINT), s: 99, h: 1, name: 'Roof', tintRM: [0.85, 0], noAO: true },
+  acunit:   { g: () => merge([rbox(1.5, 0.9, 1.1, 0.05, 0xc9cdd1), cyl(0.38, 0.38, 0.04, 0x2d3136, -0.3, 0.9, 0, 16), box(0.5, 0.6, 1.0, 0xaeb3b8, 0.5, 0.9, 0), box(0.1, 0.1, 1.2, COL.metal, 0.7, 0.3, 0)]), s: 99, h: 1.5, name: 'AC unit' },
+  tank:     { g: () => merge([...[[-0.8, -0.8], [0.8, -0.8], [-0.8, 0.8], [0.8, 0.8]].map(([x, z]) => box(0.15, 1.6, 0.15, COL.dark, x, 0, z)), cyl(1.15, 1.15, 2.0, 0x7a5638, 0, 1.6, 0, 20), ...[0.3, 1.0, 1.7].map(y => cyl(1.17, 1.17, 0.06, COL.dark, 0, 1.6 + y, 0, 20)), cone(1.3, 0.8, 0x4e3a2a, 0, 3.6, 0, 20)]), s: 99, h: 4.4, name: 'Water tank' },
+  awning:   { g: () => { const parts = []; for (let i = 0; i < 8; i++) { const b = new THREE.BoxGeometry(0.125, 0.04, 1.5); b.rotateX(0.42); parts.push(P(b, i % 2 ? 0xf2eee6 : TINT, -0.4375 + i * 0.125, 0, 0.65)); parts.push(box(0.125, 0.28, 0.03, i % 2 ? 0xf2eee6 : TINT, -0.4375 + i * 0.125, -0.6, 1.33)); } return merge(parts); }, s: 99, h: 1, name: 'Awning', tintRM: [0.9, 0], noAO: true },
+  bladesign:{ g: () => merge([box(0.22, 3.2, 1.0, TINT), ...[0, 1, 2, 3].map(i => box(0.26, 0.45, 0.55, 0xfff6e0, 0, 0.3 + i * 0.72, 0)), box(0.1, 0.1, 0.6, COL.metal, 0, 2.8, -0.75)]), s: 99, h: 3, name: 'Sign', tintRM: [0.4, 0.1], noAO: true },
+  billboard:{ g: () => merge([box(1, 1, 0.12, TINT), box(1.04, 0.04, 0.16, 0x30343a, 0, 1, 0), box(1.04, 0.04, 0.16, 0x30343a, 0, -0.04, 0), box(0.5, 0.08, 0.02, 0xf4f4f4, -0.15, 0.62, 0.07), box(0.36, 0.08, 0.02, 0xf4f4f4, -0.22, 0.48, 0.07), box(0.16, 0.34, 0.02, 0xdfe8f2, 0.3, 0.12, 0.07)]), s: 99, h: 1, name: 'Billboard', tintRM: [0.5, 0], noAO: true },
+  signal:   { g: () => merge([cyl(0.11, 0.13, 5.6, 0x3a3f45), box(4.2, 0.14, 0.14, 0x3a3f45, 2.1, 5.3, 0), rbox(0.36, 1.05, 0.34, 0.05, 0x2a2d31, 3.6, 4.15, 0), box(0.2, 0.2, 0.05, 0xd8322a, 3.6, 4.9, 0.18), box(0.2, 0.2, 0.05, 0x7a6a30, 3.6, 4.58, 0.18), box(0.2, 0.2, 0.05, 0x39e06a, 3.6, 4.26, 0.18), rbox(0.3, 0.8, 0.3, 0.05, 0x2a2d31, 0.25, 2.4, 0), box(0.16, 0.16, 0.05, 0x39e06a, 0.25, 2.5, 0.16)]), s: 0.9, h: 5.8, name: 'Traffic light' },
+  meter:    { g: () => merge([cyl(0.04, 0.05, 1.1, COL.metal), rbox(0.24, 0.38, 0.18, 0.04, 0x8d949c, 0, 1.05, 0), box(0.14, 0.1, 0.02, 0x9fd0ff, 0, 1.25, 0.1)]), s: 0.25, h: 1.45, name: 'Parking meter' },
+  bike:     { g: () => merge([P(new THREE.TorusGeometry(0.33, 0.025, 6, 20), COL.tire, 0, 0.35, 0.55, 0, Math.PI / 2), P(new THREE.TorusGeometry(0.33, 0.025, 6, 20), COL.tire, 0, 0.35, -0.55, 0, Math.PI / 2), box(0.04, 0.04, 0.95, TINT, 0, 0.64, 0), box(0.04, 0.5, 0.04, TINT, 0, 0.35, -0.2), box(0.04, 0.04, 0.6, TINT, 0, 0.4, -0.3), box(0.2, 0.05, 0.26, COL.dark, 0, 0.84, -0.25), box(0.5, 0.03, 0.03, COL.dark, 0, 0.95, 0.5)]), s: 0.6, h: 1.0, name: 'Bike', tintRM: [0.35, 0.5] },
+  railing:  { g: () => merge([cyl(0.035, 0.035, 4, 0x2e3338, 0, 1.0, 0, 8, 0, Math.PI / 2), cyl(0.025, 0.025, 4, 0x2e3338, 0, 0.55, 0, 8, 0, Math.PI / 2), ...[-1.95, -0.65, 0.65, 1.95].map(x => cyl(0.03, 0.03, 1.05, 0x2e3338, x, 0, 0, 8))]), s: 1.3, h: 1.05, name: 'Railing' },
+  sailboat: { g: () => merge([rbox(2.0, 0.9, 5.4, 0.3, 0xf4f4f0, 0, 0, 0), cone(1.0, 1.4, 0xf4f4f0, 0, 0, 3.3), box(1.8, 0.1, 5.0, COL.wood, 0, 0.88, 0), box(2.02, 0.12, 5.42, 0x1f3f6e, 0, 0.3, 0), cyl(0.06, 0.07, 7.5, 0xdcdcdc, 0, 0.9, 0.6, 8), box(0.03, 6.0, 2.4, 0xfdfdf8, 0, 1.8, -0.7), box(0.03, 4.5, 1.2, 0xfdfdf8, 0, 2.2, 1.4)]), s: 3.0, h: 8.4, name: 'Sailboat' },
+  bldg:     { g: () => { const g = new THREE.BoxGeometry(1, 1, 1); g.translate(0, 0.5, 0); return g; }, mat: bldgMat, s: 0, h: 0, name: 'Building', raw: true },
 };
-for (const k in TYPES) { const t = TYPES[k]; t.key = k; t.pool = new Pool(t.g(), t.mat || propMat, k === 'bldg' ? 256 : 128); }
+for (const k in TYPES) {
+  const t = TYPES[k]; t.key = k;
+  KIT_TINT_RM = t.tintRM || [0.7, 0];
+  let g = t.g();
+  if (!t.raw && !t.noAO) g = bakeAO(g);
+  t.pool = new Pool(g, t.mat || propMat, k === 'bldg' ? 256 : 128);
+}
 
 const PALETTES = {
   car: [0xd62d2d, 0x2d64d6, 0xf2f2f2, 0x222222, 0x9aa1a8, 0xf2c230, 0x2f8f5a, 0x7a2dd6, 0xe6772e, 0x1e3c6e],
@@ -393,13 +618,18 @@ function groundY(x, z) {
 }
 
 // ---------------------------------------------------------------- ground builder
+const SURF = new Map([
+  [COL.asphalt, 0], [COL.asphalt2, 0], [COL.sidewalk, 1], [0xcfc8b8, 1], [COL.grass, 2], [COL.grass2, 2], [COL.plaza, 3],
+  [COL.water, 4], [COL.line, 5], [COL.yellow, 5], [COL.concrete, 6], [COL.curb, 7], [0x8f8a80, 7],
+]);
 class Ground {
-  constructor() { this.p = []; this.c = []; this.n = []; }
+  constructor() { this.p = []; this.c = []; this.n = []; this.s = []; }
   col(hex, jit) { const c = new THREE.Color(hex); if (jit) c.offsetHSL(0, 0, (Math.random() - 0.5) * jit); return c; }
   quad(x0, z0, x1, z1, y, hex, jit = 0) {
     const c = this.col(hex, jit);
     this.p.push(x0, y, z0, x0, y, z1, x1, y, z1, x0, y, z0, x1, y, z1, x1, y, z0);
-    for (let i = 0; i < 6; i++) { this.c.push(c.r, c.g, c.b); this.n.push(0, 1, 0); }
+    const sf = SURF.has(hex) ? SURF.get(hex) : 6;
+    for (let i = 0; i < 6; i++) { this.c.push(c.r, c.g, c.b); this.n.push(0, 1, 0); this.s.push(sf); }
   }
   // vertical face along x (at z) or along z (at x); nx/nz gives facing
   wall(ax, bx, az, bz, y0, y1, nx, nz, hex) {
@@ -407,13 +637,14 @@ class Ground {
     const a = [ax, y0, az], b = [bx, y0, bz], cc = [bx, y1, bz], d = [ax, y1, az];
     const flip = (nx * (bz - az) - nz * (bx - ax)) > 0;
     const tri = flip ? [a, cc, b, a, d, cc] : [a, b, cc, a, cc, d];
-    for (const v of tri) { this.p.push(...v); this.c.push(c.r, c.g, c.b); this.n.push(nx, 0, nz); }
+    for (const v of tri) { this.p.push(...v); this.c.push(c.r, c.g, c.b); this.n.push(nx, 0, nz); this.s.push(7); }
   }
   mesh() {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3));
     g.setAttribute('normal', new THREE.Float32BufferAttribute(this.n, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(this.c, 3));
+    g.setAttribute('surf', new THREE.Float32BufferAttribute(this.s, 1));
     g.computeBoundingSphere();
     const m = new THREE.Mesh(g, groundMat); m.receiveShadow = true; return m;
   }
@@ -501,14 +732,6 @@ function genChunk(cx, cz) {
   g.wall(X0 + a, X0 + b, Z0 + b, Z0 + b, 0, SH, 0, 1, COL.curb);
   g.wall(X0 + a, X0 + a, Z0 + a, Z0 + b, 0, SH, -1, 0, COL.curb);
   g.wall(X0 + b, X0 + b, Z0 + a, Z0 + b, 0, SH, 1, 0, COL.curb);
-  // seams on sidewalk
-  for (let t = a + 3; t < b; t += 3) {
-    g.quad(X0 + t, Z0 + a, X0 + t + 0.06, Z0 + LOT0, SH + 0.01, 0x9e9b93);
-    g.quad(X0 + t, Z0 + LOT1, X0 + t + 0.06, Z0 + b, SH + 0.01, 0x9e9b93);
-    g.quad(X0 + a, Z0 + t, X0 + LOT0, Z0 + t + 0.06, SH + 0.01, 0x9e9b93);
-    g.quad(X0 + LOT1, Z0 + t, X0 + b, Z0 + t + 0.06, SH + 0.01, 0x9e9b93);
-  }
-
   // side helper: s=0 bottom (z small), 1 top, 2 left (x small), 3 right; u = distance from chunk edge, t = along
   const side = (s, t, u) => s === 0 ? [t, u] : s === 1 ? [t, C - u] : s === 2 ? [u, t] : [C - u, t];
   const faceStreet = [Math.PI, 0, -Math.PI / 2, Math.PI / 2];   // +z of prop points at the street
@@ -641,8 +864,7 @@ function genChunk(cx, cz) {
   } else if (type === 'waterfront') {
     lot(COL.plaza, 0.02);
     const w0 = LOT0 + 4, w1 = LOT1 - 4, WY = -0.9;
-    g.quad(X0 + w0, Z0 + w0, X0 + w1, Z0 + w1, WY, 0x2f7fb3, 0.03);
-    for (let i = 0; i < 10; i++) { const x = w0 + 2 + rng() * (w1 - w0 - 8), z = w0 + 1 + rng() * (w1 - w0 - 3); g.quad(X0 + x, Z0 + z, X0 + x + 3 + rng() * 4, Z0 + z + 0.12, WY + 0.01, 0x7fc0e6); }
+    g.quad(X0 + w0, Z0 + w0, X0 + w1, Z0 + w1, WY, COL.water);
     g.wall(X0 + w0, X0 + w1, Z0 + w0, Z0 + w0, WY, SH, 0, 1, 0x8f8a80);
     g.wall(X0 + w0, X0 + w1, Z0 + w1, Z0 + w1, WY, SH, 0, -1, 0x8f8a80);
     g.wall(X0 + w0, X0 + w0, Z0 + w0, Z0 + w1, WY, SH, 1, 0, 0x8f8a80);
@@ -758,9 +980,23 @@ const holeGroup = new THREE.Group(); scene.add(holeGroup);
     colA[i * 3] = c.r; colA[i * 3 + 1] = c.g; colA[i * 3 + 2] = c.b;
   }
   wall.setAttribute('color', new THREE.BufferAttribute(colA, 3));
-  var holeWall = new THREE.Mesh(wall, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false }));
+  const wallMat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false });
+  wallMat.onBeforeCompile = sh => {
+    sh.uniforms.uHole = holeU;
+    sh.vertexShader = 'varying vec3 vHW;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvHW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = 'uniform vec3 uHole;\nvarying vec3 vHW;\n' + NOISE + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+      vec2 d = vHW.xz - uHole.xy;
+      vec2 q = vec2(atan(d.y, d.x) * uHole.z, vHW.y);
+      float clods = fbm(q * vec2(1.6, 2.2));
+      float pebble = smoothstep(0.78, 0.84, vnoise(q * 5.0));
+      float roots = (1.0 - smoothstep(0.0, 0.03, abs(fbm(q * vec2(0.8, 1.6) + 4.0) - 0.5))) * step(-1.2 - uHole.z * 0.2, vHW.y);
+      diffuseColor.rgb *= 0.7 + 0.6 * clods;
+      diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 1.6 + 0.03, pebble * 0.6);
+      diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.45, roots * 0.8);`);
+  };
+  var holeWall = new THREE.Mesh(wall, wallMat);
   var holeFloor = new THREE.Mesh(new THREE.CircleGeometry(1, 48).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x000000, fog: false }));
-  var holeRim = new THREE.Mesh(new THREE.RingGeometry(1, 1.05, 72).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0xb45a2a }));
+  var holeRim = new THREE.Mesh(new THREE.RingGeometry(1, 1.05, 72).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x9a4e26, roughness: 1 }));
   holeRim.receiveShadow = true;
   holeGroup.add(holeWall, holeFloor, holeRim);
 }
@@ -829,6 +1065,44 @@ function blip(size) {
 }
 $('mute').onclick = e => { e.stopPropagation(); muted = !muted; $('mute').innerHTML = muted ? '&#128263;' : '&#128266;'; };
 $('mute').onpointerdown = e => e.stopPropagation();
+const hqBtn = $('hq');
+const showHQ = () => { hqBtn.textContent = HQ ? 'Graphics: high' : 'Graphics: fast'; };
+showHQ();
+hqBtn.onpointerdown = e => e.stopPropagation();
+hqBtn.onclick = e => { e.stopPropagation(); HQ = !HQ; try { localStorage.setItem('holecity.hq', HQ ? '1' : '0'); } catch (_) { } applyShadowRes(); resize(); showHQ(); };
+
+// ---------------------------------------------------------------- dust kicked up by big swallows
+const DUST_N = 240;
+const dustMesh = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshStandardMaterial({ color: 0x8a6a4c, roughness: 1, transparent: true, opacity: 0.55, depthWrite: false }), DUST_N);
+dustMesh.frustumCulled = false; dustMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+for (let i = 0; i < DUST_N; i++) dustMesh.setMatrixAt(i, ZERO_M);
+scene.add(dustMesh);
+const dustP = []; let dustHead = 0;
+function dust(o) {
+  if (o.size < 0.8) return;
+  const n = Math.min(24, 6 + Math.round(o.size * 3));
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, r = hole.r * (0.9 + Math.random() * 0.25);
+    const p = { i: dustHead, x: hole.x + Math.cos(a) * r, y: SH + 0.1, z: hole.z + Math.sin(a) * r,
+      vx: Math.cos(a) * (0.5 + Math.random()) * (1 + o.size * 0.2), vy: 1 + Math.random() * (1.5 + o.size * 0.3), vz: Math.sin(a) * (0.5 + Math.random()) * (1 + o.size * 0.2),
+      s: 0.15 + Math.random() * 0.2 * (1 + o.size * 0.3), t: 0, life: 0.9 + Math.random() * 0.8 };
+    dustHead = (dustHead + 1) % DUST_N;
+    const k = dustP.findIndex(q => q.i === p.i); if (k >= 0) dustP.splice(k, 1);
+    dustP.push(p);
+  }
+}
+function updateDust(dt) {
+  for (let j = dustP.length - 1; j >= 0; j--) {
+    const p = dustP[j]; p.t += dt;
+    if (p.t > p.life) { dustMesh.setMatrixAt(p.i, ZERO_M); dustP.splice(j, 1); continue; }
+    p.vy -= 2.5 * dt; p.vx *= 1 - dt * 1.5; p.vz *= 1 - dt * 1.5;
+    p.x += p.vx * dt; p.y = Math.max(SH, p.y + p.vy * dt); p.z += p.vz * dt;
+    const sc = p.s * (1 + p.t * 2.5) * (1 - p.t / p.life);
+    tmpM.compose(tmpV.set(p.x, p.y, p.z), tmpQ.identity(), tmpS.set(sc, sc * 0.8, sc));
+    dustMesh.setMatrixAt(p.i, tmpM);
+  }
+  dustMesh.instanceMatrix.needsUpdate = true;
+}
 
 // ---------------------------------------------------------------- swallowing
 function startFall(o) {
@@ -849,6 +1123,8 @@ function startFall(o) {
   if (o.size >= Math.max(1.5, hole.r * 0.45)) popText(o.name + '! +' + pts, o.x, o.z, true);
   else if (o.size >= hole.r * 0.25) popText('+' + pts, o.x, o.z, false);
   blip(o.size);
+  if (o.size > hole.r * 0.45) shake = Math.min(1.2, shake + o.size / hole.r * 0.5);
+  dust(o);
   if (navigator.vibrate && o.size > 3) navigator.vibrate(20);
   updateHud();
 }
@@ -944,7 +1220,7 @@ function streamChunks(budgetMs) {
 }
 
 // ---------------------------------------------------------------- main loop
-let started = false, last = performance.now(), elapsed = 0, shownSec = -1;
+let started = false, last = performance.now(), elapsed = 0, shownSec = -1, shake = 0;
 const camTarget = new V3(hole.x, 0, hole.z);
 function frame(now) {
   requestAnimationFrame(frame);
@@ -1016,8 +1292,19 @@ function frame(now) {
   updateFalling(dt);
   updatePops(dt);
 
+  updateDust(dt);
+  if (shake > 0.001) {
+    const a = shake * hole.r * 0.08;
+    camera.position.x += (Math.random() - 0.5) * a; camera.position.y += (Math.random() - 0.5) * a; camera.position.z += (Math.random() - 0.5) * a;
+    shake *= Math.exp(-dt * 6);
+  }
+  timeU.value = now / 1000;
+  sky.position.copy(camera.position);
   for (const k in TYPES) TYPES[k].pool.flush();
-  renderer.render(scene, camera);
+  if (HQ) {
+    gtao.updateGtaoMaterial({ radius: 0.6 + hole.r * 0.35, distanceExponent: 1.4, thickness: 1 + hole.r * 0.5, scale: 1.1, samples: 16 });
+    composer.render(dt);
+  } else renderer.render(scene, camera);
 }
 
 updateHoleMesh();
