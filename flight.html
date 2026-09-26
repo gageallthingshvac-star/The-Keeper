@@ -1325,21 +1325,61 @@ const QLEVELS = [
   { dpr: 1.50, lev: 13, half: 8, base: 52, trees: .38, treeR: 2600, clouds: 64000, glare: 1, vig: 1, shadow: 1, stars: 1, terrShadow: 1, cloudShadow: 1, buildings: 1000 },
   { dpr: 2.00, lev: 14, half: 9, base: 44, trees: .44, treeR: 3200, clouds: 86000, glare: 1, vig: 1, shadow: 1, stars: 1, terrShadow: 1, cloudShadow: 1, buildings: 1400 }
 ];
-const Q = { i: MOBILE ? 1 : 3, auto: true, work: 9, hold: 0, q: QLEVELS[MOBILE ? 1 : 3] };
+/* On top of the rungs, a continuous detail scale. The rungs are coarse, they
+   change the resolution of the canvas, and they only ever move when the frame
+   is already in trouble; between one rung and the next there can be four
+   milliseconds of headroom doing nothing. This spends it: cells get smaller
+   and more numerous, trees reach further, the building budget grows, until
+   the frame is as full as it can be without missing. Down is four times
+   faster than up, because being late is worse than being plain.
+
+   The floor is not zero. The two loops cost the same currency, and a rung is
+   worth about as much as the whole detail range, so a rung taken too eagerly
+   is paid for by stripping the geometry back to nothing — which is exactly
+   what happened: canvas resolution up two rungs, ground detail on the floor,
+   and eighteen frames a second. Below DET_MIN the detail scale stops giving
+   and the rung it is propping up comes down instead. */
+const DET_MAX = 1.70, DET_MIN = .80;
+const Q = { i: MOBILE ? 1 : 3, auto: true, work: 9, hold: 0, det: 1, q: QLEVELS[MOBILE ? 1 : 3] };
 
 function applyQuality() {
   Q.q = QLEVELS[Q.i];
   resize();
 }
 /* Tuned on the time spent inside the frame, not the frame interval: vsync
-   pins the interval at 16.7 ms whatever the load, so it can never show headroom. */
+   pins the interval at 16.7 ms whatever the load, so it can never show
+   headroom.
+
+   But it cannot be tuned on that ALONE, and this is the trap: the number
+   measures JavaScript, and half the cost of a rung is the fill rate of a
+   canvas that just got 1.6 times as many pixels — which happens after the
+   measurement, on the compositor, where it is invisible. Measured by work
+   the deck sat at 9.4 ms either way; measured by the clock it went from
+   thirty-three frames a second to twenty-three. So the interval comes in as
+   well, not as the thing being optimised, but as a veto: never climb a rung
+   the frame rate says is not there, and give one back when it collapses. */
 function tuneQuality(dt, workMs) {
   Q.work += (workMs - Q.work) * .06;
   if (!Q.auto || !GAME.started || GAME.paused) return;
+  /* The display list is the other wall. Running into it does not slow the
+     frame down, it silently drops whatever asked last — which is the near
+     detail, drawn after the ground. Back off before that happens. */
+  const full = DL.n > DLMAX * .90;
+  if (Q.work > 10.6 || full || fps < 28) Q.det = Math.max(Q.det - dt * .60, DET_MIN);
+  else if (Q.work < 8.8 && fps > 30) Q.det = Math.min(Q.det + dt * .16, DET_MAX);
   Q.hold -= dt;
   if (Q.hold > 0) return;
-  if (Q.work > 11.5 && Q.i > 0) { Q.i--; Q.hold = 2.5; applyQuality(); }
-  else if (Q.work < 6.5 && Q.i < QLEVELS.length - 1) { Q.i++; Q.hold = 4; applyQuality(); }
+  /* A rung comes down either when the frame is plainly late, or when the
+     detail scale has already given back everything it has and the frame is
+     still heavy — that second case is the one that tells you the rung itself
+     was the mistake. A rung up is only worth taking once the free detail has
+     been taken and there is still time to spare. */
+  const floored = Q.det <= DET_MIN + .02;
+  if ((Q.work > 11.5 || fps < 24 || (floored && Q.work > 10.2)) && Q.i > 0) {
+    Q.i--; Q.det = 1; Q.hold = 3; applyQuality();
+  } else if (Q.work < 6.0 && fps > 48 && Q.det > DET_MAX - .02 && Q.i < QLEVELS.length - 1) {
+    Q.i++; Q.det = 1; Q.hold = 4; applyQuality();
+  }
 }
 
 let PORTRAIT = false, UI = 1;
@@ -1535,6 +1575,52 @@ function offscreen(m) {
   }
   return l === m || r === m || t === m || b === m;
 }
+/* ---- what the camera can actually see, on the ground ---------------------
+
+   offscreen() is a quick reject, but it is the LAST step: by the time it runs,
+   the height field has been sampled, four vertices have been through the view
+   transform and the polygon has been clipped. The ring of ground around the
+   aeroplane is three hundred and sixty degrees and the camera sees about
+   seventy of them, so most of that work was being done for nothing —
+   measured, five and a half thousand terrain samples a frame to draw twelve
+   hundred quads, and half of everything projected thrown away.
+
+   This is the same reject, done FIRST, in two dimensions, with nothing but a
+   pair of dot products. The frustum is circumscribed by a cone; a cone whose
+   axis is tilted t above the horizon sweeps an azimuth half-width of
+   asin(sin a / cos t) on the ground, which is exact and costs one arcsine a
+   frame. Anything whose footprint falls outside that wedge cannot be on the
+   screen, whatever its height — azimuth does not care how tall a thing is.
+
+   What it buys is not speed. It is detail: the same budget, spent only on
+   ground the pilot is looking at. */
+const VIEW = { on: false, n1x: 0, n1z: 0, n2x: 0, n2z: 0, fx: 0, fz: 1 };
+function viewWedge() {
+  const cm = cam.m;
+  const fx = cm[6], fz = cm[8];
+  const fl = Math.hypot(fx, fz);
+  VIEW.on = false;
+  if (fl < 1e-6) return;                     // straight up or straight down
+  VIEW.fx = fx / fl; VIEW.fz = fz / fl;
+  const sinA = Math.sin(Math.atan2(Math.hypot(W * .5, H * .5), F));
+  if (sinA >= fl) return;                    // the cone contains the vertical
+  const az = Math.asin(sinA / fl) + .07;     // a little slack for the seams
+  if (az > 1.40) return;                     // wider than a half plane: no point
+  const c = Math.cos(az), s = Math.sin(az);
+  const ux = VIEW.fx, uz = VIEW.fz;
+  // the two edges of the wedge, and the inward normal of each
+  const e1x = ux * c - uz * s, e1z = ux * s + uz * c;
+  const e2x = ux * c + uz * s, e2z = -ux * s + uz * c;
+  let n1x = -e1z, n1z = e1x; if (n1x * ux + n1z * uz < 0) { n1x = -n1x; n1z = -n1z; }
+  let n2x = -e2z, n2z = e2x; if (n2x * ux + n2z * uz < 0) { n2x = -n2x; n2z = -n2z; }
+  VIEW.n1x = n1x; VIEW.n1z = n1z; VIEW.n2x = n2x; VIEW.n2z = n2z;
+  VIEW.on = true;
+}
+/* Could anything within r metres of the point (dx, dz) from the camera be on
+   the screen? Conservative: it says yes to a little more than it must. */
+const inView = (dx, dz, r) => !VIEW.on ||
+  (dx * VIEW.n1x + dz * VIEW.n1z >= -r && dx * VIEW.n2x + dz * VIEW.n2z >= -r);
+
 /* The planet curves away underneath you. Over a few kilometres that is a
    rounding error, but the view now runs to several hundred, and on a flat
    model ground that far off would stand well above the true horizon instead
@@ -1826,7 +1912,7 @@ const SUN_H = (() => {
   return { x: s.x / hl, z: s.z / hl, slope: s.y / hl };
 })();
 
-const _hg = new Float32Array(19 * 19);
+const _hg = new Float32Array(32 * 32), _hgOk = new Uint8Array(32 * 32);
 /* Blend a surface into shadow: the sun goes, the sky ambient stays, which is
    why real shadows are blue rather than black. */
 function shadowed(col, k) {
@@ -1872,10 +1958,14 @@ function drawTerrain() {
      describe a curved Earth at any opacity, and at four hundred kilometres
      that is exactly what it was drawing. */
   if ((LIGHT.far || 0) > .5) return;
-  const LEV = Q.q.lev, half = Q.q.half, span = half * 2 + 1;
+  /* The detail scale buys smaller cells and proportionally more of them, so
+     the ground reaches exactly as far as it did and is described in finer
+     pieces the whole way out. */
+  const LEV = Q.q.lev, half = clamp(Math.round(Q.q.half * Q.det), 5, 15), span = half * 2 + 1;
   // Widen every ring as you climb: from 80,000 ft the useful view is thousands
   // of kilometres across, and 50 m cells there would be wasted on nothing.
-  const base = clamp(Q.q.base * (1 + cam.pos.y / 5200), Q.q.base, 46000);
+  const base0 = Q.q.base / Q.det;
+  const base = clamp(base0 * (1 + cam.pos.y / 5200), base0, 46000);
   /* Nothing past the geometric horizon is worth a triangle. This is what
      makes a fourteen-ring ladder affordable: on the deck it throws almost all
      of it away, and only at eighty thousand feet does the whole thing draw. */
@@ -1892,12 +1982,19 @@ function drawTerrain() {
        there for them to describe, so they are not drawn. */
     if (cell > horiz * .34) continue;
     const gx = Math.round(cam.pos.x / cell), gz = Math.round(cam.pos.z / cell);
-    for (let j = 0; j <= span - 1; j++) {
-      const wz = (gz - half + j) * cell;
-      for (let i = 0; i <= span - 1; i++) {
-        _hg[j * span + i] = terrainH((gx - half + i) * cell, wz, cell);
+    /* Heights are fetched when a cell turns out to be worth drawing, not
+       before. Filling the whole ring up front sampled the terrain function
+       five and a half thousand times a frame to draw about twelve hundred
+       quads; almost all of the rest was behind the pilot's head. */
+    _hgOk.fill(0, 0, span * span);
+    const hAt = (i, j) => {
+      const k = j * span + i;
+      if (_hgOk[k] === 0) {
+        _hg[k] = terrainH((gx - half + i) * cell, (gz - half + j) * cell, cell);
+        _hgOk[k] = 1;
       }
-    }
+      return _hg[k];
+    };
     const lodBias = L * 140;
     for (let j = 0; j < span - 1; j++) {
       for (let i = 0; i < span - 1; i++) {
@@ -1905,12 +2002,13 @@ function drawTerrain() {
         if (L > 0 && ax < 2.9) continue;            // finer ring covers this, with overlap
         const x0 = (gx - half + i) * cell, z0 = (gz - half + j) * cell;
         const x1 = x0 + cell, z1 = z0 + cell;
-        let h00 = _hg[j * span + i], h10 = _hg[j * span + i + 1],
-          h01 = _hg[(j + 1) * span + i], h11 = _hg[(j + 1) * span + i + 1];
         const mcx = x0 + cell * .5, mcz = z0 + cell * .5;
         const dx = mcx - cam.pos.x, dz = mcz - cam.pos.z;
         const dist = Math.hypot(dx, dz);
         if (dist > cell * 11 + 400 || dist > horiz) continue;
+        if (!inView(dx, dz, cell * .78)) continue;
+        let h00 = hAt(i, j), h10 = hAt(i + 1, j),
+          h01 = hAt(i, j + 1), h11 = hAt(i + 1, j + 1);
         const push = inField(mcx, mcz) ? FIELD_PUSH : 0;
         // how flooded this patch is, from its mean height rather than a corner
         // count, which would alternate between neighbours and read as a checkerboard
@@ -2474,7 +2572,7 @@ const RING = buildRing();
 
 /* scattered trees, drawn as depth-sorted billboards */
 function drawTrees() {
-  const cell = 86, rad = Q.q.treeR, dens = Q.q.trees;
+  const cell = 86, rad = Q.q.treeR * Q.det, dens = Q.q.trees;
   const gx = Math.round(cam.pos.x / cell), gz = Math.round(cam.pos.z / cell);
   const n = Math.ceil(rad / cell);
   // which way is the sun on screen? the lit half of each canopy goes that side
@@ -2488,6 +2586,7 @@ function drawTrees() {
       const z = (gz + j) * cell + (hash2(gz + j, gx + i) - .5) * cell * .9;
       const dx = x - cam.pos.x, dz = z - cam.pos.z;
       if (dx * dx + dz * dz > rad * rad) continue;
+      if (!inView(dx, dz, 26)) continue;
       const gy = terrainH(x, z);
       if (gy < 2 || gy > 2600) continue;
       if (Math.abs(x) < 320 && Math.abs(z) < WORLD.rwyLen * .6) continue;   // keep the field clear
@@ -2688,7 +2787,7 @@ function drawLandmarks() {
 function drawCities() {
   if (!onPlanet()) return;
   const camX = cam.pos.x, camZ = cam.pos.z, camY = cam.pos.y;
-  let budget = Q.q.buildings;
+  let budget = Math.round(Q.q.buildings * Q.det);
   const labels = [];
   for (const c of CITIES) {
     const dx = c.x - camX, dz = c.z - camZ;
@@ -2698,6 +2797,7 @@ function drawCities() {
     if (budget <= 0) continue;
     const near = c.r * 5.5 + 24000;
     if (d > near || camY > 62000) continue;
+    if (!inView(dx, dz, c.r * 1.6 + 1200)) continue;    // the labels still carry
     /* The structures, before the grid, so they are never the thing the budget
        runs out on. A place is recognisable by its tall bits. */
     {
@@ -2810,8 +2910,11 @@ function drawUrban(budget) {
     const dx = bx - camX, dz = bz - camZ;
     const bd = Math.hypot(dx, dz);
     if (bd > reach) return;
-    // nothing behind the aeroplane is worth a slot out of the budget
-    if (bd > PITCH && (dx * fx + dz * fz) / bd < -.30) return;
+    /* Nothing off the edge of the screen is worth a slot out of the budget.
+       This used to reject only what was behind the wings, so two thirds of
+       the budget went on blocks nobody could see and the city in the window
+       was three times thinner than the machine could afford to draw. */
+    if (bd > PITCH && !inView(dx, dz, PITCH * .9)) return;
     const u = urbanShare(bx, bz);
     if (u < .05) return;
     const h1 = hash2(i * 7, j * 13);
@@ -2867,7 +2970,7 @@ function drawFarms(budget) {
     const bz = j * S + (hash2(j, i) - .5) * S * .66;
     const dx = bx - camX, dz = bz - camZ, bd = Math.hypot(dx, dz);
     if (bd > reach) return;
-    if (bd > S && (dx * fwx + dz * fwz) / bd < -.30) return;
+    if (bd > S * .5 && !inView(dx, dz, S * .8)) return;
     const gy = terrainH(bx, bz);
     if (gy < 3) return;
     if (farmChance(bx, bz, gy) < .35) return;
@@ -7870,6 +7973,7 @@ function frame(now) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   drawSky();
   DL.reset();
+  viewWedge();
   drawBodies();
   drawStations();
   drawTerrain();
