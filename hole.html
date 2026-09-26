@@ -1959,6 +1959,32 @@ function cosmicFrame(dt, now) {
   renderStage(cScene, cCam, cBloom.strength);
 }
 
+// ================================================================ test autopilot (window.__bot): heads for the nearest thing that fits
+const botStats = { noTarget: 0, frames: 0 };
+function botSteer() {
+  let wx = 0, wz = 0, best = Infinity;
+  if (cosmos.mode === 'cosmic') {
+    for (const o of cosmos.objs) if (o.state === 0 && o.size <= cosmos.r) { const d = Math.hypot(o.x, o.z); if (d < best) { best = d; wx = o.x; wz = o.z; } }
+  } else if (cosmos.mode === 'globe') {
+    const { e, n } = globeOrient();
+    const pick = (v, rr) => { const d = Math.acos(Math.min(1, v.dot(globe.h))); if (d < best) { best = d; const t = tmpV.copy(v).addScaledVector(globe.h, -v.dot(globe.h)); wx = t.dot(e); wz = -t.dot(n); } };
+    for (const c of globe.countries) if (!c.state && c.r <= globe.r * 0.97) pick(c.cen, c.r);
+    for (const c of globe.cities) if (!c.state && c.r <= globe.r) pick(c.n, c.r);
+    for (const c of (globe.fill || [])) if (!c.state && c.r <= globe.r) pick(c.n, c.r);
+  } else if (cosmos.mode === 'solar') {
+    const planetsLeft = solar.bodies.some(b => b.planet && !b.state);
+    for (const b of solar.bodies) if (!b.state && b.r <= solar.r && !(b.sun && planetsLeft)) { const d = Math.hypot(b.ax - solar.hx, b.az - solar.hz); if (d < best) { best = d; wx = b.ax - solar.hx; wz = b.az - solar.hz; } }
+    for (const o of solar.rocks) if (!o.state && o.r <= solar.r && o.r > solar.r * 0.02) { const d = Math.hypot(o.ax - solar.hx, o.az - solar.hz); if (d < best) { best = d; wx = o.ax - solar.hx; wz = o.az - solar.hz; } }
+  }
+  botStats.frames++;
+  const L = Math.hypot(wx, wz);
+  if (!L) { botStats.noTarget++; stick.x = stick.y = 0; return; }
+  wx /= L; wz /= L;
+  const cy = Math.cos(view.yaw), sy = Math.sin(view.yaw);
+  stick.x = wx * cy - wz * sy; stick.y = wx * sy + wz * cy;
+  boostHeld = cosmos.mode === 'solar' && best > solar.r * 30;
+}
+
 // ================================================================ shared: move input, boost, star sky, marker labels
 function moveInput() {
   let mx = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0) + stick.x;
@@ -2588,6 +2614,7 @@ function frame(now) {
     view.yaw += (view.yawT - view.yaw) * Math.min(1, dt * 8);
     view.pitch += (PITCHES[pitchIdx] * Math.PI / 180 - view.pitch) * Math.min(1, dt * 5);
     boostEl.hidden = false;
+    if (window.__bot) botSteer();
     if (cosmos.mode === 'globe') globeFrame(dt);
     else if (cosmos.mode === 'solar') solarFrame(dt);
     else cosmicFrame(dt, now);
@@ -2680,7 +2707,7 @@ $('start').addEventListener('pointerdown', e => {
   started = true;
   try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (_) { }
 });
-window.__game = { hole, chunks, dyn, active, TYPES, cosmos, jumpCosmos, globe, solar, enterGlobe, enterSolar, start: () => $('start').dispatchEvent(new PointerEvent('pointerdown')) };
+window.__game = { botStats, hole, chunks, dyn, active, TYPES, cosmos, jumpCosmos, globe, solar, enterGlobe, enterSolar, start: () => $('start').dispatchEvent(new PointerEvent('pointerdown')) };
 </script>
 </body>
 </html>
