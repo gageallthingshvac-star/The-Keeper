@@ -2083,7 +2083,7 @@ function renderStage(sc, cam, bloomK) {
 // Country borders: Natural Earth 1:110m (public domain). Imagery: NASA Blue Marble / Black Marble.
 const WORLD = JSON.parse(document.getElementById('worlddata').textContent);
 const CITY_LIST = WORLD.cities;
-const RE = 6371, GR = 1000, KG = 0.3;
+const RE = 6371, GR = 1000, KG = 0.24;
 const FILL_N = 4000, FILL_MIN = 8, FILL_MAX = 400, FILL_SKEW = 2.2, KF = 0.08;
 const gScene = new THREE.Scene();
 gScene.background = new THREE.Color(0x000000);
