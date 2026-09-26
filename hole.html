@@ -2529,7 +2529,7 @@ function enterSolar() {
 function solarEat(o, name) {
   o.state = 1; o.t = 0; o.fx = o.ax; o.fz = o.az;
   const rel = o.r / solar.r;
-  solar.targetR = Math.sqrt(solar.targetR * solar.targetR + 4 * Math.pow(solar.r / solar.R0, 0.8) * o.r * o.r);
+  solar.targetR = Math.sqrt(solar.targetR * solar.targetR + 4 * (solar.r / solar.R0) * o.r * o.r);   // grows past the Sun once the big moons and planets are in
   const pts = Math.round(60 + 600 * rel * rel);
   hole.score += pts; hole.eaten++;
   if (name) popText(name + ' · ' + fmtLen(Math.log10(o.r * 2000)), 0, 0, rel > 0.25, sCam, 0);
