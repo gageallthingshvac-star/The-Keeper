@@ -1834,12 +1834,17 @@ function drawStars(sp2, yOff, R) {
    chase camera watching from outside. */
 function drawReentryWash(P) {
   const h = P.heat || 0;
-  if (h < .8 || !GAME.started) return;
-  const k = clamp((h - .8) / 3.4, 0, 1);
-  const c = plasmaColor(h);
-  const inside = camMode === 1 ? 1 : .42;
+  if (h < .55 || !GAME.started) return;
+  const k = clamp((h - .55) / 3.6, 0, 1);
+  /* The sheath goes blue-white as it ionises, which is right on the outside
+     of the aeroplane and wrong for the light coming into the cockpit: from in
+     there a re-entry is a fire, and a pale blue screen reads as fog rather
+     than as the airframe being cooked. So the WASH keeps the fire colours and
+     gets brighter with temperature instead of colder. */
+  const c = plasmaColor(Math.min(h, 3.1));
+  const inside = camMode === 1 ? 1.45 : .42;
   const g = ctx.createRadialGradient(CX, CY * .82, 0, CX, CY, Math.hypot(W, H) * .62);
-  const a0 = (k * .21 * inside).toFixed(3), a1 = (k * .075 * inside).toFixed(3);
+  const a0 = (k * .26 * inside).toFixed(3), a1 = (k * .095 * inside).toFixed(3);
   g.addColorStop(0, "rgba(" + (c[0] | 0) + "," + (c[1] | 0) + "," + (c[2] | 0) + "," + a0 + ")");
   g.addColorStop(.55, "rgba(" + (c[0] | 0) + "," + (c[1] | 0) + "," + (c[2] | 0) + "," + a1 + ")");
   g.addColorStop(1, "rgba(" + (c[0] | 0) + "," + (c[1] | 0) + "," + (c[2] | 0) + ",0)");
@@ -4154,7 +4159,7 @@ function physics(P, dt) {
       const sgn = P.unstartSide || (P.unstartSide = Math.random() < .5 ? -1 : 1);
       M.y += sgn * 1.2e6 * clamp(P.unstart, 0, 1);
       M.z += sgn * 3.0e5 * clamp(P.unstart, 0, 1);
-      cam.shake = Math.max(cam.shake, .7);
+      cam.shake = Math.max(cam.shake, .45);
       if (P.unstart <= 0) P.unstartSide = 0;
     }
   }
@@ -4301,13 +4306,19 @@ function physics(P, dt) {
      looked identical. A return from orbit runs to about 5, and there is head
      room above that for anything faster. The thermal lag is real: the skin
      takes a couple of seconds to catch up, and a couple to let go. */
-  P.heat = clamp(approach(P.heat || 0, clamp(heatRate * .52, 0, 8), .55, dt), 0, 8);
+  P.heat = clamp(approach(P.heat || 0, clamp(heatRate * .82, 0, 8), .55, dt), 0, 8);
   /* Heat is a read-out and a rumble, not a countdown. It used to burn the
      airframe through after six seconds over the limit; it does not any more.
      Fly it as hot as you like. */
   if (!P.crashed && P.heat > 1.25) {
     P.burn = (P.burn || 0) + dt;
-    cam.shake = Math.max(cam.shake, clamp((P.heat - 1.25) * .42, 0, .8));
+    /* The fire is the point; being unable to read the instruments is not.
+       This used to reach its maximum at a skin temperature of three and
+       stay there for everything above, so every fast flight was spent
+       looking through a shaking window. It starts later and tops out at a
+       third of what it did — a rumble under a picture that is now much
+       hotter to look at. */
+    cam.shake = Math.max(cam.shake, clamp((P.heat - 2.6) * .13, 0, .26));
   } else P.burn = Math.max(0, (P.burn || 0) - dt * .5);
 
   // peak tracking, and the physiological price of pulling
@@ -4325,15 +4336,15 @@ function physics(P, dt) {
   /* The wings used to come off past nine g. They do not any more — pull as
      hard as the aeroplane will give you. All that is left of it is the
      airframe groaning, which is feedback rather than a sentence. */
-  if (!P.crashed && Math.abs(P.gload) > 9)
-    cam.shake = Math.max(cam.shake, clamp((Math.abs(P.gload) - 9) * .22, 0, .7));
+  if (!P.crashed && Math.abs(P.gload) > 10)
+    cam.shake = Math.max(cam.shake, clamp((Math.abs(P.gload) - 10) * .12, 0, .34));
 
   /* Dynamic pressure down low used to tear the airframe apart after four
      seconds. Now it just shakes: Mach 3 on the deck is punishing to look at
      and free to do. */
   if (!P.crashed && P.qbar > 160000) {
     P.overQ = (P.overQ || 0) + dt;
-    cam.shake = Math.max(cam.shake, clamp(P.overQ * .22, 0, .65));
+    cam.shake = Math.max(cam.shake, clamp(P.overQ * .12, 0, .32));
   } else P.overQ = Math.max(0, (P.overQ || 0) - dt * .6);
   /* They are places, not walls. Arrive slowly, wings level, on the wheels,
      and you have landed on the Moon; arrive any other way and you have
@@ -4636,6 +4647,8 @@ function crash(why) {
 /* ============================================================ camera ==== */
 let camMode = 0;
 const CAMNAMES = ["CHASE", "COCKPIT", "ORBIT", "WING", "TOWER"];
+// the same five, short enough for the legend on a pushbutton
+const CAMSHORT = ["CHASE", "CKPIT", "ORBIT", "WING", "TOWER"];
 let orbitA = 0;
 function updateCamera(dt) {
   const P = PLANE, m = P.m;
@@ -4691,7 +4704,16 @@ function updateCamera(dt) {
   cam.m[3] = u2.x; cam.m[4] = u2.y; cam.m[5] = u2.z;
   cam.m[6] = f2.x; cam.m[7] = f2.y; cam.m[8] = f2.z;
   if (sh > .001) {
-    const jq = qmul(qAxis(1, 0, 0, (Math.random() - .5) * sh * .05), qAxis(0, 1, 0, (Math.random() - .5) * sh * .05));
+    /* A rumble, not a strobe. A fresh random number every frame is white
+       noise at whatever the frame rate happens to be, which reads as the
+       picture tearing rather than as an airframe working; a few summed
+       sinusoids are continuous, frame-rate independent, and read as a
+       structure under load. */
+    cam.jt = (cam.jt || 0) + (dt || .016);
+    const t = cam.jt;
+    const n1 = Math.sin(t * 23.7) * .55 + Math.sin(t * 37.1 + 1.1) * .30 + Math.sin(t * 61.3 + 2.4) * .15;
+    const n2 = Math.sin(t * 27.9 + 2.3) * .55 + Math.sin(t * 43.3 + .7) * .30 + Math.sin(t * 67.7 + 1.6) * .15;
+    const jq = qmul(qAxis(1, 0, 0, n1 * sh * .028), qAxis(0, 1, 0, n2 * sh * .028));
     const jm = qMat(jq, new Float32Array(9));
     cam.m = mmul(cam.m, jm);
   }
@@ -4818,9 +4840,12 @@ function drawNozzles(P, Rb, pos) {
    a shock layer hot enough to be ionising — which is the colour a capsule
    comes home in. */
 function plasmaColor(h) {
-  if (h < 1.1) return mixc([104, 24, 10], [236, 104, 28], clamp(h / 1.1, 0, 1));
-  if (h < 2.8) return mixc([236, 104, 28], [255, 218, 158], clamp((h - 1.1) / 1.7, 0, 1));
-  return mixc([255, 218, 158], [188, 222, 255], clamp((h - 2.8) / 3.2, 0, 1));
+  /* The skin temperature reads a good deal higher than it used to, so the
+     ramp has to be stretched to match or everything above a re-entry is the
+     same flat white — which is not hotter, it is just less to look at. */
+  if (h < 1.0) return mixc([126, 28, 10], [255, 112, 24], clamp(h / 1.0, 0, 1));
+  if (h < 3.0) return mixc([255, 112, 24], [255, 222, 156], clamp((h - 1.0) / 2.0, 0, 1));
+  return mixc([255, 222, 156], [200, 228, 255], clamp((h - 3.0) / 4.4, 0, 1));
 }
 
 /* The re-entry sheath.
@@ -4833,9 +4858,9 @@ function plasmaColor(h) {
    aeroplane inside a bubble of fire the moment it touches air again. */
 function drawPlasma(P, Rb, pos) {
   const h = P.heat || 0;
-  if (h < .28 || P.crashed) return;
-  const k = clamp((h - .28) / 2.0, 0, 1);       // first glow to fully developed
-  const hot = clamp((h - 2.2) / 3.4, 0, 1);     // the ionised, blue-white end
+  if (h < .20 || P.crashed) return;
+  const k = clamp((h - .20) / 1.55, 0, 1);      // first glow to fully developed
+  const hot = clamp((h - 2.6) / 4.0, 0, 1);     // the ionised, blue-white end
   const col = plasmaColor(h);
   const R = col[0], G = col[1], B = col[2];
   const shimmer = 1 + Math.sin(GAME.t * 31) * .06 + Math.sin(GAME.t * 17.3) * .04;
@@ -4850,7 +4875,7 @@ function drawPlasma(P, Rb, pos) {
     DL.sprite(sp.z + 6 - i * .5, sp.x, sp.y,
       Math.max(sp.s * (4 + t * 16) * (.45 + k * .85) * shimmer, 2),
       sprite(R, G, B, 1),
-      clamp(k * (.50 - t * .30) * (1 + hot * .9), 0, .62));
+      clamp(k * (.56 - t * .32) * (1 + hot * .8), 0, .60));
   }
 
   /* The sheath wrapping the airframe: brightest along the chines and the
@@ -4868,7 +4893,7 @@ function drawPlasma(P, Rb, pos) {
     DL.sprite(sp.z + 2, sp.x, sp.y,
       Math.max(sp.s * (2.6 + k * 5.5) * shimmer, 1.5),
       sprite(R, G, B, 1),
-      clamp(k * .34 * near * (1 + hot * .7), 0, .50));
+      clamp(k * .40 * near * (1 + hot * .7), 0, .54));
   }
 
   /* The wake. Ionised air does not follow the nose, it follows the flight
@@ -4879,7 +4904,7 @@ function drawPlasma(P, Rb, pos) {
   if (V > 60) {
     const d = vmul(P.vel, -1 / V);
     const tail = vadd(pos, mRot(Rb, v3(0, 0, -12)));
-    const len = (26 + k * 150) * (1 + hot * 1.4);
+    const len = (34 + k * 215) * (1 + hot * 1.7);
     const SEG = 12;
     for (let i = 1; i <= SEG; i++) {
       const t = i / SEG;
@@ -4889,12 +4914,12 @@ function drawPlasma(P, Rb, pos) {
       DL.sprite(sp.z - 1 - i * .02, sp.x, sp.y,
         Math.max(sp.s * (3.4 + k * 9) * (.5 + t * 1.9), 1.2),
         sprite(cool[0], cool[1], cool[2], 1),
-        clamp(k * .30 * (1 - t) * (1 - t) * (1 + hot), 0, .55));
+        clamp(k * .38 * (1 - t) * (1 - t) * (1 + hot * 1.1), 0, .62));
     }
     /* Ablation: once it is properly hot the airframe starts shedding sparks,
        and they trail off down the wake. */
-    if (h > 1.6) {
-      const n = Math.min(14, Math.round((h - 1.6) * 5));
+    if (h > 1.25) {
+      const n = Math.min(22, Math.round((h - 1.25) * 7));
       for (let i = 0; i < n; i++) {
         const ph = (GAME.t * 2.2 + i * .618) % 1;
         const sx = (hash2(i * 13, (GAME.t * 6) | 0) - .5) * 14;
@@ -6813,40 +6838,57 @@ function layoutTouch() {
   T.stick.hy = H - sb - r - 24 * u;
   T.stick.zw = PORTRAIT ? W * .58 : W * .46;
   T.stick.zh = PORTRAIT ? H * .40 : H * .70;
-  const bw = 78 * u, bh = 54 * u, g = 9 * u, tw = 54 * u;
-  let th, bx, by;
+  /* Twelve identical rounded rectangles is not a cockpit and, on a phone, it
+     is not usable either: every one of them is the same shape, so the thumb
+     has to read before it can press. Real aeroplanes solve this by making the
+     controls look like what they do — the gear is a lever with a wheel on the
+     end, the flaps are a lever in a detented slot, the chute is a striped
+     T-handle you pull, the systems are toggle switches, and the rest are lit
+     pushbuttons. Shape carries the meaning, so a glance is enough.
+
+     Merging the two flap buttons into one lever also buys back a row, which
+     is the difference between a panel that fits an iPhone in landscape and
+     one that runs off the bottom of it. */
+  const tw = 54 * u, cw = 62 * u, gp = 9 * u;
+  const BW = cw * 3 + gp * 2;
+  const hLev = 124 * u, hPush = 46 * u, hTog = 62 * u, hPad = 46 * u;
+  let th, bx, bBot;
   if (PORTRAIT) {
-    // narrow screen: throttle low on the right, switches stacked above it
+    // narrow screen: throttle low on the right, the panel stacked above it
     th = Math.min(H * .30, 300 * u);
     T.thr.x = W - sr - tw - 16 * u;
     T.thr.y = H - sb - th - 16 * u;
-    bx = W - sr - 16 * u - (bw * 2 + g);
-    by = T.thr.y - 14 * u - (bh * 2 + g);
+    bx = Math.max(sl + 8 * u, T.thr.x + tw - BW);
+    bBot = T.thr.y - 14 * u;
   } else {
     th = Math.min(H * .54, 330 * u);
     T.thr.x = W - sr - tw - 16 * u;
     T.thr.y = H - sb - th - 16 * u;
-    bx = T.thr.x - 16 * u - (bw * 2 + g);
-    by = H - sb - 16 * u - (bh * 2 + g);
+    bx = T.thr.x - 14 * u - BW;
+    bBot = H - sb - 16 * u;
   }
   T.thr.w = tw; T.thr.h = th;
+  const yPad = bBot - hPad;
+  const yTog = yPad - gp - hTog;
+  const yPush = yTog - gp - hPush;
+  const yLev = yPush - gp - hLev;
+  const pw = (BW - gp * 3) / 4;
   T.btns = [
-    /* RESET and SAFE go at the top of the stack, where nothing else is, and
-       reset asks twice before it throws a flight away. There is no R key on a
-       phone, and a simulator you cannot restart without a keyboard is a
-       simulator you cannot restart. */
-    { k: "reset", x: bx, y: by - (bh + g) * 4, w: bw, h: bh },
-    { k: "safe", x: bx + bw + g, y: by - (bh + g) * 4, w: bw, h: bh },
-    { k: "map", x: bx, y: by - (bh + g) * 3, w: bw, h: bh },
-    { k: "spd", x: bx + bw + g, y: by - (bh + g) * 3, w: bw, h: bh },
-    { k: "ap", x: bx, y: by - (bh + g) * 2, w: bw, h: bh },
-    { k: "keys", x: bx + bw + g, y: by - (bh + g) * 2, w: bw, h: bh },
-    { k: "chute", x: bx, y: by - bh - g, w: bw, h: bh },
-    { k: "flapup", x: bx + bw + g, y: by - bh - g, w: bw, h: bh },
-    { k: "gear", x: bx, y: by, w: bw, h: bh },
-    { k: "flap", x: bx + bw + g, y: by, w: bw, h: bh },
-    { k: "brake", x: bx, y: by + bh + g, w: bw, h: bh, hold: 1 },
-    { k: "cam", x: bx + bw + g, y: by + bh + g, w: bw, h: bh }
+    // the levers and the handle, where a hand would find them
+    { k: "gear", kind: "lever", x: bx, y: yLev, w: cw, h: hLev },
+    { k: "flap", kind: "lever", x: bx + cw + gp, y: yLev, w: cw, h: hLev },
+    { k: "chute", kind: "handle", x: bx + (cw + gp) * 2, y: yLev, w: cw, h: hLev },
+    // lit pushbuttons
+    { k: "map", kind: "push", x: bx, y: yPush, w: pw, h: hPush },
+    { k: "cam", kind: "push", x: bx + (pw + gp), y: yPush, w: pw, h: hPush },
+    { k: "keys", kind: "push", x: bx + (pw + gp) * 2, y: yPush, w: pw, h: hPush },
+    { k: "reset", kind: "push", x: bx + (pw + gp) * 3, y: yPush, w: pw, h: hPush },
+    // toggle switches
+    { k: "ap", kind: "toggle", x: bx, y: yTog, w: cw, h: hTog },
+    { k: "spd", kind: "toggle", x: bx + cw + gp, y: yTog, w: cw, h: hTog },
+    { k: "safe", kind: "toggle", x: bx + (cw + gp) * 2, y: yTog, w: cw, h: hTog },
+    // and the brakes, wide, along the bottom where a thumb lands
+    { k: "brake", kind: "pad", x: bx, y: yPad, w: BW, h: hPad, hold: 1 }
   ];
   const rw = 82 * u, rh = 54 * u, ry = H - sb - 16 * u - rh;
   const rcx = PORTRAIT ? W * .5 : clamp((T.stick.hx + r + bx) / 2, T.stick.hx + r + rw + 16 * u, bx - rw - 16 * u);
@@ -6858,6 +6900,13 @@ function layoutTouch() {
   T.pause = { x: W - sr - 12 * u - 46 * u, y: st + 8 * u + 56 * u + 20 * u, w: 46 * u, h: 40 * u };
 }
 const inBox = (b, x, y) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h;
+/* Where the knob sits in its slot, for a lever at fraction t of its travel.
+   The hit test and the drawing both ask, so neither can drift from the other:
+   tapping ABOVE the knob moves the lever up, below it moves it down, which is
+   what a hand does to a lever. */
+const leverTop = b => b.y + 32 * UI;
+const leverBot = b => b.y + b.h - 32 * UI;
+const leverKnobY = (b, t) => leverTop(b) + (leverBot(b) - leverTop(b)) * clamp(t, 0, 1);
 
 let RESET_ARM = 0;
 function touchAct(k) {
@@ -6904,7 +6953,15 @@ function touchDown(id, x, y, isTouch) {
   for (const b of T.btns) {
     if (inBox(b, x, y)) {
       T.ptr.set(id, { kind: "btn", b });
-      if (!b.hold) touchAct(b.k); else TOUCH.flash[b.k] = 1;
+      if (b.hold) { TOUCH.flash[b.k] = 1; return true; }
+      /* The flap lever is not a button: it moves toward the thumb. Tap above
+         the knob and it comes up a notch, tap below and it goes down one. */
+      if (b.k === "flap" && b.kind === "lever") {
+        touchAct(y < leverKnobY(b, PLANE.flapCmd) ? "flapup" : "flap");
+        TOUCH.flash.flap = .18;
+        return true;
+      }
+      touchAct(b.k);
       return true;
     }
   }
@@ -6979,6 +7036,164 @@ window.addEventListener("touchmove", ev => { if (TOUCH.on && ev.target === cv) e
 document.addEventListener("gesturestart", ev => ev.preventDefault());
 
 /* ---- drawing the controls ---- */
+/* ---- the hardware on the panel -----------------------------------------
+
+   Everything below draws a THING rather than a rectangle with a word in it: a
+   lever in a slot, a bat-handle switch in its bezel, a lit annunciator, a
+   striped T-handle. It costs a few dozen lines of canvas each and it is worth
+   every one of them on a phone, where the alternative is reading twelve
+   identical pads with your thumb already over one of them. */
+function bezel(x, y, w, h, r, lit, warn) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  const g = ctx.createLinearGradient(0, y, 0, y + h);
+  if (warn) { g.addColorStop(0, "rgba(72,26,22,.88)"); g.addColorStop(1, "rgba(38,14,12,.88)"); }
+  else if (lit) { g.addColorStop(0, "rgba(28,64,88,.88)"); g.addColorStop(1, "rgba(12,34,52,.90)"); }
+  else { g.addColorStop(0, "rgba(24,32,41,.82)"); g.addColorStop(1, "rgba(10,15,21,.86)"); }
+  ctx.fillStyle = g; ctx.fill();
+  ctx.strokeStyle = warn ? "rgba(255,132,104,.75)" : lit ? "rgba(150,226,255,.80)" : "rgba(118,146,170,.42)";
+  ctx.lineWidth = 1.5 * UI; ctx.stroke();
+}
+function plate(txt, x, y, size, col, weight) {
+  hudFont(size, weight || 700);
+  ctx.fillStyle = col; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(txt, x, y);
+}
+const PANEL_INK = "rgba(226,240,250,.95)", PANEL_DIM = "rgba(168,192,212,.82)";
+
+/* A lever in a slot. t is 0 at the top of its travel and 1 at the bottom. */
+function drawLever(b, t, label, sub, knob, detents, lit) {
+  const u = UI, cx = b.x + b.w / 2;
+  bezel(b.x, b.y, b.w, b.h, 8 * u, lit);
+  const top = leverTop(b), bot = leverBot(b), ky = leverKnobY(b, t);
+  // the slot the lever runs in, cut into the panel
+  ctx.lineCap = "round";
+  ctx.strokeStyle = "rgba(0,0,0,.62)"; ctx.lineWidth = 13 * u;
+  ctx.beginPath(); ctx.moveTo(cx, top); ctx.lineTo(cx, bot); ctx.stroke();
+  ctx.strokeStyle = "rgba(146,176,202,.16)"; ctx.lineWidth = 9 * u;
+  ctx.beginPath(); ctx.moveTo(cx, top); ctx.lineTo(cx, bot); ctx.stroke();
+  ctx.lineCap = "butt";
+  if (detents) {
+    ctx.strokeStyle = "rgba(172,202,226,.42)"; ctx.lineWidth = 1.3 * u;
+    for (let i = 0; i <= detents; i++) {
+      const dy = top + (bot - top) * (i / detents);
+      ctx.beginPath(); ctx.moveTo(cx + 8 * u, dy); ctx.lineTo(cx + 13 * u, dy); ctx.stroke();
+    }
+  }
+  // the shaft, pivoting out of the bottom of the slot
+  ctx.lineCap = "round";
+  ctx.strokeStyle = "rgba(196,208,220,.95)"; ctx.lineWidth = 5.5 * u;
+  ctx.beginPath(); ctx.moveTo(cx, bot); ctx.lineTo(cx, ky); ctx.stroke();
+  ctx.lineCap = "butt";
+  if (knob === "wheel") {
+    // the undercarriage handle: a round white knob, as it is in every aeroplane
+    ctx.beginPath(); ctx.arc(cx, ky, 13 * u, 0, TAU);
+    ctx.fillStyle = "#edf2f6"; ctx.fill();
+    ctx.strokeStyle = "rgba(26,34,44,.90)"; ctx.lineWidth = 2.2 * u; ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, ky, 6.2 * u, 0, TAU);
+    ctx.strokeStyle = "rgba(70,86,100,.80)"; ctx.lineWidth = 1.7 * u; ctx.stroke();
+  } else {
+    // the flap handle: a wedge, the shape of the surface it moves
+    ctx.beginPath();
+    ctx.moveTo(cx - 14 * u, ky - 6.5 * u); ctx.lineTo(cx + 14 * u, ky - 2.5 * u);
+    ctx.lineTo(cx + 14 * u, ky + 4 * u); ctx.lineTo(cx - 14 * u, ky + 7.5 * u);
+    ctx.closePath();
+    ctx.fillStyle = "#ccd6de"; ctx.fill();
+    ctx.strokeStyle = "rgba(26,34,44,.85)"; ctx.lineWidth = 1.7 * u; ctx.stroke();
+  }
+  plate(label, cx, b.y + 13 * u, 10.5 * u, PANEL_INK);
+  if (sub) plate(sub, cx, b.y + b.h - 8 * u, 9.5 * u, PANEL_DIM, 600);
+}
+
+/* A bat-handle toggle: up is on, down is off, and you can see which from
+   across the cockpit without reading a word of it. */
+function drawToggle(b, on, label, sub, danger) {
+  const u = UI, cx = b.x + b.w / 2;
+  bezel(b.x, b.y, b.w, b.h, 7 * u, on && !danger, danger);
+  const py = b.y + 19 * u;
+  ctx.beginPath(); ctx.arc(cx, py, 9.5 * u, 0, TAU);
+  ctx.fillStyle = "rgba(46,56,68,.95)"; ctx.fill();
+  ctx.strokeStyle = "rgba(156,178,198,.55)"; ctx.lineWidth = 1.3 * u; ctx.stroke();
+  const tip = py + (on ? -11 : 11) * u;
+  ctx.lineCap = "round";
+  ctx.strokeStyle = on ? "#e4eef7" : "#9dabb9"; ctx.lineWidth = 6.5 * u;
+  ctx.beginPath(); ctx.moveTo(cx, py); ctx.lineTo(cx, tip); ctx.stroke();
+  ctx.lineCap = "butt";
+  ctx.beginPath(); ctx.arc(cx, tip, 5.2 * u, 0, TAU);
+  ctx.fillStyle = on ? "#f4f9ff" : "#aebbc8"; ctx.fill();
+  ctx.strokeStyle = "rgba(26,34,44,.7)"; ctx.lineWidth = 1.2 * u; ctx.stroke();
+  if (on) {
+    ctx.beginPath(); ctx.arc(b.x + b.w - 11 * u, b.y + 10 * u, 3.6 * u, 0, TAU);
+    ctx.fillStyle = "rgba(126,240,160,.95)"; ctx.fill();
+  }
+  plate(label, cx, b.y + b.h - 18 * u, 10.5 * u, on ? PANEL_INK : PANEL_DIM);
+  if (sub) plate(sub, cx, b.y + b.h - 6.5 * u, 9 * u, danger ? "rgba(255,168,148,.92)" : PANEL_DIM, 600);
+}
+
+/* A lit annunciator pushbutton: a square cap in a bezel that glows when its
+   system is doing something. */
+function drawPush(b, on, label, sub) {
+  const u = UI, cx = b.x + b.w / 2;
+  bezel(b.x, b.y, b.w, b.h, 5 * u, on);
+  const ix = b.x + 4 * u, iy = b.y + 4 * u, iw = b.w - 8 * u, ih = b.h - 8 * u;
+  const g = ctx.createLinearGradient(0, iy, 0, iy + ih);
+  g.addColorStop(0, on ? "rgba(130,226,255,.34)" : "rgba(126,148,170,.13)");
+  g.addColorStop(1, on ? "rgba(70,170,214,.20)" : "rgba(70,86,102,.07)");
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(ix + 3 * u, iy); ctx.arcTo(ix + iw, iy, ix + iw, iy + ih, 3 * u);
+  ctx.arcTo(ix + iw, iy + ih, ix, iy + ih, 3 * u); ctx.arcTo(ix, iy + ih, ix, iy, 3 * u);
+  ctx.arcTo(ix, iy, ix + iw, iy, 3 * u); ctx.closePath(); ctx.fill();
+  plate(label, cx, b.y + b.h / 2 - (sub ? 6 * u : 0), 10.5 * u, on ? "#eafaff" : PANEL_INK);
+  if (sub) plate(sub, cx, b.y + b.h / 2 + 9 * u, 8.5 * u, PANEL_DIM, 600);
+}
+
+/* The drag chute: a T-handle, painted the way every pull-to-operate handle in
+   aviation is painted, and it comes out of the panel when you pull it. */
+function drawHandle(b, pulled, label, sub) {
+  const u = UI, cx = b.x + b.w / 2;
+  bezel(b.x, b.y, b.w, b.h, 8 * u, pulled);
+  const botY = b.y + b.h - 22 * u;
+  const barY = b.y + (pulled ? 36 : 60) * u;
+  ctx.beginPath(); ctx.arc(cx, botY, 9 * u, 0, TAU);
+  ctx.fillStyle = "rgba(14,20,27,.9)"; ctx.fill();
+  ctx.strokeStyle = "rgba(140,166,188,.45)"; ctx.lineWidth = 1.3 * u; ctx.stroke();
+  ctx.lineCap = "round";
+  ctx.strokeStyle = "#c6cdd3"; ctx.lineWidth = 6 * u;
+  ctx.beginPath(); ctx.moveTo(cx, botY); ctx.lineTo(cx, barY + 12 * u); ctx.stroke();
+  ctx.lineCap = "butt";
+  const bw2 = 36 * u, bh2 = 14 * u, bx2 = cx - bw2 / 2;
+  ctx.save();
+  ctx.beginPath(); ctx.rect(bx2, barY, bw2, bh2); ctx.clip();
+  ctx.fillStyle = "#e7c336"; ctx.fillRect(bx2, barY, bw2, bh2);
+  ctx.strokeStyle = "rgba(18,18,20,.92)"; ctx.lineWidth = 4.2 * u;
+  for (let i = -2; i < 9; i++) {
+    ctx.beginPath();
+    ctx.moveTo(bx2 + i * 9 * u, barY + bh2); ctx.lineTo(bx2 + i * 9 * u + bh2, barY);
+    ctx.stroke();
+  }
+  ctx.restore();
+  ctx.strokeStyle = "rgba(22,24,26,.9)"; ctx.lineWidth = 1.5 * u;
+  ctx.strokeRect(bx2, barY, bw2, bh2);
+  plate(label, cx, b.y + 13 * u, 10.5 * u, PANEL_INK);
+  if (sub) plate(sub, cx, b.y + b.h - 8 * u, 9.5 * u, pulled ? "rgba(255,206,120,.92)" : PANEL_DIM, 600);
+}
+
+/* The wheel brakes: a wide ribbed pad, because it is held rather than set. */
+function drawPadWide(b, on, label, sub) {
+  const u = UI;
+  bezel(b.x, b.y, b.w, b.h, 8 * u, on);
+  ctx.strokeStyle = on ? "rgba(180,236,255,.34)" : "rgba(150,180,206,.16)";
+  ctx.lineWidth = 2 * u;
+  for (let i = 1; i < 7; i++) {
+    const rx = b.x + b.w * (i / 7);
+    ctx.beginPath(); ctx.moveTo(rx, b.y + 8 * u); ctx.lineTo(rx, b.y + b.h - 8 * u); ctx.stroke();
+  }
+  plate(label, b.x + b.w / 2, b.y + b.h / 2 - 6 * u, 11.5 * u, on ? "#eafaff" : PANEL_INK);
+  if (sub) plate(sub, b.x + b.w / 2, b.y + b.h / 2 + 9 * u, 9 * u, PANEL_DIM, 600);
+}
+
 function padBox(x, y, w, h, r, on, label, sub) {
   ctx.beginPath();
   ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
@@ -7051,25 +7266,39 @@ function drawPanel(P, u) {
   ctx.fillText(Math.round(P.thr * 100) + "", t.x + t.w / 2, t.y + t.h - 3 * u - fh - 12 * u);
   hudFont(10 * u); ctx.fillStyle = SPD.on && SPD.auto ? "rgba(126,232,154,.85)" : "rgba(190,214,232,.7)";
   ctx.fillText(SPD.on && SPD.auto ? "SPD" : "THR", t.x + t.w / 2, t.y - 11 * u);
-  // switches
+  // the panel: each control drawn as the thing it is
   for (const b of T.btns) {
-    let on = false, label = "", sub = "";
-    if (b.k === "gear") { on = P.gearCmd > .5; label = "GEAR"; sub = (P.gear > .98 ? "DOWN" : P.gear < .02 ? "UP" : "…") + "  G"; }
-    else if (b.k === "flap") { on = P.flapCmd > .02; label = "FLAP \u2193"; sub = Math.round(P.flapCmd * 100) + "%  F"; }
-    else if (b.k === "brake") { on = P.brake > .4; label = "BRAKE"; sub = "SPACE"; }
-    else if (b.k === "cam") { label = "VIEW"; sub = CAMNAMES[camMode] + "  C"; }
-    else if (b.k === "ap") { on = AP.on; label = "A/P"; sub = (AP.on ? "ON" : "OFF") + "  Z"; }
-    else if (b.k === "keys") { on = SHOWKEYS; label = "KEYS"; sub = "L"; }
-    else if (b.k === "map") { on = NAV.map; label = "MAP"; sub = (navTarget() ? navTarget().name.toUpperCase().slice(0, 5) : "SYS") + "  N"; }
-    else if (b.k === "spd") { on = SPD.on; label = "HOLD"; sub = (SPD.on ? navSpeed(SPD.tgt) : "OFF") + "  O"; }
-    else if (b.k === "chute") { on = P.chuteCmd > .5; label = "CHUTE"; sub = "X"; }
-    else if (b.k === "flapup") { label = "FLAP \u2191"; sub = "V"; }
-    else if (b.k === "reset") {
-      on = RESET_ARM > 0 || GAME.over || P.crashed;
-      label = "RESET"; sub = RESET_ARM > 0 ? "SURE?" : (GAME.over || P.crashed ? "\u25b8 AGAIN" : "R");
+    const fl = T.flash[b.k] > 0;
+    if (b.k === "gear") {
+      // the lever is DOWN when the wheels are down, and it travels as they do
+      drawLever(b, .12 + P.gear * .88, "GEAR",
+        (P.gear > .98 ? "DOWN" : P.gear < .02 ? "UP" : "MOVING") + "  G",
+        "wheel", 0, P.gearCmd > .5 || fl);
+    } else if (b.k === "flap") {
+      drawLever(b, P.flapCmd, "FLAPS", Math.round(P.flapCmd * 100) + "%   F / V",
+        "wedge", 4, P.flapCmd > .02 || fl);
+    } else if (b.k === "chute") {
+      drawHandle(b, P.chuteCmd > .5, "CHUTE", P.chuteCmd > .5 ? "STREAMED" : "PULL  X");
+    } else if (b.k === "brake") {
+      drawPadWide(b, P.brake > .4 || fl, "BRAKES", P.park ? "PARK  B" : "HOLD  SPACE");
+    } else if (b.k === "ap") {
+      drawToggle(b, AP.on, "A / P", (AP.on ? "ENGAGED" : "OFF") + "  Z");
+    } else if (b.k === "spd") {
+      drawToggle(b, SPD.on, "HOLD", (SPD.on ? navSpeed(SPD.tgt) : "OFF") + "  O");
+    } else if (b.k === "safe") {
+      // off is the dangerous position, so off is the one that looks it
+      drawToggle(b, NOCRASH, "SAFE", (NOCRASH ? "ARMED" : "DAMAGE") + "  K", !NOCRASH);
+    } else if (b.k === "map") {
+      drawPush(b, NAV.map || fl, "MAP", (navTarget() ? navTarget().name.toUpperCase().slice(0, 5) : "SYS") + " N");
+    } else if (b.k === "cam") {
+      drawPush(b, fl, "VIEW", CAMSHORT[camMode] + " C");
+    } else if (b.k === "keys") {
+      drawPush(b, SHOWKEYS || fl, "KEYS", "L");
+    } else if (b.k === "reset") {
+      const armed = RESET_ARM > 0 || GAME.over || P.crashed;
+      drawPush(b, armed || fl, "RESET",
+        RESET_ARM > 0 ? "SURE?" : (GAME.over || P.crashed ? "AGAIN" : "R"));
     }
-    else if (b.k === "safe") { on = NOCRASH; label = "SAFE"; sub = (NOCRASH ? "ON" : "OFF") + "  K"; }
-    padBox(b.x, b.y, b.w, b.h, 9 * u, on || T.flash[b.k] > 0, label, sub);
   }
   if (TOUCH.on) for (const b of T.rud.boxes)
     padBox(b.x, b.y, b.w, b.h, 9 * u, T.rud.v === (b.k === "rudR" ? 1 : -1), b.k === "rudR" ? "RUD ▶" : "◀ RUD");
@@ -7754,11 +7983,11 @@ const KEYCARD = [
   ["Speed hold", "O", "HOLD button"],
   ["Nav target", "J   cycles Moon / planets / Sun", "tap a world on the map"],
   ["Solar system map", "N", "MAP button"],
-  ["Wheel brakes", "Space (hold)", "BRAKE (hold)"],
+  ["Wheel brakes", "Space (hold)", "the BRAKES pad, held"],
   ["Parking brake", "B", "\u2014"],
-  ["Drag chute", "X", "CHUTE button"],
-  ["Landing gear", "G", "GEAR button"],
-  ["Flaps", "F down / V up", "FLAP \u2193 / FLAP \u2191"],
+  ["Drag chute", "X", "pull the striped T-handle"],
+  ["Landing gear", "G", "the gear lever"],
+  ["Flaps", "F down / V up", "the flap lever: tap above or below the knob"],
   ["Elevator trim", ",  .", "\u2014"],
   ["Camera", "C", "VIEW button"],
   ["Reset the flight", "R", "RESET button, twice"],
@@ -7850,8 +8079,10 @@ function showTouchHelp() {
     "<b>Left thumb</b> &mdash; put it anywhere on the left of the screen and the stick appears there. " +
     "Left / right rolls; pull the thumb <b>back</b> to raise the nose.<br>" +
     "<b>Right slider</b> &mdash; throttle. Past the orange <b>A/B</b> line the afterburners light.<br>" +
-    "<b>A/P</b> flies it for you &middot; <b>CHUTE</b> stops it on the runway &middot; " +
-    "<b>KEYS</b> lists every control &middot; <b>II</b> pauses.<br>" +
+    "<b>The panel</b> is real hardware: the <b>gear</b> and <b>flap</b> levers move in their slots " +
+    "(tap above or below the knob), the yellow <b>T-handle</b> pulls the chute, the bat switches " +
+    "fly the autopilot, hold the speed and arm safe mode, and the lit buttons are the map, the " +
+    "view, this card and reset.<br>" +
     "Rudder pads sit along the bottom. Turn the phone <b>landscape</b> for the widest view.";
 }
 
