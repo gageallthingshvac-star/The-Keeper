@@ -1563,7 +1563,7 @@ function decalTex(kind) {
 }
 const DECAL = {};
 function decal(kind, scale = 1.15, rough = 0.95) {
-  if (!DECAL[kind]) { DECAL[kind] = new THREE.MeshStandardMaterial({ map: decalTex(kind), transparent: true, depthWrite: false, roughness: rough, metalness: 0, polygonOffset: true, polygonOffsetFactor: -2 }); DECAL[kind].userData.shared = true; }
+  if (!DECAL[kind]) { DECAL[kind] = new THREE.MeshStandardMaterial({ map: decalTex(kind), transparent: true, opacity: kind === 'urban' ? 0.7 : 0.85, depthWrite: false, roughness: rough, metalness: 0, polygonOffset: true, polygonOffsetFactor: -2 }); DECAL[kind].userData.shared = true; }
   const m = new THREE.Mesh(cached('decalG', () => new THREE.CircleGeometry(1, 48).rotateX(-Math.PI / 2)), DECAL[kind]);
   m.scale.setScalar(scale); m.position.y = 0.004; m.receiveShadow = true;
   return m;
@@ -1785,7 +1785,7 @@ cGround.material.onBeforeCompile = sh => {
       float riv = 1.0 - smoothstep(0.0, 0.014, abs(tf(q * 0.18 + 7.0) - 0.5));
       c = mix(c, vec3(0.06, 0.13, 0.17), riv);
       // lakes in the low ground
-      c = mix(c, vec3(0.05, 0.12, 0.16), smoothstep(0.22, 0.2, h));
+      c = mix(c, vec3(0.05, 0.12, 0.16), smoothstep(0.22, 0.2, h) * smoothstep(8.0, 14.0, length(q - vec2(37.3, 11.9))));
       return pow(c, vec3(2.2)) * shade;      // palette is written in display (sRGB) values
     }
   ` + sh.fragmentShader
@@ -1796,7 +1796,7 @@ cGround.material.onBeforeCompile = sh => {
       vec2 euv = vec2((lon + 180.0) / 360.0, (lat + 90.0) / 180.0);
       vec2 qa = wm / 400.0;                                  // real sizes: fields ~150 m, woods ~1 km, towns ~3 km
       float aa = clamp(1.0 - length(fwidth(qa)) * 1.5, 0.0, 1.0);
-      vec3 proc = mix(vec3(0.045, 0.06, 0.03), land(qa), aa);
+      vec3 proc = mix(vec3(0.045, 0.06, 0.03), land(qa + vec2(37.3, 11.9)), aa);
       vec3 sat = texture2D(tDay, euv).rgb * 1.2;
       float wet = texture2D(tWater, euv).r + (tf(wm / 3000.0) - 0.5) * 0.3;
       float sea = smoothstep(0.45, 0.55, wet);
