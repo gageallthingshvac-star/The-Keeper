@@ -1973,8 +1973,11 @@ function botSteer() {
     for (const c of (globe.fill || [])) if (!c.state && c.r <= globe.r) pick(c.n, c.r);
   } else if (cosmos.mode === 'solar') {
     const planetsLeft = solar.bodies.some(b => b.planet && !b.state);
-    for (const b of solar.bodies) if (!b.state && b.r <= solar.r && !(b.sun && planetsLeft)) { const d = Math.hypot(b.ax - solar.hx, b.az - solar.hz); if (d < best) { best = d; wx = b.ax - solar.hx; wz = b.az - solar.hz; } }
-    for (const o of solar.rocks) if (!o.state && o.r <= solar.r && o.r > solar.r * 0.02) { const d = Math.hypot(o.ax - solar.hx, o.az - solar.hz); if (d < best) { best = d; wx = o.ax - solar.hx; wz = o.az - solar.hz; } }
+    let bestV = -1;
+    for (const b of solar.bodies) if (!b.state && b.r <= solar.r && !(b.sun && planetsLeft)) {
+      const d = Math.hypot(b.ax - solar.hx, b.az - solar.hz), v = b.r * b.r / (d + solar.r * 40);
+      if (v > bestV) { bestV = v; best = d; wx = b.ax - solar.hx; wz = b.az - solar.hz; }
+    }
   }
   botStats.frames++;
   const L = Math.hypot(wx, wz);
@@ -2081,7 +2084,7 @@ function renderStage(sc, cam, bloomK) {
 const WORLD = JSON.parse(document.getElementById('worlddata').textContent);
 const CITY_LIST = WORLD.cities;
 const RE = 6371, GR = 1000, KG = 0.3;
-const FILL_N = 4000, FILL_MIN = 8, FILL_MAX = 700, FILL_SKEW = 2.2;
+const FILL_N = 4000, FILL_MIN = 8, FILL_MAX = 400, FILL_SKEW = 2.2, KF = 0.08;
 const gScene = new THREE.Scene();
 gScene.background = new THREE.Color(0x000000);
 const gCam = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.3, 60000);
@@ -2339,7 +2342,7 @@ function globeFrame(dt) {
     for (const c of globe.cities) if (!c.state && Math.acos(Math.min(1, c.n.dot(globe.h))) + c.r / RE <= alpha) eatGlobeThing(c, 'city');
     for (const c of globe.fill) if (!c.state && c.r <= globe.r && Math.acos(Math.min(1, c.n.dot(globe.h))) + c.r / RE <= alpha) {
       c.state = 1; paintEaten(c.lon, c.lat, c.r);
-      globe.targetR = Math.sqrt(globe.targetR * globe.targetR + KG * c.r * c.r);
+      globe.targetR = Math.sqrt(globe.targetR * globe.targetR + KF * c.r * c.r);
       hole.score += Math.round(10 + 100 * (c.r / globe.r) ** 2); hole.eaten++;
       if (c.r > globe.r * 0.35) popText(c.name + ' · ' + fmtLen(Math.log10(c.r * 2000)), 0, 0, false, gCam, GR * 1.002);
     }
