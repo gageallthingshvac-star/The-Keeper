@@ -3407,6 +3407,57 @@ function gToStick(dG, lvl) {
   return uncurve(clamp(dG / range, -1, 1));
 }
 
+/* ---- stability augmentation ----------------------------------------------
+
+   Hands off, the aeroplane stops moving. At any speed, in air or out of it,
+   on the autopilot or flying it yourself.
+
+   This sits ON TOP of the fly-by-wire rather than inside it. The laws below
+   are tuned as an aeroplane and stay exactly as they are; this fills in the
+   one thing they leave behind, which is the slow residue after a disturbance
+   — seven seconds to stop rolling after a good kick, and a degree and a half
+   of bank still there at the end of it.
+
+   It acts on an axis only while that axis' stick is centred, so it can never
+   fight the pilot, and it is bypassed entirely while a transfer burn is
+   flying, which has its own idea about where the nose should be. */
+function sasAugment(P, dt, e, c) {
+  if (P.onGround || P.crashed || (AP.on && AP.mode)) { P.holdQ = null; P.holdBank = undefined; return c; }
+  const freeE = Math.abs(c.e) < .05, freeA = Math.abs(c.a) < .05, freeR = Math.abs(c.r) < .05;
+  if ((P.cont === undefined ? 1 : P.cont) < .02) {
+    /* Vacuum: hold the attitude it was left in, exactly. The error is the
+       rotation from here back to there, read in the BODY frame, and it is fed
+       in as a rate command — one loop, proportional, first order, which is
+       what does not oscillate. Feeding the measured rate back into a rate law
+       does, and that is what the autopilot used to do out here: it settled,
+       then wandered back out to nine degrees a second and sat there. */
+    P.holdBank = undefined;
+    if (!(freeE && freeA && freeR)) { P.holdQ = null; return c; }
+    if (!P.holdQ) P.holdQ = [P.q[0], P.q[1], P.q[2], P.q[3]];
+    const q = P.q, qe = qmul([q[0], -q[1], -q[2], -q[3]], P.holdQ);
+    const sg = qe[0] < 0 ? -2 : 2;
+    /* 1.35 and not more. Pushed to 1.9 it arrives a second sooner and then
+       sits there rotating at two and a half degrees a second for ever: past
+       that gain the outer loop starts racing the inner one. Dead still and
+       slightly slower is the better trade. */
+    const K = 1.35, CAP = .85;
+    const wx = clamp(sg * qe[1] * K, -CAP, CAP);
+    const wy = clamp(sg * qe[2] * K, -CAP, CAP);
+    const wz = clamp(sg * qe[3] * K, -CAP, CAP);
+    return { e: clamp(-wx / FBW.qMax, -1, 1), a: clamp(-wz / FBW.pMax, -1, 1), r: clamp(wy / .45, -1, 1) };
+  }
+  /* In air the pitch loop already holds a g and the yaw loop already damps,
+     so the one thing missing is bank: the roll law holds a RATE, and a rate
+     of zero is not the same as a wing that is level. Capture the bank angle
+     when the stick is let go and hold that. */
+  P.holdQ = null;
+  if (!freeA) { P.holdBank = undefined; return c; }
+  if (P.holdBank === undefined) P.holdBank = e.roll;
+  let be = P.holdBank - e.roll;
+  if (be > Math.PI) be -= TAU; else if (be < -Math.PI) be += TAU;
+  return { e: c.e, a: clamp(be * 1.45, -.55, .55), r: c.r };
+}
+
 function flightControl(P, dt, e, cE, cA, cR) {
   const W = SPECS.mass * 9.81;
   const qbar = P.qbar || 0;
@@ -3752,35 +3803,63 @@ function pointAt(P, aim, dt) {
   return { e: cE, a: cA, r: cR };
 }
 
+/* The autopilot has the aeroplane. All of it, except the speed.
+
+   It used to hand the aeroplane back the moment the stick moved, which meant
+   it was not really an autopilot at all — it was a thing that flew until you
+   wanted it to. Now the stick STEERS IT: roll asks for a turn and it holds
+   the new heading, pitch asks for a climb and it holds the new altitude, and
+   at no point in any of that does anything but the autopilot have the
+   controls. Out of the air the same input walks the attitude it is holding.
+   The throttle, and only the throttle, stays yours. */
 function autopilot(P, dt, e) {
   const hands = Math.abs(P.inA) > .04 || Math.abs(P.inE) > .04;
   const lvl = levelG(e, P.gRatio);
   P.trim = 0;
   if (P.onGround) { P.apAlt = undefined; P.apHdg = undefined; AP.mode = ""; return { e: P.inE * .55, a: P.inA, r: P.inR }; }
+  const vac = (P.rho !== undefined ? P.rho : 1) < 2e-5;
 
   /* Out of the air, with somewhere to go and hands off the stick, the
      autopilot flies the transfer instead of holding an altitude that no
-     longer means anything. */
-  if ((P.rho !== undefined ? P.rho : 0) < 2e-5 && !hands && navTarget()) {
+     longer means anything. A hand on the stick pauses the transfer rather
+     than cancelling it: let go and it picks the burn up again. */
+  if (vac && !hands && navTarget()) {
     const g = transferAP(P, dt);
     if (g) return pointAt(P, g.aim, dt);
   }
   AP.mode = ""; AP.accel = 0;
 
   let bankTgt, dG;
-  if (hands) {
-    P.apAlt = undefined; P.apHdg = undefined;
-    bankTgt = P.inA * 62 * DEG;
-    const pitchTgt = P.inE * 28 * DEG;
-    dG = clamp((pitchTgt - e.pitch) * 3.2, -2.0, 4.0);
-  } else if ((P.rho !== undefined ? P.rho : 1) < 2e-5) {
-    /* Hands off, out of the air, with nowhere to go: hold the attitude you
-       are in rather than an "altitude" and a "heading", neither of which
-       means anything in orbit. The altitude hold used to run here and fought
-       gravity with elevons that were moving nothing. */
+  if (vac) {
+    /* Out of the air there is no altitude and no heading worth holding, so it
+       holds the ATTITUDE — and the stick walks that attitude around instead
+       of touching the thrusters directly. The hold itself is done by the
+       stability augmentation below, which is the same one manual flight
+       uses, so both are steady to the same standard. */
     P.apAlt = undefined; P.apHdg = undefined; AP.mode = "";
-    return { e: clamp(P.w.x * 2.2, -1, 1), a: clamp(P.w.z * 2.6, -1, 1), r: clamp(-P.w.y * 2.2, -1, 1) };
+    if (hands || Math.abs(P.inR) > .04) {
+      P.holdQ = null;
+      return { e: P.inE * .55, a: P.inA * .7, r: P.inR * .7 };
+    }
+    return { e: 0, a: 0, r: 0 };
   } else {
+    /* In air the stick asks for a BANK and a rate of climb, and the autopilot
+       delivers them through its own loops — it never puts the stick back on
+       the surfaces. Let go and it captures whatever heading and altitude that
+       left you at and holds them.
+
+       Walking a heading target around instead was the obvious thing and it
+       was wrong: a target moving at twenty degrees a second in front of an
+       aeroplane that can turn at three-quarters of one just runs away, and
+       six seconds of full stick bought four degrees of heading. */
+    if (hands) {
+      P.apHdg = undefined; P.apAlt = undefined;
+      bankTgt = P.inA * 60 * DEG;
+      const vsCmd = P.inE * 60;
+      dG = clamp((vsCmd - P.vel.y) * .055, -1.7, 3.4);
+      const cA0 = clamp((bankTgt - e.roll) * 1.15, -.85, .85);
+      return { e: gToStick(dG, lvl), a: cA0, r: 0 };
+    }
     if (P.apHdg === undefined) P.apHdg = e.hdg;
     if (P.apAlt === undefined) P.apAlt = P.pos.y;
     let he = P.apHdg - e.hdg;
@@ -3800,7 +3879,8 @@ function physics(P, dt) {
   // --- control law ---------------------------------------------------------
   let cE = P.inE, cA = P.inA, cR = P.inR;
   if (AP.on) { const c = autopilot(P, dt, e); cE = c.e; cA = c.a; cR = c.r; }
-  flightControl(P, dt, e, cE, cA, cR);
+  const sc = sasAugment(P, dt, e, { e: cE, a: cA, r: cR });
+  flightControl(P, dt, e, sc.e, sc.a, sc.r);
   // Flaps blow back above their placard speed, and the chute is torn away if
   // you stream it too fast.
   const kias = P.ias * 1.94384;
@@ -3828,13 +3908,22 @@ function physics(P, dt) {
      autopilot, gated on exactly that, started dropping out on alternate
      frames and let the speed hold brake against it. */
   P.rho = rho;
+  /* And the same continuum test the forces use, computed once here because
+     INDICATED airspeed needs it too. A pitot tube measures the air stopping
+     against it, and in free-molecular flow there is nothing to stop: at a
+     thousand times the speed of light the 1e-14 kg/m^3 of deep space still
+     came out at ninety thousand metres a second indicated, which told the
+     fly-by-wire it was deep in the atmosphere. It then flew the load-factor
+     law — with no aerodynamic surfaces working — saturated the pitch
+     thrusters against a g it could never make, and tumbled the aeroplane. */
+  P.cont = clamp((rho - 1e-8) / 9e-8, 0, 1);
   const wind = WIND.at(P.pos, P);
   const va = vsub(P.vel, wind);
   const vb = mRotT(m, va);
   const V = vlen(vb);
   P.tas = V;
   P.mach = V / air.a;
-  P.ias = V * Math.sqrt(rho / 1.225);
+  P.ias = V * Math.sqrt(Math.max(rho * P.cont, 0) / 1.225);
   // Afterburner lives in the top fifth of the throttle and is what the gate
   // between "fast aeroplane" and "Mach 3" actually is.
   P.ab = clamp((thrCmd - AB_GATE) / (1 - AB_GATE), 0, 1);
@@ -3925,8 +4014,7 @@ function physics(P, dt) {
        Mach meter in empty space. Below about a hundred and thirty kilometres
        of equivalent density there is simply no fluid, and the number is
        exactly zero. */
-    const cont = clamp((rho - 1e-8) / 9e-8, 0, 1);
-    const qbar = .5 * rho * V * V * cont, qS = qbar * SPECS.S;
+    const qbar = .5 * rho * V * V * P.cont, qS = qbar * SPECS.S;
     P.qbar = qbar;
     const M8 = P.mach;
     // A slender delta does not stall the way a straight wing does: the leading
@@ -6874,48 +6962,85 @@ function layoutTouch() {
      Merging the two flap buttons into one lever also buys back a row, which
      is the difference between a panel that fits an iPhone in landscape and
      one that runs off the bottom of it. */
-  const tw = 54 * u, cw = 62 * u, gp = 9 * u;
-  const BW = cw * 3 + gp * 2;
+  /* Both consoles, and nothing across the middle.
+
+     Everything used to be stacked in one block on the right, which on a phone
+     in portrait put the switches exactly where the aeroplane is drawn. Real
+     cockpits do not do that for the same reason: the levers live on one
+     console and the systems on the other, and the view out of the front is
+     what is left. So the moving hardware — gear, flaps, chute — goes left,
+     the systems and the brakes go right, and the centre of the glass belongs
+     to the aeroplane. */
+  const tw = 54 * u, gp = 9 * u;
   const hLev = 124 * u, hPush = 46 * u, hTog = 62 * u, hPad = 46 * u;
-  let th, bx, bBot;
+  let th, LX, LB, RX, RB, cwL, cwR, stack;
   if (PORTRAIT) {
-    // narrow screen: throttle low on the right, the panel stacked above it
+    /* Portrait has no width to spare, so the left console is a single column
+       of three and the right one is two narrow ones. That leaves a clear
+       channel a third of the screen wide straight down the middle. */
     th = Math.min(H * .30, 300 * u);
     T.thr.x = W - sr - tw - 16 * u;
     T.thr.y = H - sb - th - 16 * u;
-    bx = Math.max(sl + 8 * u, T.thr.x + tw - BW);
-    bBot = T.thr.y - 14 * u;
+    cwL = 62 * u; cwR = 52 * u; stack = 1;
+    LX = sl + 12 * u;
+    RX = T.thr.x - 12 * u - (cwR * 2 + gp);
+    LB = RB = T.thr.y - 14 * u;
   } else {
     th = Math.min(H * .54, 330 * u);
     T.thr.x = W - sr - tw - 16 * u;
     T.thr.y = H - sb - th - 16 * u;
-    bx = T.thr.x - 14 * u - BW;
-    bBot = H - sb - 16 * u;
+    cwL = 62 * u; cwR = 62 * u; stack = 0;
+    LX = sl + 14 * u;
+    RX = T.thr.x - 14 * u - (cwR * 3 + gp * 2);
+    RB = H - sb - 16 * u;
+    // the left console sits under the instruments on a phone, where the thumb
+    // stick owns the bottom corner, and in the bottom corner on a desktop
+    LB = TOUCH.on ? SAFE.t * DPR + 116 * u + hLev : H - sb - 16 * u;
   }
   T.thr.w = tw; T.thr.h = th;
-  const yPad = bBot - hPad;
-  const yTog = yPad - gp - hTog;
-  const yPush = yTog - gp - hPush;
-  const yLev = yPush - gp - hLev;
-  const pw = (BW - gp * 3) / 4;
-  T.btns = [
-    // the levers and the handle, where a hand would find them
-    { k: "gear", kind: "lever", x: bx, y: yLev, w: cw, h: hLev },
-    { k: "flap", kind: "lever", x: bx + cw + gp, y: yLev, w: cw, h: hLev },
-    { k: "chute", kind: "handle", x: bx + (cw + gp) * 2, y: yLev, w: cw, h: hLev },
-    // lit pushbuttons
-    { k: "map", kind: "push", x: bx, y: yPush, w: pw, h: hPush },
-    { k: "cam", kind: "push", x: bx + (pw + gp), y: yPush, w: pw, h: hPush },
-    { k: "keys", kind: "push", x: bx + (pw + gp) * 2, y: yPush, w: pw, h: hPush },
-    { k: "reset", kind: "push", x: bx + (pw + gp) * 3, y: yPush, w: pw, h: hPush },
-    // toggle switches
-    { k: "ap", kind: "toggle", x: bx, y: yTog, w: cw, h: hTog },
-    { k: "spd", kind: "toggle", x: bx + cw + gp, y: yTog, w: cw, h: hTog },
-    { k: "safe", kind: "toggle", x: bx + (cw + gp) * 2, y: yTog, w: cw, h: hTog },
-    // and the brakes, wide, along the bottom where a thumb lands
-    { k: "brake", kind: "pad", x: bx, y: yPad, w: BW, h: hPad, hold: 1 }
-  ];
-  const rw = 82 * u, rh = 54 * u, ry = H - sb - 16 * u - rh;
+  const BR = stack ? cwR * 2 + gp : cwR * 3 + gp * 2;
+  T.btns = [];
+  // ---- left console: the things that move ----
+  if (stack) {
+    T.btns.push(
+      { k: "gear", kind: "lever", x: LX, y: LB - hLev * 3 - gp * 2, w: cwL, h: hLev },
+      { k: "flap", kind: "lever", x: LX, y: LB - hLev * 2 - gp, w: cwL, h: hLev },
+      { k: "chute", kind: "handle", x: LX, y: LB - hLev, w: cwL, h: hLev });
+  } else {
+    T.btns.push(
+      { k: "gear", kind: "lever", x: LX, y: LB - hLev, w: cwL, h: hLev },
+      { k: "flap", kind: "lever", x: LX + cwL + gp, y: LB - hLev, w: cwL, h: hLev },
+      { k: "chute", kind: "handle", x: LX + (cwL + gp) * 2, y: LB - hLev, w: cwL, h: hLev });
+  }
+  // ---- right console: the systems, and the brakes under them ----
+  const yPad = RB - hPad;
+  if (stack) {
+    const ySafe = yPad - gp - hTog, yTog = ySafe - gp - hTog;
+    const yP2 = yTog - gp - hPush, yP1 = yP2 - gp - hPush;
+    T.btns.push(
+      { k: "map", kind: "push", x: RX, y: yP1, w: cwR, h: hPush },
+      { k: "cam", kind: "push", x: RX + cwR + gp, y: yP1, w: cwR, h: hPush },
+      { k: "keys", kind: "push", x: RX, y: yP2, w: cwR, h: hPush },
+      { k: "reset", kind: "push", x: RX + cwR + gp, y: yP2, w: cwR, h: hPush },
+      { k: "ap", kind: "toggle", x: RX, y: yTog, w: cwR, h: hTog },
+      { k: "spd", kind: "toggle", x: RX + cwR + gp, y: yTog, w: cwR, h: hTog },
+      { k: "safe", kind: "toggle", x: RX, y: ySafe, w: BR, h: hTog },
+      { k: "brake", kind: "pad", x: RX, y: yPad, w: BR, h: hPad, hold: 1 });
+  } else {
+    const yTog = yPad - gp - hTog, yPush = yTog - gp - hPush;
+    const pw = (BR - gp * 3) / 4;
+    T.btns.push(
+      { k: "map", kind: "push", x: RX, y: yPush, w: pw, h: hPush },
+      { k: "cam", kind: "push", x: RX + (pw + gp), y: yPush, w: pw, h: hPush },
+      { k: "keys", kind: "push", x: RX + (pw + gp) * 2, y: yPush, w: pw, h: hPush },
+      { k: "reset", kind: "push", x: RX + (pw + gp) * 3, y: yPush, w: pw, h: hPush },
+      { k: "ap", kind: "toggle", x: RX, y: yTog, w: cwR, h: hTog },
+      { k: "spd", kind: "toggle", x: RX + cwR + gp, y: yTog, w: cwR, h: hTog },
+      { k: "safe", kind: "toggle", x: RX + (cwR + gp) * 2, y: yTog, w: cwR, h: hTog },
+      { k: "brake", kind: "pad", x: RX, y: yPad, w: BR, h: hPad, hold: 1 });
+  }
+  const bx = RX;
+  const rw = 76 * u, rh = 54 * u, ry = H - sb - 16 * u - rh;
   const rcx = PORTRAIT ? W * .5 : clamp((T.stick.hx + r + bx) / 2, T.stick.hx + r + rw + 16 * u, bx - rw - 16 * u);
   T.rud.boxes = [
     { k: "rudL", x: rcx - rw - 8 * u, y: ry, w: rw, h: rh },
@@ -7080,8 +7205,16 @@ function bezel(x, y, w, h, r, lit, warn) {
   ctx.strokeStyle = warn ? "rgba(255,132,104,.75)" : lit ? "rgba(150,226,255,.80)" : "rgba(118,146,170,.42)";
   ctx.lineWidth = 1.5 * UI; ctx.stroke();
 }
-function plate(txt, x, y, size, col, weight) {
-  hudFont(size, weight || 700);
+function plate(txt, x, y, size, col, weight, maxW) {
+  /* Engraved legends do not reflow, so they shrink: a narrow console in
+     portrait still has to fit "17,448 mph" under a switch. */
+  let s = size;
+  if (maxW) {
+    hudFont(s, weight || 700);
+    const w = ctx.measureText(txt).width;
+    if (w > maxW) s = Math.max(size * .62, s * maxW / w);
+  }
+  hudFont(s, weight || 700);
   ctx.fillStyle = col; ctx.textAlign = "center"; ctx.textBaseline = "middle";
   ctx.fillText(txt, x, y);
 }
@@ -7127,8 +7260,8 @@ function drawLever(b, t, label, sub, knob, detents, lit) {
     ctx.fillStyle = "#ccd6de"; ctx.fill();
     ctx.strokeStyle = "rgba(26,34,44,.85)"; ctx.lineWidth = 1.7 * u; ctx.stroke();
   }
-  plate(label, cx, b.y + 13 * u, 10.5 * u, PANEL_INK);
-  if (sub) plate(sub, cx, b.y + b.h - 8 * u, 9.5 * u, PANEL_DIM, 600);
+  plate(label, cx, b.y + 13 * u, 10.5 * u, PANEL_INK, 700, b.w - 6 * u);
+  if (sub) plate(sub, cx, b.y + b.h - 8 * u, 9.5 * u, PANEL_DIM, 600, b.w - 5 * u);
 }
 
 /* A bat-handle toggle: up is on, down is off, and you can see which from
@@ -7152,8 +7285,9 @@ function drawToggle(b, on, label, sub, danger) {
     ctx.beginPath(); ctx.arc(b.x + b.w - 11 * u, b.y + 10 * u, 3.6 * u, 0, TAU);
     ctx.fillStyle = "rgba(126,240,160,.95)"; ctx.fill();
   }
-  plate(label, cx, b.y + b.h - 18 * u, 10.5 * u, on ? PANEL_INK : PANEL_DIM);
-  if (sub) plate(sub, cx, b.y + b.h - 6.5 * u, 9 * u, danger ? "rgba(255,168,148,.92)" : PANEL_DIM, 600);
+  plate(label, cx, b.y + b.h - 18 * u, 10.5 * u, on ? PANEL_INK : PANEL_DIM, 700, b.w - 6 * u);
+  if (sub) plate(sub, cx, b.y + b.h - 6.5 * u, 9 * u,
+    danger ? "rgba(255,168,148,.92)" : PANEL_DIM, 600, b.w - 5 * u);
 }
 
 /* A lit annunciator pushbutton: a square cap in a bezel that glows when its
@@ -7170,8 +7304,8 @@ function drawPush(b, on, label, sub) {
   ctx.moveTo(ix + 3 * u, iy); ctx.arcTo(ix + iw, iy, ix + iw, iy + ih, 3 * u);
   ctx.arcTo(ix + iw, iy + ih, ix, iy + ih, 3 * u); ctx.arcTo(ix, iy + ih, ix, iy, 3 * u);
   ctx.arcTo(ix, iy, ix + iw, iy, 3 * u); ctx.closePath(); ctx.fill();
-  plate(label, cx, b.y + b.h / 2 - (sub ? 6 * u : 0), 10.5 * u, on ? "#eafaff" : PANEL_INK);
-  if (sub) plate(sub, cx, b.y + b.h / 2 + 9 * u, 8.5 * u, PANEL_DIM, 600);
+  plate(label, cx, b.y + b.h / 2 - (sub ? 6 * u : 0), 10.5 * u, on ? "#eafaff" : PANEL_INK, 700, b.w - 6 * u);
+  if (sub) plate(sub, cx, b.y + b.h / 2 + 9 * u, 8.5 * u, PANEL_DIM, 600, b.w - 5 * u);
 }
 
 /* The drag chute: a T-handle, painted the way every pull-to-operate handle in
@@ -7201,8 +7335,9 @@ function drawHandle(b, pulled, label, sub) {
   ctx.restore();
   ctx.strokeStyle = "rgba(22,24,26,.9)"; ctx.lineWidth = 1.5 * u;
   ctx.strokeRect(bx2, barY, bw2, bh2);
-  plate(label, cx, b.y + 13 * u, 10.5 * u, PANEL_INK);
-  if (sub) plate(sub, cx, b.y + b.h - 8 * u, 9.5 * u, pulled ? "rgba(255,206,120,.92)" : PANEL_DIM, 600);
+  plate(label, cx, b.y + 13 * u, 10.5 * u, PANEL_INK, 700, b.w - 6 * u);
+  if (sub) plate(sub, cx, b.y + b.h - 8 * u, 9.5 * u,
+    pulled ? "rgba(255,206,120,.92)" : PANEL_DIM, 600, b.w - 5 * u);
 }
 
 /* The wheel brakes: a wide ribbed pad, because it is held rather than set. */
@@ -8013,7 +8148,8 @@ const KEYCARD = [
   ["Afterburner", "throttle past 80%", "slider past the A/B line"],
   ["Speed select", "in vacuum the throttle sets SPEED", "same slider, marked SPD"],
   ["Speed range", "22 mph at the bottom to 3,300 \u00d7 c at the top", "the whole slider"],
-  ["Autopilot", "Z   flies the transfer", "A/P button, or FLY IT"],
+  ["Autopilot", "Z   it flies, you steer", "A/P switch, or FLY IT"],
+  ["Under the A/P", "the stick asks for bank and climb; let go and it holds", "same"],
   ["Speed hold", "O", "HOLD button"],
   ["Nav target", "J   cycles Moon / planets / Sun", "tap a world on the map"],
   ["Solar system map", "N", "MAP button"],
@@ -8079,7 +8215,7 @@ const KEYMAP = {
     ["A D", "rudder &mdash; commands sideslip, damped"],
     ["W S", "throttle up / down (also Shift / Ctrl)"],
     ["Drag slider", "throttle, past 80% lights the afterburners"],
-    ["Z", "autopilot on / off"],
+    ["Z", "autopilot &mdash; it has the aeroplane, the stick steers it, the throttle stays yours"],
     ["O", "speed hold &mdash; throttle then sets the speed"],
     ["J", "cycle nav target &mdash; Moon, planets, Sun"],
     ["N", "solar system map"],
@@ -8242,7 +8378,8 @@ function toggleAP() {
   const P = PLANE;
   P.pitchI = 0; P.fbwI = 0; P.apAlt = undefined; P.apHdg = undefined; P.holdHdg = undefined;
   if (!AP.on) { P.dE = P.dA = P.dR = 0; }
-  toast(AP.on ? "AUTOPILOT ENGAGED" : "AUTOPILOT OFF \u00b7 MANUAL", 1.8);
+  toast(AP.on ? "AUTOPILOT HAS IT \u00b7 STICK STEERS \u00b7 SPEED IS YOURS"
+              : "AUTOPILOT OFF \u00b7 MANUAL", 2.4);
   audio.beep(AP.on ? 760 : 420, .16, .14);
 }
 let SHOWKEYS = false;
