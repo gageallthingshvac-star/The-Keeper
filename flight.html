@@ -3251,7 +3251,15 @@ function cycleNav(d) {
    SELECTOR, logarithmic, ten metres a second at the bottom of its travel and
    twenty thousand kilometres a second at the top. Nothing else in the
    aeroplane can ask for a speed. */
-const SPD_LO = 10, SPD_SPAN = 2e7;         // top of travel = 10 * span = 200,000 km/s
+/* Eleven decades of it. The bottom of the lever is a walking pace and the
+   top is a thousand times the speed of light, which is what the solar system
+   actually asks for: at the old ceiling of two hundred thousand kilometres a
+   second Neptune was six hours away, and six hours is not a journey, it is a
+   shift. At the new one it is four seconds. Logarithmic the whole way, so a
+   per cent of lever is a fixed RATIO wherever you are on it. */
+const C_LIGHT = 299792458;
+const SPD_LO = 10, SPD_SPAN = 1e11;        // top of travel = 10 * span = 1e12 m/s
+const SPD_TOP = SPD_LO * SPD_SPAN;
 const spdOfLever = t => SPD_LO * Math.pow(SPD_SPAN, clamp(t, 0, 1));
 const leverOfSpd = v => clamp(Math.log(Math.max(v, SPD_LO) / SPD_LO) / Math.log(SPD_SPAN), 0, 1);
 function toggleSpeedHold() {
@@ -3609,7 +3617,11 @@ function transferAP(P, dt) {
   const togo = Math.max(range - park, 0);
   const V = vlen(P.vel);
   const close = P.vel.x * lx + P.vel.y * ly + P.vel.z * lz;
-  const aMax = 800000 * .55;                               // headroom for gravity
+  /* Sized to the job rather than to a constant: enough to change the whole
+     speed inside a second, so the profile below is always achievable. A fixed
+     ceiling is what made a long transfer a fixed and enormous number of
+     seconds no matter how much thrust the thing had. */
+  const aMax = Math.max(800000 * .55, V * .85, (togo / 26) * .85);
 
   /* Steer the VELOCITY VECTOR, not the nose.
 
@@ -3645,7 +3657,13 @@ function transferAP(P, dt) {
      faster than the thrusters can follow it, and the aeroplane goes past on a
      hyperbola. Twenty thousand kilometres a second is quick enough to put the
      Moon three minutes away and slow enough that the geometry stays still. */
-  const VMAX = 2.0e8;
+  /* The cap is now the lever's own ceiling rather than a speed chosen to
+     keep the geometry still, because togo/TURN already keeps the geometry
+     still: the profile speed is proportional to the range left, so the line
+     of sight sweeps at the same rate the whole way in however fast you
+     started. What the old fixed cap actually did was make a Neptune transfer
+     six hours long. */
+  const VMAX = SPD_TOP;
   const vProf = Math.min(togo / TURN + 150, VMAX);
   const wx = lx * vProf - P.vel.x, wy = ly * vProf - P.vel.y, wz = lz * vProf - P.vel.z;
   const wl = Math.hypot(wx, wy, wz) || 1;
@@ -3684,7 +3702,7 @@ function transferAP(P, dt) {
     AP.ramp = 0;
     AP.accel = clamp(wl * .9, 0, Math.max(V / 2.5, 3000));
   } else {
-    AP.ramp = Math.min((AP.ramp || 0) + dt * 40000, aMax);
+    AP.ramp = Math.min((AP.ramp || 0) + dt * aMax * .35, aMax);
     AP.accel = clamp(Math.min(wl * .9, AP.ramp), 0, aMax);
   }
   AP.mode = mode; AP.togo = range; AP.close = close;
@@ -3738,7 +3756,7 @@ function autopilot(P, dt, e) {
   /* Out of the air, with somewhere to go and hands off the stick, the
      autopilot flies the transfer instead of holding an altitude that no
      longer means anything. */
-  if ((P.qbar || 0) < 60 && !hands && navTarget()) {
+  if ((P.rho !== undefined ? P.rho : 0) < 2e-5 && !hands && navTarget()) {
     const g = transferAP(P, dt);
     if (g) return pointAt(P, g.aim, dt);
   }
@@ -3750,7 +3768,7 @@ function autopilot(P, dt, e) {
     bankTgt = P.inA * 62 * DEG;
     const pitchTgt = P.inE * 28 * DEG;
     dG = clamp((pitchTgt - e.pitch) * 3.2, -2.0, 4.0);
-  } else if ((P.qbar || 0) < 60) {
+  } else if ((P.rho !== undefined ? P.rho : 1) < 2e-5) {
     /* Hands off, out of the air, with nowhere to go: hold the attitude you
        are in rather than an "altitude" and a "heading", neither of which
        means anything in orbit. The altitude hold used to run here and fought
@@ -3797,6 +3815,14 @@ function physics(P, dt) {
   P.rpm = approach(P.rpm, .035 + thrCmd * .965, 1.5, dt);
   const air = isa(P.pos.y);
   const rho = air.rho;
+  /* Kept on the aeroplane, because "am I in the air?" is a question about
+     DENSITY and several places were asking it about dynamic pressure. Half rho
+     v-squared at a tenth of the speed of light is sixty pascals even in the
+     1e-14 of deep space, so every one of those tests flipped back to "in the
+     atmosphere" the moment the speed got interesting — and the transfer
+     autopilot, gated on exactly that, started dropping out on alternate
+     frames and let the speed hold brake against it. */
+  P.rho = rho;
   const wind = WIND.at(P.pos, P);
   const va = vsub(P.vel, wind);
   const vb = mRotT(m, va);
@@ -3877,7 +3903,25 @@ function physics(P, dt) {
     const slow = clamp((V - 3) / 6, 0, 1);   // the angles are meaningless at a standstill
     P.alpha = clamp(Math.atan2(-vd.y, vd.z), -1.4, 1.4) * slow;
     P.beta = Math.asin(clamp(vd.x, -1, 1)) * slow;
-    const qbar = .5 * rho * V * V, qS = qbar * SPECS.S;
+    /* Continuum flow is an ASSUMPTION, and it fails where the air stops being
+       a fluid and starts being occasional molecules. The heating already fades
+       out on exactly this ground and with exactly this factor; the forces have
+       to as well, and until now they did not. Half rho v-squared at a thousand
+       times the speed of light is five gigapascals even in the 1e-14 kg/m^3 of
+       deep space — five million g of "drag" in a hard vacuum, an aeroplane
+       that will not answer its thrusters because the panel thinks it is at sea
+       level, and a transfer autopilot that flies straight past Mars because it
+       is gated on the same number. Fading it with density fixes all of them at
+       once, and changes nothing anywhere you could actually fly. */
+    /* A hard zero at the bottom, not an asymptote. A fade that merely gets
+       small loses to the cube of the speed: at a thousand times light, one
+       ten-millionth of an atmosphere still works out at five hundred pascals,
+       which is enough to light the re-entry effect and put ten digits on the
+       Mach meter in empty space. Below about a hundred and thirty kilometres
+       of equivalent density there is simply no fluid, and the number is
+       exactly zero. */
+    const cont = clamp((rho - 1e-8) / 9e-8, 0, 1);
+    const qbar = .5 * rho * V * V * cont, qS = qbar * SPECS.S;
     P.qbar = qbar;
     const M8 = P.mach;
     // A slender delta does not stall the way a straight wing does: the leading
@@ -3975,7 +4019,7 @@ function physics(P, dt) {
         align = clamp((fwdx * gAim.x + fwdy * gAim.y + fwdz * gAim.z - .55) / .40, 0, 1);
       }
       fb.z += SPECS.mass * AP.accel * align - (thrust - D);
-    } else if (SPD.on && !P.crashed) {
+    } else if (SPD.on && !P.crashed && !(AP.on && AP.mode)) {
       /* Whatever it takes to sit on the number, either way — including
          thrusting backwards to slow down.
 
@@ -4002,15 +4046,30 @@ function physics(P, dt) {
          seconds, from any speed, because waiting out a deceleration is not
          flying and because it is what makes arriving somewhere possible: the
          distance needed to stop collapses from megametres to almost nothing. */
-      const aMax = thinAir ? 800000 : 400;
+      /* The acceleration ceiling used to be a flat eight hundred thousand
+         metres a second squared. Eighty thousand g sounds like plenty until
+         you ask it for a third of the speed of light, which took four and a
+         half minutes of holding the lever, nearly all of it spent watching a
+         number crawl. So it is sized to the speed you ASKED FOR instead —
+         about a sixth of it per second — and the ramp is sized to the
+         ceiling. Seven seconds from a standstill to the selected speed,
+         whether that is three hundred metres a second or a thousand times
+         light. The gentle feel at ordinary speeds is untouched: down there
+         the error term is far smaller than the ramp, and it is the error
+         term that governs. */
+      const aMax = thinAir ? Math.max(8e5, SPD.tgt * .16) : 400;
       const err = SPD.tgt - V;
       let aCmd;
       if (err >= 0) {
-        SPD.ramp = Math.min((SPD.ramp || 0) + dt * (thinAir ? 40000 : 55), aMax);
+        SPD.ramp = Math.min((SPD.ramp || 0) + dt * (thinAir ? aMax * .25 : 55), aMax);
         aCmd = Math.min(err * 2.4, SPD.ramp);
       } else {
         SPD.ramp = 0;
-        const stop = Math.max(V / 2.5, thinAir ? 12000 : 45);
+        /* The brake keeps up with it. Two and a half seconds is the right
+           feel at aircraft and orbital speeds; at a thousand megametres a
+           second those same two and a half seconds are spent crossing the
+           orbit of Saturn, so up there it tightens to one. */
+        const stop = Math.max(V / (V > 1e9 ? 1.0 : 2.5), thinAir ? 12000 : 45);
         aCmd = -Math.min(-err * 2.4, stop);
       }
       const along = thrust * vd.z - D;            // what the engine is already doing
@@ -4176,8 +4235,38 @@ function physics(P, dt) {
     }
   }
   const acc = vmul(F, 1 / SPECS.mass);
-  P.vel = vadd(P.vel, vmul(acc, dt));
+  /* An explicit step integrating a v-squared drag law is stable only while a
+     single step cannot reverse the velocity — and at a thousand times the
+     speed of light in sea-level air it can, comfortably. The force overshoots,
+     the next step overshoots further the other way, and the entire state is
+     infinity inside a tenth of a second. The old ceiling was low enough that
+     this was out of reach; it is not any more.
+
+     So the step is bounded by what the aeroplane is actually doing: drag may
+     bring you to a stop in one step, never turn you round. It costs nothing
+     in normal flight, where a step changes the speed by a fraction of a per
+     cent, and it is the difference between a hard arrival and a NaN. */
+  let dvx = acc.x * dt, dvy = acc.y * dt, dvz = acc.z * dt;
+  const dvl = Math.hypot(dvx, dvy, dvz);
+  if (!isFinite(dvl)) { dvx = dvy = dvz = 0; }
+  else {
+    const dvCap = Math.max(vlen(P.vel), 60) * 1.5 + 30;
+    if (dvl > dvCap) { const k = dvCap / dvl; dvx *= k; dvy *= k; dvz *= k; }
+  }
+  P.vel = v3(P.vel.x + dvx, P.vel.y + dvy, P.vel.z + dvz);
+  /* And a net under all of it. Nothing downstream — the swept collision test,
+     the terrain lookup, the audio — survives a non-finite position, and one
+     bad frame would otherwise poison the whole session. */
+  const vsum = P.vel.x + P.vel.y + P.vel.z;
+  if (!isFinite(vsum)) P.vel = v3();
+  else {
+    const vm = Math.hypot(P.vel.x, P.vel.y, P.vel.z), VCAP = SPD_TOP * 1.5;
+    if (vm > VCAP) { const k = VCAP / vm; P.vel.x *= k; P.vel.y *= k; P.vel.z *= k; }
+  }
   P.pos = vadd(P.pos, vmul(P.vel, dt));
+  if (!isFinite(P.pos.x + P.pos.y + P.pos.z)) {
+    P.pos = v3(0, E + 3000, 0); P.vel = v3(0, 0, 240); P.prev = null;
+  }
   P.w = v3(P.w.x + M.x / SPECS.Ipitch * dt, P.w.y + M.y / SPECS.Iyaw * dt, P.w.z + M.z / SPECS.Iroll * dt);
   const wcap = 3.2;
   P.w = v3(clamp(P.w.x, -wcap, wcap), clamp(P.w.y, -wcap, wcap), clamp(P.w.z, -wcap, wcap));
@@ -4203,7 +4292,9 @@ function physics(P, dt) {
      occasional molecules. So it is faded out with the density that justifies
      it, which puts full heating anywhere you could actually re-enter and none
      at all where there is nothing to re-enter through. */
-  const heatAir = clamp(rho / 1e-7, 0, 1);
+  /* Same hard zero, for the same reason and at the same place: velocity
+     cubed beats any fade that only tends to nothing. */
+  const heatAir = clamp((rho - 1e-8) / 9e-8, 0, 1);
   const heatRate = heatAir * Math.sqrt(Math.max(rho, 0) / 1.225) * Math.pow(Math.max(V, 0) / 1000, 3.1);
   /* Stagnation heating, and the ceiling is gone with it. It was pinned at 1.6
      — reached at about Mach 10 in the stratosphere — so everything past that
@@ -6166,6 +6257,11 @@ function navRange(m) {
     : k > 1 ? Math.round(k) + " km" : Math.round(m) + " m";
 }
 function navSpeed(v) {
+  // past a twentieth of light the only unit anyone can read is light itself
+  if (v >= C_LIGHT * .05) {
+    const c = v / C_LIGHT;
+    return (c >= 100 ? Math.round(c) : c.toFixed(c >= 10 ? 1 : 2)) + " c";
+  }
   return v > 1e6 ? (v / 1e6).toFixed(2) + " Mm/s" : v > 1000 ? (v / 1000).toFixed(1) + " km/s"
     : Math.round(v) + " m/s";
 }
@@ -6535,7 +6631,11 @@ const SPD_MARKS = [
   [1e5, "100 KM/S"],
   [1e6, "1,000 KM/S"],
   [3e7, "A TENTH THE SPEED OF LIGHT"],
-  [1.5e8, "HALF THE SPEED OF LIGHT"]
+  [1.5e8, "HALF THE SPEED OF LIGHT"],
+  [2.998e8, "THE SPEED OF LIGHT"],
+  [2.998e9, "TEN TIMES LIGHT"],
+  [2.998e10, "A HUNDRED TIMES LIGHT"],
+  [2.998e11, "A THOUSAND TIMES LIGHT"]
 ];
 const ALT_MARKS = [
   [24384, "80,000 FT \u00b7 THE FLIGHT LEVELS BEHIND YOU"],
@@ -6581,7 +6681,8 @@ function logTick(dt) {
   }
   if (LOG.dirty && LOG.save > 12) { LOG.save = 0; logSave(); }
 }
-const logSpd = v => v > 1e6 ? (v / 1e6).toFixed(1) + " Mm/s" : v > 2e3 ? (v / 1000).toFixed(2) + " km/s"
+const logSpd = v => v >= C_LIGHT * .05 ? navSpeed(v)
+  : v > 1e6 ? (v / 1e6).toFixed(1) + " Mm/s" : v > 2e3 ? (v / 1000).toFixed(2) + " km/s"
   : Math.round(v) + " m/s";
 function fillLog() {
   const el = document.getElementById("logList");
@@ -7033,12 +7134,14 @@ function drawHUDFull() {
      read nothing at all out there and the pilot had no speed reference while
      being asked to hold one. Past the air it shows true speed instead, in
      whatever unit keeps it to a readable number of digits. */
-  const vac = (P.qbar || 0) < 40;
+  const vac = (P.rho !== undefined ? P.rho : 1) < 2e-5 || (P.qbar || 0) < 40;
   if (vac) {
-    const v = P.tas;
-    const big = v > 1e5;
-    drawTape(96 * U, CY, big ? v / 1000 : v, big ? 200 : v > 4000 ? 500 : 100,
-      big ? "KM/S TAS" : "M/S TAS", big ? 1 : 0, false);
+    const v = P.tas, cv = v / C_LIGHT;
+    const lit = v >= C_LIGHT * .05, big = !lit && v > 1e5;
+    drawTape(96 * U, CY, lit ? cv : big ? v / 1000 : v,
+      lit ? (cv > 2000 ? 500 : cv > 200 ? 50 : cv > 20 ? 5 : 1) : big ? 200 : v > 4000 ? 500 : 100,
+      lit ? "\u00d7 c  TAS" : big ? "KM/S TAS" : "M/S TAS",
+      lit ? (cv > 20 ? 0 : 2) : big ? 1 : 0, false);
   } else drawTape(96 * U, CY, ias, ias > 400 ? 50 : 20, "KIAS", 0, false);
   if (bigAlt) {
     const km = P.pos.y / 1000;
@@ -7355,11 +7458,14 @@ function drawHUDCompact() {
      showed nothing at all, and altitude in feet is ten digits at the Moon,
      which sheared off the right-hand edge of the screen because the panel is
      anchored to it. The phone was the worst place to fly this, not the best. */
-  const cvac = (P.qbar || 0) < 40;
-  const spdVal = cvac
-    ? (P.tas > 1e5 ? (P.tas / 1000).toFixed(0) : Math.round(P.tas))
+  const cvac = (P.rho !== undefined ? P.rho : 1) < 2e-5 || (P.qbar || 0) < 40;
+  const clit = cvac && P.tas >= C_LIGHT * .05;
+  const spdVal = clit
+    ? (P.tas / C_LIGHT >= 100 ? Math.round(P.tas / C_LIGHT) : (P.tas / C_LIGHT).toFixed(1))
+    : cvac ? (P.tas > 1e5 ? (P.tas / 1000).toFixed(0) : Math.round(P.tas))
     : Math.round(P.ias * KT);
-  panel(sl + 12 * u, py, pw, ph, cvac ? (P.tas > 1e5 ? "KM/S" : "M/S TAS") : "KIAS",
+  panel(sl + 12 * u, py, pw, ph,
+    clit ? "\u00d7 c" : cvac ? (P.tas > 1e5 ? "KM/S" : "M/S TAS") : "KIAS",
     String(spdVal), P.stall > .2 ? "rgba(255,120,96,.95)" : G);
 
   const vs = P.vsi * FPM, avs = Math.abs(vs);
@@ -7643,6 +7749,7 @@ const KEYCARD = [
   ["Throttle", "W  S   (Shift / Ctrl)", "drag the slider"],
   ["Afterburner", "throttle past 80%", "slider past the A/B line"],
   ["Speed select", "in vacuum the throttle sets SPEED", "same slider, marked SPD"],
+  ["Speed range", "10 m/s at the bottom to 3,300 \u00d7 c at the top", "the whole slider"],
   ["Autopilot", "Z   flies the transfer", "A/P button, or FLY IT"],
   ["Speed hold", "O", "HOLD button"],
   ["Nav target", "J   cycles Moon / planets / Sun", "tap a world on the map"],
@@ -7851,7 +7958,7 @@ function applyInput(dt) {
       // changing the number is not the same as taking the system out; the
       // auto flag only records who armed it, so that leaving the atmosphere
       // does not re-arm it underneath a pilot who has set their own speed
-      SPD.tgt = clamp(SPD.tgt * (1 + tdir * .55 * dt) + tdir * 22 * dt, 0, 4e8);
+      SPD.tgt = clamp(SPD.tgt * (1 + tdir * .55 * dt) + tdir * 22 * dt, 0, SPD_TOP);
     } else { P.thr = clamp(P.thr + tdir * .5 * dt, 0, 1); if (P.thr > .02) P.park = false; }
   }
   // trim (the autopilot owns trim while it is engaged)
