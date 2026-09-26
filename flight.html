@@ -93,11 +93,11 @@
 
       <h2>Flight</h2>
       <div class="row" id="scenRow">
-        <button class="opt on" data-scen="free"><b>FREE FLIGHT</b><i>Cold on runway 18 at Keeper Field, on the Highland Rim in Lewis County, Tennessee. Brakes set, engines at idle. There is no top end and no ceiling: hold the burners in and it never stops accelerating. Orbit is 7.8 km/s, the Moon is a two-minute burn past that, and everything you gain comes back as heat on the way down.</i></button>
+        <button class="opt on" data-scen="free"><b>FREE FLIGHT</b><i>Cold on runway 18 at Keeper Field, on the Highland Rim in Lewis County, Tennessee. Brakes set, engines at idle. There is no top end and no ceiling: hold the burners in and it never stops accelerating. Orbit is 17,500 mph, the Moon is a couple of minutes past that, Neptune is about seven, and everything you gain comes back as heat on the way down.</i></button>
         <button class="opt" data-scen="air"><b>AIRBORNE START</b><i>Airborne at 23,000 ft and already supersonic. Climb and accelerate.</i></button>
-        <button class="opt" data-scen="rings"><b>RING RACE</b><i>12 gates strung across 120 km of sky, against the clock.</i></button>
+        <button class="opt" data-scen="rings"><b>RING RACE</b><i>12 gates strung across 75 miles of sky, against the clock.</i></button>
         <button class="opt" data-scen="hohenwald"><b>HOHENWALD, TN</b><i>Low and slow over the country the field sits in. Fifty miles of it are built out properly: the Highland Rim and its creek valleys, the Buffalo and the Duck, the Natchez Trace, every town and community, and the monument at Grinder's Stand.</i></button>
-        <button class="opt" data-scen="land"><b>LANDING CHALLENGE</b><i>9 km final, gear and flaps set. Stream the chute with <kbd>X</kbd> after touchdown. Scored on centreline, sink rate and touchdown point.</i></button>
+        <button class="opt" data-scen="land"><b>LANDING CHALLENGE</b><i>A five and a half mile final, gear and flaps set. Stream the chute with <kbd>X</kbd> after touchdown. Scored on centreline, sink rate and touchdown point.</i></button>
       </div>
 
       <h2>Damage</h2>
@@ -3270,7 +3270,7 @@ const leverOfSpd = v => clamp(Math.log(Math.max(v, SPD_LO) / SPD_LO) / Math.log(
 function toggleSpeedHold() {
   SPD.on = !SPD.on;
   if (SPD.on) { SPD.tgt = Math.max(PLANE.tas, 60); SPD.auto = false; SPD.lever = null; }
-  toast(SPD.on ? "SPEED HOLD \u00b7 " + Math.round(SPD.tgt) + " m/s" : "SPEED HOLD OFF", 1.8);
+  toast(SPD.on ? "SPEED HOLD \u00b7 " + navSpeed(SPD.tgt) : "SPEED HOLD OFF", 1.8);
   audio.beep(SPD.on ? 820 : 430, .14, .12);
 }
 /* Pitch sense. REAL is what a stick does: pull back (Down / thumb back) to
@@ -3994,7 +3994,7 @@ function physics(P, dt) {
       SPD.on = true; SPD.auto = true; SPD.tgt = P.tas;
       SPD.thrSave = P.thr;
       SPD.lever = leverOfSpd(P.tas); P.thr = SPD.lever;   // lever meets the speed
-      toast("SPEED SELECT \u00b7 " + Math.round(P.tas) + " m/s \u00b7 throttle sets it", 2.8);
+      toast("SPEED SELECT \u00b7 " + navSpeed(P.tas) + " \u00b7 throttle sets it", 2.8);
     }
     if (!thinAir && SPD.auto) {
       SPD.on = false; SPD.auto = false;
@@ -4460,7 +4460,7 @@ function bodyContact(P, dt) {
     logWorld(b.name);
     const g = b.gm / (touching.surf * touching.surf);
     toast("DOWN ON " + b.name.toUpperCase() + " · " + (g / 9.81).toFixed(2) + " g · "
-      + Math.round(vt) + " m/s", 3.4);
+      + navSpeed(vt), 3.4);
     audio.beep(300, .30, .18);
   }
 
@@ -6276,10 +6276,27 @@ function drawNavMarker() {
   }
   ctx.restore();
 }
+/* ---- American numbers ----------------------------------------------------
+
+   The simulation is metric all the way down, because the physics is, but
+   nobody flying out of Lewis County thinks in metres. Every number on the
+   glass is feet, miles, knots or miles an hour, and the conversion happens
+   here at the read-out and nowhere else — so the flight model never has to
+   know and can never drift out of step with what is printed.
+
+   The exceptions are the ones that are already American: Mach is a ratio,
+   feet per minute is what a vertical speed indicator reads, and past a
+   twentieth of the speed of light the only unit anyone can hold in their
+   head is light itself. */
+const M_FT = 3.280839895, M_MI = 1 / 1609.344, MS_MPH = 2.2369363;
+const comma = n => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 function navRange(m) {
-  const k = m / 1000;
-  return k > 1e6 ? (k / 1e6).toFixed(2) + " Gm" : k > 1000 ? (k / 1000).toFixed(1) + " Mm"
-    : k > 1 ? Math.round(k) + " km" : Math.round(m) + " m";
+  const mi = m * M_MI;
+  if (mi >= 1e9) return (mi / 1e9).toFixed(mi < 1e10 ? 2 : 0) + " B mi";
+  if (mi >= 1e6) return (mi / 1e6).toFixed(mi < 1e7 ? 2 : 0) + " M mi";
+  if (mi >= 1000) return comma(mi) + " mi";
+  if (mi >= 1) return (mi < 10 ? mi.toFixed(1) : comma(mi)) + " mi";
+  return comma(m * M_FT) + " ft";
 }
 function navSpeed(v) {
   // past a twentieth of light the only unit anyone can read is light itself
@@ -6287,8 +6304,15 @@ function navSpeed(v) {
     const c = v / C_LIGHT;
     return (c >= 100 ? Math.round(c) : c.toFixed(c >= 10 ? 1 : 2)) + " c";
   }
-  return v > 1e6 ? (v / 1e6).toFixed(2) + " Mm/s" : v > 1000 ? (v / 1000).toFixed(1) + " km/s"
-    : Math.round(v) + " m/s";
+  /* Miles an hour as far as fifty thousand of them, because that is where
+     the numbers people actually know live: orbit is seventeen and a half
+     thousand miles an hour and escape is twenty-five, and reading either of
+     them as "4.8 miles a second" throws away the one figure everybody has
+     heard. Past that, miles a second. */
+  const mph = v * MS_MPH;
+  if (mph < 5e4) return comma(mph) + " mph";
+  const mis = v * M_MI;
+  return (mis < 100 ? mis.toFixed(1) : comma(mis)) + " mi/s";
 }
 
 /* The map. The solar system spans eleven orders of magnitude of distance, so
@@ -6366,7 +6390,7 @@ function drawMap() {
   }
 
   /* range rings, one per decade of kilometres, and bearing spokes */
-  const L0 = 3, L1 = 10;                       // 1e3 km .. 1e10 km
+  const L0 = 3, L1 = 10;                       // a thousand miles .. ten billion
   const rr = lk => R * clamp((lk - L0) / (L1 - L0), 0, 1);
   ctx.lineWidth = 1 * u;
   for (let s = 0; s < 12; s++) {
@@ -6380,7 +6404,8 @@ function drawMap() {
     ctx.strokeStyle = "rgba(120,170,215,.22)";
     ctx.beginPath(); ctx.arc(cx, cy, rr(lk), 0, TAU); ctx.stroke();
     hudFont(9 * u, 600);
-    const lbl = lk >= 9 ? (10 ** (lk - 9)) + " Gm" : lk >= 6 ? (10 ** (lk - 6)) + " Mm" : (10 ** lk) + " km";
+    const lbl = lk >= 9 ? (10 ** (lk - 9)) + " B mi" : lk >= 6 ? (10 ** (lk - 6)) + " M mi"
+      : comma(10 ** lk) + " mi";
     // down the left spoke, backed, so a world sitting on the ring cannot eat it
     const ly = cy - rr(lk) * .707, lx = cx - rr(lk) * .707;
     const lw = ctx.measureText(lbl).width;
@@ -6424,7 +6449,7 @@ function drawMap() {
     const fx = m2[6] * dx + m2[7] * dy + m2[8] * dz;   // ahead
     const rx = m2[0] * dx + m2[1] * dy + m2[2] * dz;   // right
     const ang = Math.atan2(rx, fx);
-    const r = rr(Math.log10(Math.max(d, 1) / 1000));
+    const r = rr(Math.log10(Math.max(d * M_MI, 1)));
     list.push({ b: b, i: i, d: d,
       x: cx + Math.sin(ang) * r, y: cy - Math.cos(ang) * r });
   }
@@ -6653,8 +6678,9 @@ const SPD_MARKS = [
   [3400, "MACH 10"],
   [7800, "ORBITAL VELOCITY"],
   [11200, "ESCAPE VELOCITY"],
-  [1e5, "100 KM/S"],
-  [1e6, "1,000 KM/S"],
+  [22352, "FIFTY THOUSAND MILES AN HOUR"],
+  [1e5, "SIXTY MILES A SECOND"],
+  [1e6, "SIX HUNDRED MILES A SECOND"],
   [3e7, "A TENTH THE SPEED OF LIGHT"],
   [1.5e8, "HALF THE SPEED OF LIGHT"],
   [2.998e8, "THE SPEED OF LIGHT"],
@@ -6706,9 +6732,7 @@ function logTick(dt) {
   }
   if (LOG.dirty && LOG.save > 12) { LOG.save = 0; logSave(); }
 }
-const logSpd = v => v >= C_LIGHT * .05 ? navSpeed(v)
-  : v > 1e6 ? (v / 1e6).toFixed(1) + " Mm/s" : v > 2e3 ? (v / 1000).toFixed(2) + " km/s"
-  : Math.round(v) + " m/s";
+const logSpd = v => navSpeed(v);
 function fillLog() {
   const el = document.getElementById("logList");
   if (!el) return;
@@ -6799,8 +6823,9 @@ function checkLanding() {
     else {
       sc = 100;
       sc -= clamp(Math.abs(vs) * 11, 0, 45); notes.push("SINK " + (Math.abs(vs) * 196.85).toFixed(0) + " fpm");
-      sc -= clamp(offC * 1.8, 0, 25); notes.push("CENTRE " + offC.toFixed(1) + " m");
-      sc -= clamp(Math.abs(zone - 380) * .05, 0, 30); notes.push("TOUCHDOWN " + zone.toFixed(0) + " m");
+      sc -= clamp(offC * 1.8, 0, 25); notes.push("CENTRE " + (offC * M_FT).toFixed(0) + " ft");
+      sc -= clamp(Math.abs(zone - 380) * .05, 0, 30);
+      notes.push("TOUCHDOWN " + comma(zone * M_FT) + " ft");
       sc = Math.max(0, Math.round(sc));
     }
     GAME.landScore = sc;
@@ -7326,6 +7351,12 @@ function drawHUDFull() {
 
   /* ---- airspeed (left) and altitude (right) tapes ---- */
   const tapeH = 300 * U, tw = 78 * U;
+  /* The altitude tape sits inboard of the panel rather than under it. Pinned
+     to the edge of the glass it was partly covered by the switches in any
+     window short enough for the two to meet, and the thing it lost was the
+     bottom of the tape — which is where the units are written. */
+  const panelL = TOUCH.btns.length ? TOUCH.btns[0].x : W;
+  const altX = Math.min(W - 96 * U - tw, panelL - tw - 14 * U);
   const drawTape = (x, cy, val, step, unit, digits, right) => {
     box(x, cy - tapeH / 2, tw, tapeH, 5 * U, PANEL, GD);
     ctx.save(); ctx.beginPath(); ctx.rect(x, cy - tapeH / 2, tw, tapeH); ctx.clip();
@@ -7358,26 +7389,31 @@ function drawHUDFull() {
      digits nobody can read, and past a billion it simply overflows its box.
      Out there it switches to kilometres, and past the Moon to thousands. */
   const ias = P.ias * KT, alt = P.pos.y * FT;
-  const bigAlt = P.pos.y > 4e5;
+  /* Feet as far as feet stay readable — a hundred and twenty thousand of
+     them, which is above anything with wings — and miles after that. */
+  const bigAlt = P.pos.y > 36576;
   /* Indicated airspeed is zero in vacuum, so the primary speed instrument
      read nothing at all out there and the pilot had no speed reference while
      being asked to hold one. Past the air it shows true speed instead, in
      whatever unit keeps it to a readable number of digits. */
   const vac = (P.rho !== undefined ? P.rho : 1) < 2e-5 || (P.qbar || 0) < 40;
   if (vac) {
-    const v = P.tas, cv = v / C_LIGHT;
-    const lit = v >= C_LIGHT * .05, big = !lit && v > 1e5;
-    drawTape(96 * U, CY, lit ? cv : big ? v / 1000 : v,
-      lit ? (cv > 2000 ? 500 : cv > 200 ? 50 : cv > 20 ? 5 : 1) : big ? 200 : v > 4000 ? 500 : 100,
-      lit ? "\u00d7 c  TAS" : big ? "KM/S TAS" : "M/S TAS",
-      lit ? (cv > 20 ? 0 : 2) : big ? 1 : 0, false);
+    const v = P.tas, cv = v / C_LIGHT, mph = v * MS_MPH, mis = v * M_MI;
+    const lit = v >= C_LIGHT * .05, big = !lit && mph >= 5e4;
+    drawTape(96 * U, CY, lit ? cv : big ? mis : mph,
+      lit ? (cv > 2000 ? 500 : cv > 200 ? 50 : cv > 20 ? 5 : 1)
+          : big ? (mis > 2000 ? 500 : mis > 200 ? 100 : 20)
+          : mph > 20000 ? 2000 : mph > 4000 ? 500 : 200,
+      lit ? "\u00d7 c  TAS" : big ? "MI/S TAS" : "MPH TAS",
+      lit ? (cv > 20 ? 0 : 2) : big ? (mis > 200 ? 0 : 1) : 0, false);
   } else drawTape(96 * U, CY, ias, ias > 400 ? 50 : 20, "KIAS", 0, false);
   if (bigAlt) {
-    const km = P.pos.y / 1000;
-    const far = km > 4e5;
-    drawTape(W - 96 * U - tw, CY, far ? km / 1000 : km,
-      far ? 2000 : km > 20000 ? 2000 : 200, far ? "1000 KM" : "KM MSL", far ? 1 : 0, true);
-  } else drawTape(W - 96 * U - tw, CY, alt, alt > 20000 ? 2000 : 500, "FT MSL", 0, true);
+    const mi = P.pos.y * M_MI;
+    const far = mi > 250000;
+    drawTape(altX, CY, far ? mi / 1000 : mi,
+      far ? 2000 : mi > 12000 ? 2000 : mi > 900 ? 200 : 20,
+      far ? "1000 MI" : "MI MSL", far ? 1 : mi > 900 ? 0 : 1, true);
+  } else drawTape(altX, CY, alt, alt > 20000 ? 2000 : 500, "FT MSL", 0, true);
   // Mach and afterburner, right under the speed tape
   const mx = 96 * U - 24 * U, my = CY + tapeH / 2 + 92 * U;
   box(mx, my, 132 * U, 52 * U, 4 * U, PANEL, GD);
@@ -7541,9 +7577,7 @@ function drawHUDFull() {
     hudFont(12 * U); ctx.fillStyle = GD;
     ctx.fillText(nb.body.name.toUpperCase().slice(0, 8), rx + 8 * U, CY - 4 * U);
     hudFont(16 * U, 600); ctx.fillStyle = nb.alt < 2e6 ? "rgba(255,170,90,.95)" : G;
-    const k = nb.alt / 1000;
-    ctx.fillText(k > 1e6 ? (k / 1e6).toFixed(2) + "Gm" : k > 1000 ? (k / 1000).toFixed(1) + "Mm"
-      : Math.round(k) + "km", rx + 8 * U, CY + 16 * U);
+    ctx.fillText(navRange(Math.max(nb.alt, 0)), rx + 8 * U, CY + 16 * U);
   } else if (P.pos.y > 4e5) {
     // nothing out there worth ranging to, so range to the one you came from
     hudFont(12 * U); ctx.fillStyle = GD; ctx.fillText("EARTH", rx + 8 * U, CY - 4 * U);
@@ -7689,23 +7723,24 @@ function drawHUDCompact() {
      anchored to it. The phone was the worst place to fly this, not the best. */
   const cvac = (P.rho !== undefined ? P.rho : 1) < 2e-5 || (P.qbar || 0) < 40;
   const clit = cvac && P.tas >= C_LIGHT * .05;
+  const cmph = P.tas * MS_MPH, cmis = P.tas * M_MI;
   const spdVal = clit
     ? (P.tas / C_LIGHT >= 100 ? Math.round(P.tas / C_LIGHT) : (P.tas / C_LIGHT).toFixed(1))
-    : cvac ? (P.tas > 1e5 ? (P.tas / 1000).toFixed(0) : Math.round(P.tas))
+    : cvac ? (cmph >= 5e4 ? (cmis < 100 ? cmis.toFixed(1) : comma(cmis)) : comma(cmph))
     : Math.round(P.ias * KT);
   panel(sl + 12 * u, py, pw, ph,
-    clit ? "\u00d7 c" : cvac ? (P.tas > 1e5 ? "KM/S" : "M/S TAS") : "KIAS",
+    clit ? "\u00d7 c" : cvac ? (cmph >= 5e4 ? "MI/S" : "MPH TAS") : "KIAS",
     String(spdVal), P.stall > .2 ? "rgba(255,120,96,.95)" : G);
 
   const vs = P.vsi * FPM, avs = Math.abs(vs);
   const vsTxt = avs > 1e6 ? (vs / 1e6).toFixed(1) + "M" : avs > 99999 ? (vs / 1000).toFixed(0) + "k"
     : (vs >= 0 ? "+" : "") + Math.round(vs / 10) * 10;
-  const km = P.pos.y / 1000;
-  const altBig = P.pos.y > 4e5;
+  const amiles = P.pos.y * M_MI;
+  const altBig = P.pos.y > 36576;                    // 120,000 ft
   panel(W - sr - 12 * u - pw, py, pw, ph,
-    altBig ? (km > 4e5 ? "ALT Mm" : "ALT KM") : "ALT FT",
-    altBig ? (km > 4e5 ? (km / 1000).toFixed(1) : Math.round(km).toString())
-           : String(Math.round(P.pos.y * FT)), G, vsTxt);
+    altBig ? (amiles > 1e6 ? "ALT M mi" : "ALT MI") : "ALT FT",
+    altBig ? (amiles > 1e6 ? (amiles / 1e6).toFixed(2) : comma(amiles))
+           : comma(P.pos.y * FT), G, vsTxt);
 
   /* And the third line: height above the ground until there is no ground,
      then range to whatever you are flying at — which on a phone was the only
@@ -7931,10 +7966,10 @@ function objectiveLine() {
   if (SCEN === "rings") {
     let o = "GATE " + Math.min(GAME.ringIdx + 1, GAME.rings.length) + "/" + GAME.rings.length + "   T " + GAME.ringT.toFixed(1) + "s";
     const rg = GAME.rings[GAME.ringIdx];
-    if (rg) o += "   " + (vlen(vsub(rg.p, P.pos)) / 1000).toFixed(2) + " km";
+    if (rg) o += "   " + navRange(vlen(vsub(rg.p, P.pos)));
     return o;
   }
-  if (SCEN === "land") return "LAND RWY 18   " + (Math.hypot(P.pos.x, P.pos.z - 950) / 1000).toFixed(2) + " km to threshold";
+  if (SCEN === "land") return "LAND RWY 18   " + navRange(Math.hypot(P.pos.x, P.pos.z - 950)) + " to threshold";
   /* Off the planet, a latitude and a distance from Tokyo are noise: the map
      that produces them is a flat sheet under the runway, and out here you are
      nowhere on it. Say what there is instead — how far out, and what is
@@ -7964,9 +7999,8 @@ function objectiveLine() {
   }
   const pos = Math.abs(lat).toFixed(2) + (lat >= 0 ? "\u00b0N " : "\u00b0S ") +
     Math.abs(lon).toFixed(2) + (lon >= 0 ? "\u00b0E" : "\u00b0W");
-  const dn = near ? Math.hypot(near.x - P.pos.x, near.z - P.pos.z) / 1000 : 0;
-  return pos + (near ? "   " + dn.toFixed(0) + " km from " + near.name : "");
-  return "FREE FLIGHT   " + (Math.hypot(P.pos.x, P.pos.z) / 1000).toFixed(1) + " km from field   " + (P.dist / 1000).toFixed(1) + " km flown";
+  const dn = near ? Math.hypot(near.x - P.pos.x, near.z - P.pos.z) : 0;
+  return pos + (near ? "   " + navRange(dn) + " from " + near.name : "");
 }
 
 /* Every control, named, for both a keyboard and a thumb. Toggled with L or
@@ -7978,7 +8012,7 @@ const KEYCARD = [
   ["Throttle", "W  S   (Shift / Ctrl)", "drag the slider"],
   ["Afterburner", "throttle past 80%", "slider past the A/B line"],
   ["Speed select", "in vacuum the throttle sets SPEED", "same slider, marked SPD"],
-  ["Speed range", "10 m/s at the bottom to 3,300 \u00d7 c at the top", "the whole slider"],
+  ["Speed range", "22 mph at the bottom to 3,300 \u00d7 c at the top", "the whole slider"],
   ["Autopilot", "Z   flies the transfer", "A/P button, or FLY IT"],
   ["Speed hold", "O", "HOLD button"],
   ["Nav target", "J   cycles Moon / planets / Sun", "tap a world on the map"],
