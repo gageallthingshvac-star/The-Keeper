@@ -554,7 +554,7 @@ function applyDmg(x,z,v){
    Renderer
    ===================================================================== */
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setPixelRatio(Math.min(devicePixelRatio,3));
 renderer.setSize(innerWidth,innerHeight);
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure=1.05;
@@ -570,7 +570,7 @@ const camera=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,0.1,1e6);
 
 const hemi=new THREE.HemisphereLight(0xcfe0f2,0x5a5040,1.1);scene.add(hemi);
 const sun=new THREE.DirectionalLight(0xfff1dc,2.4);
-sun.castShadow=true;sun.shadow.mapSize.set(matchMedia('(pointer:coarse)').matches?1024:2048,matchMedia('(pointer:coarse)').matches?1024:2048);sun.shadow.bias=-0.0004;
+sun.castShadow=true;{const sm=matchMedia('(pointer:coarse)').matches?2048:4096;sun.shadow.mapSize.set(sm,sm);}sun.shadow.bias=-0.0004;
 scene.add(sun);scene.add(sun.target);
 const SUNDIR=new THREE.Vector3(0.55,0.75,0.35).normalize();
 const flashLight=new THREE.PointLight(0xffd8a0,0,1,0);scene.add(flashLight);
@@ -662,11 +662,12 @@ for(let i=0;i<4;i++){const m=new THREE.Mesh(new THREE.PlaneGeometry(1,1),frameMa
    it, so detail is dense at the crosshair and still reaches the horizon.
    ===================================================================== */
 const coarse=matchMedia('(pointer:coarse)').matches;
-const DETAILS=[80,112,144];       // multiples of 8 so ring edges line up exactly
-let detail=coarse?1:2;
-{const q=new URLSearchParams(location.search).get('d');if(q!==null)detail=clamp(+q|0,0,2);}
+const DETAILS=[80,112,144,192,256];  // multiples of 8 so ring edges line up exactly
+const DETAIL_NAMES=['Low','Med','High','Ultra','Max'];
+let detail=coarse?2:4;
+{const q=new URLSearchParams(location.search).get('d');if(q!==null)detail=clamp(+q|0,0,DETAILS.length-1);}
 let N=DETAILS[detail];
-const NLEV=3,LSTEP=4;
+const NLEV=4,LSTEP=4;
 const levels=[];let grid=null;
 class Level{
   constructor(li){
@@ -770,7 +771,9 @@ function buildWorld(){
   grid=levels[0];
 }
 function quantV(x){return Math.pow(2,Math.round(Math.log2(x)*3)/3);}
+let regenCost=0;
 function regen(){
+  const t0=performance.now();
   const v=quantV(view.S*1.35/N),vt=v*Math.pow(LSTEP,NLEV-1);
   const cx=Math.round(controls.target.x/vt)*vt,cz=Math.round(controls.target.z/vt)*vt;
   levels.forEach((L,i)=>L.layout(v*Math.pow(LSTEP,i),cx,cz));
@@ -783,11 +786,11 @@ function regen(){
   const pos=[[0,-(G/2+E/2),E*2+G,E],[0,G/2+E/2,E*2+G,E],[-(G/2+E/2),0,E,G],[G/2+E/2,0,E,G]];
   pos.forEach((p,i)=>{frameM[i].position.set(cx+p[0],fy,cz+p[1]);frameM[i].scale.set(p[2],p[3],1);});
   // sun & shadow box follow the inner ring
-  const G0=N*v,sc=sun.shadow.camera,half=G0*0.75,gy=grid.gTop[(N/2)*N+N/2];
+  const G0=N*v,sc=sun.shadow.camera,half=G0*1.2,gy=grid.gTop[(N/2)*N+N/2];
   sc.left=-half;sc.right=half;sc.top=half;sc.bottom=-half;sc.near=G0*0.05;sc.far=G0*6;sc.updateProjectionMatrix();
   sun.shadow.normalBias=v*0.6;
   sun.target.position.set(cx,gy,cz);sun.position.set(cx+SUNDIR.x*G0*2,gy+SUNDIR.y*G0*2,cz+SUNDIR.z*G0*2);
-  lastRegen=performance.now();
+  lastRegen=performance.now();regenCost=lastRegen-t0;
 }
 /* finest ring that covers a point */
 function levelAt(x,z){
@@ -803,7 +806,7 @@ function groundAt(x,z){
 /* =====================================================================
    Flying blocks: debris and dust
    ===================================================================== */
-const DMAX=coarse?1500:3000;
+const DMAX=coarse?3000:8000;
 const debGeo=new THREE.BoxGeometry(1,1,1);
 debGeo.setAttribute('aMat',new THREE.InstancedBufferAttribute(new Float32Array(DMAX*2),2));
 const debMesh=new THREE.InstancedMesh(debGeo,boxMat,DMAX);
@@ -832,7 +835,7 @@ function updateDebris(dt){
   for(let i=0;i<D.n;i++){
     D.life[i]+=dt;
     const t=D.type[i],life=D.life[i];
-    if((t===0&&life>9)||(t===1&&life>4)){killDeb(i);i--;continue;}
+    if((t===0&&life>9)||(t===1&&life>3)){killDeb(i);i--;continue;}
     const p=i*3;
     if(t===0){
       if(!D.rest[i]){
@@ -856,7 +859,7 @@ function updateDebris(dt){
     }
     let sc=D.s[i];
     if(t===0){if(life>8)sc*=Math.max(0,9-life);}
-    else sc*=(1+life*0.9)*Math.max(0,1-life/4);
+    else sc*=(1+life*0.5)*Math.max(0,1-life/3);
     _p.set(D.p[p]-ox,D.p[p+1],D.p[p+2]-oz);
     _q.setFromEuler(_e.set(D.rot[p],D.rot[p+1],D.rot[p+2]));
     _s.set(sc,sc,sc);_m.compose(_p,_q,_s);_m.toArray(debMesh.instanceMatrix.array,i*16);
@@ -878,7 +881,7 @@ function shellMaterial(){
     vertexShader:`varying vec3 vN;varying vec3 vV;void main(){vec4 mv=modelViewMatrix*vec4(position,1.0);vN=normalize(normalMatrix*normal);vV=normalize(-mv.xyz);gl_Position=projectionMatrix*mv;}`,
     fragmentShader:`uniform float uA;varying vec3 vN;varying vec3 vV;void main(){float f=1.0-abs(dot(normalize(vN),normalize(vV)));gl_FragColor=vec4(vec3(1.0,0.96,0.9)*pow(f,5.0)*uA,1.0);}`});
 }
-const NCAP=1500,NSTEM=420,NSKIRT=260,NCLOUD=NCAP+NSTEM+NSKIRT;
+const NCAP=coarse?1500:2600,NSTEM=coarse?420:700,NSKIRT=coarse?260:420,NCLOUD=NCAP+NSTEM+NSKIRT;
 const cloudGeo=()=>{const g=new THREE.BoxGeometry(1,1,1);g.setAttribute('aMat',new THREE.InstancedBufferAttribute(new Float32Array(NCLOUD*2),2));return g;};
 const HOT=LIN(0xfff4dd), DIRTY=LIN(0x6e5646), PALE=LIN(0xe6e0d8), SMOKE=LIN(0x2b2826), SMOKE2=LIN(0x6c655e), DUSTC=LIN(0x8f7c68);
 
@@ -1005,7 +1008,7 @@ class Blast{
     for(let j=0;j<NSKIRT;j++){
       const i=NCAP+NSTEM+j,a=pr[i*6],rj=pr[i*6+2],sf=pr[i*6+3];
       const rs=Rcap*1.4*surge*(0.55+0.45*rj);
-      const s=Rcap*0.07*sf*smooth(0.3,1.2,t)*(1-smooth(8,20,t))*(this.hb>this.Rfb*3?0.4:1);
+      const s=Rcap*0.035*sf*smooth(0.3,1.2,t)*(1-smooth(6,16,t))*(this.hb>this.Rfb*3?0.4:1);
       for(let c=0;c<3;c++)col[c]=DUSTC[c];
       put(i,Math.cos(a)*rs,s*0.4,Math.sin(a)*rs,s,col,0);
     }
@@ -1027,7 +1030,7 @@ function sweep(){
     if(hi>lo||th)act.push({b,lo,hi,th,thR:b.Rth*1.6});
   }
   if(!act.length)return;
-  spawnBudget=coarse?90:200;
+  spawnBudget=coarse?180:500;
   for(const Lv of levels){
     const v=Lv.v,K=Lv.K;let changed=false,lo=1e9,hi=-1;
     const debris=Lv.li===0;
@@ -1062,7 +1065,7 @@ function sweep(){
         if(psi>2.5&&Math.random()<(Lv.li?0.02:0.05)&&spawnBudget>0){
           spawnBudget--;
           const c=P.dust;
-          spawn(wx,Lv.gTop[ci]+v*0.5,wz,ux*v*(6+10*pk),v*(1+3*Math.random()),uz*v*(6+10*pk),v*(0.4+0.4*Math.random()),c[0],c[1],c[2],1,0,0);
+          spawn(wx,Lv.gTop[ci]+v*0.5,wz,ux*v*(6+10*pk),v*(1+3*Math.random()),uz*v*(6+10*pk),v*(0.22+0.25*Math.random()),c[0],c[1],c[2],1,0,0);
         }
       }
     }
@@ -1123,7 +1126,7 @@ function maybeRegen(now,force){
   const v=quantV(view.S*1.35/N),vt=v*Math.pow(LSTEP,NLEV-1);
   const cx=Math.round(controls.target.x/vt)*vt,cz=Math.round(controls.target.z/vt)*vt;
   const need=force||v!==grid.v||cx!==grid.cx||cz!==grid.cz;
-  if(need&&(force||now-lastRegen>110))regen();
+  if(need&&(force||now-lastRegen>Math.max(110,regenCost*2.5)))regen();
 }
 
 /* =====================================================================
@@ -1211,8 +1214,8 @@ const sToSlider=S=>Math.log(S/SMIN)/Math.log(SMAX/SMIN)*1000;
 $('scale').oninput=()=>{view.targetS=SMIN*Math.pow(SMAX/SMIN,$('scale').value/1000);hideHint();};
 $('bSound').onclick=e=>{soundOn=!soundOn;e.target.classList.toggle('on',soundOn);ensureAudio();};
 $('bRings').onclick=e=>{showRings=!showRings;e.target.classList.toggle('on',showRings);ringGroup.visible=showRings;};
-$('bDetail').onclick=()=>{detail=(detail+1)%DETAILS.length;N=DETAILS[detail];$('bDetail').textContent=['Detail: Low','Detail: Med','Detail: High'][detail];buildWorld();maybeRegen(performance.now(),true);};
-$('bDetail').textContent=['Detail: Low','Detail: Med','Detail: High'][detail];
+$('bDetail').onclick=()=>{detail=(detail+1)%DETAILS.length;N=DETAILS[detail];$('bDetail').textContent='Detail: '+DETAIL_NAMES[detail];buildWorld();maybeRegen(performance.now(),true);};
+$('bDetail').textContent='Detail: '+DETAIL_NAMES[detail];
 $('bReset').onclick=()=>{for(const b of blasts)b.dispose();blasts.length=0;D.n=0;maybeRegen(performance.now(),true);};
 let hintHidden=false;function hideHint(){if(!hintHidden){hintHidden=true;$('hint').style.opacity=0;}}
 setTimeout(hideHint,9000);
@@ -1298,8 +1301,8 @@ function step(dt,now){
   if(isFinite(gy)&&gy>-1e8){const dy=(gy-controls.target.y)*0.25;controls.target.y+=dy;camera.position.y+=dy;}
   maybeRegen(now,false);
   const D0=view.S*DIST;
-  camera.near=Math.max(0.02,D0*0.01);camera.far=D0*120;camera.updateProjectionMatrix();
-  scene.fog.near=D0*1.3;scene.fog.far=D0*6;
+  camera.near=Math.max(0.02,D0*0.01);camera.far=D0*400;camera.updateProjectionMatrix();
+  scene.fog.near=D0*2;scene.fog.far=D0*14;
 
   // detonations
   const sdt=dt*speed;
