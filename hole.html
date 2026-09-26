@@ -1976,7 +1976,7 @@ function botSteer() {
     let bestV = -1;
     for (const b of solar.bodies) if (!b.state && b.r <= solar.r && !(b.sun && planetsLeft)) {
       const d = Math.hypot(b.ax - solar.hx, b.az - solar.hz), v = b.r * b.r / (d + solar.r * 40);
-      if (v > bestV) { bestV = v; best = d; wx = b.ax - solar.hx; wz = b.az - solar.hz; }
+      if (v > bestV) { bestV = v; best = d; wx = b.ax - solar.hx; wz = b.az - solar.hz; botStats.target = b.name + ' st' + b.state; }
     }
   }
   botStats.frames++;
