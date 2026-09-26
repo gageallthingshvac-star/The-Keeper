@@ -2080,7 +2080,8 @@ function renderStage(sc, cam, bloomK) {
 // Country borders: Natural Earth 1:110m (public domain). Imagery: NASA Blue Marble / Black Marble.
 const WORLD = JSON.parse(document.getElementById('worlddata').textContent);
 const CITY_LIST = WORLD.cities;
-const RE = 6371, GR = 1000, KG = 0.55;
+const RE = 6371, GR = 1000, KG = 0.3;
+const FILL_N = 4000, FILL_MIN = 8, FILL_MAX = 700, FILL_SKEW = 2.2;
 const gScene = new THREE.Scene();
 gScene.background = new THREE.Color(0x000000);
 const gCam = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.3, 60000);
@@ -2112,9 +2113,9 @@ const ll2v = (lon, lat, v = new V3()) => { const a = lat * Math.PI / 180, o = lo
 function globeMat(kind, cut = true) {
   const m = new THREE.MeshStandardMaterial({ map: kind === 'city' ? null : dayTex, roughness: 0.9, metalness: 0, transparent: kind === 'city' });
   m.onBeforeCompile = sh => {
-    Object.assign(sh.uniforms, gHoleU, { tNight: { value: nightTex }, tWater: { value: waterTex } });
+    Object.assign(sh.uniforms, gHoleU, { tNight: { value: nightTex }, tWater: { value: waterTex }, tEat: { value: eatTex } });
     sh.vertexShader = 'varying vec3 vGW; varying vec2 vUv2;\n' + sh.vertexShader.replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvGW = (modelMatrix * vec4(transformed, 1.0)).xyz; vUv2 = uv;');
-    sh.fragmentShader = `uniform vec3 uHoleW, uGC, uSunV; uniform float uCosA, uCosRim, uTime; uniform sampler2D tNight, tWater; varying vec3 vGW; varying vec2 vUv2;\n` + NOISE + sh.fragmentShader
+    sh.fragmentShader = `uniform vec3 uHoleW, uGC, uSunV; uniform float uCosA, uCosRim, uTime; uniform sampler2D tNight, tWater, tEat; varying vec3 vGW; varying vec2 vUv2;\n` + NOISE + sh.fragmentShader
       .replace('void main() {', `void main() {
         float hd = dot(normalize(vGW - uGC), uHoleW);
         ${cut ? 'if (hd > uCosA) discard;' : ''}
@@ -2130,17 +2131,62 @@ function globeMat(kind, cut = true) {
         vec3 rock = vec3(0.2, 0.13, 0.09) * (0.7 + 0.6 * fbm(vMapUv * vec2(400.0, 200.0)));
         diffuseColor.rgb = mix(rock, diffuseColor.rgb, smoothstep(0.35, 0.65, wet));` : ''}`)
       .replace('#include <color_fragment>', `#include <color_fragment>
+        ${kind === 'land' ? `float eaten = smoothstep(0.3, 0.7, texture2D(tEat, vMapUv).r);
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.2, 0.13, 0.09) * (0.7 + 0.6 * fbm(vMapUv * vec2(400.0, 200.0))), eaten);` : 'float eaten = 0.0;'}
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.45, 0.22, 0.1) * (0.8 + 0.4 * vnoise(vGW.xz * 0.5)), rim);`)
       .replace('#include <metalnessmap_fragment>', `#include <metalnessmap_fragment>
         ${kind === 'floor' ? 'roughnessFactor = mix(0.95, 0.35, smoothstep(0.35, 0.65, texture2D(tWater, vMapUv).r));' : ''}`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
         float night = smoothstep(0.1, -0.25, dot(normal, uSunV));
-        ${kind === 'land' ? 'totalEmissiveRadiance += texture2D(tNight, vMapUv).rgb * night * 1.6;' : ''}
+        ${kind === 'land' ? 'totalEmissiveRadiance += texture2D(tNight, vMapUv).rgb * night * 1.6 * (1.0 - eaten);' : ''}
         ${kind === 'city' ? 'totalEmissiveRadiance += vec3(1.0, 0.75, 0.4) * night * 0.9 * diffuseColor.a * (0.4 + 0.6 * hash12(floor(vUv2 * 60.0)));' : ''}`);
   };
   m.customProgramCacheKey = () => 'globe-' + kind + (cut ? '' : '-nocut');
   return m;
 }
+// ---- edible land: thousands of regions scattered over every country; what you swallow turns to bedrock
+const eatMask = document.createElement('canvas'); eatMask.width = 1024; eatMask.height = 512;
+const eatCtx = eatMask.getContext('2d'); eatCtx.fillStyle = '#000'; eatCtx.fillRect(0, 0, 1024, 512);
+const eatTex = new THREE.CanvasTexture(eatMask);
+function paintEaten(lon, lat, rKm) {
+  const x = (lon + 180) / 360 * 1024, y = (90 - lat) / 180 * 512;
+  const ry = rKm / 111.2 / 180 * 512, rx = ry / Math.max(0.08, Math.cos(lat * Math.PI / 180));
+  eatCtx.fillStyle = '#fff'; eatCtx.beginPath(); eatCtx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); eatCtx.fill();
+  if (x - rx < 0) { eatCtx.beginPath(); eatCtx.ellipse(x + 1024, y, rx, ry, 0, 0, Math.PI * 2); eatCtx.fill(); }
+  if (x + rx > 1024) { eatCtx.beginPath(); eatCtx.ellipse(x - 1024, y, rx, ry, 0, 0, Math.PI * 2); eatCtx.fill(); }
+  eatTex.needsUpdate = true;
+}
+function pointInRing(lon, lat, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i], [xj, yj] = ring[j];
+    if (((yi > lat) !== (yj > lat)) && lon < (xj - xi) * (lat - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+function countryAt(lon, lat) {
+  for (const c of WORLD.countries) {
+    if (!c.bb) { let a = 180, b = -180, d = 90, e = -90; for (const rings of c.p) for (const [x, y] of rings[0]) { a = Math.min(a, x); b = Math.max(b, x); d = Math.min(d, y); e = Math.max(e, y); } c.bb = [a, b, d, e]; }
+    if (lon < c.bb[0] || lon > c.bb[1] || lat < c.bb[2] || lat > c.bb[3]) continue;
+    for (const rings of c.p) if (pointInRing(lon, lat, rings[0]) && !rings.slice(1).some(h => pointInRing(lon, lat, h))) return c;
+  }
+  return null;
+}
+function buildFill() {
+  const rnd = mulberry(777), fill = [];
+  const kinds = [[30, 'Town'], [70, 'County'], [160, 'District'], [320, 'Region'], [Infinity, 'Province']];
+  let tries = 0;
+  while (fill.length < FILL_N && tries++ < FILL_N * 12) {
+    const lat = Math.asin(rnd() * 2 - 1) * 180 / Math.PI, lon = rnd() * 360 - 180;
+    const c = countryAt(lon, lat);
+    if (!c) continue;
+    const r = FILL_MIN * Math.pow(FILL_MAX / FILL_MIN, Math.pow(rnd(), FILL_SKEW));
+    const kind = kinds.find(k => r < k[0])[1];
+    fill.push({ name: kind + ' in ' + c.n, r, lon, lat, n: ll2v(lon, lat), state: 0 });
+  }
+  return fill;
+}
+
 let landMat, landFallMat, floorMat, cityMat, cityFallMat, cloudMat;
 // triangulate a country in lon/lat, subdivide so it hugs the sphere, wind every face outward
 function countryGeo(polys) {
@@ -2223,8 +2269,9 @@ function buildGlobe() {
     mesh.quaternion.setFromUnitVectors(new V3(0, 0, 1), n);
     mesh.scale.setScalar(rk / RE * GR);
     globe.group.add(mesh);
-    globe.cities.push({ name, r: rk, n, mesh, state: 0, t: 0 });
+    globe.cities.push({ name, r: rk, n, lon, lat, mesh, state: 0, t: 0 });
   }
+  globe.fill = buildFill();
   // the pit: dirt walls down into the planet from the rim
   const wall = new THREE.Mesh(holeWall.geometry, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide }));
   const bottom = new THREE.Mesh(holeFloor.geometry, new THREE.MeshBasicMaterial({ color: 0x000000 }));
@@ -2248,12 +2295,12 @@ function enterGlobe() {
   ll2v(-74.0, 40.7, globe.h);               // you started in New York
   for (const o of cosmos.objs) cRemove(o); cosmos.objs.length = 0;
   fadeEl.classList.add('on'); setTimeout(() => fadeEl.classList.remove('on'), 350);
-  toast('Now: the whole Earth');
+  toast('The whole Earth: land swallows as you cross it');
   updateHud();
 }
 function eatGlobeThing(o, kind) {
   o.state = 1; o.t = 0;
-  if (kind === 'country') o.mesh.material = landFallMat; else o.mesh.material = cityFallMat;
+  if (kind === 'country') o.mesh.material = landFallMat; else { o.mesh.material = cityFallMat; paintEaten(o.lon, o.lat, o.r); }
   globe.falling.push(o);
   const rel = o.r / globe.r;
   globe.targetR = Math.sqrt(globe.targetR * globe.targetR + KG * o.r * o.r);
@@ -2290,6 +2337,12 @@ function globeFrame(dt) {
       if (ok) eatGlobeThing(c, 'country');
     }
     for (const c of globe.cities) if (!c.state && Math.acos(Math.min(1, c.n.dot(globe.h))) + c.r / RE <= alpha) eatGlobeThing(c, 'city');
+    for (const c of globe.fill) if (!c.state && c.r <= globe.r && Math.acos(Math.min(1, c.n.dot(globe.h))) + c.r / RE <= alpha) {
+      c.state = 1; paintEaten(c.lon, c.lat, c.r);
+      globe.targetR = Math.sqrt(globe.targetR * globe.targetR + KG * c.r * c.r);
+      hole.score += Math.round(10 + 100 * (c.r / globe.r) ** 2); hole.eaten++;
+      if (c.r > globe.r * 0.35) popText(c.name + ' · ' + fmtLen(Math.log10(c.r * 2000)), 0, 0, false, gCam, GR * 1.002);
+    }
   }
   for (let i = globe.falling.length - 1; i >= 0; i--) {
     const o = globe.falling[i]; o.t += dt * 0.8;
@@ -2331,7 +2384,12 @@ function globeFrame(dt) {
   gSun.position.copy(GSUN).multiplyScalar(5000);
   gHoleU.uSunV.value.copy(GSUN).transformDirection(gCam.matrixWorldInverse);
   gSky.position.copy(gCam.position);
-  hideMarkers();
+  const near = [];
+  const consider = (o, v) => { if (o.state || o.r > globe.r) return; near.push({ o, v, d: Math.acos(Math.min(1, v.dot(globe.h))) }); };
+  for (const c of globe.countries) consider(c, c.cen);
+  for (const c of globe.cities) consider(c, c.n);
+  near.sort((a, b) => a.d - b.d);
+  placeMarkers(near.slice(0, 4).filter(m => m.d > alpha).map(m => ({ pos: globe.group.localToWorld(m.v.clone().multiplyScalar(GR)), px: 0, fits: true, label: m.o.name + ' · ' + fmtLen(Math.log10(Math.max(1, (m.d - alpha) * RE) * 1000)) })), gCam);
   renderStage(gScene, gCam, 0.25);
 }
 
@@ -2448,7 +2506,8 @@ function buildSolar() {
     const m = new THREE.Group(); m.add(new THREE.Mesh(sphereG, name === 'Io' ? planetMat(0, 0xe8d060, 0xa88a30, 0xf2f0a0) : name === 'Titan' ? planetMat(2, 0xd8a050, 0xc08a40, 0xe8b868, { band: 0.15 }) : planetMat(0, col, shade(col, 0.6), shade(col, 1.25))));
     sScene.add(m);
     const gl = glint(0xcfd6e0); gl.scale.setScalar(0.006); sScene.add(gl);
-    solar.bodies.push({ name, r, parent: p, dist, w: Math.PI * 2 / (20 + Math.abs(days) * 1.5) * Math.sign(days), th0: Math.random() * 6.28, ax: 0, az: 0, mesh: m, glint: gl, moon: true, state: 0, t: 0, spin: 0.08 });
+    const period = Math.max(Math.abs(days) * 60, 2 * Math.PI * dist / 6000);
+    solar.bodies.push({ name, r, parent: p, dist, w: Math.PI * 2 / period * Math.sign(days), th0: Math.random() * 6.28, ax: 0, az: 0, mesh: m, glint: gl, moon: true, state: 0, t: 0, spin: 0.08 });
   }
   // asteroid belt and Kuiper belt
   const rnd = mulberry(4242);
