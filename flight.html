@@ -6972,18 +6972,21 @@ function layoutTouch() {
      the systems and the brakes go right, and the centre of the glass belongs
      to the aeroplane. */
   const tw = 54 * u, gp = 9 * u;
-  const hLev = 124 * u, hPush = 46 * u, hTog = 62 * u, hPad = 46 * u;
+  let hLev = 124 * u;
+  const hPush = 46 * u, hTog = 62 * u, hPad = 46 * u;
   let th, LX, LB, RX, RB, cwL, cwR, stack;
   if (PORTRAIT) {
-    /* Portrait has no width to spare, so the left console is a single column
-       of three and the right one is two narrow ones. That leaves a clear
-       channel a third of the screen wide straight down the middle. */
+    /* Portrait has no width to spare, so BOTH consoles are a single column
+       and the pushbuttons are split between them — two on the left above the
+       levers, two on the right above the switches. Two narrow columns on the
+       right put their inboard edge five per cent past the centre of the
+       screen, which is exactly where the aeroplane is drawn. */
     th = Math.min(H * .30, 300 * u);
     T.thr.x = W - sr - tw - 16 * u;
     T.thr.y = H - sb - th - 16 * u;
-    cwL = 62 * u; cwR = 52 * u; stack = 1;
+    cwL = 62 * u; cwR = 62 * u; stack = 1; hLev = 106 * u;
     LX = sl + 12 * u;
-    RX = T.thr.x - 12 * u - (cwR * 2 + gp);
+    RX = T.thr.x - 12 * u - cwR;
     LB = RB = T.thr.y - 14 * u;
   } else {
     th = Math.min(H * .54, 330 * u);
@@ -6998,14 +7001,17 @@ function layoutTouch() {
     LB = TOUCH.on ? SAFE.t * DPR + 116 * u + hLev : H - sb - 16 * u;
   }
   T.thr.w = tw; T.thr.h = th;
-  const BR = stack ? cwR * 2 + gp : cwR * 3 + gp * 2;
+  const BR = stack ? cwR : cwR * 3 + gp * 2;
   T.btns = [];
   // ---- left console: the things that move ----
   if (stack) {
+    const yCh = LB - hLev, yFl = yCh - gp - hLev, yGe = yFl - gp - hLev;
     T.btns.push(
-      { k: "gear", kind: "lever", x: LX, y: LB - hLev * 3 - gp * 2, w: cwL, h: hLev },
-      { k: "flap", kind: "lever", x: LX, y: LB - hLev * 2 - gp, w: cwL, h: hLev },
-      { k: "chute", kind: "handle", x: LX, y: LB - hLev, w: cwL, h: hLev });
+      { k: "map", kind: "push", x: LX, y: yGe - gp * 2 - hPush * 2, w: cwL, h: hPush },
+      { k: "cam", kind: "push", x: LX, y: yGe - gp - hPush, w: cwL, h: hPush },
+      { k: "gear", kind: "lever", x: LX, y: yGe, w: cwL, h: hLev },
+      { k: "flap", kind: "lever", x: LX, y: yFl, w: cwL, h: hLev },
+      { k: "chute", kind: "handle", x: LX, y: yCh, w: cwL, h: hLev });
   } else {
     T.btns.push(
       { k: "gear", kind: "lever", x: LX, y: LB - hLev, w: cwL, h: hLev },
@@ -7015,16 +7021,14 @@ function layoutTouch() {
   // ---- right console: the systems, and the brakes under them ----
   const yPad = RB - hPad;
   if (stack) {
-    const ySafe = yPad - gp - hTog, yTog = ySafe - gp - hTog;
-    const yP2 = yTog - gp - hPush, yP1 = yP2 - gp - hPush;
+    const ySafe = yPad - gp - hTog, ySpd = ySafe - gp - hTog, yAp = ySpd - gp - hTog;
+    const yP2 = yAp - gp - hPush, yP1 = yP2 - gp - hPush;
     T.btns.push(
-      { k: "map", kind: "push", x: RX, y: yP1, w: cwR, h: hPush },
-      { k: "cam", kind: "push", x: RX + cwR + gp, y: yP1, w: cwR, h: hPush },
-      { k: "keys", kind: "push", x: RX, y: yP2, w: cwR, h: hPush },
-      { k: "reset", kind: "push", x: RX + cwR + gp, y: yP2, w: cwR, h: hPush },
-      { k: "ap", kind: "toggle", x: RX, y: yTog, w: cwR, h: hTog },
-      { k: "spd", kind: "toggle", x: RX + cwR + gp, y: yTog, w: cwR, h: hTog },
-      { k: "safe", kind: "toggle", x: RX, y: ySafe, w: BR, h: hTog },
+      { k: "keys", kind: "push", x: RX, y: yP1, w: cwR, h: hPush },
+      { k: "reset", kind: "push", x: RX, y: yP2, w: cwR, h: hPush },
+      { k: "ap", kind: "toggle", x: RX, y: yAp, w: cwR, h: hTog },
+      { k: "spd", kind: "toggle", x: RX, y: ySpd, w: cwR, h: hTog },
+      { k: "safe", kind: "toggle", x: RX, y: ySafe, w: cwR, h: hTog },
       { k: "brake", kind: "pad", x: RX, y: yPad, w: BR, h: hPad, hold: 1 });
   } else {
     const yTog = yPad - gp - hTog, yPush = yTog - gp - hPush;
@@ -7040,11 +7044,22 @@ function layoutTouch() {
       { k: "brake", kind: "pad", x: RX, y: yPad, w: BR, h: hPad, hold: 1 });
   }
   const bx = RX;
-  const rw = 76 * u, rh = 54 * u, ry = H - sb - 16 * u - rh;
-  const rcx = PORTRAIT ? W * .5 : clamp((T.stick.hx + r + bx) / 2, T.stick.hx + r + rw + 16 * u, bx - rw - 16 * u);
+  /* Rudder: one pedal per side, each attached to its own console. They used
+     to sit as a pair in the middle of the bottom edge, which is the one part
+     of the glass the aeroplane is drawn on — and a pedal on the centreline is
+     not what a rudder is anyway. Left pedal, left console; right pedal, right
+     console; and each one goes below its console if there is room under it
+     and above it if there is not. */
+  const rw = stack ? cwL : 96 * u, rh = 50 * u;
+  const lTop = T.btns[0].y;
+  const fits = y2 => y2 + rh <= H - sb - 8 * u;
+  const rudLY = fits(LB + gp) ? LB + gp : lTop - gp - rh;
+  let rTop = RB;
+  for (const b2 of T.btns) if (b2.x >= RX - 1 && b2.y < rTop) rTop = b2.y;
+  const rudRY = fits(RB + gp) ? RB + gp : rTop - gp - rh;
   T.rud.boxes = [
-    { k: "rudL", x: rcx - rw - 8 * u, y: ry, w: rw, h: rh },
-    { k: "rudR", x: rcx + 8 * u, y: ry, w: rw, h: rh }
+    { k: "rudL", x: LX, y: rudLY, w: rw, h: rh },
+    { k: "rudR", x: RX + BR - rw, y: rudRY, w: rw, h: rh }
   ];
   // tucked under the altitude read-out so it never sits on top of it
   T.pause = { x: W - sr - 12 * u - 46 * u, y: st + 8 * u + 56 * u + 20 * u, w: 46 * u, h: 40 * u };
@@ -7998,7 +8013,11 @@ function drawHUDCompact() {
     ctx.fillText(warn[i][0], CX, CY - 60 * u + i * 24 * u);
   }
   hudFont(11.5 * u); ctx.fillStyle = "rgba(200,224,244,.85)"; ctx.textAlign = "center";
-  ctx.fillText(objectiveLine(), CX, hy + 26 * u + (camMode === 1 ? 14 * u : 118 * u));
+  /* Clear of the corner panels. In portrait the glass is narrow enough that
+     the heading strip and the two corner read-outs already use the whole top
+     edge, and this line was printed straight across both of them. */
+  ctx.fillText(objectiveLine(), CX,
+    hy + 26 * u + (camMode === 1 ? 14 * u : 118 * u) + (PORTRAIT ? 96 * u : 0));
   ctx.restore();
 }
 
