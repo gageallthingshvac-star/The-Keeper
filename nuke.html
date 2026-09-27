@@ -47,11 +47,15 @@
   #bdesc{color:var(--dim);font-size:12px;margin-top:2px}
   #beff{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:6px;font-size:12px;font-variant-numeric:tabular-nums}
   #beff i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:-1px}
-  #chips{display:flex;gap:6px;overflow-x:auto;margin:9px -2px 0;padding:2px 2px 4px;scrollbar-width:none;touch-action:pan-x}
-  #chips::-webkit-scrollbar{display:none}
+  #chips,.chips2{display:flex;gap:6px;overflow-x:auto;margin:9px -2px 0;padding:2px 2px 4px;scrollbar-width:none;touch-action:pan-x}
+  #chips::-webkit-scrollbar,.chips2::-webkit-scrollbar{display:none}
+  .chips2{margin-top:4px}
   .chip{flex:0 0 auto;padding:6px 10px;border-radius:999px;font-size:12px;white-space:nowrap}
   .chip small{color:var(--dim);margin-left:5px}
   .chip.nuc small{color:#f7a07a}
+  .chip.nat small{color:#9fd3a0}
+  #targets .chip{background:rgba(120,170,255,.08)}
+  #targets .chip.on{background:rgba(120,170,255,.22);border-color:rgba(140,185,255,.7);color:#dbe8ff}
   .row{display:flex;align-items:center;gap:8px;margin-top:8px}
   .row label{font-size:12px;color:var(--dim);min-width:40px}
   input[type=range]{flex:1;accent-color:var(--hot);touch-action:pan-x;min-width:60px}
@@ -101,6 +105,7 @@
   <div id="beff"></div>
   <div class="row" id="customRow"><label>Yield</label><input type="range" id="cy" min="0" max="1000" value="500" /></div>
   <div id="chips"></div>
+  <div id="targets" class="chips2"></div>
   <div class="row"><label>Scale</label><input type="range" id="scale" min="0" max="1000" value="200" /><span id="scaleVal"></span></div>
   <div class="row">
     <div class="seg" id="burst"><button data-v="surface" class="on">Surface</button><button data-v="air">Airburst</button></div>
@@ -161,14 +166,23 @@ const BOMBS=[
   {n:'W76-1',kt:90,nuc:1,d:'Trident II submarine warhead; the most numerous in the US arsenal.'},
   {n:'W87',kt:300,nuc:1,d:'Minuteman III ICBM warhead.'},
   {n:'W88',kt:475,nuc:1,d:'Trident II high-yield warhead.'},
+  {n:'Chelyabinsk meteor',kt:500,nuc:1,kind:'impact',y:2013,air:29700,d:'20 m asteroid that exploded ~30 km over Russia. Blew out windows across a city.'},
   {n:'B83',kt:1200,nuc:1,d:'Largest weapon in the current US stockpile.'},
   {n:'B53',kt:9000,nuc:1,d:'Cold-war US bunker-buster bomb, retired 2011.'},
+  {n:'Meteor Crater impact',kt:10000,nuc:1,kind:'impact',d:'The ~50 m iron asteroid that dug Arizona\'s Barringer Crater 50,000 years ago.'},
   {n:'Ivy Mike',kt:10400,nuc:1,y:1952,d:'First full-scale hydrogen bomb test. Erased the island of Elugelab.'},
+  {n:'Tunguska event',kt:12000,nuc:1,kind:'impact',y:1908,air:8000,d:'Asteroid airburst over Siberia. Flattened 80 million trees across 2,150 km².'},
   {n:'Castle Bravo',kt:15000,nuc:1,y:1954,d:'Largest US test — 2.5× its predicted yield.'},
   {n:'B41',kt:25000,nuc:1,d:'Highest-yield weapon the US ever deployed.'},
   {n:'Tsar Bomba',kt:50000,nuc:1,y:1961,air:4000,d:'AN602. The largest explosion humans have ever made. Airburst at ~4 km.'},
   {n:'Tsar Bomba (full design)',kt:100000,nuc:1,air:4000,d:'The 100 Mt configuration. Designed, never detonated.'},
-  {n:'Custom',custom:true,d:'Pick any yield from 1 kg to 100 Mt. Above 10 t it is treated as nuclear.'}
+  {n:'Krakatoa eruption',kt:200000,nuc:0,kind:'volcano',y:1883,d:'Volcanic explosion heard 4,800 km away. Ash column reached ~80 km.'},
+  {n:'Gnomon (proposed)',kt:1e6,nuc:1,d:'1 Gt device Edward Teller proposed in 1954 as a first stage for Sundial. Never built.'},
+  {n:'Apophis impact',kt:1.2e6,nuc:1,kind:'impact',d:'What asteroid 99942 Apophis (~370 m) would release if it ever hit. It will miss in 2029.'},
+  {n:'Sundial (proposed)',kt:1e7,nuc:1,d:'Teller\'s 10 Gt "doomsday" design. Largest weapon ever seriously proposed.'},
+  {n:'Comet fragment G (SL9)',kt:6e9,nuc:1,kind:'impact',y:1994,d:'Largest Shoemaker–Levy 9 fragment, which hit Jupiter with ~6 Tt. Shown here as if it hit Earth.'},
+  {n:'Chicxulub impact',kt:1e11,nuc:1,kind:'impact',d:'The ~10 km asteroid that ended the dinosaurs 66 million years ago. ~100 teratons.'},
+  {n:'Custom',custom:true,d:'Pick any yield from 1 kg to 100 teratons. Above 10 t it is treated as nuclear.'}
 ];
 
 /* Peak overpressure vs scaled distance (km per kt^1/3), log-log interpolated */
@@ -190,8 +204,8 @@ function makeFx(kt,nuc,burst,hob){
   f.Rfg=f.hb===0?f.Rfb*0.85:(f.Rfb>f.hb?Math.sqrt(f.Rfb*f.Rfb-f.hb*f.hb):0);
   f.Rc=f.hb===0?(nuc?30:45)*f.cr:0;       // crater radius
   f.Dc=f.Rc*0.32;
-  f.Rth=nuc?700*Math.pow(kt,0.41):0;      // 3rd-degree burns / ignition
-  f.H=nuc?Math.min(5380*Math.pow(kt,0.229),80*f.Rfb):7*f.Rfb; // cloud top
+  f.Rth=nuc?Math.min(700*Math.pow(kt,0.41),3e6):0;      // 3rd-degree burns / ignition
+  f.H=Math.min(nuc?Math.min(5380*Math.pow(kt,0.229),80*f.Rfb):7*f.Rfb,5e5); // cloud top
   f.Rcap=f.H*(nuc?0.42:0.3);
   f.psiAt=d=>{let p=psiScaled(Math.hypot(d,f.hb)/1000/f.crb);if(f.hb>0)p*=1+0.6*smooth(0.4*f.hb,1.4*f.hb,d);return p;};
   f.rAt=p=>{if(f.psiAt(0)<p)return 0;let a=0,b=2e7;for(let i=0;i<64;i++){const m=(a+b)/2;if(f.psiAt(m)>p)a=m;else b=m;}return a;};
@@ -217,7 +231,8 @@ const P={
   crate2:LIN(0xb08a57),pole:LIN(0x2d2f33),lamp:LIN(0xf3e6b0),red:LIN(0xb8322a),bin:LIN(0x3e5a3a),
   hedge:LIN(0x3b6a2c),barn:LIN(0x93302a),silo:LIN(0xb8b8b0),roofGray:LIN(0x5a5a5e),
   char:LIN(0x1f1b19),scorch:LIN(0x6f5a3c),glass:LIN(0x2e2723),rubble:LIN(0x6c6258),dirt:LIN(0x6b5540),
-  dust:LIN(0xa39581),cityAgg:LIN(0x7b7c7e)
+  dust:LIN(0xa39581),deepSea:LIN(0x1b4a74),steel:LIN(0x6f777e),deck:LIN(0x4d5359),sandstone:LIN(0xcdb57e),
+  seatA:LIN(0xb3312c),seatB:LIN(0x2d56a0),concrete:LIN(0xb9b6ae),spire:LIN(0xcfd8e0),field:LIN(0x4f9a3a),field2:LIN(0x5aa843),cityAgg:LIN(0x7b7c7e)
 };
 const TOWER=[0x8fa3b3,0x6d7f8c,0xb8b2a6,0x56646e,0xc7c0b0,0x9aa7a0].map(LIN);
 const BRICK=[0x9c5a43,0xb07a55,0xc9b79c,0x8a8f94,0xa39a86,0x7e6a5a].map(LIN);
@@ -239,13 +254,32 @@ function push(y0,y1,c,mat,cls){
 }
 function pushG(h,c,nat){SC.n=0;SC.nat=nat;push(-1e9,h,c,M_GROUND,C_GROUND);}
 
+const VOLC={x:-45000,z:60000,r:24000,h:3700};
+const RANGE={x:-320000,z:-180000,r:170000,h:8800};
+const MEGA={x:-900000,z:400000,r:45000};
 function terrainRaw(x,z){
   let h=25+55*vnoise(x/14000+11.3,z/14000-7.1)+22*vnoise(x/3100+3.7,z/3100+9.2)+6*vnoise(x/700+1.1,z/700-4.4)+1.2*vnoise(x/90,z/90);
   const coast=42000+9000*vnoise(z/26000,5.3);
   h-=smooth(coast-6000,coast+5000,x)*150;
+  // continents and ocean basins
+  const dO=Math.hypot(x,z);
+  const cont=0.65*vnoise(x/1.2e6+3.3,z/1.2e6-1.7)+0.35*vnoise(x/3.5e5+7.1,z/3.5e5+2.2)+1.2*(1-smooth(3e5,2e6,dO));
+  h+=cont<0?cont*9000:Math.min(cont,0.3)*150;
+  // a stratovolcano with a summit crater
+  const vd=Math.hypot(x-VOLC.x,z-VOLC.z);
+  if(vd<VOLC.r){h+=VOLC.h*Math.pow(1-vd/VOLC.r,1.7);if(vd<900)h-=420*(1-vd/900);}
+  // a Himalaya-sized range
+  const rd=Math.hypot(x-RANGE.x,z-RANGE.z);
+  if(rd<RANGE.r){const ridge=1-Math.abs(vnoise(x/38000+4.4,z/38000-8.1));h+=RANGE.h*Math.pow(1-rd/RANGE.r,1.1)*(0.3+0.7*ridge*ridge);}
   return h;
 }
-function terrainBase(x,z){const f=1-smooth(3500,9000,Math.hypot(x,z));return lerp(terrainRaw(x,z),6,f);}
+function terrainBase(x,z){
+  let h=terrainRaw(x,z);
+  h=lerp(h,6,1-smooth(3500,9000,Math.hypot(x,z)));
+  const dm=Math.hypot(x-MEGA.x,z-MEGA.z);
+  if(dm<90000)h=lerp(h,20,1-smooth(MEGA.r*0.8,90000,dm));
+  return h;
+}
 
 const TOWN=26000,townCache=new Map();
 function town(a,b){
@@ -260,6 +294,7 @@ function town(a,b){
 const fall=(d,r)=>d>=r?0:Math.pow(1-d/r,0.7);
 function urban(x,z){
   let I=fall(Math.hypot(x,z),5200);
+  const dm=Math.hypot(x-MEGA.x,z-MEGA.z);if(dm<MEGA.r)I=Math.max(I,fall(dm,MEGA.r));
   const cx=Math.floor(x/TOWN),cz=Math.floor(z/TOWN);
   for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){
     const t=town(cx+i,cz+j);if(t)I=Math.max(I,0.72*fall(Math.hypot(x-t.x,z-t.z),t.r));
@@ -293,11 +328,59 @@ function house(hx,hz,h,wallH,wc,rc,w,d){
   return false;
 }
 
+/* Landmarks: progressively bigger things to aim at */
+const LANDMARKS=[
+  {x:300,z:200,r:45,f(dx,dz,v){ // 828 m supertall with setbacks
+    if(Math.abs(dx)>40||Math.abs(dz)>40)return false;
+    const h=terrainBase(dx+300,dz+200),rr=Math.hypot(dx,dz);
+    pushG(h,P.plaza,0);
+    const T=[[Math.max(2.5,v*0.5),828],[7,700],[13,600],[19,480],[25,350],[31,200],[36,90]];
+    for(const [r,H] of T)if(rr<r){push(h,h+H,P.spire,M_BLD,C_TOWER);return true;}
+    return true;
+  }},
+  {x:-700,z:500,r:170,f(dx,dz,v){ // stadium
+    const q=Math.hypot(dx/140,dz/110);if(q>1.1)return false;
+    const h=terrainBase(dx-700,dz+500);
+    if(q<0.6){pushG(h,(Math.floor(dx/6)&1)?P.field:P.field2,1);return true;}
+    if(q>=1){pushG(h,P.plaza,0);return true;}
+    pushG(h,P.concrete,0);
+    const top=h+6+40*(q-0.6)/0.4,seat=(Math.floor(Math.atan2(dz,dx)*12)&1)?P.seatA:P.seatB;
+    push(h,top,v<4&&q<0.97?seat:P.concrete,M_NAT,C_MID);
+    if(q>0.78)push(Math.max(top+2,h+49),h+52,P.white,M_NAT,C_ROOF);
+    return true;
+  }},
+  {x:-2600,z:-1900,r:170,f(dx,dz,v){ // Great Pyramid, 146 m
+    const m=Math.max(Math.abs(dx),Math.abs(dz));if(m>160)return false;
+    const h=terrainBase(dx-2600,dz-1900);
+    pushG(h,P.sand,1);
+    if(m<115)push(h,h+146*(1-m/115),P.sandstone,M_NAT,C_STONE);
+    return true;
+  }},
+  {x:60000,z:0,r:700,f(dx,dz,v){ // carrier group at sea
+    const hb=terrainBase(dx+60000,dz);if(hb>-5)return false;
+    const hull=(L,W,H,ox,oz)=>{const ax=dx-ox,az=Math.abs(dz-oz);if(Math.abs(ax)>L)return 0;
+      const w=W*(ax>L*0.6?1-(ax-L*0.6)/(L*0.4)*0.85:1);return az<w?H:0;};
+    let H=hull(165,38,20,0,0),isl=0;
+    if(H&&Math.abs(dx-40)<18&&dz>20&&dz<34)isl=48;
+    const e1=hull(78,10,12,300,-420),e2=hull(78,10,12,-250,380);
+    const top=Math.max(isl||H,e1,e2);
+    if(!top)return false;
+    const fl=Math.min(hb,-0.3);
+    pushG(fl,P.seabed,1);push(fl,0,P.water,M_WATER,C_WATER);
+    push(0,top,isl?P.steel:(H&&v<3&&Math.abs(dz)<0.6)?P.white:(H?P.deck:P.steel),M_NAT,C_MID);
+    return true;
+  }}
+];
 function features(x,z,v){
   SC.n=0;
+  for(let i=0;i<LANDMARKS.length;i++){
+    const L=LANDMARKS[i];
+    if(Math.abs(x-L.x)<L.r&&Math.abs(z-L.z)<L.r&&L.f(x-L.x,z-L.z,v))return;
+  }
   const hb=terrainBase(x,z);
   if(hb<0.5){
     const fl=Math.min(hb,-0.3);
+    if(-fl<v*0.6){pushG(0,hb<-400?P.deepSea:P.water,0);SC.mat[0]=M_WATER;return;}
     pushG(fl,hb<-3?P.seabed:P.sand,1);
     push(fl,0,P.water,M_WATER,C_WATER);
     return;
@@ -308,8 +391,9 @@ function features(x,z,v){
 
 function ruralF(x,z,v,hb){
   const h=hb+0.3*vnoise(x/12,z/12)+0.05*vnoise(x/1.7,z/1.7);
-  if(hb>260){pushG(h,P.snow,1);return;}
-  if(hb>170){pushG(h,P.rock,1);return;}
+  if(hb>2600){pushG(h,P.snow,1);return;}
+  if(hb>1100){pushG(h,hb>2000&&vnoise(x/900,z/900)>0.2?P.snow:P.rock,1);return;}
+  if(hb>600){pushG(h,vnoise(x/600,z/600)>0?P.rock:P.forest,1);return;}
   if(hb<1.6){pushG(h,P.sand,1);return;}
   if(v<40&&(mod(x+1200,2400)<7||mod(z+1200,2400)<7)){pushG(hb,P.gravel,0);return;}
   const fm=vnoise(x/1800+50,z/1800-20)*0.7+vnoise(x/420+9,z/420+3)*0.3;
@@ -1104,7 +1188,7 @@ function boom(str,big){
 /* =====================================================================
    View / controls
    ===================================================================== */
-const SMIN=4,SMAX=6e5;
+const SMIN=4,SMAX=2.5e7;
 const view={S:30,targetS:null};
 const controls=new OrbitControls(camera,renderer.domElement);
 controls.enableDamping=true;controls.dampingFactor=0.12;
@@ -1147,7 +1231,9 @@ function fmtYield(kt){
   if(kt<1e-3)return +(kt*1e6).toPrecision(3)+' kg';
   if(kt<1)return +(kt*1e3).toPrecision(3)+' t';
   if(kt<1000)return +kt.toPrecision(3)+' kt';
-  return +(kt/1000).toPrecision(3)+' Mt';
+  if(kt<1e6)return +(kt/1000).toPrecision(3)+' Mt';
+  if(kt<1e9)return +(kt/1e6).toPrecision(3)+' Gt';
+  return +(kt/1e9).toPrecision(3)+' Tt';
 }
 function fmtTime(s){
   if(s<1e-3)return (s*1e6).toFixed(0)+' µs';
@@ -1173,9 +1259,33 @@ function buildChips(){
   const box=$('chips');box.innerHTML='';
   BOMBS.forEach((b,i)=>{
     const el=document.createElement('button');
-    el.className='chip'+(b.nuc?' nuc':'')+(i===sel?' on':'');
+    el.className='chip'+(b.kind?' nat':b.nuc?' nuc':'')+(i===sel?' on':'');
     el.innerHTML=b.custom?'Custom…':`${b.n}<small>${fmtYield(b.kt)}</small>`;
     el.onclick=()=>{select(i,true);};
+    box.appendChild(el);
+  });
+}
+const TARGETS=[
+  {n:'Park kiosk',x:0,z:0,S:30},
+  {n:'Great Pyramid',x:-2600,z:-1900,S:1000},
+  {n:'Stadium',x:-700,z:500,S:1000},
+  {n:'828 m supertall',x:300,z:200,S:2600},
+  {n:'Carrier group',x:60000,z:0,S:2200},
+  {n:'City',x:0,z:0,S:14000},
+  {n:'Volcano',x:VOLC.x,z:VOLC.z,S:80000},
+  {n:'Megalopolis',x:MEGA.x,z:MEGA.z,S:160000},
+  {n:'Mountain range',x:RANGE.x,z:RANGE.z,S:600000},
+  {n:'Continent',x:0,z:0,S:1.2e7}
+];
+function buildTargets(){
+  const box=$('targets');box.innerHTML='';
+  TARGETS.forEach(t=>{
+    const el=document.createElement('button');el.className='chip';el.textContent='→ '+t.n;
+    el.onclick=()=>{
+      [...box.children].forEach(c=>c.classList.toggle('on',c===el));
+      gzAnim={from:controls.target.clone(),to:new THREE.Vector3(t.x,0,t.z),t:0};
+      view.targetS=t.S;hideHint();
+    };
     box.appendChild(el);
   });
 }
@@ -1190,7 +1300,7 @@ function select(i,fit){
 function refreshInfo(){
   const b=curBomb(),f=curFx();
   $('bname').textContent=b.n+(b.y?` (${b.y})`:'');
-  $('byield').textContent=fmtYield(b.kt)+(b.nuc?' · nuclear':' · conventional');
+  $('byield').textContent=fmtYield(b.kt)+' · '+(b.kind==='impact'?'impact':b.kind==='volcano'?'volcanic':b.nuc?'nuclear':'conventional');
   $('bdesc').textContent=b.d;
   const parts=[];
   for(const r of RING_DEFS){const v=f[r.k];if(v>0)parts.push(`<span><i style="background:${r.c}"></i>${r.label.split(' — ')[0]} ${fmtDist(v)}</span>`);}
@@ -1202,8 +1312,8 @@ function refreshInfo(){
 function setBurst(v){burst=v;[...$('burst').children].forEach(c=>c.classList.toggle('on',c.dataset.v===v));}
 $('burst').onclick=e=>{const v=e.target.dataset&&e.target.dataset.v;if(v){setBurst(v);refreshInfo();}};
 $('speed').onclick=e=>{const v=e.target.dataset&&e.target.dataset.v;if(v){speed=+v;[...$('speed').children].forEach(c=>c.classList.toggle('on',c===e.target));}};
-$('cy').oninput=()=>{customKt=Math.pow(10,-6+11*$('cy').value/1000);refreshInfo();};
-customKt=Math.pow(10,-6+11*$('cy').value/1000);
+$('cy').oninput=()=>{customKt=Math.pow(10,-6+17*$('cy').value/1000);refreshInfo();};
+customKt=Math.pow(10,-6+17*$('cy').value/1000);
 function fitView(){
   const f=curFx();
   const R=Math.max(f.r1,f.Rth,f.Rfb*3,f.Rc*4);
@@ -1368,7 +1478,7 @@ function fitCamera(){
 addEventListener('resize',fitCamera);fitCamera();
 if(window.ResizeObserver)new ResizeObserver(fitCamera).observe($('panel'));
 
-buildChips();
+buildChips();buildTargets();
 select(0,false);
 fitView();view.S=view.targetS;setDist(view.S*DIST);view.targetS=null;
 maybeRegen(performance.now(),true);
