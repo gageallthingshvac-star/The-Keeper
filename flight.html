@@ -3356,11 +3356,12 @@ const FBW = {
   pSmooth: 3.6,       // how fast the roll-rate command itself is allowed to move
   kPitch: 1.6,        // g loop proportional gain, 1/s
   kPitchI: 1.5,       // g loop integral gain
-  zeta: .62,          // damping ratio the pitch loop holds the short period to
+  zeta: .85,          // damping ratio the pitch loop holds the short period to
   qRef: 9000,         // Pa the ground law gears its authority against
   expo: .30,          // how much of the stick travel is the fine, low-gain part
   kBeta: 13,          // sideslip loop gain
-  kYawD: 1.6          // yaw damper gain
+  kYawD: 1.6,         // yaw damper gain, out of the air
+  zetaY: .55          // damping ratio the yaw loop holds the dutch roll to
 };
 
 /* A stick curve. Straight through would give the same gearing everywhere,
@@ -3640,9 +3641,22 @@ function flightControl(P, dt, e, cE, cA, cR) {
      way (negative beta IS nose right), and carrying that sign across to the
      rate command reversed the rudder everywhere there was no air. */
   const yRate = sR * 0.45 * rcsAuth * (1 + 1.4 * rcsAuth);
+  /* The yaw damper gets the schedule the pitch damper already has, for
+     exactly the same reason it needed one. Its gain was a fixed number of
+     units of RUDDER per unit of rate, while the mode it damps rises in
+     frequency with the square root of dynamic pressure — so at Mach 12 it
+     was applying the same deflection against an oscillation four times
+     quicker, and the aeroplane carried a small permanent dutch roll: seven
+     sideslip reversals in eighteen seconds down low, twenty-three up high,
+     for ever. Expressed as a yaw ACCELERATION per unit of rate it schedules
+     itself against the very mode it is there to kill. Out of the air the old
+     constant stands, because out there it is thrusters against nothing and
+     there is no dutch roll to have. */
+  const wdr = Math.sqrt(Math.max(qS * SPECS.b * SPECS.Cnb / SPECS.Iyaw, .25));
+  const yawD = aero * 2 * FBW.zetaY * wdr + (1 - aero) * FBW.kYawD * (.10 + .16 * rcsAuth);
   let dR = clamp(
-    aero * (((P.beta || 0) - bCmd) * FBW.kBeta / Math.max(rPer, .01) * .12)
-    + (P.w.y - yRate) * FBW.kYawD / Math.max(rPer, .01) * -(.10 + .16 * rcsAuth), -1, 1);
+    aero * (((P.beta || 0) - bCmd) * FBW.kBeta / Math.max(rPer, .01) * .34)
+    - (P.w.y - yRate) * yawD / Math.max(rPer, .01), -1, 1);
   // on the ground the pedals are the nosewheel, and the computer keeps the
   // roll straight rather than trying to hold a sideslip that means nothing
   if (gnd > .5 && P.onGround) {
