@@ -54,6 +54,8 @@
   .chip small{color:var(--dim);margin-left:5px}
   .chip.nuc small{color:#f7a07a}
   .chip.nat small{color:#9fd3a0}
+  .chip.end{border-color:rgba(255,80,60,.45)}
+  .chip.end small{color:#ff8a70}
   #targets .chip{background:rgba(120,170,255,.08)}
   #targets .chip.on{background:rgba(120,170,255,.22);border-color:rgba(140,185,255,.7);color:#dbe8ff}
   .row{display:flex;align-items:center;gap:8px;margin-top:8px}
@@ -182,7 +184,11 @@ const BOMBS=[
   {n:'Sundial (proposed)',kt:1e7,nuc:1,d:'Teller\'s 10 Gt "doomsday" design. Largest weapon ever seriously proposed.'},
   {n:'Comet fragment G (SL9)',kt:6e9,nuc:1,kind:'impact',y:1994,d:'Largest Shoemaker–Levy 9 fragment, which hit Jupiter with ~6 Tt. Shown here as if it hit Earth.'},
   {n:'Chicxulub impact',kt:1e11,nuc:1,kind:'impact',d:'The ~10 km asteroid that ended the dinosaurs 66 million years ago. ~100 teratons.'},
-  {n:'Custom',custom:true,d:'Pick any yield from 1 kg to 100 teratons. Above 10 t it is treated as nuclear.'}
+  {n:'Ocean-boiling impact',kt:2.4e15,nuc:1,kind:'impact',d:'A ~500 km asteroid, like those that hit the early Earth. Boils the oceans and melts the whole crust.'},
+  {n:'Theia impact',kt:2.4e18,nuc:1,kind:'impact',d:'The Mars-sized collision 4.5 billion years ago that melted Earth and threw off the debris that became the Moon.'},
+  {n:'Earth shatterer',kt:5.4e19,nuc:1,kind:'planet',d:'2.2×10³² J, Earth\'s gravitational binding energy: the minimum it takes to blow the planet apart for good.'},
+  {n:'10× overkill',kt:5.4e20,nuc:1,kind:'planet',d:'Ten times the binding energy. The pieces leave fast.'},
+  {n:'Custom',custom:true,d:'Pick any yield from 1 kg up to 10× what it takes to destroy the Earth. Above 10 t it is treated as nuclear.'}
 ];
 
 /* Peak overpressure vs scaled distance (km per kt^1/3), log-log interpolated */
@@ -199,10 +205,10 @@ function makeFx(kt,nuc,burst,hob){
   const f={kt,nuc};
   f.cr=Math.cbrt(kt);
   f.crb=Math.cbrt(nuc?kt:kt*2);          // chemical: ~all energy goes to blast; nuclear: ~half
-  f.Rfb=nuc?55*Math.pow(kt,0.4):150*f.cr; // max fireball radius (m)
+  f.Rfb=Math.min(nuc?55*Math.pow(kt,0.4):150*f.cr,2e7); // max fireball radius (m); past planet size it stops meaning anything
   f.hb=burst==='air'?(hob||Math.max(240*f.crb,f.Rfb*1.15)):0;
   f.Rfg=f.hb===0?f.Rfb*0.85:(f.Rfb>f.hb?Math.sqrt(f.Rfb*f.Rfb-f.hb*f.hb):0);
-  f.Rc=f.hb===0?(nuc?30:45)*f.cr:0;       // crater radius
+  f.Rc=f.hb===0&&kt<1e14?(nuc?30:45)*f.cr:0;       // crater radius (beyond this the crust just melts)
   f.Dc=f.Rc*0.32;
   f.Rth=nuc?Math.min(700*Math.pow(kt,0.41),3e6):0;      // 3rd-degree burns / ignition
   f.H=Math.min(nuc?Math.min(5380*Math.pow(kt,0.229),80*f.Rfb):7*f.Rfb,5e5); // cloud top
@@ -976,8 +982,8 @@ class Blast{
     this.thermalOn=false;this.thermalDone=false;this.heard=false;
     this.gH=groundAt(x,z);
     // real-time table for the shock front: dr/dt from Rankine–Hugoniot
-    const n=320,r0=Math.max(this.Rfb*0.01,0.004);
-    this.rEnd=this.rAt(0.3)*1.05;this.rMax=Math.max(this.rEnd,this.Rth*1.7,this.Rc*1.6)+1;
+    const n=320;
+    this.rEnd=this.rAt(0.3)*1.05;const r0=Math.min(Math.max(this.Rfb*0.01,0.004),this.rEnd*1e-3);this.rMax=Math.max(this.rEnd,this.Rth*1.7,this.Rc*1.6)+1;
     this.tr=new Float64Array(n);this.tt=new Float64Array(n);
     let t=0,prev=r0;
     for(let i=0;i<n;i++){
@@ -1104,6 +1110,135 @@ class Blast{
   }
 }
 
+/* =====================================================================
+   The whole planet — a sphere of blocks that takes over from the flat
+   world once the view is wider than ~13,000 km. Ground zero sits on top,
+   and the flat world maps onto it by distance and bearing from there.
+   ===================================================================== */
+const RE=6.371e6,PN=coarse?48:64,PBS=2*RE/PN;
+const planet={dirty:true,brk:null,n:0,nSurf:0};
+(function buildPlanet(){
+  const surf=[],inner=[];
+  for(let i=0;i<PN;i++)for(let j=0;j<PN;j++)for(let k=0;k<PN;k++){
+    const x=(i+0.5-PN/2)*PBS,y=(j+0.5-PN/2)*PBS,z=(k+0.5-PN/2)*PBS,r=Math.hypot(x,y,z);
+    if(r>RE)continue;
+    (r+PBS*0.9>RE?surf:inner).push([x,y,z,r]);
+  }
+  const all=surf.concat(inner),n=all.length;
+  planet.n=n;planet.nSurf=surf.length;
+  const geo=new THREE.BoxGeometry(1,1,1);
+  geo.setAttribute('aMat',new THREE.InstancedBufferAttribute(new Float32Array(n*2),2));
+  const m=new THREE.InstancedMesh(geo,boxMat,n);
+  m.instanceColor=new THREE.InstancedBufferAttribute(new Float32Array(n*3),3);
+  m.frustumCulled=false;m.count=planet.nSurf;m.visible=false;m.position.set(0,-RE,0);
+  scene.add(m);planet.mesh=m;
+  planet.p0=new Float32Array(n*3);planet.vel=new Float32Array(n*3);planet.fx=new Float64Array(n);planet.fz=new Float64Array(n);planet.rr=new Float32Array(n);
+  const M=m.instanceMatrix.array,C=m.instanceColor.array,A=geo.attributes.aMat.array;
+  const LAY=[[0.19,LIN(0xfff6d8),1],[0.55,LIN(0xffc04a),0.85],[0.9,LIN(0xd4521c),0.55],[2,LIN(0x6b3b2a),0.2]];
+  all.forEach(([x,y,z,r],i)=>{
+    planet.p0[i*3]=x;planet.p0[i*3+1]=y;planet.p0[i*3+2]=z;planet.rr[i]=r/RE;
+    const th=Math.acos(clamp(y/r,-1,1)),ph=Math.atan2(z,x);
+    planet.fx[i]=th*RE*Math.cos(ph);planet.fz[i]=th*RE*Math.sin(ph);
+    const o=i*16;M.fill(0,o,o+16);M[o]=M[o+5]=M[o+10]=PBS*0.999;M[o+12]=x;M[o+13]=y;M[o+14]=z;M[o+15]=1;
+    const rf=r/RE,L=LAY.find(l=>rf<l[0]);
+    C[i*3]=L[1][0];C[i*3+1]=L[1][1];C[i*3+2]=L[1][2];A[i*2]=M_CLOUD;A[i*2+1]=L[2];
+    const d=1/r,sp=(0.35+0.5*Math.random())*(1.2-0.5*rf);
+    planet.vel[i*3]=x*d*sp+(Math.random()-0.5)*0.15;planet.vel[i*3+1]=y*d*sp+(Math.random()-0.5)*0.15;planet.vel[i*3+2]=z*d*sp+(Math.random()-0.5)*0.15;
+  });
+  // atmosphere glow and a star field for the view from space
+  const atm=new THREE.Mesh(new THREE.SphereGeometry(RE*1.035,64,32),new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,
+    uniforms:{uA:{value:1}},
+    vertexShader:`varying vec3 vN;varying vec3 vV;void main(){vec4 mv=modelViewMatrix*vec4(position,1.0);vN=normalize(normalMatrix*normal);vV=normalize(-mv.xyz);gl_Position=projectionMatrix*mv;}`,
+    fragmentShader:`uniform float uA;varying vec3 vN;varying vec3 vV;void main(){float f=1.0-abs(dot(normalize(vN),normalize(vV)));gl_FragColor=vec4(vec3(0.35,0.6,1.0)*pow(f,3.0)*uA,1.0);}`}));
+  atm.position.set(0,-RE,0);atm.visible=false;scene.add(atm);planet.atm=atm;
+  const sp=[];for(let i=0;i<4000;i++){const u=Math.random()*2-1,a=Math.random()*Math.PI*2,q=Math.sqrt(1-u*u);sp.push(q*Math.cos(a),u,q*Math.sin(a));}
+  const sg=new THREE.BufferGeometry();sg.setAttribute('position',new THREE.Float32BufferAttribute(sp,3));
+  planet.stars=new THREE.Points(sg,new THREE.PointsMaterial({color:0xffffff,size:1.5,sizeAttenuation:false,transparent:true,opacity:0,fog:false,depthWrite:false}));
+  planet.stars.frustumCulled=false;scene.add(planet.stars);
+  // the glow of the core when the planet comes apart
+  planet.core=new THREE.Mesh(new THREE.SphereGeometry(1,32,16),new THREE.MeshBasicMaterial({color:0xffc070,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+  planet.core.position.set(0,-RE,0);planet.core.visible=false;scene.add(planet.core);
+})();
+const PC={sea:LIN(0x1f5f93),deep:LIN(0x163f6c),ice:LIN(0xe9f1f6),desert:LIN(0xc9ad70),green:LIN(0x5d8f3c),forest:LIN(0x3d6a2c),rock:LIN(0x857d72),snow:LIN(0xf2f3f5),city:LIN(0x8b8a86),glass:LIN(0x2a211d),lava:LIN(0x3a1a0e)};
+function colorPlanet(){
+  const C=planet.mesh.instanceColor.array,A=planet.mesh.geometry.attributes.aMat.array;
+  const molten=blasts.some(b=>b.molten&&b.t>0.3);
+  if(!planet.base){ // terrain colours never change, so work them out once
+    planet.base=new Float32Array(planet.nSurf*3);
+    for(let i=0;i<planet.nSurf;i++){
+      const x=planet.fx[i],z=planet.fz[i],px=planet.p0[i*3]/RE,hb=terrainBase(x,z);
+      let c;
+      if(Math.abs(px)>0.88)c=PC.ice;
+      else if(hb<0)c=hb<-1500?PC.deep:PC.sea;
+      else if(urban(x,z)>0.1)c=PC.city;
+      else if(hb>2600)c=PC.snow;else if(hb>1100)c=PC.rock;
+      else{const b=vnoise(x/5e5+3,z/5e5-2);c=b>0.3?PC.desert:b>-0.15?PC.green:PC.forest;}
+      planet.base.set(c,i*3);
+    }
+  }
+  for(let i=0;i<planet.nSurf;i++){
+    const x=planet.fx[i],z=planet.fz[i],pb=planet.base;
+    let c=[pb[i*3],pb[i*3+1],pb[i*3+2]],mat=M_NAT,m2=0;
+    if(blasts.length){
+      computeDmg(x,z);
+      if(DM.fb||molten){c=molten?PC.lava:PC.glass;if(molten){mat=M_FIRE;m2=0.12+0.22*hash2(i,7);}}
+      else{
+        if(DM.therm>=1)for(let k=0;k<3;k++)c[k]=lerp(c[k],P.char[k],0.6);
+        else if(DM.psi>5)for(let k=0;k<3;k++)c[k]=lerp(c[k],P.dirt[k],0.4);
+      }
+    }
+    C[i*3]=c[0];C[i*3+1]=c[1];C[i*3+2]=c[2];A[i*2]=mat;A[i*2+1]=m2;
+  }
+  planet.mesh.instanceColor.needsUpdate=true;planet.mesh.geometry.attributes.aMat.needsUpdate=true;
+}
+function resetPlanet(){
+  const M=planet.mesh.instanceMatrix.array,P0=planet.p0;
+  for(let i=0;i<planet.n;i++){const o=i*16;M[o]=M[o+5]=M[o+10]=PBS*0.999;M[o+1]=M[o+2]=M[o+4]=M[o+6]=M[o+8]=M[o+9]=0;M[o+12]=P0[i*3];M[o+13]=P0[i*3+1];M[o+14]=P0[i*3+2];}
+  planet.mesh.instanceMatrix.needsUpdate=true;planet.mesh.count=planet.nSurf;planet.brk=null;planet.dirty=true;
+  planet.core.visible=false;planet.atm.material.uniforms.uA.value=1;
+}
+const _pq=new THREE.Quaternion(),_pa=new THREE.Vector3();
+function updatePlanet(dt,S,tick){
+  const show=S>1.3e7;
+  planet.mesh.visible=show;planet.atm.visible=show&&!planet.brk;
+  for(const L of levels)L.mesh.visible=!show;
+  for(const f of frameM)f.visible=!show;
+  debMesh.visible=!show;
+  const space=smooth(3e6,1.6e7,S);
+  planet.stars.material.opacity=space;planet.stars.visible=space>0.01;
+  planet.stars.position.copy(camera.position);planet.stars.scale.setScalar(camera.far*0.7);
+  // the planet-killer: once its shock has wrapped the globe, the pieces leave
+  const pk=blasts.find(b=>b.planetKill&&b.t>1.6);
+  if(pk&&!planet.brk){planet.brk={t:0,sp:RE*0.32*Math.cbrt(pk.kt/5.4e19)};planet.mesh.count=planet.n;planet.core.visible=true;boom(1,1);shake=1;}
+  if(planet.brk){
+    const B=planet.brk;B.t+=dt;
+    const M=planet.mesh.instanceMatrix.array,A=planet.mesh.geometry.attributes.aMat.array,P0=planet.p0,V=planet.vel;
+    const d=B.sp*B.t*(1-0.35*Math.exp(-B.t*0.5)),sc=PBS*0.999;
+    for(let i=0;i<planet.n;i++){
+      const o=i*16;
+      _pa.set(V[i*3+1]+0.3,V[i*3+2]+0.2,V[i*3]+0.1).normalize();_pq.setFromAxisAngle(_pa,B.t*(0.3+hash2(i,3)*0.8));
+      const x=_pq.x,y=_pq.y,z=_pq.z,w=_pq.w;
+      M[o]=(1-2*(y*y+z*z))*sc;M[o+1]=2*(x*y+z*w)*sc;M[o+2]=2*(x*z-y*w)*sc;
+      M[o+4]=2*(x*y-z*w)*sc;M[o+5]=(1-2*(x*x+z*z))*sc;M[o+6]=2*(y*z+x*w)*sc;
+      M[o+8]=2*(x*z+y*w)*sc;M[o+9]=2*(y*z-x*w)*sc;M[o+10]=(1-2*(x*x+y*y))*sc;
+      M[o+12]=P0[i*3]+V[i*3]*d;M[o+13]=P0[i*3+1]+V[i*3+1]*d;M[o+14]=P0[i*3+2]+V[i*3+2]*d;
+      if(tick)A[i*2+1]=Math.max(i>=planet.nSurf?0.1:0.05,A[i*2+1]*0.985);
+    }
+    planet.mesh.instanceMatrix.needsUpdate=true;if(tick)planet.mesh.geometry.attributes.aMat.needsUpdate=true;
+    const cg=1-Math.exp(-B.t*0.8);
+    planet.core.scale.setScalar(RE*(0.3+1.4*cg));planet.core.material.opacity=0.45*Math.exp(-B.t*0.7);
+  }
+  if(show&&(planet.dirty||(tick&&blasts.some(b=>!b.done||b.t<3)))){colorPlanet();planet.dirty=false;}
+}
+/* tapping the globe maps back to the flat world's coordinates */
+function planetHit(cx,cy){
+  ndc.set(cx/innerWidth*2-1,-(cy/innerHeight)*2+1);ray.setFromCamera(ndc,camera);
+  const hit=new THREE.Vector3();
+  if(!ray.ray.intersectSphere(new THREE.Sphere(new THREE.Vector3(0,-RE,0),RE),hit))return null;
+  hit.y+=RE;const r=hit.length(),th=Math.acos(clamp(hit.y/r,-1,1)),ph=Math.atan2(hit.z,hit.x);
+  return new THREE.Vector3(th*RE*Math.cos(ph),0,th*RE*Math.sin(ph));
+}
+
 /* sweep the shock front through the block grid, rebuilding columns it crosses */
 let spawnBudget=0;
 function sweep(){
@@ -1188,7 +1323,7 @@ function boom(str,big){
 /* =====================================================================
    View / controls
    ===================================================================== */
-const SMIN=4,SMAX=2.5e7;
+const SMIN=4,SMAX=1.2e8;
 const view={S:30,targetS:null};
 const controls=new OrbitControls(camera,renderer.domElement);
 controls.enableDamping=true;controls.dampingFactor=0.12;
@@ -1233,7 +1368,10 @@ function fmtYield(kt){
   if(kt<1000)return +kt.toPrecision(3)+' kt';
   if(kt<1e6)return +(kt/1000).toPrecision(3)+' Mt';
   if(kt<1e9)return +(kt/1e6).toPrecision(3)+' Gt';
-  return +(kt/1e9).toPrecision(3)+' Tt';
+  if(kt<1e12)return +(kt/1e9).toPrecision(3)+' Tt';
+  const e=Math.floor(Math.log10(kt*1e3)),m=kt*1e3/Math.pow(10,e);
+  const sup=String(e).split('').map(c=>'⁰¹²³⁴⁵⁶⁷⁸⁹'[+c]).join('');
+  return m.toFixed(1)+'×10'+sup+' t';
 }
 function fmtTime(s){
   if(s<1e-3)return (s*1e6).toFixed(0)+' µs';
@@ -1251,7 +1389,7 @@ const RING_DEFS=[
 ];
 function curBomb(){
   const b=BOMBS[sel];
-  if(b.custom){const kt=customKt;return {n:'Custom',kt,nuc:kt>=0.01?1:0,d:b.d};}
+  if(b.custom){const kt=customKt;return {n:'Custom',kt,nuc:kt>=0.01?1:0,kind:kt>=5.4e19?'planet':undefined,d:b.d};}
   return b;
 }
 function curFx(){const b=curBomb();return makeFx(b.kt,b.nuc,burst,burst==='air'?b.air:0);}
@@ -1259,9 +1397,9 @@ function buildChips(){
   const box=$('chips');box.innerHTML='';
   BOMBS.forEach((b,i)=>{
     const el=document.createElement('button');
-    el.className='chip'+(b.kind?' nat':b.nuc?' nuc':'')+(i===sel?' on':'');
+    el.className='chip'+(b.kind==='planet'?' end':b.kind?' nat':b.nuc?' nuc':'')+(i===sel?' on':'');
     el.innerHTML=b.custom?'Custom…':`${b.n}<small>${fmtYield(b.kt)}</small>`;
-    el.onclick=()=>{select(i,true);};
+    el.onclick=()=>{select(i,false);};
     box.appendChild(el);
   });
 }
@@ -1275,7 +1413,8 @@ const TARGETS=[
   {n:'Volcano',x:VOLC.x,z:VOLC.z,S:80000},
   {n:'Megalopolis',x:MEGA.x,z:MEGA.z,S:160000},
   {n:'Mountain range',x:RANGE.x,z:RANGE.z,S:600000},
-  {n:'Continent',x:0,z:0,S:1.2e7}
+  {n:'Continent',x:0,z:0,S:1.2e7},
+  {n:'Whole Earth',x:0,z:0,S:4.5e7}
 ];
 function buildTargets(){
   const box=$('targets');box.innerHTML='';
@@ -1300,7 +1439,7 @@ function select(i,fit){
 function refreshInfo(){
   const b=curBomb(),f=curFx();
   $('bname').textContent=b.n+(b.y?` (${b.y})`:'');
-  $('byield').textContent=fmtYield(b.kt)+' · '+(b.kind==='impact'?'impact':b.kind==='volcano'?'volcanic':b.nuc?'nuclear':'conventional');
+  $('byield').textContent=fmtYield(b.kt)+' · '+(b.kind==='planet'?'planet-ending':b.kind==='impact'?'impact':b.kind==='volcano'?'volcanic':b.nuc?'nuclear':'conventional');
   $('bdesc').textContent=b.d;
   const parts=[];
   for(const r of RING_DEFS){const v=f[r.k];if(v>0)parts.push(`<span><i style="background:${r.c}"></i>${r.label.split(' — ')[0]} ${fmtDist(v)}</span>`);}
@@ -1312,8 +1451,10 @@ function refreshInfo(){
 function setBurst(v){burst=v;[...$('burst').children].forEach(c=>c.classList.toggle('on',c.dataset.v===v));}
 $('burst').onclick=e=>{const v=e.target.dataset&&e.target.dataset.v;if(v){setBurst(v);refreshInfo();}};
 $('speed').onclick=e=>{const v=e.target.dataset&&e.target.dataset.v;if(v){speed=+v;[...$('speed').children].forEach(c=>c.classList.toggle('on',c===e.target));}};
-$('cy').oninput=()=>{customKt=Math.pow(10,-6+17*$('cy').value/1000);refreshInfo();};
-customKt=Math.pow(10,-6+17*$('cy').value/1000);
+const CYR=[-6,20.8];
+$('cy').oninput=()=>{customKt=Math.pow(10,CYR[0]+(CYR[1]-CYR[0])*$('cy').value/1000);refreshInfo();};
+$('cy').value=Math.round((1.3-CYR[0])/(CYR[1]-CYR[0])*1000);
+customKt=Math.pow(10,CYR[0]+(CYR[1]-CYR[0])*$('cy').value/1000);
 function fitView(){
   const f=curFx();
   const R=Math.max(f.r1,f.Rth,f.Rfb*3,f.Rc*4);
@@ -1326,7 +1467,7 @@ $('bSound').onclick=e=>{soundOn=!soundOn;e.target.classList.toggle('on',soundOn)
 $('bRings').onclick=e=>{showRings=!showRings;e.target.classList.toggle('on',showRings);ringGroup.visible=showRings;};
 $('bDetail').onclick=()=>{detail=(detail+1)%DETAILS.length;N=DETAILS[detail];$('bDetail').textContent='Detail: '+DETAIL_NAMES[detail];buildWorld();maybeRegen(performance.now(),true);};
 $('bDetail').textContent='Detail: '+DETAIL_NAMES[detail];
-$('bReset').onclick=()=>{for(const b of blasts)b.dispose();blasts.length=0;D.n=0;maybeRegen(performance.now(),true);};
+$('bReset').onclick=()=>{for(const b of blasts)b.dispose();blasts.length=0;D.n=0;resetPlanet();maybeRegen(performance.now(),true);};
 let hintHidden=false;function hideHint(){if(!hintHidden){hintHidden=true;$('hint').style.opacity=0;}}
 setTimeout(hideHint,12000);
 
@@ -1343,7 +1484,9 @@ function detonate(px,pz){
   const b=curBomb();
   const x=px!==undefined?px:controls.target.x,z=pz!==undefined?pz:controls.target.z;
   const bl=new Blast(b.kt,b.nuc,x,z,burst,burst==='air'?b.air:0,b.n);
-  blasts.push(bl);
+  bl.molten=b.kt>=1e15;bl.planetKill=b.kind==='planet';
+  if(bl.molten&&bl.cloud)bl.cloud.visible=false;
+  blasts.push(bl);planet.dirty=true;
   while(blasts.filter(q=>q.cloud).length>4){const o=blasts.find(q=>q.cloud);o.dispose();o.cloud=null;}
   lastBlast=bl;
   flashV=b.nuc?1:0.55;
@@ -1364,7 +1507,7 @@ renderer.domElement.addEventListener('pointerup',e=>{
   const multi=downN>1;downN=Math.max(0,downN-1);
   if(multi||downN>0)return;
   if(Math.hypot(e.clientX-downX,e.clientY-downY)>8||performance.now()-downT>450)return;
-  const hit=groundHit(e.clientX,e.clientY);
+  const hit=view.S>1.3e7?planetHit(e.clientX,e.clientY):groundHit(e.clientX,e.clientY);
   if(hit)detonate(hit.x,hit.z);
 });
 renderer.domElement.addEventListener('pointercancel',()=>{downN=0;});
@@ -1395,6 +1538,7 @@ let gzAnim=null;
    Loop
    ===================================================================== */
 const clock={last:performance.now()};
+let planetWasOn=false,frameNo=0;const SPACE=new THREE.Color(0x03050b);
 let hudT=0,shake=0;
 const flashEl=$('flash');
 function frame(now){
@@ -1428,7 +1572,9 @@ function step(dt,now){
   // keep the orbit point on the ground
   const gy=groundAt(controls.target.x,controls.target.z);
   if(isFinite(gy)&&gy>-1e8){const dy=(gy-controls.target.y)*0.25;controls.target.y+=dy;camera.position.y+=dy;}
-  maybeRegen(now,false);
+  const inSpace=view.S>1.3e7;
+  if(!inSpace)maybeRegen(now,planetWasOn);
+  planetWasOn=inSpace;
   const D0=view.S*DIST;
   camera.near=Math.max(0.02,D0*0.01);camera.far=D0*400;camera.updateProjectionMatrix();
   scene.fog.near=D0*2;scene.fog.far=D0*14;
@@ -1438,6 +1584,12 @@ function step(dt,now){
   for(const b of blasts)if(b.cloud||!b.done)b.update(sdt);
   sweep();
   updateDebris(sdt);
+  frameNo++;
+  updatePlanet(sdt,view.S,frameNo%4===0);
+  // a planet-killer pulls the camera out to watch
+  for(const b of blasts)if(b.planetKill&&!b.zoomed&&b.t>0.5){b.zoomed=true;view.targetS=Math.max(view.S,7e7);}
+  for(const b of blasts)if(b.shell)b.shell.visible=b.shell.visible&&!inSpace;
+  ringGroup.visible=showRings&&!inSpace;
 
   // light & flash from the newest detonation
   let fl=0,heat=0;
@@ -1459,7 +1611,7 @@ function step(dt,now){
     }
   }else flashLight.intensity=0;
   flashEl.style.opacity=clamp(fl,0,1);
-  skyNow.copy(SKY).lerp(new THREE.Color(0xffc38a),clamp(heat*0.35,0,0.5));
+  skyNow.copy(SKY).lerp(new THREE.Color(0xffc38a),clamp(heat*0.35,0,0.5)).lerp(SPACE,smooth(3e6,1.6e7,view.S));
   scene.fog.color.copy(skyNow);
   hemi.intensity=1.1+fl*3;
 
