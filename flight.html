@@ -3917,6 +3917,16 @@ function physics(P, dt) {
      law — with no aerodynamic surfaces working — saturated the pitch
      thrusters against a g it could never make, and tumbled the aeroplane. */
   P.cont = clamp((rho - 1e-8) / 9e-8, 0, 1);
+  /* Nothing shakes the camera below about Mach 15.
+
+     Every continuous source — the stall buffet, an inlet unstart, skin
+     temperature, load factor, dynamic pressure — is scaled by this one
+     number, so there is a single place that decides when the picture starts
+     to move and a single speed at which it does. Below Mach 13 it is exactly
+     zero; by Mach 16 it is fully awake. Arrivals are not in it: hitting a
+     planet, hitting the ground and writing the aeroplane off all still shake,
+     because those are events rather than a ride. */
+  P.shakeK = sstep(13, 16, P.mach || 0);
   const wind = WIND.at(P.pos, P);
   const va = vsub(P.vel, wind);
   const vb = mRotT(m, va);
@@ -4212,7 +4222,7 @@ function physics(P, dt) {
       const drop = (1 - st) * (hash2((P.pos.x * 3) | 0, (P.pos.z * 3) | 0) - .5);
       M.z += drop * qS * SPECS.b * .031;
       M.x += (1 - st) * qS * SPECS.cbar * .028;      // nose drops
-      cam.shake = Math.max(cam.shake, (1 - st) * .5 * clamp(qbar / 2500, 0, 1));
+      cam.shake = Math.max(cam.shake, (1 - st) * .5 * clamp(qbar / 2500, 0, 1) * (P.shakeK || 0));
     }
   } else {
     P.alpha = 0; P.beta = 0; P.gload = 0; P.stall = 0;
@@ -4247,7 +4257,7 @@ function physics(P, dt) {
       const sgn = P.unstartSide || (P.unstartSide = Math.random() < .5 ? -1 : 1);
       M.y += sgn * 1.2e6 * clamp(P.unstart, 0, 1);
       M.z += sgn * 3.0e5 * clamp(P.unstart, 0, 1);
-      cam.shake = Math.max(cam.shake, .45);
+      cam.shake = Math.max(cam.shake, .45 * (P.shakeK || 0));
       if (P.unstart <= 0) P.unstartSide = 0;
     }
   }
@@ -4406,7 +4416,7 @@ function physics(P, dt) {
        looking through a shaking window. It starts later and tops out at a
        third of what it did — a rumble under a picture that is now much
        hotter to look at. */
-    cam.shake = Math.max(cam.shake, clamp((P.heat - 2.6) * .13, 0, .26));
+    cam.shake = Math.max(cam.shake, clamp((P.heat - 2.6) * .13, 0, .26) * (P.shakeK || 0));
   } else P.burn = Math.max(0, (P.burn || 0) - dt * .5);
 
   // peak tracking, and the physiological price of pulling
@@ -4425,14 +4435,14 @@ function physics(P, dt) {
      hard as the aeroplane will give you. All that is left of it is the
      airframe groaning, which is feedback rather than a sentence. */
   if (!P.crashed && Math.abs(P.gload) > 10)
-    cam.shake = Math.max(cam.shake, clamp((Math.abs(P.gload) - 10) * .12, 0, .34));
+    cam.shake = Math.max(cam.shake, clamp((Math.abs(P.gload) - 10) * .12, 0, .34) * (P.shakeK || 0));
 
   /* Dynamic pressure down low used to tear the airframe apart after four
      seconds. Now it just shakes: Mach 3 on the deck is punishing to look at
      and free to do. */
   if (!P.crashed && P.qbar > 160000) {
     P.overQ = (P.overQ || 0) + dt;
-    cam.shake = Math.max(cam.shake, clamp(P.overQ * .12, 0, .32));
+    cam.shake = Math.max(cam.shake, clamp(P.overQ * .12, 0, .32) * (P.shakeK || 0));
   } else P.overQ = Math.max(0, (P.overQ || 0) - dt * .6);
   /* They are places, not walls. Arrive slowly, wings level, on the wheels,
      and you have landed on the Moon; arrive any other way and you have
@@ -6982,19 +6992,19 @@ function layoutTouch() {
        right put their inboard edge five per cent past the centre of the
        screen, which is exactly where the aeroplane is drawn. */
     th = Math.min(H * .30, 300 * u);
-    T.thr.x = W - sr - tw - 16 * u;
+    T.thr.x = W - sr - tw - 6 * u;
     T.thr.y = H - sb - th - 16 * u;
     cwL = 62 * u; cwR = 62 * u; stack = 1; hLev = 106 * u;
-    LX = sl + 12 * u;
-    RX = T.thr.x - 12 * u - cwR;
+    LX = sl + 6 * u;
+    RX = T.thr.x - 8 * u - cwR;
     LB = RB = T.thr.y - 14 * u;
   } else {
     th = Math.min(H * .54, 330 * u);
-    T.thr.x = W - sr - tw - 16 * u;
+    T.thr.x = W - sr - tw - 6 * u;
     T.thr.y = H - sb - th - 16 * u;
     cwL = 62 * u; cwR = 62 * u; stack = 0;
-    LX = sl + 14 * u;
-    RX = T.thr.x - 14 * u - (cwR * 3 + gp * 2);
+    LX = sl + 6 * u;
+    RX = T.thr.x - 8 * u - (cwR * 3 + gp * 2);
     RB = H - sb - 16 * u;
     // the left console sits under the instruments on a phone, where the thumb
     // stick owns the bottom corner, and in the bottom corner on a desktop
