@@ -100,7 +100,7 @@
   <button id="bReset" title="Rebuild the world">Rebuild</button>
 </div>
 <div id="cross"></div>
-<div id="hint">Pick a bomb · tap anywhere to drop it · drag to orbit · pinch or scroll to zoom</div>
+<div id="hint">Pick a bomb · tap anywhere to fire it there · drag to orbit · pinch or scroll to zoom</div>
 <div id="panel">
   <div id="info"><span id="bname"></span><span id="byield"></span></div>
   <div id="bdesc"></div>
@@ -113,7 +113,7 @@
     <div class="seg" id="burst"><button data-v="surface" class="on">Surface</button><button data-v="air">Airburst</button></div>
     <div class="seg" id="speed"><button data-v="0.1">0.1×</button><button data-v="1" class="on">1×</button><button data-v="5">5×</button></div>
     <button id="fit">Fit</button>
-    <button id="go">DETONATE</button>
+    <button id="go">FIRE</button>
   </div>
 </div>
 <div id="err">Couldn't load the 3D engine. This page needs an internet connection the first time it opens.</div>
@@ -185,6 +185,7 @@ const BOMBS=[
   {n:'Comet fragment G (SL9)',kt:6e9,nuc:1,kind:'impact',y:1994,d:'Largest Shoemaker–Levy 9 fragment, which hit Jupiter with ~6 Tt. Shown here as if it hit Earth.'},
   {n:'Chicxulub impact',kt:1e11,nuc:1,kind:'impact',d:'The ~10 km asteroid that ended the dinosaurs 66 million years ago. ~100 teratons.'},
   {n:'Ocean-boiling impact',kt:2.4e15,nuc:1,kind:'impact',d:'A ~500 km asteroid, like those that hit the early Earth. Boils the oceans and melts the whole crust.'},
+  {n:'Moon shatterer',kt:2.96e16,nuc:1,kind:'planet',d:'1.2×10²⁹ J, the Moon\'s binding energy. Shoot it at the Moon to blow it apart; on Earth it melts the crust.'},
   {n:'Theia impact',kt:2.4e18,nuc:1,kind:'impact',d:'The Mars-sized collision 4.5 billion years ago that melted Earth and threw off the debris that became the Moon.'},
   {n:'Earth shatterer',kt:5.4e19,nuc:1,kind:'planet',d:'2.2×10³² J, Earth\'s gravitational binding energy: the minimum it takes to blow the planet apart for good.'},
   {n:'10× overkill',kt:5.4e20,nuc:1,kind:'planet',d:'Ten times the binding energy. The pieces leave fast.'},
@@ -1111,133 +1112,273 @@ class Blast{
 }
 
 /* =====================================================================
-   The whole planet — a sphere of blocks that takes over from the flat
-   world once the view is wider than ~13,000 km. Ground zero sits on top,
+   Space — a block-built Earth and Moon. The flat world hands over to the
+   globe once the view is wider than ~13,000 km. Ground zero sits on top,
    and the flat world maps onto it by distance and bearing from there.
    ===================================================================== */
-const RE=6.371e6,PN=coarse?48:64,PBS=2*RE/PN;
-const planet={dirty:true,brk:null,n:0,nSurf:0};
-(function buildPlanet(){
-  const surf=[],inner=[];
-  for(let i=0;i<PN;i++)for(let j=0;j<PN;j++)for(let k=0;k<PN;k++){
-    const x=(i+0.5-PN/2)*PBS,y=(j+0.5-PN/2)*PBS,z=(k+0.5-PN/2)*PBS,r=Math.hypot(x,y,z);
-    if(r>RE)continue;
-    (r+PBS*0.9>RE?surf:inner).push([x,y,z,r]);
-  }
-  const all=surf.concat(inner),n=all.length;
-  planet.n=n;planet.nSurf=surf.length;
-  const geo=new THREE.BoxGeometry(1,1,1);
-  geo.setAttribute('aMat',new THREE.InstancedBufferAttribute(new Float32Array(n*2),2));
-  const m=new THREE.InstancedMesh(geo,boxMat,n);
-  m.instanceColor=new THREE.InstancedBufferAttribute(new Float32Array(n*3),3);
-  m.frustumCulled=false;m.count=planet.nSurf;m.visible=false;m.position.set(0,-RE,0);
-  scene.add(m);planet.mesh=m;
-  planet.p0=new Float32Array(n*3);planet.vel=new Float32Array(n*3);planet.fx=new Float64Array(n);planet.fz=new Float64Array(n);planet.rr=new Float32Array(n);
-  const M=m.instanceMatrix.array,C=m.instanceColor.array,A=geo.attributes.aMat.array;
-  const LAY=[[0.19,LIN(0xfff6d8),1],[0.55,LIN(0xffc04a),0.85],[0.9,LIN(0xd4521c),0.55],[2,LIN(0x6b3b2a),0.2]];
-  all.forEach(([x,y,z,r],i)=>{
-    planet.p0[i*3]=x;planet.p0[i*3+1]=y;planet.p0[i*3+2]=z;planet.rr[i]=r/RE;
-    const th=Math.acos(clamp(y/r,-1,1)),ph=Math.atan2(z,x);
-    planet.fx[i]=th*RE*Math.cos(ph);planet.fz[i]=th*RE*Math.sin(ph);
-    const o=i*16;M.fill(0,o,o+16);M[o]=M[o+5]=M[o+10]=PBS*0.999;M[o+12]=x;M[o+13]=y;M[o+14]=z;M[o+15]=1;
-    const rf=r/RE,L=LAY.find(l=>rf<l[0]);
-    C[i*3]=L[1][0];C[i*3+1]=L[1][1];C[i*3+2]=L[1][2];A[i*2]=M_CLOUD;A[i*2+1]=L[2];
-    const d=1/r,sp=(0.35+0.5*Math.random())*(1.2-0.5*rf);
-    planet.vel[i*3]=x*d*sp+(Math.random()-0.5)*0.15;planet.vel[i*3+1]=y*d*sp+(Math.random()-0.5)*0.15;planet.vel[i*3+2]=z*d*sp+(Math.random()-0.5)*0.15;
-  });
-  // atmosphere glow and a star field for the view from space
-  const atm=new THREE.Mesh(new THREE.SphereGeometry(RE*1.035,64,32),new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,
-    uniforms:{uA:{value:1}},
-    vertexShader:`varying vec3 vN;varying vec3 vV;void main(){vec4 mv=modelViewMatrix*vec4(position,1.0);vN=normalize(normalMatrix*normal);vV=normalize(-mv.xyz);gl_Position=projectionMatrix*mv;}`,
-    fragmentShader:`uniform float uA;varying vec3 vN;varying vec3 vV;void main(){float f=1.0-abs(dot(normalize(vN),normalize(vV)));gl_FragColor=vec4(vec3(0.35,0.6,1.0)*pow(f,3.0)*uA,1.0);}`}));
-  atm.position.set(0,-RE,0);atm.visible=false;scene.add(atm);planet.atm=atm;
-  const sp=[];for(let i=0;i<4000;i++){const u=Math.random()*2-1,a=Math.random()*Math.PI*2,q=Math.sqrt(1-u*u);sp.push(q*Math.cos(a),u,q*Math.sin(a));}
-  const sg=new THREE.BufferGeometry();sg.setAttribute('position',new THREE.Float32BufferAttribute(sp,3));
-  planet.stars=new THREE.Points(sg,new THREE.PointsMaterial({color:0xffffff,size:1.5,sizeAttenuation:false,transparent:true,opacity:0,fog:false,depthWrite:false}));
-  planet.stars.frustumCulled=false;scene.add(planet.stars);
-  // the glow of the core when the planet comes apart
-  planet.core=new THREE.Mesh(new THREE.SphereGeometry(1,32,16),new THREE.MeshBasicMaterial({color:0xffc070,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
-  planet.core.position.set(0,-RE,0);planet.core.visible=false;scene.add(planet.core);
-})();
-const PC={sea:LIN(0x1f5f93),deep:LIN(0x163f6c),ice:LIN(0xe9f1f6),desert:LIN(0xc9ad70),green:LIN(0x5d8f3c),forest:LIN(0x3d6a2c),rock:LIN(0x857d72),snow:LIN(0xf2f3f5),city:LIN(0x8b8a86),glass:LIN(0x2a211d),lava:LIN(0x3a1a0e)};
-function colorPlanet(){
-  const C=planet.mesh.instanceColor.array,A=planet.mesh.geometry.attributes.aMat.array;
-  const molten=blasts.some(b=>b.molten&&b.t>0.3);
-  if(!planet.base){ // terrain colours never change, so work them out once
-    planet.base=new Float32Array(planet.nSurf*3);
-    for(let i=0;i<planet.nSurf;i++){
-      const x=planet.fx[i],z=planet.fz[i],px=planet.p0[i*3]/RE,hb=terrainBase(x,z);
-      let c;
-      if(Math.abs(px)>0.88)c=PC.ice;
-      else if(hb<0)c=hb<-1500?PC.deep:PC.sea;
-      else if(urban(x,z)>0.1)c=PC.city;
-      else if(hb>2600)c=PC.snow;else if(hb>1100)c=PC.rock;
-      else{const b=vnoise(x/5e5+3,z/5e5-2);c=b>0.3?PC.desert:b>-0.15?PC.green:PC.forest;}
-      planet.base.set(c,i*3);
+const RE=6.371e6,RM=1.7374e6;
+const EARTHC=new THREE.Vector3(0,-RE,0);
+const MOONC=new THREE.Vector3(-0.62,0.35,-0.7).normalize().multiplyScalar(384.4e6).add(EARTHC);
+const PC={sea:LIN(0x1f5f93),deep:LIN(0x163f6c),ice:LIN(0xe9f1f6),desert:LIN(0xc9ad70),green:LIN(0x5d8f3c),forest:LIN(0x3d6a2c),rock:LIN(0x857d72),snow:LIN(0xf2f3f5),city:LIN(0x8b8a86),glass:LIN(0x2a211d),lava:LIN(0x3a1a0e),
+  moon:LIN(0x9a9893),mare:LIN(0x5b5a56),moonHi:LIN(0xbab8b2)};
+const _bq=new THREE.Quaternion(),_ba=new THREE.Vector3();
+
+/* A world made of blocks: a fine surface shell over a coarse core.
+   Blocks can be blasted out of craters or the whole body blown apart. */
+class Body{
+  constructor(o){
+    this.R=o.R;this.center=o.center;this.bindKt=o.bindKt;
+    const R=o.R,nF=o.nFine,bs=2*R/nF,pts=[];
+    this.bs=bs;
+    const cell=(k)=>(k+0.5-nF/2)*bs;
+    for(let i=0;i<nF;i++){const x=cell(i);for(let j=0;j<nF;j++){
+      const y=cell(j),rho2=x*x+y*y;if(rho2>R*R)continue;
+      const zmax=Math.sqrt(R*R-rho2),rin=R-bs*0.9,zin=rho2<rin*rin?Math.sqrt(rin*rin-rho2):0;
+      const kk=z=>clamp(Math.floor(z/bs+nF/2),0,nF-1);
+      const a0=kk(-zmax)-1,a1=kk(-zin+bs)+1,b0=kk(zin-bs)-1,b1=kk(zmax)+1;
+      const test=k=>{if(k<0||k>=nF)return;const z=cell(k),r=Math.sqrt(rho2+z*z);if(r<=R&&r+bs*0.9>R)pts.push(x,y,z,bs,r);};
+      for(let k=a0;k<=a1;k++)test(k);
+      for(let k=Math.max(b0,a1+1);k<=b1;k++)test(k);
+    }}
+    this.nSurf=pts.length/5;
+    const nC=o.nCore,bc=2*R/nC,lim=R-bs*0.9;
+    for(let i=0;i<nC;i++)for(let j=0;j<nC;j++)for(let k=0;k<nC;k++){
+      const x=(i+0.5-nC/2)*bc,y=(j+0.5-nC/2)*bc,z=(k+0.5-nC/2)*bc,r=Math.hypot(x,y,z);
+      if(r+bc*0.5<lim)pts.push(x,y,z,bc*1.001,r);
     }
+    const n=this.n=pts.length/5;
+    const geo=new THREE.BoxGeometry(1,1,1);
+    geo.setAttribute('aMat',new THREE.InstancedBufferAttribute(new Float32Array(n*2),2));
+    const m=new THREE.InstancedMesh(geo,boxMat,n);
+    m.instanceColor=new THREE.InstancedBufferAttribute(new Float32Array(n*3),3);
+    m.frustumCulled=false;m.visible=false;m.position.copy(o.center);
+    m.count=o.showCore?n:this.nSurf;this.showCoreAlways=!!o.showCore;
+    scene.add(m);this.mesh=m;
+    this.M=m.instanceMatrix.array;this.C=m.instanceColor.array;this.A=geo.attributes.aMat.array;
+    this.p0=new Float32Array(n*3);this.sz=new Float32Array(n);this.rf=new Float32Array(n);
+    this.vel=new Float32Array(n*3);this.state=new Uint8Array(n);this.life=new Float32Array(n);
+    this.flying=[];this.hot=new Set();this.brk=null;
+    for(let i=0;i<n;i++){
+      this.p0[i*3]=pts[i*5];this.p0[i*3+1]=pts[i*5+1];this.p0[i*3+2]=pts[i*5+2];this.sz[i]=pts[i*5+3];this.rf[i]=pts[i*5+4]/R;
+      const sp=(0.35+0.5*Math.random())*(1.2-0.5*this.rf[i]),inv=1/Math.max(pts[i*5+4],1);
+      this.vel[i*3]=pts[i*5]*inv*sp+(Math.random()-0.5)*0.15;this.vel[i*3+1]=pts[i*5+1]*inv*sp+(Math.random()-0.5)*0.15;this.vel[i*3+2]=pts[i*5+2]*inv*sp+(Math.random()-0.5)*0.15;
+    }
+    this.layers=o.layers;
+    this.reset();
   }
-  for(let i=0;i<planet.nSurf;i++){
-    const x=planet.fx[i],z=planet.fz[i],pb=planet.base;
+  place(i,x,y,z,s,spin){
+    const M=this.M,o=i*16;
+    if(!spin){M[o]=M[o+5]=M[o+10]=s;M[o+1]=M[o+2]=M[o+3]=M[o+4]=M[o+6]=M[o+7]=M[o+8]=M[o+9]=M[o+11]=0;}
+    else{
+      _ba.set(hash2(i,1)-0.5,hash2(i,2)-0.5,hash2(i,3)-0.5).normalize();_bq.setFromAxisAngle(_ba,spin);
+      const x2=_bq.x,y2=_bq.y,z2=_bq.z,w=_bq.w;
+      M[o]=(1-2*(y2*y2+z2*z2))*s;M[o+1]=2*(x2*y2+z2*w)*s;M[o+2]=2*(x2*z2-y2*w)*s;M[o+3]=0;
+      M[o+4]=2*(x2*y2-z2*w)*s;M[o+5]=(1-2*(x2*x2+z2*z2))*s;M[o+6]=2*(y2*z2+x2*w)*s;M[o+7]=0;
+      M[o+8]=2*(x2*z2+y2*w)*s;M[o+9]=2*(y2*z2-x2*w)*s;M[o+10]=(1-2*(x2*x2+y2*y2))*s;M[o+11]=0;
+    }
+    M[o+12]=x;M[o+13]=y;M[o+14]=z;M[o+15]=1;
+  }
+  reset(){
+    const A=this.A,C=this.C;
+    for(let i=0;i<this.n;i++){
+      this.place(i,this.p0[i*3],this.p0[i*3+1],this.p0[i*3+2],this.sz[i]*0.999,0);
+      this.state[i]=0;this.life[i]=0;
+      if(i>=this.nSurf){const L=this.layers.find(l=>this.rf[i]<l[0]);C.set(L[1],i*3);A[i*2]=M_CLOUD;A[i*2+1]=L[2];}
+    }
+    this.flying.length=0;this.hot.clear();this.brk=null;
+    this.mesh.count=this.showCoreAlways?this.n:this.nSurf;
+    this.mesh.instanceMatrix.needsUpdate=true;this.mesh.instanceColor.needsUpdate=true;this.mesh.geometry.attributes.aMat.needsUpdate=true;
+  }
+  /* blast a crater: blocks inside fly off glowing, blocks around it are scorched */
+  impact(lx,ly,lz,kt,allowBreak){
+    const Rc=30*Math.cbrt(kt)*(this.R<3e6?1.8:1),Rg=Math.max(Rc*1.9,Math.min(55*Math.pow(kt,0.4),this.R*2));
+    if(allowBreak&&(kt>=this.bindKt||Rc>this.R*1.05)){this.breakup(kt);return;}
+    const P=this.p0,C=this.C,A=this.A,sp=Math.max(Rc,this.bs)*1.2;
+    let carved=0;
+    for(let i=0;i<this.n;i++){
+      if(this.state[i])continue;
+      const dx=P[i*3]-lx,dy=P[i*3+1]-ly,dz=P[i*3+2]-lz;
+      if(Math.abs(dx)>Rg||Math.abs(dy)>Rg||Math.abs(dz)>Rg)continue;
+      const d=Math.hypot(dx,dy,dz);
+      if(d<Rc){
+        const inv=1/Math.max(d,1),nr=1/Math.hypot(lx,ly,lz),r=0.6+0.8*Math.random();
+        this.vel[i*3]=(dx*inv+lx*nr*1.2)*sp*r;this.vel[i*3+1]=(dy*inv+ly*nr*1.2)*sp*r;this.vel[i*3+2]=(dz*inv+lz*nr*1.2)*sp*r;
+        this.state[i]=1;this.life[i]=0;this.flying.push(i);
+        C.set(PC.lava,i*3);A[i*2]=M_FIRE;A[i*2+1]=1;carved++;
+      }else if(d<Rg){
+        const k=1-(d-Rc)/(Rg-Rc);
+        for(let c=0;c<3;c++)C[i*3+c]=lerp(C[i*3+c],PC.glass[c],0.4+0.5*k);
+        A[i*2]=M_FIRE;A[i*2+1]=Math.max(A[i*2+1],0.7*k);this.hot.add(i);
+      }
+    }
+    if(carved)this.mesh.count=this.n; // the crater can open onto the core
+    this.mesh.instanceColor.needsUpdate=true;this.mesh.geometry.attributes.aMat.needsUpdate=true;
+    return carved;
+  }
+  breakup(kt){
+    if(this.brk)return;
+    this.brk={t:0,sp:this.R*0.32*Math.cbrt(Math.max(1,kt/this.bindKt))};
+    this.mesh.count=this.n;
+    for(let i=0;i<this.nSurf;i++){this.C.set(PC.lava,i*3);this.A[i*2]=M_FIRE;this.A[i*2+1]=0.6;}
+    this.mesh.instanceColor.needsUpdate=true;this.mesh.geometry.attributes.aMat.needsUpdate=true;
+  }
+  update(dt,tick){
+    let moved=false;
+    const P=this.p0,V=this.vel,A=this.A;
+    if(this.brk){
+      const B=this.brk;B.t+=dt;
+      const d=B.sp*B.t*(1-0.35*Math.exp(-B.t*0.5));
+      for(let i=0;i<this.n;i++){
+        if(this.state[i]===2)continue;
+        this.place(i,P[i*3]+V[i*3]*d,P[i*3+1]+V[i*3+1]*d,P[i*3+2]+V[i*3+2]*d,this.sz[i]*0.999,B.t*(0.3+hash2(i,4)*0.8));
+        if(tick)A[i*2+1]=Math.max(i>=this.nSurf?0.1:0.05,A[i*2+1]*0.985);
+      }
+      moved=true;
+    }else if(this.flying.length){
+      const keep=[];
+      for(const i of this.flying){
+        const L=(this.life[i]+=dt);
+        if(L>9){this.state[i]=2;this.place(i,0,0,0,0,0);continue;}
+        const s=this.sz[i]*0.999*(L>7?(9-L)/2:1);
+        this.place(i,P[i*3]+V[i*3]*L,P[i*3+1]+V[i*3+1]*L,P[i*3+2]+V[i*3+2]*L,s,L*(1+hash2(i,5)*2));
+        if(tick)A[i*2+1]=Math.max(0.1,A[i*2+1]*0.97);
+        keep.push(i);
+      }
+      this.flying=keep;moved=true;
+    }
+    if(tick&&this.hot.size){
+      for(const i of this.hot){A[i*2+1]*=0.96;if(A[i*2+1]<0.03){A[i*2]=M_NAT;A[i*2+1]=0;this.hot.delete(i);}}
+      moved=true;
+    }
+    if(moved){this.mesh.instanceMatrix.needsUpdate=true;if(tick)this.mesh.geometry.attributes.aMat.needsUpdate=true;}
+  }
+  /* nearest hit of a world-space ray on this body's sphere */
+  hit(r){
+    const h=new THREE.Vector3();
+    if(this.brk)return null;
+    return r.intersectSphere(new THREE.Sphere(this.center,this.R),h)?h:null;
+  }
+}
+const CORE_LAYERS=[[0.19,LIN(0xfff6d8),1],[0.55,LIN(0xffc04a),0.85],[0.9,LIN(0xd4521c),0.55],[2,LIN(0x6b3b2a),0.2]];
+const earth=new Body({R:RE,center:EARTHC,nFine:coarse?128:192,nCore:coarse?32:40,bindKt:5.4e19,layers:CORE_LAYERS});
+const moon=new Body({R:RM,center:MOONC,nFine:coarse?64:96,nCore:16,bindKt:2.96e16,showCore:true,
+  layers:[[0.3,LIN(0xffd27a),0.7],[2,LIN(0x6a5a4c),0.15]]});
+// flat-world coordinates of each Earth surface block (distance and bearing from ground zero)
+earth.fx=new Float64Array(earth.nSurf);earth.fz=new Float64Array(earth.nSurf);
+for(let i=0;i<earth.nSurf;i++){
+  const x=earth.p0[i*3],y=earth.p0[i*3+1],z=earth.p0[i*3+2],r=Math.hypot(x,y,z);
+  const th=Math.acos(clamp(y/r,-1,1)),ph=Math.atan2(z,x);
+  earth.fx[i]=th*RE*Math.cos(ph);earth.fz[i]=th*RE*Math.sin(ph);
+}
+earth.base=new Float32Array(earth.nSurf*3);earth.baseDone=0;
+for(let i=0;i<earth.nSurf;i++){earth.C.set(PC.sea,i*3);}
+// moon surface: highlands, dark maria and bright crater rays
+for(let i=0;i<moon.nSurf;i++){
+  const x=moon.p0[i*3]/RM,y=moon.p0[i*3+1]/RM,z=moon.p0[i*3+2]/RM;
+  const m=vnoise(x*2.2+3.1,z*2.2+y*1.7)*0.7+vnoise(x*7+y*3,z*7-1)*0.3;
+  const c=m<-0.2?PC.mare:m>0.45?PC.moonHi:PC.moon,k=0.9+0.2*hash2(i,9);
+  moon.C[i*3]=c[0]*k;moon.C[i*3+1]=c[1]*k;moon.C[i*3+2]=c[2]*k;moon.A[i*2]=M_NAT;
+}
+moon.mesh.instanceColor.needsUpdate=true;
+moon.base=moon.C.slice(0,moon.nSurf*3);
+function flatToLocal(x,z){ // flat-world point to a point on Earth's surface, relative to Earth's centre
+  const th=Math.hypot(x,z)/RE,ph=Math.atan2(z,x);
+  return new THREE.Vector3(Math.sin(th)*Math.cos(ph)*RE,Math.cos(th)*RE,Math.sin(th)*Math.sin(ph)*RE);
+}
+function localToFlat(p){
+  const r=p.length(),th=Math.acos(clamp(p.y/r,-1,1)),ph=Math.atan2(p.z,p.x);
+  return {x:th*RE*Math.cos(ph),z:th*RE*Math.sin(ph)};
+}
+
+const planet={dirty:true};
+let focus='ground';   // 'ground' orbits a point on Earth; 'moon' orbits the Moon
+const atm=new THREE.Mesh(new THREE.SphereGeometry(RE*1.035,64,32),new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,
+  uniforms:{uA:{value:1}},
+  vertexShader:`varying vec3 vN;varying vec3 vV;void main(){vec4 mv=modelViewMatrix*vec4(position,1.0);vN=normalize(normalMatrix*normal);vV=normalize(-mv.xyz);gl_Position=projectionMatrix*mv;}`,
+  fragmentShader:`uniform float uA;varying vec3 vN;varying vec3 vV;void main(){float f=1.0-abs(dot(normalize(vN),normalize(vV)));gl_FragColor=vec4(vec3(0.35,0.6,1.0)*pow(f,3.0)*uA,1.0);}`}));
+atm.position.copy(EARTHC);atm.visible=false;scene.add(atm);
+const stars=(()=>{const sp=[];for(let i=0;i<5000;i++){const u=Math.random()*2-1,a=Math.random()*Math.PI*2,q=Math.sqrt(1-u*u);sp.push(q*Math.cos(a),u,q*Math.sin(a));}
+  const sg=new THREE.BufferGeometry();sg.setAttribute('position',new THREE.Float32BufferAttribute(sp,3));
+  const p=new THREE.Points(sg,new THREE.PointsMaterial({color:0xffffff,size:1.5,sizeAttenuation:false,transparent:true,opacity:0,fog:false,depthWrite:false}));
+  p.frustumCulled=false;scene.add(p);return p;})();
+const coreGlow=new THREE.Mesh(new THREE.SphereGeometry(1,32,16),new THREE.MeshBasicMaterial({color:0xffc070,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+coreGlow.visible=false;scene.add(coreGlow);
+const impactGlows=[];  // brief glowing spheres where space shots land
+function spaceGlow(pos,r){
+  const m=new THREE.Mesh(new THREE.SphereGeometry(1,24,12),new THREE.MeshBasicMaterial({color:0xffd9a0,transparent:true,opacity:0.9,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+  m.position.copy(pos);m.userData={t:0,r};scene.add(m);impactGlows.push(m);
+}
+
+function colorEarth(){
+  const C=earth.C,A=earth.A;
+  const molten=blasts.some(b=>b.molten&&b.t>0.3);
+  for(let i=0;i<earth.nSurf;i++){
+    if(earth.state[i])continue;
+    if(i>=earth.baseDone&&!blasts.length)continue;
+    const pb=earth.base,x=earth.fx[i],z=earth.fz[i];
     let c=[pb[i*3],pb[i*3+1],pb[i*3+2]],mat=M_NAT,m2=0;
     if(blasts.length){
       computeDmg(x,z);
       if(DM.fb||molten){c=molten?PC.lava:PC.glass;if(molten){mat=M_FIRE;m2=0.12+0.22*hash2(i,7);}}
-      else{
-        if(DM.therm>=1)for(let k=0;k<3;k++)c[k]=lerp(c[k],P.char[k],0.6);
-        else if(DM.psi>5)for(let k=0;k<3;k++)c[k]=lerp(c[k],P.dirt[k],0.4);
-      }
+      else if(DM.therm>=1)for(let k=0;k<3;k++)c[k]=lerp(c[k],P.char[k],0.6);
+      else if(DM.psi>5)for(let k=0;k<3;k++)c[k]=lerp(c[k],P.dirt[k],0.4);
     }
+    if(earth.hot.has(i))continue;
     C[i*3]=c[0];C[i*3+1]=c[1];C[i*3+2]=c[2];A[i*2]=mat;A[i*2+1]=m2;
   }
-  planet.mesh.instanceColor.needsUpdate=true;planet.mesh.geometry.attributes.aMat.needsUpdate=true;
+  earth.mesh.instanceColor.needsUpdate=true;earth.mesh.geometry.attributes.aMat.needsUpdate=true;
 }
-function resetPlanet(){
-  const M=planet.mesh.instanceMatrix.array,P0=planet.p0;
-  for(let i=0;i<planet.n;i++){const o=i*16;M[o]=M[o+5]=M[o+10]=PBS*0.999;M[o+1]=M[o+2]=M[o+4]=M[o+6]=M[o+8]=M[o+9]=0;M[o+12]=P0[i*3];M[o+13]=P0[i*3+1];M[o+14]=P0[i*3+2];}
-  planet.mesh.instanceMatrix.needsUpdate=true;planet.mesh.count=planet.nSurf;planet.brk=null;planet.dirty=true;
-  planet.core.visible=false;planet.atm.material.uniforms.uA.value=1;
+/* terrain colours for the globe, worked out a slice at a time so loading never stalls */
+function earthBaseSlice(n){
+  const end=Math.min(earth.nSurf,earth.baseDone+n);
+  for(let i=earth.baseDone;i<end;i++){
+    const x=earth.fx[i],z=earth.fz[i],px=earth.p0[i*3]/RE,hb=terrainBase(x,z);
+    let c;
+    if(Math.abs(px)>0.88)c=PC.ice;
+    else if(hb<0)c=hb<-1500?PC.deep:PC.sea;
+    else if(urban(x,z)>0.1)c=PC.city;
+    else if(hb>2600)c=PC.snow;else if(hb>1100)c=PC.rock;
+    else{const b=vnoise(x/5e5+3,z/5e5-2);c=b>0.3?PC.desert:b>-0.15?PC.green:PC.forest;}
+    earth.base.set(c,i*3);earth.C.set(c,i*3);
+  }
+  earth.baseDone=end;earth.mesh.instanceColor.needsUpdate=true;
+  if(end>=earth.nSurf)planet.dirty=true;
 }
-const _pq=new THREE.Quaternion(),_pa=new THREE.Vector3();
-function updatePlanet(dt,S,tick){
-  const show=S>1.3e7;
-  planet.mesh.visible=show;planet.atm.visible=show&&!planet.brk;
+function resetPlanet(){earth.reset();moon.reset();moon.C.set(moon.base,0);for(let i=0;i<moon.nSurf;i++){moon.A[i*2]=M_NAT;moon.A[i*2+1]=0;}for(let i=0;i<earth.nSurf;i++)earth.C.set(earth.base.subarray(i*3,i*3+3),i*3);planet.dirty=true;coreGlow.visible=false;}
+
+function updatePlanet(dt,show,tick){
+  if(earth.baseDone<earth.nSurf)earthBaseSlice(coarse?6000:12000);
+  earth.mesh.visible=show;moon.mesh.visible=show;atm.visible=show&&!earth.brk;
   for(const L of levels)L.mesh.visible=!show;
   for(const f of frameM)f.visible=!show;
   debMesh.visible=!show;
-  const space=smooth(3e6,1.6e7,S);
-  planet.stars.material.opacity=space;planet.stars.visible=space>0.01;
-  planet.stars.position.copy(camera.position);planet.stars.scale.setScalar(camera.far*0.7);
-  // the planet-killer: once its shock has wrapped the globe, the pieces leave
+  const space=focus==='moon'?1:smooth(3e6,1.6e7,view.S);
+  stars.material.opacity=space;stars.visible=space>0.01;
+  stars.position.copy(camera.position);stars.scale.setScalar(camera.far*0.7);
+  // the planet-killer: the pieces leave once its shock has wrapped the globe
   const pk=blasts.find(b=>b.planetKill&&b.t>1.6);
-  if(pk&&!planet.brk){planet.brk={t:0,sp:RE*0.32*Math.cbrt(pk.kt/5.4e19)};planet.mesh.count=planet.n;planet.core.visible=true;boom(1,1);shake=1;}
-  if(planet.brk){
-    const B=planet.brk;B.t+=dt;
-    const M=planet.mesh.instanceMatrix.array,A=planet.mesh.geometry.attributes.aMat.array,P0=planet.p0,V=planet.vel;
-    const d=B.sp*B.t*(1-0.35*Math.exp(-B.t*0.5)),sc=PBS*0.999;
-    for(let i=0;i<planet.n;i++){
-      const o=i*16;
-      _pa.set(V[i*3+1]+0.3,V[i*3+2]+0.2,V[i*3]+0.1).normalize();_pq.setFromAxisAngle(_pa,B.t*(0.3+hash2(i,3)*0.8));
-      const x=_pq.x,y=_pq.y,z=_pq.z,w=_pq.w;
-      M[o]=(1-2*(y*y+z*z))*sc;M[o+1]=2*(x*y+z*w)*sc;M[o+2]=2*(x*z-y*w)*sc;
-      M[o+4]=2*(x*y-z*w)*sc;M[o+5]=(1-2*(x*x+z*z))*sc;M[o+6]=2*(y*z+x*w)*sc;
-      M[o+8]=2*(x*z+y*w)*sc;M[o+9]=2*(y*z-x*w)*sc;M[o+10]=(1-2*(x*x+y*y))*sc;
-      M[o+12]=P0[i*3]+V[i*3]*d;M[o+13]=P0[i*3+1]+V[i*3+1]*d;M[o+14]=P0[i*3+2]+V[i*3+2]*d;
-      if(tick)A[i*2+1]=Math.max(i>=planet.nSurf?0.1:0.05,A[i*2+1]*0.985);
-    }
-    planet.mesh.instanceMatrix.needsUpdate=true;if(tick)planet.mesh.geometry.attributes.aMat.needsUpdate=true;
-    const cg=1-Math.exp(-B.t*0.8);
-    planet.core.scale.setScalar(RE*(0.3+1.4*cg));planet.core.material.opacity=0.45*Math.exp(-B.t*0.7);
-  }
-  if(show&&(planet.dirty||(tick&&blasts.some(b=>!b.done||b.t<3)))){colorPlanet();planet.dirty=false;}
+  if(pk&&!earth.brk){earth.breakup(pk.kt);coreGlow.visible=true;coreGlow.position.copy(EARTHC);coreGlow.userData={t:0,R:RE};boom(1,1);shake=1;}
+  earth.update(dt,tick);moon.update(dt,tick);
+  if(coreGlow.visible){const g=coreGlow.userData;g.t+=dt;const cg=1-Math.exp(-g.t*0.8);coreGlow.scale.setScalar(g.R*(0.3+1.4*cg));coreGlow.material.opacity=0.45*Math.exp(-g.t*0.7);if(g.t>12)coreGlow.visible=false;}
+  for(let i=impactGlows.length-1;i>=0;i--){const m=impactGlows[i],u=m.userData;u.t+=dt;m.scale.setScalar(u.r*(0.3+0.7*(1-Math.exp(-u.t*3))));m.material.opacity=0.9*Math.exp(-u.t*2.5);
+    if(u.t>4){scene.remove(m);m.geometry.dispose();m.material.dispose();impactGlows.splice(i,1);}}
+  if(show&&(planet.dirty||(tick&&frameNo%8===0&&blasts.some(b=>!b.done||b.t<3)))){colorEarth();planet.dirty=false;}
 }
-/* tapping the globe maps back to the flat world's coordinates */
-function planetHit(cx,cy){
-  ndc.set(cx/innerWidth*2-1,-(cy/innerHeight)*2+1);ray.setFromCamera(ndc,camera);
-  const hit=new THREE.Vector3();
-  if(!ray.ray.intersectSphere(new THREE.Sphere(new THREE.Vector3(0,-RE,0),RE),hit))return null;
-  hit.y+=RE;const r=hit.length(),th=Math.acos(clamp(hit.y/r,-1,1)),ph=Math.atan2(hit.z,hit.x);
-  return new THREE.Vector3(th*RE*Math.cos(ph),0,th*RE*Math.sin(ph));
+function moonBreak(){moon.breakup(1);coreGlowAt(MOONC,RM);}
+function coreGlowAt(p,R){coreGlow.visible=true;coreGlow.position.copy(p);coreGlow.userData={t:0,R};}
+
+/* shots that land in space: craters on the Moon or on the globe */
+function spaceImpact(body,worldP,b){
+  const l=worldP.clone().sub(body.center);
+  const wasBroken=!!body.brk;
+  body.impact(l.x,l.y,l.z,b.kt,true);
+  if(body.brk&&!wasBroken){coreGlowAt(body.center,body.R);boom(1,1);shake=1;}
+  const Rfb=Math.min(b.nuc?55*Math.pow(b.kt,0.4):150*Math.cbrt(b.kt),body.R*2);
+  spaceGlow(worldP,Math.max(Rfb,body.bs*0.8));
+  extraFlash=Math.max(extraFlash,b.nuc?0.6:0.3);
+  boom(clamp(Math.log10(b.kt*1e6+1)/22,0.2,1),clamp(Math.log10(b.kt*1e6)/11,0,1));
 }
+let extraFlash=0;
 
 /* sweep the shock front through the block grid, rebuilding columns it crosses */
 let spawnBudget=0;
@@ -1323,7 +1464,7 @@ function boom(str,big){
 /* =====================================================================
    View / controls
    ===================================================================== */
-const SMIN=4,SMAX=1.2e8;
+const SMIN=4,SMAX=1.5e9;
 const view={S:30,targetS:null};
 const controls=new OrbitControls(camera,renderer.domElement);
 controls.enableDamping=true;controls.dampingFactor=0.12;
@@ -1414,7 +1555,9 @@ const TARGETS=[
   {n:'Megalopolis',x:MEGA.x,z:MEGA.z,S:160000},
   {n:'Mountain range',x:RANGE.x,z:RANGE.z,S:600000},
   {n:'Continent',x:0,z:0,S:1.2e7},
-  {n:'Whole Earth',x:0,z:0,S:4.5e7}
+  {n:'Whole Earth',x:0,z:0,S:4.5e7},
+  {n:'Moon',moon:true,S:9e6},
+  {n:'Earth and Moon',x:0,z:0,S:9e8}
 ];
 function buildTargets(){
   const box=$('targets');box.innerHTML='';
@@ -1422,7 +1565,11 @@ function buildTargets(){
     const el=document.createElement('button');el.className='chip';el.textContent='→ '+t.n;
     el.onclick=()=>{
       [...box.children].forEach(c=>c.classList.toggle('on',c===el));
-      gzAnim={from:controls.target.clone(),to:new THREE.Vector3(t.x,0,t.z),t:0};
+      if(t.moon){focus='moon';gzAnim={from:controls.target.clone(),to:MOONC.clone(),t:0,y:true};}
+      else{
+        const back=focus==='moon';focus='ground';
+        gzAnim={from:controls.target.clone(),to:new THREE.Vector3(t.x,back?6:controls.target.y,t.z),t:0,y:back};
+      }
       view.targetS=t.S;hideHint();
     };
     box.appendChild(el);
@@ -1484,7 +1631,9 @@ function detonate(px,pz){
   const b=curBomb();
   const x=px!==undefined?px:controls.target.x,z=pz!==undefined?pz:controls.target.z;
   const bl=new Blast(b.kt,b.nuc,x,z,burst,burst==='air'?b.air:0,b.n);
-  bl.molten=b.kt>=1e15;bl.planetKill=b.kind==='planet';
+  bl.molten=b.kt>=1e15;bl.planetKill=b.kt>=earth.bindKt;
+  // a big enough impact also blasts a real crater into the globe
+  {const l=flatToLocal(x,z),Rc=30*Math.cbrt(b.kt);if(Rc>earth.bs*0.6&&b.kt<1e15)earth.impact(l.x,l.y,l.z,b.kt,false);}
   if(bl.molten&&bl.cloud)bl.cloud.visible=false;
   blasts.push(bl);planet.dirty=true;
   while(blasts.filter(q=>q.cloud).length>4){const o=blasts.find(q=>q.cloud);o.dispose();o.cloud=null;}
@@ -1493,8 +1642,17 @@ function detonate(px,pz){
   if(b.nuc)boom(0.12,0.2);
 }
 let lastBlast=null,flashV=0;
-$('go').onclick=()=>detonate();
-addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();detonate();}});
+$('go').onclick=()=>fireAtCrosshair();
+addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();fireAtCrosshair();}});
+function fireAtCrosshair(){
+  if(focus==='moon'){
+    const p=camera.position.clone().sub(MOONC).normalize().multiplyScalar(RM).add(MOONC);
+    launch(p,()=>spaceImpact(moon,p,curBomb()));return;
+  }
+  const x=controls.target.x,z=controls.target.z;
+  const p=view.S>1.3e7?flatToLocal(x,z).add(EARTHC):new THREE.Vector3(x,groundAt(x,z),z);
+  launch(p,()=>detonate(x,z));
+}
 
 /* a single tap (or click) on the ground drops the selected bomb right there */
 const ray=new THREE.Raycaster(),ndc=new THREE.Vector2();
@@ -1507,8 +1665,17 @@ renderer.domElement.addEventListener('pointerup',e=>{
   const multi=downN>1;downN=Math.max(0,downN-1);
   if(multi||downN>0)return;
   if(Math.hypot(e.clientX-downX,e.clientY-downY)>8||performance.now()-downT>450)return;
-  const hit=view.S>1.3e7?planetHit(e.clientX,e.clientY):groundHit(e.clientX,e.clientY);
-  if(hit)detonate(hit.x,hit.z);
+  const inSpace=view.S>1.3e7||focus!=='ground';
+  if(inSpace){
+    ndc.set(e.clientX/innerWidth*2-1,-(e.clientY/innerHeight)*2+1);ray.setFromCamera(ndc,camera);
+    const he=earth.hit(ray.ray),hm=moon.hit(ray.ray),o=ray.ray.origin;
+    const useMoon=hm&&(!he||o.distanceTo(hm)<o.distanceTo(he));
+    if(useMoon){launch(hm,()=>spaceImpact(moon,hm,curBomb()));return;}
+    if(he){const f=localToFlat(he.clone().sub(EARTHC));launch(he,()=>detonate(f.x,f.z));}
+    return;
+  }
+  const hit=groundHit(e.clientX,e.clientY);
+  if(hit)launch(new THREE.Vector3(hit.x,hit.y,hit.z),()=>detonate(hit.x,hit.z));
 });
 renderer.domElement.addEventListener('pointercancel',()=>{downN=0;});
 /* march the view ray through the block world to the first surface it meets */
@@ -1526,11 +1693,73 @@ function groundHit(cx,cy){
     if(y<=top){
       let a=prev,b=t;  // refine against the ground under the hit column
       for(let k=0;k<12;k++){const m=(a+b)/2,mx=o.x+d.x*m,mz=o.z+d.z*m,l2=levelAt(mx,mz);if(o.y+d.y*m<=(l2?l2.L.oTop[l2.ci]:top))b=m;else a=m;}
-      return new THREE.Vector3(o.x+d.x*b,0,o.z+d.z*b);
+      return new THREE.Vector3(o.x+d.x*b,o.y+d.y*b,o.z+d.z*b);
     }
     prev=t;
   }
   return est.lengthSq()?est:null;
+}
+
+/* =====================================================================
+   Missiles — every shot flies from beside the camera to its target
+   ===================================================================== */
+const missiles=[];
+const TRAIL_MAX=900;
+const trailGeo=new THREE.BoxGeometry(1,1,1);
+trailGeo.setAttribute('aMat',new THREE.InstancedBufferAttribute(new Float32Array(TRAIL_MAX*2),2));
+const trailMesh=new THREE.InstancedMesh(trailGeo,boxMat,TRAIL_MAX);
+trailMesh.instanceColor=new THREE.InstancedBufferAttribute(new Float32Array(TRAIL_MAX*3),3);
+trailMesh.frustumCulled=false;trailMesh.count=0;scene.add(trailMesh);
+const trail={n:0,p:new Float64Array(TRAIL_MAX*3),s:new Float32Array(TRAIL_MAX),life:new Float32Array(TRAIL_MAX),heat:new Float32Array(TRAIL_MAX)};
+const mslMat={body:new THREE.MeshLambertMaterial({color:0xd8dcdf}),nose:new THREE.MeshLambertMaterial({color:0xc0392b}),fin:new THREE.MeshLambertMaterial({color:0x3a3f45}),
+  flame:new THREE.MeshBasicMaterial({color:0xffc060,fog:false})};
+const mslBox=new THREE.BoxGeometry(1,1,1);
+function launch(to,onArrive){
+  ensureAudio();hideHint();
+  const D=camera.position.distanceTo(controls.target);
+  const q=camera.quaternion,down=new THREE.Vector3(0,-1,0).applyQuaternion(q),right=new THREE.Vector3(1,0,0).applyQuaternion(q),up=new THREE.Vector3(0,1,0).applyQuaternion(q);
+  const from=camera.position.clone().addScaledVector(down,D*0.2).addScaledVector(right,D*0.14*(Math.random()<0.5?-1:1));
+  const dist=from.distanceTo(to),L=D*0.03;
+  const g=new THREE.Group();
+  const part=(m,sx,sy,sz,z)=>{const b=new THREE.Mesh(mslBox,m);b.scale.set(sx*L,sy*L,sz*L);b.position.z=z*L;g.add(b);};
+  part(mslMat.body,0.16,0.16,0.8,0);part(mslMat.nose,0.11,0.11,0.2,0.48);
+  part(mslMat.fin,0.42,0.04,0.14,-0.36);part(mslMat.fin,0.04,0.42,0.14,-0.36);part(mslMat.flame,0.1,0.1,0.16,-0.5);
+  g.position.copy(from);scene.add(g);
+  missiles.push({from,to:to.clone(),up,apex:dist*0.22,t:0,dur:clamp(0.8+0.3*Math.log10(1+dist/D),0.8,1.6),g,L,onArrive});
+  whoosh();
+}
+const _mp=new THREE.Vector3(),_mn=new THREE.Vector3();
+function mslPos(m,e,out){const k=4*e*(1-e);return out.copy(m.from).lerp(m.to,e).addScaledVector(m.up,m.apex*k);}
+function updateMissiles(dt){
+  for(let i=missiles.length-1;i>=0;i--){
+    const m=missiles[i];m.t+=dt;
+    const e=Math.min(1,m.t/m.dur),ee=e*e*(3-2*e)*0.35+e*0.65;
+    mslPos(m,ee,_mp);mslPos(m,Math.min(1,ee+0.01),_mn);
+    m.g.position.copy(_mp);if(_mn.distanceToSquared(_mp)>0)m.g.lookAt(_mn);
+    // exhaust puffs behind the tail
+    if(trail.n<TRAIL_MAX){const k=trail.n++,back=_mp.clone().sub(_mn).normalize().multiplyScalar(m.L*0.55).add(_mp);
+      trail.p[k*3]=back.x;trail.p[k*3+1]=back.y;trail.p[k*3+2]=back.z;trail.s[k]=m.L*(0.18+0.12*Math.random());trail.life[k]=0;trail.heat[k]=1;}
+    if(e>=1){scene.remove(m.g);missiles.splice(i,1);m.onArrive();}
+  }
+  const M=trailMesh.instanceMatrix.array,C=trailMesh.instanceColor.array,A=trailGeo.attributes.aMat.array;
+  for(let k=0;k<trail.n;k++){
+    trail.life[k]+=dt;const L=trail.life[k];
+    if(L>1.6){const j=--trail.n;trail.p[k*3]=trail.p[j*3];trail.p[k*3+1]=trail.p[j*3+1];trail.p[k*3+2]=trail.p[j*3+2];trail.s[k]=trail.s[j];trail.life[k]=trail.life[j];k--;continue;}
+    const s=trail.s[k]*(1+L*2.2)*(1-L/1.6),o=k*16;
+    M.fill(0,o,o+16);M[o]=M[o+5]=M[o+10]=s;M[o+12]=trail.p[k*3];M[o+13]=trail.p[k*3+1]+trail.s[k]*L*0.6;M[o+14]=trail.p[k*3+2];M[o+15]=1;
+    const g=0.78-0.25*Math.min(1,L);C[k*3]=g;C[k*3+1]=g;C[k*3+2]=g*0.98;
+    const h=Math.max(0,1-L*5);A[k*2]=h>0.02?M_CLOUD:M_NAT;A[k*2+1]=h;
+  }
+  trailMesh.count=trail.n;
+  trailMesh.instanceMatrix.needsUpdate=true;trailMesh.instanceColor.needsUpdate=true;trailGeo.attributes.aMat.needsUpdate=true;
+}
+function whoosh(){
+  if(!soundOn||!actx)return;
+  const t=actx.currentTime,len=Math.floor(actx.sampleRate*0.9),buf=actx.createBuffer(1,len,actx.sampleRate),d=buf.getChannelData(0);
+  for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.sin(Math.PI*i/len);
+  const src=actx.createBufferSource();src.buffer=buf;
+  const bp=actx.createBiquadFilter();bp.type='bandpass';bp.Q.value=1.2;bp.frequency.setValueAtTime(2400,t);bp.frequency.exponentialRampToValueAtTime(500,t+0.9);
+  const g=actx.createGain();g.gain.value=0.18;src.connect(bp).connect(g).connect(actx.destination);src.start(t);
 }
 let gzAnim=null;
 
@@ -1559,6 +1788,7 @@ function step(dt,now){
     const nx=lerp(gzAnim.from.x,gzAnim.to.x,k),nz=lerp(gzAnim.from.z,gzAnim.to.z,k);
     camera.position.x+=nx-controls.target.x;camera.position.z+=nz-controls.target.z;
     controls.target.x=nx;controls.target.z=nz;
+    if(gzAnim.y){const ny=lerp(gzAnim.from.y,gzAnim.to.y,k);camera.position.y+=ny-controls.target.y;controls.target.y=ny;}
     if(gzAnim.t>=1)gzAnim=null;
   }
   if(view.targetS){
@@ -1570,9 +1800,11 @@ function step(dt,now){
   controls.update();
   view.S=camera.position.distanceTo(controls.target)/DIST;
   // keep the orbit point on the ground
-  const gy=groundAt(controls.target.x,controls.target.z);
-  if(isFinite(gy)&&gy>-1e8){const dy=(gy-controls.target.y)*0.25;controls.target.y+=dy;camera.position.y+=dy;}
-  const inSpace=view.S>1.3e7;
+  if(focus==='ground'&&!(gzAnim&&gzAnim.y)){
+    const gy=groundAt(controls.target.x,controls.target.z);
+    if(isFinite(gy)&&gy>-1e8){const dy=(gy-controls.target.y)*0.25;controls.target.y+=dy;camera.position.y+=dy;}
+  }
+  const inSpace=view.S>1.3e7||focus!=='ground';
   if(!inSpace)maybeRegen(now,planetWasOn);
   planetWasOn=inSpace;
   const D0=view.S*DIST;
@@ -1585,7 +1817,8 @@ function step(dt,now){
   sweep();
   updateDebris(sdt);
   frameNo++;
-  updatePlanet(sdt,view.S,frameNo%4===0);
+  updatePlanet(sdt,inSpace,frameNo%4===0);
+  updateMissiles(dt);
   // a planet-killer pulls the camera out to watch
   for(const b of blasts)if(b.planetKill&&!b.zoomed&&b.t>0.5){b.zoomed=true;view.targetS=Math.max(view.S,7e7);}
   for(const b of blasts)if(b.shell)b.shell.visible=b.shell.visible&&!inSpace;
@@ -1610,8 +1843,9 @@ function step(dt,now){
       shake=Math.max(shake,s);
     }
   }else flashLight.intensity=0;
-  flashEl.style.opacity=clamp(fl,0,1);
-  skyNow.copy(SKY).lerp(new THREE.Color(0xffc38a),clamp(heat*0.35,0,0.5)).lerp(SPACE,smooth(3e6,1.6e7,view.S));
+  extraFlash*=Math.exp(-dt*6);
+  flashEl.style.opacity=clamp(Math.max(fl,extraFlash),0,1);
+  skyNow.copy(SKY).lerp(new THREE.Color(0xffc38a),clamp(heat*0.35,0,0.5)).lerp(SPACE,focus!=='ground'?1:smooth(3e6,1.6e7,view.S));
   scene.fog.color.copy(skyNow);
   hemi.intensity=1.1+fl*3;
 
