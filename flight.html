@@ -3287,7 +3287,7 @@ function resetPlane(scen) {
   P.inE = P.inA = P.inR = 0; P.trim = 0; P.flap = P.flapCmd = 0;
   P.crashed = false; P.crashT = 0; P.stall = 0; P.hardLand = 0; P.touched = 0; P.pitchI = 0; P.holdHdg = undefined;
   P.gear = P.gearCmd = 1; P.brake = 0; P.rpm = 0; P.dist = 0;
-  P.fbwI = 0; P.fbwG = 1; P.pCmdS = 0; P.wxF = 0; P.steer = 0; P.gRatio = 1;
+  P.fbwI = 0; P.fbwG = 1; P.pCmdS = 0; P.gCmdS = undefined; P.holdBank = undefined; P.holdQ = null; P.wxF = 0; P.steer = 0; P.gRatio = 1;
   /* The swept collision test draws a line from where you were to where you
      are. A reset moves the aeroplane without flying it there, so leaving the
      old point in place hands the test a segment tens of millions of
@@ -3339,21 +3339,27 @@ function resetPlane(scen) {
      yaw    - commands sideslip, with a yaw damper underneath it            */
 
 const FBW = {
-  gMax: 12,           // g at full back stick. Below about 385 kt the wing runs
+  /* Gearing, not authority. Measured, the old numbers made an ordinary
+     input an emergency: a little under half stick held for three seconds
+     rolled the aeroplane to a hundred and twenty-five degrees — past
+     inverted — and a fifth of the stick pulled nearly two g. Full deflection
+     still gives everything the airframe has; what has changed is how much of
+     it the first third of the travel hands you. */
+  gMax: 9,            // g at full back stick. Below about 385 kt the wing runs
                       // out first; above it, this is what you get.
-  gMin: -4.5,         // g at full forward stick
-  pMax: 2.6,          // rad/s roll rate at full lateral stick (~150 deg/s)
+  gMin: -3.2,         // g at full forward stick
+  pMax: 1.45,         // rad/s roll rate at full lateral stick (~83 deg/s)
   qMax: .40,          // rad/s pitch rate at full stick in the low-speed law
   bMax: 7 * DEG,      // sideslip at full rudder
   aoaMax: 27 * DEG,   // where the wing actually breaks down, not a soft cap
   kRoll: 9.0,         // roll-rate loop bandwidth, 1/s
-  pSmooth: 5.5,       // how fast the roll-rate command itself is allowed to move
+  pSmooth: 3.6,       // how fast the roll-rate command itself is allowed to move
   kPitch: 1.6,        // g loop proportional gain, 1/s
   kPitchI: 1.5,       // g loop integral gain
   zeta: .62,          // damping ratio the pitch loop holds the short period to
   qRef: 9000,         // Pa the ground law gears its authority against
-  expo: .46,          // how much of the stick travel is the fine, low-gain part
-  kBeta: 11,          // sideslip loop gain
+  expo: .30,          // how much of the stick travel is the fine, low-gain part
+  kBeta: 13,          // sideslip loop gain
   kYawD: 1.6          // yaw damper gain
 };
 
@@ -3440,7 +3446,10 @@ function sasAugment(P, dt, e, c) {
        sits there rotating at two and a half degrees a second for ever: past
        that gain the outer loop starts racing the inner one. Dead still and
        slightly slower is the better trade. */
-    const K = 1.35, CAP = .85;
+    /* Retuned when the roll gearing came down: the outer loop has to stay
+       slower than the inner one, and the inner one is now slower than it
+       was. At 1.35 it left half a degree a second of residual wander. */
+    const K = 1.0, CAP = .60;
     const wx = clamp(sg * qe[1] * K, -CAP, CAP);
     const wy = clamp(sg * qe[2] * K, -CAP, CAP);
     const wz = clamp(sg * qe[3] * K, -CAP, CAP);
@@ -3453,6 +3462,13 @@ function sasAugment(P, dt, e, c) {
   P.holdQ = null;
   if (!freeA) { P.holdBank = undefined; return c; }
   if (P.holdBank === undefined) P.holdBank = e.roll;
+  /* And the bank it holds washes out to level over a few seconds. Holding
+     whatever bank the stick was let go at sounds right and flies wrong: a
+     fumbled input left the aeroplane in a fifty degree bank indefinitely, and
+     the pilot had to fly it out. An aeroplane that comes back to level on its
+     own is the single biggest thing that makes one easy to fly. Hold the
+     stick and you keep your turn; let go and it rolls out. */
+  P.holdBank = approach(P.holdBank, 0, .42, dt);
   let be = P.holdBank - e.roll;
   if (be > Math.PI) be -= TAU; else if (be < -Math.PI) be += TAU;
   return { e: c.e, a: clamp(be * 1.45, -.55, .55), r: c.r };
@@ -3512,8 +3528,20 @@ function flightControl(P, dt, e, cE, cA, cR) {
      computer already holds whatever it is asked to hold. It shifts the datum
      instead: a touch of nose-up trim means hands off it holds a gentle climb
      rather than level flight. */
-  const gCmd = (sE >= 0 ? lvl + (FBW.gMax - lvl) * sE : lvl + (lvl - FBW.gMin) * sE)
+  let gCmd = (sE >= 0 ? lvl + (FBW.gMax - lvl) * sE : lvl + (lvl - FBW.gMin) * sE)
     + (P.trim || 0) * .30;
+  /* Hands off, wash the vertical speed out. The g law holds the flight path
+     it is given, which is right, but it means a shove that leaves you in a
+     climb leaves you climbing for ever. A very light bias — a tenth of a g at
+     thirty metres a second — brings it back to level over about half a
+     minute without ever fighting a deliberate pull, and trim switches it off,
+     because trim is how you ask for a standing climb. */
+  if (Math.abs(sE) < .03 && !P.onGround && Math.abs(P.trim || 0) < .05)
+    gCmd += clamp(-(P.vel.y || 0) * .004, -.14, .14);
+  /* And the command itself moves at a finite rate, so that a stick slammed
+     to the stop is still a smooth pull rather than a step. */
+  P.gCmdS = P.gCmdS === undefined ? gCmd : approach(P.gCmdS, gCmd, 6.5, dt);
+  gCmd = P.gCmdS;
   const gErr = gCmd - (P.gload || 0);
   /* Anti-windup. The span scales with the command range: fixed at 1.2-3.0 g
      it would have gated the integrator off for the whole of any pull worth
@@ -8366,12 +8394,12 @@ function applyInput(dt) {
   if (K.q) r -= 1; if (K.e) r += 1;
   if (mouseStick) { a = clamp(a + mdx, -1, 1); e2 = clamp(e2 + mdy * ps, -1, 1); mdx *= Math.exp(-.8 * dt); mdy *= Math.exp(-.8 * dt); }
   if (TOUCH.on && TOUCH.rud.v) r = TOUCH.rud.v;
-  const rate = 4.0, ret = 4.8;
+  const rate = 2.8, ret = 4.2;
   if (stick) {
     // the thumb stick is an absolute position, not a rate
-    P.inA = approach(P.inA, TOUCH.stick.dx, 15, dt);
+    P.inA = approach(P.inA, TOUCH.stick.dx, 10, dt);
     // pushing the thumb forward (up the screen) is pushing the stick forward
-    P.inE = approach(P.inE, TOUCH.stick.dy * ps, 15, dt);
+    P.inE = approach(P.inE, TOUCH.stick.dy * ps, 10, dt);
   } else {
     P.inA = a ? clamp(P.inA + a * rate * dt, -1, 1) : approach(P.inA, 0, ret, dt);
     P.inE = e2 ? clamp(P.inE + e2 * rate * dt, -1, 1) : approach(P.inE, 0, ret, dt);
