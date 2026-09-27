@@ -80,7 +80,7 @@
     .row{flex-wrap:wrap}
     #go{flex:1 0 100%;margin-left:0}
     #scaleVal{min-width:0}
-    #hint{display:none}
+    #hint{top:calc(92px + env(safe-area-inset-top));white-space:normal;text-align:center;width:calc(100% - 32px)}
   }
 </style>
 </head>
@@ -98,7 +98,7 @@
   <button id="bReset" title="Rebuild the world">Rebuild</button>
 </div>
 <div id="cross"></div>
-<div id="hint">Drag to orbit · pinch or scroll to zoom · double-tap to move ground zero</div>
+<div id="hint">Pick a bomb · tap anywhere to drop it · drag to orbit · pinch or scroll to zoom</div>
 <div id="panel">
   <div id="info"><span id="bname"></span><span id="byield"></span></div>
   <div id="bdesc"></div>
@@ -1328,7 +1328,7 @@ $('bDetail').onclick=()=>{detail=(detail+1)%DETAILS.length;N=DETAILS[detail];$('
 $('bDetail').textContent='Detail: '+DETAIL_NAMES[detail];
 $('bReset').onclick=()=>{for(const b of blasts)b.dispose();blasts.length=0;D.n=0;maybeRegen(performance.now(),true);};
 let hintHidden=false;function hideHint(){if(!hintHidden){hintHidden=true;$('hint').style.opacity=0;}}
-setTimeout(hideHint,9000);
+setTimeout(hideHint,12000);
 
 /* effect radii rings at the crosshair */
 const ringGroup=new THREE.Group();scene.add(ringGroup);
@@ -1338,10 +1338,10 @@ const rings=RING_DEFS.map(r=>{const l=new THREE.Line(circGeo,new THREE.LineBasic
 function updateRings(f){RING_DEFS.forEach((r,i)=>{const v=f[r.k];rings[i].visible=v>0;rings[i].scale.setScalar(Math.max(v,1e-4));});}
 
 /* detonate */
-function detonate(){
+function detonate(px,pz){
   ensureAudio();hideHint();
   const b=curBomb();
-  const x=controls.target.x,z=controls.target.z;
+  const x=px!==undefined?px:controls.target.x,z=pz!==undefined?pz:controls.target.z;
   const bl=new Blast(b.kt,b.nuc,x,z,burst,burst==='air'?b.air:0,b.n);
   blasts.push(bl);
   while(blasts.filter(q=>q.cloud).length>4){const o=blasts.find(q=>q.cloud);o.dispose();o.cloud=null;}
@@ -1350,27 +1350,46 @@ function detonate(){
   if(b.nuc)boom(0.12,0.2);
 }
 let lastBlast=null,flashV=0;
-$('go').onclick=detonate;
+$('go').onclick=()=>detonate();
 addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();detonate();}});
 
-/* double-tap / double-click moves ground zero */
+/* a single tap (or click) on the ground drops the selected bomb right there */
 const ray=new THREE.Raycaster(),ndc=new THREE.Vector2();
-let lastTap=0,tapX=0,tapY=0,downX=0,downY=0;
-renderer.domElement.addEventListener('pointerdown',e=>{downX=e.clientX;downY=e.clientY;});
-renderer.domElement.addEventListener('pointerup',e=>{
-  if(Math.hypot(e.clientX-downX,e.clientY-downY)>8)return;
-  const now=performance.now();
-  if(now-lastTap<320&&Math.hypot(e.clientX-tapX,e.clientY-tapY)<30){moveGZ(e.clientX,e.clientY);lastTap=0;return;}
-  lastTap=now;tapX=e.clientX;tapY=e.clientY;
+let downX=0,downY=0,downT=0,downN=0;
+renderer.domElement.addEventListener('pointerdown',e=>{
+  downN++;if(downN>1)return;  // a second finger means pinch, not tap
+  downX=e.clientX;downY=e.clientY;downT=performance.now();
 });
-let gzAnim=null;
-function moveGZ(cx,cy){
+renderer.domElement.addEventListener('pointerup',e=>{
+  const multi=downN>1;downN=Math.max(0,downN-1);
+  if(multi||downN>0)return;
+  if(Math.hypot(e.clientX-downX,e.clientY-downY)>8||performance.now()-downT>450)return;
+  const hit=groundHit(e.clientX,e.clientY);
+  if(hit)detonate(hit.x,hit.z);
+});
+renderer.domElement.addEventListener('pointercancel',()=>{downN=0;});
+/* march the view ray through the block world to the first surface it meets */
+function groundHit(cx,cy){
   ndc.set(cx/innerWidth*2-1,-(cy/innerHeight)*2+1);
   ray.setFromCamera(ndc,camera);
-  const pl=new THREE.Plane(new THREE.Vector3(0,1,0),-controls.target.y),hit=new THREE.Vector3();
-  if(!ray.ray.intersectPlane(pl,hit))return;
-  gzAnim={from:controls.target.clone(),to:hit,t:0};
+  const o=ray.ray.origin,d=ray.ray.direction;
+  const pl=new THREE.Plane(new THREE.Vector3(0,1,0),-controls.target.y),est=new THREE.Vector3();
+  const far=ray.ray.intersectPlane(pl,est)?o.distanceTo(est)*2.5:view.S*20;
+  const n=400;let prev=0;
+  for(let i=1;i<=n;i++){
+    const t=far*Math.pow(i/n,1.6),x=o.x+d.x*t,y=o.y+d.y*t,z=o.z+d.z*t;
+    const lv=levelAt(x,z);
+    const top=lv?lv.L.oTop[lv.ci]:controls.target.y;
+    if(y<=top){
+      let a=prev,b=t;  // refine against the ground under the hit column
+      for(let k=0;k<12;k++){const m=(a+b)/2,mx=o.x+d.x*m,mz=o.z+d.z*m,l2=levelAt(mx,mz);if(o.y+d.y*m<=(l2?l2.L.oTop[l2.ci]:top))b=m;else a=m;}
+      return new THREE.Vector3(o.x+d.x*b,0,o.z+d.z*b);
+    }
+    prev=t;
+  }
+  return est.lengthSq()?est:null;
 }
+let gzAnim=null;
 
 /* =====================================================================
    Loop
