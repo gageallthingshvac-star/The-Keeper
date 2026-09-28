@@ -963,8 +963,9 @@ const CITY_CELL = 120000, CITY_GRID = new Map();
   }
 })();
 let _cityPop = 0;                     // how big the place is that won the sample
+let _cityCore = 0;                    // and how near the middle of it this is
 function cityAt(x, z) {
-  _cityPop = 0;
+  _cityPop = 0; _cityCore = 0;
   const a = CITY_GRID.get(Math.round(x / CITY_CELL) + "," + Math.round(z / CITY_CELL));
   if (!a) return 0;
   let u = 0;
@@ -974,7 +975,12 @@ function cityAt(x, z) {
     if (d > c.r * 2.1) continue;
     // dense core, thinning suburbs
     const v = (1 - sstep(c.r * .45, c.r * 2.1, d)) * clamp(.35 + c.pop / 900, .4, 1);
-    if (v > u) { u = v; _cityPop = c.pop; }
+    /* Density saturates across the whole inner half of a city, which is right
+       — it is all built up — and useless for deciding what is DOWNTOWN. That
+       needs how far in you are, kept separately: one at the middle, nothing by
+       four fifths of the way out. Without it every cell over New York drew a
+       four-hundred-metre tower and the place read as a pin cushion. */
+    if (v > u) { u = v; _cityPop = c.pop; _cityCore = clamp(1 - d / (c.r * .80), 0, 1); }
   }
   return clamp(u, 0, 1);
 }
@@ -1182,15 +1188,18 @@ function groundH(x, z) {
 /* cityAt, memoised on the last query: terrainColor asks for it twice per
    sample and the grid walk is not free. */
 let _uX = 1e9, _uZ = 1e9, _uV = 0;
-let _uP = 0;
+let _uP = 0, _uC = 0;
 function urbanShare(x, z) {
-  if (x !== _uX || z !== _uZ) { _uX = x; _uZ = z; _uV = cityAt(x, z); _uP = _cityPop; }
+  if (x !== _uX || z !== _uZ) { _uX = x; _uZ = z; _uV = cityAt(x, z); _uP = _cityPop; _uC = _cityCore; }
   return _uV;
 }
 /* The population of whatever won the last urbanShare call — which is what
    decides how tall the tall bit is. Density alone cannot: a dense village and
    a dense city centre look identical to it, and they are not. */
 const urbanPop = () => _uP;
+/* How near the middle of it, for the same sample: what decides whether this is
+   downtown or the edge of town, which density cannot. */
+const urbanCore = () => _uC;
 /* ---- farmland ------------------------------------------------------------
 
    Farm country from the air is not a green rug with noise on it. It is
@@ -1292,7 +1301,10 @@ function terrainColor(h, slope, x, z, cell) {
   if (urb > .01) {
     const gf = fade(1010);
     const grid = gf > 0 ? ((Math.sin(x * .0062) * Math.sin(z * .0062)) * .5 + .5) * gf + .5 * (1 - gf) : .5;
-    c = mixc(c, mixc([104, 102, 100], [138, 136, 132], grid), clamp(urb * .85, 0, .85));
+    /* Built-up ground is not grass with buildings on it. Take it most of the
+       way to concrete — a town seen from a thousand feet is grey with green in
+       it, not green with grey in it. */
+    c = mixc(c, mixc([96, 95, 94], [142, 139, 134], grid), clamp(urb * 1.15, 0, .93));
   }
   /* Middle Tennessee is two thirds timber, and it is not distributed at
      random: the flat ridge tops are cleared for pasture and the valley sides
@@ -1727,6 +1739,21 @@ function drawSky() {
   const sp2 = L.space;
   const zen = mixc(L.zenith, [3, 5, 14], sp2);
 
+  /* The background, before anything is shaped.
+
+     drawSky is the first thing drawn each frame and nothing clears the canvas
+     for it, so every pixel it does not reach keeps whatever was there LAST
+     frame. That is invisible in level flight, where the gradient band and the
+     ground between them cover the glass. Point the nose up: the band is a
+     rectangle hung off a horizon that is now five thousand pixels below the
+     screen, it covers nothing, and the canvas fills with a smeared composite
+     of every previous frame — a soft dome of stale sky with a coloured rim
+     and hard horizontal bands where the edge of the rectangle used to be,
+     sitting in a sky that should be plain black. That is the haze.
+
+     One fill fixes it: at the zenith colour, because looking up is the case
+     that breaks, and the band and the ground are drawn over it afterwards. */
+  ctx.fillStyle = rgb(...zen); ctx.fillRect(0, 0, W, H);
   ctx.save();
   ctx.translate(CX, CY); ctx.rotate(-e.roll);
   const dp = L.deep || 0;
@@ -1750,8 +1777,11 @@ function drawSky() {
   g2.addColorStop(.30, rgb(...mixc(hz2, WORLD.ground, .5)));
   g2.addColorStop(1, rgb(...mixc(shade(WORLD.ground, .92), hz2, .18)));
   ctx.fillStyle = g2;
+  /* Six radii, not one. Nose down hard and the horizon is thousands of pixels
+     above the top of the screen; a fill one radius deep then stops short of
+     the bottom of it and leaves the same stale smear underneath. */
   if (dip < .004) {
-    ctx.fillRect(-R, yOff, R * 2, R);
+    ctx.fillRect(-R, yOff, R * 2, R * 6);
   } else {
     const drop = F * Math.tan(clamp(pitch + dip, -1.45, 1.45));
     const sag = F * Math.tan(dip) * .55;
@@ -1761,7 +1791,7 @@ function drawSky() {
       const px = -R + (i / 28) * R * 2, k = px / (R * 1.02);
       ctx.lineTo(px, drop + sag * k * k);
     }
-    ctx.lineTo(R, yOff + R * 2); ctx.lineTo(-R, yOff + R * 2);
+    ctx.lineTo(R, yOff + R * 6); ctx.lineTo(-R, yOff + R * 6);
     ctx.closePath(); ctx.fill();
   }
   ctx.restore();
@@ -2950,11 +2980,50 @@ function drawCities() {
    big ones instead of drawing a hundred thousand of them. Doubling means each
    coarser level is a SUBSET of the one below, so nothing shuffles as you
    climb; the small ones simply stop being drawn. */
+/* ---- what a built-up place looks like from the air ------------------------
+
+   One grey box per cell, all the same size, all the same colour, is a lattice
+   of grey cubes standing on a green field. Nothing about it reads as a town,
+   and from a thousand feet over Manhattan that is what it was.
+
+   A real built-up place is three different things mixed by density, and the
+   mix is the whole of it. Most of the built world by AREA is houses: eight
+   metres tall, ten metres across, a pitched roof in a different colour from
+   the walls, four or five to a block. Where the density comes up it becomes
+   blocks: thirty to fifty metres on a side, ten to sixty metres tall, brick
+   and stone and concrete rather than one grey. And in the middle of somewhere
+   big enough to have one, towers: slender, stepped, four times the height of
+   anything around them, with a crown and a red light on it.
+
+   Which one a cell gets is a draw against the local density, so the change
+   from suburb to downtown happens across the map rather than at a boundary,
+   and the odds on a tower are cubed in density AND gated on the city's
+   population, because a dense village is not a city centre and the difference
+   is three hundred metres.
+
+   The detail is spent by distance: past a couple of kilometres every building
+   is the single box it always was, because that is all a couple of pixels can
+   show, and the budget it saves goes on the ones near enough to look at. */
+const URB_HOUSE = [[198, 186, 168], [208, 198, 182], [180, 168, 152], [192, 180, 166],
+                   [170, 162, 150], [212, 200, 186], [186, 172, 150], [200, 190, 176]];
+const URB_ROOF = [[110, 92, 82], [96, 86, 80], [128, 104, 86], [86, 90, 98],
+                  [76, 72, 70], [120, 98, 84], [92, 84, 76]];
+const URB_BLOCK = [[168, 146, 126], [150, 128, 112], [176, 168, 156], [138, 132, 126],
+                   [158, 140, 120], [186, 176, 164], [146, 138, 128], [172, 152, 130]];
+const URB_TOWER = [[156, 172, 188], [132, 148, 168], [176, 186, 196], [120, 134, 152],
+                   [166, 172, 178], [142, 158, 178], [150, 162, 174], [128, 144, 164]];
+const pickCol = (a, h) => a[Math.min(a.length - 1, (h * a.length) | 0)];
 function drawUrban(budget) {
   const camX = cam.pos.x, camZ = cam.pos.z, camY = cam.pos.y;
   if (budget <= 0 || camY > 30000) return budget;
   const lvl = clamp(Math.floor(Math.log2(Math.max(camY, 400) / 400)), 0, 4);
-  const PITCH = 96 * (1 << lvl);
+  /* Sixty-four metres, not ninety-six. A city block is about that, and at the
+     old pitch a building filling a third of its cell left sixty metres of bare
+     ground between it and the next one: correct for a suburb, and nothing like
+     a city. Two and a quarter times as many cells cost nothing, because the
+     budget was always what decided how many got drawn — they are simply
+     spent closer in, which is where they can be seen. */
+  const PITCH = 64 * (1 << lvl);
   // a phone draws a smaller circle of it, which costs less than drawing the
   // same circle worse
   const reach = Math.min(2700 * (1 << lvl), 26000) * (Q.q.buildings < 700 ? .74 : 1);
@@ -2976,17 +3045,103 @@ function drawUrban(budget) {
     const gy = terrainH(bx, bz);
     if (gy < 2) return;
     const h2 = hash2(i * 17 + 3, j * 29 + 7);
-    /* How tall depends on TWO things: how big the place is, and how near this
-       is to the middle of it. Density on its own cannot tell a dense village
-       from a city centre, and the difference is a hundred metres. */
-    const coreH = clamp(16 + Math.pow(urbanPop(), .50) * 3.0, 16, 340);
-    const maxH = lerp(11, coreH, Math.pow(u, 1.25));
-    const hgt = (6 + (.25 + h2 * h2 * .75) * maxH) * (.6 + .4 * u);
-    const wid = PITCH * (.24 + h1 * .20) * (lvl ? 1.18 : 1);
-    budget--;
-    const tone = 88 + h2 * 52 + u * 14;
-    boxOnGround(bx + (h1 - .5) * PITCH * .22, gy, bz + (h2 - .5) * PITCH * .22,
-      wid, hgt, wid * (.72 + h2 * .5), [tone * .92, tone * .95, tone], bd);
+    const h3 = hashF(i * 23 + 5, j * 11 + 17);
+    const h4 = hashF(i * 13 + 9, j * 37 + 3);
+    /* How tall the tall bit is depends on TWO things: how big the place is,
+       and how near this is to the middle of it. Density on its own cannot
+       tell a dense village from a city centre, and the difference is a
+       hundred metres. */
+    const pop = urbanPop(), core = urbanCore();
+    const coreH = clamp(16 + Math.pow(pop, .50) * 3.0, 16, 340);
+    const near = lvl === 0 && bd < 3000;
+    const ox = (h1 - .25) * PITCH * .26, oz = (h2 - .25) * PITCH * .26;
+    /* Downtown is a small place. Towers want to be near the middle AND in a
+       city big enough to have any, and even there they are one cell in three
+       rather than every cell — a skyline is a few tall things against a lot
+       of ordinary ones, and a city where every block is four hundred metres
+       is a pin cushion, which is exactly what the first pass drew. */
+    const towerOdds = Math.pow(core, 2.6) * Math.pow(u, 1.5)
+      * sstep(200, 3000, pop) * .22;
+    /* Density saturates across a whole metropolitan area — eleven miles out
+       from Manhattan it still reads one — so on its own it made the suburbs
+       out of the same mid-rise blocks as downtown. What separates a suburb
+       from a city centre is not how built up it is, it is HOW FAR IN, so the
+       blocks follow that and the houses get everything else. Most of the
+       built world by area is houses; it should look like it. */
+    const blockOdds = Math.pow(u, 1.15) * Math.pow(core, 2.3) * .95;
+    if (h3 < towerOdds) {
+      /* A tower. Stepped, because a tall building that is one extrusion is a
+         chimney; tapering each stage by a fifth is what gives it a silhouette
+         from five miles out. */
+      /* Skewed hard toward the short ones. A skyline is two or three things
+         that stand out of a great many that do not; a hundred buildings all
+         at the maximum is a pin cushion, and a cube on the draw is what puts
+         most of them between a third and a half of it. */
+      const t3 = h2 * 2;
+      const hgt = clamp((.10 + t3 * t3 * t3 * .95) * coreH * (.34 + .90 * core),
+        38, coreH * 1.2);
+      const col = pickCol(URB_TOWER, h4);
+      const seg = hgt > 190 ? 4 : hgt > 95 ? 3 : 2;
+      let base = gy, bw = clamp(hgt * .17, 14, 42), n = 0;
+      for (let s = 0; s < seg; s++) {
+        const sh = hgt / seg;
+        boxOnGround(bx + ox, base, bz + oz, bw, sh, bw * (.80 + h2 * .5),
+          shade(col, 1 - s * .05), bd);
+        base += sh; bw *= .80; n++;
+      }
+      if (hgt > 165) {
+        boxOnGround(bx + ox, base, bz + oz, bw * .34, hgt * .055, bw * .34, shade(col, .78), bd);
+        n++;
+        const sp = projectPoint(v3(bx + ox, base + hgt * .055 + 3, bz + oz));
+        if (sp) DL.sprite(sp.z - 2, sp.x, sp.y, Math.max(1.6, 24 * sp.s), sprite(255, 66, 56, 3),
+          .30 + .52 * (.5 + .5 * Math.sin(GAME.t * 2.4 + i * .7 + j * .3)));
+      }
+      budget -= n;
+    } else if (h3 < towerOdds + blockOdds || lvl > 0) {
+      // a block: the ordinary four-to-twelve-storey stuff a city is made of
+      /* Proportions matter more than size: fifty metres wide and twelve tall
+         is a warehouse, and a city of warehouses is what the first pass drew.
+         Narrower and taller, so a block reads as a building. */
+      /* Wide enough to nearly fill the cell, so what is left between them
+         reads as a street rather than as a field. */
+      /* And how tall a block is follows how far into town it is, hard. A
+         suburb has shops and walk-ups of three or four storeys, not the
+         fifty-metre slabs that come out of reading density alone — which is
+         what buried the houses under mid-rise eleven miles from Manhattan. */
+      const hgt = 10 + (.18 + h2 * 1.90) * lerp(8, 60, Math.pow(u * core, 1.7));
+      const wid = PITCH * (.46 + h1 * .50) * (lvl ? 1.2 : 1);
+      const dep = wid * (.74 + h4 * .44);
+      const col = pickCol(URB_BLOCK, h4);
+      boxOnGround(bx + ox, gy, bz + oz, wid, hgt, dep, col, bd);
+      budget--;
+      if (near) {                                      // parapet along the roof
+        boxOnGround(bx + ox, gy + hgt, bz + oz, wid * 1.03, 1.5, dep * 1.03,
+          shade(col, .72), bd);
+        budget--;
+      }
+    } else {
+      /* Houses. Most of the built world, and the part that was missing
+         entirely: four of them to a block, ten metres across, with a roof in
+         a different colour. Far off they collapse to one box, because at two
+         kilometres that is every pixel they have. */
+      const n = near ? 3 : 1;
+      for (let k = 0; k < n; k++) {
+        const a1 = hashF(i * 61 + k * 7 + 1, j * 53 + k * 3 + 5);
+        const a2 = hashF(i * 29 + k * 13 + 3, j * 71 + k * 5 + 9);
+        const px = bx + (a1 - .5) * PITCH * .70, pz = bz + (a2 - .5) * PITCH * .70;
+        const wid = (9 + a1 * 5.5) * (lvl ? 2.2 : 1);
+        const hgt = (5.0 + a2 * 3.6) * (lvl ? 1.9 : 1);
+        const dep = wid * (.70 + a2 * .55);
+        boxOnGround(px, gy, pz, wid, hgt, dep, pickCol(URB_HOUSE, a1), bd);
+        budget--;
+        if (near) {
+          boxOnGround(px, gy + hgt, pz, wid * 1.06, 1.5 + a2 * 1.5, dep * 1.06,
+            pickCol(URB_ROOF, a2), bd);
+          budget--;
+        }
+        if (budget <= 0) break;
+      }
+    }
   };
   /* Outward from the aeroplane in rings, because the budget runs out and what
      it must not run out on is the ground you are directly over. Scanning the
@@ -3710,7 +3865,7 @@ function gToStick(dG, lvl) {
 function sasAugment(P, dt, e, c) {
   if (P.onGround || P.crashed || (AP.on && AP.mode)) { P.holdQ = null; P.holdBank = undefined; return c; }
   const freeE = Math.abs(c.e) < .05, freeA = Math.abs(c.a) < .05, freeR = Math.abs(c.r) < .05;
-  if ((P.cont === undefined ? 1 : P.cont) < .02 || (P.point || 0) > .5) {
+  if ((P.cont === undefined ? 1 : P.cont) < .02 || (P.point || 0) > .45) {
     /* Vacuum: hold the attitude it was left in, exactly. The error is the
        rotation from here back to there, read in the BODY frame, and it is fed
        in as a rate command — one loop, proportional, first order, which is
@@ -3734,7 +3889,7 @@ function sasAugment(P, dt, e, c) {
        comes back to level, which is the only hands-off behaviour that means
        anything at a speed where altitude changes by a planetary radius a
        millisecond. */
-    const pointAir = (P.point || 0) > .5;
+    const pointAir = (P.point || 0) > .45;
     let hold;
     if (pointAir) {
       /* The horizon, keeping the heading. Pointing makes a level nose into a
@@ -3828,7 +3983,7 @@ function flightControl(P, dt, e, cE, cA, cR) {
   /* Pointing hands the pitch axis to the rate law, which is the same law the
      runway and the vacuum use and the only one that means anything when lift
      no longer decides where the aeroplane goes. */
-  const gnd = Math.max(clamp(P.fbwG, 0, 1), P.point || 0);
+  const gnd = Math.max(clamp(P.fbwG, 0, 1), sstep(0, .45, P.point || 0));
 
   /* ---------------- pitch ------------------------------------------------ */
   const lvl = levelG(e, P.gRatio);
@@ -3845,8 +4000,14 @@ function flightControl(P, dt, e, cE, cA, cR) {
      thirty metres a second — brings it back to level over about half a
      minute without ever fighting a deliberate pull, and trim switches it off,
      because trim is how you ask for a standing climb. */
+  /* The cap was a tenth of a g, which is the right STRENGTH and was the wrong
+     LIMIT: it binds above thirty-five metres a second of climb, and above
+     orbital speed a hands-off aeroplane accumulates hundreds. Half a g is
+     still gentle where it is felt — below thirty-five metres a second the
+     slope governs and the cap is never reached, so an ordinary circuit is
+     untouched — and it is enough to stop a zoom becoming a departure. */
   if (Math.abs(sE) < .03 && !P.onGround && Math.abs(P.trim || 0) < .05)
-    gCmd += clamp(-(P.vel.y || 0) * .004, -.14, .14);
+    gCmd += clamp(-(P.vel.y || 0) * .0045, -.55, .55);
   /* And the command itself moves at a finite rate, so that a stick slammed
      to the stop is still a smooth pull rather than a step. */
   P.gCmdS = P.gCmdS === undefined ? gCmd : approach(P.gCmdS, gCmd, 6.5, dt);
@@ -4319,11 +4480,25 @@ function physics(P, dt) {
      with no fixed point, and it flew the aeroplane into the ground every
      time.
 
+     So they are ORDERED, not simultaneous. Below .45 the pitch law and the
+     augmentation change over and the velocity is left alone entirely; above
+     it, with both already in their new mode, the velocity starts to follow
+     the nose. Overlap them and the band in between is exactly the loop with
+     no fixed point: at fourteen thousand metres a second it read sixteen g
+     and put the aeroplane thirteen kilometres lower with the stick centred.
+
      It is multiplied by the continuum factor, so it is a thing that happens
      in AIR and nowhere else: out of the atmosphere the aeroplane goes back to
      being a body on a trajectory, orbits are orbits again, and every law in
      here is the one it always was. */
-  P.point = LIMITS.free ? sstep(3000, 12000, V) * P.cont : 0;
+  /* With the limiter ON it still applies, just much further out. Below about
+     Mach 40 the aerodynamic model is doing real work and is measurably well
+     behaved, so nothing there changes. Above it, it is not: the dynamic
+     pressure is several times the structural limit, half a stick of push
+     comes back as twenty g of nothing, and the aeroplane climbs whatever the
+     pilot does. That is not an aeroplane any more, so up there it becomes the
+     same thing it becomes with the limiter off — something you point. */
+  P.point = (LIMITS.free ? sstep(3000, 12000, V) : sstep(12000, 25000, V)) * P.cont;
   P.ias = P.vAero * Math.sqrt(Math.max(rho * P.cont, 0) / 1.225);
   // Afterburner lives in the top fifth of the throttle and is what the gate
   // between "fast aeroplane" and "Mach 3" actually is.
@@ -4364,9 +4539,24 @@ function physics(P, dt) {
      that is the term doing it — but it is unbounded in v squared, so at forty
      thousand metres a second down low it reaches thirty g of lift and throws
      the aeroplane off the planet. Real physics, wrong model: at that speed
-     over a flat plane the geometry stopped applying long ago. The floor keeps
-     orbits exact (they need a fraction of a g) and stops the absurdity. */
-  const gEff = Math.max(gLoc - (P.vel.x * P.vel.x + P.vel.z * P.vel.z) / rOrb, -3 * 9.81);
+     over a flat plane the geometry stopped applying long ago.
+
+     A hard floor of -3 g was not enough of an answer. Three g of unopposed
+     lift pointing at space is still a departure: hands off and level at
+     20,000 m/s the aeroplane was forty thousand kilometres up a minute later,
+     with the stick centred and nothing the pilot could do about it — not
+     flying, and not a choice. The relief is SATURATED instead of clipped. It
+     is exact up to orbital speed, which is the only place it is honest and
+     the place that has to stay right, and above it the surplus rolls off to a
+     third of a g and stops. That much the wing can cancel at any altitude and
+     any speed, which is all "hold this height" ever needed: the curve of the
+     Earth is something you can follow again rather than something your speed
+     throws you off. Leaving is still leaving — you pitch up, like anything
+     else that leaves. */
+  const relief = (P.vel.x * P.vel.x + P.vel.z * P.vel.z) / rOrb;
+  const s = relief / Math.max(gLoc, 1e-6);
+  const sEff = s <= 1 ? s : 1 + (1 - Math.exp(-(s - 1) * .6)) * .35;
+  const gEff = gLoc * (1 - sEff);
   P.gRatio = gEff / 9.81;
   let F = v3(0, -SPECS.mass * gEff, 0);      // world-frame accumulator
 
@@ -4790,9 +4980,9 @@ function physics(P, dt) {
      third of a second of lag. It is no longer flight; it is pointing, which
      is the only thing that can work at ten times the speed of light and is
      what the mode is for. Below Mach 10 nothing here does anything at all. */
-  if (LIMITS.free && !P.crashed && !P.onGround) {
+  if ((P.point || 0) > 0 && !P.crashed && !P.onGround) {
     const vm2 = Math.hypot(P.vel.x, P.vel.y, P.vel.z);
-    const auth = P.point || 0;
+    const auth = sstep(.45, 1, P.point || 0);
     if (auth > 0 && vm2 > 1) {
       const k = auth * (1 - Math.exp(-dt * 3.0));
       /* The horizontal part of the velocity follows the nose exactly. The
