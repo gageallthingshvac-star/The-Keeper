@@ -2908,10 +2908,11 @@ function frame(now) {
   // swallow statics near the hole
   if (started) {
     const reach = hole.r + 40 * cityS;
-    const cx0 = Math.floor((hole.x - reach) / C), cx1 = Math.floor((hole.x + reach) / C);
-    const cz0 = Math.floor((hole.z - reach) / C), cz1 = Math.floor((hole.z + reach) / C);
+    const CS = C * cityS;
+    const cx0 = Math.floor((hole.x - reach) / CS), cx1 = Math.floor((hole.x + reach) / CS);
+    const cz0 = Math.floor((hole.z - reach) / CS), cz1 = Math.floor((hole.z + reach) / CS);
     for (let cz = cz0; cz <= cz1; cz++) for (let cx = cx0; cx <= cx1; cx++) {
-      const ch = chunks.get(cx + ',' + cz); if (!ch) continue;
+      const ch = chunks.get(cityT + ':' + cx + ',' + cz); if (!ch) continue;
       let dead = 0;
       for (const o of ch.objs) { tryEat(o); if (o.state > 1) dead++; }
       if (dead > 32) ch.objs = ch.objs.filter(o => o.state <= 1);
