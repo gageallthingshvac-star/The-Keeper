@@ -106,6 +106,12 @@
         <button class="opt" data-safe="off"><b>REAL DAMAGE</b><i>Structural contact, a hard landing or a gear-up touchdown ends the flight.</i></button>
       </div>
 
+      <h2>Speed limiter</h2>
+      <div class="row" id="freeRow">
+        <button class="opt on" data-free="on"><b>REAL AIR</b><i>Drag sets an honest top end down here, the way it does for a real aeroplane. Leaving the atmosphere still lifts it: out there the throttle becomes a speed selector and the top of its travel is a thousand times the speed of light.</i></button>
+        <button class="opt" data-free="off"><b>NO LIMIT &mdash; 10&times; LIGHT IN AIR</b><i>Takes the ceiling off inside the atmosphere too. The airframe pretends it is at a survivable dynamic pressure, the burner's surplus grows with the speed you are already doing, and the ceiling over Tennessee becomes ten times the speed of light &mdash; about half a minute from the runway. The heat is real. <kbd>U</kbd></i></button>
+      </div>
+
       <h2>Pilot log</h2>
       <div id="logList"></div>
 
@@ -187,6 +193,40 @@ function qIntegrate(q, w, dt) {
   const d = [0, w.x * dt * .5, w.y * dt * .5, w.z * dt * .5];
   const r = qmul(q, [1, d[1], d[2], d[3]]);
   return qnorm(r);
+}
+/* An orientation from a direction to point the nose down, plus a hint at
+   which way is up. The jump drive needs it: it puts the aeroplane somewhere
+   else and has to decide how it is facing when it arrives, and "facing" is a
+   basis, not three angles. Right = up x forward, then up = forward x right,
+   which is orthonormal whatever the hint was as long as it was not parallel
+   to the nose. */
+function qLook(fwd, upHint) {
+  let z = vnorm(fwd);
+  let x = vcross(upHint, z);
+  if (vlen(x) < 1e-6) x = vcross(v3(0, 0, 1), z);
+  if (vlen(x) < 1e-6) x = vcross(v3(1, 0, 0), z);
+  x = vnorm(x);
+  const y = vcross(z, x);
+  // columns are the body axes in world, exactly as qMat lays them out
+  const m00 = x.x, m10 = x.y, m20 = x.z;
+  const m01 = y.x, m11 = y.y, m21 = y.z;
+  const m02 = z.x, m12 = z.y, m22 = z.z;
+  const tr = m00 + m11 + m22;
+  let q;
+  if (tr > 0) {
+    const s = Math.sqrt(tr + 1) * 2;
+    q = [.25 * s, (m21 - m12) / s, (m02 - m20) / s, (m10 - m01) / s];
+  } else if (m00 > m11 && m00 > m22) {
+    const s = Math.sqrt(1 + m00 - m11 - m22) * 2;
+    q = [(m21 - m12) / s, .25 * s, (m01 + m10) / s, (m02 + m20) / s];
+  } else if (m11 > m22) {
+    const s = Math.sqrt(1 + m11 - m00 - m22) * 2;
+    q = [(m02 - m20) / s, (m01 + m10) / s, .25 * s, (m12 + m21) / s];
+  } else {
+    const s = Math.sqrt(1 + m22 - m00 - m11) * 2;
+    q = [(m10 - m01) / s, (m02 + m20) / s, (m12 + m21) / s, .25 * s];
+  }
+  return qnorm(q);
 }
 /* Euler read-outs for the instruments (aviation convention). */
 function eulerOf(m) {
@@ -1320,10 +1360,10 @@ const MOBILE = COARSE || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent ||
 /* More LOD rings than a propeller aeroplane needs: at Mach 3 you cross the
    old draw distance in eight seconds, and from 24 km you can see most of it. */
 const QLEVELS = [
-  { dpr: 1.00, lev: 11, half: 6, base: 78, trees: .22, treeR: 1300, clouds: 26000, glare: 0, vig: 0, shadow: 1, stars: 0, terrShadow: 0, cloudShadow: 0, buildings: 320 },
-  { dpr: 1.25, lev: 12, half: 6, base: 62, trees: .30, treeR: 1900, clouds: 44000, glare: 1, vig: 1, shadow: 1, stars: 1, terrShadow: 1, cloudShadow: 0, buildings: 620 },
-  { dpr: 1.50, lev: 13, half: 8, base: 52, trees: .38, treeR: 2600, clouds: 64000, glare: 1, vig: 1, shadow: 1, stars: 1, terrShadow: 1, cloudShadow: 1, buildings: 1000 },
-  { dpr: 2.00, lev: 14, half: 9, base: 44, trees: .44, treeR: 3200, clouds: 86000, glare: 1, vig: 1, shadow: 1, stars: 1, terrShadow: 1, cloudShadow: 1, buildings: 1400 }
+  { dpr: 1.00, lev: 13, half: 6, base: 78, trees: .22, treeR: 1700, clouds: 34000, glare: 0, vig: 0, shadow: 1, stars: 0, terrShadow: 0, cloudShadow: 0, buildings: 380 },
+  { dpr: 1.25, lev: 14, half: 7, base: 62, trees: .30, treeR: 2400, clouds: 56000, glare: 1, vig: 1, shadow: 1, stars: 1, terrShadow: 1, cloudShadow: 0, buildings: 720 },
+  { dpr: 1.50, lev: 15, half: 9, base: 52, trees: .38, treeR: 3300, clouds: 84000, glare: 1, vig: 1, shadow: 1, stars: 1, terrShadow: 1, cloudShadow: 1, buildings: 1200 },
+  { dpr: 2.00, lev: 16, half: 10, base: 44, trees: .44, treeR: 4100, clouds: 112000, glare: 1, vig: 1, shadow: 1, stars: 1, terrShadow: 1, cloudShadow: 1, buildings: 1700 }
 ];
 /* On top of the rungs, a continuous detail scale. The rungs are coarse, they
    change the resolution of the canvas, and they only ever move when the frame
@@ -1966,7 +2006,7 @@ function drawTerrain() {
   /* The detail scale buys smaller cells and proportionally more of them, so
      the ground reaches exactly as far as it did and is described in finer
      pieces the whole way out. */
-  const LEV = Q.q.lev, half = clamp(Math.round(Q.q.half * Q.det), 5, 15), span = half * 2 + 1;
+  const LEV = Q.q.lev, half = clamp(Math.round(Q.q.half * Q.det), 5, 17), span = half * 2 + 1;
   // Widen every ring as you climb: from 80,000 ft the useful view is thousands
   // of kilometres across, and 50 m cells there would be wasted on nothing.
   const base0 = Q.q.base / Q.det;
@@ -1974,7 +2014,16 @@ function drawTerrain() {
   /* Nothing past the geometric horizon is worth a triangle. This is what
      makes a fourteen-ring ladder affordable: on the deck it throws almost all
      of it away, and only at eighty thousand feet does the whole thing draw. */
-  const horiz = Math.sqrt(2 * EARTH_R * Math.max(cam.pos.y - WORLD.sea, 30)) + 190000;
+  /* Two horizons, added. The first is geometric — how far the eye can see
+     over a sphere from this height — and it is the one that matters on the
+     deck. The second is how far a MOUNTAIN can be and still stand above that
+     line, which is a horizon of its own: a two-and-a-half-kilometre peak
+     shows from a hundred and seventy-eight kilometres past where the sea
+     disappears. The old figure was a flat 190 km of slack, which covered the
+     peaks and nothing else. At 460 km the far ranges arrive before they are
+     already under the nose, which is the whole of what "see further" means
+     from a cockpit. */
+  const horiz = Math.sqrt(2 * EARTH_R * Math.max(cam.pos.y - WORLD.sea, 30)) + 460000;
   const sunv = LIGHT.sun;
   const cm = cam.m;
   const inflate = SEAM_PX * DPR;
@@ -1985,7 +2034,7 @@ function drawTerrain() {
        enormous quads stretched across the whole view — the flat grey slabs
        that showed up above three hundred kilometres. There is nothing out
        there for them to describe, so they are not drawn. */
-    if (cell > horiz * .34) continue;
+    if (cell > horiz * .52) continue;
     const gx = Math.round(cam.pos.x / cell), gz = Math.round(cam.pos.z / cell);
     /* Heights are fetched when a cell turns out to be worth drawing, not
        before. Filling the whole ring up front sampled the terrain function
@@ -2010,7 +2059,7 @@ function drawTerrain() {
         const mcx = x0 + cell * .5, mcz = z0 + cell * .5;
         const dx = mcx - cam.pos.x, dz = mcz - cam.pos.z;
         const dist = Math.hypot(dx, dz);
-        if (dist > cell * 11 + 400 || dist > horiz) continue;
+        if (dist > cell * 13 + 900 || dist > horiz) continue;
         if (!inView(dx, dz, cell * .78)) continue;
         let h00 = hAt(i, j), h10 = hAt(i + 1, j),
           h01 = hAt(i, j + 1), h11 = hAt(i + 1, j + 1);
@@ -3273,6 +3322,235 @@ function toggleSpeedHold() {
   toast(SPD.on ? "SPEED HOLD \u00b7 " + navSpeed(SPD.tgt) : "SPEED HOLD OFF", 1.8);
   audio.beep(SPD.on ? 820 : 430, .14, .12);
 }
+/* ---- the limiter, and taking it off -------------------------------------
+
+   In the air, the top end is drag, and drag is honest: half rho v-squared
+   against a fixed area, rising with the SQUARE of speed, so any engine gets
+   matched by it sooner or later and the needle stops. That is what a Mach 3
+   aeroplane is. It is also, in the atmosphere, an absolute ceiling of a few
+   thousand miles an hour no amount of thrust will move.
+
+   This takes the limiter off. It does not pretend to be physics — nothing
+   goes ten times the speed of light through air — so rather than fight the
+   equations it tells them a different speed: the dynamic pressure the
+   airframe FEELS is pinned at FREE_Q, a little under the structural limit,
+   while the speed itself runs free. Everything downstream is then consistent
+   and the aeroplane stays flyable — drag is finite, the control surfaces keep
+   working, indicated airspeed reads a number a pilot would recognise, and the
+   fly-by-wire flies the same laws it always did. The heating is deliberately
+   NOT pinned: it goes as the cube of true speed and it is the one part of
+   going this fast that should be visible from inside.
+
+   The acceleration comes off the same leash. The burner's vacuum-grade
+   surplus applies in air as well, and instead of a flat figure it is
+   proportional to the speed you are already doing — which makes the climb
+   exponential with a time constant under two seconds, so the whole span from
+   a runway to ten times light is about half a minute of holding the burner
+   rather than a career. */
+const SPD_ATM_TOP = 10 * C_LIGHT;    // ten times light, and that is the ceiling in air
+const FREE_Q = 1.15e5;               // Pa the airframe pretends it is in, whatever the speed
+const LIMITS = { free: false };
+function toggleFree() {
+  LIMITS.free = !LIMITS.free;
+  if (LIMITS.free) {
+    toast("LIMITER OFF \u00b7 ATMOSPHERIC CEILING 10\u00d7 LIGHT \u00b7 BURNER UNLEASHED", 3.4);
+    audio.beep(1180, .22, .14);
+  } else {
+    toast("LIMITER ON \u00b7 REAL AIR", 2.0);
+    audio.beep(430, .16, .12);
+  }
+  syncFreeRow();
+}
+/* ===== the jump drive ====================================================
+
+   The solar system is honestly scaled, and the honest scale is the problem:
+   Neptune is 4.35e12 metres away, and even at a thousand times the speed of
+   light that is seven minutes of holding a lever and watching a number. The
+   transfer autopilot will fly it for you, which is the right answer when you
+   want the trip and the wrong one when you want the destination.
+
+   So: a jump. Pick a world on the map, press it, and the aeroplane opens a
+   corridor and is THERE — a few seconds of tunnel rather than a crossing.
+   It is not a burn and it is not physics; it moves the aeroplane along a
+   straight line with a quintic ease, which is flat at both ends, so the jump
+   accelerates out of the entry point and settles into the exit instead of
+   being a cut. Nothing integrates while it runs: no drag, no gravity, no
+   collision, and the swept test is restarted on arrival so it does not
+   discover a segment four billion kilometres long and put you into the Sun.
+
+   Where you come out is chosen to be useful rather than dramatic. A standoff
+   of a couple of planetary radii on the side you came from, and — this is the
+   part that makes it worth having — a CIRCULAR ORBIT there, not a dead stop.
+   Arriving stationary above a planet means arriving in a fall; arriving in
+   orbit means arriving somewhere you can look around from. */
+const WARP = {
+  on: false, t: 0, dur: 0, body: null, from: null, to: null,
+  vel: null, dir: null, dist: 0, spd: 0, flash: 0, cool: 0, name: "", fade: 0
+};
+/* Where a jump puts you: low orbit at home, a couple of radii out anywhere
+   else — far enough that the world is a world you can see rather than a wall
+   filling the canopy, close enough that it is the thing you are at. */
+function warpStandoff(b) {
+  if (b.home) return b.r + 420000;                 // the altitude the shuttle used
+  return Math.max(b.r * 2.2, b.r + 150000);
+}
+/* The velocity to arrive with: circular, about the body you arrived at.
+
+   Two gravity models, so two answers. Everything but the Earth is a genuine
+   GM over r squared, so a circular orbit is sqrt(GM/r) perpendicular to the
+   radius. The Earth is not modelled that way — its field is flat and
+   downward, with a centrifugal relief term in the horizontal speed — so
+   "orbit" there is a HORIZONTAL speed of sqrt(g r), and a radial one would
+   simply be a climb. Either way the direction is taken from the velocity you
+   arrived with, so a jump does not silently reverse which way you were going. */
+function warpArrivalVel(b, to, v0) {
+  if (b.home) {
+    const r = EARTH_R + Math.max(to.y, 0);
+    const vc = Math.sqrt(9.81 * EARTH_R * EARTH_R / r);
+    let hx = v0.x, hz = v0.z;
+    if (Math.hypot(hx, hz) < 1) { hx = 0; hz = 1; }
+    const hl = Math.hypot(hx, hz);
+    return v3(hx / hl * vc, 0, hz / hl * vc);
+  }
+  if (b.gm > 0) {
+    const rx = to.x - b.p.x, ry = to.y - b.p.y, rz = to.z - b.p.z;
+    const r = Math.hypot(rx, ry, rz) || 1;
+    const ux = rx / r, uy = ry / r, uz = rz / r;
+    const vc = Math.sqrt(b.gm / r);
+    // whatever part of the old velocity was already tangential
+    const rad = v0.x * ux + v0.y * uy + v0.z * uz;
+    let t = v3(v0.x - rad * ux, v0.y - rad * uy, v0.z - rad * uz);
+    if (vlen(t) < 1) t = vcross(v3(0, 1, 0), v3(ux, uy, uz));
+    if (vlen(t) < 1e-6) t = vcross(v3(1, 0, 0), v3(ux, uy, uz));
+    return vmul(vnorm(t), vc);
+  }
+  return v3();
+}
+function jumpEngage() {
+  const P = PLANE;
+  if (!GAME.started || GAME.paused || WARP.on) return;
+  if (P.crashed) { toast("JUMP DRIVE OFFLINE", 1.6); audio.beep(190, .26, .12); return; }
+  if (WARP.cool > 0) {
+    toast("JUMP DRIVE SPOOLING \u00b7 " + WARP.cool.toFixed(1) + " S", 1.6);
+    audio.beep(240, .18, .10); return;
+  }
+  const t = navTarget();
+  if (!t) {
+    toast("NO JUMP TARGET \u00b7 PICK A WORLD ON THE MAP (N)", 2.8);
+    audio.beep(200, .26, .12); return;
+  }
+  if (P.onGround) {
+    toast("JUMP NEEDS AIR UNDER THE WHEELS", 2.2);
+    audio.beep(200, .26, .12); return;
+  }
+  const b2 = t, R = warpStandoff(t);
+  let dx = P.pos.x - t.p.x, dy = P.pos.y - t.p.y, dz = P.pos.z - t.p.z;
+  let d = Math.hypot(dx, dy, dz);
+  if (d < 1) { dx = 0; dy = 1; dz = 0; d = 1; }
+  const nx = dx / d, ny = dy / d, nz = dz / d;
+  const to = v3(t.p.x + nx * R, t.p.y + ny * R, t.p.z + nz * R);
+  const leg = Math.hypot(to.x - P.pos.x, to.y - P.pos.y, to.z - P.pos.z);
+  /* "Already there" has to be measured against the world, not against the
+     standoff radius: eight per cent of the Earth's own standoff is five
+     hundred kilometres, which refused a jump from the runway to low orbit on
+     the grounds that the two are the same place. */
+  if (leg < Math.max(b2.r * .03, 20000)) {
+    toast("ALREADY AT " + t.name.toUpperCase(), 1.8);
+    audio.beep(520, .14, .10); return;
+  }
+  WARP.on = true; WARP.t = 0; WARP.flash = 1; WARP.fade = 0;
+  WARP.body = t; WARP.name = t.name;
+  WARP.from = v3(P.pos.x, P.pos.y, P.pos.z); WARP.to = to;
+  WARP.dist = leg;
+  WARP.dir = vnorm(v3(to.x - P.pos.x, to.y - P.pos.y, to.z - P.pos.z));
+  WARP.vel = warpArrivalVel(t, to, P.vel);
+  /* Long jumps take a little longer, but only a little: the point of a jump
+     is that Neptune and the Moon cost roughly the same. Two seconds for the
+     Moon, six for the edge of the system. */
+  WARP.dur = clamp(2.0 + Math.log10(Math.max(leg, 1e6) / 1e6) * .66, 2.0, 6.0);
+  toast("JUMP \u00b7 " + t.name.toUpperCase() + " \u00b7 " + navRange(Math.max(d - t.r, 0)), 2.4);
+  audio.beep(160, .5, .16); audio.beep(1320, .7, .10);
+}
+/* One frame of it. The path is straight and the ease is quintic, so the
+   reported speed is the derivative of that ease — which is a real number, and
+   at the outer planets an absurd one, which is the whole appeal. */
+function warpStep(dt) {
+  const P = PLANE;
+  WARP.t += dt;
+  const u = clamp(WARP.t / WARP.dur, 0, 1);
+  const s = u * u * u * (u * (u * 6 - 15) + 10);
+  const f = WARP.from, b = WARP.to;
+  P.pos = v3(f.x + (b.x - f.x) * s, f.y + (b.y - f.y) * s, f.z + (b.z - f.z) * s);
+  const ds = 30 * u * u * (1 - u) * (1 - u) / Math.max(WARP.dur, .001);
+  WARP.spd = WARP.dist * ds;
+  P.vel = vmul(WARP.dir, WARP.spd);
+  P.tas = WARP.spd; P.ias = 0; P.qbar = 0; P.mach = 0;
+  P.stall = 0; P.heat = Math.max(0, (P.heat || 0) - dt * 2.2);
+  // nose down the corridor, and a slow roll into it so it reads as travel
+  const up = Math.abs(WARP.dir.y) > .97 ? v3(0, 0, 1) : v3(0, 1, 0);
+  P.q = qmul(qLook(WARP.dir, up), qAxis(0, 0, 1, Math.sin(WARP.t * 1.5) * .22));
+  qMat(P.q, P.m);
+  P.w = v3();
+  P.onGround = false; P.onBody = null; P.touched = 0;
+  P.prev = null;                       // nothing swept while the corridor is open
+  WARP.flash = Math.max(WARP.flash - dt * 2.6, 0);
+  WARP.fade = u < .5 ? Math.min(1, u * 5) : Math.min(1, (1 - u) * 5);
+  if (u >= 1) {
+    P.pos = v3(b.x, b.y, b.z);
+    P.vel = v3(WARP.vel.x, WARP.vel.y, WARP.vel.z);
+    /* Wings level to the local horizon, going the way the orbit goes, and
+       nosed over forty degrees so the WORLD IS IN THE WINDOW. Facing straight
+       along the orbit is the correct attitude and the wrong picture: the
+       planet you just crossed the solar system for is then directly beneath
+       the floor, the marker says BEHIND, and the arrival is a starfield.
+
+       Seventy degrees below the track puts the nose twenty degrees off the
+       centre of the world, whose disc from a standoff of two and a bit radii
+       is twenty-seven degrees across: it fills the lower half of the canopy
+       with its limb against the stars, which is the picture worth arriving
+       to. */
+    const bd = WARP.body;
+    const rad = bd.home ? v3(0, 1, 0)
+      : vnorm(v3(b.x - bd.p.x, b.y - bd.p.y, b.z - bd.p.z));
+    const tan = vlen(P.vel) > 1 ? vnorm(P.vel) : vnorm(vcross(rad, v3(0, 0, 1)));
+    /* Except at home, where a jump lands in low orbit and the Earth already
+       fills seventy degrees below the nose. Nosing over into it there would
+       just be pointing at the ground from four hundred kilometres up. */
+    const dn = bd.home ? 0 : .940, fo = Math.sqrt(1 - dn * dn);
+    const fw = vnorm(v3(tan.x * fo - rad.x * dn,
+                        tan.y * fo - rad.y * dn,
+                        tan.z * fo - rad.z * dn));
+    P.q = qLook(fw, rad);
+    qMat(P.q, P.m);
+    P.w = v3(); P.prev = null;
+    WARP.on = false; WARP.cool = 2.6; WARP.flash = 1; WARP.fade = 0;
+    /* Hand the throttle over as a speed selector already set to the speed you
+       arrived at, rather than letting the vacuum arming notice a second later
+       and talk over the arrival message. */
+    SPD.on = true; SPD.auto = true; SPD.tgt = Math.max(vlen(P.vel), 1);
+    SPD.lever = leverOfSpd(SPD.tgt);
+    if (SPD.thrSave === undefined) SPD.thrSave = P.thr;
+    P.thr = SPD.lever;
+    if (AP.on) { AP.mode = ""; AP.accel = 0; }
+    toast("JUMP COMPLETE \u00b7 " + WARP.name.toUpperCase() + " \u00b7 "
+      + navRange(Math.max(warpStandoff(WARP.body) - WARP.body.r, 0)) + " \u00b7 IN ORBIT", 3.6);
+    audio.beep(900, .3, .14);
+  }
+}
+/* The full stop. Out here the speed hold's brake is sized to wash off
+   anything in a second or two, which makes "stop" a thing you can ask for
+   rather than a manoeuvre you plan: it arms the hold, sets the number to
+   zero, and brings the lever down with it so the panel agrees with the
+   aeroplane. This is what makes arriving somewhere possible by hand. */
+function spaceStop() {
+  const P = PLANE;
+  if (!GAME.started || GAME.paused || P.crashed) return;
+  if (P.onGround) { P.park = true; P.brake = 1; toast("PARKING BRAKE SET", 1.4); return; }
+  SPD.on = true; SPD.auto = false; SPD.tgt = 0;
+  SPD.lever = 0; P.thr = 0;
+  toast("FULL STOP \u00b7 SPEED HOLD ZERO", 2.2);
+  audio.beep(320, .34, .14);
+}
 /* Pitch sense. REAL is what a stick does: pull back (Down / thumb back) to
    raise the nose. DIRECT is the arcade sense, Up to climb. */
 let PITCH_REAL = true;
@@ -3283,6 +3561,7 @@ const CHUTE_LIMIT = 230;    // KIAS the drag chute survives
 function resetPlane(scen) {
   const P = PLANE;
   SPD.on = false; SPD.auto = false; SPD.tgt = 0; SPD.ramp = 0;
+  WARP.on = false; WARP.t = 0; WARP.cool = 0; WARP.flash = 0; WARP.fade = 0; WARP.spd = 0;
   P.vel = v3(); P.w = v3(); P.thr = 0; P.dE = P.dA = P.dR = 0;
   P.inE = P.inA = P.inR = 0; P.trim = 0; P.flap = P.flapCmd = 0;
   P.crashed = false; P.crashT = 0; P.stall = 0; P.hardLand = 0; P.touched = 0; P.pitchI = 0; P.holdHdg = undefined;
@@ -3292,7 +3571,7 @@ function resetPlane(scen) {
      are. A reset moves the aeroplane without flying it there, so leaving the
      old point in place hands the test a segment tens of millions of
      kilometres long that skewers half the solar system. */
-  P.prev = null; P.onBody = null; P.bodyRef = null; P.bodyAlt = 0; P.qbar = 0; P.gload = 0; P.alpha = 0; P.beta = 0; P.aoaCap = false; P.cmdG = 1;
+  P.prev = null; P.onBody = null; P.bodyRef = null; P.bodyAlt = 0; P.qbar = 0; P.vAero = 0; P.machA = 0; P.point = 0; P.gload = 0; P.alpha = 0; P.beta = 0; P.aoaCap = false; P.cmdG = 1;
   P.chute = P.chuteCmd = 0; P.mach = 0; P.overQ = 0; P.gMax = 1; P.gMin = 1; P.gStress = 0; P.gRed = 0; P.heat = 0; P.burn = 0; P.ab = 0; P.abSm = 0; P.unstart = 0; P.apAlt = undefined; P.apHdg = undefined;
   P.q = qAxis(0, 1, 0, Math.PI);            // runway 18: heading south
   P.thr = 0;
@@ -3431,7 +3710,7 @@ function gToStick(dG, lvl) {
 function sasAugment(P, dt, e, c) {
   if (P.onGround || P.crashed || (AP.on && AP.mode)) { P.holdQ = null; P.holdBank = undefined; return c; }
   const freeE = Math.abs(c.e) < .05, freeA = Math.abs(c.a) < .05, freeR = Math.abs(c.r) < .05;
-  if ((P.cont === undefined ? 1 : P.cont) < .02) {
+  if ((P.cont === undefined ? 1 : P.cont) < .02 || (P.point || 0) > .5) {
     /* Vacuum: hold the attitude it was left in, exactly. The error is the
        rotation from here back to there, read in the BODY frame, and it is fed
        in as a rate command — one loop, proportional, first order, which is
@@ -3440,8 +3719,34 @@ function sasAugment(P, dt, e, c) {
        then wandered back out to nine degrees a second and sat there. */
     P.holdBank = undefined;
     if (!(freeE && freeA && freeR)) { P.holdQ = null; return c; }
-    if (!P.holdQ) P.holdQ = [P.q[0], P.q[1], P.q[2], P.q[3]];
-    const q = P.q, qe = qmul([q[0], -q[1], -q[2], -q[3]], P.holdQ);
+    /* Two different things to hold, and which one depends on whether there is
+       still a planet under you.
+
+       In vacuum, hold the attitude it was left in, exactly. There is no
+       horizon out there and no reason to prefer one direction over another.
+
+       Pointing, in AIR, is the opposite case and holding an inertial attitude
+       is exactly wrong there: a tenth of a degree of nose-up, which is what
+       the transition leaves behind, is six thousand kilometres a second of
+       climb at ten times the speed of light, and the aeroplane is past the
+       Moon before anybody notices. So hands off it returns to the HORIZON,
+       keeping the heading it was on. Push or pull to leave it; let go and it
+       comes back to level, which is the only hands-off behaviour that means
+       anything at a speed where altitude changes by a planetary radius a
+       millisecond. */
+    const pointAir = (P.point || 0) > .5;
+    let hold;
+    if (pointAir) {
+      /* The horizon, keeping the heading. Pointing makes a level nose into a
+         level flight path exactly, so this is all the hold has to do. */
+      const mm = P.m, hl = Math.hypot(mm[6], mm[8]) || 1;
+      hold = qLook(v3(mm[6] / hl, 0, mm[8] / hl), v3(0, 1, 0));
+      P.holdQ = null;
+    } else {
+      if (!P.holdQ) P.holdQ = [P.q[0], P.q[1], P.q[2], P.q[3]];
+      hold = P.holdQ;
+    }
+    const q = P.q, qe = qmul([q[0], -q[1], -q[2], -q[3]], hold);
     const sg = qe[0] < 0 ? -2 : 2;
     /* 1.35 and not more. Pushed to 1.9 it arrives a second sooner and then
        sits there rotating at two and a half degrees a second for ever: past
@@ -3450,7 +3755,7 @@ function sasAugment(P, dt, e, c) {
     /* Retuned when the roll gearing came down: the outer loop has to stay
        slower than the inner one, and the inner one is now slower than it
        was. At 1.35 it left half a degree a second of residual wander. */
-    const K = 1.0, CAP = .60;
+    const K = pointAir ? 1.6 : 1.0, CAP = .60;
     const wx = clamp(sg * qe[1] * K, -CAP, CAP);
     const wy = clamp(sg * qe[2] * K, -CAP, CAP);
     const wz = clamp(sg * qe[3] * K, -CAP, CAP);
@@ -3520,7 +3825,10 @@ function flightControl(P, dt, e, cE, cA, cR) {
      (P.ias is metres per second: 50 to 72 is 97 to 140 knots.) */
   P.fbwG = approach(P.fbwG === undefined ? 1 : P.fbwG,
     P.onGround ? 1 : (1 - sstep(50, 72, P.ias || 0)), 3.0, dt);
-  const gnd = clamp(P.fbwG, 0, 1);
+  /* Pointing hands the pitch axis to the rate law, which is the same law the
+     runway and the vacuum use and the only one that means anything when lift
+     no longer decides where the aeroplane goes. */
+  const gnd = Math.max(clamp(P.fbwG, 0, 1), P.point || 0);
 
   /* ---------------- pitch ------------------------------------------------ */
   const lvl = levelG(e, P.gRatio);
@@ -3620,7 +3928,7 @@ function flightControl(P, dt, e, cE, cA, cR) {
      The damping is not a mystery, though: it is Clp, and the model already
      knows it. Feeding it forward means the aeroplane rolls at the rate the
      stick asked for, and at the same rate at every speed that can sustain it. */
-  const rollD = qS * SPECS.b * SPECS.b * SPECS.Clp / (Math.max(P.tas || 1, 25) * SPECS.Iroll);
+  const rollD = qS * SPECS.b * SPECS.b * SPECS.Clp / (Math.max(P.vAero || P.tas || 1, 25) * SPECS.Iroll);
   let dA = clamp(-((pCmd - P.w.z) * FBW.kRoll + pCmd * rollD) / pPer, -1, 1);
 
   /* ---------------- yaw -------------------------------------------------- */
@@ -3975,7 +4283,48 @@ function physics(P, dt) {
   const V = vlen(vb);
   P.tas = V;
   P.mach = V / air.a;
-  P.ias = V * Math.sqrt(Math.max(rho * P.cont, 0) / 1.225);
+  /* The speed the AIRFRAME is allowed to know about, which with the limiter
+     off is not the speed it is doing. Pinning it in ONE place rather than
+     pinning each consequence separately is what keeps the aeroplane coherent:
+     dynamic pressure, indicated airspeed, drag, control power, roll damping,
+     the stall and every placard fall out of this single number and stay
+     consistent with each other. The speed itself, the Mach number and the
+     heating are all still the real ones, because those are what you came for. */
+  P.vAero = V;
+  if (LIMITS.free) {
+    const vq = Math.sqrt(2 * FREE_Q / Math.max(rho * P.cont, 1e-9));
+    if (P.vAero > vq) P.vAero = vq;
+  }
+  /* And the Mach number it is allowed to know about, which follows from the
+     same speed. Every aerodynamic coefficient in here is scheduled on Mach —
+     the lift-curve slope, the drag rise, the pitching moment — and every one
+     of those schedules was written for an aeroplane, so they are asked about
+     Mach 5 and not Mach four and a half thousand. Off the end of them the
+     lift-curve slope falls to nothing, the fly-by-wire finds it has no
+     aeroplane to command, the integrator winds up, and the pitch rate ends
+     the step saturated against its own limit, reversing every step: the
+     nose oscillates three quarters of a degree at a hundred and twenty hertz
+     and the aeroplane flies itself into the ground. This is the other half of
+     what "the airframe is not told how fast it is going" has to mean. */
+  P.machA = P.vAero / air.a;
+  /* How much of the aeroplane has stopped being an aeroplane. Zero with the
+     limiter on, and zero with it off until about Mach 10; one above Mach 35,
+     where the wing has no say in where the machine goes. Three things read
+     it, and they have to agree or they fight each other: the velocity follows
+     the nose by it, the fly-by-wire hands the pitch axis from the g law to
+     the rate law by it, and the stability augmentation switches from holding
+     a bank angle to holding an ATTITUDE by it. Half a change is worse than
+     none: a g law trying to unload by pitching down, against a velocity
+     vector that follows the nose down a tenth of a second later, is a loop
+     with no fixed point, and it flew the aeroplane into the ground every
+     time.
+
+     It is multiplied by the continuum factor, so it is a thing that happens
+     in AIR and nowhere else: out of the atmosphere the aeroplane goes back to
+     being a body on a trajectory, orbits are orbits again, and every law in
+     here is the one it always was. */
+  P.point = LIMITS.free ? sstep(3000, 12000, V) * P.cont : 0;
+  P.ias = P.vAero * Math.sqrt(Math.max(rho * P.cont, 0) / 1.225);
   // Afterburner lives in the top fifth of the throttle and is what the gate
   // between "fast aeroplane" and "Mach 3" actually is.
   P.ab = clamp((thrCmd - AB_GATE) / (1 - AB_GATE), 0, 1);
@@ -4066,9 +4415,10 @@ function physics(P, dt) {
        Mach meter in empty space. Below about a hundred and thirty kilometres
        of equivalent density there is simply no fluid, and the number is
        exactly zero. */
-    const qbar = .5 * rho * V * V * P.cont, qS = qbar * SPECS.S;
+    // half rho v squared, on the speed the airframe is allowed to know about
+    const qbar = .5 * rho * P.vAero * P.vAero * P.cont, qS = qbar * SPECS.S;
     P.qbar = qbar;
-    const M8 = P.mach;
+    const M8 = P.machA;
     // A slender delta does not stall the way a straight wing does: the leading
     // edge sheds a vortex that keeps adding lift far past where a wing would
     // let go, so the break is late and soft.
@@ -4130,13 +4480,17 @@ function physics(P, dt) {
        already taken charge, and from then on the aeroplane holds the number
        until somebody changes it. */
     const thinAir = rho < 2e-5;
+    /* Everywhere the speed controller asks "is the air gone?", the limiter
+       being off answers yes: the hold gets its full authority in atmosphere,
+       and the throttle becomes a speed selector down here as well. */
+    const noLimit = thinAir || LIMITS.free;
     if (thinAir && !SPD.on && !SPD.auto && !P.crashed && P.tas > 40) {
       SPD.on = true; SPD.auto = true; SPD.tgt = P.tas;
       SPD.thrSave = P.thr;
       SPD.lever = leverOfSpd(P.tas); P.thr = SPD.lever;   // lever meets the speed
       toast("SPEED SELECT \u00b7 " + navSpeed(P.tas) + " \u00b7 throttle sets it", 2.8);
     }
-    if (!thinAir && SPD.auto) {
+    if (!thinAir && SPD.auto && !LIMITS.free) {
       SPD.on = false; SPD.auto = false;
       if (SPD.thrSave !== undefined) { P.thr = SPD.thrSave; SPD.thrSave = undefined; }
       SPD.lever = null;
@@ -4144,11 +4498,13 @@ function physics(P, dt) {
     /* Moving the lever commands a new speed. Moving it is the ONLY thing that
        does, so an autopilot transfer trimming the target back does not drag
        the lever around under the pilot's hand. */
-    if (SPD.on && thinAir && !P.crashed) {
+    if (SPD.on && noLimit && !P.crashed) {
       if (SPD.lever === null || SPD.lever === undefined) SPD.lever = leverOfSpd(SPD.tgt);
       if (Math.abs(P.thr - SPD.lever) > .0015) {
         SPD.lever = P.thr;
         SPD.tgt = spdOfLever(P.thr);
+        // ten times light is the ceiling in air, whatever the lever asks for
+        if (!thinAir) SPD.tgt = Math.min(SPD.tgt, SPD_ATM_TOP);
       }
     }
 
@@ -4202,11 +4558,11 @@ function physics(P, dt) {
          light. The gentle feel at ordinary speeds is untouched: down there
          the error term is far smaller than the ramp, and it is the error
          term that governs. */
-      const aMax = thinAir ? Math.max(8e5, SPD.tgt * .16) : 400;
+      const aMax = noLimit ? Math.max(8e5, SPD.tgt * .16) : 400;
       const err = SPD.tgt - V;
       let aCmd;
       if (err >= 0) {
-        SPD.ramp = Math.min((SPD.ramp || 0) + dt * (thinAir ? aMax * .25 : 55), aMax);
+        SPD.ramp = Math.min((SPD.ramp || 0) + dt * (noLimit ? aMax * .25 : 55), aMax);
         aCmd = Math.min(err * 2.4, SPD.ramp);
       } else {
         SPD.ramp = 0;
@@ -4214,7 +4570,7 @@ function physics(P, dt) {
            feel at aircraft and orbital speeds; at a thousand megametres a
            second those same two and a half seconds are spent crossing the
            orbit of Saturn, so up there it tightens to one. */
-        const stop = Math.max(V / (V > 1e9 ? 1.0 : 2.5), thinAir ? 12000 : 45);
+        const stop = Math.max(V / (V > 1e9 ? 1.0 : 2.5), noLimit ? 12000 : 45);
         aCmd = -Math.min(-err * 2.4, stop);
       }
       const along = thrust * vd.z - D;            // what the engine is already doing
@@ -4228,7 +4584,9 @@ function physics(P, dt) {
          surplus is multiplied, which puts the Moon a couple of minutes out
          and the inner planets within half an hour. Inside the atmosphere
          nothing changes — the boost is keyed to there being no air at all. */
-      const vac = 1 - clamp(rho / 2e-5, 0, 1);
+      /* With the limiter off, "no air" is declared everywhere: the surplus
+         that gets you to the Moon applies over Tennessee too. */
+      const vac = LIMITS.free ? 1 : 1 - clamp(rho / 2e-5, 0, 1);
       /* In air the surplus grows with the logarithm of Mach and never stops.
          In vacuum it goes to a flat figure instead of carrying on growing:
          multiplying the two ran the speed to a third of the speed of light
@@ -4236,7 +4594,13 @@ function physics(P, dt) {
          thousand puts the Moon a couple of minutes out on a burn-and-brake
          and Mars in the half hour it deserves to be. */
       const aAir = 12 + 26 * Math.log10(1 + Math.max(P.mach, 0));
-      const push = SPECS.mass * abSm * lerp(aAir, Math.max(aAir, 800000), vac);
+      /* A flat eighty thousand g is a lot until you ask it for ten times the
+         speed of light: three thousand seconds of holding the lever. Made
+         proportional to the speed already achieved it becomes exponential
+         with a time constant of under two seconds, which is the difference
+         between a cheat that works and a number that crawls. */
+      const aFlat = LIMITS.free ? Math.max(8e5, V * .55) : 800000;
+      const push = SPECS.mass * abSm * lerp(aAir, Math.max(aAir, aFlat), vac);
       const net = thrust - D;
       if (net < push) fb.z += push - net;
     }
@@ -4246,7 +4610,16 @@ function physics(P, dt) {
     // actually feel — not lift over weight.
     P.gload = (L * Math.cos(P.alpha) + D * Math.sin(P.alpha)) / (SPECS.mass * 9.81);
     // moments
-    const cq = .5 * rho * V * SPECS.S;
+    /* The rate-damping factor is half rho V S — LINEAR in speed, not
+       quadratic — so pinning the dynamic pressure does not pin this, and it
+       is the one term that must be pinned hardest. At a million metres a
+       second it comes to seven billion, the pitch damping moment to ten to
+       the thirteenth newton metres, and the angular acceleration to eleven
+       million radians a second squared: an explicit step then reverses the
+       pitch rate against its own limit every single step, and the aeroplane
+       rings at a hundred and twenty hertz until it is in the ground. It takes
+       the same pinned speed as everything else. */
+    const cq = .5 * rho * P.vAero * SPECS.S;
     const dET = clamp(P.dE, -1.3, 1.3);   // the trim datum lives in the command, not here
     // control power falls away supersonically as the shock moves aft
     const ctlM = lerp(1, .55, sstep(1.0, 2.2, M8));
@@ -4402,10 +4775,68 @@ function physics(P, dt) {
   /* And a net under all of it. Nothing downstream — the swept collision test,
      the terrain lookup, the audio — survives a non-finite position, and one
      bad frame would otherwise poison the whole session. */
+  /* Above about Mach 10 with the limiter off, the wing is no longer what
+     steers the aeroplane, and no amount of pinned dynamic pressure changes
+     that. Turning a velocity vector takes an acceleration of V times the turn
+     rate: at a million metres a second, nulling a flight path angle of one
+     fortieth of a degree inside a second wants two hundred and fifty g. Nine
+     is what the airframe has. So a hundredth of a degree of flight path, left
+     over from the moment the burner lit, becomes thousands of metres a second
+     of descent as the speed multiplies underneath it — the aeroplane is not
+     diving, it is being stretched — and there is nothing the pilot can do
+     about it, because the stick commands lift and lift has stopped mattering.
+
+     So above Mach 10 the velocity is turned toward the NOSE directly, with a
+     third of a second of lag. It is no longer flight; it is pointing, which
+     is the only thing that can work at ten times the speed of light and is
+     what the mode is for. Below Mach 10 nothing here does anything at all. */
+  if (LIMITS.free && !P.crashed && !P.onGround) {
+    const vm2 = Math.hypot(P.vel.x, P.vel.y, P.vel.z);
+    const auth = P.point || 0;
+    if (auth > 0 && vm2 > 1) {
+      const k = auth * (1 - Math.exp(-dt * 3.0));
+      /* The horizontal part of the velocity follows the nose exactly. The
+         VERTICAL part does not: it follows the nose on a human scale, capped
+         at sixty kilometres a second.
+
+         Without that cap there is no flyable altitude at all. The atmosphere
+         is a hundred kilometres thick and at a tenth of the speed of light it
+         is crossed in three milliseconds, so holding a height inside it means
+         holding a flight path level to within a millionth of a radian — which
+         no attitude loop can do, and which no pilot could fly if it could.
+         Every version of this without the cap did the same thing: held for a
+         few seconds, then left the atmosphere or arrived at the ground, both
+         at a tenth of the speed of light. With it, a level nose is a level
+         flight path exactly, and a nose up is a climb you can see happening.
+         The scale is a capped SPEED rather than a capped rate, and that
+         distinction is the whole of it: the vertical speed is the sine of the
+         pitch angle times whichever is smaller, the speed being flown or
+         sixty kilometres a second. Cap the rate instead and a twelfth of a
+         degree of residual pitch — which is what any attitude loop leaves
+         behind — is still thirty-five kilometres a second of climb at a tenth
+         of light, and the aeroplane quietly leaves the atmosphere while
+         nobody is touching anything. Capping the speed makes that same
+         twelfth of a degree eighty metres a second, and a deliberate thirty
+         degrees of nose-up thirty kilometres a second, which is a climb out
+         of the atmosphere in three seconds. Below about Mach 180 the cap is
+         above the whole speed and this is simply the nose being followed. */
+      const nh = Math.hypot(m[6], m[8]) || 1;
+      const want = m[7] * Math.min(vm2, 60000);
+      const hs = Math.sqrt(Math.max(vm2 * vm2 - want * want, 0));
+      const tx = m[6] / nh * hs, ty = want, tz = m[8] / nh * hs;
+      P.vel = v3(P.vel.x + (tx - P.vel.x) * k,
+                 P.vel.y + (ty - P.vel.y) * k,
+                 P.vel.z + (tz - P.vel.z) * k);
+    }
+  }
   const vsum = P.vel.x + P.vel.y + P.vel.z;
   if (!isFinite(vsum)) P.vel = v3();
   else {
-    const vm = Math.hypot(P.vel.x, P.vel.y, P.vel.z), VCAP = SPD_TOP * 1.5;
+    /* Ten times light is the ceiling with the limiter off INSIDE the air;
+       leave the atmosphere and the old ceiling of a thousand times light
+       comes back, because that is what the solar system asks for. */
+    const vm = Math.hypot(P.vel.x, P.vel.y, P.vel.z),
+      VCAP = (LIMITS.free && rho > 2e-5) ? SPD_ATM_TOP : SPD_TOP * 1.5;
     if (vm > VCAP) { const k = VCAP / vm; P.vel.x *= k; P.vel.y *= k; P.vel.z *= k; }
   }
   P.pos = vadd(P.pos, vmul(P.vel, dt));
@@ -4745,6 +5176,10 @@ function toggleSafe() {
 function syncSafeRow() {
   document.querySelectorAll("#safeRow .opt").forEach(o =>
     o.classList.toggle("on", (o.dataset.safe === "on") === NOCRASH));
+}
+function syncFreeRow() {
+  document.querySelectorAll("#freeRow .opt").forEach(o =>
+    o.classList.toggle("on", (o.dataset.free === "on") === !LIMITS.free));
 }
 function saveAirframe(why) {
   const P = PLANE;
@@ -6430,6 +6865,18 @@ function drawNavMarker() {
    head is light itself. */
 const M_FT = 3.280839895, M_MI = 1 / 1609.344, MS_MPH = 2.2369363;
 const comma = n => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+/* Mach, in a box three characters wide. Two decimals are right up to a
+   hundred; past that they are noise, and past ten thousand the number no
+   longer fits at all, so it goes to thousands and then to millions. With the
+   limiter off, ten times the speed of light in sea-level air is Mach 8.7M. */
+function machStr(m) {
+  if (!isFinite(m)) return "\u2014";
+  const a = Math.abs(m);
+  if (a >= 1e6) return (m / 1e6).toFixed(1) + "M";
+  if (a >= 1e4) return Math.round(m / 1e3) + "K";
+  if (a >= 100) return Math.round(m).toString();
+  return m.toFixed(2);
+}
 function navRange(m) {
   const mi = m * M_MI;
   if (mi >= 1e9) return (mi / 1e9).toFixed(mi < 1e10 ? 2 : 0) + " B mi";
@@ -6480,6 +6927,8 @@ function mapAct(k, i) {
   else if (k === "off") { NAV.idx = -1; toast("NAV OFF", 1.2); audio.beep(430, .12, .1); }
   else if (k === "ap") toggleAP();
   else if (k === "spd") toggleSpeedHold();
+  else if (k === "stop") spaceStop();
+  else if (k === "jump") { jumpEngage(); if (WARP.on) NAV.map = false; }
   else if (k === "body") {
     NAV.idx = i;
     const t = navTarget();
@@ -6497,6 +6946,92 @@ function mapChip(x, y, w, h, on, label, k, i) {
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
   ctx.fillText(label, x + w / 2, y + h / 2);
   if (k) mapHit(k, i, x, y, w, h);
+}
+/* ---- what a jump looks like from inside ---------------------------------
+
+   The corridor itself. Everything here is screen space and none of it goes
+   through the display list, because none of it is in the world: it is what
+   travelling that fast does to what you can see. Four layers, cheapest first.
+
+   A cold wash over the whole frame, so the colour of the scene changes rather
+   than something being pasted on top of it. Radial streaks from the vanishing
+   point, each with its own phase, stretching as they run outward — which is
+   what a star looks like when you pass it at a hundred astronomical units a
+   second. Rings of light sweeping out past the camera, one every fifth of a
+   second, for the sense of passing through structure. And a white flash at
+   entry and at exit, because the two moments that matter are leaving and
+   arriving.
+
+   The streak count is fixed and small. This runs while nothing else is being
+   simulated, so the frame has room, but a jump that stutters is worse than a
+   jump that is plain. */
+function drawWarpFX() {
+  const live = WARP.on;
+  const flash = WARP.flash || 0;
+  if (!live && flash <= .002) return;
+  const fade = live ? Math.max(WARP.fade, .25) : 0;
+  ctx.save();
+  if (live) {
+    // the wash: deep blue, heaviest at the edges, so the middle stays readable
+    const g = ctx.createRadialGradient(CX, CY, 0, CX, CY, Math.hypot(W, H) * .55);
+    g.addColorStop(0, "rgba(120,200,255," + (.05 * fade).toFixed(3) + ")");
+    g.addColorStop(.45, "rgba(40,110,220," + (.16 * fade).toFixed(3) + ")");
+    g.addColorStop(1, "rgba(6,14,52," + (.72 * fade).toFixed(3) + ")");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+    const rMax = Math.hypot(W, H) * .62;
+    const N = 132;
+    ctx.lineCap = "round";
+    for (let i = 0; i < N; i++) {
+      const a = hashF(i, 11) * TAU;
+      const sp = .45 + hashF(i, 12) * 1.25;
+      const ph = (WARP.t * sp * 1.6 + hashF(i, 13)) % 1;
+      // out of the middle, accelerating: a star passed close goes by fast
+      const r0 = rMax * ph * ph * 1.05;
+      const len = rMax * (.06 + .34 * ph) * (.5 + hashF(i, 14) * .9);
+      if (r0 > rMax) continue;
+      const ca = Math.cos(a), sa = Math.sin(a);
+      const al = clamp((1 - ph) * 1.5, 0, 1) * fade * (.35 + hashF(i, 15) * .65);
+      const warm = hashF(i, 16);
+      ctx.strokeStyle = "rgba(" + (170 + warm * 85 | 0) + ","
+        + (215 + warm * 40 | 0) + ",255," + al.toFixed(3) + ")";
+      ctx.lineWidth = (.8 + hashF(i, 17) * 2.1) * DPR;
+      ctx.beginPath();
+      ctx.moveTo(CX + ca * r0, CY + sa * r0);
+      ctx.lineTo(CX + ca * (r0 + len), CY + sa * (r0 + len));
+      ctx.stroke();
+    }
+    // rings of light sweeping past, five a second
+    ctx.lineWidth = 2.2 * DPR;
+    for (let k = 0; k < 5; k++) {
+      const ph = ((WARP.t * 5 + k * .2) % 1);
+      const rr = rMax * ph * ph;
+      const al = clamp(1 - ph, 0, 1) * .34 * fade;
+      ctx.strokeStyle = "rgba(190,236,255," + al.toFixed(3) + ")";
+      ctx.beginPath(); ctx.arc(CX, CY, rr, 0, TAU); ctx.stroke();
+    }
+    /* The read-out sits high rather than in the middle of the glass. In the
+       middle it lands on the aeroplane and on the nav marker, and three
+       overlapping labels is not a read-out. */
+    const u = UI;
+    const done = clamp(WARP.t / Math.max(WARP.dur, .001), 0, 1);
+    const ty = Math.max(H * .22, SAFE.t * DPR + 92 * u);
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    hudFont(15 * u, 800); ctx.fillStyle = "rgba(226,246,255,.96)";
+    ctx.fillText("JUMP \u00b7 " + WARP.name.toUpperCase(), CX, ty);
+    hudFont(11.5 * u, 700); ctx.fillStyle = "rgba(170,222,255,.92)";
+    ctx.fillText(navSpeed(WARP.spd), CX, ty + 20 * u);
+    const bw = Math.min(W * .42, 320 * u), bh = 5 * u;
+    ctx.fillStyle = "rgba(10,26,54,.7)";
+    ctx.fillRect(CX - bw / 2, ty + 34 * u, bw, bh);
+    ctx.fillStyle = "rgba(150,226,255,.95)";
+    ctx.fillRect(CX - bw / 2, ty + 34 * u, bw * done, bh);
+  }
+  if (flash > .002) {
+    ctx.fillStyle = "rgba(236,250,255," + (flash * flash * .82).toFixed(3) + ")";
+    ctx.fillRect(0, 0, W, H);
+  }
+  ctx.restore();
 }
 function drawMap() {
   if (!NAV.map || typeof BODIES === "undefined") return;
@@ -6658,7 +7193,7 @@ function drawMap() {
   ctx.textAlign = "center";
   ctx.fillText("SOLAR SYSTEM", cx, top + ch * .5);
   hudFont(9.5 * u, 600); ctx.fillStyle = "rgba(150,190,225,.7)";
-  ctx.fillText(narrow ? "tap a world to fly to it" : "tap a world to fly to it · up is where the nose points",
+  ctx.fillText(narrow ? "tap a world, then JUMP" : "tap a world, then JUMP · up is where the nose points",
     cx, top + ch + 11 * u);
   mapChip(W - SAFE.r * DPR - 12 * u - cw, top, cw, ch, false, "CLOSE", "close", 0);
   mapChip(SAFE.l * DPR + 12 * u, top, cw, ch, NAV.idx < 0, "NAV OFF", "off", 0);
@@ -6698,15 +7233,28 @@ function drawMap() {
     ctx.textAlign = "center";
   } else {
     hudFont(narrow ? 10 * u : 11.5 * u, 600); ctx.fillStyle = "rgba(160,190,216,.8)";
-    ctx.fillText(narrow ? "pick a world · the autopilot flies the transfer"
-      : "no target · pick one and the autopilot will fly the transfer",
+    ctx.fillText(narrow ? "pick a world · then JUMP, or let the autopilot fly it"
+      : "no target · pick one, then JUMP to it or let the autopilot fly the transfer",
       cx, barY + (narrow ? 26 * u : barH / 2));
   }
-  const bw2 = 84 * u, chH = 30 * u;
+  /* Four things the map can do: hold the speed, stop dead, JUMP to the world
+     that is selected, or hand the trip to the autopilot. The jump is the
+     reason the map is worth opening at all — pick a world, press it, be
+     there — so it sits where a thumb lands. The run is sized from the room
+     available rather than fixed, because four chips at a fixed width run off
+     the side of a phone in portrait. */
+  const chH = 30 * u, gapC = 8 * u;
+  const room = narrow ? inW - 24 * u : Math.min(inW * .64, 440 * u);
+  const bw2 = clamp((room - gapC * 3) / 4, 50 * u, 92 * u);
+  const runW = bw2 * 4 + gapC * 3;
   const cy2 = narrow ? barY + barH - 12 * u - chH : barY + (barH - chH) / 2;
-  const cx2 = narrow ? cx + 6 * u : W - SAFE.r * DPR - 26 * u - bw2;
-  mapChip(cx2, cy2, bw2, chH, AP.on, AP.on ? "A/P ON" : "FLY IT", "ap", 0);
-  mapChip(cx2 - 12 * u - bw2, cy2, bw2, chH, SPD.on, SPD.on ? "HOLD ON" : "HOLD", "spd", 0);
+  const x0 = narrow ? cx - runW / 2 : W - SAFE.r * DPR - 26 * u - runW;
+  const jumpReady = !!t && !WARP.on && WARP.cool <= 0 && !P.onGround;
+  mapChip(x0, cy2, bw2, chH, SPD.on, SPD.on ? "HOLD ON" : "HOLD", "spd", 0);
+  mapChip(x0 + (bw2 + gapC), cy2, bw2, chH, false, "STOP", "stop", 0);
+  mapChip(x0 + (bw2 + gapC) * 2, cy2, bw2, chH, jumpReady,
+    WARP.on ? "JUMPING" : WARP.cool > 0 ? "SPOOL" : "JUMP", "jump", 0);
+  mapChip(x0 + (bw2 + gapC) * 3, cy2, bw2, chH, AP.on, AP.on ? "A/P ON" : "FLY IT", "ap", 0);
   ctx.restore();
 }
 /* ============================================================= audio ==== */
@@ -7622,7 +8170,7 @@ function drawHUDFull() {
   hudFont(10 * U); ctx.fillStyle = GD; ctx.textAlign = "left";
   ctx.fillText("MACH", mx + 8 * U, my + 11 * U);
   hudFont(20 * U, 700); ctx.fillStyle = P.mach > 3.2 ? "rgba(255,150,90,.95)" : G;
-  ctx.fillText((P.qbar || 0) > 5 ? P.mach.toFixed(2) : "\u2014", mx + 8 * U, my + 27 * U);
+  ctx.fillText((P.qbar || 0) > 5 ? machStr(P.mach) : "\u2014", mx + 8 * U, my + 27 * U);
   hudFont(11 * U, 700); ctx.textAlign = "left";
   ctx.fillStyle = P.ab > .01 ? "rgba(255,176,80,.95)" : "rgba(120,140,155,.55)";
   ctx.fillText(P.ab > .01 ? "A/B  " + Math.round(P.ab * 100) + "%" : "A/B  \u2014", mx + 8 * U, my + 43 * U);
@@ -7793,7 +8341,7 @@ function drawHUDFull() {
   hudFont(12 * U); ctx.fillStyle = GD; ctx.fillText("MACH", rx + 8 * U, CY + 38 * U);
   hudFont(16 * U, 600); ctx.fillStyle = G;
   // Mach against air that is not there is a number about nothing
-  ctx.fillText((P.qbar || 0) > 5 ? P.mach.toFixed(2) : "--", rx + 8 * U, CY + 54 * U);
+  ctx.fillText((P.qbar || 0) > 5 ? machStr(P.mach) : "--", rx + 8 * U, CY + 54 * U);
   drawGMeter(P, 96 * U + tw + 74 * U, H - 146 * U, 60 * U);
 
   // throttle + prop
@@ -7964,7 +8512,7 @@ function drawHUDCompact() {
   hudFont(10 * u); ctx.fillStyle = GD; ctx.textAlign = "left";
   ctx.fillText("MACH", sl + 20 * u, py + ph + 16 * u);
   hudFont(17 * u, 700); ctx.fillStyle = P.mach > 3.2 ? "rgba(255,150,90,.95)" : G;
-  ctx.fillText((P.qbar || 0) > 5 ? P.mach.toFixed(2) : "\u2014", sl + 60 * u, py + ph + 23 * u);
+  ctx.fillText((P.qbar || 0) > 5 ? machStr(P.mach) : "\u2014", sl + 60 * u, py + ph + 23 * u);
   if (P.ab > .01) {
     hudFont(11 * u, 700); ctx.fillStyle = "rgba(255,176,80,.95)";
     ctx.fillText("A/B", sl + 20 * u, py + ph + 30 * u);
@@ -8224,6 +8772,10 @@ const KEYCARD = [
   ["Speed hold", "O", "HOLD button"],
   ["Nav target", "J   cycles Moon / planets / Sun", "tap a world on the map"],
   ["Solar system map", "N", "MAP button"],
+  ["Jump", "E   opens a corridor to the nav target", "the JUMP chip on the map"],
+  ["Where a jump lands", "in orbit around it, a couple of radii out", "same"],
+  ["Full stop", "Q   speed hold to zero, from any speed", "the STOP chip on the map"],
+  ["Speed limiter", "U   off takes the ceiling in air to 10 \u00d7 c", "the menu, under Speed limiter"],
   ["Wheel brakes", "Space (hold)", "the BRAKES pad, held"],
   ["Parking brake", "B", "\u2014"],
   ["Drag chute", "X", "pull the striped T-handle"],
@@ -8290,6 +8842,9 @@ const KEYMAP = {
     ["O", "speed hold &mdash; throttle then sets the speed"],
     ["J", "cycle nav target &mdash; Moon, planets, Sun"],
     ["N", "solar system map"],
+    ["E", "<b>jump</b> &mdash; open a corridor to the nav target and arrive in orbit around it"],
+    ["Q", "full stop &mdash; speed hold to zero, from any speed"],
+    ["U", "speed limiter &mdash; off takes the atmospheric ceiling to 10&times; light"],
     ["Space", "wheel brakes"],
     ["B", "parking brake"],
     ["G", "landing gear"],
@@ -8306,6 +8861,7 @@ const KEYMAP = {
 };
 fillLog();
 syncSafeRow();
+syncFreeRow();
 (function fillKeys() {
   const el = document.getElementById("keyList");
   const rows = KEYMAP.common;
@@ -8324,7 +8880,11 @@ function showTouchHelp() {
     "(tap above or below the knob), the yellow <b>T-handle</b> pulls the chute, the bat switches " +
     "fly the autopilot, hold the speed and arm safe mode, and the lit buttons are the map, the " +
     "view, this card and reset.<br>" +
-    "Rudder pads sit along the bottom. Turn the phone <b>landscape</b> for the widest view.";
+    "Rudder pads sit along the bottom.<br>" +
+    "<b>The map</b> (MAP button) is how you travel: tap a world, then <b>JUMP</b> &mdash; a few " +
+    "seconds of corridor and you arrive in orbit around it. <b>STOP</b> next to it kills the " +
+    "speed from any speed at all, and <b>FLY IT</b> hands the trip to the autopilot instead.<br>" +
+    "Turn the phone <b>landscape</b> for the widest view.";
 }
 
 window.addEventListener("keydown", ev => {
@@ -8364,6 +8924,9 @@ function onKeyPress(k) {
   if (lk === "o") { toggleSpeedHold(); }
   if (lk === "j") { cycleNav(1); }
   if (lk === "n") { NAV.map = !NAV.map; }
+  if (lk === "e") { jumpEngage(); }
+  if (lk === "q") { spaceStop(); }
+  if (lk === "u") { toggleFree(); }
   if (lk === "x") {
     if (P.chuteCmd) { P.chuteCmd = 0; toast("CHUTE JETTISONED", 1.4); }
     else if (P.ias * 1.94384 > CHUTE_LIMIT) toast("TOO FAST FOR THE CHUTE", 1.6);
@@ -8488,6 +9051,10 @@ document.querySelectorAll("#safeRow .opt").forEach(b => b.addEventListener("clic
   NOCRASH = b.dataset.safe === "on";
   syncSafeRow();
 }));
+document.querySelectorAll("#freeRow .opt").forEach(b => b.addEventListener("click", () => {
+  LIMITS.free = b.dataset.free !== "on";
+  syncFreeRow();
+}));
 document.querySelectorAll("#scenRow .opt").forEach(b => b.addEventListener("click", () => {
   SCEN = b.dataset.scen; dirty = true;
   document.querySelectorAll("#scenRow .opt").forEach(o => o.classList.toggle("on", o === b));
@@ -8510,11 +9077,22 @@ function frame(now) {
   if (GAME.started && !GAME.paused) {
     WIND.t += dt;
     applyInput(dt);
-    const h = 1 / 240;
-    acc += dt;
-    let steps = 0;
-    while (acc >= h && steps < 16) { physics(PLANE, h); acc -= h; steps++; }
-    if (acc > h) acc = 0;
+    if (WARP.cool > 0) WARP.cool = Math.max(0, WARP.cool - dt);
+    if (WARP.flash > 0 && !WARP.on) WARP.flash = Math.max(0, WARP.flash - dt * 2.2);
+    if (WARP.on) {
+      /* The corridor replaces the integrator rather than running beside it.
+         Stepping the aeroplane through four billion kilometres of drag,
+         gravity and swept collision would be meaningless at best and would
+         put it into something at worst. */
+      acc = 0;
+      warpStep(dt);
+    } else {
+      const h = 1 / 240;
+      acc += dt;
+      let steps = 0;
+      while (acc >= h && steps < 16) { physics(PLANE, h); acc -= h; steps++; }
+      if (acc > h) acc = 0;
+    }
     GAME.t += dt;
     updateParts(dt);
     spawnTrails(dt);
@@ -8574,7 +9152,13 @@ function frame(now) {
   drawLandmarks();
   drawGlare();
   if (Q.q.vig && vignette) { ctx.fillStyle = vignette; ctx.fillRect(0, 0, W, H); }
-  if (GAME.started && !GAME.paused) { drawGEffect(PLANE); drawHUD(dt); drawStationTags(); drawNavMarker(); drawMap(); }
+  drawWarpFX();
+  // the nav marker is exactly where the jump read-out is, so it stands down
+  if (GAME.started && !GAME.paused) {
+    drawGEffect(PLANE); drawHUD(dt); drawStationTags();
+    if (!WARP.on) drawNavMarker();
+    drawMap();
+  }
   tuneQuality(dt, performance.now() - work0);
   requestAnimationFrame(frame);
 }
