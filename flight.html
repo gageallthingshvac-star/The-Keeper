@@ -86,6 +86,10 @@
   .chip{width:34px;height:34px;border-radius:9px;border:2px solid rgba(255,255,255,.18);
     cursor:pointer;padding:0;position:relative;transition:transform .1s,border-color .12s}
   .chip:hover{transform:translateY(-2px)}
+  .chip:active{transform:scale(.90)}
+  .opt:active{transform:scale(.99)}
+  @keyframes chippop{0%{box-shadow:0 0 0 0 rgba(111,211,255,.55)}100%{box-shadow:0 0 0 12px rgba(111,211,255,0)}}
+  .chip.on{animation:chippop .45s ease-out}
   .chip.on{border-color:var(--accent);box-shadow:0 0 0 2px rgba(111,211,255,.28)}
   .chip i{position:absolute;left:0;right:0;bottom:-15px;font-style:normal;font-size:8px;
     letter-spacing:.08em;color:var(--dim);text-align:center;white-space:nowrap;opacity:0}
@@ -98,6 +102,33 @@
   .fld input{width:100%;font:inherit;font-size:14px;letter-spacing:.06em;color:var(--ink);
     background:rgba(255,255,255,.05);border:1px solid var(--edge);border-radius:9px;padding:10px 12px}
   .fld input:focus{outline:none;border-color:var(--accent);background:rgba(111,211,255,.08)}
+  /* The menu is DOCKED, not draped. The hangar has to stay visible and
+     touchable, so the card takes one side of the screen and the backdrop
+     goes away entirely. */
+  #menu{background:none;backdrop-filter:none;pointer-events:none;overflow:visible;
+    padding:0;align-items:stretch;justify-content:flex-end}
+  #menu .card{pointer-events:auto;width:min(460px,42vw);margin:0;height:100%;overflow:auto;
+    border-radius:0;border-width:0 0 0 1px;box-shadow:-24px 0 60px rgba(0,0,0,.55);
+    background:linear-gradient(180deg,rgba(6,11,18,.94),rgba(4,8,13,.965));
+    padding:calc(20px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right))
+            calc(20px + env(safe-area-inset-bottom)) 20px}
+  @media (max-width:900px),(orientation:portrait){
+    #menu{align-items:flex-end;justify-content:stretch}
+    #menu .card{width:100%;height:62%;border-width:1px 0 0;border-radius:16px 16px 0 0;
+      box-shadow:0 -24px 60px rgba(0,0,0,.55);
+      padding:14px calc(15px + env(safe-area-inset-right))
+              calc(15px + env(safe-area-inset-bottom)) calc(15px + env(safe-area-inset-left))}
+    #menu .card::before{content:"";display:block;width:44px;height:4px;border-radius:3px;
+      background:rgba(150,190,225,.35);margin:-4px auto 12px}
+  }
+  /* The two things you can touch out there, and the two sections in here. */
+  .sect{border-radius:12px;padding:1px 10px 8px;margin:0 -10px;scroll-margin-top:8px;
+    transition:background .35s ease,box-shadow .35s ease}
+  .sect.flash{background:rgba(111,211,255,.09);box-shadow:0 0 0 1px rgba(111,211,255,.42)}
+  .tapnote{display:block;font-size:11px;letter-spacing:.06em;
+    color:var(--dim);background:rgba(111,211,255,.07);border:1px solid rgba(111,211,255,.22);
+    border-radius:9px;padding:8px 11px;margin:0 0 16px;line-height:1.5}
+  .tapnote b{color:var(--accent);font-weight:700}
   #touchNote{font-size:11.5px;color:var(--dim);line-height:1.6}
   #touchNote b{color:var(--ink);font-weight:600}
   #logList{font-size:11.5px;color:var(--dim);line-height:1.8}
@@ -128,6 +159,7 @@
     <div class="card">
       <h1>BLACK<span>BIRD</span></h1>
       <div class="sub">Mach&nbsp;3 reconnaissance jet &mdash; fly-by-wire, software-rendered, no plugins</div>
+      <div class="tapnote">Tap the <b>aeroplane</b> or the <b>pilot</b> in the hangar to walk up to them and change them. Tap the floor to step back.</div>
 
       <h2>Pitch sense</h2>
       <div class="row" id="pitchRow">
@@ -150,20 +182,24 @@
         <button class="opt" data-safe="off"><b>REAL DAMAGE</b><i>Structural contact, a hard landing or a gear-up touchdown ends the flight.</i></button>
       </div>
 
-      <h2>Your aeroplane</h2>
-      <div class="row" id="livRow"></div>
+      <div class="sect" id="secPlane">
+        <h2>Your aeroplane</h2>
+        <div class="row" id="livRow"></div>
 
-      <h2>Trim</h2>
-      <div class="sw" id="trimRow"></div>
-
-      <h2>Your pilot</h2>
-      <div class="pilotgrid">
-        <label class="fld"><span>NAME</span><input id="pName" maxlength="18" placeholder="your name" autocomplete="off" spellcheck="false"></label>
-        <label class="fld"><span>CALLSIGN</span><input id="pCall" maxlength="10" placeholder="callsign" autocomplete="off" spellcheck="false"></label>
+        <h2>Trim</h2>
+        <div class="sw" id="trimRow"></div>
       </div>
-      <div class="swrow"><b>HELMET</b><div class="sw" id="helmRow"></div></div>
-      <div class="swrow"><b>VISOR</b><div class="sw" id="visorRow"></div></div>
-      <div class="swrow"><b>SUIT</b><div class="sw" id="suitRow"></div></div>
+
+      <div class="sect" id="secPilot">
+        <h2>Your pilot</h2>
+        <div class="pilotgrid">
+          <label class="fld"><span>NAME</span><input id="pName" maxlength="18" placeholder="your name" autocomplete="off" spellcheck="false"></label>
+          <label class="fld"><span>CALLSIGN</span><input id="pCall" maxlength="10" placeholder="callsign" autocomplete="off" spellcheck="false"></label>
+        </div>
+        <div class="swrow"><b>HELMET</b><div class="sw" id="helmRow"></div></div>
+        <div class="swrow"><b>VISOR</b><div class="sw" id="visorRow"></div></div>
+        <div class="swrow"><b>SUIT</b><div class="sw" id="suitRow"></div></div>
+      </div>
 
       <h2>Speed limiter</h2>
       <div class="row" id="freeRow">
@@ -1033,7 +1069,14 @@ function cityAt(x, z) {
     const d = Math.sqrt(dx * dx + dz * dz);
     if (d > c.r * 2.1) continue;
     // dense core, thinning suburbs
-    const v = (1 - sstep(c.r * .45, c.r * 2.1, d)) * clamp(.35 + c.pop / 900, .4, 1);
+    /* How built-up, independent of how BIG. The population term used to hold
+       a town of four thousand at four tenths, which is why from altitude the
+       county read as farmland: the ground tint that makes a town legible
+       from five miles up is driven by this, and at four tenths it is a green
+       field with a grey wash on it. A small town's ground is just as grey as
+       a city's — there is simply less of it — so the floor is six tenths and
+       the size is left to the radius, where it belongs. */
+    const v = (1 - sstep(c.r * .45, c.r * 2.1, d)) * clamp(.58 + c.pop / 900, .6, 1);
     /* Density saturates across the whole inner half of a city, which is right
        — it is all built up — and useless for deciding what is DOWNTOWN. That
        needs how far in you are, kept separately: one at the middle, nothing by
@@ -2342,6 +2385,12 @@ function drawMesh(mesh, origin, M, pivot, tint, alphaFade, tintK) {
     const dist = Math.hypot(cxv, cyv, czv) || 1;
     const ex = vx / dist, ey = vy / dist, ez = vz / dist;   // eye -> surface
     let c2 = litColor(col, nx, ny, nz);
+    /* Light that is not the sun. Indoors the sun is the one thing there
+       isn't, so a face can carry its own: `emit` adds back a share of the
+       face's own colour, which is what a roof full of high-bays does to a
+       wall the sun never reaches. */
+    const em = fc.emit;
+    if (em) { c2 = [c2[0] + col[0] * em, c2[1] + col[1] * em, c2[2] + col[2] * em]; }
     // Blinn-Phong highlight: paint and glass both catch the sun
     const sh = fc.spec;
     if (sh) {
@@ -2689,26 +2738,148 @@ function applyLivery() {
 applyLivery();
 let AC = buildAircraft();
 function rebuildAircraft() { applyLivery(); AC = buildAircraft(); PILOTMESH = buildPilot(); }
-/* A pilot, in six boxes and a helmet. They stand by the nose in the hangar
-   and nowhere else — which is the right amount of pilot for an aeroplane you
-   spend the rest of the time inside. */
+/* A pilot, properly.
+
+   Fourteen boxes read as a robot, and the start screen now walks the camera
+   up to within a metre and a half of them, so they had to be built like
+   anything else in here: round limbs, a suit with a harness over it, a
+   pressure helmet with a wrapped visor, a mask and a hose. Everything is
+   still flat-shaded quads — it is the PROPORTIONS and the roundness that do
+   the work, not the shading. Measurements are a 1.79 m adult: ankle .08,
+   knee .50, hip .93, shoulder 1.44, chin 1.52, crown 1.79.
+
+   The figure is built facing +Z and stood up in the world by a single yaw. */
+const PIL = {
+  /* a tapered round limb between two points, in n facets */
+  limb(mb, a, b, r0, r1, n, col, o) {
+    const ax = b[0] - a[0], ay = b[1] - a[1], az = b[2] - a[2];
+    const L = Math.hypot(ax, ay, az) || 1;
+    const ux = ax / L, uy = ay / L, uz = az / L;
+    let px = 0, py = 0, pz = 1;
+    if (Math.abs(uz) > .9) { px = 1; pz = 0; }
+    let rx = uy * pz - uz * py, ry = uz * px - ux * pz, rz = ux * py - uy * px;
+    const rl = Math.hypot(rx, ry, rz) || 1; rx /= rl; ry /= rl; rz /= rl;
+    const sx = uy * rz - uz * ry, sy = uz * rx - ux * rz, sz = ux * ry - uy * rx;
+    const P = (t, r, ang) => {
+      const c = Math.cos(ang), s = Math.sin(ang);
+      return [a[0] + ax * t + (rx * c + sx * s) * r,
+              a[1] + ay * t + (ry * c + sy * s) * r,
+              a[2] + az * t + (rz * c + sz * s) * r];
+    };
+    for (let i = 0; i < n; i++) {
+      const A0 = i / n * TAU, A1 = (i + 1) / n * TAU;
+      mb.quad(P(0, r0, A0), P(0, r0, A1), P(1, r1, A1), P(1, r1, A0),
+        shade(col, .87 + .26 * (.5 + .5 * Math.cos(A0 + .6))), o);
+    }
+  },
+  /* an ellipsoid, in n around by m up */
+  blob(mb, cx, cy, cz, rx, ry, rz, n, m, col, o) {
+    for (let j = 0; j < m; j++) {
+      const t0 = j / m * Math.PI, t1 = (j + 1) / m * Math.PI;
+      const y0 = cy + Math.cos(t0) * ry, y1 = cy + Math.cos(t1) * ry;
+      const s0 = Math.sin(t0), s1 = Math.sin(t1);
+      for (let i = 0; i < n; i++) {
+        const a0 = i / n * TAU, a1 = (i + 1) / n * TAU;
+        const P = (s, y, a) => [cx + Math.sin(a) * rx * s, y, cz + Math.cos(a) * rz * s];
+        mb.quad(P(s0, y0, a0), P(s0, y0, a1), P(s1, y1, a1), P(s1, y1, a0),
+          shade(col, .88 + .22 * (.5 + .5 * Math.cos(a0 - .4))), o);
+      }
+    }
+  }
+};
 function buildPilot() {
-  const mb = MB(), S = SUITS[KIT.suit][1], H = HELMETS[KIT.helm][1], V = VISORS[KIT.visor][1];
-  const boot = [38, 36, 38], glove = [56, 58, 64];
-  mb.box(-.11, .09, 0, .17, .18, .30, boot, TWO);      // boots
-  mb.box(.11, .09, 0, .17, .18, .30, boot, TWO);
-  mb.box(-.11, .46, 0, .17, .56, .19, shade(S, .94), TWO);   // legs
-  mb.box(.11, .46, 0, .17, .56, .19, shade(S, .94), TWO);
-  mb.box(0, .98, 0, .42, .58, .25, S, TWO);            // torso
-  mb.box(0, 1.20, .14, .30, .22, .06, shade(S, .82), TWO);   // chest rig
-  mb.box(-.27, .96, 0, .13, .50, .15, shade(S, .90), TWO);   // arms
-  mb.box(.27, .96, 0, .13, .50, .15, shade(S, .90), TWO);
-  mb.box(-.27, .66, .02, .12, .14, .18, glove, TWO);   // gloves
-  mb.box(.27, .66, .02, .12, .14, .18, glove, TWO);
-  mb.box(0, 1.34, 0, .17, .14, .17, shade(S, .78), TWO);     // neck ring
-  mb.box(0, 1.53, 0, .29, .31, .30, H, TWO);           // helmet
-  mb.box(0, 1.52, .155, .21, .16, .04, V, { two: true, spec: .9, gloss: 40 });  // visor
-  mb.box(0, 1.70, -.02, .26, .06, .26, shade(H, 1.08), TWO); // crown
+  const mb = MB();
+  const S = SUITS[KIT.suit][1], HC = HELMETS[KIT.helm][1], VC = VISORS[KIT.visor][1];
+  const IN = .20;                         // the hangar's light, on the pilot
+  const M = (c, e) => ({ two: true, emit: e === undefined ? IN : e, c });
+  const o = { two: true, emit: IN };
+  const oS = { two: true, emit: IN * .9, spec: .35, gloss: 26 };
+  const dark = [30, 32, 36], strap = shade(S, .60), rubber = [38, 38, 42];
+  const glove = [52, 54, 60], metal = [148, 154, 162];
+  const L = PIL.limb.bind(PIL), B = PIL.blob.bind(PIL);
+
+  // ---- boots: sole, upper, heel, and a strap across the instep ----------
+  for (const s of [-1, 1]) {
+    const x = s * .115;
+    mb.box(x, .022, .045, .115, .044, .295, [24, 25, 28], o);           // sole
+    mb.box(x, .010, -.075, .105, .030, .085, [20, 21, 24], o);          // heel
+    L(mb, [x, .04, .00], [x, .17, -.015], .073, .066, 6, dark, o);      // ankle
+    mb.box(x, .10, .105, .105, .105, .175, shade(dark, 1.1), o);        // toe box
+    mb.box(x, .175, .015, .118, .035, .150, [18, 19, 22], o);           // instep strap
+  }
+  // ---- legs: shin, knee, thigh, with a pocket on the outside ------------
+  for (const s of [-1, 1]) {
+    const x = s * .112;
+    L(mb, [x, .16, -.01], [x * 1.02, .49, .01], .080, .068, 7, S, o);   // shin
+    B(mb, x * 1.02, .50, .015, .085, .072, .090, 7, 3, shade(S, 1.04), o);  // knee
+    L(mb, [x * 1.02, .50, .015], [x * 1.18, .93, 0], .097, .116, 7, S, o);  // thigh
+    mb.box(x * 1.45, .62, .02, .055, .200, .150, shade(S, .88), o);     // thigh pocket
+    mb.box(x * 1.46, .62, .02, .022, .020, .140, strap, o);
+    mb.box(x * 1.02, .40, .075, .120, .130, .045, shade(S, .92), o);    // shin pocket
+  }
+  // ---- pelvis, belt and the seat harness --------------------------------
+  B(mb, 0, .98, 0, .185, .125, .135, 9, 4, S, o);
+  mb.box(0, 1.04, 0, .345, .075, .250, strap, o);                        // belt
+  mb.box(0, 1.04, .126, .085, .070, .030, metal, oS);                    // buckle
+  for (const s of [-1, 1]) mb.box(s * .175, 1.02, .05, .045, .110, .120, shade(S, .84), o);
+  // ---- torso: a barrel, wider at the chest, with the survival pack on ---
+  L(mb, [0, 1.02, 0], [0, 1.24, .008], .175, .200, 12, S, o);
+  L(mb, [0, 1.24, .008], [0, 1.44, 0], .200, .185, 12, shade(S, 1.02), o);
+  mb.box(0, 1.20, .175, .270, .240, .070, shade(S, .90), o);             // chest pack
+  mb.box(0, 1.20, .212, .200, .150, .012, shade(S, .78), o);
+  // parachute harness: over each shoulder, crossing to the belt
+  for (const s of [-1, 1]) {
+    L(mb, [s * .150, 1.445, -.02], [s * .085, 1.09, .150], .030, .030, 4, strap, o);
+    L(mb, [s * .150, 1.445, -.06], [s * .120, 1.10, -.140], .028, .028, 4, shade(strap, .9), o);
+    L(mb, [s * .150, 1.445, -.02], [s * .190, 1.30, .02], .034, .030, 4, strap, o);
+  }
+  mb.box(0, 1.30, .195, .150, .045, .040, metal, oS);                    // the koch fitting
+  // name tag and a shoulder patch, because a pilot has both
+  mb.box(.075, 1.345, .196, .120, .042, .008, [214, 208, 190], { two: true, emit: IN * 1.2 });
+  mb.box(-.205, 1.395, .02, .012, .075, .075, [168, 62, 52], { two: true, emit: IN * 1.1 });
+  // ---- shoulders and arms ------------------------------------------------
+  for (const s of [-1, 1]) {
+    B(mb, s * .180, 1.412, 0, .088, .086, .098, 8, 4, shade(S, 1.05), o);
+    L(mb, [s * .184, 1.40, 0], [s * .228, 1.13, .020], .082, .068, 7, S, o);   // upper arm
+    B(mb, s * .228, 1.125, .022, .069, .062, .073, 7, 3, shade(S, 1.03), o);   // elbow
+    L(mb, [s * .228, 1.125, .022], [s * .234, .875, .055], .064, .052, 7, S, o); // forearm
+    mb.box(s * .236, .885, .055, .078, .048, .088, strap, o);                  // cuff ring
+    B(mb, s * .236, .820, .062, .054, .066, .058, 7, 3, glove, o);             // glove
+    mb.box(s * .236, .762, .080, .078, .072, .080, shade(glove, .92), o);      // fingers
+  }
+  // ---- neck ring, head, helmet ------------------------------------------
+  mb.box(0, 1.475, 0, .150, .060, .150, metal, oS);
+  L(mb, [0, 1.44, 0], [0, 1.54, 0], .078, .072, 7, shade(S, .92), o);
+  B(mb, 0, 1.655, -.004, .132, .152, .142, 12, 6, HC, { two: true, emit: IN * 1.05, spec: .30, gloss: 24 });
+  // the visor: a wrapped band across the front of the shell
+  for (let i = 0; i < 9; i++) {
+    const a0 = (-.345 + i * .0767) * Math.PI, a1 = (-.345 + (i + 1) * .0767) * Math.PI;
+    const P = (a, y, k) => [Math.sin(a) * .137 * k, y, -.004 + Math.cos(a) * .147 * k];
+    mb.quad(P(a0, 1.585, 1.01), P(a1, 1.585, 1.01), P(a1, 1.692, 1.01), P(a0, 1.692, 1.01),
+      shade(VC, .92 + i * .02), { two: true, emit: IN * .8, spec: .95, gloss: 52 });
+    mb.quad(P(a0, 1.692, 1.02), P(a1, 1.692, 1.02), P(a1, 1.715, 1.02), P(a0, 1.715, 1.02),
+      shade(HC, 1.18), { two: true, emit: IN });                        // the brow trim
+    mb.quad(P(a0, 1.566, 1.02), P(a1, 1.566, 1.02), P(a1, 1.585, 1.02), P(a0, 1.585, 1.02),
+      shade(HC, .82), { two: true, emit: IN });
+  }
+  // oxygen mask under the visor, and the hose down to the chest
+  mb.box(0, 1.553, .100, .130, .080, .070, rubber, o);
+  mb.box(0, 1.520, .085, .095, .050, .060, shade(rubber, 1.15), o);
+  let hx = .045, hy = 1.500, hz = .105;
+  for (let k = 0; k < 5; k++) {
+    const nx = .045 + k * .017, ny = 1.500 - k * .067, nz = .105 + Math.sin(k * .6) * .020;
+    L(mb, [hx, hy, hz], [nx, ny, nz], .026, .026, 5, k & 1 ? rubber : shade(rubber, 1.2), o);
+    hx = nx; hy = ny; hz = nz;
+  }
+  // comms lead off the back of the helmet
+  L(mb, [-.10, 1.62, -.13], [-.16, 1.40, -.18], .016, .016, 4, dark, o);
+  // crown stripe and the earcups
+  for (let i = 0; i < 9; i++) {
+    const a0 = i / 9 * TAU, a1 = (i + 1) / 9 * TAU;
+    const P = a => [Math.sin(a) * .050, 1.800, -.004 + Math.cos(a) * .054];
+    mb.tri([0, 1.806, -.004], P(a0), P(a1), shade(HC, 1.22), o);
+  }
+  for (const s of [-1, 1]) B(mb, s * .133, 1.640, -.010, .030, .058, .062, 6, 3, shade(HC, .80), o);
   return mb.done();
 }
 let PILOTMESH = buildPilot();
@@ -2828,116 +2999,529 @@ const HANGAR = {
 };
 HANGAR.pos = v3(HANGAR.x - 4, E + 2.92, HANGAR.z);
 HANGAR.q = qAxis(0, 1, 0, Math.PI * .5);           // nose out of the door, east
+/* The shed is built twice: a SHELL that is worth drawing from the taxiway,
+   and the DETAIL — the stair, the bowser, the chest, the drums, the tug —
+   which only exists when you are close enough to read it. A hangar you fly
+   past at 300 kt does not need its tool chest sorted.
+
+   Everything inside carries `emit`. The renderer lights the world off the
+   sun, and the whole point of a roof is that the sun is not in here; the
+   high-bays are, so each face adds back a share of its own colour and the
+   floor adds more of it where a lamp is actually hanging. */
 function buildHangar() {
-  const mb = MB();
+  const sh = MB(), det = MB();
   const X = HANGAR.x, Z = HANGAR.z, HW = HANGAR.w * .5, HD = HANGAR.d * .5, HH = HANGAR.h;
   const y0 = E + .06;
-  const CONC = [116, 116, 118], CONC2 = [104, 104, 107];
-  const SKINC = [126, 132, 138], RIB = [112, 118, 124], TRIM = [64, 70, 78];
-  const DARK = [46, 50, 56];
-  // ---- apron and floor, with the taxi line running out of the door -------
-  for (let i = 0; i < 8; i++) {
-    for (let j = 0; j < 6; j++) {
-      const x0 = X - HW + i * (HANGAR.w / 8), x1 = x0 + HANGAR.w / 8;
-      const z0 = Z - HD + j * (HANGAR.d / 6), z1 = z0 + HANGAR.d / 6;
-      const c = shade((i + j) & 1 ? CONC : CONC2, 1 + (hash2(i, j) - .5) * .06);
-      mb.quad([x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1], c, { two: true, bias: -180, edge: 1 });
+  const IN = .42;
+  const lit = (e, o) => Object.assign({ two: true, emit: e === undefined ? IN : e }, o || {});
+  const CONC = [104, 105, 109], CONC2 = [94, 95, 99];
+  const SKIN = [140, 147, 154], WAINS = [44, 60, 74], TRIM = [68, 74, 82];
+  const DARK = [40, 44, 50], STEEL = [92, 98, 106], ALU = [166, 172, 180];
+  const YEL = [214, 178, 46], RED = [172, 56, 44], WHT = [222, 226, 230];
+
+  // ---- the lamps, first, because the floor has to know where they are ----
+  const LAMPX = [], LAMPZ = [Z - 16, Z, Z + 16];
+  for (let i = 1; i <= 4; i++) LAMPX.push(X - HW + i * (HANGAR.w / 5));
+  const pool = (x, z) => {
+    let s = 0;
+    for (let a = 0; a < LAMPX.length; a++) for (let b = 0; b < LAMPZ.length; b++) {
+      const dx = x - LAMPX[a], dz = z - LAMPZ[b];
+      s += Math.exp(-(dx * dx + dz * dz) / 170);
     }
+    return Math.min(s, 1.2);
+  };
+
+  // ---- floor: slabs with real joints, lamp pools and daylight at the door
+  sh.quad([X - HW, y0 - .03, Z - HD], [X + HW, y0 - .03, Z - HD],
+          [X + HW, y0 - .03, Z + HD], [X - HW, y0 - .03, Z + HD], [52, 53, 57],
+          { two: true, bias: -220 });
+  const NX = 13, NZ = 9, sw = HANGAR.w / NX, sd = HANGAR.d / NZ;
+  const STAIN = [[X - 7, Z - 4.4], [X - 7, Z + 4.4], [X - 24, Z + 9], [X + 3, Z - 11]];
+  for (let i = 0; i < NX; i++) for (let j = 0; j < NZ; j++) {
+    const xa = X - HW + i * sw, za = Z - HD + j * sd;
+    const xb = xa + sw - .07, zb = za + sd - .07;
+    const xc = xa + sw * .5, zc = za + sd * .5;
+    const day = sstep(.44, 1.02, (xc - (X - HW)) / HANGAR.w) * (1 - sstep(17, 23.5, Math.abs(zc - Z)));
+    let c = shade((i + j) & 1 ? CONC : CONC2, 1 + (hash2(i, j) - .5) * .07 + day * .10);
+    let st = 0;
+    for (const s2 of STAIN) st = Math.max(st, Math.exp(-((xc - s2[0]) * (xc - s2[0]) + (zc - s2[1]) * (zc - s2[1])) / 9));
+    if (st > .02) c = mixc(c, [52, 50, 48], st * .55);
+    sh.quad([xa, y0, za], [xb, y0, za], [xb, y0, zb], [xa, y0, zb], c,
+      { two: true, bias: -180, emit: IN * .34 + pool(xc, zc) * .26 + day * .30, spec: .22, gloss: 26 });
   }
-  // the apron outside the door
+  // the apron outside the door keeps the sun on it
   for (let i = 0; i < 5; i++) {
-    const x0 = X + HW + i * 12, x1 = x0 + 12;
-    mb.quad([x0, y0, Z - HD], [x1, y0, Z - HD], [x1, y0, Z + HD], [x0, y0, Z + HD],
+    const xa = X + HW + i * 12, xb = xa + 12;
+    sh.quad([xa, y0, Z - HD], [xb, y0, Z - HD], [xb, y0, Z + HD], [xa, y0, Z + HD],
       shade(CONC2, 1 + (hash2(i, 3) - .5) * .05), { two: true, bias: -180, edge: 1 });
   }
-  // yellow lead-in line, down the middle and out
-  for (let x = X - HW + 4; x < X + HW + 58; x += 7)
-    mb.quad([x, y0 + .02, Z - .28], [x + 4.4, y0 + .02, Z - .28],
-      [x + 4.4, y0 + .02, Z + .28], [x, y0 + .02, Z + .28], [206, 176, 52], { two: true, bias: 0 });
-  // ---- walls -------------------------------------------------------------
-  const wall = (x0, z0, x1, z1, h, col) => {
-    mb.quad([x0, y0, z0], [x1, y0, z1], [x1, y0 + h, z1], [x0, y0 + h, z0], col, { two: true });
+  // ---- paint on the floor -----------------------------------------------
+  const paint = (xa, za, xb, zb, col, e) =>
+    sh.quad([xa, y0 + .015, za], [xb, y0 + .015, za], [xb, y0 + .015, zb], [xa, y0 + .015, zb], col,
+      { two: true, bias: 0, emit: e === undefined ? IN * .8 : e });
+  for (let x = X - HW + 4; x < X + HW + 58; x += 7) paint(x, Z - .30, x + 4.4, Z + .30, YEL);
+  paint(X - HW + 3.0, Z - 2.6, X - HW + 3.9, Z + 2.6, RED);              // the stop bar
+  for (const zz of [-1, 1]) {                                            // walkway edges
+    paint(X - HW + 1, Z + zz * 25.4, X + HW - 1, Z + zz * 26.0, WHT, IN * .9);
+    paint(X - HW + 1, Z + zz * 27.4, X + HW - 1, Z + zz * 28.0, WHT, IN * .9);
+  }
+  // hazard chevrons across the threshold
+  for (let k = -11; k <= 11; k++) {
+    const zc = Z + k * 2.0;
+    const c = (k & 1) ? [26, 27, 30] : YEL;
+    sh.quad([X + HW - 2.6, y0 + .015, zc], [X + HW - 2.6 + 1.0, y0 + .015, zc],
+            [X + HW + .1, y0 + .015, zc + 1.6], [X + HW + .1 - 1.0, y0 + .015, zc + 1.6], c,
+            { two: true, bias: 0, emit: IN * .5 });
+  }
+  // bay number, stencilled on the floor by the door
+  for (const [bx, bz, w2, h2] of [[X + 28, Z - 20, .6, 3.2]])
+    paint(bx, bz, bx + w2, bz + h2, WHT, IN * .9);
+
+  // ---- walls: ribbed steel over a painted wainscot, on girts -------------
+  const wallRun = (xa, za, xb, zb, h, base, ix, iz) => {
+    const dx = xb - xa, dz = zb - za, L = Math.hypot(dx, dz);
+    const ux = dx / L, uz = dz / L, n = Math.max(2, Math.round(L / 1.55));
+    for (let i = 0; i < n; i++) {
+      const a0 = i / n * L, a1 = (i + 1) / n * L;
+      const x0 = xa + ux * a0, z0 = za + uz * a0, x1 = xa + ux * a1, z1 = za + uz * a1;
+      sh.quad([x0, y0, z0], [x1, y0, z1], [x1, y0 + h, z1], [x0, y0 + h, z0],
+        shade(base, i & 1 ? 1.07 : .93), lit(IN * .86));
+    }
+    const px = ix * .07, pz = iz * .07;
+    sh.quad([xa + px, y0, za + pz], [xb + px, y0, zb + pz],
+            [xb + px, y0 + 2.7, zb + pz], [xa + px, y0 + 2.7, za + pz], WAINS, lit(IN * .70));
+    sh.quad([xa + px, y0 + 2.7, za + pz], [xb + px, y0 + 2.7, zb + pz],
+            [xb + px, y0 + 2.92, zb + pz], [xa + px, y0 + 2.92, za + pz], YEL, lit(IN * .85));
+    for (const gy of [5.6, 9.6, 13.6, 17.6]) {
+      if (gy > h - .8) continue;
+      sh.box((xa + xb) * .5 + px, y0 + gy, (za + zb) * .5 + pz,
+        Math.abs(dx) + Math.abs(uz) * .26, .26, Math.abs(dz) + Math.abs(ux) * .26, STEEL, lit(IN * .62));
+    }
   };
-  wall(X - HW, Z - HD, X - HW, Z + HD, HH, SKINC);                 // back (west)
-  wall(X - HW, Z - HD, X + HW, Z - HD, HH, shade(SKINC, .92));     // south side
-  wall(X - HW, Z + HD, X + HW, Z + HD, HH, shade(SKINC, .88));     // north side
-  // vertical ribs, inside and out, which is what makes a steel shed read
-  for (let i = 1; i < 16; i++) {
-    const z = Z - HD + i * (HANGAR.d / 16);
-    mb.box(X - HW + .22, y0 + HH * .5, z, .30, HH, .55, RIB, TWO);
-  }
-  for (let i = 1; i < 20; i++) {
-    const x = X - HW + i * (HANGAR.w / 20);
-    mb.box(x, y0 + HH * .5, Z - HD + .22, .55, HH, .30, shade(RIB, .94), TWO);
-    mb.box(x, y0 + HH * .5, Z + HD - .22, .55, HH, .30, shade(RIB, .90), TWO);
-  }
-  // ---- the door wall: two piers and a lintel, with a 44 m opening --------
-  const OP = 22;                                    // half the opening
-  wall(X + HW, Z - HD, X + HW, Z - OP, HH, shade(SKINC, .84));
-  wall(X + HW, Z + OP, X + HW, Z + HD, HH, shade(SKINC, .84));
-  mb.box(X + HW, y0 + HH - 1.6, Z, .9, 3.2, OP * 2, shade(SKINC, .80), TWO);
-  // door tracks and the folded leaves stacked against the piers
-  mb.box(X + HW - .8, y0 + HH - 3.4, Z - OP - 2.4, 1.6, .5, 5.0, TRIM, TWO);
-  mb.box(X + HW - .8, y0 + HH - 3.4, Z + OP + 2.4, 1.6, .5, 5.0, TRIM, TWO);
-  for (let k = 0; k < 3; k++) {
-    mb.box(X + HW - 1.0 - k * .55, y0 + (HH - 3.6) * .5, Z - OP - .9 - k * 1.1,
-      .45, HH - 3.6, 2.0, shade(TRIM, 1 + k * .08), TWO);
-    mb.box(X + HW - 1.0 - k * .55, y0 + (HH - 3.6) * .5, Z + OP + .9 + k * 1.1,
-      .45, HH - 3.6, 2.0, shade(TRIM, 1 + k * .08), TWO);
-  }
-  // ---- roof: a shallow gable on trusses ----------------------------------
-  const ridge = y0 + HH + 4.2;
-  mb.quad([X - HW, y0 + HH, Z - HD], [X + HW, y0 + HH, Z - HD],
-          [X + HW, ridge, Z], [X - HW, ridge, Z], shade(SKINC, 1.05), TWO);
-  mb.quad([X - HW, ridge, Z], [X + HW, ridge, Z],
-          [X + HW, y0 + HH, Z + HD], [X - HW, y0 + HH, Z + HD], shade(SKINC, .98), TWO);
-  // gable ends
-  mb.tri([X - HW, y0 + HH, Z - HD], [X - HW, y0 + HH, Z + HD], [X - HW, ridge, Z], shade(SKINC, .90), TWO);
-  mb.tri([X + HW, y0 + HH, Z - HD], [X + HW, ridge, Z], [X + HW, y0 + HH, Z + HD], shade(SKINC, .86), TWO);
-  // trusses under it, and the lamps hanging off them
-  for (let i = 1; i < 7; i++) {
-    const x = X - HW + i * (HANGAR.w / 7);
-    mb.box(x, y0 + HH - .45, Z, .42, .9, HANGAR.d - 1.2, DARK, TWO);
-    mb.box(x, y0 + HH + 1.6, Z, .30, 3.6, .30, DARK, TWO);
-    for (const zz of [Z - 15, Z, Z + 15]) {
-      mb.box(x, y0 + HH - 1.9, zz, .16, 1.4, .16, [70, 74, 80], TWO);
-      mb.box(x, y0 + HH - 2.8, zz, 1.5, .34, 1.5, [40, 42, 46], TWO);
-      mb.box(x, y0 + HH - 3.0, zz, 1.2, .12, 1.2, [255, 248, 224], { two: true, emit: 1 });
+  wallRun(X - HW, Z - HD, X - HW, Z + HD, HH, SKIN, 1, 0);                  // back
+  wallRun(X - HW, Z - HD, X + HW, Z - HD, HH, shade(SKIN, .95), 0, 1);      // south
+  wallRun(X - HW, Z + HD, X + HW, Z + HD, HH, shade(SKIN, .91), 0, -1);     // north
+  // ---- the door wall: piers, lintel and the folded leaves ---------------
+  const OP = 22;
+  wallRun(X + HW, Z - HD, X + HW, Z - OP, HH, shade(SKIN, .88), -1, 0);
+  wallRun(X + HW, Z + OP, X + HW, Z + HD, HH, shade(SKIN, .88), -1, 0);
+  sh.box(X + HW, y0 + HH - 1.7, Z, 1.0, 3.4, OP * 2, shade(SKIN, .84), lit(IN * .6));
+  sh.box(X + HW - .1, y0 + HH - 3.55, Z, 1.5, .55, OP * 2 + 10, TRIM, lit(IN * .7));   // the track
+  for (let k = 0; k < 4; k++) {
+    for (const s2 of [-1, 1]) {
+      sh.box(X + HW - 1.1 - k * .62, y0 + (HH - 3.8) * .5 + .1, Z + s2 * (OP + .9 + k * 1.15),
+        .50, HH - 3.9, 2.05, shade(TRIM, 1 + k * .09), lit(IN * .55));
+      // the ribs down each leaf
+      for (let r = 0; r < 4; r++)
+        sh.box(X + HW - 1.38 - k * .62, y0 + 2.6 + r * 4.2, Z + s2 * (OP + .9 + k * 1.15),
+          .06, .22, 1.9, shade(TRIM, 1.25), lit(IN * .8));
     }
   }
-  // ---- what is in it -----------------------------------------------------
-  // rolling stair, by the cockpit
-  for (let s = 0; s < 7; s++)
-    mb.box(X - 2 + s * .46, y0 + .34 + s * .42, 8.4, .5, .12, 1.8, [176, 178, 182], TWO);
-  mb.box(X - 2.4, y0 + 1.6, 7.5, .12, 3.2, .12, [176, 178, 182], TWO);
-  mb.box(X + 1.2, y0 + 1.6, 7.5, .12, 3.2, .12, [176, 178, 182], TWO);
-  mb.box(X - .6, y0 + .16, 8.4, 4.0, .32, 2.2, [96, 98, 104], TWO);
-  // fuel bowser
-  mb.box(X - 26, y0 + 1.5, Z - 17, 7.0, 2.2, 2.6, [58, 78, 104], TWO);
-  mb.box(X - 22, y0 + 1.9, Z - 17, 2.6, 2.4, 2.4, [44, 58, 78], TWO);
-  for (const wx of [-29, -23.5]) for (const wz of [-18.2, -15.8])
-    mb.box(X + wx, y0 + .45, Z + wz, 1.0, .9, .5, [28, 28, 32], TWO);
-  // tool chest, drums, crates
-  mb.box(X - 31, y0 + .62, Z + 12, 2.4, 1.24, 1.0, [168, 62, 52], TWO);
-  for (let k = 0; k < 4; k++)
-    mb.box(X - 34 + (k % 2) * 1.0, y0 + .48, Z + 16 + ((k / 2) | 0) * 1.0, .82, .96, .82,
-      k & 1 ? [188, 152, 48] : [72, 96, 120], TWO);
-  for (let k = 0; k < 3; k++)
-    mb.box(X - 12 + k * 2.6, y0 + .7, Z + 21, 2.2, 1.4, 1.6, [142, 130, 104], TWO);
-  // cones along the nose line
-  for (let k = 0; k < 6; k++) {
-    const cx = X + 10 + k * 9;
-    mb.box(cx, y0 + .10, Z - 9.5, .7, .2, .7, [214, 92, 34], TWO);
-    mb.box(cx, y0 + .42, Z - 9.5, .34, .66, .34, [230, 104, 40], TWO);
-    mb.box(cx, y0 + .10, Z + 9.5, .7, .2, .7, [214, 92, 34], TWO);
-    mb.box(cx, y0 + .42, Z + 9.5, .34, .66, .34, [230, 104, 40], TWO);
+  // a personnel door and a window strip in the south wall
+  sh.box(X - 24, y0 + 1.05, Z - HD + .12, 1.0, 2.1, .16, [58, 66, 76], lit(IN * .8));
+  sh.box(X - 24, y0 + 1.05, Z - HD + .22, .10, .10, .10, ALU, lit(IN));
+  for (let i = 0; i < 9; i++)
+    sh.box(X - HW + 6 + i * 7.5, y0 + 15.4, Z - HD + .10, 4.4, 1.7, .10, [126, 156, 176],
+      { two: true, emit: .95, spec: .5, gloss: 40 });
+
+  // ---- roof: a gable on open-web trusses, with roof lights --------------
+  const ridge = y0 + HH + 4.2;
+  const slope = (x0, x1, c) => {
+    sh.quad([x0, y0 + HH, Z - HD], [x1, y0 + HH, Z - HD], [x1, ridge, Z], [x0, ridge, Z], c, lit(IN * .55));
+    sh.quad([x0, ridge, Z], [x1, ridge, Z], [x1, y0 + HH, Z + HD], [x0, y0 + HH, Z + HD], shade(c, .96), lit(IN * .55));
+  };
+  for (let i = 0; i < 14; i++) {
+    const x0 = X - HW + i * (HANGAR.w / 14), x1 = x0 + HANGAR.w / 14;
+    // every fourth bay is a translucent panel: that is where the daylight is
+    if (i % 4 === 2) {
+      sh.quad([x0 + .3, y0 + HH, Z - HD], [x1 - .3, y0 + HH, Z - HD], [x1 - .3, ridge, Z], [x0 + .3, ridge, Z],
+        [196, 214, 230], { two: true, emit: 1.05 });
+      sh.quad([x0 + .3, ridge, Z], [x1 - .3, ridge, Z], [x1 - .3, y0 + HH, Z + HD], [x0 + .3, y0 + HH, Z + HD],
+        [186, 205, 222], { two: true, emit: 1.0 });
+    } else slope(x0, x1, shade(SKIN, i & 1 ? 1.03 : .97));
   }
-  // a board on the back wall, because every hangar has one
-  mb.quad([X - HW + .5, y0 + 3.0, Z - 9], [X - HW + .5, y0 + 3.0, Z - 3],
-          [X - HW + .5, y0 + 6.0, Z - 3], [X - HW + .5, y0 + 6.0, Z - 9], [42, 52, 44], TWO);
-  return mb.done();
+  sh.tri([X - HW, y0 + HH, Z - HD], [X - HW, y0 + HH, Z + HD], [X - HW, ridge, Z], shade(SKIN, .92), lit(IN * .5));
+  sh.tri([X + HW, y0 + HH, Z - HD], [X + HW, ridge, Z], [X + HW, y0 + HH, Z + HD], shade(SKIN, .88), lit(IN * .5));
+  sh.box(X, ridge + .18, Z, HANGAR.w, .36, 1.1, shade(SKIN, 1.08), lit(IN * .6));   // ridge cap
+  // purlins following the slope
+  for (let k = 1; k <= 5; k++) {
+    for (const s2 of [-1, 1]) {
+      const zz = Z + s2 * HD * (k / 6), yy = y0 + HH + 4.2 * (1 - k / 6);
+      sh.box(X, yy - .32, zz, HANGAR.w - .6, .22, .22, shade(STEEL, 1.1), lit(IN * .8));
+    }
+  }
+  // trusses: a bottom chord, the sloping top chord, posts and diagonals
+  const TX = [];
+  for (let i = 1; i < 7; i++) TX.push(X - HW + i * (HANGAR.w / 7));
+  for (const tx of TX) {
+    const by = y0 + HH - .55;
+    sh.box(tx, by, Z, .40, .34, HANGAR.d - 1.0, DARK, lit(IN * .75));
+    const topY = z => y0 + HH + 4.2 * (1 - Math.abs(z - Z) / HD) - .30;
+    const NW = 6;
+    for (let k = 0; k < NW * 2; k++) {
+      const za = Z - HD + k * (HANGAR.d / (NW * 2)), zb = za + HANGAR.d / (NW * 2);
+      // top chord segment
+      sh.quad([tx - .16, topY(za), za], [tx + .16, topY(za), za], [tx + .16, topY(zb), zb], [tx - .16, topY(zb), zb],
+        shade(DARK, 1.15), lit(IN * .7));
+      // alternating web: a post then a diagonal
+      const p0 = k & 1 ? [za, by] : [za, topY(za)], p1 = k & 1 ? [zb, topY(zb)] : [zb, by];
+      sh.quad([tx - .07, p0[1], p0[0]], [tx + .07, p0[1], p0[0]], [tx + .07, p1[1], p1[0]], [tx - .07, p1[1], p1[0]],
+        shade(DARK, 1.05), lit(IN * .6));
+    }
+  }
+  // ---- high-bay lamps ----------------------------------------------------
+  for (const lx of LAMPX) for (const lz of LAMPZ) {
+    sh.box(lx, y0 + HH - 1.5, lz, .12, 1.9, .12, [70, 74, 80], lit(IN));
+    sh.box(lx, y0 + HH - 2.62, lz, 1.40, .42, 1.40, [38, 40, 44], lit(IN * .8));
+    sh.box(lx, y0 + HH - 2.66, lz, 1.62, .16, 1.62, ALU, lit(IN * 1.1));
+    sh.box(lx, y0 + HH - 2.90, lz, 1.10, .16, 1.10, [255, 250, 232], { two: true, emit: 1.35 });
+  }
+
+  // ---- the back wall is somebody's workshop ------------------------------
+  const wx = X - HW + .30;
+  // bench + pegboard + a rack of tools
+  sh.box(wx + .45, y0 + .92, Z - 12, .90, .10, 8.0, [120, 96, 66], lit(IN * .95));
+  sh.box(wx + .45, y0 + .45, Z - 12, .82, .84, 7.6, [58, 70, 84], lit(IN * .7));
+  sh.box(wx + .06, y0 + 2.05, Z - 12, .08, 2.0, 8.0, [46, 58, 70], lit(IN * .85));
+  for (let k = 0; k < 16; k++) {
+    const t = hash2(k, 5);
+    sh.box(wx + .16, y0 + 1.45 + (k % 4) * .46, Z - 15.4 + ((k / 4) | 0) * 1.9 + t,
+      .10, .30 + t * .3, .09, k & 1 ? [188, 190, 196] : [180, 130, 40], lit(IN));
+  }
+  // wall cabinets, a board and a clock
+  for (let k = 0; k < 3; k++)
+    sh.box(wx + .40, y0 + 3.6, Z + 2 + k * 2.3, .80, 1.7, 2.1, [78, 92, 106], lit(IN * .9));
+  sh.box(wx + .12, y0 + 4.5, Z + 12.5, .10, 2.4, 4.2, [232, 234, 236], lit(IN * .95));
+  sh.disc(wx + .16, y0 + 4.6, Z + 17.2, .42, 12, 0, [238, 240, 242], { emit: IN * 1.1 });
+  // extinguishers and a hose reel
+  for (const zz of [Z - 19, Z + 20]) {
+    sh.box(wx + .32, y0 + .62, zz, .34, 1.15, .34, [168, 44, 36], lit(IN));
+    sh.box(wx + .32, y0 + 1.30, zz, .12, .26, .12, [180, 182, 186], lit(IN));
+  }
+  sh.box(wx + .50, y0 + 2.4, Z + 24, .95, 1.0, .95, [188, 82, 40], lit(IN * .95));
+  // signage, high up where it belongs
+  sh.box(wx + .14, y0 + 7.4, Z, .10, 1.2, 9.0, [30, 62, 96], lit(IN * 1.05));
+  sh.box(wx + .20, y0 + 7.4, Z, .06, .55, 7.2, [226, 232, 238], lit(IN * 1.1));
+
+  /* ================= the detail pass: only worth it up close ============ */
+  // rolling crew stair, at the cockpit
+  const stx = X - 1.6, stz = Z + 8.6;
+  det.box(stx - .4, y0 + .16, stz, 4.4, .32, 2.3, [84, 88, 96], lit(IN * .8));
+  for (let s2 = 0; s2 < 8; s2++)
+    det.box(stx - 1.9 + s2 * .50, y0 + .38 + s2 * .40, stz, .46, .10, 1.9, [178, 180, 184], lit(IN));
+  for (const zz of [stz - .95, stz + .95]) {
+    det.box(stx - 2.1, y0 + 1.7, zz, .09, 3.3, .09, [178, 180, 184], lit(IN));
+    det.box(stx + 1.9, y0 + 2.9, zz, .09, 1.6, .09, [178, 180, 184], lit(IN));
+    // the rail itself, sloping
+    det.quad([stx - 2.1, y0 + 3.30, zz - .05], [stx + 1.9, y0 + 3.70, zz - .05],
+             [stx + 1.9, y0 + 3.78, zz + .05], [stx - 2.1, y0 + 3.38, zz + .05], [186, 188, 192], lit(IN));
+  }
+  for (const wz of [stz - 1.0, stz + 1.0]) for (const wx2 of [stx - 1.9, stx + 1.8])
+    det.box(wx2, y0 + .16, wz, .34, .32, .20, [26, 26, 30], lit(IN * .8));
+  // fuel bowser with a reel and a hose
+  const bx = X - 26, bz = Z - 17;
+  det.box(bx, y0 + 1.55, bz, 7.2, 2.2, 2.7, [48, 70, 98], lit(IN * .85));
+  det.box(bx + 4.1, y0 + 1.95, bz, 2.6, 2.4, 2.5, [38, 52, 72], lit(IN * .8));
+  det.box(bx + 4.1, y0 + 2.55, bz, 2.2, .9, 2.3, [120, 150, 178], { two: true, emit: .75, spec: .5, gloss: 40 });
+  det.box(bx - 2.6, y0 + 2.9, bz, 1.6, 1.5, 1.5, [188, 82, 40], lit(IN * .9));
+  det.box(bx, y0 + 2.78, bz, 7.0, .22, 2.4, [178, 132, 42], lit(IN));
+  for (const wx2 of [bx - 3.0, bx + 2.5]) for (const wz of [bz - 1.25, bz + 1.25])
+    det.box(wx2, y0 + .48, wz, 1.05, .96, .52, [26, 26, 30], lit(IN * .8));
+  // tool chest with drawers
+  const tx = X - 31, tz = Z + 12;
+  det.box(tx, y0 + .66, tz, 2.5, 1.32, 1.05, [162, 56, 46], lit(IN * .95));
+  for (let k = 0; k < 4; k++)
+    det.box(tx, y0 + .26 + k * .30, tz + .53, 2.3, .22, .05, [196, 82, 66], lit(IN));
+  det.box(tx, y0 + 1.36, tz, 2.6, .08, 1.15, [190, 192, 196], lit(IN * 1.05));
+  // drums, with lids
+  for (let k = 0; k < 5; k++) {
+    const dx2 = X - 35 + (k % 3) * 1.1, dz2 = Z + 16 + ((k / 3) | 0) * 1.1;
+    const c = k % 3 === 0 ? [176, 146, 44] : k % 3 === 1 ? [64, 92, 116] : [86, 96, 88];
+    det.box(dx2, y0 + .46, dz2, .84, .92, .84, c, lit(IN * .9));
+    det.disc(dx2, y0 + .93, dz2, .44, 10, 1, shade(c, 1.16), { emit: IN });
+  }
+  // crates and a stack of tyres
+  for (let k = 0; k < 3; k++)
+    det.box(X - 12 + k * 2.7, y0 + .72, Z + 21, 2.3, 1.44, 1.7, [138, 126, 100], lit(IN * .9));
+  for (let k = 0; k < 4; k++)
+    det.box(X - 5.5, y0 + .22 + k * .40, Z + 22, 1.15, .38, 1.15, [30, 30, 34], lit(IN * .8));
+  // the tug, with a towbar pointing at the nosewheel
+  const gx = X + 9, gz = Z - 13;
+  det.box(gx, y0 + .72, gz, 3.4, .95, 1.9, [196, 168, 52], lit(IN * .95));
+  det.box(gx - .6, y0 + 1.5, gz, 1.5, .70, 1.7, [36, 40, 46], lit(IN * .8));
+  for (const wx2 of [gx - 1.2, gx + 1.2]) for (const wz of [gz - .95, gz + .95])
+    det.box(wx2, y0 + .40, wz, .78, .80, .42, [26, 26, 30], lit(IN * .8));
+  det.box(gx + 3.1, y0 + .38, gz, 3.0, .18, .30, [180, 182, 186], lit(IN));
+  // jet stands and chocks
+  for (const [jx, jz] of [[X - 4, Z - 9.6], [X - 4, Z + 9.6]]) {
+    det.box(jx, y0 + .55, jz, .22, 1.10, .22, YEL, lit(IN));
+    det.box(jx, y0 + 1.16, jz, 1.0, .16, 1.0, shade(YEL, 1.1), lit(IN));
+  }
+  for (const [cx2, cz2] of [[X - 6.2, Z - 4.4], [X - 6.2, Z + 4.4]])
+    for (const s2 of [-1, 1])
+      det.box(cx2 + s2 * .95, y0 + .14, cz2, .55, .28, .95, [214, 168, 40], lit(IN));
+  // cones down both sides of the lead-in line
+  for (let k = 0; k < 4; k++) {
+    const cx2 = X - 10 + k * 8;
+    for (const s2 of [-1, 1]) {
+      det.box(cx2, y0 + .09, Z + s2 * 9.8, .72, .18, .72, [196, 84, 30], lit(IN * .9));
+      det.box(cx2, y0 + .42, Z + s2 * 9.8, .32, .62, .32, [228, 104, 40], lit(IN));
+      det.box(cx2, y0 + .52, Z + s2 * 9.8, .35, .14, .35, [232, 232, 232], lit(IN * 1.1));
+    }
+  }
+  // a ladder leaning on the back wall, and a gas-bottle rack
+  for (let k = 0; k < 9; k++)
+    det.box(X - HW + 1.5 + k * .10, y0 + .5 + k * .55, Z - 22, .60, .07, .07, ALU, lit(IN));
+  for (const s2 of [0, 1, 2, 3])
+    det.box(X - HW + 2.2, y0 + .78, Z + 27 - s2 * .55, .42, 1.56, .42,
+      s2 & 1 ? [58, 96, 78] : [64, 70, 78], lit(IN * .9));
+  return { shell: sh.done(), det: det.done() };
 }
 const HANGARMESH = buildHangar();
+
+/* ===== the stage =========================================================
+
+   The start screen is a PLACE, not a picture behind a menu. The card is
+   docked to one side so the shed is never behind it, the camera has three
+   shots — the whole bay, the aeroplane, the pilot — and the two things you
+   can change are the two things you can walk up to and touch. Everything
+   picked in the card is on the machine before the finger leaves the chip. */
+const STAGE = {
+  want: "wide", pos: null, look: null, fov: 1.05, init: false,
+  hover: null, glow: 0, glowWhat: null, cap: "", capT: 0, t: 0,
+  pick: { plane: null, pilot: null }, offX: 0, offY: 0, insetT: 0,
+  free: { x0: 0, y0: 0, x1: 1, y1: 1 }
+};
+/* Which way the pilot is standing is a framing decision as much as a
+   staging one: face them at the aeroplane and the camera that sees their
+   face is standing in the doorway, so every close-up is a silhouette
+   against a bright apron. Turned across the bay they read against the
+   north wall, still looking over the nose. */
+const PILOT_YAW = -2.55;
+STAGE.pilotFace = v3(Math.sin(PILOT_YAW), 0, Math.cos(PILOT_YAW));
+STAGE.pilotPos = () => v3(HANGAR.pos.x + 14.6, E + .05, HANGAR.pos.z + 6.0);
+/* Where the eye stands for each shot. Every one of them drifts a little:
+   a locked-off camera on a static model looks like a crash, not a hangar. */
+/* How far back the eye has to stand for something this wide and this tall to
+   fit in the part of the screen the card has left. Guessing a distance works
+   on exactly one screen; asking the frustum works on all of them. */
+function stageDist(fov, halfW, halfH, dmin, dmax) {
+  const F2 = (H * .5) / Math.tan(fov * .5), f = STAGE.free;
+  const hax = Math.max(Math.atan((f.x1 - f.x0) * .5 / F2), .06);
+  const hay = Math.max(Math.atan((f.y1 - f.y0) * .5 / F2), .06);
+  return clamp(Math.max(halfW / Math.tan(hax), halfH / Math.tan(hay)), dmin, dmax);
+}
+function stageShot(name, t) {
+  const P = HANGAR.pos;
+  if (name === "pilot") {
+    const fa = STAGE.pilotFace, hp = STAGE.pilotPos();
+    const rt = vnorm(vcross(v3(0, 1, 0), fa));
+    const d = stageDist(.60, .58, 1.14, 2.4, 7.5);
+    const sw = Math.sin(t * .42), c = v3(hp.x, E + .98, hp.z);
+    const off = .30 * d / 3;
+    return {
+      pos: v3(c.x + fa.x * d + rt.x * (off + sw * .10 * d),
+              c.y + .42 + Math.sin(t * .63) * .05,
+              c.z + fa.z * d + rt.z * (off + sw * .10 * d)),
+      look: c, fov: .60
+    };
+  }
+  if (name === "plane") {
+    /* Thirty-three metres of aeroplane in a fifty-eight metre shed: the shot
+       stands in the far corner of the bay, on the quarter, not in front of
+       the nose where it can only see the nose. */
+    const d = stageDist(.86, 15.8, 5.0, 24, 46);
+    const th = .62 + Math.sin(t * .15) * .06;
+    const c = v3(P.x + 6.0, E + 2.85, P.z);
+    return {
+      pos: v3(c.x + Math.cos(th) * d, E + 1.95 + Math.sin(t * .20) * .22, c.z + Math.sin(th) * d),
+      look: c, fov: .86
+    };
+  }
+  // the whole bay: the aeroplane and the pilot both inside whatever is left
+  const d = stageDist(1.02, 20.0, 6.4, 24, 46);
+  const th = (.30 + Math.sin(t * .09) * .10) * clamp((d < 40 ? 1 : .35), 0, 1);
+  const c = v3(P.x + 1.0, E + 2.70, P.z + 3.0);
+  return {
+    pos: v3(c.x + Math.cos(th) * d, E + 3.55 + Math.sin(t * .105) * .35, c.z + Math.sin(th) * d),
+    look: c, fov: 1.02
+  };
+}
+/* The card eats a side of the screen, so the picture is not centred on the
+   screen — it is centred on what is LEFT of the screen. Biasing the
+   projection centre moves the render and the hit tests together, which is
+   the only way the two can never disagree. */
+function stageInset() {
+  const menu = document.getElementById("menu");
+  const card = menu && !menu.classList.contains("hide") ? menu.querySelector(".card") : null;
+  const f = STAGE.free;
+  f.x0 = 0; f.y0 = 0; f.x1 = W; f.y1 = H;
+  if (!card) { STAGE.offX = 0; STAGE.offY = 0; return; }
+  const r = card.getBoundingClientRect(), cr = cv.getBoundingClientRect();
+  if (!cr.width || !cr.height) return;
+  const sx = W / cr.width, sy = H / cr.height;
+  if (r.width < cr.width - 40) {
+    f.x1 = clamp((r.left - cr.left) * sx, W * .25, W);
+    STAGE.offX = (f.x1 - W) * .5; STAGE.offY = 0;
+  } else {
+    f.y1 = clamp((r.top - cr.top) * sy, H * .18, H);
+    STAGE.offX = 0; STAGE.offY = (f.y1 - H) * .5;
+  }
+}
+function stageStep(dt) {
+  STAGE.t += dt;
+  STAGE.insetT -= dt;
+  if (STAGE.insetT <= 0) { stageInset(); STAGE.insetT = .25; }
+  const s = stageShot(STAGE.want, STAGE.t);
+  if (!STAGE.init) { STAGE.pos = s.pos; STAGE.look = s.look; STAGE.fov = s.fov; STAGE.init = true; }
+  const k = 2.6;
+  STAGE.pos = v3(approach(STAGE.pos.x, s.pos.x, k, dt), approach(STAGE.pos.y, s.pos.y, k, dt), approach(STAGE.pos.z, s.pos.z, k, dt));
+  STAGE.look = v3(approach(STAGE.look.x, s.look.x, k, dt), approach(STAGE.look.y, s.look.y, k, dt), approach(STAGE.look.z, s.look.z, k, dt));
+  STAGE.fov = approach(STAGE.fov, s.fov, k, dt);
+  if (STAGE.glow > 0) STAGE.glow = Math.max(0, STAGE.glow - dt * 1.5);
+  if (STAGE.capT > 0) STAGE.capT -= dt;
+  cam.pos = STAGE.pos;
+  const f2 = vnorm(vsub(STAGE.look, cam.pos));
+  const r2 = vnorm(vcross(v3(0, 1, 0), f2)), u2 = vcross(f2, r2);
+  cam.m[0] = r2.x; cam.m[1] = r2.y; cam.m[2] = r2.z;
+  cam.m[3] = u2.x; cam.m[4] = u2.y; cam.m[5] = u2.z;
+  cam.m[6] = f2.x; cam.m[7] = f2.y; cam.m[8] = f2.z;
+  CX = W * .5 + STAGE.offX; CY = H * .5 + STAGE.offY;
+  FOV = FOVBASE * STAGE.fov; F = (H * .5) / Math.tan(FOV * .5);
+}
+function stageBox(pts) {
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, n = 0;
+  for (const p of pts) {
+    const s = projectRaw(p);
+    if (!s) continue;
+    n++;
+    if (s.x < x0) x0 = s.x; if (s.y < y0) y0 = s.y;
+    if (s.x > x1) x1 = s.x; if (s.y > y1) y1 = s.y;
+  }
+  if (n < 4) return null;
+  x0 = Math.max(x0, -40); y0 = Math.max(y0, -40);
+  x1 = Math.min(x1, W + 40); y1 = Math.min(y1, H + 40);
+  if (x1 - x0 < 8 || y1 - y0 < 8) return null;
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+}
+function stagePickBoxes() {
+  const P = PLANE, m = P.m, o = P.pos, pts = [];
+  for (const sx of [-8.6, 8.6]) for (const sy of [-1.9, 3.2]) for (const sz of [-16.5, 16.5])
+    pts.push(vadd(o, mRot(m, v3(sx, sy, sz))));
+  STAGE.pick.plane = stageBox(pts);
+  const hp = STAGE.pilotPos(), pp = [];
+  for (const sx of [-.55, .55]) for (const sy of [.02, 1.80]) for (const sz of [-.55, .55])
+    pp.push(v3(hp.x + sx, E + sy, hp.z + sz));
+  STAGE.pick.pilot = stageBox(pp);
+}
+/* The pilot is small and stands in front of the aeroplane, so they are asked
+   first: the box that is inside the other box has to win or it can never be
+   hit at all. */
+function stageHit(x, y) {
+  if (STAGE.pick.pilot && inBox(STAGE.pick.pilot, x, y)) return "pilot";
+  if (STAGE.pick.plane && inBox(STAGE.pick.plane, x, y)) return "plane";
+  return null;
+}
+function stageFocus(what, quiet) {
+  const first = STAGE.want !== what;
+  STAGE.want = what;
+  STAGE.glow = 1; STAGE.glowWhat = what === "wide" ? null : what;
+  if (what !== "wide") {
+    STAGE.cap = what === "pilot"
+      ? (pilotName() ? pilotName() : "YOUR PILOT")
+      : LIVERIES[KIT.liv].name.toUpperCase();
+    STAGE.capLab = what === "pilot" ? "PILOT" : "LIVERY";
+    STAGE.capT = 3.2;
+  } else { STAGE.capT = 0; }
+  const id = what === "pilot" ? "secPilot" : what === "plane" ? "secPlane" : null;
+  if (id) {
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+      el.classList.remove("flash");
+      void el.offsetWidth;
+      el.classList.add("flash");
+      clearTimeout(STAGE.flashTO);
+      STAGE.flashTO = setTimeout(() => el.classList.remove("flash"), 1500);
+    }
+  }
+  if (!quiet && first) audio.beep(what === "wide" ? 440 : 720, .10, .06);
+}
+/* Corner brackets, the way a viewfinder marks what it has found. Quiet when
+   nothing is happening, bright under the finger, and gone once you are
+   standing in front of the thing. */
+function stageBracket(b, bright, label, sub) {
+  const u = UI, L = Math.min(b.w, b.h) * .26 + 6 * u, p = 6 * u;
+  const x0 = b.x - p, y0 = b.y - p, x1 = b.x + b.w + p, y1 = b.y + b.h + p;
+  ctx.save();
+  ctx.lineWidth = (bright ? 2.4 : 1.4) * u;
+  ctx.strokeStyle = bright ? "rgba(150,226,255,.95)" : "rgba(180,210,235,.42)";
+  ctx.shadowColor = "rgba(90,190,255,.7)"; ctx.shadowBlur = bright ? 14 * u : 0;
+  ctx.beginPath();
+  for (const [cx, cy, sx, sy] of [[x0, y0, 1, 1], [x1, y0, -1, 1], [x0, y1, 1, -1], [x1, y1, -1, -1]]) {
+    ctx.moveTo(cx + sx * L, cy); ctx.lineTo(cx, cy); ctx.lineTo(cx, cy + sy * L);
+  }
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  const F2 = STAGE.free;
+  const cx = clamp((x0 + x1) * .5, F2.x0 + 80 * u, F2.x1 - 80 * u);
+  let ty = y0 - 10 * u;
+  if (ty < F2.y0 + 26 * u) ty = y1 + 20 * u;
+  if (ty > F2.y1 - 14 * u) ty = F2.y1 - 14 * u;
+  hudFont(12 * u, 700);
+  const tw = Math.max(ctx.measureText(label).width, (hudFont(9.5 * u, 600), ctx.measureText(sub).width));
+  ctx.fillStyle = bright ? "rgba(10,22,34,.82)" : "rgba(8,16,24,.52)";
+  ctx.beginPath();
+  const bw = tw + 20 * u, bh = 30 * u, bx = cx - bw / 2, by = ty - 20 * u, rr = 7 * u;
+  ctx.moveTo(bx + rr, by); ctx.arcTo(bx + bw, by, bx + bw, by + bh, rr); ctx.arcTo(bx + bw, by + bh, bx, by + bh, rr);
+  ctx.arcTo(bx, by + bh, bx, by, rr); ctx.arcTo(bx, by, bx + bw, by, rr); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = bright ? "rgba(150,226,255,.6)" : "rgba(150,190,225,.22)";
+  ctx.lineWidth = 1 * u; ctx.stroke();
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  hudFont(12 * u, 700); ctx.fillStyle = bright ? "#eafaff" : "rgba(226,240,250,.80)";
+  ctx.fillText(label, cx, by + 11 * u);
+  hudFont(9.5 * u, 600); ctx.fillStyle = bright ? "rgba(150,226,255,.95)" : "rgba(168,192,212,.70)";
+  ctx.fillText(sub, cx, by + 22 * u);
+  ctx.restore();
+}
+function drawStage() {
+  if (GAME.started) return;
+  const u = UI, w = STAGE.want;
+  const SUBJ = [["plane", "THE AEROPLANE", "TAP TO CHANGE THE PAINT"],
+                ["pilot", "THE PILOT", "TAP TO CHANGE THE KIT"]];
+  for (const [k, label, sub] of SUBJ) {
+    if (w === k) continue;                       // you are already standing in front of it
+    const b = STAGE.pick[k];
+    if (!b) continue;
+    stageBracket(b, STAGE.hover === k, label, sub);
+  }
+  if (w !== "wide") {
+    // the caption for what you walked up to, and the way back out
+    const cx = (STAGE.free.x0 + STAGE.free.x1) * .5;
+    if (STAGE.capT > 0 && STAGE.cap) {
+      const al = clamp(STAGE.capT, 0, 1);
+      ctx.save(); ctx.globalAlpha = al;
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      hudFont(9.5 * u, 600); ctx.fillStyle = "rgba(150,226,255,.85)";
+      ctx.fillText(STAGE.capLab || (w === "pilot" ? "PILOT" : "LIVERY"), cx, STAGE.free.y0 + 22 * u);
+      hudFont(21 * u, 700); ctx.fillStyle = "#eafaff";
+      ctx.fillText(STAGE.cap, cx, STAGE.free.y0 + 42 * u);
+      ctx.restore();
+    }
+    hudFont(10 * u, 600);
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const hy = STAGE.free.y1 - 18 * u;
+    const hw2 = ctx.measureText("TAP ANYWHERE ELSE TO STEP BACK").width + 20 * u;
+    ctx.fillStyle = "rgba(8,16,24,.55)";
+    ctx.beginPath();
+    const hx2 = cx - hw2 / 2, hh2 = 20 * u, hr = 7 * u;
+    ctx.moveTo(hx2 + hr, hy - hh2 / 2); ctx.arcTo(hx2 + hw2, hy - hh2 / 2, hx2 + hw2, hy + hh2 / 2, hr);
+    ctx.arcTo(hx2 + hw2, hy + hh2 / 2, hx2, hy + hh2 / 2, hr); ctx.arcTo(hx2, hy + hh2 / 2, hx2, hy - hh2 / 2, hr);
+    ctx.arcTo(hx2, hy - hh2 / 2, hx2 + hw2, hy - hh2 / 2, hr); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "rgba(198,218,236,.88)";
+    ctx.fillText("TAP ANYWHERE ELSE TO STEP BACK", cx, hy);
+  }
+}
 
 function buildRing() {
   const mb = MB(), R = 240, t = 18, N = 22;
@@ -3241,6 +3825,13 @@ function drawCities() {
   /* The hand-built town gets its slice first and the generated one stands
      down wherever it stood something. */
   budget = drawTown(budget);
+  /* The far layer runs FIRST and out of its own allowance. Run last it got
+     nothing: the near lattice spends the shared budget on the ground under
+     the nose, which is correct for the near lattice and leaves every town on
+     the horizon undrawn — and the towns on the horizon are the whole reason
+     for climbing. They do not compete: one draws inside three and a half
+     kilometres and the other only outside it. */
+  drawTownsFar(Math.round(Q.q.buildings * Q.det * .9));
   const farmCap = Math.min(budget, Math.round(Q.q.buildings * .34));
   budget -= farmCap - drawFarms(farmCap);
   budget = drawUrban(budget);
@@ -3316,6 +3907,105 @@ const URB_BLOCK = [[168, 146, 126], [150, 128, 112], [176, 168, 156], [138, 132,
 const URB_TOWER = [[156, 172, 188], [132, 148, 168], [176, 186, 196], [120, 134, 152],
                    [166, 172, 178], [142, 158, 178], [150, 162, 174], [128, 144, 164]];
 const pickCol = (a, h) => a[Math.min(a.length - 1, (h * a.length) | 0)];
+let TOWNFAR = 0;                      // how many far-town blocks the last frame drew
+/* ---- towns from altitude ------------------------------------------------
+
+   The lattice stops working before the view does. Buildings are placed by
+   sampling a grid whose pitch doubles with height — sixty-four metres on the
+   deck, half a kilometre at seventeen thousand feet — and a town of four
+   thousand people is about a kilometre across. At that pitch the whole town
+   is two or three samples, the density thinning throws most of those away,
+   and what is left is nothing: from the Hohenwald flyover the entire county
+   was open farmland with name tags floating over it, which is not what
+   middle Tennessee looks like from a Mach 3 aeroplane and is not why anybody
+   climbs.
+
+   So above about five thousand feet the towns stop being sampled and start
+   being PLACED. Each one is stamped as a cluster of blocks inside its own
+   real radius, taller toward the middle, as many of them as it is worth on
+   the glass — which is what a town is from up there: a grey patch with
+   something standing up in the middle of it. Nearest first, until the budget
+   runs out, so the ones you are about to fly over are the ones that get
+   drawn. */
+/* The grey a town lays on the ground: a disc at its own radius, drawn just
+   above the terrain and shaded like everything else at that distance. */
+function townPatch(c, gy0, d) {
+  const cp = cam.pos, m = cam.m;
+  const N = clamp(Math.round(6 + F * c.r / Math.max(d, 1) * .06), 8, 22);
+  const pts = [];
+  let ok = 0;
+  for (let i = 0; i < N; i++) {
+    const a = i / N * TAU;
+    const px = c.x + Math.cos(a) * c.r * 1.05, pz = c.z + Math.sin(a) * c.r * 1.05;
+    const gy = terrainH(px, pz) + .8;
+    const rx = px - cp.x, rz = pz - cp.z, ry = gy - cp.y - curveDrop(rx, rz);
+    const vx = m[0] * rx + m[1] * ry + m[2] * rz, vy = m[3] * rx + m[4] * ry + m[5] * rz,
+      vz = m[6] * rx + m[7] * ry + m[8] * rz;
+    pts.push(vx, vy, vz);
+    if (vz >= NEAR) ok = 1;
+  }
+  if (!ok) return;
+  for (let i = 0; i < N * 3; i++) _vp[i] = pts[i];
+  const mm = clipProject(N);
+  if (mm < 3 || offscreen(mm)) return;
+  const dy = gy0 - cp.y, d3 = Math.hypot(c.x - cp.x, dy, c.z - cp.z) || 1;
+  const tone = 100 + clamp(Math.log10(Math.max(c.pop, .1)) * 9, -10, 26);
+  DL.poly(d + 240, _sp, mm,
+    aerial(litColor([tone, tone * .99, tone * .97], 0, 1, 0), d,
+      (c.x - cp.x) / d3, dy / d3, (c.z - cp.z) / d3), null, 0);
+}
+function drawTownsFar(budget) {
+  const cp = cam.pos, camY = cp.y;
+  if (budget <= 0 || camY < 1400 || camY > 40000 || !onPlanet()) return budget;
+  TOWNFAR = 0;
+  const reach = clamp(camY * 14 + 12000, 12000, 150000);
+  const near = [];
+  for (const c of CITIES) {
+    const dx = c.x - cp.x, dz = c.z - cp.z;
+    const d = Math.hypot(dx, dz);
+    if (d > reach || d < 3500) continue;            // the lattice owns the near ones
+    if (TWN.built && c.name === "Hohenwald" && camY < 16000) continue;
+    if (!inView(dx, dz, c.r * 1.7 + 1500)) continue;
+    // how wide it is on the glass; under a few pixels there is nothing to draw
+    const px = F * (c.r * 2) / Math.max(d, 1);
+    if (px < 7) continue;
+    near.push([d, c, px]);
+  }
+  near.sort((a, b) => a[0] - b[0]);
+  for (const [d, c, px] of near) {
+    if (budget <= 0) break;
+    const gy0 = terrainH(c.x, c.z);
+    if (gy0 < 3) continue;
+    /* The GROUND first. This is the part that actually makes a town legible
+       from five miles up, and it cannot come from the terrain shader: out
+       there the ground is drawn in cells two kilometres on a side and a town
+       is two kilometres across, so whether it tints at all depends on where
+       the cell centre happens to land. A patch of its own, at its own real
+       radius, is not a guess — and it is one polygon. */
+    townPatch(c, gy0, d);
+    let n = clamp(Math.round(Math.pow(c.pop, .46) * 8 * clamp(px / 160, .30, 1.8)), 5, 90);
+    n = Math.min(n, budget);
+    const coreH = clamp(9 + Math.pow(c.pop, .48) * 2.8, 9, 300);
+    const key = (c.x | 0) % 7919;
+    for (let k = 0; k < n; k++) {
+      const a1 = hashF(k * 7 + 3, key), a2 = hashF(k * 13 + 11, key + 31);
+      const a3 = hashF(k * 23 + 5, key + 77);
+      /* Square root of a uniform draw, so the blocks land evenly over the
+         AREA of the disc instead of piling into the middle of it. */
+      const rr = c.r * Math.sqrt(a1) * .95, th = a2 * TAU;
+      const bx = c.x + Math.cos(th) * rr, bz = c.z + Math.sin(th) * rr;
+      const gy = terrainH(bx, bz);
+      if (gy < 3) continue;
+      const cen = clamp(1 - rr / Math.max(c.r, 1), 0, 1);
+      const h = (7 + a3 * 13) * (.55 + cen * .9) + coreH * Math.pow(cen, 2.4) * (.3 + a1);
+      const w = 24 + a3 * 44;
+      const bd = Math.hypot(bx - cp.x, bz - cp.z);
+      boxOnGround(bx, gy, bz, w, h, w * (.68 + a2 * .55), pickCol(URB_BLOCK, a1), bd);
+      budget--; TOWNFAR++;
+    }
+  }
+  return budget;
+}
 function drawUrban(budget) {
   const camX = cam.pos.x, camZ = cam.pos.z, camY = cam.pos.y;
   if (budget <= 0 || camY > 30000) return budget;
@@ -3329,6 +4019,15 @@ function drawUrban(budget) {
   const PITCH = 64 * (1 << lvl);
   // a phone draws a smaller circle of it, which costs less than drawing the
   // same circle worse
+  /* How far out towns are drawn at all. Twenty-six kilometres is right over
+     a city, where the budget runs out inside two of them, and wrong at
+     seventeen thousand feet over open country, where you can see a hundred
+     and the nearest town is thirty away — the whole county read as empty
+     farmland with name tags floating on it. It rises with the same power of
+     two the block pitch does, so the reach and the spacing stay in step, and
+     the BUDGET is what decides how many get drawn either way: a wider reach
+     spreads the same seventeen hundred boxes over the country instead of
+     piling them on the field under the nose. */
   const reach = Math.min(2700 * (1 << lvl), 26000) * (Q.q.buildings < 700 ? .74 : 1);
   const fx = cam.m[6], fz = cam.m[8];
   const cell = (i, j) => {
@@ -3729,7 +4428,7 @@ const twnHas = (x, z) => TWN.built && Math.abs(x - TWN.x) < 2900 && Math.abs(z -
    kerb never covers a wall. */
 function drawTownStreets() {
   const cp = cam.pos, m = cam.m;
-  const reach = clamp(cp.y * 9 + 3000, 3000, 26000);
+  const reach = clamp(cp.y * 11 + 3000, 3000, 40000);
   for (const [cls, wid, q] of TWN.streets) {
     for (let i = 0; i + 3 < q.length; i += 2) {
       const ax = q[i], az = q[i + 1], bx = q[i + 2], bz = q[i + 3];
@@ -3800,7 +4499,7 @@ function drawTown(budget) {
   const cp = cam.pos;
   if (Math.hypot(cp.x - TWN.x, cp.z - TWN.z) > TWN.R + 4000) return budget;
   twnInit();
-  if (cp.y > 9000) return budget;
+  if (cp.y > 16000) return budget;
   drawTownStreets();
   /* The town has its OWN allowance and does not take from the shared one.
      That looks like cheating and is not: nothing else is drawing here — the
@@ -3810,9 +4509,17 @@ function drawTown(budget) {
      has already returned. */
   let tb = Math.round(Q.q.buildings * Q.det * 2.0);
   const C = TWN.cell;
-  const reach = clamp(2400 + cp.y * 3.2, 2400, 12000);
-  const ci = Math.floor((cp.x - TWN.minX) / C), cj = Math.floor((cp.z - TWN.minZ) / C);
-  const RN = Math.ceil(reach / C);
+  const reach = clamp(2400 + cp.y * 4.2, 2400, 26000);
+  /* The rings expand from the camera's cell — CLAMPED INTO THE GRID, which
+     is the whole of it. Twenty kilometres out to the north the camera's cell
+     index is eighty-odd cells off the end of the array, and a ring scan
+     bounded by the size of the town then never reaches the town: from the
+     flyover start, nineteen kilometres away and well inside the draw
+     distance, Hohenwald was not drawn at all. Clamped, the rings start at the
+     nearest corner of it and sweep across. */
+  const ci = clamp(Math.floor((cp.x - TWN.minX) / C), -1, TWN.nx),
+    cj = clamp(Math.floor((cp.z - TWN.minZ) / C), -1, TWN.nz);
+  const RN = Math.min(Math.ceil(reach / C), TWN.nx + TWN.nz + 4);
   const one = (i, j) => {
     if (i < 0 || j < 0 || i >= TWN.nx || j >= TWN.nz || tb <= 0) return;
     const cellArr = TWN.grid[j * TWN.nx + i];
@@ -4516,6 +5223,7 @@ function resetPlane(scen) {
   SPD.on = false; SPD.auto = false; SPD.tgt = 0; SPD.ramp = 0;
   WARP.on = false; WARP.t = 0; WARP.cool = 0; WARP.flash = 0; WARP.fade = 0; WARP.spd = 0;
   ARRIVE.on = false; ARRIVE.t = 0; ARRIVE.body = null;
+  LOOK.yaw = 0; LOOK.pitch = 0; LOOK.tap = 0;
   P.vel = v3(); P.w = v3(); P.thr = 0; P.dE = P.dA = P.dR = 0;
   P.inE = P.inA = P.inR = 0; P.trim = 0; P.flap = P.flapCmd = 0;
   P.crashed = false; P.crashT = 0; P.stall = 0; P.hardLand = 0; P.touched = 0; P.pitchI = 0; P.holdHdg = undefined;
@@ -6214,6 +6922,57 @@ const CAMNAMES = ["CHASE", "COCKPIT", "ORBIT", "WING", "TOWER"];
 // the same five, short enough for the legend on a pushbutton
 const CAMSHORT = ["CHASE", "CKPIT", "ORBIT", "WING", "TOWER"];
 let orbitA = 0;
+/* ===== free look =========================================================
+
+   The camera was bolted to the aeroplane: whatever it was pointed at, that
+   was the view. Now it is not. Drag anywhere that is not a control and the
+   view swings — out of the cockpit it orbits the machine, so you can look at
+   your own aeroplane from any angle it has; inside it, it turns your head.
+   Double-tap the same place and it goes back to the nose.
+
+   It does not spring back on its own. A view that creeps back to centre
+   while you are looking at something is a view you are fighting, and the
+   double tap is there so nothing has to be fought. */
+const LOOK = { yaw: 0, pitch: 0, tap: 0, tx: 0, ty: 0 };
+const LOOK_P = 1.20;                  // how far up and down, in radians
+function lookRecentre() {
+  if (!LOOK.yaw && !LOOK.pitch) return;
+  LOOK.yaw = 0; LOOK.pitch = 0;
+  toast("VIEW \u00b7 ON THE NOSE", 1.1);
+  audio.beep(660, .09, .07);
+}
+const looking = () => Math.abs(LOOK.yaw) > 1e-4 || Math.abs(LOOK.pitch) > 1e-4;
+/* In the cockpit the head turns: the camera keeps its place and its basis is
+   rotated in its OWN frame, yaw first and then pitch, which is what a neck
+   does. Outside, the camera orbits the aeroplane and keeps looking at it,
+   because the thing you want to see from out there is the aeroplane. */
+function applyLook() {
+  if (!looking()) return;
+  const P = PLANE;
+  if (camMode === 1) {
+    cam.m = mmul(cam.m, mmul(mAxis(0, 1, 0, LOOK.yaw), mAxis(1, 0, 0, LOOK.pitch)));
+    return;
+  }
+  const off = vsub(cam.pos, P.pos);
+  const ol = vlen(off) || 1;
+  const u0 = v3(off.x / ol, off.y / ol, off.z / ol);
+  let rt = vcross(v3(0, 1, 0), u0);
+  if (vlen(rt) < 1e-5) rt = vcross(v3(0, 0, 1), u0);
+  rt = vnorm(rt);
+  const no = mRot(mmul(mAxis(rt.x, rt.y, rt.z, LOOK.pitch), mAxis(0, 1, 0, LOOK.yaw)), off);
+  cam.pos = vadd(P.pos, no);
+  const gh = groundH(cam.pos.x, cam.pos.z) + 3;
+  if (cam.pos.y < gh) cam.pos.y = gh;
+  const f = vnorm(vsub(P.pos, cam.pos));
+  let r2 = vcross(v3(0, 1, 0), f);
+  if (vlen(r2) < 1e-5) r2 = vcross(v3(0, 0, 1), f);
+  r2 = vnorm(r2);
+  const u2 = vcross(f, r2);
+  const cm = cam.m;
+  cm[0] = r2.x; cm[1] = r2.y; cm[2] = r2.z;
+  cm[3] = u2.x; cm[4] = u2.y; cm[5] = u2.z;
+  cm[6] = f.x; cm[7] = f.y; cm[8] = f.z;
+}
 function updateCamera(dt) {
   const P = PLANE, m = P.m;
   if (ARRIVE.on && ARRIVE.body && !P.crashed) { arriveCamera(); return; }
@@ -6224,6 +6983,7 @@ function updateCamera(dt) {
     cam.pos = want;
     cam.m = qMat(P.q, cam.m);
     FOV = FOVBASE * 1.16; F = (H * .5) / Math.tan(FOV * .5);
+    applyLook();
     return;
   }
   FOV = FOVBASE; F = (H * .5) / Math.tan(FOV * .5);
@@ -6268,6 +7028,7 @@ function updateCamera(dt) {
   cam.m[0] = r2.x; cam.m[1] = r2.y; cam.m[2] = r2.z;
   cam.m[3] = u2.x; cam.m[4] = u2.y; cam.m[5] = u2.z;
   cam.m[6] = f2.x; cam.m[7] = f2.y; cam.m[8] = f2.z;
+  applyLook();
   if (sh > .001) {
     /* A rumble, not a strobe. A fresh random number every frame is white
        noise at whatever the frame rate happens to be, which reads as the
@@ -6285,7 +7046,7 @@ function updateCamera(dt) {
 }
 
 /* ======================================================= draw aircraft == */
-function drawAircraft() {
+function drawAircraft(hi) {
   const P = PLANE, Rb = P.m, pos = P.pos;
   const external = camMode !== 1;
   const ail = P.dA * 20 * DEG, ele = P.dE * 22 * DEG, rud = P.dR * 22 * DEG, fl = P.flap * 28 * DEG;
@@ -6299,8 +7060,10 @@ function drawAircraft() {
      around heat 1.25; it now runs all the way to the blue-white of a shock
      layer, because there is now somewhere past 1.25 to go. */
   const heat = P.heat || 0;
-  const glow = heat > .22 ? plasmaColor(heat) : null;
-  const gk = glow ? clamp((heat - .22) * .62, 0, .94) : 0;
+  let glow = heat > .22 ? plasmaColor(heat) : null;
+  let gk = glow ? clamp((heat - .22) * .62, 0, .94) : 0;
+  // a cold highlight, for the hangar: this is the thing you just changed
+  if (!glow && hi > .01) { glow = [150, 226, 255]; gk = hi; }
   if (external) {
     drawMesh(AC.fuse, pos, Rb, null, glow, undefined, gk);
     drawMesh(AC.chine, pos, Rb, null, glow, undefined, gk);
@@ -8516,15 +9279,15 @@ const LOG_KEY = "skyward.log.v1";
    The number is the point: it is the thing you can quote back when something
    is wrong, and the list under it is what to go and look at. */
 const BUILD = {
-  no: 33,
-  name: "HOHENWALD, FOR REAL",
+  no: 34,
+  name: "LOOK AROUND, WALK UP",
   date: "30 SEP 2026",
   notes: [
-    ["HOHENWALD", "The town is a hand-built model of the real one out to ten miles: Main Street and Park Avenue crossing at the square, the courthouse, the brick storefronts, the residential grid, the schools and their ball fields, the water tower, the industrial sheds on the south side and the highways running out to Columbia, Centerville, Summertown, Waynesboro and Linden."],
-    ["PLANETS", "Saturn has rings from close up, every world with air has a lit limb against the black, and the ground you arrive over is the ground you can land on."],
-    ["ARRIVAL", "Coming out of a jump is now a thirty-second arrival: the camera holds the world while the card gives you its size, its gravity, its day and how far from home you are. Any control skips it."],
-    ["HANGAR", "The start screen is a hangar with the aeroplane in it. Pick a livery, pick a pilot, put your name on it — and it is your name on the HUD from then on."],
-    ["THIS CARD", "Shown once per build. The number in the corner is the build."]
+    ["LOOK AROUND", "Drag the picture anywhere off the panel and the view comes off the nose \u2014 in the cockpit the head turns, outside the camera swings round the aeroplane. Double-tap the same spot and it snaps back. A little rose at the bottom says how far off you are."],
+    ["THE HANGAR", "Rebuilt: a ribbed steel shed on open-web trusses, roof lights, high-bay lamps with pools of light on a concrete floor that has joints, stains, walkway lines and hazard chevrons across the threshold, and a workshop down the back wall."],
+    ["THE PILOT", "Rebuilt too, out of round limbs instead of boxes: a pressure suit with a harness over it, a helmet with a wrapped visor, a mask and a hose. Your name is on the chest."],
+    ["WALK UP TO IT", "The start screen is a place you can point at. The menu is docked to one side so the shed is never behind it, and tapping the aeroplane or the pilot walks the camera up to them. Tap the floor to step back."],
+    ["RENDER DISTANCE", "Towns read from the Hohenwald flyover altitude now instead of appearing under the nose, and the right-hand console sits hard against the edge of the screen."]
   ]
 };
 const NEWS_KEY = "skyward.build";
@@ -8775,6 +9538,17 @@ function layoutTouch() {
   const tw = 54 * u, gp = 9 * u;
   let hLev = 124 * u;
   const hPush = 46 * u, hTog = 62 * u, hPad = 46 * u;
+  /* Both consoles hard against their own edge.
+
+     The left one already was. The right one was not, and the reason was the
+     throttle: it sat in the last fifty pixels of glass and everything else
+     was pushed inboard of it, so the switches you actually look at ended up
+     floating a finger's width off the edge while the slider owned the rim.
+     That is backwards. The RIM is where a thumb rests without being told to,
+     so the rim gets the switches, and the throttle moves one column inboard
+     — still under the same hand, still the tallest thing on that side, and
+     no longer the only thing touching the edge. */
+  const RE = W - sr - 6 * u;                    // the hard right edge
   let th, LX, LB, RX, RB, cwL, cwR, stack;
   if (PORTRAIT) {
     /* Portrait has no width to spare, so BOTH consoles are a single column
@@ -8783,19 +9557,19 @@ function layoutTouch() {
        right put their inboard edge five per cent past the centre of the
        screen, which is exactly where the aeroplane is drawn. */
     th = Math.min(H * .30, 300 * u);
-    T.thr.x = W - sr - tw - 6 * u;
-    T.thr.y = H - sb - th - 16 * u;
     cwL = 62 * u; cwR = 62 * u; stack = 1; hLev = 106 * u;
     LX = sl + 6 * u;
-    RX = T.thr.x - 8 * u - cwR;
+    RX = RE - cwR;                              // switches on the rim
+    T.thr.x = RX - 8 * u - tw;                  // throttle one column inboard
+    T.thr.y = H - sb - th - 16 * u;
     LB = RB = T.thr.y - 14 * u;
   } else {
     th = Math.min(H * .54, 330 * u);
-    T.thr.x = W - sr - tw - 6 * u;
-    T.thr.y = H - sb - th - 16 * u;
     cwL = 62 * u; cwR = 62 * u; stack = 0;
     LX = sl + 6 * u;
-    RX = T.thr.x - 8 * u - (cwR * 3 + gp * 2);
+    RX = RE - (cwR * 3 + gp * 2);               // the three columns on the rim
+    T.thr.x = RX - 8 * u - tw;                  // throttle one column inboard
+    T.thr.y = H - sb - th - 16 * u;
     RB = H - sb - 16 * u;
     // the left console sits under the instruments on a phone, where the thumb
     // stick owns the bottom corner, and in the bottom corner on a desktop
@@ -8891,7 +9665,7 @@ function touchAct(k) {
   // clamps at full, like the F key. It used to wrap back to 0%, so one extra
   // tap on a control marked FLAP-DOWN dumped the whole configuration on short final.
   else if (k === "flap") { P.flapCmd = clamp(P.flapCmd + .25, 0, 1); toast("FLAPS " + Math.round(P.flapCmd * 100) + "%", 1); }
-  else if (k === "cam") { camMode = (camMode + 1) % CAMNAMES.length; toast("CAMERA: " + CAMNAMES[camMode], 1.2); }
+  else if (k === "cam") { camMode = (camMode + 1) % CAMNAMES.length; LOOK.yaw = 0; LOOK.pitch = 0; toast("CAMERA: " + CAMNAMES[camMode], 1.2); }
   else if (k === "map") { NAV.map = !NAV.map; audio.beep(NAV.map ? 700 : 430, .12, .1); }
   else if (k === "spd") toggleSpeedHold();
   else if (k === "ap") toggleAP();
@@ -8905,7 +9679,16 @@ function touchAct(k) {
 }
 function touchDown(id, x, y, isTouch) {
   const T = TOUCH;
-  if (!GAME.started || GAME.paused) return false;
+  /* On the start screen the picture IS the interface: the aeroplane and the
+     pilot are buttons, and the floor is the way back out. */
+  if (!GAME.started) {
+    if (GAME.paused) return false;
+    audio.init();
+    const hit = stageHit(x, y);
+    stageFocus(hit || "wide");
+    return true;
+  }
+  if (GAME.paused) return false;
   if (SHOWKEYS) { SHOWKEYS = false; return true; }
   /* The map is a full-screen modal. Anything pressed on it is a map press,
      and anything pressed OFF a chip is swallowed rather than handed to the
@@ -8945,7 +9728,20 @@ function touchDown(id, x, y, isTouch) {
     T.ptr.set(id, { kind: "stick" });
     return true;
   }
-  return false;
+  /* Nothing on the panel wanted this pointer, so it is a look. Drag the bare
+     picture and the view swings off the nose; tap the same spot twice and it
+     snaps back. With the mouse stick flying the aeroplane the mouse is the
+     stick, so it cannot also be the neck. */
+  if (!isTouch && mouseStick) return false;
+  const tn = performance.now();
+  if (tn - LOOK.tap < 340 && Math.hypot(x - LOOK.tx, y - LOOK.ty) < 70 * UI) {
+    LOOK.tap = 0;
+    if (looking()) lookRecentre(); else toast("DRAG TO LOOK AROUND", 1.2);
+    return true;
+  }
+  LOOK.tap = tn; LOOK.tx = x; LOOK.ty = y;
+  T.ptr.set(id, { kind: "look", x, y, moved: 0 });
+  return true;
 }
 function touchThrottle(y) {
   const T = TOUCH.thr;
@@ -8966,6 +9762,16 @@ function touchMove(id, x, y) {
     if (!inBox(e.b, x, y)) { TOUCH.rud.v = 0; TOUCH.ptr.delete(id); }
   } else if (e.kind === "btn" && e.b.hold) {
     if (!inBox(e.b, x, y)) { TOUCH.flash[e.b.k] = 0; TOUCH.ptr.delete(id); }
+  } else if (e.kind === "look") {
+    const dx = x - e.x, dy = y - e.y;
+    e.x = x; e.y = y; e.moved += Math.abs(dx) + Math.abs(dy);
+    // one screen width is a little over half a turn, which is about right for
+    // a thumb and not so fast that a mouse flick loses the aeroplane
+    const g = 2.0 / Math.max(W, 1);
+    LOOK.yaw += dx * g * 1.9;
+    if (LOOK.yaw > Math.PI) LOOK.yaw -= Math.PI * 2;
+    if (LOOK.yaw < -Math.PI) LOOK.yaw += Math.PI * 2;
+    LOOK.pitch = clamp(LOOK.pitch + dy * g * 1.5, -LOOK_P, LOOK_P);
   }
   return true;
 }
@@ -8976,6 +9782,7 @@ function touchUp(id) {
   else if (e.kind === "thr") TOUCH.thr.id = null;
   else if (e.kind === "rud") TOUCH.rud.v = 0;
   else if (e.kind === "btn" && e.b.hold) TOUCH.flash[e.b.k] = 0;
+  else if (e.kind === "look" && e.moved > 14 * UI) LOOK.tap = 0;
   TOUCH.ptr.delete(id);
 }
 function canvasXY(ev) {
@@ -8994,6 +9801,12 @@ cv.addEventListener("pointerdown", ev => {
 }, { passive: false });
 cv.addEventListener("pointermove", ev => {
   const [x, y] = canvasXY(ev);
+  if (!GAME.started && !GAME.paused) {
+    const h = stageHit(x, y);
+    if (h !== STAGE.hover) { STAGE.hover = h; cv.style.cursor = h ? "pointer" : ""; }
+    return;
+  }
+  if (STAGE.hover) { STAGE.hover = null; cv.style.cursor = ""; }
   if (touchMove(ev.pointerId, x, y)) ev.preventDefault();
 }, { passive: false });
 for (const t of ["pointerup", "pointercancel"])
@@ -9195,7 +10008,50 @@ function drawTouch(dt) {
   if (TOUCH.on) drawStick();
   drawPanel(P, u);
   ctx.restore();
+  drawLookTag();
   if (SHOWKEYS) drawKeyCard();
+}
+/* A view that is not on the nose has to SAY it is not on the nose, or the
+   first thing the pilot does is fight the aeroplane to bring a horizon back
+   that was never crooked. A little compass rose with the nose marked, the
+   angle in degrees, and the way out of it. */
+function drawLookTag() {
+  if (!looking() || NAV.map || GAME.paused) return;
+  const u = UI, r = 13 * u, cx = W * .5, cy = H - 34 * u;
+  const yaw = LOOK.yaw, pit = LOOK.pitch;
+  const deg = Math.round(Math.abs(yaw) / DEG);
+  const pdeg = Math.round(Math.abs(pit) / DEG);
+  let txt = deg ? deg + "\u00b0 " + (yaw > 0 ? "R" : "L") : "";
+  if (pdeg) txt += (txt ? "  " : "") + pdeg + "\u00b0 " + (pit > 0 ? "DN" : "UP");
+  hudFont(12 * u, 700);
+  const tw = ctx.measureText(txt).width;
+  hudFont(10 * u, 600);
+  const hw = ctx.measureText("DOUBLE-TAP TO CENTRE").width;
+  const w = r * 2 + 12 * u + Math.max(tw, hw) + 20 * u, h = 34 * u;
+  const x = cx - w / 2, y = cy - h / 2;
+  ctx.save();
+  ctx.beginPath();
+  const rr = 8 * u;
+  ctx.moveTo(x + rr, y); ctx.arcTo(x + w, y, x + w, y + h, rr); ctx.arcTo(x + w, y + h, x, y + h, rr);
+  ctx.arcTo(x, y + h, x, y, rr); ctx.arcTo(x, y, x + w, y, rr); ctx.closePath();
+  ctx.fillStyle = "rgba(8,16,24,.44)"; ctx.fill();
+  ctx.strokeStyle = "rgba(150,226,255,.42)"; ctx.lineWidth = 1.2 * u; ctx.stroke();
+  // the rose: the ring is the aeroplane, the wedge is where you are looking
+  const ox = x + 10 * u + r, oy = y + h / 2;
+  ctx.beginPath(); ctx.arc(ox, oy, r, 0, TAU);
+  ctx.strokeStyle = "rgba(160,200,230,.45)"; ctx.lineWidth = 1.2 * u; ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(ox, oy - r - 3 * u); ctx.lineTo(ox - 3 * u, oy - r + 2 * u); ctx.lineTo(ox + 3 * u, oy - r + 2 * u);
+  ctx.closePath(); ctx.fillStyle = "rgba(190,214,232,.85)"; ctx.fill();   // the nose
+  ctx.beginPath(); ctx.moveTo(ox, oy);
+  ctx.arc(ox, oy, r - 2 * u, -Math.PI / 2 + yaw - .26, -Math.PI / 2 + yaw + .26);
+  ctx.closePath(); ctx.fillStyle = "rgba(150,226,255,.80)"; ctx.fill();
+  ctx.textAlign = "left"; ctx.textBaseline = "middle";
+  const tx = ox + r + 10 * u;
+  hudFont(12 * u, 700); ctx.fillStyle = "#eafaff";
+  ctx.fillText(txt || "OFF THE NOSE", tx, oy - 7 * u);
+  hudFont(10 * u, 600); ctx.fillStyle = "rgba(190,214,232,.80)";
+  ctx.fillText("DOUBLE-TAP TO CENTRE", tx, oy + 7 * u);
+  ctx.restore();
 }
 function drawStick() {
   const T = TOUCH, u = UI;
@@ -9972,6 +10828,8 @@ const KEYCARD = [
   ["Autopilot", "Z   it flies, you steer", "A/P switch, or FLY IT"],
   ["Under the A/P", "the stick asks for bank and climb; let go and it holds", "same"],
   ["Speed hold", "O", "HOLD button"],
+  ["Look around", "drag the picture, anywhere off the panel", "drag the picture"],
+  ["Back on the nose", "double-tap the same spot", "double-tap"],
   ["Nav target", "J   cycles Moon / planets / Sun", "tap a world on the map"],
   ["Solar system map", "N", "MAP button"],
   ["Jump", "E   opens a corridor to the nav target", "the JUMP chip on the map"],
@@ -10075,6 +10933,12 @@ function swatches(el, list, key) {
     s[0] + "\"><i>" + s[0] + "</i></button>").join("");
   el.querySelectorAll(".chip").forEach(btn => btn.addEventListener("click", () => {
     KIT[key] = +btn.dataset.i; kitSave(); rebuildAircraft(); swatches(el, list, key);
+    if (!GAME.started) {
+      stageFocus(key === "trim" ? "plane" : "pilot", true);
+      STAGE.cap = list[KIT[key]][0].toUpperCase();
+      STAGE.capLab = key.toUpperCase() === "HELM" ? "HELMET" : key.toUpperCase();
+      STAGE.capT = 2.4;
+    }
   }));
 }
 function fillLiveries() {
@@ -10084,6 +10948,7 @@ function fillLiveries() {
     L.name + "</b><i>" + L.note + "</i></button>").join("");
   el.querySelectorAll(".opt").forEach(btn => btn.addEventListener("click", () => {
     KIT.liv = +btn.dataset.i; kitSave(); rebuildAircraft(); fillLiveries();
+    if (!GAME.started) stageFocus("plane", true);
   }));
 }
 fillLiveries();
@@ -10127,6 +10992,8 @@ function showTouchHelp() {
     "fly the autopilot, hold the speed and arm safe mode, and the lit buttons are the map, the " +
     "view, this card and reset.<br>" +
     "Rudder pads sit along the bottom.<br>" +
+    "<b>Look around</b> &mdash; drag the picture anywhere that is not a control and the view comes " +
+    "off the nose. <b>Double-tap</b> the same spot to put it back.<br>" +
     "<b>The map</b> (MAP button) is how you travel: tap a world, then <b>JUMP</b> &mdash; a few " +
     "seconds of corridor and you arrive in orbit around it. <b>STOP</b> next to it kills the " +
     "speed from any speed at all, and <b>FLY IT</b> hands the trip to the autopilot instead.<br>" +
@@ -10156,7 +11023,7 @@ function onKeyPress(k) {
   if (lk === "h") { togglePause(); return; }
   if (GAME.paused) return;
   if (ARRIVE.on) arriveEnd();
-  if (lk === "c") { camMode = (camMode + 1) % CAMNAMES.length; toast("CAMERA: " + CAMNAMES[camMode], 1.2); }
+  if (lk === "c") { camMode = (camMode + 1) % CAMNAMES.length; LOOK.yaw = 0; LOOK.pitch = 0; toast("CAMERA: " + CAMNAMES[camMode], 1.2); }
   if (lk === "r") { startFlight(); }
   if (lk === "k") { toggleSafe(); }
   if (lk === "g") {
@@ -10331,6 +11198,7 @@ function frame(now) {
   if (!isFinite(dt) || dt < 0) dt = .016;
   dt = Math.min(dt, .066);
   fps = lerp(fps, 1 / Math.max(dt, .001), .06);
+  CX = W * .5; CY = H * .5;        // the stage biases this; nothing else does
 
   if (GAME.started && !GAME.paused) {
     WIND.t += dt;
@@ -10387,16 +11255,7 @@ function frame(now) {
     /* The camera stays INSIDE. The shed is seventy-eight metres across and
        an orbit of forty puts the eye in the wall, which is a grey rectangle
        and not a start screen. */
-    const a = now * .00009;
-    cam.pos = v3(HANGAR.x + 20 + Math.sin(a * .62) * 3.2,
-                 E + 2.9 + Math.sin(a * 1.15) * .55,
-                 HANGAR.z + Math.sin(a) * 15);
-    const look = v3(HANGAR.pos.x + 6, E + 3.5, HANGAR.pos.z);
-    const f2 = vnorm(vsub(look, cam.pos)), r2 = vnorm(vcross(v3(0, 1, 0), f2)), u2 = vcross(f2, r2);
-    cam.m[0] = r2.x; cam.m[1] = r2.y; cam.m[2] = r2.z;
-    cam.m[3] = u2.x; cam.m[4] = u2.y; cam.m[5] = u2.z;
-    cam.m[6] = f2.x; cam.m[7] = f2.y; cam.m[8] = f2.z;
-    FOV = FOVBASE * 1.05; F = (H * .5) / Math.tan(FOV * .5);
+    stageStep(dt);
   }
 
   // ---- render ----
@@ -10413,8 +11272,13 @@ function frame(now) {
   // view all the way to the Moon if you climbed straight up off the runway
   if (onPlanet() && Math.hypot(cam.pos.x, cam.pos.z) < 40000) {
     drawMesh(AIRPORT, v3(0, 0, 0), mIdent(), null);
-    if (Math.hypot(cam.pos.x - HANGAR.x, cam.pos.z - HANGAR.z) < 3200)
-      drawMesh(HANGARMESH, v3(0, 0, 0), mIdent(), null);
+    const hd = Math.hypot(cam.pos.x - HANGAR.x, cam.pos.z - HANGAR.z);
+    if (hd < 3200) {
+      drawMesh(HANGARMESH.shell, v3(0, 0, 0), mIdent(), null);
+      // the stair, the bowser, the chest, the drums: only from close enough
+      // to read them, which from the taxiway at 300 kt you are not
+      if (!GAME.started || hd < 260) drawMesh(HANGARMESH.det, v3(0, 0, 0), mIdent(), null);
+    }
   }
   /* On the start screen the camera is INSIDE a steel shed looking at the
      back wall of it. Every tree, town, lake and road in the county is behind
@@ -10432,10 +11296,15 @@ function frame(now) {
   if (GAME.started) { drawShadow(); drawAircraft(); }
   else if (PILOTMESH) {
     /* In the hangar only: the aeroplane, and the pilot standing at the nose
-       looking at it, which is what a pilot does. */
-    drawAircraft();
-    drawMesh(PILOTMESH, v3(HANGAR.pos.x + 15.5, E + .05, HANGAR.pos.z + 4.6),
-      mAxis(0, 1, 0, -2.25), null);
+       looking at it, which is what a pilot does. A change made in the card
+       lights the thing that changed for a moment, so the eye is taken to it
+       instead of hunting for what moved. */
+    const gw = STAGE.glow, gk = gw > 0 ? gw * .30 : 0;
+    drawAircraft(STAGE.glowWhat === "plane" ? gk : 0);
+    drawMesh(PILOTMESH, STAGE.pilotPos(), mAxis(0, 1, 0, PILOT_YAW), null,
+      STAGE.glowWhat === "pilot" && gk > .01 ? [150, 226, 255] : null, undefined,
+      STAGE.glowWhat === "pilot" ? gk : 0);
+    stagePickBoxes();
   }
   drawParts();
   drawClouds();
@@ -10445,6 +11314,7 @@ function frame(now) {
   drawGlare();
   if (Q.q.vig && vignette) { ctx.fillStyle = vignette; ctx.fillRect(0, 0, W, H); }
   drawWarpFX();
+  drawStage();
   // the nav marker is exactly where the jump read-out is, so it stands down
   if (GAME.started && !GAME.paused) {
     drawGEffect(PLANE);
