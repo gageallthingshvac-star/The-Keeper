@@ -68,6 +68,36 @@
     .go{padding:16px;font-size:14px;margin-top:14px}
     .foot{font-size:10px}
   }
+  .newscard{width:min(660px,96vw)}
+  .newshead{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+  .newsno{font-size:44px;font-weight:700;letter-spacing:.02em;color:var(--accent);
+    line-height:.9;opacity:.55;text-shadow:0 0 30px rgba(111,211,255,.35)}
+  .newsno::before{content:"UPDATE";display:block;font-size:10px;letter-spacing:.24em;
+    color:var(--dim);opacity:.9;margin-bottom:4px;text-shadow:none;font-weight:600}
+  #newsList{display:flex;flex-direction:column;gap:9px;margin-top:6px}
+  .nitem{display:flex;gap:11px;align-items:flex-start;background:rgba(255,255,255,.035);
+    border:1px solid var(--edge);border-radius:9px;padding:10px 12px}
+  .nitem s{text-decoration:none;color:var(--accent);font-size:10px;letter-spacing:.16em;
+    font-weight:700;padding-top:2px;min-width:74px}
+  .nitem div{font-size:12px;line-height:1.5;color:var(--ink)}
+  .nitem div em{font-style:normal;color:var(--dim)}
+  .sw{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:18px}
+  .swrow .sw{margin-bottom:0}
+  .chip{width:34px;height:34px;border-radius:9px;border:2px solid rgba(255,255,255,.18);
+    cursor:pointer;padding:0;position:relative;transition:transform .1s,border-color .12s}
+  .chip:hover{transform:translateY(-2px)}
+  .chip.on{border-color:var(--accent);box-shadow:0 0 0 2px rgba(111,211,255,.28)}
+  .chip i{position:absolute;left:0;right:0;bottom:-15px;font-style:normal;font-size:8px;
+    letter-spacing:.08em;color:var(--dim);text-align:center;white-space:nowrap;opacity:0}
+  .chip.on i{opacity:1}
+  .swrow{display:flex;align-items:center;gap:14px;margin:4px 0 16px}
+  .swrow>b{font-size:10px;letter-spacing:.18em;color:var(--dim);min-width:62px;font-weight:600}
+  .pilotgrid{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+  .fld{flex:1 1 220px;display:block}
+  .fld span{display:block;font-size:10px;letter-spacing:.18em;color:var(--dim);margin-bottom:5px}
+  .fld input{width:100%;font:inherit;font-size:14px;letter-spacing:.06em;color:var(--ink);
+    background:rgba(255,255,255,.05);border:1px solid var(--edge);border-radius:9px;padding:10px 12px}
+  .fld input:focus{outline:none;border-color:var(--accent);background:rgba(111,211,255,.08)}
   #touchNote{font-size:11.5px;color:var(--dim);line-height:1.6}
   #touchNote b{color:var(--ink);font-weight:600}
   #logList{font-size:11.5px;color:var(--dim);line-height:1.8}
@@ -79,6 +109,20 @@
 <div id="wrap">
   <canvas id="c"></canvas>
   <div class="layer"><div id="toast"></div><div id="banner"></div></div>
+
+  <div class="modal hide" id="news">
+    <div class="card newscard">
+      <div class="newshead">
+        <div>
+          <h1>WHAT&rsquo;S <span>NEW</span></h1>
+          <div class="sub" id="newsVer"></div>
+        </div>
+        <div class="newsno" id="newsNo">33</div>
+      </div>
+      <div id="newsList"></div>
+      <button class="go" id="newsBtn">GOT IT</button>
+    </div>
+  </div>
 
   <div class="modal" id="menu">
     <div class="card">
@@ -105,6 +149,21 @@
         <button class="opt on" data-safe="on"><b>AIRFRAME HOLDS</b><i>Nothing writes the aeroplane off. Hit anything and it is set back on its feet. <kbd>K</kbd></i></button>
         <button class="opt" data-safe="off"><b>REAL DAMAGE</b><i>Structural contact, a hard landing or a gear-up touchdown ends the flight.</i></button>
       </div>
+
+      <h2>Your aeroplane</h2>
+      <div class="row" id="livRow"></div>
+
+      <h2>Trim</h2>
+      <div class="sw" id="trimRow"></div>
+
+      <h2>Your pilot</h2>
+      <div class="pilotgrid">
+        <label class="fld"><span>NAME</span><input id="pName" maxlength="18" placeholder="your name" autocomplete="off" spellcheck="false"></label>
+        <label class="fld"><span>CALLSIGN</span><input id="pCall" maxlength="10" placeholder="callsign" autocomplete="off" spellcheck="false"></label>
+      </div>
+      <div class="swrow"><b>HELMET</b><div class="sw" id="helmRow"></div></div>
+      <div class="swrow"><b>VISOR</b><div class="sw" id="visorRow"></div></div>
+      <div class="swrow"><b>SUIT</b><div class="sw" id="suitRow"></div></div>
 
       <h2>Speed limiter</h2>
       <div class="row" id="freeRow">
@@ -1412,7 +1471,12 @@ function applyQuality() {
    the frame rate says is not there, and give one back when it collapses. */
 function tuneQuality(dt, workMs) {
   Q.work += (workMs - Q.work) * .06;
-  if (!Q.auto || !GAME.started || GAME.paused) return;
+  /* The tuner used to stand down until the flight began, which was right
+     when the menu sat over a distant fly-by and is wrong now that it sits
+     inside a hangar: the start screen is a full-screen 3D interior and it is
+     the first thing anybody sees. It still stands down while PAUSED, because
+     a frozen frame measures nothing. */
+  if (!Q.auto || GAME.paused) return;
   /* The display list is the other wall. Running into it does not slow the
      frame down, it silently drops whatever asked last — which is the near
      detail, drawn after the ground. Back off before that happens. */
@@ -1509,7 +1573,14 @@ function sprite(r, g, b, profile) {
 }
 
 /* ---- display list: every polygon in the scene, sorted back-to-front ---- */
-const DLMAX = 9000;
+/* Fourteen thousand, not nine. Nine was comfortable until one place on the
+   planet stopped being generated: a town with five thousand hand-placed
+   buildings in it saturates the list on its own, and a saturated list is not
+   a slow frame, it is a frame with things MISSING from it. The tuner already
+   watches for it — ninety per cent full pulls the detail scale down — so the
+   larger list is headroom for the tuner to manage rather than a licence to
+   spend. */
+const DLMAX = 14000;
 const DL = {
   n: 0, kind: new Uint8Array(DLMAX), depth: new Float64Array(DLMAX),
   off: new Int32Array(DLMAX), cnt: new Int32Array(DLMAX),
@@ -2543,7 +2614,104 @@ function buildAircraft() {
   }
   return P;
 }
-const AC = buildAircraft();
+/* ===== the aeroplane is YOURS =============================================
+
+   A livery is not decoration. The whole machine is built out of one palette
+   — LIV — at load, and every panel, chine, nacelle and leading edge in the
+   mesh reads from it, so swapping the palette and rebuilding gives a real
+   repaint rather than a tint on top of a black aeroplane. Six of them, a
+   separate trim colour for the accents, and the mesh goes together again in
+   about a millisecond, which is fast enough to do it while you watch. */
+const LIV0 = JSON.parse(JSON.stringify(LIV));
+const LIVERIES = [
+  { id: "midnight", name: "MIDNIGHT", note: "Iron ferrite black, as delivered. A Mach 3 aeroplane in the only colour one was ever painted.",
+    skin: [26, 29, 36], top: [31, 35, 43], belly: [21, 23, 29], edge: [50, 55, 66],
+    chine: [24, 27, 34], nac: [29, 32, 40], glass: [96, 140, 170] },
+  { id: "titanium", name: "BARE TITANIUM", note: "Unpainted. Ninety-three per cent of the airframe is titanium and this is what it looks like.",
+    skin: [138, 142, 148], top: [152, 156, 162], belly: [118, 122, 128], edge: [186, 190, 196],
+    chine: [130, 134, 142], nac: [144, 148, 154], glass: [120, 160, 186] },
+  { id: "arctic", name: "ARCTIC", note: "High-visibility white over pale grey. What a test airframe wears over ice.",
+    skin: [224, 228, 233], top: [236, 240, 244], belly: [176, 182, 190], edge: [246, 248, 250],
+    chine: [214, 220, 226], nac: [206, 212, 219], glass: [110, 150, 180] },
+  { id: "desert", name: "DESERT", note: "Sand over pale earth. It disappears over anything dry and lit from above.",
+    skin: [186, 166, 130], top: [200, 180, 142], belly: [172, 158, 132], edge: [214, 196, 158],
+    chine: [178, 158, 124], nac: [190, 170, 136], glass: [118, 146, 160] },
+  { id: "testbed", name: "TESTBED", note: "White with day-glo. What an aeroplane wears when somebody has to find it from a chase plane.",
+    skin: [232, 234, 238], top: [240, 242, 246], belly: [206, 210, 216], edge: [236, 112, 40],
+    chine: [236, 112, 40], nac: [222, 226, 232], glass: [104, 148, 180] },
+  { id: "hunter", name: "NIGHT HUNTER", note: "Matte black on black, with the edges picked out. You will lose it against the ground.",
+    skin: [17, 18, 22], top: [21, 22, 27], belly: [13, 14, 17], edge: [62, 64, 72],
+    chine: [15, 16, 20], nac: [19, 20, 25], glass: [58, 88, 110] }
+];
+const TRIMS = [
+  ["SCARLET", [176, 40, 36]], ["GOLD", [214, 168, 58]], ["SKY", [64, 150, 216]],
+  ["JADE", [58, 166, 106]], ["BONE", [228, 232, 238]], ["EMBER", [232, 108, 36]]
+];
+/* The pilot. Four things about them are yours: the helmet, the visor, the
+   suit and the name — and the name is the one that matters, because it is
+   the one that ends up on the HUD and in the log. */
+const HELMETS = [["WHITE", [230, 232, 236]], ["ORANGE", [232, 128, 42]], ["BLACK", [34, 36, 42]],
+                 ["SILVER", [178, 184, 192]], ["SCARLET", [176, 44, 40]], ["BLUE", [54, 96, 168]]];
+const VISORS = [["GOLD", [214, 172, 66]], ["SMOKE", [42, 46, 54]], ["MIRROR", [150, 186, 214]],
+                ["CLEAR", [120, 150, 170]]];
+const SUITS = [["PRESSURE SILVER", [176, 180, 188]], ["FLIGHT GREEN", [92, 104, 74]],
+               ["ORANGE", [214, 118, 48]], ["SLATE", [64, 70, 82]], ["TAN", [172, 156, 124]]];
+const KIT = { liv: 0, trim: 0, helm: 0, visor: 0, suit: 0, name: "", call: "" };
+const KIT_KEY = "skyward.kit";
+(function kitLoad() {
+  try {
+    const o = JSON.parse(localStorage.getItem(KIT_KEY) || "null");
+    if (!o) return;
+    for (const k of ["liv", "trim", "helm", "visor", "suit"])
+      if (typeof o[k] === "number" && o[k] >= 0) KIT[k] = o[k] | 0;
+    if (typeof o.name === "string") KIT.name = o.name.slice(0, 18);
+    if (typeof o.call === "string") KIT.call = o.call.slice(0, 10);
+  } catch (e) {}
+  KIT.liv = clamp(KIT.liv, 0, LIVERIES.length - 1);
+  KIT.trim = clamp(KIT.trim, 0, TRIMS.length - 1);
+  KIT.helm = clamp(KIT.helm, 0, HELMETS.length - 1);
+  KIT.visor = clamp(KIT.visor, 0, VISORS.length - 1);
+  KIT.suit = clamp(KIT.suit, 0, SUITS.length - 1);
+})();
+function kitSave() { try { localStorage.setItem(KIT_KEY, JSON.stringify(KIT)); } catch (e) {} }
+function applyLivery() {
+  const L = LIVERIES[KIT.liv], t = TRIMS[KIT.trim][1];
+  for (const k of ["skin", "top", "belly", "edge", "chine", "nac", "glass"])
+    LIV[k] = L[k] ? L[k].slice() : LIV0[k].slice();
+  LIV.red = t.slice();
+  /* The trim is the ONE thing that is allowed to be loud, so it goes on the
+     leading edges of a dark scheme and stays off a light one, where an
+     orange leading edge on a white aeroplane is not a trim, it is a warning. */
+  const lum = (L.skin[0] + L.skin[1] + L.skin[2]) / 3;
+  if (lum < 120) LIV.edge = mixc(L.edge, t, .55);
+  LIV.paint = LIV0.paint.slice();
+}
+applyLivery();
+let AC = buildAircraft();
+function rebuildAircraft() { applyLivery(); AC = buildAircraft(); PILOTMESH = buildPilot(); }
+/* A pilot, in six boxes and a helmet. They stand by the nose in the hangar
+   and nowhere else — which is the right amount of pilot for an aeroplane you
+   spend the rest of the time inside. */
+function buildPilot() {
+  const mb = MB(), S = SUITS[KIT.suit][1], H = HELMETS[KIT.helm][1], V = VISORS[KIT.visor][1];
+  const boot = [38, 36, 38], glove = [56, 58, 64];
+  mb.box(-.11, .09, 0, .17, .18, .30, boot, TWO);      // boots
+  mb.box(.11, .09, 0, .17, .18, .30, boot, TWO);
+  mb.box(-.11, .46, 0, .17, .56, .19, shade(S, .94), TWO);   // legs
+  mb.box(.11, .46, 0, .17, .56, .19, shade(S, .94), TWO);
+  mb.box(0, .98, 0, .42, .58, .25, S, TWO);            // torso
+  mb.box(0, 1.20, .14, .30, .22, .06, shade(S, .82), TWO);   // chest rig
+  mb.box(-.27, .96, 0, .13, .50, .15, shade(S, .90), TWO);   // arms
+  mb.box(.27, .96, 0, .13, .50, .15, shade(S, .90), TWO);
+  mb.box(-.27, .66, .02, .12, .14, .18, glove, TWO);   // gloves
+  mb.box(.27, .66, .02, .12, .14, .18, glove, TWO);
+  mb.box(0, 1.34, 0, .17, .14, .17, shade(S, .78), TWO);     // neck ring
+  mb.box(0, 1.53, 0, .29, .31, .30, H, TWO);           // helmet
+  mb.box(0, 1.52, .155, .21, .16, .04, V, { two: true, spec: .9, gloss: 40 });  // visor
+  mb.box(0, 1.70, -.02, .26, .06, .26, shade(H, 1.08), TWO); // crown
+  return mb.done();
+}
+let PILOTMESH = buildPilot();
 
 /* ========================================================== scenery ====== */
 const E = WORLD.fieldElev;
@@ -2639,6 +2807,137 @@ function buildAirport() {
   return mb.done();
 }
 const AIRPORT = buildAirport();
+
+/* ===== the hangar ========================================================
+
+   The aeroplane has to live somewhere, and a menu over a fly-by of a field
+   is a screensaver. So there is a hangar on the west apron at Keeper Field
+   with the aeroplane in it, and the start screen is simply the camera
+   standing inside it.
+
+   It is not a backdrop: it is in the world, at a real place, built out of
+   the same primitives as everything else, and it is still there when you
+   taxi past it half an hour later. Everything in it is something a hangar
+   has — a door opening the height of the fin, roof trusses, a run of lamps,
+   a rolling stair, a bowser, a tool chest, drums, cones, and a painted line
+   on the floor for the nosewheel. */
+const HANGAR = {
+  x: -170, z: -430,                      // west of the runway, mid-field
+  w: 78, d: 58, h: 22, wall: 1.0,
+  pos: null, q: null
+};
+HANGAR.pos = v3(HANGAR.x - 4, E + 2.92, HANGAR.z);
+HANGAR.q = qAxis(0, 1, 0, Math.PI * .5);           // nose out of the door, east
+function buildHangar() {
+  const mb = MB();
+  const X = HANGAR.x, Z = HANGAR.z, HW = HANGAR.w * .5, HD = HANGAR.d * .5, HH = HANGAR.h;
+  const y0 = E + .06;
+  const CONC = [116, 116, 118], CONC2 = [104, 104, 107];
+  const SKINC = [126, 132, 138], RIB = [112, 118, 124], TRIM = [64, 70, 78];
+  const DARK = [46, 50, 56];
+  // ---- apron and floor, with the taxi line running out of the door -------
+  for (let i = 0; i < 8; i++) {
+    for (let j = 0; j < 6; j++) {
+      const x0 = X - HW + i * (HANGAR.w / 8), x1 = x0 + HANGAR.w / 8;
+      const z0 = Z - HD + j * (HANGAR.d / 6), z1 = z0 + HANGAR.d / 6;
+      const c = shade((i + j) & 1 ? CONC : CONC2, 1 + (hash2(i, j) - .5) * .06);
+      mb.quad([x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1], c, { two: true, bias: -180, edge: 1 });
+    }
+  }
+  // the apron outside the door
+  for (let i = 0; i < 5; i++) {
+    const x0 = X + HW + i * 12, x1 = x0 + 12;
+    mb.quad([x0, y0, Z - HD], [x1, y0, Z - HD], [x1, y0, Z + HD], [x0, y0, Z + HD],
+      shade(CONC2, 1 + (hash2(i, 3) - .5) * .05), { two: true, bias: -180, edge: 1 });
+  }
+  // yellow lead-in line, down the middle and out
+  for (let x = X - HW + 4; x < X + HW + 58; x += 7)
+    mb.quad([x, y0 + .02, Z - .28], [x + 4.4, y0 + .02, Z - .28],
+      [x + 4.4, y0 + .02, Z + .28], [x, y0 + .02, Z + .28], [206, 176, 52], { two: true, bias: 0 });
+  // ---- walls -------------------------------------------------------------
+  const wall = (x0, z0, x1, z1, h, col) => {
+    mb.quad([x0, y0, z0], [x1, y0, z1], [x1, y0 + h, z1], [x0, y0 + h, z0], col, { two: true });
+  };
+  wall(X - HW, Z - HD, X - HW, Z + HD, HH, SKINC);                 // back (west)
+  wall(X - HW, Z - HD, X + HW, Z - HD, HH, shade(SKINC, .92));     // south side
+  wall(X - HW, Z + HD, X + HW, Z + HD, HH, shade(SKINC, .88));     // north side
+  // vertical ribs, inside and out, which is what makes a steel shed read
+  for (let i = 1; i < 16; i++) {
+    const z = Z - HD + i * (HANGAR.d / 16);
+    mb.box(X - HW + .22, y0 + HH * .5, z, .30, HH, .55, RIB, TWO);
+  }
+  for (let i = 1; i < 20; i++) {
+    const x = X - HW + i * (HANGAR.w / 20);
+    mb.box(x, y0 + HH * .5, Z - HD + .22, .55, HH, .30, shade(RIB, .94), TWO);
+    mb.box(x, y0 + HH * .5, Z + HD - .22, .55, HH, .30, shade(RIB, .90), TWO);
+  }
+  // ---- the door wall: two piers and a lintel, with a 44 m opening --------
+  const OP = 22;                                    // half the opening
+  wall(X + HW, Z - HD, X + HW, Z - OP, HH, shade(SKINC, .84));
+  wall(X + HW, Z + OP, X + HW, Z + HD, HH, shade(SKINC, .84));
+  mb.box(X + HW, y0 + HH - 1.6, Z, .9, 3.2, OP * 2, shade(SKINC, .80), TWO);
+  // door tracks and the folded leaves stacked against the piers
+  mb.box(X + HW - .8, y0 + HH - 3.4, Z - OP - 2.4, 1.6, .5, 5.0, TRIM, TWO);
+  mb.box(X + HW - .8, y0 + HH - 3.4, Z + OP + 2.4, 1.6, .5, 5.0, TRIM, TWO);
+  for (let k = 0; k < 3; k++) {
+    mb.box(X + HW - 1.0 - k * .55, y0 + (HH - 3.6) * .5, Z - OP - .9 - k * 1.1,
+      .45, HH - 3.6, 2.0, shade(TRIM, 1 + k * .08), TWO);
+    mb.box(X + HW - 1.0 - k * .55, y0 + (HH - 3.6) * .5, Z + OP + .9 + k * 1.1,
+      .45, HH - 3.6, 2.0, shade(TRIM, 1 + k * .08), TWO);
+  }
+  // ---- roof: a shallow gable on trusses ----------------------------------
+  const ridge = y0 + HH + 4.2;
+  mb.quad([X - HW, y0 + HH, Z - HD], [X + HW, y0 + HH, Z - HD],
+          [X + HW, ridge, Z], [X - HW, ridge, Z], shade(SKINC, 1.05), TWO);
+  mb.quad([X - HW, ridge, Z], [X + HW, ridge, Z],
+          [X + HW, y0 + HH, Z + HD], [X - HW, y0 + HH, Z + HD], shade(SKINC, .98), TWO);
+  // gable ends
+  mb.tri([X - HW, y0 + HH, Z - HD], [X - HW, y0 + HH, Z + HD], [X - HW, ridge, Z], shade(SKINC, .90), TWO);
+  mb.tri([X + HW, y0 + HH, Z - HD], [X + HW, ridge, Z], [X + HW, y0 + HH, Z + HD], shade(SKINC, .86), TWO);
+  // trusses under it, and the lamps hanging off them
+  for (let i = 1; i < 7; i++) {
+    const x = X - HW + i * (HANGAR.w / 7);
+    mb.box(x, y0 + HH - .45, Z, .42, .9, HANGAR.d - 1.2, DARK, TWO);
+    mb.box(x, y0 + HH + 1.6, Z, .30, 3.6, .30, DARK, TWO);
+    for (const zz of [Z - 15, Z, Z + 15]) {
+      mb.box(x, y0 + HH - 1.9, zz, .16, 1.4, .16, [70, 74, 80], TWO);
+      mb.box(x, y0 + HH - 2.8, zz, 1.5, .34, 1.5, [40, 42, 46], TWO);
+      mb.box(x, y0 + HH - 3.0, zz, 1.2, .12, 1.2, [255, 248, 224], { two: true, emit: 1 });
+    }
+  }
+  // ---- what is in it -----------------------------------------------------
+  // rolling stair, by the cockpit
+  for (let s = 0; s < 7; s++)
+    mb.box(X - 2 + s * .46, y0 + .34 + s * .42, 8.4, .5, .12, 1.8, [176, 178, 182], TWO);
+  mb.box(X - 2.4, y0 + 1.6, 7.5, .12, 3.2, .12, [176, 178, 182], TWO);
+  mb.box(X + 1.2, y0 + 1.6, 7.5, .12, 3.2, .12, [176, 178, 182], TWO);
+  mb.box(X - .6, y0 + .16, 8.4, 4.0, .32, 2.2, [96, 98, 104], TWO);
+  // fuel bowser
+  mb.box(X - 26, y0 + 1.5, Z - 17, 7.0, 2.2, 2.6, [58, 78, 104], TWO);
+  mb.box(X - 22, y0 + 1.9, Z - 17, 2.6, 2.4, 2.4, [44, 58, 78], TWO);
+  for (const wx of [-29, -23.5]) for (const wz of [-18.2, -15.8])
+    mb.box(X + wx, y0 + .45, Z + wz, 1.0, .9, .5, [28, 28, 32], TWO);
+  // tool chest, drums, crates
+  mb.box(X - 31, y0 + .62, Z + 12, 2.4, 1.24, 1.0, [168, 62, 52], TWO);
+  for (let k = 0; k < 4; k++)
+    mb.box(X - 34 + (k % 2) * 1.0, y0 + .48, Z + 16 + ((k / 2) | 0) * 1.0, .82, .96, .82,
+      k & 1 ? [188, 152, 48] : [72, 96, 120], TWO);
+  for (let k = 0; k < 3; k++)
+    mb.box(X - 12 + k * 2.6, y0 + .7, Z + 21, 2.2, 1.4, 1.6, [142, 130, 104], TWO);
+  // cones along the nose line
+  for (let k = 0; k < 6; k++) {
+    const cx = X + 10 + k * 9;
+    mb.box(cx, y0 + .10, Z - 9.5, .7, .2, .7, [214, 92, 34], TWO);
+    mb.box(cx, y0 + .42, Z - 9.5, .34, .66, .34, [230, 104, 40], TWO);
+    mb.box(cx, y0 + .10, Z + 9.5, .7, .2, .7, [214, 92, 34], TWO);
+    mb.box(cx, y0 + .42, Z + 9.5, .34, .66, .34, [230, 104, 40], TWO);
+  }
+  // a board on the back wall, because every hangar has one
+  mb.quad([X - HW + .5, y0 + 3.0, Z - 9], [X - HW + .5, y0 + 3.0, Z - 3],
+          [X - HW + .5, y0 + 6.0, Z - 3], [X - HW + .5, y0 + 6.0, Z - 9], [42, 52, 44], TWO);
+  return mb.done();
+}
+const HANGARMESH = buildHangar();
 
 function buildRing() {
   const mb = MB(), R = 240, t = 18, N = 22;
@@ -2881,6 +3180,7 @@ function drawCities() {
     if (budget <= 0) continue;
     const near = c.r * 5.5 + 24000;
     if (d > near || camY > 62000) continue;
+    if (c.name === "Hohenwald" && camY < 9000) continue;   // the hand-built one has it
     if (!inView(dx, dz, c.r * 1.6 + 1200)) continue;    // the labels still carry
     /* The structures, before the grid, so they are never the thing the budget
        runs out on. A place is recognisable by its tall bits. */
@@ -2938,6 +3238,9 @@ function drawCities() {
   }
   /* Farms get their own slice before the towns take the rest, so flying over
      open country is not flying over nothing. */
+  /* The hand-built town gets its slice first and the generated one stands
+     down wherever it stood something. */
+  budget = drawTown(budget);
   const farmCap = Math.min(budget, Math.round(Q.q.buildings * .34));
   budget -= farmCap - drawFarms(farmCap);
   budget = drawUrban(budget);
@@ -3038,6 +3341,7 @@ function drawUrban(budget) {
        the budget went on blocks nobody could see and the city in the window
        was three times thinner than the machine could afford to draw. */
     if (bd > PITCH && !inView(dx, dz, PITCH * .9)) return;
+    if (twnHas(bx, bz)) return;                        // Hohenwald is built by hand
     const u = urbanShare(bx, bz);
     if (u < .05) return;
     const h1 = hash2(i * 7, j * 13);
@@ -3160,6 +3464,415 @@ function drawUrban(budget) {
   }
   return budget;
 }
+/* ===== Hohenwald, Tennessee ===============================================
+
+   Everywhere else on this planet is generated: a density field, a hash, and
+   rules about what tends to stand where. That is the only way to cover a
+   world, and it is why every town looks like a town in general and nowhere in
+   particular.
+
+   One place gets built by hand instead, out to ten miles, because the field
+   is in it: Hohenwald, county seat of Lewis County, up on the Highland Rim.
+   Not a scan and not a survey — a MODEL, laid out the way the town is laid
+   out. Main Street runs east and west; Park Avenue runs north and south; the
+   two cross at the bottom of the square and the courthouse stands on the
+   north-east corner of it. Two blocks of brick storefronts either way, built
+   to the pavement with no gaps, because that is what a county-seat main
+   street is. Then the residential grid — eight streets one way, ten the
+   other, houses on fifty-foot lots with a porch roof on the front. The strip
+   east along the Linden highway with its parking lots. The schools on the
+   north side with their ball fields, the industrial sheds on the south, the
+   water tower where the ground is highest, and five highways running out of
+   it: Columbia north-east, Centerville north, Summertown south-east,
+   Waynesboro south-west, Linden west.
+
+   Ten miles is where it stops and the generated country takes over again,
+   which is about where the town stops caring.
+
+   It is all in metres from the courthouse steps, because a grid is easier to
+   write down than a list of coordinates and every distance in it is one you
+   can check by walking. */
+const TWN = {
+  R: 16093,                           // ten miles, and the edge of the model
+  x: 0, z: 0, built: false,
+  b: null, flat: null, grid: null, cell: 240, minX: 0, minZ: 0, nx: 0, nz: 0, streets: []
+};
+/* The street plan, in metres east and north of the courthouse. Each entry is
+   a class and a polyline: 3 is a highway, 2 a town artery, 1 a residential
+   street, 0 a lane. The class decides how wide it is drawn and what gets
+   built along it. */
+const TWN_PLAN = [
+  // --- the two that cross at the square --------------------------------
+  [3, "W Main St",        [-2900, 40, -1200, 20, -300, 0, 0, 0]],
+  [3, "E Main St",        [0, 0, 420, -10, 1500, -40, 2600, -90, 4200, -160]],
+  [3, "N Park Ave",       [0, 0, 20, 300, 40, 900, 90, 1900, 160, 3200]],
+  [3, "S Park Ave",       [0, 0, -20, -420, -60, -1100, -120, -2300, -200, -3600]],
+  // --- highways out ------------------------------------------------------
+  [3, "Columbia Hwy",     [90, 1900, 700, 2600, 1700, 3500, 3200, 4600, 5200, 5600]],
+  [3, "Summertown Hwy",   [420, -10, 900, -700, 1700, -1600, 2900, -2700, 4600, -3800]],
+  [3, "Waynesboro Hwy",   [-60, -1100, -700, -1700, -1600, -2600, -2900, -3900, -4600, -5200]],
+  [3, "Linden Hwy",       [-2900, 40, -4200, 120, -5800, 260, -7600, 360]],
+  [3, "Natchez Trace",    [4200, -160, 5100, 300, 5600, 1400, 5700, 2900]],
+  [2, "Centerville Hwy",  [40, 900, -260, 1600, -600, 2600, -1000, 4000]],
+  [2, "Old Trace Rd",     [2600, -90, 3100, 700, 3400, 1700]],
+  [2, "Buffalo Rd",       [-1200, 20, -1500, -700, -2000, -1700, -2700, -2900]],
+  [2, "Cedar Creek Rd",   [1500, -40, 1900, 800, 2100, 1800, 2000, 3000]],
+  [2, "Mt Joy Rd",        [-300, 0, -600, 900, -900, 2000, -1400, 3100]],
+  // --- the old rail bed, which is why Depot Street is on a diagonal ------
+  [2, "Depot St",         [-1500, 780, -900, 480, -300, 180, 300, -140, 1000, -520, 1900, -1000]],
+  // --- downtown: streets parallel to Main -------------------------------
+  [1, "Court St",         [-900, 120, 1200, 120]],
+  [1, "Oak St",           [-1000, 250, 1300, 250]],
+  [1, "Cherry St",        [-900, 380, 1100, 380]],
+  [1, "College St",       [-800, 510, 1000, 510]],
+  [1, "High St",          [-700, 650, 900, 650]],
+  [1, "Ridge St",         [-650, 800, 800, 800]],
+  [1, "Poplar St",        [-900, -130, 1200, -130]],
+  [1, "Walnut St",        [-1000, -260, 1300, -260]],
+  [1, "Maple St",         [-900, -400, 1100, -400]],
+  [1, "Church St",        [-800, -540, 1000, -540]],
+  [1, "Spring St",        [-700, -690, 900, -690]],
+  [1, "Pine St",          [-650, -850, 800, -850]],
+  // --- downtown: streets parallel to Park -------------------------------
+  [1, "1st Ave W",        [-130, 900, -130, -950]],
+  [1, "2nd Ave W",        [-270, 880, -270, -930]],
+  [1, "3rd Ave W",        [-410, 840, -410, -900]],
+  [1, "4th Ave W",        [-560, 780, -560, -850]],
+  [1, "5th Ave W",        [-720, 700, -720, -780]],
+  [1, "6th Ave W",        [-880, 600, -880, -700]],
+  [1, "1st Ave E",        [140, 900, 140, -950]],
+  [1, "2nd Ave E",        [290, 880, 290, -930]],
+  [1, "3rd Ave E",        [450, 840, 450, -900]],
+  [1, "4th Ave E",        [620, 780, 620, -850]],
+  [1, "5th Ave E",        [800, 700, 800, -780]],
+  [1, "6th Ave E",        [990, 600, 990, -700]],
+  [1, "7th Ave E",        [1190, 500, 1190, -600]],
+  // --- the edges: lanes off the highways --------------------------------
+  [0, "Sunset Dr",        [-880, 600, -1400, 560, -1900, 620]],
+  [0, "Meadowview",       [1190, 500, 1700, 560, 2100, 480]],
+  [0, "Hillcrest",        [990, -700, 1500, -820, 1900, -700]],
+  [0, "Shady Ln",         [-880, -700, -1400, -800, -1800, -700]],
+  [0, "Industrial Dr",    [-120, -2300, 500, -2400, 1000, -2200]],
+  [0, "School Rd",        [90, 1900, 620, 2100, 1000, 1900]]
+];
+/* The handful of buildings that are not houses or storefronts: the ones that
+   make the place identifiable from the air. [x, z, footprint, depth, height,
+   kind]. Kind steers the colour and what goes on top. */
+const TWN_MARK = [
+  [ 60,  70,  46, 34, 19, "civic",   "Lewis County Courthouse"],
+  [-140, 60,  30, 22, 11, "civic",   "County Offices"],
+  [ 190, 130, 26, 20,  9, "civic",   "Museum of Natural History"],
+  [-250, -90, 24, 34, 15, "church",  "First Baptist"],
+  [ 520, 430, 22, 30, 14, "church",  "First Methodist"],
+  [-640, -480, 20, 28, 13, "church", "Church of Christ"],
+  [ 780, 2050, 96, 34, 11, "school", "Lewis County High School"],
+  [ 620, 2260, 70, 28, 9,  "school", "Lewis County Middle"],
+  [-560, 1450, 74, 26, 9,  "school", "Hohenwald Elementary"],
+  [ 300, -2380, 120, 44, 14, "shed",  "Industrial Park"],
+  [ 620, -2300, 88, 40, 12, "shed",   "Lumber Yard"],
+  [-120, -2250, 70, 34, 11, "shed",   "Works Depot"],
+  [ 1240, -120, 58, 40, 9,  "big",    "Grocery"],
+  [ 1520, -180, 44, 32, 8,  "big",    "Hardware"],
+  [ 1850, -240, 66, 44, 9,  "big",    "Discount Store"],
+  [-420, 240, 34, 26, 12,  "civic",   "Lewis County Hospital"],
+  [-120, 780, 28, 20, 10,  "civic",   "Fire Hall"]
+];
+/* Colour families. Small-town brick is red and buff, not grey; houses are
+   painted board and vinyl in pale colours with a dark roof; the sheds on the
+   edge of town are corrugated metal, which is almost white in the sun. */
+const TWN_BRICK = [[152, 86, 68], [138, 78, 62], [166, 104, 78], [128, 96, 78],
+                   [178, 132, 96], [144, 112, 92], [120, 74, 60]];
+const TWN_WALL = [[224, 222, 214], [206, 208, 200], [186, 196, 190], [214, 200, 178],
+                  [196, 186, 172], [230, 226, 210], [176, 188, 196], [208, 194, 186]];
+const TWN_ROOF = [[84, 80, 76], [96, 84, 72], [70, 72, 76], [104, 88, 74],
+                  [78, 74, 70], [92, 90, 88], [110, 96, 80]];
+const TWN_METAL = [[196, 198, 196], [182, 188, 190], [206, 204, 196], [172, 180, 180]];
+
+function twnInit() {
+  if (TWN.built) return;
+  TWN.built = true;
+  TWN.x = HOH.x; TWN.z = HOH.z;          // the courthouse, already placed above
+  const B = [];
+  const push = (x, z, w, dp, h, col, roof, rh, kind) => {
+    const gy = terrainH(x, z);
+    if (gy < 3) return;
+    B.push({ x: x, z: z, w: w, d: dp, h: h, c: col, rc: roof, rh: rh, k: kind, gy: gy,
+      /* A stable number per building, so which ones survive the thinning does
+         not change as the aeroplane moves and the town does not shimmer. */
+      t: ((B.length * 2654435761) >>> 0) % 1000 / 1000 });
+  };
+  const pick = (a, t) => a[((t * 9973) | 0) % a.length];
+  let sd = 12345;
+  const rnd = () => { sd = (sd * 1103515245 + 12345) & 0x7fffffff; return sd / 0x7fffffff; };
+
+  /* --- the storefronts. Built to the pavement, shoulder to shoulder, in a
+     run rather than as separate boxes: a main street is a WALL of brick with
+     doors in it, and spacing them out is what makes a generated town look
+     like a retail park. */
+  const strip = (x0, z0, x1, z1, side, from, to, minW, maxW, hlo, hhi) => {
+    const dx = x1 - x0, dz = z1 - z0, L = Math.hypot(dx, dz) || 1;
+    const ux = dx / L, uz = dz / L, nx = -uz * side, nz = ux * side;
+    let t = from;
+    while (t < to) {
+      const w = minW + rnd() * (maxW - minW);
+      if (t + w > to) break;
+      const cx = x0 + ux * (t + w * .5) + nx * 11, cz = z0 + uz * (t + w * .5) + nz * 11;
+      const dp = 16 + rnd() * 12;
+      const h = hlo + rnd() * (hhi - hlo);
+      push(cx + nx * dp * .5, cz + nz * dp * .5, w, dp, h,
+        pick(TWN_BRICK, rnd()), null, 0, "store");
+      t += w + .4;
+    }
+  };
+  // Main Street, both sides, two blocks either way from the square
+  strip(-300, 0, 480, -12, 1, 0, 780, 11, 26, 8.5, 13);
+  strip(-300, 0, 480, -12, -1, 0, 780, 11, 26, 8.5, 13);
+  // Park Avenue, one block north and south
+  strip(0, -300, 8, 340, 1, 0, 640, 10, 22, 8, 12);
+  strip(0, -300, 8, 340, -1, 0, 640, 10, 22, 8, 12);
+
+  /* --- houses on the residential grid. Every street that is not a highway
+     gets lots on both sides, and the further out the bigger the lot. */
+  for (const [cls, name, pts] of TWN_PLAN) {
+    if (cls > 1) continue;
+    for (let i = 0; i + 3 < pts.length; i += 2) {
+      const ax = pts[i], az = pts[i + 1], bx = pts[i + 2], bz = pts[i + 3];
+      const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz) || 1;
+      const ux = dx / L, uz = dz / L;
+      for (const side of [1, -1]) {
+        const nx = -uz * side, nz = ux * side;
+        const lot = cls === 0 ? 34 : 22;
+        for (let t = lot * .5; t < L; t += lot) {
+          const r = Math.hypot(ax + ux * t, az + uz * t);
+          if (r < 190) continue;                       // the square is shops
+          if (rnd() > (r < 900 ? .90 : r < 1600 ? .68 : .42)) continue;
+          const back = 13 + rnd() * 8;
+          const px = ax + ux * t + nx * back + (rnd() - .5) * 4;
+          const pz = az + uz * t + nz * back + (rnd() - .5) * 4;
+          const w = 9.5 + rnd() * 5, dp = w * (.8 + rnd() * .5);
+          const h = 4.6 + rnd() * 3.2;
+          push(px, pz, w, dp, h, pick(TWN_WALL, rnd()), pick(TWN_ROOF, rnd()),
+            1.6 + rnd() * 1.8, "house");
+          if (rnd() < .34)                              // a shed or a garage out back
+            push(px + nx * 15 + ux * 5, pz + nz * 15 + uz * 5, 5.5 + rnd() * 2.5,
+              5 + rnd() * 2, 2.8 + rnd() * 1.2, pick(TWN_WALL, rnd()),
+              pick(TWN_ROOF, rnd()), .9, "shedlet");
+        }
+      }
+    }
+  }
+  /* --- the strip east, which is one-storey and surrounded by parking */
+  for (let t = 900; t < 2600; t += 150 + rnd() * 120) {
+    for (const side of [1, -1]) {
+      if (rnd() < .3) continue;
+      const w = 26 + rnd() * 34, dp = 20 + rnd() * 16;
+      push(t, -30 - t * .033 + side * (46 + rnd() * 20), w, dp, 5.6 + rnd() * 2.4,
+        pick(TWN_METAL, rnd()), null, 0, "big");
+    }
+  }
+  // --- the named ones
+  for (const [x, z, w, dp, h, kind] of TWN_MARK) {
+    const col = kind === "shed" || kind === "big" ? pick(TWN_METAL, rnd())
+      : kind === "church" ? [222, 220, 212] : pick(TWN_BRICK, rnd() * .5);
+    push(x, z, w, dp, h, col, kind === "church" ? [92, 88, 84] : null,
+      kind === "church" ? 3 : 0, kind);
+  }
+  /* --- the water tower, on the high ground north of the square, and the two
+     grain bins by the rail bed. They are the two things you can see from
+     outside the town, so they are placed rather than scattered. */
+  B.push({ tower: 1, x: 240, z: 1080, h: 38, r: 9, gy: terrainH(TWN.x + 240, TWN.z + 1080) });
+  for (let k = 0; k < 3; k++)
+    push(1020 + k * 15, -560, 9, 9, 17 + k * 2, [198, 200, 198], null, 0, "silo");
+
+  /* --- ball fields and parking are DARKER GROUND, not buildings: flat slabs
+     that read from the air as the things a town has that are not roofed. */
+  const FLAT = [];
+  const flat = (x, z, w, dp, col) => FLAT.push({ x: x, z: z, w: w, d: dp, c: col });
+  flat(900, 2050, 150, 110, [86, 118, 72]);      // high school fields
+  flat(-560, 1300, 110, 80, [86, 118, 72]);      // elementary field
+  flat(1600, -200, 220, 130, [72, 72, 76]);      // strip parking
+  flat(300, -2300, 260, 160, [74, 74, 78]);      // industrial yard
+  flat(120, 120, 90, 70, [74, 74, 78]);          // courthouse parking
+
+  // world coordinates, once, and a grid to look them up by
+  let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9;
+  for (const b of B) {
+    b.x += TWN.x; b.z += TWN.z;
+    if (b.x < minX) minX = b.x; if (b.x > maxX) maxX = b.x;
+    if (b.z < minZ) minZ = b.z; if (b.z > maxZ) maxZ = b.z;
+  }
+  for (const f of FLAT) { f.x += TWN.x; f.z += TWN.z; f.gy = terrainH(f.x, f.z); }
+  const C = TWN.cell;
+  TWN.minX = Math.floor(minX / C) * C; TWN.minZ = Math.floor(minZ / C) * C;
+  TWN.nx = Math.ceil((maxX - TWN.minX) / C) + 1;
+  TWN.nz = Math.ceil((maxZ - TWN.minZ) / C) + 1;
+  TWN.grid = new Array(TWN.nx * TWN.nz);
+  for (const b of B) {
+    const i = Math.floor((b.x - TWN.minX) / C), j = Math.floor((b.z - TWN.minZ) / C);
+    const k = j * TWN.nx + i;
+    (TWN.grid[k] || (TWN.grid[k] = [])).push(b);
+  }
+  TWN.b = B; TWN.flat = FLAT;
+  // streets in world coordinates, for drawing
+  for (const [cls, name, pts] of TWN_PLAN) {
+    const w = [4.5, 5.5, 8, 11][cls];
+    const q = [];
+    for (let i = 0; i < pts.length; i += 2) q.push(TWN.x + pts[i], TWN.z + pts[i + 1]);
+    TWN.streets.push([cls, w, q]);
+  }
+}
+/* Is this patch of ground inside the hand-built town? The generated one
+   stands down wherever this is true, or the two draw on top of each other. */
+const twnHas = (x, z) => TWN.built && Math.abs(x - TWN.x) < 2900 && Math.abs(z - TWN.z) < 3400;
+
+/* The streets, as thin slabs on the ground. Drawn before the buildings so a
+   kerb never covers a wall. */
+function drawTownStreets() {
+  const cp = cam.pos, m = cam.m;
+  const reach = clamp(cp.y * 9 + 3000, 3000, 26000);
+  for (const [cls, wid, q] of TWN.streets) {
+    for (let i = 0; i + 3 < q.length; i += 2) {
+      const ax = q[i], az = q[i + 1], bx = q[i + 2], bz = q[i + 3];
+      const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz) || 1;
+      const N = clamp(Math.round(L / 160), 1, 26);
+      const nx = -dz / L * wid, nz = dx / L * wid;
+      for (let k = 0; k < N; k++) {
+        const t0 = k / N, t1 = (k + 1) / N;
+        const x0 = ax + dx * t0, z0 = az + dz * t0, x1 = ax + dx * t1, z1 = az + dz * t1;
+        const mx = (x0 + x1) * .5, mz = (z0 + z1) * .5;
+        const d = Math.hypot(mx - cp.x, mz - cp.z);
+        if (d > reach) continue;
+        if (!inView(mx - cp.x, mz - cp.z, L / N + wid * 2)) continue;
+        const gy = terrainH(mx, mz) + .35;
+        _vp[0] = x0 + nx; _vp[1] = gy; _vp[2] = z0 + nz;
+        _vp[3] = x1 + nx; _vp[4] = gy; _vp[5] = z1 + nz;
+        _vp[6] = x1 - nx; _vp[7] = gy; _vp[8] = z1 - nz;
+        _vp[9] = x0 - nx; _vp[10] = gy; _vp[11] = z0 - nz;
+        let front = false;
+        for (let v = 0; v < 4; v++) {
+          const px = _vp[v * 3] - cp.x, pz = _vp[v * 3 + 2] - cp.z;
+          const py = _vp[v * 3 + 1] - cp.y - curveDrop(px, pz);
+          const vx = m[0] * px + m[1] * py + m[2] * pz, vy = m[3] * px + m[4] * py + m[5] * pz,
+            vz = m[6] * px + m[7] * py + m[8] * pz;
+          _vp[v * 3] = vx; _vp[v * 3 + 1] = vy; _vp[v * 3 + 2] = vz;
+          if (vz >= NEAR) front = true;
+        }
+        if (!front) continue;
+        const mm = clipProject(4);
+        if (mm < 3 || offscreen(mm)) continue;
+        const dy = gy - cp.y, d3 = Math.hypot(mx - cp.x, dy, mz - cp.z) || 1;
+        const col = cls >= 2 ? [86, 84, 82] : [104, 101, 97];
+        DL.poly(d - 300, _sp, mm, aerial(litColor(col, 0, 1, 0), d,
+          (mx - cp.x) / d3, dy / d3, (mz - cp.z) / d3), null, 0);
+      }
+    }
+  }
+  for (const f of TWN.flat) {
+    const d = Math.hypot(f.x - cp.x, f.z - cp.z);
+    if (d > reach) continue;
+    if (!inView(f.x - cp.x, f.z - cp.z, Math.max(f.w, f.d))) continue;
+    const gy = f.gy + .3, hw = f.w * .5, hd = f.d * .5;
+    _vp[0] = f.x - hw; _vp[1] = gy; _vp[2] = f.z - hd;
+    _vp[3] = f.x + hw; _vp[4] = gy; _vp[5] = f.z - hd;
+    _vp[6] = f.x + hw; _vp[7] = gy; _vp[8] = f.z + hd;
+    _vp[9] = f.x - hw; _vp[10] = gy; _vp[11] = f.z + hd;
+    let front = false;
+    for (let v = 0; v < 4; v++) {
+      const px = _vp[v * 3] - cp.x, pz = _vp[v * 3 + 2] - cp.z;
+      const py = _vp[v * 3 + 1] - cp.y - curveDrop(px, pz);
+      const vx = m[0] * px + m[1] * py + m[2] * pz, vy = m[3] * px + m[4] * py + m[5] * pz,
+        vz = m[6] * px + m[7] * py + m[8] * pz;
+      _vp[v * 3] = vx; _vp[v * 3 + 1] = vy; _vp[v * 3 + 2] = vz;
+      if (vz >= NEAR) front = true;
+    }
+    if (!front) continue;
+    const mm = clipProject(4);
+    if (mm < 3 || offscreen(mm)) continue;
+    const dy = gy - cp.y, d3 = Math.hypot(f.x - cp.x, dy, f.z - cp.z) || 1;
+    DL.poly(d - 280, _sp, mm, aerial(litColor(f.c, 0, 1, 0), d,
+      (f.x - cp.x) / d3, dy / d3, (f.z - cp.z) / d3), null, 0);
+  }
+}
+/* The town itself. Outward from the aeroplane in rings, like everything else,
+   so the budget lands on what is under the nose. */
+function drawTown(budget) {
+  if (!onPlanet()) return budget;
+  const cp = cam.pos;
+  if (Math.hypot(cp.x - TWN.x, cp.z - TWN.z) > TWN.R + 4000) return budget;
+  twnInit();
+  if (cp.y > 9000) return budget;
+  drawTownStreets();
+  /* The town has its OWN allowance and does not take from the shared one.
+     That looks like cheating and is not: nothing else is drawing here — the
+     generated buildings and the farms both stand down inside the town — so
+     the shared budget would otherwise go unspent over the one place on the
+     planet that has something to spend it on. Outside the town this function
+     has already returned. */
+  let tb = Math.round(Q.q.buildings * Q.det * 2.0);
+  const C = TWN.cell;
+  const reach = clamp(2400 + cp.y * 3.2, 2400, 12000);
+  const ci = Math.floor((cp.x - TWN.minX) / C), cj = Math.floor((cp.z - TWN.minZ) / C);
+  const RN = Math.ceil(reach / C);
+  const one = (i, j) => {
+    if (i < 0 || j < 0 || i >= TWN.nx || j >= TWN.nz || tb <= 0) return;
+    const cellArr = TWN.grid[j * TWN.nx + i];
+    if (!cellArr) return;
+    const gx = TWN.minX + (i + .5) * C - cp.x, gz = TWN.minZ + (j + .5) * C - cp.z;
+    if (!inView(gx, gz, C)) return;
+    for (const b of cellArr) {
+      if (tb <= 0) return;
+      const bd = Math.hypot(b.x - cp.x, b.z - cp.z);
+      if (bd > reach) continue;
+      /* Thinned with distance rather than cut off at a range. Five thousand
+         buildings will not fit in the budget at once and never needed to:
+         what a town looks like from two miles up is its SHAPE, which survives
+         losing four out of five of them, and what it looks like from a
+         thousand feet is the street you are over, which does not. Cutting off
+         instead of thinning drew the nearest six hundred in full and left the
+         rest of the town as bare streets, which is worse than either. */
+      if (b.t > clamp(2600 / Math.max(bd, 1), .10, 1) && !b.tower && b.k !== "civic"
+        && b.k !== "school" && b.k !== "church" && b.k !== "shed") continue;
+      if (b.tower) {                                   // the water tower
+        boxOnGround(b.x, b.gy, b.z, 2.2, b.h, 2.2, [176, 180, 184], bd);
+        boxOnGround(b.x, b.gy + b.h * .30, b.z, 9, 1.0, 9, [166, 170, 174], bd);
+        boxOnGround(b.x, b.gy + b.h, b.z, b.r * 2, b.r * 1.5, b.r * 2, [212, 216, 220], bd);
+        tb -= 3;
+        continue;
+      }
+      boxOnGround(b.x, b.gy, b.z, b.w, b.h, b.d, b.c, bd);
+      tb--;
+      if (b.rc && bd < 1100) {                         // a roof in its own colour
+        boxOnGround(b.x, b.gy + b.h, b.z, b.w * 1.10, b.rh, b.d * 1.10, b.rc, bd);
+        tb--;
+      }
+      if (b.k === "store" && bd < 900) {               // parapet and awning
+        boxOnGround(b.x, b.gy + b.h, b.z, b.w, 1.1, b.d, shade(b.c, .74), bd);
+        tb--;
+      }
+      if (b.k === "civic" && b.w > 40 && bd < 4000) {  // the courthouse cupola
+        boxOnGround(b.x, b.gy + b.h, b.z, 9, 7, 9, shade(b.c, 1.12), bd);
+        boxOnGround(b.x, b.gy + b.h + 7, b.z, 3.2, 8, 3.2, [186, 176, 150], bd);
+        tb -= 2;
+      }
+      if (b.k === "church" && bd < 3000) {             // a steeple
+        boxOnGround(b.x, b.gy + b.h, b.z + b.d * .34, 4.2, 12, 4.2, [232, 230, 224], bd);
+        boxOnGround(b.x, b.gy + b.h + 12, b.z + b.d * .34, 1.4, 5, 1.4, [206, 202, 194], bd);
+        tb -= 2;
+      }
+      if (b.k === "school" && bd < 3000) {             // a flat roof plant box
+        boxOnGround(b.x + b.w * .28, b.gy + b.h, b.z, 8, 2.4, 8, shade(b.c, .8), bd);
+        tb--;
+      }
+    }
+  };
+  one(ci, cj);
+  for (let ring = 1; ring <= RN && tb > 0; ring++) {
+    for (let k = -ring; k <= ring && tb > 0; k++) { one(ci + k, cj - ring); one(ci + k, cj + ring); }
+    for (let k = -ring + 1; k <= ring - 1 && tb > 0; k++) { one(ci - ring, cj + k); one(ci + ring, cj + k); }
+  }
+  return budget;
+}
+
 /* A farmstead: a house, a barn, a pair of silos and a machine shed, one to a
    section or so, standing in the corner of a field. Cities are where the
    buildings are concentrated; this is where the other ninety per cent of the
@@ -3183,7 +3896,7 @@ function drawFarms(budget) {
     const gy = terrainH(bx, bz);
     if (gy < 3) return;
     if (farmChance(bx, bz, gy) < .35) return;
-    if (urbanShare(bx, bz) > .22) return;
+    if (urbanShare(bx, bz) > .22 || twnHas(bx, bz)) return;
     const t = hashF(i * 5 + 2, j * 9 + 4);
     const flip = hashF(i * 17, j * 13) > .5 ? 1 : -1;
     budget -= 5;
@@ -3687,10 +4400,95 @@ function warpStep(dt) {
     if (SPD.thrSave === undefined) SPD.thrSave = P.thr;
     P.thr = SPD.lever;
     if (AP.on) { AP.mode = ""; AP.accel = 0; }
-    toast("JUMP COMPLETE \u00b7 " + WARP.name.toUpperCase() + " \u00b7 "
-      + navRange(Math.max(warpStandoff(WARP.body) - WARP.body.r, 0)) + " \u00b7 IN ORBIT", 3.6);
     audio.beep(900, .3, .14);
+    arriveStart(WARP.body);
   }
+}
+/* ===== arriving =========================================================
+
+   Crossing four billion kilometres in six seconds and then being handed the
+   controls facing a wall of cloud is not an arrival, it is a teleport. So
+   there is a beat: for half a minute the camera comes off the tail, swings
+   out to one side and holds the aeroplane as a silhouette against the world
+   it has just arrived at, drifting, while a card names the thing and says
+   how big it is, what it weighs on, how long its day is and how far from
+   home you now are.
+
+   Any control ends it instantly — stick, throttle, key, thumb. It is a view,
+   not a cutscene, and nothing about it is allowed to be in the way. */
+const ARRIVE = { on: false, t: 0, dur: 30, body: null, fade: 0 };
+/* Real numbers, because the whole point of the card is that they are real.
+   Day is the rotation period in Earth hours; au is the distance from the Sun,
+   which is what makes Neptune feel like Neptune. */
+const WORLD_FACTS = {
+  Moon:    { day: 655.7,  au: 1.00,  moons: 0,  of: "Earth",
+             note: "Twelve people have stood here. Nobody since 1972." },
+  Mercury: { day: 1407.5, au: 0.39,  moons: 0,  of: "the Sun",
+             note: "430\u00b0C in the day, \u2212180\u00b0C at night. No air to carry the difference." },
+  Venus:   { day: 5832.5, au: 0.72,  moons: 0,  of: "the Sun",
+             note: "Ninety atmospheres of carbon dioxide. It turns backwards." },
+  Mars:    { day: 24.6,   au: 1.52,  moons: 2,  of: "the Sun",
+             note: "A day here is forty minutes longer than one at home." },
+  Jupiter: { day: 9.9,    au: 5.20,  moons: 95, of: "the Sun",
+             note: "Two and a half times the mass of every other planet put together." },
+  Saturn:  { day: 10.7,   au: 9.54,  moons: 146, of: "the Sun",
+             note: "The rings are ten metres thick and two hundred thousand miles across." },
+  Uranus:  { day: 17.2,   au: 19.2,  moons: 28, of: "the Sun",
+             note: "Tipped over on its side. Its poles face the Sun in turn." },
+  Neptune: { day: 16.1,   au: 30.1,  moons: 16, of: "the Sun",
+             note: "Winds of twelve hundred miles an hour, on the least sunlight of anywhere." },
+  Earth:   { day: 23.93,  au: 1.00,  moons: 1,  of: "the Sun",
+             note: "Home. The only one of these with a runway on it." },
+  Sun:     { day: 609.1,  au: 0,     moons: 0,  of: "nothing",
+             note: "Ninety-nine point eight per cent of everything in the solar system." }
+};
+function arriveStart(b) {
+  ARRIVE.on = true; ARRIVE.t = 0; ARRIVE.body = b; ARRIVE.fade = 0;
+  ARRIVE.thr0 = PLANE.thr;
+  cam.init = 0;
+}
+function arriveEnd() {
+  if (!ARRIVE.on) return;
+  ARRIVE.on = false; ARRIVE.t = 0; cam.init = 0;
+}
+function arriveStep(dt) {
+  if (!ARRIVE.on) return;
+  ARRIVE.t += dt;
+  ARRIVE.fade = Math.min(1, ARRIVE.fade + dt * 1.4);
+  if (ARRIVE.t > ARRIVE.dur) arriveEnd();
+}
+/* The camera for it. Off the wing, low, with the world behind the aeroplane
+   and a slow drift across so the light moves. Nothing here touches the
+   flight: the aeroplane is in orbit and stays in it. */
+function arriveCamera() {
+  const P = PLANE, b = ARRIVE.body;
+  const u = clamp(ARRIVE.t / ARRIVE.dur, 0, 1);
+  let toB = vsub(b.p, P.pos);
+  const tl = vlen(toB) || 1;
+  toB = v3(toB.x / tl, toB.y / tl, toB.z / tl);
+  const upw = Math.abs(toB.y) > .92 ? v3(0, 0, 1) : v3(0, 1, 0);
+  const rt = vnorm(vcross(upw, toB));
+  const up2 = vcross(toB, rt);
+  /* Swings from well off one side to nearly behind, and closes in, so the
+     aeroplane grows against the planet instead of sitting still on it. */
+  const ang = -1.05 + u * 1.35;
+  const dist = lerp(155, 62, smooth(clamp(u * 1.25, 0, 1)));
+  const lift = (.20 - u * .10) * dist;
+  cam.pos = v3(
+    P.pos.x + rt.x * Math.sin(ang) * dist + up2.x * lift - toB.x * Math.cos(ang) * dist,
+    P.pos.y + rt.y * Math.sin(ang) * dist + up2.y * lift - toB.y * Math.cos(ang) * dist,
+    P.pos.z + rt.z * Math.sin(ang) * dist + up2.z * lift - toB.z * Math.cos(ang) * dist);
+  const f = vnorm(vsub(P.pos, cam.pos));
+  let r2 = vcross(up2, f);
+  if (vlen(r2) < 1e-5) r2 = vcross(v3(0, 1, 0), f);
+  r2 = vnorm(r2);
+  const u3 = vcross(f, r2);
+  const cm = cam.m;
+  cm[0] = r2.x; cm[1] = r2.y; cm[2] = r2.z;
+  cm[3] = u3.x; cm[4] = u3.y; cm[5] = u3.z;
+  cm[6] = f.x; cm[7] = f.y; cm[8] = f.z;
+  FOV = FOVBASE * lerp(1.06, .86, u);          // a slow push in
+  F = (H * .5) / Math.tan(FOV * .5);
 }
 /* The full stop. Out here the speed hold's brake is sized to wash off
    anything in a second or two, which makes "stop" a thing you can ask for
@@ -3717,6 +4515,7 @@ function resetPlane(scen) {
   const P = PLANE;
   SPD.on = false; SPD.auto = false; SPD.tgt = 0; SPD.ramp = 0;
   WARP.on = false; WARP.t = 0; WARP.cool = 0; WARP.flash = 0; WARP.fade = 0; WARP.spd = 0;
+  ARRIVE.on = false; ARRIVE.t = 0; ARRIVE.body = null;
   P.vel = v3(); P.w = v3(); P.thr = 0; P.dE = P.dA = P.dR = 0;
   P.inE = P.inA = P.inR = 0; P.trim = 0; P.flap = P.flapCmd = 0;
   P.crashed = false; P.crashT = 0; P.stall = 0; P.hardLand = 0; P.touched = 0; P.pitchI = 0; P.holdHdg = undefined;
@@ -5417,6 +6216,7 @@ const CAMSHORT = ["CHASE", "CKPIT", "ORBIT", "WING", "TOWER"];
 let orbitA = 0;
 function updateCamera(dt) {
   const P = PLANE, m = P.m;
+  if (ARRIVE.on && ARRIVE.body && !P.crashed) { arriveCamera(); return; }
   const fwd = v3(m[6], m[7], m[8]), up = v3(m[3], m[4], m[5]), right = v3(m[0], m[1], m[2]);
   let want, look, rollBlend = 1;
   if (camMode === 1) {                      // cockpit
@@ -6187,9 +6987,14 @@ function drawBodyNear(b, d, fade) {
      else: fine enough for a world made of noise, and no more. Throwing six
      thousand quads at the Earth to resolve geography the raster is about to
      draw properly cost twenty milliseconds a frame for nothing. */
-  const fine = Q.i >= 2, px = fine ? 23 : 34;
-  let NR = clamp(Math.round(scr / px), 12, fine ? 32 : 20);
-  let NS = clamp(Math.round(TAU * scr / (px * 1.5)), 26, fine ? 96 : 48);
+  /* Finer, and with a higher ceiling on how fine. Both numbers already scale
+     with how big the thing is on the glass, so raising the cap costs nothing
+     at all until a world actually fills the screen — which, now that a jump
+     puts you two radii off one, it does. At twenty pixels a facet Neptune
+     was visibly a polyhedron. */
+  const fine = Q.i >= 2, px = fine ? 17 : 30;
+  let NR = clamp(Math.round(scr / px), 12, fine ? 44 : 22);
+  let NS = clamp(Math.round(TAU * scr / (px * 1.5)), 26, fine ? 128 : 54);
   /* Rings even on the SCREEN, not on the sphere. From four hundred kilometres
      up the visible cap is twenty degrees of surface and a hundred and forty
      degrees of sky: spaced evenly in surface angle, nine rings out of ten
@@ -6402,7 +7207,13 @@ function drawBodyNear(b, d, fade) {
    in it at all, and an asin and an atan2 per pixel is most of a millisecond
    a frame. It carries the albedo in its colour and the city lights in its
    alpha, and it is built a few rows at a time so it never costs a frame. */
-const ETEX = { N: 512, dat: null, row: 0, done: false };
+/* A thousand and twenty-four across on anything but a phone, where it used
+   to be five hundred and twelve everywhere. Five hundred and twelve is eighty
+   kilometres to a texel: superb from the Moon and a blur from low orbit,
+   which is exactly where a jump now drops you. Four times the pixels is four
+   megabytes and four times the bake, and the bake is on a time budget, so it
+   simply takes a few more seconds of the climb and nothing else changes. */
+const ETEX = { N: MOBILE ? 640 : 1024, dat: null, row: 0, done: false };
 /* A time budget, not a row count. A row of this thing is half a thousand
    elevation lookups and it is not cheap; counting rows made the first second
    of every climb cost twenty milliseconds a frame and the quality tuner
@@ -6605,11 +7416,28 @@ function drawBody(b) {
   const scrR = F * b.r / Math.max(d, 1);
   if (!b.sun && (d < b.r * NEARBODY || !c || (b.home && scrR > 4))) {
     // the mesh covers the second or two the bake takes, and then never again
-    if (b.home && ETEX.done) {
-      drawEarthRaster(b, d, clamp((LIGHT.far || 0) * 2, 0, 1));
-      return;
+    if (b.home && ETEX.done) drawEarthRaster(b, d, clamp((LIGHT.far || 0) * 2, 0, 1));
+    else drawBodyNear(b, d, b.home ? clamp((LIGHT.far || 0) * 2, 0, 1) : fade);
+    /* And, up close, the two things the disc renderer was doing that the
+       surface renderer was not: the rings, and the lit rim of the air. Both
+       of them are the reason a world looks like a world rather than a ball of
+       terrain, and both of them were switched off at exactly the range where
+       you are close enough to see them. */
+    if (b.ring) { if (!b.ax && BODYART[b.name]) bodyFeatures(b, BODYART[b.name]); drawRing3D(b, d); }
+    if (c && BODYART[b.name] && BODYART[b.name].atm) {
+      const sinT2 = clamp(b.r / Math.max(d, b.r), 0, .999);
+      const rp2 = F * sinT2 / Math.sqrt(1 - sinT2 * sinT2);
+      let ax2 = SUNBODY.p.x - b.p.x, ay2 = SUNBODY.p.y - b.p.y, az2 = SUNBODY.p.z - b.p.z;
+      const al2 = Math.hypot(ax2, ay2, az2) || 1; ax2 /= al2; ay2 /= al2; az2 /= al2;
+      const cph = clamp(ax2 * (-dx / d) + ay2 * (-dy / d) + az2 * (-dz / d), -1, 1);
+      const sp3 = projectRaw(v3(b.p.x + ax2 * b.r, b.p.y + ay2 * b.r, b.p.z + az2 * b.r));
+      let ux2 = 1, uy2 = 0;
+      if (sp3) {
+        const ex2 = sp3.x - c.x, ey2 = sp3.y - c.y, el2 = Math.hypot(ex2, ey2);
+        if (el2 > 1e-6) { ux2 = ex2 / el2; uy2 = ey2 / el2; }
+      }
+      if (rp2 < W * 4) drawBodyAir(b, c, d, rp2, fade, cph, ux2, uy2);
     }
-    drawBodyNear(b, d, b.home ? clamp((LIGHT.far || 0) * 2, 0, 1) : fade);
     return;
   }
   if (!c) return;
@@ -6670,7 +7498,7 @@ function drawBody(b) {
   }
   DL.poly(d + 1, full, NS, rgb(dark[0], dark[1], dark[2]), null, 0);
 
-  if (b.ring) drawRing(b, c, rp, ux, uy, wx, wy, d, cosPh);
+  if (b.ring) { if (!b.ax) bodyFeatures(b, BODYART[b.name]); drawRing3D(b, d); }
 
   /* The lit part: the sunward half of the limb, then the terminator ellipse
      back again. The ellipse reaches -cosPh along the sunward axis, NOT
@@ -6701,6 +7529,91 @@ function drawBody(b) {
 }
 
 /* Saturn, because it would be a waste not to. */
+/* ---- a ring system, in three dimensions --------------------------------
+
+   The old one was a painted ellipse behind the disc, which is exactly right
+   while Saturn is a dot in the sky and exactly wrong the moment you are at
+   it: come out of a jump twenty thousand miles off and the most famous
+   object in the solar system had no rings at all, because the renderer that
+   drew them was the one for things too far away to see.
+
+   This is the real thing: an annulus of quads in the ring plane, at their own
+   depths, so the planet occludes the far half and the near half crosses in
+   front of it without anything being told which is which. Four bands with the
+   Cassini division between the B and the A, brightness by how open they are
+   to the Sun, and the planet's own shadow falling across them — which is the
+   detail that makes it read as a solid object lit from one side rather than a
+   decal. */
+function drawRing3D(b, d) {
+  const ax = b.ax || [0, 1, 0];
+  const pr = orthoPair(ax), e1 = pr[0], e2 = pr[1];
+  const cp = cam.pos, m = cam.m;
+  let sx = SUNBODY.p.x - b.p.x, sy = SUNBODY.p.y - b.p.y, sz = SUNBODY.p.z - b.p.z;
+  const sl = Math.hypot(sx, sy, sz) || 1; sx /= sl; sy /= sl; sz /= sl;
+  // how open the rings are to the Sun, and to the eye
+  const sunTilt = Math.abs(sx * ax[0] + sy * ax[1] + sz * ax[2]);
+  const vxr = (cp.x - b.p.x) / d, vyr = (cp.y - b.p.y) / d, vzr = (cp.z - b.p.z) / d;
+  const eyeTilt = Math.abs(vxr * ax[0] + vyr * ax[1] + vzr * ax[2]);
+  const rp = F * b.r / Math.max(d, 1);
+  if (rp < 2.5) return;
+  const NSEG = clamp(Math.round(rp * .5) * 2, 44, 128);
+  const BANDS = [
+    [1.11, 1.24, .16, [188, 174, 150]],   // C, the crepe ring: thin and grey
+    [1.24, 1.52, .62, [232, 216, 184]],   // B, the bright one
+    [1.53, 1.71, .44, [214, 198, 168]],
+    [1.95, 2.02, .30, [206, 192, 164]],   // A, outside the Cassini division
+    [2.02, 2.27, .40, [220, 204, 172]]
+  ];
+  const P4 = new Float32Array(12);
+  for (const band of BANDS) {
+    const r0 = band[0] * b.r, r1 = band[1] * b.r, al = band[2], col = band[3];
+    for (let s = 0; s < NSEG; s++) {
+      const t0 = s / NSEG * TAU, t1 = (s + 1) / NSEG * TAU;
+      const c0 = Math.cos(t0), n0 = Math.sin(t0), c1 = Math.cos(t1), n1 = Math.sin(t1);
+      const put = (k, r, cc, ss) => {
+        P4[k] = b.p.x + (e1[0] * cc + e2[0] * ss) * r;
+        P4[k + 1] = b.p.y + (e1[1] * cc + e2[1] * ss) * r;
+        P4[k + 2] = b.p.z + (e1[2] * cc + e2[2] * ss) * r;
+      };
+      put(0, r0, c0, n0); put(3, r1, c0, n0); put(6, r1, c1, n1); put(9, r0, c1, n1);
+      let front = false, dsum = 0;
+      for (let k = 0; k < 4; k++) {
+        const px = P4[k * 3] - cp.x, py = P4[k * 3 + 1] - cp.y, pz = P4[k * 3 + 2] - cp.z;
+        const vx = m[0] * px + m[1] * py + m[2] * pz, vy = m[3] * px + m[4] * py + m[5] * pz,
+          vz = m[6] * px + m[7] * py + m[8] * pz;
+        _vp[k * 3] = vx; _vp[k * 3 + 1] = vy; _vp[k * 3 + 2] = vz;
+        if (vz >= NEAR) front = true;
+        dsum += Math.hypot(px, py, pz);
+      }
+      if (!front) continue;
+      const mm = clipProject(4);
+      if (mm < 3 || offscreen(mm)) continue;
+      /* The planet's shadow: a cylinder of its own radius cast down-sun. A
+         ring particle is in it if it is on the far side of the planet from
+         the Sun and within a radius of the axis of that cylinder. */
+      const mxr = (P4[0] + P4[6]) * .5 - b.p.x, myr = (P4[1] + P4[7]) * .5 - b.p.y,
+        mzr = (P4[2] + P4[8]) * .5 - b.p.z;
+      const along = mxr * sx + myr * sy + mzr * sz;
+      let shade2 = 1;
+      if (along < 0) {
+        const px2 = mxr - sx * along, py2 = myr - sy * along, pz2 = mzr - sz * along;
+        const off = Math.hypot(px2, py2, pz2);
+        shade2 = clamp((off - b.r * .96) / (b.r * .30), .10, 1);
+      }
+      /* Seen edge-on a ring almost vanishes, and seen face-on it is at its
+         brightest — both because there is less of it in the line of sight and
+         because the Sun is hitting the flat of it. */
+      const bright = (.20 + .80 * sunTilt) * (.30 + .70 * Math.pow(eyeTilt, .55));
+      const a2 = clamp(al * bright * shade2, 0, .96);
+      if (a2 < .015) continue;
+      const lc = [col[0] * (.55 + .45 * shade2), col[1] * (.55 + .45 * shade2),
+                  col[2] * (.55 + .45 * shade2)];
+      DL.poly(dsum * .25, _sp, mm,
+        "rgba(" + (lc[0] | 0) + "," + (lc[1] | 0) + "," + (lc[2] | 0) + "," + a2.toFixed(3) + ")",
+        null, 0);
+    }
+  }
+}
 function drawRing(b, c, rp, ux, uy, wx, wy, d, cosPh) {
   const inner = 1.24, outer = 2.27;                 // in planet radii, real
   const tilt = .42;                                 // how open the rings are
@@ -7223,6 +8136,69 @@ function drawWarpFX() {
   }
   ctx.restore();
 }
+/* The arrival card. Letterboxed, because the black bars are what tell you
+   the aeroplane is not being flown at this moment and nothing is going
+   wrong; and one line at the bottom saying how to leave, because a view you
+   cannot get out of is a cutscene. */
+function drawArrive() {
+  if (!ARRIVE.on || !ARRIVE.body) return;
+  const b = ARRIVE.body, u = UI;
+  const t = ARRIVE.t, dur = ARRIVE.dur;
+  const inn = smooth(clamp(t / 1.1, 0, 1));
+  const out = 1 - smooth(clamp((t - (dur - 1.2)) / 1.2, 0, 1));
+  const a = inn * out;
+  if (a <= .002) return;
+  ctx.save();
+  // letterbox
+  const bar = H * .085 * a;
+  ctx.fillStyle = "rgba(2,4,8,.92)";
+  ctx.fillRect(0, 0, W, bar); ctx.fillRect(0, H - bar, W, bar);
+  const F2 = WORLD_FACTS[b.name] || { day: 24, moons: 0, note: "" };
+  const dEarth = Math.hypot(b.p.x - HOMEBODY.p.x, b.p.y - HOMEBODY.p.y, b.p.z - HOMEBODY.p.z);
+  const gsurf = b.gm > 0 ? b.gm / (b.r * b.r) / 9.81 : (b.home ? 1 : 0);
+  const rows = [
+    ["DIAMETER", comma(b.r * 2 * M_MI) + " mi"],
+    ["GRAVITY", gsurf > 0 ? gsurf.toFixed(2) + " g" : "\u2014"],
+    ["DAY", F2.day >= 48 ? (F2.day / 24).toFixed(1) + " days" : F2.day.toFixed(1) + " h"],
+    ["MOONS", String(F2.moons)],
+    ["FROM EARTH", b.home ? "you are home" : navRange(dEarth)]
+  ];
+  // the plate
+  const pw = Math.min(W * .78, 720 * u), ph = 108 * u;
+  const px = CX - pw / 2, py = H - bar - ph - 26 * u;
+  const slide = (1 - inn) * 30 * u;
+  ctx.globalAlpha = a;
+  box(px, py + slide, pw, ph, 12 * u, "rgba(5,10,18,.80)", "rgba(120,190,240,.40)");
+  ctx.textBaseline = "alphabetic";
+  ctx.textAlign = "left";
+  hudFont(27 * u, 800); ctx.fillStyle = "rgba(232,246,255,.98)";
+  ctx.fillText(b.name.toUpperCase(), px + 20 * u, py + slide + 36 * u);
+  hudFont(10.5 * u, 600); ctx.fillStyle = "rgba(150,196,228,.9)";
+  ctx.fillText("ARRIVED \u00b7 IN ORBIT \u00b7 " + navRange(Math.max(
+    Math.hypot(PLANE.pos.x - b.p.x, PLANE.pos.y - b.p.y, PLANE.pos.z - b.p.z) - b.r, 0)) + " UP",
+    px + 20 * u, py + slide + 52 * u);
+  // the numbers, revealed one after another
+  const cw = (pw - 40 * u) / rows.length;
+  for (let i = 0; i < rows.length; i++) {
+    const ra = clamp((t - .35 - i * .16) / .4, 0, 1);
+    if (ra <= 0) continue;
+    ctx.globalAlpha = a * ra;
+    const x = px + 20 * u + cw * i;
+    hudFont(9 * u, 700); ctx.fillStyle = "rgba(130,172,205,.85)";
+    ctx.fillText(rows[i][0], x, py + slide + 76 * u);
+    hudFont(15 * u, 700); ctx.fillStyle = "rgba(210,236,255,.96)";
+    ctx.fillText(rows[i][1], x, py + slide + 96 * u);
+  }
+  ctx.globalAlpha = a * clamp((t - 1.5) / .8, 0, 1);
+  hudFont(11.5 * u, 600); ctx.fillStyle = "rgba(190,214,236,.80)";
+  ctx.textAlign = "center";
+  ctx.fillText(F2.note, CX, py + slide - 14 * u);
+  ctx.globalAlpha = a * clamp((t - 2.4) / 1.0, 0, 1) * (.45 + .3 * (.5 + .5 * Math.sin(t * 2.2)));
+  hudFont(10 * u, 700); ctx.fillStyle = "rgba(226,244,255,.9)";
+  ctx.fillText("ANY CONTROL TO FLY", CX, H - bar - 9 * u);
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
 function drawMap() {
   if (!NAV.map || typeof BODIES === "undefined") return;
   const u = UI, P = PLANE;
@@ -7534,6 +8510,39 @@ const LOG = {
   worlds: {}, stations: {}
 };
 const LOG_KEY = "skyward.log.v1";
+/* ---- the build, and telling you what changed in it ----------------------
+
+   A single card, once per build, and never again unless the number moves.
+   The number is the point: it is the thing you can quote back when something
+   is wrong, and the list under it is what to go and look at. */
+const BUILD = {
+  no: 33,
+  name: "HOHENWALD, FOR REAL",
+  date: "30 SEP 2026",
+  notes: [
+    ["HOHENWALD", "The town is a hand-built model of the real one out to ten miles: Main Street and Park Avenue crossing at the square, the courthouse, the brick storefronts, the residential grid, the schools and their ball fields, the water tower, the industrial sheds on the south side and the highways running out to Columbia, Centerville, Summertown, Waynesboro and Linden."],
+    ["PLANETS", "Saturn has rings from close up, every world with air has a lit limb against the black, and the ground you arrive over is the ground you can land on."],
+    ["ARRIVAL", "Coming out of a jump is now a thirty-second arrival: the camera holds the world while the card gives you its size, its gravity, its day and how far from home you are. Any control skips it."],
+    ["HANGAR", "The start screen is a hangar with the aeroplane in it. Pick a livery, pick a pilot, put your name on it — and it is your name on the HUD from then on."],
+    ["THIS CARD", "Shown once per build. The number in the corner is the build."]
+  ]
+};
+const NEWS_KEY = "skyward.build";
+function newsShow(force) {
+  const m = document.getElementById("news");
+  if (!m) return;
+  document.getElementById("newsVer").textContent = BUILD.name + " \u00b7 " + BUILD.date;
+  document.getElementById("newsNo").textContent = BUILD.no;
+  document.getElementById("newsList").innerHTML = BUILD.notes.map(n =>
+    "<div class=\"nitem\"><s>" + n[0] + "</s><div>" + n[1] + "</div></div>").join("");
+  m.classList.remove("hide");
+  document.getElementById("menu").classList.add("hide");
+}
+function newsSeen() {
+  try { localStorage.setItem(NEWS_KEY, String(BUILD.no)); } catch (e) {}
+  document.getElementById("news").classList.add("hide");
+  if (!GAME.started) document.getElementById("menu").classList.remove("hide");
+}
 (function logLoad() {
   try {
     const o = JSON.parse(localStorage.getItem(LOG_KEY) || "null");
@@ -7626,7 +8635,9 @@ function fillLog() {
     bit(LOG.land + "/100", "best landing"),
     bit(LOG.flights, "flights"),
     bit(LOG.saves, "times the airframe held")
-  ].join(" &middot; ") + (w.length ? "<br>" + w.join(" &middot; ") : "");
+  ].join(" &middot; ") + (KIT.name || KIT.call
+    ? "<br><b>" + (KIT.name || "—") + (KIT.call ? " &ldquo;" + KIT.call + "&rdquo;" : "")
+      + "</b>&nbsp;flying " + LIVERIES[KIT.liv].name.toLowerCase() : "") + (w.length ? "<br>" + w.join(" &middot; ") : "");
 }
 
 const GAME = {
@@ -8617,7 +9628,8 @@ function drawHUDFull() {
   hudFont(12.5 * U); ctx.textAlign = "center"; ctx.fillStyle = "rgba(200,224,244,.8)";
   ctx.fillText(obj, CX, H - 74 * U);
   hudFont(11 * U); ctx.fillStyle = "rgba(140,158,178,.75)";
-  ctx.fillText(CAMNAMES[camMode] + "  ·  " + (AP.on ? "AUTOPILOT ON" : "MANUAL") + "  ·  L controls  ·  H help", CX, hy + 74 * U);
+  ctx.fillText((pilotName() ? pilotName() + "  ·  " : "") + CAMNAMES[camMode]
+    + "  ·  " + (AP.on ? "AUTOPILOT ON" : "MANUAL") + "  ·  L controls  ·  H help", CX, hy + 74 * U);
 
   // direction cue to the next objective
   const tgt = SCEN === "rings" ? (GAME.rings[GAME.ringIdx] && GAME.rings[GAME.ringIdx].p) : v3(0, E, 950);
@@ -9052,6 +10064,50 @@ const KEYMAP = {
 fillLog();
 syncSafeRow();
 syncFreeRow();
+/* ---- the customiser -----------------------------------------------------
+   Every control here rebuilds the mesh and the pilot on the spot, so the
+   thing turning slowly in the hangar behind the card is always the aeroplane
+   you are about to fly, in the paint you just chose. */
+function swatches(el, list, key) {
+  el.innerHTML = list.map((s, i) =>
+    "<button class=\"chip" + (KIT[key] === i ? " on" : "") + "\" data-i=\"" + i +
+    "\" style=\"background:rgb(" + s[1][0] + "," + s[1][1] + "," + s[1][2] + ")\" title=\"" +
+    s[0] + "\"><i>" + s[0] + "</i></button>").join("");
+  el.querySelectorAll(".chip").forEach(btn => btn.addEventListener("click", () => {
+    KIT[key] = +btn.dataset.i; kitSave(); rebuildAircraft(); swatches(el, list, key);
+  }));
+}
+function fillLiveries() {
+  const el = document.getElementById("livRow");
+  el.innerHTML = LIVERIES.map((L, i) =>
+    "<button class=\"opt" + (KIT.liv === i ? " on" : "") + "\" data-i=\"" + i + "\"><b>" +
+    L.name + "</b><i>" + L.note + "</i></button>").join("");
+  el.querySelectorAll(".opt").forEach(btn => btn.addEventListener("click", () => {
+    KIT.liv = +btn.dataset.i; kitSave(); rebuildAircraft(); fillLiveries();
+  }));
+}
+fillLiveries();
+swatches(document.getElementById("trimRow"), TRIMS, "trim");
+swatches(document.getElementById("helmRow"), HELMETS, "helm");
+swatches(document.getElementById("visorRow"), VISORS, "visor");
+swatches(document.getElementById("suitRow"), SUITS, "suit");
+(function pilotFields() {
+  const nm = document.getElementById("pName"), cl = document.getElementById("pCall");
+  nm.value = KIT.name; cl.value = KIT.call;
+  const upd = () => {
+    KIT.name = nm.value.slice(0, 18);
+    KIT.call = cl.value.slice(0, 10);
+    kitSave();
+  };
+  nm.addEventListener("input", upd); cl.addEventListener("input", upd);
+  /* The keyboard flies the aeroplane, so a field with focus has to swallow
+     its keys or typing an "R" in your own name resets the flight. */
+  for (const f of [nm, cl]) {
+    f.addEventListener("keydown", e => e.stopPropagation());
+    f.addEventListener("keyup", e => e.stopPropagation());
+  }
+})();
+const pilotName = () => (KIT.call ? KIT.call.toUpperCase() : (KIT.name ? KIT.name.toUpperCase() : "")); 
 (function fillKeys() {
   const el = document.getElementById("keyList");
   const rows = KEYMAP.common;
@@ -9099,6 +10155,7 @@ function onKeyPress(k) {
   if (lk === "escape" || lk === "p") { togglePause(); return; }
   if (lk === "h") { togglePause(); return; }
   if (GAME.paused) return;
+  if (ARRIVE.on) arriveEnd();
   if (lk === "c") { camMode = (camMode + 1) % CAMNAMES.length; toast("CAMERA: " + CAMNAMES[camMode], 1.2); }
   if (lk === "r") { startFlight(); }
   if (lk === "k") { toggleSafe(); }
@@ -9194,6 +10251,11 @@ function applyInput(dt) {
   // brakes
   const held = (K[" "] || touchHeld("brake")) ? 1 : 0;
   P.brake = clamp(approach(P.brake, Math.max(held, P.park && P.onGround ? 1 : 0), 12, dt), 0, 1);
+  /* Any control at all ends the arrival. It is a view, not a cutscene: the
+     moment the pilot does anything, the camera is theirs again. */
+  if (ARRIVE.on && (Math.abs(P.inE) + Math.abs(P.inA) + Math.abs(P.inR) > .10
+    || Math.abs(P.thr - (ARRIVE.thr0 || 0)) > .02 || stick || held))
+    arriveEnd();
 }
 
 /* ============================================================== flow ==== */
@@ -9254,6 +10316,12 @@ document.getElementById("startBtn").addEventListener("click", () => {
   if (GAME.started && GAME.paused && !dirty) { togglePause(); return; }
   startFlight();
 });
+document.getElementById("newsBtn").addEventListener("click", newsSeen);
+(function newsMaybe() {
+  let seen = null;
+  try { seen = localStorage.getItem(NEWS_KEY); } catch (e) {}
+  if (seen !== String(BUILD.no)) newsShow();
+})();
 
 /* ============================================================== loop ==== */
 let last = performance.now(), fps = 60, acc = 0;
@@ -9268,6 +10336,7 @@ function frame(now) {
     WIND.t += dt;
     applyInput(dt);
     if (WARP.cool > 0) WARP.cool = Math.max(0, WARP.cool - dt);
+    arriveStep(dt);
     if (WARP.flash > 0 && !WARP.on) WARP.flash = Math.max(0, WARP.flash - dt * 2.2);
     if (WARP.on) {
       /* The corridor replaces the integrator rather than running beside it.
@@ -9305,14 +10374,29 @@ function frame(now) {
   } else if (GAME.started) {
     updateCamera(0);
   } else {
-    // slow fly-by of the field behind the menu
-    const a = now * .00007;
-    cam.pos = v3(Math.cos(a) * 900, E + 320, Math.sin(a) * 900 + 200);
-    const look = v3(0, E + 20, 0);
+    /* The start screen: standing in the hangar with it. The aeroplane is
+       parked on the lead-in line, the camera walks a slow arc around the nose
+       from just inside the door, and everything the pilot picks in the menu
+       is on the machine in front of them before they let go of the button. */
+    PLANE.pos = v3(HANGAR.pos.x, HANGAR.pos.y, HANGAR.pos.z);
+    PLANE.q = [HANGAR.q[0], HANGAR.q[1], HANGAR.q[2], HANGAR.q[3]];
+    qMat(PLANE.q, PLANE.m);
+    PLANE.gear = PLANE.gearCmd = 1; PLANE.flap = PLANE.flapCmd = 0;
+    PLANE.vel = v3(); PLANE.thr = 0; PLANE.rpm = 0; PLANE.abSm = 0; PLANE.heat = 0;
+    PLANE.dE = PLANE.dA = PLANE.dR = 0; PLANE.chute = 0; PLANE.crashed = false;
+    /* The camera stays INSIDE. The shed is seventy-eight metres across and
+       an orbit of forty puts the eye in the wall, which is a grey rectangle
+       and not a start screen. */
+    const a = now * .00009;
+    cam.pos = v3(HANGAR.x + 20 + Math.sin(a * .62) * 3.2,
+                 E + 2.9 + Math.sin(a * 1.15) * .55,
+                 HANGAR.z + Math.sin(a) * 15);
+    const look = v3(HANGAR.pos.x + 6, E + 3.5, HANGAR.pos.z);
     const f2 = vnorm(vsub(look, cam.pos)), r2 = vnorm(vcross(v3(0, 1, 0), f2)), u2 = vcross(f2, r2);
     cam.m[0] = r2.x; cam.m[1] = r2.y; cam.m[2] = r2.z;
     cam.m[3] = u2.x; cam.m[4] = u2.y; cam.m[5] = u2.z;
     cam.m[6] = f2.x; cam.m[7] = f2.y; cam.m[8] = f2.z;
+    FOV = FOVBASE * 1.05; F = (H * .5) / Math.tan(FOV * .5);
   }
 
   // ---- render ----
@@ -9327,26 +10411,46 @@ function frame(now) {
   drawTerrain();
   // the airfield was gated on horizontal distance alone, so it stayed in
   // view all the way to the Moon if you climbed straight up off the runway
-  if (onPlanet() && Math.hypot(cam.pos.x, cam.pos.z) < 40000)
+  if (onPlanet() && Math.hypot(cam.pos.x, cam.pos.z) < 40000) {
     drawMesh(AIRPORT, v3(0, 0, 0), mIdent(), null);
-  drawLakes();
-  drawTrees();
-  drawRoadsRivers();
-  drawCities();
+    if (Math.hypot(cam.pos.x - HANGAR.x, cam.pos.z - HANGAR.z) < 3200)
+      drawMesh(HANGARMESH, v3(0, 0, 0), mIdent(), null);
+  }
+  /* On the start screen the camera is INSIDE a steel shed looking at the
+     back wall of it. Every tree, town, lake and road in the county is behind
+     that wall or behind the camera, and drawing them cost twenty-seven
+     milliseconds to render a building's interior — eighteen frames a second
+     on the first thing anybody sees. None of it is visible and none of it is
+     drawn. */
+  if (GAME.started) {
+    drawLakes();
+    drawTrees();
+    drawRoadsRivers();
+    drawCities();
+  }
   if (GAME.rings.length) drawRings();
   if (GAME.started) { drawShadow(); drawAircraft(); }
+  else if (PILOTMESH) {
+    /* In the hangar only: the aeroplane, and the pilot standing at the nose
+       looking at it, which is what a pilot does. */
+    drawAircraft();
+    drawMesh(PILOTMESH, v3(HANGAR.pos.x + 15.5, E + .05, HANGAR.pos.z + 4.6),
+      mAxis(0, 1, 0, -2.25), null);
+  }
   drawParts();
   drawClouds();
   DL.flush();
   drawReentryWash(PLANE);
-  drawLandmarks();
+  if (GAME.started) drawLandmarks();
   drawGlare();
   if (Q.q.vig && vignette) { ctx.fillStyle = vignette; ctx.fillRect(0, 0, W, H); }
   drawWarpFX();
   // the nav marker is exactly where the jump read-out is, so it stands down
   if (GAME.started && !GAME.paused) {
-    drawGEffect(PLANE); drawHUD(dt); drawStationTags();
-    if (!WARP.on) drawNavMarker();
+    drawGEffect(PLANE);
+    if (!ARRIVE.on) { drawHUD(dt); drawStationTags(); }
+    if (!WARP.on && !ARRIVE.on) drawNavMarker();
+    drawArrive();
     drawMap();
   }
   tuneQuality(dt, performance.now() - work0);
