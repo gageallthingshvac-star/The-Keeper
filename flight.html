@@ -107,19 +107,72 @@
      goes away entirely. */
   #menu{background:none;backdrop-filter:none;pointer-events:none;overflow:visible;
     padding:0;align-items:stretch;justify-content:flex-end}
-  #menu .card{pointer-events:auto;width:min(460px,42vw);margin:0;height:100%;overflow:auto;
+  /* The card is a fixed head, a scrolling middle and a fixed foot. One long
+     scroll meant the button that actually starts the flight was four screens
+     down, and the tabs mean nothing is more than one tap away. */
+  #menu .card{pointer-events:auto;width:min(470px,42vw);margin:0;height:100%;overflow:hidden;
+    display:flex;flex-direction:column;padding:0;
     border-radius:0;border-width:0 0 0 1px;box-shadow:-24px 0 60px rgba(0,0,0,.55);
-    background:linear-gradient(180deg,rgba(6,11,18,.94),rgba(4,8,13,.965));
-    padding:calc(20px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right))
-            calc(20px + env(safe-area-inset-bottom)) 20px}
+    background:linear-gradient(180deg,rgba(6,11,18,.95),rgba(4,8,13,.975));
+    --padx:20px; --padr:calc(20px + env(safe-area-inset-right));
+    --padt:calc(16px + env(safe-area-inset-top)); --padb:calc(14px + env(safe-area-inset-bottom))}
+  .mhead{flex:0 0 auto;padding:var(--padt) var(--padr) 0 var(--padx);
+    border-bottom:1px solid var(--edge);background:rgba(3,7,12,.5)}
+  .mbody{flex:1 1 auto;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;
+    padding:14px var(--padr) 10px var(--padx)}
+  .mfoot{flex:0 0 auto;padding:12px var(--padr) var(--padb) var(--padx);
+    border-top:1px solid var(--edge);background:rgba(3,7,12,.62)}
+  .mfoot .go{margin-top:0}
+  .tabs{display:flex;gap:3px;margin:12px 0 0}
+  .tabs button{flex:1 1 0;min-width:0;font:inherit;font-size:10.5px;letter-spacing:.10em;font-weight:700;
+    padding:11px 2px 9px;border:0;border-bottom:2px solid transparent;background:none;color:var(--dim);
+    cursor:pointer;border-radius:8px 8px 0 0;transition:color .15s,background .15s,border-color .15s}
+  .tabs button:hover{color:var(--ink);background:rgba(255,255,255,.05)}
+  .tabs button.on{color:var(--accent);border-bottom-color:var(--accent);background:rgba(111,211,255,.09)}
+  section[data-pane]{display:none}
+  section[data-pane].on{display:block;animation:panefade .22s ease}
+  @keyframes panefade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+  section[data-pane] h2:first-child{margin-top:2px}
+  .ghost{width:100%;margin-top:8px;padding:11px;font:inherit;font-size:11px;letter-spacing:.14em;
+    background:rgba(255,255,255,.04);border:1px solid var(--edge);color:var(--dim);
+    border-radius:9px;cursor:pointer}
+  .ghost:hover{color:#ffd9cf;border-color:rgba(255,120,96,.55);background:rgba(255,120,96,.10)}
   @media (max-width:900px),(orientation:portrait){
     #menu{align-items:flex-end;justify-content:stretch}
-    #menu .card{width:100%;height:62%;border-width:1px 0 0;border-radius:16px 16px 0 0;
+    #menu .card{width:100%;height:60%;border-width:1px 0 0;border-radius:16px 16px 0 0;
       box-shadow:0 -24px 60px rgba(0,0,0,.55);
-      padding:14px calc(15px + env(safe-area-inset-right))
-              calc(15px + env(safe-area-inset-bottom)) calc(15px + env(safe-area-inset-left))}
-    #menu .card::before{content:"";display:block;width:44px;height:4px;border-radius:3px;
-      background:rgba(150,190,225,.35);margin:-4px auto 12px}
+      --padx:calc(15px + env(safe-area-inset-left)); --padr:calc(15px + env(safe-area-inset-right));
+      --padt:12px; --padb:calc(12px + env(safe-area-inset-bottom))}
+    .mhead::before{content:"";display:block;width:44px;height:4px;border-radius:3px;
+      background:rgba(150,190,225,.35);margin:-4px auto 10px}
+    .tabs button{font-size:10px;padding:10px 1px 8px;letter-spacing:.06em}
+    .mfoot .foot{display:none}
+    /* One option per line reads as a list; two ragged columns of different
+       lengths read as a mess. The blurb is clamped to three lines unless it
+       is the one you have chosen, which is the only one you need to read. */
+    #scenRow .opt,#livRow .opt,#pitchRow .opt,#safeRow .opt,#freeRow .opt{flex:1 1 100%}
+    .opt i{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+    .opt.on i{-webkit-line-clamp:99}
+  }
+  /* A phone on its side has four hundred points of glass from top to bottom
+     and the card has to live inside that: the title shrinks, the strapline
+     and the key line go, and what is left is the part you came for. */
+  @media (max-height:560px){
+    #menu .card{--padt:calc(10px + env(safe-area-inset-top));--padb:calc(8px + env(safe-area-inset-bottom))}
+    .mhead h1{font-size:18px;letter-spacing:.13em}
+    .mhead .sub{display:none}
+    .tabs{margin-top:8px}
+    .tabs button{padding:8px 1px 7px;font-size:9.5px;letter-spacing:.05em}
+    .mbody{padding-top:10px}
+    .mfoot{padding-top:8px}
+    .mfoot .foot{display:none}
+    .mfoot .go{padding:12px;font-size:13px}
+    .ghost{padding:9px;font-size:10px}
+    .tapnote{padding:7px 9px;margin-bottom:10px;font-size:10px;line-height:1.4}
+    h2{margin:10px 0 6px}
+    #scenRow .opt,#livRow .opt,#pitchRow .opt,#safeRow .opt,#freeRow .opt{flex:1 1 100%}
+    .opt i{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+    .opt.on i{-webkit-line-clamp:99}
   }
   /* The two things you can touch out there, and the two sections in here. */
   .sect{border-radius:12px;padding:1px 10px 8px;margin:0 -10px;scroll-margin-top:8px;
@@ -157,65 +210,85 @@
 
   <div class="modal" id="menu">
     <div class="card">
-      <h1>BLACK<span>BIRD</span></h1>
-      <div class="sub">Mach&nbsp;3 reconnaissance jet &mdash; fly-by-wire, software-rendered, no plugins</div>
-      <div class="tapnote">Tap the <b>aeroplane</b> or the <b>pilot</b> in the hangar to walk up to them and change them. Tap the floor to step back.</div>
-
-      <h2>Pitch sense</h2>
-      <div class="row" id="pitchRow">
-        <button class="opt on" data-pitch="real"><b>PULL BACK TO CLIMB</b><i>What a control stick really does. <kbd>&darr;</kbd> or thumb back raises the nose, <kbd>&uarr;</kbd> or thumb forward drops it. Swap any time with <kbd>T</kbd>.</i></button>
-        <button class="opt" data-pitch="direct"><b>PUSH UP TO CLIMB</b><i>Arcade sense. <kbd>&uarr;</kbd> or thumb forward raises the nose.</i></button>
+      <div class="mhead">
+        <h1>BLACK<span>BIRD</span></h1>
+        <div class="sub">Mach&nbsp;3 reconnaissance jet &mdash; fly-by-wire, software-rendered, no plugins</div>
+        <nav class="tabs" id="tabs">
+          <button class="on" data-tab="flight">FLIGHT</button>
+          <button data-tab="plane">PLANE</button>
+          <button data-tab="pilot">PILOT</button>
+          <button data-tab="setup">SET-UP</button>
+          <button data-tab="log">LOG</button>
+        </nav>
       </div>
 
-      <h2>Flight</h2>
-      <div class="row" id="scenRow">
-        <button class="opt on" data-scen="free"><b>FREE FLIGHT</b><i>Cold on runway 18 at Keeper Field, on the Highland Rim in Lewis County, Tennessee. Brakes set, engines at idle. There is no top end and no ceiling: hold the burners in and it never stops accelerating. Orbit is 17,500 mph, the Moon is a couple of minutes past that, Neptune is about seven, and everything you gain comes back as heat on the way down.</i></button>
-        <button class="opt" data-scen="air"><b>AIRBORNE START</b><i>Airborne at 23,000 ft and already supersonic. Climb and accelerate.</i></button>
-        <button class="opt" data-scen="rings"><b>RING RACE</b><i>12 gates strung across 75 miles of sky, against the clock.</i></button>
-        <button class="opt" data-scen="hohenwald"><b>HOHENWALD, TN</b><i>Low and slow over the country the field sits in. Fifty miles of it are built out properly: the Highland Rim and its creek valleys, the Buffalo and the Duck, the Natchez Trace, every town and community, and the monument at Grinder's Stand.</i></button>
-        <button class="opt" data-scen="land"><b>LANDING CHALLENGE</b><i>A five and a half mile final, gear and flaps set. Stream the chute with <kbd>X</kbd> after touchdown. Scored on centreline, sink rate and touchdown point.</i></button>
+      <div class="mbody" id="mbody">
+        <section data-pane="flight" class="on">
+          <div class="tapnote">Tap the <b>aeroplane</b> or the <b>pilot</b> in the hangar to walk up to them. Tap the floor to step back.</div>
+          <h2>Where you start</h2>
+          <div class="row" id="scenRow">
+            <button class="opt on" data-scen="free"><b>FREE FLIGHT</b><i>Cold on runway 18 at Keeper Field, Lewis County, Tennessee. Brakes set, engines at idle. No top end and no ceiling: orbit is 17,500 mph, the Moon a couple of minutes past that, and all of it comes back as heat on the way down.</i></button>
+            <button class="opt" data-scen="air"><b>AIRBORNE START</b><i>Airborne at 23,000 ft and already supersonic. Climb and accelerate.</i></button>
+            <button class="opt" data-scen="rings"><b>RING RACE</b><i>12 gates strung across 75 miles of sky, against the clock.</i></button>
+            <button class="opt" data-scen="hohenwald"><b>HOHENWALD, TN</b><i>Low and slow over the country the field sits in &mdash; the Highland Rim, the Buffalo and the Duck, the Natchez Trace, and Hohenwald itself built street by street.</i></button>
+            <button class="opt" data-scen="land"><b>LANDING CHALLENGE</b><i>A five and a half mile final, gear and flaps set. Stream the chute with <kbd>X</kbd> after touchdown. Scored on centreline, sink rate and touchdown point.</i></button>
+          </div>
+        </section>
+
+        <section data-pane="plane" class="sect" id="secPlane">
+          <h2>Livery</h2>
+          <div class="row" id="livRow"></div>
+          <h2>Trim colour</h2>
+          <div class="sw" id="trimRow"></div>
+        </section>
+
+        <section data-pane="pilot" class="sect" id="secPilot">
+          <h2>Who is flying</h2>
+          <div class="pilotgrid">
+            <label class="fld"><span>NAME</span><input id="pName" maxlength="18" placeholder="your name" autocomplete="off" spellcheck="false"></label>
+            <label class="fld"><span>CALLSIGN</span><input id="pCall" maxlength="10" placeholder="callsign" autocomplete="off" spellcheck="false"></label>
+          </div>
+          <h2>Kit</h2>
+          <div class="swrow"><b>HELMET</b><div class="sw" id="helmRow"></div></div>
+          <div class="swrow"><b>VISOR</b><div class="sw" id="visorRow"></div></div>
+          <div class="swrow"><b>SUIT</b><div class="sw" id="suitRow"></div></div>
+        </section>
+
+        <section data-pane="setup">
+          <h2>Pitch sense</h2>
+          <div class="row" id="pitchRow">
+            <button class="opt on" data-pitch="real"><b>PULL BACK TO CLIMB</b><i>What a control stick really does. <kbd>&darr;</kbd> or thumb back raises the nose. Swap any time with <kbd>T</kbd>.</i></button>
+            <button class="opt" data-pitch="direct"><b>PUSH UP TO CLIMB</b><i>Arcade sense. <kbd>&uarr;</kbd> or thumb forward raises the nose.</i></button>
+          </div>
+
+          <h2>Damage</h2>
+          <div class="row" id="safeRow">
+            <button class="opt on" data-safe="on"><b>AIRFRAME HOLDS</b><i>Nothing writes the aeroplane off. Hit anything and it is set back on its feet. <kbd>K</kbd></i></button>
+            <button class="opt" data-safe="off"><b>REAL DAMAGE</b><i>Structural contact, a hard landing or a gear-up touchdown ends the flight.</i></button>
+          </div>
+
+          <h2>Speed limiter</h2>
+          <div class="row" id="freeRow">
+            <button class="opt on" data-free="on"><b>REAL AIR</b><i>Drag sets an honest top end down here. Out of the atmosphere the throttle becomes a speed selector and the top of its travel is a thousand times light.</i></button>
+            <button class="opt" data-free="off"><b>NO LIMIT &mdash; 10&times; LIGHT IN AIR</b><i>Takes the ceiling off inside the atmosphere too: ten times the speed of light over Tennessee, about half a minute from the runway. The heat is still real. <kbd>U</kbd></i></button>
+          </div>
+
+          <h2 id="keyHead">Keys</h2>
+          <div class="keys" id="keyList"></div>
+          <div id="touchNote" class="hide"></div>
+        </section>
+
+        <section data-pane="log">
+          <h2>Pilot log</h2>
+          <div id="logList"></div>
+        </section>
       </div>
 
-      <h2>Damage</h2>
-      <div class="row" id="safeRow">
-        <button class="opt on" data-safe="on"><b>AIRFRAME HOLDS</b><i>Nothing writes the aeroplane off. Hit anything and it is set back on its feet. <kbd>K</kbd></i></button>
-        <button class="opt" data-safe="off"><b>REAL DAMAGE</b><i>Structural contact, a hard landing or a gear-up touchdown ends the flight.</i></button>
+      <div class="mfoot">
+        <button class="go" id="startBtn">BEGIN FLIGHT</button>
+        <button class="ghost hide" id="baseBtn">END THE FLIGHT &middot; BACK TO THE HANGAR</button>
+        <div class="foot">Esc or P pauses &middot; H goes back to the hangar &middot; R restarts &middot; K toggles safe mode &middot; L shows the control card &middot; Z flies the autopilot</div>
       </div>
-
-      <div class="sect" id="secPlane">
-        <h2>Your aeroplane</h2>
-        <div class="row" id="livRow"></div>
-
-        <h2>Trim</h2>
-        <div class="sw" id="trimRow"></div>
-      </div>
-
-      <div class="sect" id="secPilot">
-        <h2>Your pilot</h2>
-        <div class="pilotgrid">
-          <label class="fld"><span>NAME</span><input id="pName" maxlength="18" placeholder="your name" autocomplete="off" spellcheck="false"></label>
-          <label class="fld"><span>CALLSIGN</span><input id="pCall" maxlength="10" placeholder="callsign" autocomplete="off" spellcheck="false"></label>
-        </div>
-        <div class="swrow"><b>HELMET</b><div class="sw" id="helmRow"></div></div>
-        <div class="swrow"><b>VISOR</b><div class="sw" id="visorRow"></div></div>
-        <div class="swrow"><b>SUIT</b><div class="sw" id="suitRow"></div></div>
-      </div>
-
-      <h2>Speed limiter</h2>
-      <div class="row" id="freeRow">
-        <button class="opt on" data-free="on"><b>REAL AIR</b><i>Drag sets an honest top end down here, the way it does for a real aeroplane. Leaving the atmosphere still lifts it: out there the throttle becomes a speed selector and the top of its travel is a thousand times the speed of light.</i></button>
-        <button class="opt" data-free="off"><b>NO LIMIT &mdash; 10&times; LIGHT IN AIR</b><i>Takes the ceiling off inside the atmosphere too. The airframe pretends it is at a survivable dynamic pressure, the burner's surplus grows with the speed you are already doing, and the ceiling over Tennessee becomes ten times the speed of light &mdash; about half a minute from the runway. The heat is real. <kbd>U</kbd></i></button>
-      </div>
-
-      <h2>Pilot log</h2>
-      <div id="logList"></div>
-
-      <h2 id="keyHead">Keys</h2>
-      <div class="keys" id="keyList"></div>
-      <div id="touchNote" class="hide"></div>
-
-      <button class="go" id="startBtn">BEGIN FLIGHT</button>
-      <div class="foot">Esc pauses &middot; R or the RESET button restarts the flight &middot; K toggles safe mode &middot; L shows the control card in flight &middot; Z flies the autopilot</div>
     </div>
   </div>
 </div>
@@ -1560,6 +1633,13 @@ function resize() {
   // HUD scale: proportional to the canvas, then boosted on a physically small
   // screen so the numbers stay readable at arm's length
   UI = (H / 900) * clamp(640 / Math.max(H / DPR, 1), 1, 2);
+  /* On a touch screen the unit has a floor, and the floor is the device
+     pixel ratio: a control drawn 44 units across is then 44 POINTS across,
+     which is the smallest thing a thumb can be asked to hit. Tying the scale
+     to the height alone meant a 6.7-inch phone on its side — 430 points tall
+     and 932 wide — drew its switches at 28 points, which is a screen you
+     have to aim at. */
+  if (MOBILE || COARSE) UI = Math.max(UI, DPR);
   // a phone held upright has almost no horizontal view, so widen the lens
   FOVBASE = (PORTRAIT ? 78 : MOBILE ? 68 : 62) * DEG;
   FOV = FOVBASE;
@@ -3422,7 +3502,7 @@ function stageHit(x, y) {
   if (STAGE.pick.plane && inBox(STAGE.pick.plane, x, y)) return "plane";
   return null;
 }
-function stageFocus(what, quiet) {
+function stageFocus(what, quiet, fromTab) {
   const first = STAGE.want !== what;
   STAGE.want = what;
   STAGE.glow = 1; STAGE.glowWhat = what === "wide" ? null : what;
@@ -3434,10 +3514,10 @@ function stageFocus(what, quiet) {
     STAGE.capT = 3.2;
   } else { STAGE.capT = 0; }
   const id = what === "pilot" ? "secPilot" : what === "plane" ? "secPlane" : null;
-  if (id) {
+  if (id && !fromTab) {
+    menuTab(what === "pilot" ? "pilot" : "plane", 1);
     const el = document.getElementById(id);
     if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
       el.classList.remove("flash");
       void el.offsetWidth;
       el.classList.add("flash");
@@ -9279,15 +9359,15 @@ const LOG_KEY = "skyward.log.v1";
    The number is the point: it is the thing you can quote back when something
    is wrong, and the list under it is what to go and look at. */
 const BUILD = {
-  no: 34,
-  name: "LOOK AROUND, WALK UP",
+  no: 35,
+  name: "BUILT FOR A THUMB",
   date: "30 SEP 2026",
   notes: [
-    ["LOOK AROUND", "Drag the picture anywhere off the panel and the view comes off the nose \u2014 in the cockpit the head turns, outside the camera swings round the aeroplane. Double-tap the same spot and it snaps back. A little rose at the bottom says how far off you are."],
-    ["THE HANGAR", "Rebuilt: a ribbed steel shed on open-web trusses, roof lights, high-bay lamps with pools of light on a concrete floor that has joints, stains, walkway lines and hazard chevrons across the threshold, and a workshop down the back wall."],
-    ["THE PILOT", "Rebuilt too, out of round limbs instead of boxes: a pressure suit with a harness over it, a helmet with a wrapped visor, a mask and a hose. Your name is on the chest."],
-    ["WALK UP TO IT", "The start screen is a place you can point at. The menu is docked to one side so the shed is never behind it, and tapping the aeroplane or the pilot walks the camera up to them. Tap the floor to step back."],
-    ["RENDER DISTANCE", "Towns read from the Hohenwald flyover altitude now instead of appearing under the nose, and the right-hand console sits hard against the edge of the screen."]
+    ["FITTED TO THE PHONE", "Every control is at least forty-four points on its short side now, on a 6.7-inch screen either way up. The scale used to be tied to the height alone, so a phone on its side drew its switches at twenty-eight points \u2014 a panel you had to aim at."],
+    ["PAUSE", "A real button on the panel, next to the map and the view. It stops the flight and opens the set-up card, so anything can be changed mid-flight and picked back up. <em>P</em> or Esc does the same."],
+    ["BACK TO BASE", "And next to it, BASE. Two taps \u2014 the second confirms \u2014 ends the flight, writes the log and walks you back into the hangar with everything as you left it. <em>H</em>, or the button at the foot of the pause card."],
+    ["ONE PLACE TO LOOK", "Pause, base, map, view, card and reset are one group of six: a bar across the top upright, a block on the right console on its side. The levers keep the left console, the switches the right, and the middle of the glass still belongs to the aeroplane."],
+    ["THE CARD HAS PAGES", "Flight, plane, pilot, set-up and log are tabs instead of one four-screen scroll, with BEGIN FLIGHT pinned to the bottom where it can always be reached. Walking up to the aeroplane or the pilot in the hangar turns to their page, and turning to their page walks the camera up to them."]
   ]
 };
 const NEWS_KEY = "skyward.build";
@@ -9523,121 +9603,101 @@ function layoutTouch() {
      T-handle you pull, the systems are toggle switches, and the rest are lit
      pushbuttons. Shape carries the meaning, so a glance is enough.
 
-     Merging the two flap buttons into one lever also buys back a row, which
-     is the difference between a panel that fits an iPhone in landscape and
-     one that runs off the bottom of it. */
-  /* Both consoles, and nothing across the middle.
-
-     Everything used to be stacked in one block on the right, which on a phone
-     in portrait put the switches exactly where the aeroplane is drawn. Real
-     cockpits do not do that for the same reason: the levers live on one
-     console and the systems on the other, and the view out of the front is
-     what is left. So the moving hardware — gear, flaps, chute — goes left,
-     the systems and the brakes go right, and the centre of the glass belongs
-     to the aeroplane. */
-  const tw = 54 * u, gp = 9 * u;
-  let hLev = 124 * u;
+     The panel is then split by JOB rather than by convenience. The moving
+     hardware — gear, flaps, chute — is the left console. The systems and the
+     brakes are the right console. Everything that is not flying the
+     aeroplane — pause, back to base, the map, the view, the card, reset —
+     is a separate group of six, so it is one place to look and none of it
+     can be hit by mistake while reaching for a lever. */
+  const gp = 9 * u, cw = 62 * u, tw = 54 * u, rh = 50 * u;
   const hPush = 46 * u, hTog = 62 * u, hPad = 46 * u;
-  /* Both consoles hard against their own edge.
-
-     The left one already was. The right one was not, and the reason was the
-     throttle: it sat in the last fifty pixels of glass and everything else
-     was pushed inboard of it, so the switches you actually look at ended up
-     floating a finger's width off the edge while the slider owned the rim.
-     That is backwards. The RIM is where a thumb rests without being told to,
-     so the rim gets the switches, and the throttle moves one column inboard
-     — still under the same hand, still the tallest thing on that side, and
-     no longer the only thing touching the edge. */
-  const RE = W - sr - 6 * u;                    // the hard right edge
-  let th, LX, LB, RX, RB, cwL, cwR, stack;
-  if (PORTRAIT) {
-    /* Portrait has no width to spare, so BOTH consoles are a single column
-       and the pushbuttons are split between them — two on the left above the
-       levers, two on the right above the switches. Two narrow columns on the
-       right put their inboard edge five per cent past the centre of the
-       screen, which is exactly where the aeroplane is drawn. */
-    th = Math.min(H * .30, 300 * u);
-    cwL = 62 * u; cwR = 62 * u; stack = 1; hLev = 106 * u;
-    LX = sl + 6 * u;
-    RX = RE - cwR;                              // switches on the rim
-    T.thr.x = RX - 8 * u - tw;                  // throttle one column inboard
-    T.thr.y = H - sb - th - 16 * u;
-    LB = RB = T.thr.y - 14 * u;
-  } else {
-    th = Math.min(H * .54, 330 * u);
-    cwL = 62 * u; cwR = 62 * u; stack = 0;
-    LX = sl + 6 * u;
-    RX = RE - (cwR * 3 + gp * 2);               // the three columns on the rim
-    T.thr.x = RX - 8 * u - tw;                  // throttle one column inboard
-    T.thr.y = H - sb - th - 16 * u;
-    RB = H - sb - 16 * u;
-    // the left console sits under the instruments on a phone, where the thumb
-    // stick owns the bottom corner, and in the bottom corner on a desktop
-    LB = TOUCH.on ? SAFE.t * DPR + 116 * u + hLev : H - sb - 16 * u;
-  }
-  T.thr.w = tw; T.thr.h = th;
-  const BR = stack ? cwR : cwR * 3 + gp * 2;
+  const LE = sl + 6 * u, RE = W - sr - 6 * u;
+  /* The instruments own the top of the glass and nothing is allowed to start
+     above them. The compact HUD runs to st+104u down the left (speed, Mach)
+     and st+170u down the right (altitude, AGL, and the g meter under them),
+     which is why the two sides get different ceilings. */
+  const HUDL = st + 112 * u, HUDR = st + 178 * u;
+  /* Heights are a wish, not a promise. A 6.7-inch phone on its side is four
+     hundred and thirty points of glass with a home indicator to keep clear
+     of, so a console that does not fit is squeezed rather than run off the
+     bottom — to three quarters, and no further. */
+  const fitK = (avail, hs) => {
+    const gaps = gp * (hs.length - 1), need = hs.reduce((a, b) => a + b, 0);
+    return need + gaps <= avail ? 1 : clamp((avail - gaps) / need, .74, 1);
+  };
   T.btns = [];
-  // ---- left console: the things that move ----
-  if (stack) {
-    const yCh = LB - hLev, yFl = yCh - gp - hLev, yGe = yFl - gp - hLev;
+  if (PORTRAIT) {
+    /* Upright there is no width for two columns a side, so the utilities go
+       across the top in one bar under the instruments, and each console is a
+       single column hard against its own rim. */
+    const UK = ["pause", "base", "map", "cam", "keys", "reset"];
+    const bw = (RE - LE - gp * (UK.length - 1)) / UK.length;
+    const by = HUDR;
+    for (let i = 0; i < UK.length; i++)
+      T.btns.push({ k: UK[i], kind: "push", x: LE + i * (bw + gp), y: by, w: bw, h: hPush, tiny: 1 });
+    const top = by + hPush + 14 * u;
+    const th = Math.min(H * .26, 300 * u);
+    const RX = RE - cw;
+    T.thr.x = RX - 8 * u - tw; T.thr.y = H - sb - th - 16 * u; T.thr.w = tw; T.thr.h = th;
+    const bot = T.thr.y - 14 * u, band = bot - top;
+    const hL = 118 * u * fitK(band, [118 * u, 118 * u, 118 * u]);
     T.btns.push(
-      { k: "map", kind: "push", x: LX, y: yGe - gp * 2 - hPush * 2, w: cwL, h: hPush },
-      { k: "cam", kind: "push", x: LX, y: yGe - gp - hPush, w: cwL, h: hPush },
-      { k: "gear", kind: "lever", x: LX, y: yGe, w: cwL, h: hLev },
-      { k: "flap", kind: "lever", x: LX, y: yFl, w: cwL, h: hLev },
-      { k: "chute", kind: "handle", x: LX, y: yCh, w: cwL, h: hLev });
+      { k: "gear", kind: "lever", x: LE, y: bot - hL * 3 - gp * 2, w: cw, h: hL },
+      { k: "flap", kind: "lever", x: LE, y: bot - hL * 2 - gp, w: cw, h: hL },
+      { k: "chute", kind: "handle", x: LE, y: bot - hL, w: cw, h: hL });
+    const k2 = fitK(band, [hTog, hTog, hTog, hPad]);
+    const tg = hTog * k2, pd = hPad * k2;
+    T.btns.push(
+      { k: "ap", kind: "toggle", x: RX, y: bot - pd - tg * 3 - gp * 3, w: cw, h: tg },
+      { k: "spd", kind: "toggle", x: RX, y: bot - pd - tg * 2 - gp * 2, w: cw, h: tg },
+      { k: "safe", kind: "toggle", x: RX, y: bot - pd - tg - gp, w: cw, h: tg },
+      { k: "brake", kind: "pad", x: RX, y: bot - pd, w: cw, h: pd, hold: 1 });
+    const ry = Math.min(bot + gp, H - sb - 8 * u - rh);
+    T.rud.boxes = [{ k: "rudL", x: LE, y: ry, w: cw, h: rh },
+                   { k: "rudR", x: RX, y: ry, w: cw, h: rh }];
   } else {
+    /* On its side the right console is three columns and four rows deep,
+       which gives the six utilities two rows of their own above the
+       switches, and puts the right pedal beside the brake rather than
+       anywhere near the thumb that is flying the aeroplane. The left pedal
+       goes on the end of the lever row for the same reason. */
+    const th = Math.min(H * .54, 330 * u);
+    const BR = cw * 3 + gp * 2, RX = RE - BR;
+    T.thr.x = RX - 8 * u - tw; T.thr.y = H - sb - th - 16 * u; T.thr.w = tw; T.thr.h = th;
+    const RB = H - sb - 10 * u;
+    /* When the band is short something has to give, and it is never the
+       pushbuttons: six of them at forty-four points is the whole reason the
+       panel is usable with a thumb. The switches give first — they are tall
+       for looks, not for aim — and then the brake, which is a hundred and
+       thirty points wide and can afford to lose height. */
+    const ph = hPush;
+    let tg = hTog, pd = hPad;
+    const band = RB - HUDR, need = () => ph * 2 + tg + pd + gp * 3;
+    if (need() > band) tg = Math.max(44 * u, tg - (need() - band));
+    if (need() > band) pd = Math.max(38 * u, pd - (need() - band));
+    const y4 = RB - pd, y3 = y4 - gp - tg, y2 = y3 - gp - ph, y1 = y2 - gp - ph;
+    const row = (keys, y) => keys.forEach((k, i) =>
+      T.btns.push({ k, kind: "push", x: RX + i * (cw + gp), y, w: cw, h: ph, tiny: 1 }));
+    row(["map", "cam", "keys"], y1);
+    row(["pause", "base", "reset"], y2);
     T.btns.push(
-      { k: "gear", kind: "lever", x: LX, y: LB - hLev, w: cwL, h: hLev },
-      { k: "flap", kind: "lever", x: LX + cwL + gp, y: LB - hLev, w: cwL, h: hLev },
-      { k: "chute", kind: "handle", x: LX + (cwL + gp) * 2, y: LB - hLev, w: cwL, h: hLev });
+      { k: "ap", kind: "toggle", x: RX, y: y3, w: cw, h: tg },
+      { k: "spd", kind: "toggle", x: RX + cw + gp, y: y3, w: cw, h: tg },
+      { k: "safe", kind: "toggle", x: RX + (cw + gp) * 2, y: y3, w: cw, h: tg },
+      { k: "brake", kind: "pad", x: RX, y: y4, w: cw * 2 + gp, h: pd, hold: 1 });
+    // the left cluster: the three levers and the left pedal, one row of them
+    const hLev = clamp(118 * u, 70 * u, Math.max(H - sb - 20 * u - HUDL, 70 * u));
+    const LTOP = TOUCH.on ? HUDL : H - sb - 16 * u - hLev;
+    T.btns.push(
+      { k: "gear", kind: "lever", x: LE, y: LTOP, w: cw, h: hLev },
+      { k: "flap", kind: "lever", x: LE + cw + gp, y: LTOP, w: cw, h: hLev },
+      { k: "chute", kind: "handle", x: LE + (cw + gp) * 2, y: LTOP, w: cw, h: hLev });
+    T.rud.boxes = [
+      { k: "rudL", x: LE + (cw + gp) * 3, y: LTOP, w: cw, h: hLev },
+      { k: "rudR", x: RX + (cw + gp) * 2, y: y4, w: cw, h: pd }
+    ];
   }
-  // ---- right console: the systems, and the brakes under them ----
-  const yPad = RB - hPad;
-  if (stack) {
-    const ySafe = yPad - gp - hTog, ySpd = ySafe - gp - hTog, yAp = ySpd - gp - hTog;
-    const yP2 = yAp - gp - hPush, yP1 = yP2 - gp - hPush;
-    T.btns.push(
-      { k: "keys", kind: "push", x: RX, y: yP1, w: cwR, h: hPush },
-      { k: "reset", kind: "push", x: RX, y: yP2, w: cwR, h: hPush },
-      { k: "ap", kind: "toggle", x: RX, y: yAp, w: cwR, h: hTog },
-      { k: "spd", kind: "toggle", x: RX, y: ySpd, w: cwR, h: hTog },
-      { k: "safe", kind: "toggle", x: RX, y: ySafe, w: cwR, h: hTog },
-      { k: "brake", kind: "pad", x: RX, y: yPad, w: BR, h: hPad, hold: 1 });
-  } else {
-    const yTog = yPad - gp - hTog, yPush = yTog - gp - hPush;
-    const pw = (BR - gp * 3) / 4;
-    T.btns.push(
-      { k: "map", kind: "push", x: RX, y: yPush, w: pw, h: hPush },
-      { k: "cam", kind: "push", x: RX + (pw + gp), y: yPush, w: pw, h: hPush },
-      { k: "keys", kind: "push", x: RX + (pw + gp) * 2, y: yPush, w: pw, h: hPush },
-      { k: "reset", kind: "push", x: RX + (pw + gp) * 3, y: yPush, w: pw, h: hPush },
-      { k: "ap", kind: "toggle", x: RX, y: yTog, w: cwR, h: hTog },
-      { k: "spd", kind: "toggle", x: RX + cwR + gp, y: yTog, w: cwR, h: hTog },
-      { k: "safe", kind: "toggle", x: RX + (cwR + gp) * 2, y: yTog, w: cwR, h: hTog },
-      { k: "brake", kind: "pad", x: RX, y: yPad, w: BR, h: hPad, hold: 1 });
-  }
-  const bx = RX;
-  /* Rudder: one pedal per side, each attached to its own console. They used
-     to sit as a pair in the middle of the bottom edge, which is the one part
-     of the glass the aeroplane is drawn on — and a pedal on the centreline is
-     not what a rudder is anyway. Left pedal, left console; right pedal, right
-     console; and each one goes below its console if there is room under it
-     and above it if there is not. */
-  const rw = stack ? cwL : 96 * u, rh = 50 * u;
-  const lTop = T.btns[0].y;
-  const fits = y2 => y2 + rh <= H - sb - 8 * u;
-  const rudLY = fits(LB + gp) ? LB + gp : lTop - gp - rh;
-  let rTop = RB;
-  for (const b2 of T.btns) if (b2.x >= RX - 1 && b2.y < rTop) rTop = b2.y;
-  const rudRY = fits(RB + gp) ? RB + gp : rTop - gp - rh;
-  T.rud.boxes = [
-    { k: "rudL", x: LX, y: rudLY, w: rw, h: rh },
-    { k: "rudR", x: RX + BR - rw, y: rudRY, w: rw, h: rh }
-  ];
-  // tucked under the altitude read-out so it never sits on top of it
-  T.pause = { x: W - sr - 12 * u - 46 * u, y: st + 8 * u + 56 * u + 20 * u, w: 46 * u, h: 40 * u };
+  T.pause = { x: 0, y: 0, w: 0, h: 0 };   // it is a real button now
 }
 const inBox = (b, x, y) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h;
 /* Where the knob sits in its slot, for a lever at fraction t of its travel.
@@ -9648,10 +9708,46 @@ const leverTop = b => b.y + 32 * UI;
 const leverBot = b => b.y + b.h - 32 * UI;
 const leverKnobY = (b, t) => leverTop(b) + (leverBot(b) - leverTop(b)) * clamp(t, 0, 1);
 
-let RESET_ARM = 0;
+let RESET_ARM = 0, BASE_ARM = 0;
+/* Ending a flight and walking back into the hangar. Not a reset — the flight
+   is over, the log is written, and the aeroplane is back on the lead-in line
+   with the card up, exactly as it was before you left. */
+function returnToBase() {
+  if (!GAME.started) return;
+  if (LOG.dirty) logSave();
+  fillLog();
+  GAME.started = false; GAME.paused = false; GAME.over = false;
+  GAME.result = ""; GAME.landScore = null; GAME.rings = [];
+  SHOWKEYS = false; NAV.map = false; RESET_ARM = 0; BASE_ARM = 0;
+  LOOK.yaw = 0; LOOK.pitch = 0;
+  PARTS.length = 0; cam.shake = 0; cam.init = 0; cam.off = v3();
+  hideBanner();
+  resetPlane(SCEN);
+  STAGE.init = false; STAGE.want = "wide"; STAGE.hover = null; STAGE.capT = 0;
+  if (mouseStick) { mouseStick = false; document.exitPointerLock && document.exitPointerLock(); }
+  const m = document.getElementById("menu");
+  if (m) m.classList.remove("hide");
+  const sb2 = document.getElementById("startBtn");
+  if (sb2) sb2.textContent = "BEGIN FLIGHT";
+  const bb = document.getElementById("baseBtn");
+  if (bb) bb.classList.add("hide");
+  menuTab("flight");
+  dirty = false;
+  toast("BACK AT THE HANGAR", 2.2);
+  audio.beep(520, .14, .1);
+}
 function touchAct(k) {
   const P = PLANE;
   TOUCH.flash[k] = .18;
+  if (k === "pause") { BASE_ARM = 0; RESET_ARM = 0; togglePause(); return; }
+  if (k === "base") {
+    /* One tap arms it, the second does it. Walking out of a flight by
+       accident is worse than any other mis-tap on this panel. */
+    if (BASE_ARM > 0) { BASE_ARM = 0; returnToBase(); }
+    else { BASE_ARM = 3.0; RESET_ARM = 0; toast("TAP BASE AGAIN TO END THE FLIGHT AND GO BACK", 2.8); audio.beep(430, .12, .1); }
+    return;
+  }
+  BASE_ARM = 0;
   if (k === "reset") {
     /* One tap when the flight is already over — there is nothing left to
        lose. Two taps when it is not. */
@@ -9698,7 +9794,6 @@ function touchDown(id, x, y, isTouch) {
     for (const h of NAV.hits) if (inBox(h, x, y)) { mapAct(h.k, h.i); return true; }
     return true;
   }
-  if (inBox(T.pause, x, y)) { togglePause(); return true; }
   for (const b of T.btns) {
     if (inBox(b, x, y)) {
       T.ptr.set(id, { kind: "btn", b });
@@ -9921,9 +10016,9 @@ function drawToggle(b, on, label, sub, danger) {
 
 /* A lit annunciator pushbutton: a square cap in a bezel that glows when its
    system is doing something. */
-function drawPush(b, on, label, sub) {
+function drawPush(b, on, label, sub, warn) {
   const u = UI, cx = b.x + b.w / 2;
-  bezel(b.x, b.y, b.w, b.h, 5 * u, on);
+  bezel(b.x, b.y, b.w, b.h, 5 * u, on, warn);
   const ix = b.x + 4 * u, iy = b.y + 4 * u, iw = b.w - 8 * u, ih = b.h - 8 * u;
   const g = ctx.createLinearGradient(0, iy, 0, iy + ih);
   g.addColorStop(0, on ? "rgba(130,226,255,.34)" : "rgba(126,148,170,.13)");
@@ -10004,6 +10099,7 @@ function drawTouch(dt) {
   const T = TOUCH, P = PLANE, u = UI;
   for (const k in T.flash) if (T.flash[k] > 0 && T.flash[k] < 1) T.flash[k] = Math.max(0, T.flash[k] - dt);
   if (RESET_ARM > 0) RESET_ARM = Math.max(0, RESET_ARM - dt);
+  if (BASE_ARM > 0) BASE_ARM = Math.max(0, BASE_ARM - dt);
   ctx.save();
   if (TOUCH.on) drawStick();
   drawPanel(P, u);
@@ -10124,6 +10220,10 @@ function drawPanel(P, u) {
       drawPush(b, NAV.map || fl, "MAP", (navTarget() ? navTarget().name.toUpperCase().slice(0, 5) : "SYS") + " N");
     } else if (b.k === "cam") {
       drawPush(b, fl, "VIEW", CAMSHORT[camMode] + " C");
+    } else if (b.k === "pause") {
+      drawPush(b, fl, "PAUSE", "SET-UP  P");
+    } else if (b.k === "base") {
+      drawPush(b, BASE_ARM > 0 || fl, "BASE", BASE_ARM > 0 ? "SURE?" : "HANGAR  H", BASE_ARM > 0);
     } else if (b.k === "keys") {
       drawPush(b, SHOWKEYS || fl, "KEYS", "L");
     } else if (b.k === "reset") {
@@ -10134,8 +10234,6 @@ function drawPanel(P, u) {
   }
   if (TOUCH.on) for (const b of T.rud.boxes)
     padBox(b.x, b.y, b.w, b.h, 9 * u, T.rud.v === (b.k === "rudR" ? 1 : -1), b.k === "rudR" ? "RUD ▶" : "◀ RUD");
-  // pause
-  padBox(T.pause.x, T.pause.y, T.pause.w, T.pause.h, 8 * u, false, "II");
   ctx.restore();
 }
 
@@ -10831,6 +10929,8 @@ const KEYCARD = [
   ["Look around", "drag the picture, anywhere off the panel", "drag the picture"],
   ["Back on the nose", "double-tap the same spot", "double-tap"],
   ["Nav target", "J   cycles Moon / planets / Sun", "tap a world on the map"],
+  ["Pause \u00b7 change the set-up", "Esc or P", "the PAUSE button"],
+  ["Back to the hangar", "H, then again to confirm", "the BASE button, twice"],
   ["Solar system map", "N", "MAP button"],
   ["Jump", "E   opens a corridor to the nav target", "the JUMP chip on the map"],
   ["Where a jump lands", "in orbit around it, a couple of radii out", "same"],
@@ -10926,6 +11026,34 @@ syncFreeRow();
    Every control here rebuilds the mesh and the pilot on the spot, so the
    thing turning slowly in the hangar behind the card is always the aeroplane
    you are about to fly, in the paint you just chose. */
+/* The card has five pages and one of them is showing. Everything that used
+   to be a heading four screens down is now a tab, and anything that wants
+   the pilot's attention — tapping the aeroplane in the hangar, a change to
+   the kit — can bring its own page to the front. */
+function menuTab(name, fromStage) {
+  const tabs = document.getElementById("tabs");
+  if (!tabs) return;
+  tabs.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.tab === name));
+  document.querySelectorAll("#mbody section[data-pane]").forEach(s =>
+    s.classList.toggle("on", s.dataset.pane === name));
+  const body = document.getElementById("mbody");
+  if (body) body.scrollTop = 0;
+  /* Turning to the PILOT page in the hangar and leaving the camera at the
+     far end of the shed is half an answer: the page and the eye go to the
+     same place. */
+  if (!fromStage && !GAME.started)
+    stageFocus(name === "pilot" ? "pilot" : name === "plane" ? "plane" : "wide", true, 1);
+}
+(function wireTabs() {
+  const tabs = document.getElementById("tabs");
+  if (!tabs) return;
+  tabs.querySelectorAll("button").forEach(b =>
+    b.addEventListener("click", () => menuTab(b.dataset.tab)));
+})();
+document.getElementById("baseBtn").addEventListener("click", () => {
+  BASE_ARM = 1;                      // the card asked the question; this IS the answer
+  touchAct("base");
+});
 function swatches(el, list, key) {
   el.innerHTML = list.map((s, i) =>
     "<button class=\"chip" + (KIT[key] === i ? " on" : "") + "\" data-i=\"" + i +
@@ -10991,7 +11119,9 @@ function showTouchHelp() {
     "(tap above or below the knob), the yellow <b>T-handle</b> pulls the chute, the bat switches " +
     "fly the autopilot, hold the speed and arm safe mode, and the lit buttons are the map, the " +
     "view, this card and reset.<br>" +
-    "Rudder pads sit along the bottom.<br>" +
+    "<b>PAUSE</b> stops the flight and opens the set-up card; <b>BASE</b>, tapped twice, ends it " +
+    "and walks you back into the hangar. Both sit with the map, the view, the card and reset.<br>" +
+    "Rudder pads sit with each console.<br>" +
     "<b>Look around</b> &mdash; drag the picture anywhere that is not a control and the view comes " +
     "off the nose. <b>Double-tap</b> the same spot to put it back.<br>" +
     "<b>The map</b> (MAP button) is how you travel: tap a world, then <b>JUMP</b> &mdash; a few " +
@@ -11020,7 +11150,9 @@ function onKeyPress(k) {
   const lk = k.toLowerCase();
   if (!GAME.started) return;
   if (lk === "escape" || lk === "p") { togglePause(); return; }
-  if (lk === "h") { togglePause(); return; }
+  // H used to be a second key for pause, which nothing needed; it is the way
+  // back to the hangar now, and like the button it asks twice.
+  if (lk === "h") { touchAct("base"); return; }
   if (GAME.paused) return;
   if (ARRIVE.on) arriveEnd();
   if (lk === "c") { camMode = (camMode + 1) % CAMNAMES.length; LOOK.yaw = 0; LOOK.pitch = 0; toast("CAMERA: " + CAMNAMES[camMode], 1.2); }
@@ -11144,6 +11276,8 @@ function togglePause() {
   const m = document.getElementById("menu");
   m.classList.toggle("hide", !GAME.paused);
   document.getElementById("startBtn").textContent = GAME.paused ? (dirty ? "RESTART FLIGHT" : "RESUME FLIGHT") : "BEGIN FLIGHT";
+  // there is only somewhere to go back to once you have left it
+  document.getElementById("baseBtn").classList.toggle("hide", !GAME.paused);
   if (GAME.paused && mouseStick) { mouseStick = false; document.exitPointerLock && document.exitPointerLock(); }
 }
 let dirty = false;
