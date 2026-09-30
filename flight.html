@@ -2464,13 +2464,18 @@ function drawMesh(mesh, origin, M, pivot, tint, alphaFade, tintK) {
     if (tint) col = mixc(col, tint, tintK === undefined ? .55 : tintK);
     const dist = Math.hypot(cxv, cyv, czv) || 1;
     const ex = vx / dist, ey = vy / dist, ez = vz / dist;   // eye -> surface
-    let c2 = litColor(col, nx, ny, nz);
-    /* Light that is not the sun. Indoors the sun is the one thing there
-       isn't, so a face can carry its own: `emit` adds back a share of the
-       face's own colour, which is what a roof full of high-bays does to a
-       wall the sun never reaches. */
-    const em = fc.emit;
-    if (em) { c2 = [c2[0] + col[0] * em, c2[1] + col[1] * em, c2[2] + col[2] * em]; }
+    /* A face can carry its own light. `flat` means the colour already IS
+       the answer — it was worked out once, at build time, against the lamps
+       and the walls of the room the face is in (see bakeMesh) — so the sun
+       is not asked about it again. `emit` is the cruder version: add a
+       share of the face's own colour back on top of whatever the sun did. */
+    let c2;
+    if (fc.flat) c2 = col;
+    else {
+      c2 = litColor(col, nx, ny, nz);
+      const em = fc.emit;
+      if (em) { c2 = [c2[0] + col[0] * em, c2[1] + col[1] * em, c2[2] + col[2] * em]; }
+    }
     // Blinn-Phong highlight: paint and glass both catch the sun
     const sh = fc.spec;
     if (sh) {
@@ -2817,18 +2822,21 @@ function applyLivery() {
 }
 applyLivery();
 let AC = buildAircraft();
-function rebuildAircraft() { applyLivery(); AC = buildAircraft(); PILOTMESH = buildPilot(); }
+function rebuildAircraft() { applyLivery(); AC = buildAircraft(); PILOTMESH = bakePilot(buildPilot()); }
 /* A pilot, properly.
 
-   Fourteen boxes read as a robot, and the start screen now walks the camera
-   up to within a metre and a half of them, so they had to be built like
-   anything else in here: round limbs, a suit with a harness over it, a
-   pressure helmet with a wrapped visor, a mask and a hose. Everything is
-   still flat-shaded quads — it is the PROPORTIONS and the roundness that do
-   the work, not the shading. Measurements are a 1.79 m adult: ankle .08,
-   knee .50, hip .93, shoulder 1.44, chin 1.52, crown 1.79.
+   The aeroplane is an SR-71 and the men who flew it did not wear a flight
+   suit, they wore a David Clark full-pressure suit: silver-white, bulky,
+   ribbed at every joint, a gold visor, a metal neck ring, a parachute
+   harness over the top of it and a hose from the mask to a controller on
+   the chest. All of that is built here, because at a metre and a half — and
+   the camera goes that close — the RIBS at the elbows and knees are what
+   say pressure suit rather than pyjamas.
 
-   The figure is built facing +Z and stood up in the world by a single yaw. */
+   Everything is still flat-shaded quads. It is the proportions, the
+   roundness and the light baked into it that do the work. Measurements are
+   a 1.79 m adult: ankle .08, knee .50, hip .93, shoulder 1.44, chin 1.52,
+   crown 1.81. Built facing +Z and stood up in the world by a single yaw. */
 const PIL = {
   /* a tapered round limb between two points, in n facets */
   limb(mb, a, b, r0, r1, n, col, o) {
@@ -2852,7 +2860,7 @@ const PIL = {
         shade(col, .87 + .26 * (.5 + .5 * Math.cos(A0 + .6))), o);
     }
   },
-  /* an ellipsoid, in n around by m up */
+  /* an ellipsoid, in n around by m up. Wound so the normals point OUT. */
   blob(mb, cx, cy, cz, rx, ry, rz, n, m, col, o) {
     for (let j = 0; j < m; j++) {
       const t0 = j / m * Math.PI, t1 = (j + 1) / m * Math.PI;
@@ -2861,106 +2869,203 @@ const PIL = {
       for (let i = 0; i < n; i++) {
         const a0 = i / n * TAU, a1 = (i + 1) / n * TAU;
         const P = (s, y, a) => [cx + Math.sin(a) * rx * s, y, cz + Math.cos(a) * rz * s];
-        mb.quad(P(s0, y0, a0), P(s0, y0, a1), P(s1, y1, a1), P(s1, y1, a0),
+        mb.quad(P(s0, y0, a1), P(s0, y0, a0), P(s1, y1, a0), P(s1, y1, a1),
           shade(col, .88 + .22 * (.5 + .5 * Math.cos(a0 - .4))), o);
-      }
+    }
+    }
+  },
+  /* a convolute: the ribbed joint of a pressure suit, which is the one
+     detail that says pressure suit and not overalls */
+  joint(mb, x, y, z, r, h, n, rib, col, o) {
+    for (let k = 0; k < rib; k++) {
+      const yy = y - h / 2 + h * (k + .5) / rib;
+      const rr = r * (k & 1 ? 1.13 : 1.0);
+      this.limb(mb, [x, yy - h / rib * .5, z], [x, yy + h / rib * .5, z], rr, rr, n,
+        k & 1 ? shade(col, .90) : shade(col, 1.04), o);
     }
   }
 };
 function buildPilot() {
   const mb = MB();
   const S = SUITS[KIT.suit][1], HC = HELMETS[KIT.helm][1], VC = VISORS[KIT.visor][1];
-  const IN = .20;                         // the hangar's light, on the pilot
-  const M = (c, e) => ({ two: true, emit: e === undefined ? IN : e, c });
-  const o = { two: true, emit: IN };
-  const oS = { two: true, emit: IN * .9, spec: .35, gloss: 26 };
-  const dark = [30, 32, 36], strap = shade(S, .60), rubber = [38, 38, 42];
-  const glove = [52, 54, 60], metal = [148, 154, 162];
-  const L = PIL.limb.bind(PIL), B = PIL.blob.bind(PIL);
+  const o = { two: true, bake: 1 };
+  const oS = { two: true, bake: 1, gain: 1.9 };          // alloy, and it shows
+  const dark = [30, 32, 36], strap = shade(S, .52), rubber = [40, 40, 45];
+  const glove = shade(S, .86), metal = [176, 182, 190], alu = [150, 156, 164];
+  const tape = [188, 190, 186];
+  const L = PIL.limb.bind(PIL), B = PIL.blob.bind(PIL), J = PIL.joint.bind(PIL);
+  /* Weight on the right leg, the left knee soft — nobody stands to
+     attention next to their own aeroplane. */
+  const HIPT = .018;
 
-  // ---- boots: sole, upper, heel, and a strap across the instep ----------
+  // ---- boots: sole, welt, heel, toe cap, laces --------------------------
   for (const s of [-1, 1]) {
-    const x = s * .115;
-    mb.box(x, .022, .045, .115, .044, .295, [24, 25, 28], o);           // sole
-    mb.box(x, .010, -.075, .105, .030, .085, [20, 21, 24], o);          // heel
-    L(mb, [x, .04, .00], [x, .17, -.015], .073, .066, 6, dark, o);      // ankle
-    mb.box(x, .10, .105, .105, .105, .175, shade(dark, 1.1), o);        // toe box
-    mb.box(x, .175, .015, .118, .035, .150, [18, 19, 22], o);           // instep strap
+    const x = s * .115, tw = s < 0 ? .012 : -.012;      // toes turned out a little
+    mb.box(x, .016, .040 + tw, .112, .032, .288, [22, 23, 26], o);     // sole
+    mb.box(x, .044, .040 + tw, .120, .024, .296, [34, 35, 39], o);     // welt
+    mb.box(x, .011, -.082 + tw, .100, .022, .086, [18, 19, 22], o);    // heel
+    L(mb, [x, .05, -.012 + tw], [x, .175, -.024 + tw], .072, .064, 10, dark, o);
+    // the upper: a tapered box of a foot with a rounded toe on the end
+    L(mb, [x, .092, .020 + tw], [x, .080, .140 + tw], .062, .048, 10, shade(dark, 1.10), o);
+    B(mb, x, .066, .168 + tw, .050, .040, .046, 7, 4, shade(dark, 1.14), o);
+    for (let k = 0; k < 4; k++)                                          // laces
+      mb.box(x, .086 + k * .028, .034 + tw, .080, .010, .010, shade(dark, 1.6), o);
+    mb.box(x, .150, .030 + tw, .058, .060, .060, shade(dark, .80), o);   // tongue
+    mb.box(x, .180, .010 + tw, .118, .034, .152, [18, 19, 22], o);      // instep strap
+    J(mb, x, .215, -.012 + tw, .072, .075, 9, 3, S, o);                 // ankle convolute
   }
-  // ---- legs: shin, knee, thigh, with a pocket on the outside ------------
+  // ---- legs: shin, knee convolute, thigh, pockets, restraint garters ----
   for (const s of [-1, 1]) {
-    const x = s * .112;
-    L(mb, [x, .16, -.01], [x * 1.02, .49, .01], .080, .068, 7, S, o);   // shin
-    B(mb, x * 1.02, .50, .015, .085, .072, .090, 7, 3, shade(S, 1.04), o);  // knee
-    L(mb, [x * 1.02, .50, .015], [x * 1.18, .93, 0], .097, .116, 7, S, o);  // thigh
-    mb.box(x * 1.45, .62, .02, .055, .200, .150, shade(S, .88), o);     // thigh pocket
-    mb.box(x * 1.46, .62, .02, .022, .020, .140, strap, o);
-    mb.box(x * 1.02, .40, .075, .120, .130, .045, shade(S, .92), o);    // shin pocket
+    const x = s * .112, bend = s < 0 ? .012 : 0;
+    L(mb, [x, .245, -.012], [x * 1.02, .455, .012 + bend], .081, .074, 10, S, o);
+    J(mb, x * 1.02, .505, .016 + bend, .082, .115, 10, 4, S, o);          // knee
+    L(mb, [x * 1.02, .560, .014 + bend], [x * 1.16, .900, 0], .092, .114, 10, S, o);
+    // leg restraint garter, with its ring
+    mb.box(x * 1.02, .360, -.004, .174, .040, .174, strap, o);
+    mb.box(x * 1.48, .360, -.004, .040, .046, .046, metal, oS);
+    // thigh pocket with a flap and a pull tab
+    mb.box(x * 1.52, .660, .022, .052, .190, .140, shade(S, .90), o);
+    mb.box(x * 1.53, .752, .022, .058, .034, .150, shade(S, .80), o);
+    mb.box(x * 1.55, .742, .022, .022, .046, .030, tape, o);
+    mb.box(x * 1.05, .400, .078, .118, .128, .044, shade(S, .93), o);    // shin pocket
   }
-  // ---- pelvis, belt and the seat harness --------------------------------
-  B(mb, 0, .98, 0, .185, .125, .135, 9, 4, S, o);
-  mb.box(0, 1.04, 0, .345, .075, .250, strap, o);                        // belt
-  mb.box(0, 1.04, .126, .085, .070, .030, metal, oS);                    // buckle
-  for (const s of [-1, 1]) mb.box(s * .175, 1.02, .05, .045, .110, .120, shade(S, .84), o);
-  // ---- torso: a barrel, wider at the chest, with the survival pack on ---
-  L(mb, [0, 1.02, 0], [0, 1.24, .008], .175, .200, 12, S, o);
-  L(mb, [0, 1.24, .008], [0, 1.44, 0], .200, .185, 12, shade(S, 1.02), o);
-  mb.box(0, 1.20, .175, .270, .240, .070, shade(S, .90), o);             // chest pack
-  mb.box(0, 1.20, .212, .200, .150, .012, shade(S, .78), o);
-  // parachute harness: over each shoulder, crossing to the belt
+  // ---- pelvis, belt, hip convolutes -------------------------------------
+  B(mb, 0, .975 + HIPT, 0, .188, .128, .138, 10, 5, S, o);
+  J(mb, 0, .905, 0, .176, .080, 12, 2, S, o);
+  mb.box(0, 1.035 + HIPT, 0, .350, .078, .256, strap, o);                 // waist strap
+  mb.box(0, 1.035 + HIPT, .130, .092, .074, .032, metal, oS);             // buckle
   for (const s of [-1, 1]) {
-    L(mb, [s * .150, 1.445, -.02], [s * .085, 1.09, .150], .030, .030, 4, strap, o);
-    L(mb, [s * .150, 1.445, -.06], [s * .120, 1.10, -.140], .028, .028, 4, shade(strap, .9), o);
-    L(mb, [s * .150, 1.445, -.02], [s * .190, 1.30, .02], .034, .030, 4, strap, o);
+    mb.box(s * .178, 1.015 + HIPT, .050, .046, .112, .124, shade(S, .84), o);
+    mb.box(s * .120, .955, .140, .070, .150, .040, strap, o);             // leg strap
   }
-  mb.box(0, 1.30, .195, .150, .045, .040, metal, oS);                    // the koch fitting
-  // name tag and a shoulder patch, because a pilot has both
-  mb.box(.075, 1.345, .196, .120, .042, .008, [214, 208, 190], { two: true, emit: IN * 1.2 });
-  mb.box(-.205, 1.395, .02, .012, .075, .075, [168, 62, 52], { two: true, emit: IN * 1.1 });
-  // ---- shoulders and arms ------------------------------------------------
+  // ---- torso: the cover layer, its seams, and the survival vest ---------
+  L(mb, [0, 1.020 + HIPT, 0], [0, 1.235, .008], .178, .204, 14, S, o);
+  L(mb, [0, 1.235, .008], [0, 1.440, 0], .204, .186, 14, shade(S, 1.02), o);
+  for (const s of [-1, 1])                                                // side seams
+    mb.box(s * .195, 1.225, 0, .020, .390, .150, shade(S, .86), o);
+  mb.box(0, 1.230, .196, .026, .400, .026, shade(S, .80), o);             // front zip
+  // survival vest: four pouches and the shoulder yoke
+  mb.box(0, 1.180, .186, .310, .250, .075, shade(S, .93), o);
+  for (const s of [-1, 1]) for (const yy of [1.118, 1.252]) {
+    mb.box(s * .088, yy, .232, .130, .104, .036, shade(S, .84), o);
+    mb.box(s * .088, yy + .054, .236, .136, .028, .042, shade(S, .74), o);
+  }
+  mb.box(0, 1.330, .176, .300, .066, .062, shade(S, .88), o);
+  // the chest controller, on the left, where the hose goes
+  mb.box(-.140, 1.300, .214, .118, .130, .070, alu, oS);
+  mb.box(-.140, 1.300, .252, .080, .080, .016, [58, 64, 72], oS);
+  mb.box(-.176, 1.352, .240, .034, .034, .034, metal, oS);
+  // ---- the parachute harness, over all of it ----------------------------
   for (const s of [-1, 1]) {
-    B(mb, s * .180, 1.412, 0, .088, .086, .098, 8, 4, shade(S, 1.05), o);
-    L(mb, [s * .184, 1.40, 0], [s * .228, 1.13, .020], .082, .068, 7, S, o);   // upper arm
-    B(mb, s * .228, 1.125, .022, .069, .062, .073, 7, 3, shade(S, 1.03), o);   // elbow
-    L(mb, [s * .228, 1.125, .022], [s * .234, .875, .055], .064, .052, 7, S, o); // forearm
-    mb.box(s * .236, .885, .055, .078, .048, .088, strap, o);                  // cuff ring
-    B(mb, s * .236, .820, .062, .054, .066, .058, 7, 3, glove, o);             // glove
-    mb.box(s * .236, .762, .080, .078, .072, .080, shade(glove, .92), o);      // fingers
+    L(mb, [s * .150, 1.448, -.02], [s * .086, 1.086, .156], .032, .032, 5, strap, o);
+    L(mb, [s * .150, 1.448, -.06], [s * .124, 1.096, -.146], .030, .030, 5, shade(strap, .9), o);
+    L(mb, [s * .150, 1.448, -.02], [s * .196, 1.300, .02], .036, .032, 5, strap, o);
+    mb.box(s * .104, 1.246, .190, .062, .088, .044, metal, oS);           // koch fitting
+    mb.box(s * .104, 1.190, .186, .044, .040, .036, shade(metal, .8), oS);
   }
-  // ---- neck ring, head, helmet ------------------------------------------
-  mb.box(0, 1.475, 0, .150, .060, .150, metal, oS);
-  L(mb, [0, 1.44, 0], [0, 1.54, 0], .078, .072, 7, shade(S, .92), o);
-  B(mb, 0, 1.655, -.004, .132, .152, .142, 12, 6, HC, { two: true, emit: IN * 1.05, spec: .30, gloss: 24 });
-  // the visor: a wrapped band across the front of the shell
-  for (let i = 0; i < 9; i++) {
-    const a0 = (-.345 + i * .0767) * Math.PI, a1 = (-.345 + (i + 1) * .0767) * Math.PI;
-    const P = (a, y, k) => [Math.sin(a) * .137 * k, y, -.004 + Math.cos(a) * .147 * k];
-    mb.quad(P(a0, 1.585, 1.01), P(a1, 1.585, 1.01), P(a1, 1.692, 1.01), P(a0, 1.692, 1.01),
-      shade(VC, .92 + i * .02), { two: true, emit: IN * .8, spec: .95, gloss: 52 });
-    mb.quad(P(a0, 1.692, 1.02), P(a1, 1.692, 1.02), P(a1, 1.715, 1.02), P(a0, 1.715, 1.02),
-      shade(HC, 1.18), { two: true, emit: IN });                        // the brow trim
-    mb.quad(P(a0, 1.566, 1.02), P(a1, 1.566, 1.02), P(a1, 1.585, 1.02), P(a0, 1.585, 1.02),
-      shade(HC, .82), { two: true, emit: IN });
+  mb.box(0, 1.380, .188, .224, .052, .046, strap, o);                      // chest strap
+  // name tape and a shoulder patch
+  mb.box(.086, 1.372, .198, .128, .044, .010, [214, 208, 190], o);
+  mb.box(-.214, 1.392, .028, .014, .080, .080, [150, 46, 40], o);
+  mb.box(.214, 1.392, .028, .014, .080, .080, [40, 70, 132], o);
+  // ---- shoulders, arms, convolutes, gloves ------------------------------
+  for (const s of [-1, 1]) {
+    B(mb, s * .180, 1.412, 0, .094, .090, .102, 9, 5, shade(S, 1.05), o);
+    J(mb, s * .188, 1.352, .004, .092, .090, 10, 3, S, o);                 // shoulder
+    L(mb, [s * .190, 1.318, .004], [s * .232, 1.152, .016], .086, .074, 10, S, o);
+    J(mb, s * .234, 1.108, .020, .076, .104, 10, 4, S, o);                 // elbow
+    L(mb, [s * .236, 1.056, .022], [s * .242, .898, .052], .070, .058, 10, S, o);
+    mb.box(s * .244, .886, .054, .084, .046, .092, metal, oS);             // wrist ring
+    B(mb, s * .244, .826, .060, .056, .066, .060, 8, 4, glove, o);         // back of hand
+    // four fingers, curled, and a thumb tucked in against the leg
+    for (let k = 0; k < 4; k++) {
+      const fx = s * (.212 + k * .021);
+      L(mb, [fx, .790, .078], [fx, .740, .090], .0115, .0100, 5, shade(glove, 1.06 - k * .03), o);
+    }
+    mb.box(s * .243, .737, .090, .088, .018, .022, shade(glove, .92), o);
+    L(mb, [s * .262, .800, .040], [s * .268, .762, .072], .017, .015, 6, shade(glove, .96), o);
+    mb.box(s * .244, .806, .060, .066, .026, .060, shade(glove, 1.14), o);  // knuckle bar
   }
-  // oxygen mask under the visor, and the hose down to the chest
-  mb.box(0, 1.553, .100, .130, .080, .070, rubber, o);
-  mb.box(0, 1.520, .085, .095, .050, .060, shade(rubber, 1.15), o);
-  let hx = .045, hy = 1.500, hz = .105;
-  for (let k = 0; k < 5; k++) {
-    const nx = .045 + k * .017, ny = 1.500 - k * .067, nz = .105 + Math.sin(k * .6) * .020;
-    L(mb, [hx, hy, hz], [nx, ny, nz], .026, .026, 5, k & 1 ? rubber : shade(rubber, 1.2), o);
+  // ---- neck ring, helmet, visor, mask -----------------------------------
+  L(mb, [0, 1.436, 0], [0, 1.500, 0], .080, .076, 11, shade(S, .92), o);
+  mb.box(0, 1.520, 0, .166, .052, .166, metal, oS);                        // locking ring
+  for (let k = 0; k < 6; k++) {                                            // its lugs
+    const a = k / 6 * TAU;
+    mb.box(Math.sin(a) * .086, 1.520, Math.cos(a) * .086, .026, .034, .026, shade(metal, .82), oS);
+  }
+  B(mb, 0, 1.665, -.006, .134, .156, .146, 13, 7, HC, o);
+  mb.box(0, 1.566, -.040, .186, .052, .162, shade(HC, .90), o);            // shell skirt
+  // the visor aperture: a frame, the glass, and a brow over it
+  for (let i = 0; i < 10; i++) {
+    const a0 = (-.345 + i * .069) * Math.PI, a1 = (-.345 + (i + 1) * .069) * Math.PI;
+    const P = (a, y, k) => [Math.sin(a) * .139 * k, y, -.006 + Math.cos(a) * .149 * k];
+    mb.quad(P(a1, 1.592, 1.01), P(a0, 1.592, 1.01), P(a0, 1.700, 1.01), P(a1, 1.700, 1.01),
+      shade(VC, .90 + i * .02), { two: true, bake: 1, gain: 2.7 });
+    mb.quad(P(a1, 1.700, 1.03), P(a0, 1.700, 1.03), P(a0, 1.730, 1.03), P(a1, 1.730, 1.03),
+      shade(HC, 1.20), o);                                                  // brow
+    mb.quad(P(a1, 1.570, 1.03), P(a0, 1.570, 1.03), P(a0, 1.592, 1.03), P(a1, 1.592, 1.03),
+      shade(HC, .78), o);                                                   // lower frame
+    mb.quad(P(a1, 1.700, 1.045), P(a0, 1.700, 1.045), P(a0, 1.712, 1.045), P(a1, 1.712, 1.045),
+      alu, oS);                                                             // the alloy trim
+  }
+  // crown, ear cups, chin strap
+  for (let i = 0; i < 12; i++) {
+    const a0 = i / 12 * TAU, a1 = (i + 1) / 12 * TAU;
+    const P = a => [Math.sin(a) * .052, 1.818, -.006 + Math.cos(a) * .056];
+    mb.tri([0, 1.826, -.006], P(a1), P(a0), shade(HC, 1.22), o);
+  }
+  for (const s of [-1, 1]) {
+    B(mb, s * .136, 1.646, -.014, .032, .062, .066, 7, 4, shade(HC, .78), o);
+    mb.box(s * .142, 1.646, -.014, .022, .034, .038, shade(metal, .9), oS);
+  }
+  mb.box(0, 1.548, .034, .150, .038, .110, shade(HC, .70), o);
+  // oxygen mask and its hose, down to the controller on the chest
+  mb.box(0, 1.556, .104, .134, .086, .074, rubber, o);
+  mb.box(0, 1.520, .088, .098, .052, .062, shade(rubber, 1.18), o);
+  mb.box(0, 1.500, .096, .054, .034, .050, shade(alu, .9), oS);
+  let hx = -.052, hy = 1.516, hz = .098;
+  for (let k = 0; k < 7; k++) {
+    const t = (k + 1) / 7;
+    const nx = lerp(-.052, -.150, t) - Math.sin(t * 3.1) * .020;
+    const ny = lerp(1.516, 1.352, t);
+    const nz = lerp(.098, .244, t) + Math.sin(t * 3.1) * .030;
+    L(mb, [hx, hy, hz], [nx, ny, nz], .027, .027, 7, k & 1 ? rubber : shade(rubber, 1.22), o);
     hx = nx; hy = ny; hz = nz;
   }
-  // comms lead off the back of the helmet
-  L(mb, [-.10, 1.62, -.13], [-.16, 1.40, -.18], .016, .016, 4, dark, o);
-  // crown stripe and the earcups
-  for (let i = 0; i < 9; i++) {
-    const a0 = i / 9 * TAU, a1 = (i + 1) / 9 * TAU;
-    const P = a => [Math.sin(a) * .050, 1.800, -.004 + Math.cos(a) * .054];
-    mb.tri([0, 1.806, -.004], P(a0), P(a1), shade(HC, 1.22), o);
+  /* The floor under them. Three rings of it, because a hard-edged ellipse
+     is a decal and a person standing on concrete under a roof full of lamps
+     has a soft one. */
+  for (let k = 0; k < 5; k++) {
+    const rr = .22 + k * .095, al = [.20, .15, .11, .07, .035][k];
+    const pts = [];
+    for (let i = 0; i < 12; i++) {
+      const a = i / 12 * TAU;
+      pts.push([Math.sin(a) * rr * 1.28, .012, -.02 + Math.cos(a) * rr]);
+    }
+    for (let i = 1; i < 11; i++)
+      mb.tri(pts[0], pts[i], pts[i + 1], [12, 16, 20], { two: true, alpha: al, bias: -12 });
   }
-  for (const s of [-1, 1]) B(mb, s * .133, 1.640, -.010, .030, .058, .062, 6, 3, shade(HC, .80), o);
+  // comms lead off the back of the helmet
+  let cx2 = -.104, cy2 = 1.618, cz2 = -.140;
+  for (let k = 0; k < 5; k++) {
+    const t = (k + 1) / 5;
+    const nx = lerp(-.104, -.178, t), ny = lerp(1.618, 1.360, t), nz = lerp(-.140, -.196, t);
+    L(mb, [cx2, cy2, cz2], [nx, ny, nz], .015, .015, 6, dark, o);
+    cx2 = nx; cy2 = ny; cz2 = nz;
+  }
   return mb.done();
+}
+/* The pilot is lit by the shed they are standing in, the same way the shed
+   is: worked out once, against the same lamps, with the aeroplane in the
+   way. Their own box comes out of the occluder list first, or they would
+   shadow themselves into a silhouette. */
+function bakePilot(mesh) {
+  const L = HANGAR.light;
+  if (!L) return mesh;
+  return bakeMesh(mesh, {
+    occ: L.occNP, lights: L.lights, amb: [.185, .197, .222], aoR: 6, aoK: .58,
+    ox: HANGAR.pilot.x, oy: HANGAR.pilot.y, oz: HANGAR.pilot.z, yaw: PILOT_YAW
+  });
 }
 let PILOTMESH = buildPilot();
 
@@ -3059,6 +3164,128 @@ function buildAirport() {
 }
 const AIRPORT = buildAirport();
 
+/* ===== baking the light in ===============================================
+
+   The renderer lights the world off the sun, and a shed is the one place the
+   sun is not. Adding a flat term back per face made the inside VISIBLE but
+   not LIT: every surface the same brightness, no falloff, no corners, no
+   shadow under anything. That is what a rendering looks like. It is not what
+   a building looks like.
+
+   So the light in here is worked out ONCE, when the mesh is built, and
+   written into the faces. Each face asks every lamp above it how much it
+   gives — cosine, inverse square, and whether anything is in the way — then
+   asks the roof lights and the open door for their share, and then asks the
+   room how much of it it can see at all: a dozen rays into its own
+   hemisphere against the boxes that make up the building and everything
+   parked in it. That last part is what puts the dark in the corners, under
+   the wings, behind the tool chest and along the wall-floor joint, and it is
+   most of the difference between a picture of a hangar and a hangar.
+
+   It costs nothing at run time. The face keeps the answer and `flat` tells
+   the renderer not to ask the sun about it again. */
+const AO_DIRS = (function () {
+  const d = [], N = 12;
+  for (let i = 0; i < N; i++) {
+    const t = (i + .5) / N;                     // cosine-weighted hemisphere
+    const r = Math.sqrt(t), z = Math.sqrt(1 - t), a = i * 2.3999632;
+    d.push([Math.cos(a) * r, Math.sin(a) * r, z]);
+  }
+  return d;
+})();
+function bakeMesh(mesh, L) {
+  const v = mesh.v, F = mesh.f;
+  const occ = L.occ || [], lights = L.lights || [];
+  const amb = L.amb || [.10, .11, .13];
+  const aoR = L.aoR === undefined ? 10 : L.aoR;
+  const aoK = L.aoK === undefined ? .80 : L.aoK;
+  const oX = L.ox || 0, oY = L.oy || 0, oZ = L.oz || 0;
+  const cs = Math.cos(L.yaw || 0), sn = Math.sin(L.yaw || 0);
+  /* A ray against the occluder boxes, slab by slab. The origin is pushed a
+     few centimetres along its own direction so a face never shadows itself
+     on the box it is part of. */
+  const blocked = (px, py, pz, dx, dy, dz, tmax) => {
+    const ex = px + dx * .07, ey = py + dy * .07, ez = pz + dz * .07;
+    for (let i = 0; i < occ.length; i++) {
+      const b = occ[i];
+      let t0 = 0, t1 = tmax, iv = 1 / dx;
+      let a = (b[0] - ex) * iv, c = (b[3] - ex) * iv, s;
+      if (a > c) { s = a; a = c; c = s; }
+      if (a > t0) t0 = a; if (c < t1) t1 = c;
+      if (t0 > t1) continue;
+      iv = 1 / dy; a = (b[1] - ey) * iv; c = (b[4] - ey) * iv;
+      if (a > c) { s = a; a = c; c = s; }
+      if (a > t0) t0 = a; if (c < t1) t1 = c;
+      if (t0 > t1) continue;
+      iv = 1 / dz; a = (b[2] - ez) * iv; c = (b[5] - ez) * iv;
+      if (a > c) { s = a; a = c; c = s; }
+      if (a > t0) t0 = a; if (c < t1) t1 = c;
+      if (t0 > t1) continue;
+      return true;
+    }
+    return false;
+  };
+  for (let fi = 0; fi < F.length; fi++) {
+    const fc = F[fi];
+    if (!fc.bake) continue;
+    const idx = fc.i, n = idx.length;
+    let lx = 0, ly = 0, lz = 0;
+    for (let k = 0; k < n; k++) { const o = idx[k] * 3; lx += v[o]; ly += v[o + 1]; lz += v[o + 2]; }
+    lx /= n; ly /= n; lz /= n;
+    const a0 = idx[0] * 3, b0 = idx[1] * 3, c0 = idx[2] * 3;
+    const e1x = v[b0] - v[a0], e1y = v[b0 + 1] - v[a0 + 1], e1z = v[b0 + 2] - v[a0 + 2];
+    const e2x = v[c0] - v[a0], e2y = v[c0 + 1] - v[a0 + 1], e2z = v[c0 + 2] - v[a0 + 2];
+    let mx = e1y * e2z - e1z * e2y, my = e1z * e2x - e1x * e2z, mz = e1x * e2y - e1y * e2x;
+    const ml = Math.hypot(mx, my, mz) || 1; mx /= ml; my /= ml; mz /= ml;
+    // into world, for the lighting only — the mesh keeps its own coordinates
+    const cx = oX + lx * cs + lz * sn, cy = oY + ly, cz = oZ - lx * sn + lz * cs;
+    let nx = mx * cs + mz * sn, ny = my, nz = -mx * sn + mz * cs;
+    /* A two-sided face has no side, so it is lit from whichever way faces
+       the room: point the normal away from the middle of the light. */
+    if (fc.face && L.inx !== undefined) {
+      const ix = L.inx - cx, iy = L.iny - cy, iz = L.inz - cz;
+      if (nx * ix + ny * iy + nz * iz < 0) { nx = -nx; ny = -ny; nz = -nz; }
+    }
+    // a tangent frame to spin the hemisphere samples in
+    let tx = 0, ty = 0, tz = 1;
+    if (Math.abs(nz) > .9) { tx = 1; tz = 0; }
+    let ux = ny * tz - nz * ty, uy = nz * tx - nx * tz, uz = nx * ty - ny * tx;
+    const ul = Math.hypot(ux, uy, uz) || 1; ux /= ul; uy /= ul; uz /= ul;
+    const wx = ny * uz - nz * uy, wy = nz * ux - nx * uz, wz = nx * uy - ny * ux;
+    let open = 0;
+    for (let k = 0; k < AO_DIRS.length; k++) {
+      const d = AO_DIRS[k];
+      const dx = ux * d[0] + wx * d[1] + nx * d[2];
+      const dy = uy * d[0] + wy * d[1] + ny * d[2];
+      const dz = uz * d[0] + wz * d[1] + nz * d[2];
+      if (!blocked(cx, cy, cz, dx, dy, dz, aoR)) open++;
+    }
+    const ao = 1 - aoK * (1 - open / AO_DIRS.length);
+    let r = amb[0] * ao, g = amb[1] * ao, b = amb[2] * ao;
+    const dirAO = .30 + .70 * ao;
+    for (let li = 0; li < lights.length; li++) {
+      const L2 = lights[li];
+      let dx = L2.x - cx, dy = L2.y - cy, dz = L2.z - cz;
+      const d2 = dx * dx + dy * dy + dz * dz, d = Math.sqrt(d2) || 1;
+      dx /= d; dy /= d; dz /= d;
+      const ndl = nx * dx + ny * dy + nz * dz;
+      if (ndl <= 0) continue;
+      const at = L2.p / (1 + d2 / (L2.r * L2.r));
+      if (at < .004) continue;
+      if (L2.hard !== false && blocked(cx, cy, cz, dx, dy, dz, d - .25)) continue;
+      const k = ndl * at * dirAO;
+      r += L2.c[0] * k; g += L2.c[1] * k; b += L2.c[2] * k;
+    }
+    if (fc.gain) { r *= fc.gain; g *= fc.gain; b *= fc.gain; }
+    const col = fc.c;
+    fc.c = [clamp(col[0] * r, 0, 255), clamp(col[1] * g, 0, 255), clamp(col[2] * b, 0, 255)];
+    fc.flat = 1;
+    fc.emit = 0;
+    fc.spec = 0;
+  }
+  return mesh;
+}
+
 /* ===== the hangar ========================================================
 
    The aeroplane has to live somewhere, and a menu over a fly-by of a field
@@ -3079,6 +3306,7 @@ const HANGAR = {
 };
 HANGAR.pos = v3(HANGAR.x - 4, E + 2.92, HANGAR.z);
 HANGAR.q = qAxis(0, 1, 0, Math.PI * .5);           // nose out of the door, east
+HANGAR.pilot = v3(HANGAR.pos.x + 14.6, E + .05, HANGAR.pos.z + 6.0);
 /* The shed is built twice: a SHELL that is worth drawing from the taxiway,
    and the DETAIL — the stair, the bowser, the chest, the drums, the tug —
    which only exists when you are close enough to read it. A hangar you fly
@@ -3092,42 +3320,77 @@ function buildHangar() {
   const sh = MB(), det = MB();
   const X = HANGAR.x, Z = HANGAR.z, HW = HANGAR.w * .5, HD = HANGAR.d * .5, HH = HANGAR.h;
   const y0 = E + .06;
-  const IN = .42;
-  const lit = (e, o) => Object.assign({ two: true, emit: e === undefined ? IN : e }, o || {});
-  const CONC = [104, 105, 109], CONC2 = [94, 95, 99];
-  const SKIN = [140, 147, 154], WAINS = [44, 60, 74], TRIM = [68, 74, 82];
-  const DARK = [40, 44, 50], STEEL = [92, 98, 106], ALU = [166, 172, 180];
-  const YEL = [214, 178, 46], RED = [172, 56, 44], WHT = [222, 226, 230];
+  const lit = o => Object.assign({ two: true, bake: 1 }, o || {});   // an object inside
+  /* A face of the ROOM itself — floor, wall, roof liner. It is two-sided, so
+     it has no side of its own, and the baker is told to light whichever way
+     the room is. An object's box already has its normals pointing out. */
+  const fl = o => Object.assign({ two: true, bake: 1, face: 1 }, o || {});
+  /* One-sided, and wound outward: from inside the shed the renderer throws
+     every one of these away before it paints it, which is two hundred and
+     fifty full-screen polygons that were being drawn and then covered up. */
+  const OUT = {};                                                     // outside: the sun
+  /* A two-centimetre rib on a phone is a sub-pixel rib, and it costs the
+     same to draw as the wall it is on. The fine grain of the place is built
+     for a screen that can show it. */
+  const FINE = !MOBILE && !COARSE;
+  const CONC = [116, 117, 121], CONC2 = [106, 107, 111];
+  const SKIN = [150, 157, 164], WAINS = [52, 70, 86], TRIM = [78, 85, 94];
+  const DARK = [46, 50, 57], STEEL = [104, 111, 120], ALU = [176, 182, 190];
+  const YEL = [214, 178, 46], RED = [172, 56, 44], WHT = [226, 230, 234];
+  const WOOD = [132, 104, 68], GREEN = [70, 96, 78];
 
-  // ---- the lamps, first, because the floor has to know where they are ----
-  const LAMPX = [], LAMPZ = [Z - 16, Z, Z + 16];
-  for (let i = 1; i <= 4; i++) LAMPX.push(X - HW + i * (HANGAR.w / 5));
-  const pool = (x, z) => {
-    let s = 0;
-    for (let a = 0; a < LAMPX.length; a++) for (let b = 0; b < LAMPZ.length; b++) {
-      const dx = x - LAMPX[a], dz = z - LAMPZ[b];
-      s += Math.exp(-(dx * dx + dz * dz) / 170);
-    }
-    return Math.min(s, 1.2);
+  /* Boxes the light has to get past. Everything big enough to cast a shadow
+     goes in, and nothing else: the list is walked once per ray. */
+  const OCC = [];
+  /* A box is shrunk before it becomes an occluder. A face that lies ON the
+     box would otherwise start every one of its rays INSIDE it, count them
+     all as blocked, and come out black — which is exactly what the walls
+     did the first time this ran. */
+  const occ = (x, y, z, sx, sy, sz) => {
+    const ex = Math.max(sx / 2 - .12, sx * .02), ey = Math.max(sy / 2 - .12, sy * .02),
+          ez = Math.max(sz / 2 - .12, sz * .02);
+    OCC.push([x - ex, y - ey, z - ez, x + ex, y + ey, z + ez]);
+  };
+  const obox = (mb, x, y, z, sx, sy, sz, c, o) => {
+    mb.box(x, y, z, sx, sy, sz, c, o || lit());
+    occ(x, y, z, sx, sy, sz);
   };
 
-  // ---- floor: slabs with real joints, lamp pools and daylight at the door
+  // ---- the lamps, and the rest of what is lighting this place ------------
+  const LAMPX = [], LAMPZ = [Z - 17, Z, Z + 17];
+  for (let i = 1; i <= 4; i++) LAMPX.push(X - HW + i * (HANGAR.w / 5));
+  const LIGHTS = [];
+  for (const lx of LAMPX) for (const lz of LAMPZ)
+    LIGHTS.push({ x: lx, y: y0 + HH - 3.0, z: lz, r: 8.5, p: 1.15, c: [1.00, .930, .800] });
+  /* The roof lights and the open door are areas, not points, so each is a
+     row of weak wide ones — which is what gives a soft edge instead of a
+     hard little pool. */
+  for (let i = 0; i < 4; i++) {
+    const rx = X - HW + (i * 4 + 2.5) * (HANGAR.w / 14);
+    for (const rz of [Z - HD * .5, Z + HD * .5])
+      LIGHTS.push({ x: rx, y: y0 + HH + 2.4, z: rz, r: 30, p: .30, c: [.62, .75, .98] });
+  }
+  for (let k = -1; k <= 1; k++)
+    LIGHTS.push({ x: X + HW - .5, y: y0 + 7, z: Z + k * 12, r: 30, p: .34, c: [.66, .78, 1.00] });
+  LIGHTS.push({ x: X - HW + 6, y: y0 + 5.0, z: Z + HD - 7, r: 9, p: .55, c: [1.0, .93, .78] }); // office
+
+  // ---- floor -------------------------------------------------------------
   sh.quad([X - HW, y0 - .03, Z - HD], [X + HW, y0 - .03, Z - HD],
-          [X + HW, y0 - .03, Z + HD], [X - HW, y0 - .03, Z + HD], [52, 53, 57],
+          [X + HW, y0 - .03, Z + HD], [X - HW, y0 - .03, Z + HD], [40, 41, 45],
           { two: true, bias: -220 });
   const NX = 13, NZ = 9, sw = HANGAR.w / NX, sd = HANGAR.d / NZ;
-  const STAIN = [[X - 7, Z - 4.4], [X - 7, Z + 4.4], [X - 24, Z + 9], [X + 3, Z - 11]];
+  const STAIN = [[X - 7, Z - 4.4], [X - 7, Z + 4.4], [X - 24, Z + 9], [X + 3, Z - 11], [X - 26, Z - 17]];
   for (let i = 0; i < NX; i++) for (let j = 0; j < NZ; j++) {
     const xa = X - HW + i * sw, za = Z - HD + j * sd;
     const xb = xa + sw - .07, zb = za + sd - .07;
     const xc = xa + sw * .5, zc = za + sd * .5;
-    const day = sstep(.44, 1.02, (xc - (X - HW)) / HANGAR.w) * (1 - sstep(17, 23.5, Math.abs(zc - Z)));
-    let c = shade((i + j) & 1 ? CONC : CONC2, 1 + (hash2(i, j) - .5) * .07 + day * .10);
+    let c = shade((i + j) & 1 ? CONC : CONC2, 1 + (hash2(i, j) - .5) * .07);
     let st = 0;
     for (const s2 of STAIN) st = Math.max(st, Math.exp(-((xc - s2[0]) * (xc - s2[0]) + (zc - s2[1]) * (zc - s2[1])) / 9));
-    if (st > .02) c = mixc(c, [52, 50, 48], st * .55);
-    sh.quad([xa, y0, za], [xb, y0, za], [xb, y0, zb], [xa, y0, zb], c,
-      { two: true, bias: -180, emit: IN * .34 + pool(xc, zc) * .26 + day * .30, spec: .22, gloss: 26 });
+    if (st > .02) c = mixc(c, [54, 52, 50], st * .55);
+    // a patched repair or two, poured later and never the same colour
+    if ((i === 4 && j === 2) || (i === 9 && j === 6)) c = mixc(c, [138, 136, 132], .55);
+    sh.quad([xa, y0, za], [xb, y0, za], [xb, y0, zb], [xa, y0, zb], c, fl({ bias: -180 }));
   }
   // the apron outside the door keeps the sun on it
   for (let i = 0; i < 5; i++) {
@@ -3135,227 +3398,421 @@ function buildHangar() {
     sh.quad([xa, y0, Z - HD], [xb, y0, Z - HD], [xb, y0, Z + HD], [xa, y0, Z + HD],
       shade(CONC2, 1 + (hash2(i, 3) - .5) * .05), { two: true, bias: -180, edge: 1 });
   }
-  // ---- paint on the floor -----------------------------------------------
-  const paint = (xa, za, xb, zb, col, e) =>
+  // ---- paint, and the rubber laid down on top of it ----------------------
+  const paint = (xa, za, xb, zb, col) =>
     sh.quad([xa, y0 + .015, za], [xb, y0 + .015, za], [xb, y0 + .015, zb], [xa, y0 + .015, zb], col,
-      { two: true, bias: 0, emit: e === undefined ? IN * .8 : e });
+      fl({ bias: 0 }));
   for (let x = X - HW + 4; x < X + HW + 58; x += 7) paint(x, Z - .30, x + 4.4, Z + .30, YEL);
-  paint(X - HW + 3.0, Z - 2.6, X - HW + 3.9, Z + 2.6, RED);              // the stop bar
-  for (const zz of [-1, 1]) {                                            // walkway edges
-    paint(X - HW + 1, Z + zz * 25.4, X + HW - 1, Z + zz * 26.0, WHT, IN * .9);
-    paint(X - HW + 1, Z + zz * 27.4, X + HW - 1, Z + zz * 28.0, WHT, IN * .9);
+  paint(X - HW + 3.0, Z - 2.6, X - HW + 3.9, Z + 2.6, RED);
+  for (const zz of [-1, 1]) {
+    paint(X - HW + 1, Z + zz * 25.4, X + HW - 1, Z + zz * 26.0, WHT);
+    paint(X - HW + 1, Z + zz * 27.4, X + HW - 1, Z + zz * 28.0, WHT);
   }
-  // hazard chevrons across the threshold
+  // tyre rubber where the mains have been rolled in and out a thousand times
+  for (const zz of [-4.4, 4.4])
+    for (let x = X - 12; x < X + HW + 40; x += 12)
+      paint(x, Z + zz - .55, x + 10, Z + zz + .55, [70, 68, 66]);
   for (let k = -11; k <= 11; k++) {
-    const zc = Z + k * 2.0;
-    const c = (k & 1) ? [26, 27, 30] : YEL;
-    sh.quad([X + HW - 2.6, y0 + .015, zc], [X + HW - 2.6 + 1.0, y0 + .015, zc],
-            [X + HW + .1, y0 + .015, zc + 1.6], [X + HW + .1 - 1.0, y0 + .015, zc + 1.6], c,
-            { two: true, bias: 0, emit: IN * .5 });
+    const zc = Z + k * 2.0, c = (k & 1) ? [30, 31, 34] : YEL;
+    sh.quad([X + HW - 2.6, y0 + .015, zc], [X + HW - 1.6, y0 + .015, zc],
+            [X + HW + .1, y0 + .015, zc + 1.6], [X + HW - .9, y0 + .015, zc + 1.6], c, fl({ bias: 0 }));
   }
-  // bay number, stencilled on the floor by the door
-  for (const [bx, bz, w2, h2] of [[X + 28, Z - 20, .6, 3.2]])
-    paint(bx, bz, bx + w2, bz + h2, WHT, IN * .9);
+  paint(X + 28, Z - 20, X + 28.6, Z - 16.8, WHT);
+  // a trench drain down the back, with its grate
+  for (let k = 0; k < 22; k++) {
+    const zz = Z - HD + 2 + k * 2.4;
+    paint(X - HW + 5.2, zz, X - HW + 5.9, zz + 2.2, [58, 60, 62]);
+    if (FINE) for (let g = 0; g < 5; g++)
+      paint(X - HW + 5.25, zz + .1 + g * .42, X - HW + 5.85, zz + .32 + g * .42, [96, 100, 104]);
+  }
 
-  // ---- walls: ribbed steel over a painted wainscot, on girts -------------
+  // ---- walls: a lined inner skin, an outer one, and columns between ------
   const wallRun = (xa, za, xb, zb, h, base, ix, iz) => {
     const dx = xb - xa, dz = zb - za, L = Math.hypot(dx, dz);
-    const ux = dx / L, uz = dz / L, n = Math.max(2, Math.round(L / 1.55));
+    const ux = dx / L, uz = dz / L, n = Math.max(2, Math.round(L / (FINE ? 1.9 : 2.8)));
     for (let i = 0; i < n; i++) {
       const a0 = i / n * L, a1 = (i + 1) / n * L;
       const x0 = xa + ux * a0, z0 = za + uz * a0, x1 = xa + ux * a1, z1 = za + uz * a1;
-      sh.quad([x0, y0, z0], [x1, y0, z1], [x1, y0 + h, z1], [x0, y0 + h, z0],
-        shade(base, i & 1 ? 1.07 : .93), lit(IN * .86));
+      const c = shade(base, i & 1 ? 1.06 : .94);
+      sh.quad([x0, y0, z0], [x1, y0, z1], [x1, y0 + h, z1], [x0, y0 + h, z0], c, fl());
+      // the outside of the same wall, which the sun does get at
+      const ox = -ix * .20, oz = -iz * .20;
+      sh.quad([x0 + ox, y0, z0 + oz], [x1 + ox, y0, z1 + oz],
+              [x1 + ox, y0 + h, z1 + oz], [x0 + ox, y0 + h, z0 + oz], c, OUT);
     }
     const px = ix * .07, pz = iz * .07;
     sh.quad([xa + px, y0, za + pz], [xb + px, y0, zb + pz],
-            [xb + px, y0 + 2.7, zb + pz], [xa + px, y0 + 2.7, za + pz], WAINS, lit(IN * .70));
+            [xb + px, y0 + 2.7, zb + pz], [xa + px, y0 + 2.7, za + pz], WAINS, fl());
     sh.quad([xa + px, y0 + 2.7, za + pz], [xb + px, y0 + 2.7, zb + pz],
-            [xb + px, y0 + 2.92, zb + pz], [xa + px, y0 + 2.92, za + pz], YEL, lit(IN * .85));
+            [xb + px, y0 + 2.92, zb + pz], [xa + px, y0 + 2.92, za + pz], YEL, fl());
     for (const gy of [5.6, 9.6, 13.6, 17.6]) {
       if (gy > h - .8) continue;
       sh.box((xa + xb) * .5 + px, y0 + gy, (za + zb) * .5 + pz,
-        Math.abs(dx) + Math.abs(uz) * .26, .26, Math.abs(dz) + Math.abs(ux) * .26, STEEL, lit(IN * .62));
+        Math.abs(dx) + Math.abs(uz) * .26, .26, Math.abs(dz) + Math.abs(ux) * .26, STEEL, lit());
+    }
+    /* Stanchions. A steel shed stands on a grid of them and you can always
+       see where it is; without them the wall is a painted sheet. */
+    const cn = Math.max(1, Math.round(L / 7.6));
+    for (let i = 1; i < cn; i++) {
+      const t = i / cn * L, x = xa + ux * t, z = za + uz * t;
+      const fx = Math.abs(uz) * .52 + .16, fz = Math.abs(ux) * .52 + .16;
+      sh.box(x + px * 5, y0 + h * .5, z + pz * 5, fx, h, fz, shade(STEEL, 1.08), lit());
+      if (FINE) sh.box(x + px * 5, y0 + .30, z + pz * 5, fx * 1.5, .6, fz * 1.5, shade(DARK, 1.1), lit());
     }
   };
-  wallRun(X - HW, Z - HD, X - HW, Z + HD, HH, SKIN, 1, 0);                  // back
-  wallRun(X - HW, Z - HD, X + HW, Z - HD, HH, shade(SKIN, .95), 0, 1);      // south
-  wallRun(X - HW, Z + HD, X + HW, Z + HD, HH, shade(SKIN, .91), 0, -1);     // north
-  // ---- the door wall: piers, lintel and the folded leaves ---------------
+  wallRun(X - HW, Z - HD, X - HW, Z + HD, HH, SKIN, 1, 0);
+  wallRun(X - HW, Z - HD, X + HW, Z - HD, HH, shade(SKIN, .95), 0, 1);
+  wallRun(X - HW, Z + HD, X + HW, Z + HD, HH, shade(SKIN, .91), 0, -1);
+  occ(X - HW - .45, y0 + HH * .5, Z, .7, HH, HANGAR.d);
+  occ(X, y0 + HH * .5, Z - HD - .45, HANGAR.w, HH, .7);
+  occ(X, y0 + HH * .5, Z + HD + .45, HANGAR.w, HH, .7);
+  // ---- the door wall -----------------------------------------------------
   const OP = 22;
   wallRun(X + HW, Z - HD, X + HW, Z - OP, HH, shade(SKIN, .88), -1, 0);
   wallRun(X + HW, Z + OP, X + HW, Z + HD, HH, shade(SKIN, .88), -1, 0);
-  sh.box(X + HW, y0 + HH - 1.7, Z, 1.0, 3.4, OP * 2, shade(SKIN, .84), lit(IN * .6));
-  sh.box(X + HW - .1, y0 + HH - 3.55, Z, 1.5, .55, OP * 2 + 10, TRIM, lit(IN * .7));   // the track
-  for (let k = 0; k < 4; k++) {
-    for (const s2 of [-1, 1]) {
-      sh.box(X + HW - 1.1 - k * .62, y0 + (HH - 3.8) * .5 + .1, Z + s2 * (OP + .9 + k * 1.15),
-        .50, HH - 3.9, 2.05, shade(TRIM, 1 + k * .09), lit(IN * .55));
-      // the ribs down each leaf
-      for (let r = 0; r < 4; r++)
-        sh.box(X + HW - 1.38 - k * .62, y0 + 2.6 + r * 4.2, Z + s2 * (OP + .9 + k * 1.15),
-          .06, .22, 1.9, shade(TRIM, 1.25), lit(IN * .8));
-    }
+  occ(X + HW + .45, y0 + HH * .5, Z - (HD + OP) * .5, .7, HH, HD - OP);
+  occ(X + HW + .45, y0 + HH * .5, Z + (HD + OP) * .5, .7, HH, HD - OP);
+  sh.box(X + HW, y0 + HH - 1.7, Z, 1.0, 3.4, OP * 2, shade(SKIN, .84), lit());
+  occ(X + HW, y0 + HH - 1.7, Z, 1.2, 3.4, OP * 2);
+  sh.box(X + HW - .1, y0 + HH - 3.55, Z, 1.5, .55, OP * 2 + 10, TRIM, lit());
+  for (let k = 0; k < 4; k++) for (const s2 of [-1, 1]) {
+    const lz = Z + s2 * (OP + .9 + k * 1.15);
+    sh.box(X + HW - 1.1 - k * .62, y0 + (HH - 3.8) * .5 + .1, lz, .50, HH - 3.9, 2.05,
+      shade(TRIM, 1 + k * .09), lit());
+    for (let r = 0; r < 2; r++)
+      sh.box(X + HW - 1.38 - k * .62, y0 + 2.6 + r * 8.4, lz, .06, .22, 1.9, shade(TRIM, 1.25), lit());
   }
-  // a personnel door and a window strip in the south wall
-  sh.box(X - 24, y0 + 1.05, Z - HD + .12, 1.0, 2.1, .16, [58, 66, 76], lit(IN * .8));
-  sh.box(X - 24, y0 + 1.05, Z - HD + .22, .10, .10, .10, ALU, lit(IN));
+  // a personnel door with a push bar, and the sign over it
+  sh.box(X - 24, y0 + 1.05, Z - HD + .14, 1.0, 2.1, .16, [58, 66, 76], lit());
+  sh.box(X - 24, y0 + 1.02, Z - HD + .26, .78, .07, .07, ALU, lit());
+  sh.box(X - 24, y0 + 2.30, Z - HD + .18, .52, .20, .08, [36, 120, 62], { two: true, emit: 1.0 });
+  // clerestory glazing, high up where a shed puts it
   for (let i = 0; i < 9; i++)
-    sh.box(X - HW + 6 + i * 7.5, y0 + 15.4, Z - HD + .10, 4.4, 1.7, .10, [126, 156, 176],
+    sh.box(X - HW + 6 + i * 7.5, y0 + 15.4, Z - HD + .10, 4.4, 1.7, .10, [140, 168, 190],
       { two: true, emit: .95, spec: .5, gloss: 40 });
 
-  // ---- roof: a gable on open-web trusses, with roof lights --------------
+  // ---- roof --------------------------------------------------------------
   const ridge = y0 + HH + 4.2;
-  const slope = (x0, x1, c) => {
-    sh.quad([x0, y0 + HH, Z - HD], [x1, y0 + HH, Z - HD], [x1, ridge, Z], [x0, ridge, Z], c, lit(IN * .55));
-    sh.quad([x0, ridge, Z], [x1, ridge, Z], [x1, y0 + HH, Z + HD], [x0, y0 + HH, Z + HD], shade(c, .96), lit(IN * .55));
-  };
   for (let i = 0; i < 14; i++) {
     const x0 = X - HW + i * (HANGAR.w / 14), x1 = x0 + HANGAR.w / 14;
-    // every fourth bay is a translucent panel: that is where the daylight is
     if (i % 4 === 2) {
       sh.quad([x0 + .3, y0 + HH, Z - HD], [x1 - .3, y0 + HH, Z - HD], [x1 - .3, ridge, Z], [x0 + .3, ridge, Z],
-        [196, 214, 230], { two: true, emit: 1.05 });
+        [206, 222, 238], { two: true, emit: .92 });
       sh.quad([x0 + .3, ridge, Z], [x1 - .3, ridge, Z], [x1 - .3, y0 + HH, Z + HD], [x0 + .3, y0 + HH, Z + HD],
-        [186, 205, 222], { two: true, emit: 1.0 });
-    } else slope(x0, x1, shade(SKIN, i & 1 ? 1.03 : .97));
-  }
-  sh.tri([X - HW, y0 + HH, Z - HD], [X - HW, y0 + HH, Z + HD], [X - HW, ridge, Z], shade(SKIN, .92), lit(IN * .5));
-  sh.tri([X + HW, y0 + HH, Z - HD], [X + HW, ridge, Z], [X + HW, y0 + HH, Z + HD], shade(SKIN, .88), lit(IN * .5));
-  sh.box(X, ridge + .18, Z, HANGAR.w, .36, 1.1, shade(SKIN, 1.08), lit(IN * .6));   // ridge cap
-  // purlins following the slope
-  for (let k = 1; k <= 5; k++) {
-    for (const s2 of [-1, 1]) {
-      const zz = Z + s2 * HD * (k / 6), yy = y0 + HH + 4.2 * (1 - k / 6);
-      sh.box(X, yy - .32, zz, HANGAR.w - .6, .22, .22, shade(STEEL, 1.1), lit(IN * .8));
+        [196, 214, 232], { two: true, emit: .88 });
+    } else {
+      const c = shade(SKIN, i & 1 ? 1.03 : .97);
+      // liner inside, deck outside
+      sh.quad([x0, y0 + HH - .22, Z - HD], [x1, y0 + HH - .22, Z - HD], [x1, ridge - .22, Z], [x0, ridge - .22, Z], shade(c, .92), fl());
+      sh.quad([x0, ridge - .22, Z], [x1, ridge - .22, Z], [x1, y0 + HH - .22, Z + HD], [x0, y0 + HH - .22, Z + HD], shade(c, .88), fl());
+      sh.quad([x0, y0 + HH, Z - HD], [x0, ridge, Z], [x1, ridge, Z], [x1, y0 + HH, Z - HD], c, OUT);
+      sh.quad([x0, ridge, Z], [x0, y0 + HH, Z + HD], [x1, y0 + HH, Z + HD], [x1, ridge, Z], shade(c, .96), OUT);
     }
   }
-  // trusses: a bottom chord, the sloping top chord, posts and diagonals
+  /* Shafts. A roof light is a hole in a roof; what says so is the slab of
+     pale air under it and the bright patch of floor at the bottom of that.
+     Four faint faces and a patch, per panel, and the shed stops being a
+     model of a shed. */
+  const SHAFT = [.30, .16];                       // how far the light leans
+  for (let i = 0; i < 14; i++) {
+    if (i % 4 !== 2) continue;
+    const x0 = X - HW + i * (HANGAR.w / 14) + .3, x1 = x0 + HANGAR.w / 14 - .6;
+    for (const s2 of [-1, 1]) {
+      const za = Z + s2 * HD, zb = Z;
+      const ya = y0 + HH, yb = ridge;
+      const top = [[x0, ya, za], [x1, ya, za], [x1, yb, zb], [x0, yb, zb]];
+      const bot = top.map(p => [p[0] + (p[1] - y0) * SHAFT[0], y0 + .02, p[2] + (p[1] - y0) * SHAFT[1]]);
+      const air = { two: true, alpha: .055 };
+      for (const k of (FINE ? [0, 2] : [0])) {
+        const k2 = (k + 1) % 4;
+        sh.quad(top[k], top[k2], bot[k2], bot[k], [206, 222, 242], air);
+      }
+      sh.quad(bot[0], bot[1], bot[2], bot[3], [196, 214, 236], { two: true, alpha: .17, bias: -40 });
+    }
+  }
+  sh.tri([X - HW, y0 + HH, Z - HD], [X - HW, y0 + HH, Z + HD], [X - HW, ridge, Z], shade(SKIN, .92), fl());
+  sh.tri([X + HW, y0 + HH, Z - HD], [X + HW, ridge, Z], [X + HW, y0 + HH, Z + HD], shade(SKIN, .88), fl());
+  sh.box(X, ridge + .18, Z, HANGAR.w, .36, 1.1, shade(SKIN, 1.08), OUT);
+  for (let k = 1; k <= 3; k++) for (const s2 of [-1, 1]) {
+    const zz = Z + s2 * HD * (k / 4), yy = y0 + HH + 4.2 * (1 - k / 4);
+    sh.box(X, yy - .44, zz, HANGAR.w - .6, .22, .22, shade(STEEL, 1.1), lit());
+  }
   const TX = [];
   for (let i = 1; i < 7; i++) TX.push(X - HW + i * (HANGAR.w / 7));
   for (const tx of TX) {
-    const by = y0 + HH - .55;
-    sh.box(tx, by, Z, .40, .34, HANGAR.d - 1.0, DARK, lit(IN * .75));
-    const topY = z => y0 + HH + 4.2 * (1 - Math.abs(z - Z) / HD) - .30;
-    const NW = 6;
+    const by = y0 + HH - .70;
+    sh.box(tx, by, Z, .40, .34, HANGAR.d - 1.0, DARK, lit());
+    const topY = z => y0 + HH + 4.2 * (1 - Math.abs(z - Z) / HD) - .45;
+    const NW = FINE ? 5 : 3;
     for (let k = 0; k < NW * 2; k++) {
       const za = Z - HD + k * (HANGAR.d / (NW * 2)), zb = za + HANGAR.d / (NW * 2);
-      // top chord segment
       sh.quad([tx - .16, topY(za), za], [tx + .16, topY(za), za], [tx + .16, topY(zb), zb], [tx - .16, topY(zb), zb],
-        shade(DARK, 1.15), lit(IN * .7));
-      // alternating web: a post then a diagonal
+        shade(DARK, 1.15), lit());
       const p0 = k & 1 ? [za, by] : [za, topY(za)], p1 = k & 1 ? [zb, topY(zb)] : [zb, by];
       sh.quad([tx - .07, p0[1], p0[0]], [tx + .07, p0[1], p0[0]], [tx + .07, p1[1], p1[0]], [tx - .07, p1[1], p1[0]],
-        shade(DARK, 1.05), lit(IN * .6));
+        shade(DARK, 1.05), lit());
     }
   }
+  /* Services. A roof with nothing under it is a lid; a roof with a sprinkler
+     main, a cable tray and a run of duct under it is a building. */
+  for (const zz of [Z - 9, Z + 9]) {
+    sh.box(X, y0 + HH - 1.55, zz, HANGAR.w - 2, .16, .16, [128, 92, 74], lit());   // sprinkler main
+    for (let x = X - HW + 6; x < X + HW - 4; x += FINE ? 9.5 : 19) {
+      sh.box(x, y0 + HH - 1.92, zz, .07, .60, .07, [140, 104, 84], lit());
+      if (FINE) sh.box(x, y0 + HH - 2.28, zz, .17, .13, .17, [190, 150, 90], lit());
+    }
+  }
+  for (let k = 0; k < 3; k++) {                                                    // cable tray
+    const x = X - HW + 13 + k * 26;
+    sh.box(x, y0 + HH - 1.30, Z - 20, 25.4, .10, .46, shade(STEEL, 1.06), lit());
+    sh.box(x, y0 + HH - 1.42, Z - 20, 25.4, .14, .07, shade(STEEL, .9), lit());
+  }
+  sh.box(X - 10, y0 + HH - 2.5, Z + 21, 34, .95, .95, [150, 155, 160], lit());     // duct
+
   // ---- high-bay lamps ----------------------------------------------------
   for (const lx of LAMPX) for (const lz of LAMPZ) {
-    sh.box(lx, y0 + HH - 1.5, lz, .12, 1.9, .12, [70, 74, 80], lit(IN));
-    sh.box(lx, y0 + HH - 2.62, lz, 1.40, .42, 1.40, [38, 40, 44], lit(IN * .8));
-    sh.box(lx, y0 + HH - 2.66, lz, 1.62, .16, 1.62, ALU, lit(IN * 1.1));
-    sh.box(lx, y0 + HH - 2.90, lz, 1.10, .16, 1.10, [255, 250, 232], { two: true, emit: 1.35 });
+    sh.box(lx, y0 + HH - 1.65, lz, .12, 1.9, .12, [72, 76, 82], lit());
+    sh.box(lx, y0 + HH - 2.74, lz, 1.46, .46, 1.46, [40, 42, 46], lit());
+    if (FINE) sh.box(lx, y0 + HH - 2.78, lz, 1.66, .18, 1.66, ALU, lit({ gain: 1.8 }));
+    sh.box(lx, y0 + HH - 3.02, lz, 1.12, .16, 1.12, [255, 250, 232], { two: true, emit: 1.45 });
   }
 
   // ---- the back wall is somebody's workshop ------------------------------
   const wx = X - HW + .30;
-  // bench + pegboard + a rack of tools
-  sh.box(wx + .45, y0 + .92, Z - 12, .90, .10, 8.0, [120, 96, 66], lit(IN * .95));
-  sh.box(wx + .45, y0 + .45, Z - 12, .82, .84, 7.6, [58, 70, 84], lit(IN * .7));
-  sh.box(wx + .06, y0 + 2.05, Z - 12, .08, 2.0, 8.0, [46, 58, 70], lit(IN * .85));
-  for (let k = 0; k < 16; k++) {
+  obox(sh, wx + .45, y0 + .92, Z - 12, .90, .10, 8.0, WOOD);                 // bench top
+  sh.box(wx + .45, y0 + .45, Z - 12, .82, .84, 7.6, [58, 70, 84], lit());
+  sh.box(wx + .06, y0 + 2.05, Z - 12, .08, 2.0, 8.0, [46, 58, 70], lit());   // pegboard
+  for (let k = 0; k < (FINE ? 22 : 8); k++) {
     const t = hash2(k, 5);
-    sh.box(wx + .16, y0 + 1.45 + (k % 4) * .46, Z - 15.4 + ((k / 4) | 0) * 1.9 + t,
-      .10, .30 + t * .3, .09, k & 1 ? [188, 190, 196] : [180, 130, 40], lit(IN));
+    sh.box(wx + .16, y0 + 1.42 + (k % 5) * .40, Z - 15.6 + ((k / 5) | 0) * 1.6 + t,
+      .10, .26 + t * .34, .09, k & 1 ? [188, 190, 196] : [180, 130, 40], lit());
   }
-  // wall cabinets, a board and a clock
+  sh.box(wx + .85, y0 + 1.06, Z - 15.2, .34, .18, .34, [120, 60, 46], lit());  // vice
+  sh.box(wx + .85, y0 + 1.22, Z - 15.2, .12, .22, .30, [140, 74, 58], lit());
   for (let k = 0; k < 3; k++)
-    sh.box(wx + .40, y0 + 3.6, Z + 2 + k * 2.3, .80, 1.7, 2.1, [78, 92, 106], lit(IN * .9));
-  sh.box(wx + .12, y0 + 4.5, Z + 12.5, .10, 2.4, 4.2, [232, 234, 236], lit(IN * .95));
-  sh.disc(wx + .16, y0 + 4.6, Z + 17.2, .42, 12, 0, [238, 240, 242], { emit: IN * 1.1 });
-  // extinguishers and a hose reel
+    obox(sh, wx + .40, y0 + 3.6, Z + 2 + k * 2.3, .80, 1.7, 2.1, [82, 96, 112]);
+  sh.box(wx + .12, y0 + 4.5, Z + 12.5, .10, 2.4, 4.2, [236, 238, 240], lit());
+  sh.disc(wx + .16, y0 + 4.6, Z + 17.2, .42, 12, 0, [240, 242, 244], { two: true, bake: 1 });
+  sh.disc(wx + .17, y0 + 4.6, Z + 17.2, .30, 10, 0, [40, 44, 50], { two: true, bake: 1 });
   for (const zz of [Z - 19, Z + 20]) {
-    sh.box(wx + .32, y0 + .62, zz, .34, 1.15, .34, [168, 44, 36], lit(IN));
-    sh.box(wx + .32, y0 + 1.30, zz, .12, .26, .12, [180, 182, 186], lit(IN));
+    sh.box(wx + .32, y0 + .62, zz, .34, 1.15, .34, [168, 44, 36], lit());
+    sh.box(wx + .32, y0 + 1.30, zz, .12, .26, .12, [180, 182, 186], lit());
   }
-  sh.box(wx + .50, y0 + 2.4, Z + 24, .95, 1.0, .95, [188, 82, 40], lit(IN * .95));
-  // signage, high up where it belongs
-  sh.box(wx + .14, y0 + 7.4, Z, .10, 1.2, 9.0, [30, 62, 96], lit(IN * 1.05));
-  sh.box(wx + .20, y0 + 7.4, Z, .06, .55, 7.2, [226, 232, 238], lit(IN * 1.1));
+  sh.box(wx + .50, y0 + 2.4, Z + 24, .95, 1.0, .95, [188, 82, 40], lit());     // hose reel
+  sh.box(wx + .14, y0 + 7.4, Z, .10, 1.2, 9.0, [30, 62, 96], lit());
+  sh.box(wx + .20, y0 + 7.4, Z, .06, .55, 7.2, [226, 232, 238], lit());
+  // conduit, a panel board and a downpipe, because a wall carries services
+  sh.box(wx + .30, y0 + 6.2, Z - 4, .12, .12, 46, [150, 152, 156], lit());
+  for (let k = 0; k < 5; k++)
+    sh.box(wx + .30, y0 + 4.4, Z - 18 + k * 9, .12, 3.6, .12, [150, 152, 156], lit());
+  obox(sh, wx + .45, y0 + 1.9, Z - 22, .70, 1.5, 1.0, [150, 152, 156]);
+  sh.box(wx + .45, y0 + 10, Z + HD - 1.2, .34, 20, .34, [120, 124, 128], lit());
+
+  // ---- a mezzanine office in the back corner -----------------------------
+  const oX = X - HW + 8, oZ = Z + HD - 7.5, oY = y0 + 3.2;
+  occ(oX, oY + 1.5, oZ, 15, 6.4, 13);
+  sh.box(oX, oY - .18, oZ, 15, .36, 13, shade(STEEL, .9), lit());              // deck
+  sh.box(oX, oY + 1.55, oZ, 15, 3.1, 13, [174, 176, 172], lit());              // the box
+  sh.box(oX + 7.4, oY + 1.8, oZ - 1, .12, 1.5, 8, [120, 168, 190], { two: true, emit: .55, spec: .5, gloss: 40 });
+  sh.box(oX + 1, oY + 1.8, oZ - 6.4, 9, 1.5, .12, [120, 168, 190], { two: true, emit: .55, spec: .5, gloss: 40 });
+  sh.box(oX + 7.3, oY + 1.05, oZ + 4.2, .16, 2.1, 1.0, [62, 70, 80], lit());   // door
+  sh.box(oX, oY + 3.2, oZ, 15.4, .22, 13.4, shade(STEEL, 1.04), lit());
+  for (let k = 0; k < (FINE ? 12 : 6); k++)                                     // stair down
+    sh.box(oX + 7.9 + k * (FINE ? .30 : .60), oY - .30 - k * (FINE ? .27 : .54), oZ + 4.2,
+      .34, .08, 1.5, [182, 184, 188], lit());
+  for (const zz of [oZ + 3.5, oZ + 4.9]) {
+    sh.box(oX + 9.6, oY - 1.5, zz, .08, 3.4, .08, [182, 184, 188], lit());
+    sh.quad([oX + 7.8, oY + .60, zz], [oX + 11.6, oY - .40, zz],
+            [oX + 11.6, oY - .30, zz + .07], [oX + 7.8, oY + .70, zz + .07], [186, 188, 192], lit());
+  }
+  for (const cx2 of [oX - 6.6, oX + 6.6]) for (const cz2 of [oZ - 5.6, oZ + 5.6])
+    sh.box(cx2, oY - 1.6, cz2, .30, 3.2, .30, shade(STEEL, .96), lit());
+
+  // ---- a jib crane on one of the columns ---------------------------------
+  const jx = X - 8, jz = Z - HD + 1.2;
+  sh.box(jx, y0 + 4.2, jz + .5, .42, 8.4, .42, [176, 140, 44], lit());
+  sh.box(jx + 3.4, y0 + 8.0, jz + .5, 7.2, .34, .34, [176, 140, 44], lit());
+  sh.quad([jx, y0 + 7.4, jz + .42], [jx + 6.6, y0 + 7.9, jz + .42],
+          [jx + 6.6, y0 + 7.9, jz + .58], [jx, y0 + 7.4, jz + .58], [160, 128, 40], lit());
+  sh.box(jx + 5.2, y0 + 7.6, jz + .5, .70, .60, .60, [50, 54, 60], lit());
+  for (let k = 0; k < (FINE ? 7 : 2); k++)
+    sh.box(jx + 5.2, y0 + 7.2 - k * (FINE ? .34 : 1.2), jz + .5, .07, FINE ? .26 : .9, .07, [130, 134, 140], lit());
+  sh.box(jx + 5.2, y0 + 4.9, jz + .5, .22, .34, .22, [140, 100, 40], lit());
 
   /* ================= the detail pass: only worth it up close ============ */
   // rolling crew stair, at the cockpit
   const stx = X - 1.6, stz = Z + 8.6;
-  det.box(stx - .4, y0 + .16, stz, 4.4, .32, 2.3, [84, 88, 96], lit(IN * .8));
-  for (let s2 = 0; s2 < 8; s2++)
-    det.box(stx - 1.9 + s2 * .50, y0 + .38 + s2 * .40, stz, .46, .10, 1.9, [178, 180, 184], lit(IN));
+  occ(stx, y0 + 1.8, stz, 5, 3.6, 2.4);
+  det.box(stx - .4, y0 + .16, stz, 4.4, .32, 2.3, [84, 88, 96], lit());
+  for (let s2 = 0; s2 < (FINE ? 8 : 4); s2++)
+    det.box(stx - 1.9 + s2 * (FINE ? .50 : 1.0), y0 + .38 + s2 * (FINE ? .40 : .80), stz,
+      .46, .10, 1.9, [178, 180, 184], lit());
   for (const zz of [stz - .95, stz + .95]) {
-    det.box(stx - 2.1, y0 + 1.7, zz, .09, 3.3, .09, [178, 180, 184], lit(IN));
-    det.box(stx + 1.9, y0 + 2.9, zz, .09, 1.6, .09, [178, 180, 184], lit(IN));
-    // the rail itself, sloping
+    det.box(stx - 2.1, y0 + 1.7, zz, .09, 3.3, .09, [178, 180, 184], lit());
+    det.box(stx + 1.9, y0 + 2.9, zz, .09, 1.6, .09, [178, 180, 184], lit());
     det.quad([stx - 2.1, y0 + 3.30, zz - .05], [stx + 1.9, y0 + 3.70, zz - .05],
-             [stx + 1.9, y0 + 3.78, zz + .05], [stx - 2.1, y0 + 3.38, zz + .05], [186, 188, 192], lit(IN));
+             [stx + 1.9, y0 + 3.78, zz + .05], [stx - 2.1, y0 + 3.38, zz + .05], [186, 188, 192], lit());
   }
   for (const wz of [stz - 1.0, stz + 1.0]) for (const wx2 of [stx - 1.9, stx + 1.8])
-    det.box(wx2, y0 + .16, wz, .34, .32, .20, [26, 26, 30], lit(IN * .8));
-  // fuel bowser with a reel and a hose
+    det.box(wx2, y0 + .16, wz, .34, .32, .20, [26, 26, 30], lit());
+  // fuel bowser
   const bx = X - 26, bz = Z - 17;
-  det.box(bx, y0 + 1.55, bz, 7.2, 2.2, 2.7, [48, 70, 98], lit(IN * .85));
-  det.box(bx + 4.1, y0 + 1.95, bz, 2.6, 2.4, 2.5, [38, 52, 72], lit(IN * .8));
-  det.box(bx + 4.1, y0 + 2.55, bz, 2.2, .9, 2.3, [120, 150, 178], { two: true, emit: .75, spec: .5, gloss: 40 });
-  det.box(bx - 2.6, y0 + 2.9, bz, 1.6, 1.5, 1.5, [188, 82, 40], lit(IN * .9));
-  det.box(bx, y0 + 2.78, bz, 7.0, .22, 2.4, [178, 132, 42], lit(IN));
+  occ(bx, y0 + 1.6, bz, 7.4, 3.2, 2.9);
+  det.box(bx, y0 + 1.55, bz, 7.2, 2.2, 2.7, [48, 70, 98], lit());
+  det.box(bx + 4.1, y0 + 1.95, bz, 2.6, 2.4, 2.5, [38, 52, 72], lit());
+  det.box(bx + 4.1, y0 + 2.55, bz, 2.2, .9, 2.3, [128, 158, 186], { two: true, emit: .55, spec: .5, gloss: 40 });
+  det.box(bx - 2.6, y0 + 2.9, bz, 1.6, 1.5, 1.5, [188, 82, 40], lit());
+  det.box(bx, y0 + 2.78, bz, 7.0, .22, 2.4, [178, 132, 42], lit());
   for (const wx2 of [bx - 3.0, bx + 2.5]) for (const wz of [bz - 1.25, bz + 1.25])
-    det.box(wx2, y0 + .48, wz, 1.05, .96, .52, [26, 26, 30], lit(IN * .8));
-  // tool chest with drawers
+    det.box(wx2, y0 + .48, wz, 1.05, .96, .52, [26, 26, 30], lit());
+  // a ground power cart, with its cable run out to the nose
+  const gx = X + 6, gz = Z - 8.5;
+  occ(gx, y0 + .8, gz, 2.6, 1.6, 1.6);
+  det.box(gx, y0 + .80, gz, 2.6, 1.30, 1.55, [186, 152, 48], lit());
+  det.box(gx, y0 + 1.50, gz, 2.2, .18, 1.3, [60, 62, 66], lit());
+  det.box(gx - 1.5, y0 + .95, gz, .60, .09, .09, [150, 152, 156], lit());
+  for (const wz of [gz - .68, gz + .68]) for (const wx2 of [gx - .9, gx + .9])
+    det.box(wx2, y0 + .22, wz, .46, .44, .24, [26, 26, 30], lit());
+  for (let k = 0; k < 9; k++) {
+    const t = k / 8, cxp = lerp(gx + 1.4, HANGAR.pos.x + 13.5, t);
+    det.box(cxp, y0 + .10 + Math.sin(t * 3.1) * .05, lerp(gz, HANGAR.pos.z - 2.4, t),
+      1.3, .12, .12, [36, 38, 42], lit());
+  }
+  // tool chest and a rolling cart by the nose
   const tx = X - 31, tz = Z + 12;
-  det.box(tx, y0 + .66, tz, 2.5, 1.32, 1.05, [162, 56, 46], lit(IN * .95));
+  occ(tx, y0 + .7, tz, 2.6, 1.4, 1.1);
+  det.box(tx, y0 + .66, tz, 2.5, 1.32, 1.05, [162, 56, 46], lit());
   for (let k = 0; k < 4; k++)
-    det.box(tx, y0 + .26 + k * .30, tz + .53, 2.3, .22, .05, [196, 82, 66], lit(IN));
-  det.box(tx, y0 + 1.36, tz, 2.6, .08, 1.15, [190, 192, 196], lit(IN * 1.05));
-  // drums, with lids
-  for (let k = 0; k < 5; k++) {
+    det.box(tx, y0 + .26 + k * .30, tz + .53, 2.3, .22, .05, [196, 82, 66], lit());
+  det.box(tx, y0 + 1.36, tz, 2.6, .08, 1.15, [190, 192, 196], lit());
+  det.box(X + 9, y0 + .48, Z + 6.2, 1.1, .90, .70, [60, 96, 130], lit());
+  det.box(X + 9, y0 + .96, Z + 6.2, 1.2, .07, .78, [190, 192, 196], lit());
+  // drums with lids
+  for (let k = 0; k < (FINE ? 6 : 3); k++) {
     const dx2 = X - 35 + (k % 3) * 1.1, dz2 = Z + 16 + ((k / 3) | 0) * 1.1;
     const c = k % 3 === 0 ? [176, 146, 44] : k % 3 === 1 ? [64, 92, 116] : [86, 96, 88];
-    det.box(dx2, y0 + .46, dz2, .84, .92, .84, c, lit(IN * .9));
-    det.disc(dx2, y0 + .93, dz2, .44, 10, 1, shade(c, 1.16), { emit: IN });
+    det.box(dx2, y0 + .46, dz2, .84, .92, .84, c, lit());
+    det.disc(dx2, y0 + .93, dz2, .44, 10, 1, shade(c, 1.16), { two: true, bake: 1 });
   }
-  // crates and a stack of tyres
+  occ(X - 34, y0 + .5, Z + 16.5, 3.4, 1, 2.2);
+  // crates, tyres, pallets
   for (let k = 0; k < 3; k++)
-    det.box(X - 12 + k * 2.7, y0 + .72, Z + 21, 2.3, 1.44, 1.7, [138, 126, 100], lit(IN * .9));
+    obox(det, X - 12 + k * 2.7, y0 + .72, Z + 21, 2.3, 1.44, 1.7, [138, 126, 100]);
   for (let k = 0; k < 4; k++)
-    det.box(X - 5.5, y0 + .22 + k * .40, Z + 22, 1.15, .38, 1.15, [30, 30, 34], lit(IN * .8));
-  // the tug, with a towbar pointing at the nosewheel
-  const gx = X + 9, gz = Z - 13;
-  det.box(gx, y0 + .72, gz, 3.4, .95, 1.9, [196, 168, 52], lit(IN * .95));
-  det.box(gx - .6, y0 + 1.5, gz, 1.5, .70, 1.7, [36, 40, 46], lit(IN * .8));
-  for (const wx2 of [gx - 1.2, gx + 1.2]) for (const wz of [gz - .95, gz + .95])
-    det.box(wx2, y0 + .40, wz, .78, .80, .42, [26, 26, 30], lit(IN * .8));
-  det.box(gx + 3.1, y0 + .38, gz, 3.0, .18, .30, [180, 182, 186], lit(IN));
-  // jet stands and chocks
-  for (const [jx, jz] of [[X - 4, Z - 9.6], [X - 4, Z + 9.6]]) {
-    det.box(jx, y0 + .55, jz, .22, 1.10, .22, YEL, lit(IN));
-    det.box(jx, y0 + 1.16, jz, 1.0, .16, 1.0, shade(YEL, 1.1), lit(IN));
+    det.box(X - 5.5, y0 + .22 + k * .40, Z + 22, 1.15, .38, 1.15, [30, 30, 34], lit());
+  for (let k = 0; k < 4; k++)
+    det.box(X - 20, y0 + .08 + k * .16, Z + 25, 1.2, .12, 1.0, WOOD, lit());
+  // pallet racking down the back wall
+  for (let b2 = 0; b2 < (FINE ? 3 : 2); b2++) {
+    const rz = Z - 24 + b2 * 3.2, rx2 = X - HW + 2.6;
+    occ(rx2, y0 + 2.2, rz, 1.6, 4.4, 2.6);
+    for (const zz of [rz - 1.2, rz + 1.2]) {
+      det.box(rx2 - .7, y0 + 2.2, zz, .14, 4.4, .14, [150, 96, 44], lit());
+      det.box(rx2 + .7, y0 + 2.2, zz, .14, 4.4, .14, [150, 96, 44], lit());
+    }
+    for (const ly of FINE ? [1.4, 2.9, 4.3] : [1.4, 4.3]) {
+      det.box(rx2, y0 + ly, rz, 1.5, .10, 2.5, [66, 98, 148], lit());
+      det.box(rx2, y0 + ly + .42, rz + (hash2(b2, ly * 10) - .25) * 1.2, 1.1, .74, 1.0,
+        hash2(b2, ly) > .25 ? WOOD : [120, 126, 118], lit());
+    }
   }
-  for (const [cx2, cz2] of [[X - 6.2, Z - 4.4], [X - 6.2, Z + 4.4]])
-    for (const s2 of [-1, 1])
-      det.box(cx2 + s2 * .95, y0 + .14, cz2, .55, .28, .95, [214, 168, 40], lit(IN));
-  // cones down both sides of the lead-in line
+  // the tug, with a bar pointing at the nosewheel
+  const gx2 = X + 12, gz2 = Z - 13;
+  occ(gx2, y0 + .9, gz2, 3.6, 1.8, 2.1);
+  det.box(gx2, y0 + .72, gz2, 3.4, .95, 1.9, [196, 168, 52], lit());
+  det.box(gx2 - .6, y0 + 1.5, gz2, 1.5, .70, 1.7, [36, 40, 46], lit());
+  for (const wx2 of [gx2 - 1.2, gx2 + 1.2]) for (const wz of [gz2 - .95, gz2 + .95])
+    det.box(wx2, y0 + .40, wz, .78, .80, .42, [26, 26, 30], lit());
+  det.box(gx2 + 3.1, y0 + .38, gz2, 3.0, .18, .30, [180, 182, 186], lit());
+  // a forklift parked out of the way
+  const fx = X - 30, fz = Z - 24;
+  occ(fx, y0 + 1.1, fz, 2.6, 2.2, 1.8);
+  det.box(fx, y0 + .70, fz, 2.4, 1.10, 1.6, [196, 130, 36], lit());
+  det.box(fx - .5, y0 + 1.45, fz, 1.0, .50, 1.4, [40, 44, 50], lit());
+  for (const zz of [fz - .62, fz + .62]) det.box(fx + 1.3, y0 + 1.7, zz, .12, 3.0, .12, [90, 94, 100], lit());
+  for (const zz of [fz - .45, fz + .45]) det.box(fx + 1.7, y0 + .10, zz, .9, .10, .22, [120, 124, 130], lit());
+  for (const wx2 of [fx - .85, fx + .9]) for (const wz of [fz - .75, fz + .75])
+    det.box(wx2, y0 + .32, wz, .62, .64, .34, [26, 26, 30], lit());
+  // jack stands, chocks, cones
+  for (const [jx2, jz2] of [[X - 4, Z - 9.6], [X - 4, Z + 9.6]]) {
+    det.box(jx2, y0 + .55, jz2, .22, 1.10, .22, YEL, lit());
+    det.box(jx2, y0 + 1.16, jz2, 1.0, .16, 1.0, shade(YEL, 1.1), lit());
+  }
+  for (const [cx2, cz2] of [[X - 6.2, Z - 4.4], [X - 6.2, Z + 4.4]]) for (const s2 of [-1, 1])
+    det.box(cx2 + s2 * .95, y0 + .14, cz2, .55, .28, .95, [214, 168, 40], lit());
   for (let k = 0; k < 4; k++) {
     const cx2 = X - 10 + k * 8;
     for (const s2 of [-1, 1]) {
-      det.box(cx2, y0 + .09, Z + s2 * 9.8, .72, .18, .72, [196, 84, 30], lit(IN * .9));
-      det.box(cx2, y0 + .42, Z + s2 * 9.8, .32, .62, .32, [228, 104, 40], lit(IN));
-      det.box(cx2, y0 + .52, Z + s2 * 9.8, .35, .14, .35, [232, 232, 232], lit(IN * 1.1));
+      det.box(cx2, y0 + .09, Z + s2 * 9.8, .72, .18, .72, [196, 84, 30], lit());
+      det.box(cx2, y0 + .42, Z + s2 * 9.8, .32, .62, .32, [228, 104, 40], lit());
+      if (FINE) det.box(cx2, y0 + .52, Z + s2 * 9.8, .35, .14, .35, [232, 232, 232], lit());
     }
   }
-  // a ladder leaning on the back wall, and a gas-bottle rack
-  for (let k = 0; k < 9; k++)
-    det.box(X - HW + 1.5 + k * .10, y0 + .5 + k * .55, Z - 22, .60, .07, .07, ALU, lit(IN));
+  // a ladder on the wall, gas bottles, a bin and a mop bucket
+  for (let k = 0; k < (FINE ? 9 : 4); k++)
+    det.box(X - HW + 1.5 + k * (FINE ? .10 : .22), y0 + .5 + k * (FINE ? .55 : 1.2), Z - 22,
+      .60, .07, .07, ALU, lit());
   for (const s2 of [0, 1, 2, 3])
     det.box(X - HW + 2.2, y0 + .78, Z + 27 - s2 * .55, .42, 1.56, .42,
-      s2 & 1 ? [58, 96, 78] : [64, 70, 78], lit(IN * .9));
-  return { shell: sh.done(), det: det.done() };
+      s2 & 1 ? [58, 96, 78] : [64, 70, 78], lit());
+  det.box(X - 16, y0 + .46, Z - 25, .70, .92, .70, [52, 78, 58], lit());
+  det.box(X - 14.6, y0 + .30, Z - 25, .60, .60, .46, [180, 184, 188], lit());
+  /* The door end of the floor was bare concrete, which is the one thing a
+     working hangar never has. Everything here is something that has to live
+     somewhere and ends up in the way. */
+  // a parts trolley under a cover, and a set of steps beside it
+  const px2 = X + 17, pz2 = Z + 14;
+  occ(px2, y0 + .8, pz2, 2.4, 1.6, 1.4);
+  det.box(px2, y0 + .52, pz2, 2.3, .10, 1.3, [120, 124, 130], lit());
+  det.box(px2, y0 + .92, pz2, 2.1, .72, 1.15, [96, 110, 96], lit());
+  for (const wx2 of [px2 - .9, px2 + .9]) for (const wz of [pz2 - .5, pz2 + .5])
+    det.box(wx2, y0 + .22, wz, .28, .44, .18, [26, 26, 30], lit());
+  for (let k = 0; k < 5; k++)
+    det.box(px2 + 2.6, y0 + .18 + k * .26, pz2 - 1.6 + k * .30, 1.1, .08, .34, [172, 176, 180], lit());
+  det.box(px2 + 2.6, y0 + .80, pz2 - .5, 1.2, .08, .9, [172, 176, 180], lit());
+  for (const zz of [pz2 - .96, pz2 - .04])
+    det.box(px2 + 3.15, y0 + .80, zz, .07, 1.5, .07, [176, 180, 184], lit());
+  // a hose reel on a stand and a spill kit beside it
+  det.box(X + 24, y0 + .74, Z - 15, .30, 1.45, .30, [86, 90, 96], lit());
+  det.box(X + 24, y0 + 1.40, Z - 15, .95, .95, .34, [178, 78, 40], lit());
+  det.box(X + 25.4, y0 + .42, Z - 15, .70, .85, .70, [190, 160, 40], lit());
+  occ(X + 24.4, y0 + .8, Z - 15, 2.4, 1.8, 1);
+  // a compressor, and the floor fan somebody left running
+  det.box(X + 12, y0 + .58, Z - 18, 1.6, 1.05, .95, [58, 74, 96], lit());
+  det.box(X + 12, y0 + 1.22, Z - 18, 1.7, .30, .60, [180, 184, 190], lit());
+  occ(X + 12, y0 + .6, Z - 18, 1.7, 1.5, 1);
+  det.box(X + 6, y0 + .16, Z + 17, .80, .30, .60, [66, 70, 76], lit());
+  det.box(X + 6, y0 + .74, Z + 17, .86, .86, .22, [48, 52, 58], lit());
+  det.disc(X + 6, y0 + .74, Z + 17.13, .34, 12, 2, [150, 154, 160], { two: true, bake: 1 });
+  // a pallet of boxes and a wheeled bin, where they are in the way
+  for (let k = 0; k < 3; k++)
+    det.box(X + 27, y0 + .10 + k * .14, Z + 9, 1.2, .10, 1.0, WOOD, lit());
+  for (let k = 0; k < 4; k++)
+    det.box(X + 26.7 + (k % 2) * .56, y0 + .60 + ((k / 2) | 0) * .52, Z + 9, .52, .48, .86,
+      k & 1 ? [150, 132, 100] : [138, 120, 92], lit());
+  occ(X + 27, y0 + .7, Z + 9, 1.4, 1.6, 1.2);
+  det.box(X + 31, y0 + .48, Z - 6, 1.0, .96, .78, [58, 88, 62], lit());
+  det.box(X + 31, y0 + .98, Z - 6, 1.05, .09, .82, [40, 62, 44], lit());
+
+  /* The aeroplane and the pilot standing at its nose are not part of this
+     mesh, but the light does not know that: without them there is no shadow
+     under the wings and the pilot stands on a floor lit right through them. */
+  const AP2 = HANGAR.pos;
+  occ(AP2.x - 1, y0 + 2.40, AP2.z, 30, 2.6, 3.2);
+  occ(AP2.x - 4, y0 + 2.10, AP2.z, 20, .7, 17);
+  for (const s2 of [-1, 1]) {
+    occ(AP2.x - 4, y0 + 2.30, AP2.z + s2 * 4.6, 15, 2.6, 2.6);
+    occ(AP2.x - 10, y0 + 4.60, AP2.z + s2 * 3.2, 5, 4, .7);
+  }
+  occ(HANGAR.pilot.x, y0 + .92, HANGAR.pilot.z, .72, 1.84, .55);
+
+  const LGT = {
+    occ: OCC, occNP: OCC.slice(0, OCC.length - 1),   // everything but the pilot
+    lights: LIGHTS, amb: [.078, .086, .104], aoR: 9, aoK: .80,
+    inx: X, iny: y0 + 6.5, inz: Z
+  };
+  HANGAR.light = LGT;
+  return { shell: bakeMesh(sh.done(), LGT), det: bakeMesh(det.done(), LGT) };
 }
 const HANGARMESH = buildHangar();
 
@@ -3379,7 +3836,9 @@ const STAGE = {
    north wall, still looking over the nose. */
 const PILOT_YAW = -2.55;
 STAGE.pilotFace = v3(Math.sin(PILOT_YAW), 0, Math.cos(PILOT_YAW));
-STAGE.pilotPos = () => v3(HANGAR.pos.x + 14.6, E + .05, HANGAR.pos.z + 6.0);
+STAGE.pilotPos = () => HANGAR.pilot;
+// the pilot can only be lit once the shed they are standing in has been built
+PILOTMESH = bakePilot(PILOTMESH);
 /* Where the eye stands for each shot. Every one of them drifts a little:
    a locked-off camera on a static model looks like a crash, not a hangar. */
 /* How far back the eye has to stand for something this wide and this tall to
@@ -4769,13 +5228,15 @@ const SHADOW_HULL = [
   v3(8.4, 0, -11.3), v3(3.3, 0, -14.0), v3(0, 0, -14.1), v3(-3.3, 0, -14.0),
   v3(-8.4, 0, -11.3), v3(-8.4, 0, -9.3), v3(-3.7, 0, -2.4), v3(-3.2, 0, 5.4), v3(-1.7, 0, 12.4)
 ];
-function drawShadow() {
+function drawShadow(k) {
   if (!Q.q.shadow) return;
   const P = PLANE, sun = LIGHT.sun;
   const gh = groundH(P.pos.x, P.pos.z);
   const agl = P.pos.y - gh;
   if (agl > 1400 || agl < -2) return;
-  const fade = (1 - sstep(150, 1400, agl)) * .46 + .04;
+  /* Under a roof full of lamps a shadow is soft and pale, not one hard
+     black cut-out: the hangar asks for a fraction of the sun's. */
+  const fade = ((1 - sstep(150, 1400, agl)) * .46 + .04) * (k === undefined ? 1 : k);
   const N = SHADOW_HULL.length;
   let cxs = 0, cys = 0, ok = true, dmin = 1e9;
   for (let i = 0; i < N; i++) {
@@ -4790,7 +5251,7 @@ function drawShadow() {
   }
   if (!ok) return;
   // soften the edge as the aircraft climbs away from the ground
-  grow(N, clamp(agl * .02, .5, 8) * DPR);
+  grow(N, clamp(agl * .02, .5, 8) * DPR + (k === undefined ? 0 : 3.5 * DPR));
   DL.poly(dmin - 4, _sp, N, "rgba(16,26,22," + fade.toFixed(3) + ")", null, 0);
 }
 
@@ -9359,15 +9820,15 @@ const LOG_KEY = "skyward.log.v1";
    The number is the point: it is the thing you can quote back when something
    is wrong, and the list under it is what to go and look at. */
 const BUILD = {
-  no: 35,
-  name: "BUILT FOR A THUMB",
+  no: 36,
+  name: "THE LIGHT IN THE SHED",
   date: "30 SEP 2026",
   notes: [
-    ["FITTED TO THE PHONE", "Every control is at least forty-four points on its short side now, on a 6.7-inch screen either way up. The scale used to be tied to the height alone, so a phone on its side drew its switches at twenty-eight points \u2014 a panel you had to aim at."],
-    ["PAUSE", "A real button on the panel, next to the map and the view. It stops the flight and opens the set-up card, so anything can be changed mid-flight and picked back up. <em>P</em> or Esc does the same."],
-    ["BACK TO BASE", "And next to it, BASE. Two taps \u2014 the second confirms \u2014 ends the flight, writes the log and walks you back into the hangar with everything as you left it. <em>H</em>, or the button at the foot of the pause card."],
-    ["ONE PLACE TO LOOK", "Pause, base, map, view, card and reset are one group of six: a bar across the top upright, a block on the right console on its side. The levers keep the left console, the switches the right, and the middle of the glass still belongs to the aeroplane."],
-    ["THE CARD HAS PAGES", "Flight, plane, pilot, set-up and log are tabs instead of one four-screen scroll, with BEGIN FLIGHT pinned to the bottom where it can always be reached. Walking up to the aeroplane or the pilot in the hangar turns to their page, and turning to their page walks the camera up to them."]
+    ["THE LIGHT IS REAL", "The inside of the hangar is no longer a flat tint. Every face asks the twelve high-bays, the roof lights and the open door how much they give it, whether anything is in the way, and how much of the room it can see at all. That is worked out once and written into the building: lamp pools on the floor, dark corners, a shadow under the wings, and a shadow under the pilot."],
+    ["THE SHED", "Rebuilt again, and now it is a building: stanchions on a grid, girts, a lined roof on open-web trusses, a sprinkler main and a cable tray under it, a mezzanine office with stairs and windows, a jib crane, a trench drain, clerestory glazing, shafts of daylight coming down through the roof lights and landing on the floor."],
+    ["AND WHAT IS IN IT", "A ground power cart with its cable run out to the nose, a compressor, pallet racking, a forklift, a parts trolley under a cover, a hose reel, a spill kit, a bench with a vice and a pegboard. Everything in here is something that has to live somewhere."],
+    ["THE PILOT", "Not a flight suit \u2014 the pressure suit the men who flew this aeroplane actually wore. Ribbed convolutes at every joint, a metal neck ring, a parachute harness with its fittings, a survival vest, leg restraint garters, a controller on the chest with the hose running up to the mask, and a gold visor. Lit by the same lamps as the shed they are standing in."],
+    ["THE COST", "About a third more to draw than before. On a machine that cannot carry it the quality tuner gives up the loose equipment first and keeps the building."]
   ]
 };
 const NEWS_KEY = "skyward.build";
@@ -11409,9 +11870,13 @@ function frame(now) {
     const hd = Math.hypot(cam.pos.x - HANGAR.x, cam.pos.z - HANGAR.z);
     if (hd < 3200) {
       drawMesh(HANGARMESH.shell, v3(0, 0, 0), mIdent(), null);
-      // the stair, the bowser, the chest, the drums: only from close enough
-      // to read them, which from the taxiway at 300 kt you are not
-      if (!GAME.started || hd < 260) drawMesh(HANGARMESH.det, v3(0, 0, 0), mIdent(), null);
+      /* The stair, the bowser, the chest, the drums: only from close enough
+         to read them, which from the taxiway at 300 kt you are not — and
+         only on a machine that can carry them. A thousand polygons of tool
+         chest is the first thing to give up when the frame is late and
+         everything else has already been given up. */
+      if ((!GAME.started || hd < 260) && !(Q.i === 0 && Q.det <= DET_MIN + .02 && Q.work > 12))
+        drawMesh(HANGARMESH.det, v3(0, 0, 0), mIdent(), null);
     }
   }
   /* On the start screen the camera is INSIDE a steel shed looking at the
@@ -11434,7 +11899,19 @@ function frame(now) {
        lights the thing that changed for a moment, so the eye is taken to it
        instead of hunting for what moved. */
     const gw = STAGE.glow, gk = gw > 0 ? gw * .30 : 0;
+    /* The aeroplane is the one thing in here that is not baked, because it
+       leaves. So for the length of this one call the sun is moved into the
+       roof and turned down to what a row of high-bays actually gives: the
+       aeroplane is lit from above, with a dim cold fill off the walls, and
+       it sits in the shed instead of on top of it. */
+    const L0 = LIGHT.sun, C0 = LIGHT.sunCol, K0 = LIGHT.skyCol, G0 = LIGHT.gndCol;
+    LIGHT.sun = v3(-.16, .965, .21);
+    LIGHT.sunCol = [.62, .595, .545];
+    LIGHT.skyCol = [.26, .275, .305];
+    LIGHT.gndCol = [.135, .140, .150];
+    drawShadow(.42);
     drawAircraft(STAGE.glowWhat === "plane" ? gk : 0);
+    LIGHT.sun = L0; LIGHT.sunCol = C0; LIGHT.skyCol = K0; LIGHT.gndCol = G0;
     drawMesh(PILOTMESH, STAGE.pilotPos(), mAxis(0, 1, 0, PILOT_YAW), null,
       STAGE.glowWhat === "pilot" && gk > .01 ? [150, 226, 255] : null, undefined,
       STAGE.glowWhat === "pilot" ? gk : 0);
