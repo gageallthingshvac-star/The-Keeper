@@ -115,7 +115,10 @@
     border-radius:0;border-width:0 0 0 1px;box-shadow:-24px 0 60px rgba(0,0,0,.55);
     background:linear-gradient(180deg,rgba(6,11,18,.95),rgba(4,8,13,.975));
     --padx:20px; --padr:calc(20px + env(safe-area-inset-right));
-    --padt:calc(16px + env(safe-area-inset-top)); --padb:calc(14px + env(safe-area-inset-bottom))}
+    /* --hostbar is set from script: inside a frame the safe-area insets all
+       read zero and the card's title ends up under the host's title bar. */
+    --padt:calc(16px + env(safe-area-inset-top) + var(--hostbar,0px));
+    --padb:calc(14px + env(safe-area-inset-bottom))}
   .mhead{flex:0 0 auto;padding:var(--padt) var(--padr) 0 var(--padx);
     border-bottom:1px solid var(--edge);background:rgba(3,7,12,.5)}
   .mbody{flex:1 1 auto;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;
@@ -1616,14 +1619,64 @@ function tuneQuality(dt, workMs) {
 
 let PORTRAIT = false, UI = 1;
 const SAFE = { t: 0, r: 0, b: 0, l: 0 };
+/* Somebody else's document.
+
+   This file can be served inside another page — an artifact viewer wraps the
+   whole of it in one — and two things break when it is.
+
+   The first is the viewport tag. A nested document's <head> is not a head:
+   the parser has long since passed it, so everything in it lands in the
+   BODY, and a viewport meta in the body is one iOS ignores. Without
+   `user-scalable=no` the page can be pinched, and a pinched page lays its
+   FIXED elements out to the layout viewport, which is wider than the glass:
+   the right-hand console walks off the edge of the screen and there is no
+   way to bring it back. So the tag is written from here, into whatever head
+   there actually is, and any stray copy is thrown away.
+
+   The second is the safe area. Inside a frame every env(safe-area-inset-*)
+   is zero, so the instruments do not know the host has put a title bar over
+   the top of them — which is exactly where they end up. If we are not the
+   top window, assume a bar. */
+const EMBEDDED = (function () { try { return window.top !== window.self; } catch (e) { return true; } })();
+const HOST_BAR = 68;                      // what a host's title bar costs
+(function fixViewport() {
+  const all = document.querySelectorAll('meta[name="viewport"]');
+  let m = null;
+  for (const x of all) { if (x.parentNode === document.head) m = x; else x.remove(); }
+  if (!m) { m = document.createElement("meta"); m.name = "viewport"; document.head.appendChild(m); }
+  m.setAttribute("content", "width=device-width,initial-scale=1,minimum-scale=1," +
+    "maximum-scale=1,user-scalable=no,viewport-fit=cover");
+  // and the wrapper's own padding on the root, which this page does not want
+  const r = document.documentElement.style;
+  r.padding = "0"; r.margin = "0"; r.overflow = "hidden";
+  r.setProperty("--hostbar", (EMBEDDED ? HOST_BAR : 0) + "px");
+})();
 function readSafe() {
   const el = document.getElementById("safe");
   if (!el) return;
   const cs = getComputedStyle(el);
   SAFE.t = parseFloat(cs.paddingTop) || 0; SAFE.r = parseFloat(cs.paddingRight) || 0;
   SAFE.b = parseFloat(cs.paddingBottom) || 0; SAFE.l = parseFloat(cs.paddingLeft) || 0;
+  if (EMBEDDED) SAFE.t = Math.max(SAFE.t, HOST_BAR);
+}
+/* If the page is zoomed anyway, follow what is actually on the glass. A
+   fixed element is laid out to the LAYOUT viewport; the visual viewport is
+   the part of it you can see, and under a pinch they are not the same
+   rectangle. Pin the whole interface to the second one. */
+function fitVisual() {
+  const vv = window.visualViewport, w = document.getElementById("wrap");
+  if (!vv || !w) return;
+  if (Math.abs(vv.width - window.innerWidth) > 1 || Math.abs(vv.height - window.innerHeight) > 1) {
+    w.style.left = vv.offsetLeft + "px"; w.style.top = vv.offsetTop + "px";
+    w.style.right = "auto"; w.style.bottom = "auto";
+    w.style.width = vv.width + "px"; w.style.height = vv.height + "px";
+  } else if (w.style.width) {
+    w.style.left = w.style.top = w.style.right = w.style.bottom = "0";
+    w.style.width = w.style.height = "";
+  }
 }
 function resize() {
+  fitVisual();
   const cw = cv.clientWidth || window.innerWidth, ch = cv.clientHeight || window.innerHeight;
   DPR = Math.min(window.devicePixelRatio || 1, Q.q.dpr);
   W = Math.max(2, Math.round(cw * DPR)); H = Math.max(2, Math.round(ch * DPR));
@@ -1650,6 +1703,11 @@ function resize() {
 }
 window.addEventListener("resize", resize);
 window.addEventListener("orientationchange", () => setTimeout(resize, 120));
+if (window.visualViewport) {
+  const vvr = () => setTimeout(resize, 30);
+  window.visualViewport.addEventListener("resize", vvr);
+  window.visualViewport.addEventListener("scroll", vvr);
+}
 
 /* vignette + lens dirt, baked once per resize */
 let vignette = null;
@@ -9874,15 +9932,14 @@ const LOG_KEY = "skyward.log.v1";
    The number is the point: it is the thing you can quote back when something
    is wrong, and the list under it is what to go and look at. */
 const BUILD = {
-  no: 37,
-  name: "NOTHING IS A BOX",
+  no: 38,
+  name: "SOMEBODY ELSE'S WINDOW",
   date: "30 SEP 2026",
   notes: [
-    ["ROUND THINGS ARE ROUND", "A drum, a wheel, a traffic cone, a gas bottle, a fire extinguisher, a hose reel, a fuel tank, a compressor and a lamp reflector are all the same shape, and it is not a box. Every one of them is built out of a real tapered cylinder now \u2014 two dozen wheels among them."],
-    ["THE UNDERCARRIAGE", "The oleos are tubes and the wheels are wheels, with hubs, instead of a disc on each side of a rectangle. On the ground that is the part of the aeroplane the camera is nearest to."],
-    ["THE PILOT", "Rounder everywhere it shows: half again as many facets down the arms, legs, torso and helmet, and the pockets, pouches, fittings, mask, rings and patches are curved shapes set into the suit rather than rectangles stuck on it."],
-    ["THE SHADOW UNDER THEM", "Five bands of equal weight instead of four of falling weight. Stacked, equal layers step by the same amount at every edge and read as a ramp; falling ones put the whole of the biggest step in one place, and that one place is a visible ring."],
-    ["STILL AFFORDABLE", "The fine grain is built only for a screen that can show it, so a phone gets about two thirds of the faces a desktop does, and a machine that is at the bottom of the quality ladder and still late gives up the loose equipment and keeps the building."]
+    ["THE RIGHT-HAND CONSOLE IS BACK", "Viewed inside another page the right-hand quarter of the panel was off the edge of the screen. A nested document's head is not a head, so the viewport tag ended up in the body where a phone ignores it \u2014 and without it the page can be pinched, and a pinched page lays its fixed panel out to a window wider than the glass. The tag is written into the real head now, and if the page is zoomed anyway the whole interface follows what is actually visible."],
+    ["AND THE INSTRUMENTS ARE BELOW THE TITLE BAR", "Inside a frame every safe-area inset reads zero, so the speed, altitude and g meter had no idea there was a title bar over the top of them. If this is not the top window it assumes one."],
+    ["THE LEFT PEDAL", "Upright it sat inside the top of the area the thumb stick appears in, so a thumb reaching for the stick near the rim could get rudder instead. The stick's area now starts under the pedals."],
+    ["AND FROM LAST TIME", "Drums, wheels, cones, bottles, extinguishers, hose reels, the fuel tank and the lamp reflectors are real cylinders; the undercarriage is tubes and wheels with hubs; and the pilot has half again as many facets with curved fittings set into the suit instead of rectangles stuck on it."]
   ]
 };
 const NEWS_KEY = "skyward.build";
@@ -10170,6 +10227,11 @@ function layoutTouch() {
     const ry = Math.min(bot + gp, H - sb - 8 * u - rh);
     T.rud.boxes = [{ k: "rudL", x: LE, y: ry, w: cw, h: rh },
                    { k: "rudR", x: RX, y: ry, w: cw, h: rh }];
+    /* The stick appears wherever the thumb lands in its zone, and upright
+       the left pedal sits inside the top of that zone: a thumb going for the
+       stick near the rim gets rudder instead. The zone starts under the
+       pedals. */
+    T.stick.zh = Math.max(H - (ry + rh + 6 * u), H * .26);
   } else {
     /* On its side the right console is three columns and four rows deep,
        which gives the six utilities two rows of their own above the
