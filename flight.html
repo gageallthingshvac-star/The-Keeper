@@ -143,9 +143,15 @@
   @media (max-width:900px),(orientation:portrait){
     #menu{align-items:flex-end;justify-content:stretch}
     #menu .card{width:100%;height:60%;border-width:1px 0 0;border-radius:16px 16px 0 0;
-      box-shadow:0 -24px 60px rgba(0,0,0,.55);
+      box-shadow:0 -24px 60px rgba(0,0,0,.55);transition:height .28s ease;
       --padx:calc(15px + env(safe-area-inset-left)); --padr:calc(15px + env(safe-area-inset-right));
       --padt:12px; --padb:calc(12px + env(safe-area-inset-bottom))}
+    /* Choosing a paint for something you cannot see is a colour swatch, not
+       a customiser. On the two pages where the subject IS the point, the
+       sheet gets out of the way and gives the model most of the glass. */
+    #menu.look .card{height:46%}
+    #menu.look .mhead .sub{display:none}
+    #menu.look .mhead h1{font-size:19px;letter-spacing:.14em}
     .mhead::before{content:"";display:block;width:44px;height:4px;border-radius:3px;
       background:rgba(150,190,225,.35);margin:-4px auto 10px}
     .tabs button{font-size:10px;padding:10px 1px 8px;letter-spacing:.06em}
@@ -1596,6 +1602,15 @@ function tuneQuality(dt, workMs) {
      the first thing anybody sees. It still stands down while PAUSED, because
      a frozen frame measures nothing. */
   if (!Q.auto || GAME.paused) return;
+  /* On the start screen the extra resolution is spent first and taken back
+     first: dropping a rung of model detail to pay for pixels nobody asked
+     for would be the wrong way round. Only once it is all back does the
+     ladder get a say in the hangar. */
+  if (!GAME.started && SSHOT > 1.004) {
+    SSWATCH = (workMs > 26 || fps < 24) ? SSWATCH + dt : 0;
+    if (SSWATCH > 1.3) { SSCAP = Math.max(1, SSHOT - .30); SSWATCH = 0; resize(); }
+    return;
+  }
   /* The display list is the other wall. Running into it does not slow the
      frame down, it silently drops whatever asked last — which is the near
      detail, drawn after the ground. Back off before that happens. */
@@ -1675,10 +1690,28 @@ function fitVisual() {
     w.style.width = w.style.height = "";
   }
 }
+/* Resolution on the start screen.
+
+   In the air the pixel count is a cost like any other and the quality ladder
+   owns it. In the hangar it is the PRODUCT: the thing on screen is a model
+   you are being asked to look at and choose a paint for, and a 430-point
+   phone canvas draws that aeroplane with about four hundred pixels of nose.
+
+   So the start screen is rendered at whatever it takes to put at least two
+   thousand pixels on the long edge, independent of the device ratio, and
+   gives it back a third at a time if the frame cannot pay for it. Flight
+   gets the ordinary ratio back the moment it begins. */
+const SS_TARGET = 2048;
+let SSHOT = 1, SSCAP = 2.75, SSWATCH = 0;
+function shotScale(cw, ch) {
+  return clamp(SS_TARGET / Math.max(cw, ch, 1), 1, SSCAP);
+}
 function resize() {
   fitVisual();
   const cw = cv.clientWidth || window.innerWidth, ch = cv.clientHeight || window.innerHeight;
   DPR = Math.min(window.devicePixelRatio || 1, Q.q.dpr);
+  SSHOT = GAME.started ? 1 : shotScale(cw, ch);
+  if (SSHOT > DPR) DPR = SSHOT;
   W = Math.max(2, Math.round(cw * DPR)); H = Math.max(2, Math.round(ch * DPR));
   cv.width = W; cv.height = H; CX = W / 2; CY = H / 2;
   PORTRAIT = H > W;
@@ -1699,6 +1732,10 @@ function resize() {
   F = (H * .5) / Math.tan(FOV * .5);
   ctx.lineJoin = "round"; ctx.lineCap = "round";
   makeVignette();
+  /* The free rectangle is otherwise refreshed on a quarter-second timer, so
+     for a quarter of a second after the canvas changes size it describes
+     the old one — and a hit test against it misses. */
+  if (typeof stageInset === "function" && !GAME.started) { stageInset(); STAGE.insetT = .25; }
   if (typeof layoutTouch === "function") layoutTouch();
 }
 window.addEventListener("resize", resize);
@@ -3163,7 +3200,7 @@ function bakePilot(mesh) {
   const L = HANGAR.light;
   if (!L) return mesh;
   return bakeMesh(mesh, {
-    occ: L.occNP, lights: L.lights, amb: [.185, .197, .222], aoR: 6, aoK: .58,
+    occ: L.occNP, lights: L.lights, amb: [.075, .084, .100], aoR: 6, aoK: .55,
     ox: HANGAR.pilot.x, oy: HANGAR.pilot.y, oz: HANGAR.pilot.z, yaw: PILOT_YAW
   });
 }
@@ -3308,6 +3345,13 @@ function bakeMesh(mesh, L) {
     const ex = px + dx * .07, ey = py + dy * .07, ez = pz + dz * .07;
     for (let i = 0; i < occ.length; i++) {
       const b = occ[i];
+      /* A box that the face is standing INSIDE never blocks it. Shrinking
+         each box by twelve centimetres fixed this for a wall, where the
+         face lies on the box; it does not fix a crew stair, a bowser or a
+         tool chest, where one box is thrown round a dozen parts and every
+         one of them is deep inside it. Those came out black — which is
+         what every dark lump in the middle of the hangar was. */
+      if (px > b[0] && px < b[3] && py > b[1] && py < b[4] && pz > b[2] && pz < b[5]) continue;
       let t0 = 0, t1 = tmax, iv = 1 / dx;
       let a = (b[0] - ex) * iv, c = (b[3] - ex) * iv, s;
       if (a > c) { s = a; a = c; c = s; }
@@ -3370,7 +3414,15 @@ function bakeMesh(mesh, L) {
       dx /= d; dy /= d; dz /= d;
       const ndl = nx * dx + ny * dy + nz * dz;
       if (ndl <= 0) continue;
-      const at = L2.p / (1 + d2 / (L2.r * L2.r));
+      let at = L2.p / (1 + d2 / (L2.r * L2.r));
+      /* A lamp with a direction is a spot: how far off its axis the face is
+         decides how much of it the face gets. This is what a stage rig is
+         and it is the whole difference between a lit room and a lit
+         SUBJECT in a dark room. */
+      if (L2.dir) {
+        const cd = -(dx * L2.dir[0] + dy * L2.dir[1] + dz * L2.dir[2]);
+        at *= sstep(L2.co, L2.ci, cd);
+      }
       if (at < .004) continue;
       if (L2.hard !== false && blocked(cx, cy, cz, dx, dy, dz, d - .25)) continue;
       const k = ndl * at * dirAO;
@@ -3433,8 +3485,8 @@ function buildHangar() {
      same to draw as the wall it is on. The fine grain of the place is built
      for a screen that can show it. */
   const FINE = !MOBILE && !COARSE;
-  const CONC = [116, 117, 121], CONC2 = [106, 107, 111];
-  const SKIN = [150, 157, 164], WAINS = [52, 70, 86], TRIM = [78, 85, 94];
+  const CONC = [96, 97, 101], CONC2 = [86, 87, 91];
+  const SKIN = [132, 139, 147], WAINS = [46, 62, 78], TRIM = [70, 77, 86];
   const DARK = [46, 50, 57], STEEL = [104, 111, 120], ALU = [176, 182, 190];
   const YEL = [214, 178, 46], RED = [172, 56, 44], WHT = [226, 230, 234];
   const WOOD = [132, 104, 68], GREEN = [70, 96, 78];
@@ -3463,23 +3515,78 @@ function buildHangar() {
     if (r > .30) mb.cyl(x, y, z + (s || 0) * w * .55, r * .42, r * .42, w * .9, 6, [96, 100, 106], lit(), 2, 1);
   };
 
-  // ---- the lamps, and the rest of what is lighting this place ------------
-  const LAMPX = [], LAMPZ = [Z - 17, Z, Z + 17];
-  for (let i = 1; i <= 4; i++) LAMPX.push(X - HW + i * (HANGAR.w / 5));
+  /* ===== the rig ========================================================
+
+     This is not a working shed with the strip lights on any more. It is a
+     BAY: a dark hall with one thing in it that is lit, which is how every
+     garage in every game that has ever had a garage is lit, and for the
+     same reason — you came here to look at the machine, not at the walls.
+
+     So the general lighting is turned almost off and a stage rig goes in
+     over the aeroplane: ten spots on a truss aimed down at it, six uplights
+     round the edge of the platform throwing light up into the underside,
+     and two cold ones behind to cut its shape away from the dark. The
+     high-bays stay, dimmed to a quarter, so the hall still has a shape to
+     be dark in. */
+  const STG = { x: HANGAR.pos.x, z: HANGAR.pos.z, r: 19.5, y: y0 + .010 };
   const LIGHTS = [];
+  const spot = (x, y, z, t, r, p, c, inner, outer) => {
+    const dx = t[0] - x, dy = t[1] - y, dz = t[2] - z, l = Math.hypot(dx, dy, dz) || 1;
+    LIGHTS.push({ x, y, z, r, p, c, t,
+      dir: [dx / l, dy / l, dz / l], ci: Math.cos(inner * DEG), co: Math.cos(outer * DEG) });
+  };
+  /* The truss: two runs over the stage, five heads on each, every one of
+     them aimed at the far side of the aeroplane so the two rows cross over
+     it instead of both lighting the same flank. */
+  const RIGY = y0 + 15.0, RIGZ = 9.5;
+  const SPOTS = [];
+  for (let i = 0; i < 5; i++) {
+    const sx = STG.x - 16 + i * 8;
+    for (const s2 of [-1, 1]) {
+      const sz = STG.z + s2 * RIGZ;
+      const t = [sx, y0 + 2.2, STG.z - s2 * 2.2];
+      SPOTS.push([sx, RIGY, sz, t]);
+      spot(sx, RIGY, sz, t, 26, .54, [1.00, .960, .890], 24, 48);
+    }
+  }
+  /* Uplights, close in under the wing and aimed straight up, which is the
+     only way to get light into the underside of an aeroplane. Out at the
+     rim they would just be floodlights raking the floor. */
+  const UPS = [];
+  for (const ux of [STG.x - 13, STG.x - 4, STG.x + 7])
+    for (const s2 of [-1, 1]) {
+      const uz = STG.z + s2 * 6.4;
+      UPS.push([ux, uz]);
+      spot(ux, y0 + .22, uz, [ux, y0 + 9, uz], 15, .46, [1.00, .870, .690], 34, 72);
+    }
+  // two cold ones behind the tail, to cut it away from the dark
+  const RIMS = [];
+  for (const s2 of [-1, 1]) {
+    const rx = STG.x - 25, ry = y0 + 7.0, rz = STG.z + s2 * 12;
+    const t = [STG.x - 7, y0 + 3.4, STG.z + s2 * 2];
+    RIMS.push([rx, ry, rz, t]);
+    spot(rx, ry, rz, t, 30, .72, [.58, .73, 1.00], 20, 44);
+  }
+  // the hall itself, barely: enough to say there is one
+  const LAMPX = [], LAMPZ = [Z - 17, Z + 17];
+  for (let i = 1; i <= 4; i++) LAMPX.push(X - HW + i * (HANGAR.w / 5));
   for (const lx of LAMPX) for (const lz of LAMPZ)
-    LIGHTS.push({ x: lx, y: y0 + HH - 3.0, z: lz, r: 8.5, p: 1.15, c: [1.00, .930, .800] });
-  /* The roof lights and the open door are areas, not points, so each is a
-     row of weak wide ones — which is what gives a soft edge instead of a
-     hard little pool. */
+    LIGHTS.push({ x: lx, y: y0 + HH - 3.0, z: lz, r: 9, p: .20, c: [1.00, .900, .760] });
   for (let i = 0; i < 4; i++) {
     const rx = X - HW + (i * 4 + 2.5) * (HANGAR.w / 14);
     for (const rz of [Z - HD * .5, Z + HD * .5])
-      LIGHTS.push({ x: rx, y: y0 + HH + 2.4, z: rz, r: 30, p: .30, c: [.62, .75, .98] });
+      LIGHTS.push({ x: rx, y: y0 + HH + 2.4, z: rz, r: 30, p: .030, c: [.50, .62, .88] });
   }
   for (let k = -1; k <= 1; k++)
-    LIGHTS.push({ x: X + HW - .5, y: y0 + 7, z: Z + k * 12, r: 30, p: .34, c: [.66, .78, 1.00] });
-  LIGHTS.push({ x: X - HW + 6, y: y0 + 5.0, z: Z + HD - 7, r: 9, p: .55, c: [1.0, .93, .78] }); // office
+    LIGHTS.push({ x: X + HW - .5, y: y0 + 7, z: Z + k * 12, r: 26, p: .070, c: [.55, .68, 1.00] });
+  LIGHTS.push({ x: X - HW + 6, y: y0 + 5.0, z: Z + HD - 7, r: 9, p: .38, c: [1.0, .93, .78] }); // office
+  /* Wall packs. A corner with nothing in it reads as a hole in the model
+     rather than as a dark corner, and a bowser parked in one is a black
+     polygon. Three small ones say what is back there without lifting the
+     hall off the floor. */
+  const PACK = [[X - 26, Z - 17.5], [X - HW + 5, Z - 24], [X - HW + 5, Z + 24], [X + 20, Z - 24]];
+  for (const [px2, pz2] of PACK)
+    LIGHTS.push({ x: px2, y: y0 + 6.2, z: pz2, r: 13, p: .34, c: [1.00, .905, .760] });
 
   // ---- floor -------------------------------------------------------------
   sh.quad([X - HW, y0 - .03, Z - HD], [X + HW, y0 - .03, Z - HD],
@@ -3531,6 +3638,183 @@ function buildHangar() {
     paint(X - HW + 5.2, zz, X - HW + 5.9, zz + 2.2, [58, 60, 62]);
     if (FINE) for (let g = 0; g < 5; g++)
       paint(X - HW + 5.25, zz + .1 + g * .42, X - HW + 5.85, zz + .32 + g * .42, [96, 100, 104]);
+  }
+
+  /* ===== the stage =======================================================
+
+     A dark hall is only half of it. The other half is the plate: a marked
+     circle of polished floor with the machine standing in the middle of it,
+     a rim of edge lights, and a rig over the top you can actually see. The
+     plate is inlaid, not raised — the aeroplane's wheels are on the floor,
+     and a step under them would look like it had sunk through. */
+  const SR = STG.r, SY = STG.y;
+  const SEG = FINE ? 28 : 18, SBAND = FINE ? 4 : 3;
+  const PLATE = [128, 132, 141], PLATE2 = [112, 116, 125];
+  for (let b2 = 0; b2 < SBAND; b2++) {
+    const r0 = SR * b2 / SBAND, r1 = SR * (b2 + 1) / SBAND;
+    for (let i = 0; i < SEG; i++) {
+      const a0 = i / SEG * TAU, a1 = (i + 1) / SEG * TAU;
+      const p = (r, a) => [STG.x + Math.cos(a) * r, SY, STG.z + Math.sin(a) * r];
+      const c = shade((i + b2) & 1 ? PLATE : PLATE2, 1 + (hash2(i, b2) - .5) * .06);
+      if (b2 === 0) sh.tri(p(0, 0), p(r1, a0), p(r1, a1), c, fl({ bias: -170 }));
+      else sh.quad(p(r0, a0), p(r1, a0), p(r1, a1), p(r0, a1), c, fl({ bias: -170 }));
+    }
+  }
+  /* The marks on it. Two painted rings, a hazard rim chopped into teeth,
+     and a cross of ticks on the cardinals so the circle has an up. */
+  const band = (r0, r1, col, yy, o, n) => {
+    const N = n || SEG * 2;
+    for (let i = 0; i < N; i++) {
+      const a0 = i / N * TAU, a1 = (i + 1) / N * TAU;
+      const p = (r, a) => [STG.x + Math.cos(a) * r, yy, STG.z + Math.sin(a) * r];
+      sh.quad(p(r0, a0), p(r1, a0), p(r1, a1), p(r0, a1), col, fl(o || { bias: -150 }));
+    }
+  };
+  band(SR - .34, SR, [196, 200, 206], SY + .006, { bias: -150 });
+  band(SR - 2.30, SR - 2.12, [150, 154, 160], SY + .006, { bias: -150 });
+  band(7.6, 7.78, [120, 124, 130], SY + .006, { bias: -150 });
+  for (let i = 0; i < (FINE ? 40 : 24); i++) {
+    const n2 = FINE ? 40 : 24, a0 = i / n2 * TAU + .02, a1 = (i + .52) / n2 * TAU;
+    const p = (r, a) => [STG.x + Math.cos(a) * r, SY + .007, STG.z + Math.sin(a) * r];
+    sh.quad(p(SR - 1.95, a0), p(SR - .40, a0), p(SR - .40, a1), p(SR - 1.95, a1),
+      i & 1 ? [188, 158, 40] : [38, 40, 44], fl({ bias: -140 }));
+  }
+  for (let k = 0; k < 4; k++) {
+    const a = k * Math.PI * .5;
+    const p = (r, s) => [STG.x + Math.cos(a) * r - Math.sin(a) * s, SY + .007, STG.z + Math.sin(a) * r + Math.cos(a) * s];
+    sh.quad(p(SR - 5.4, -.16), p(SR - 2.6, -.16), p(SR - 2.6, .16), p(SR - 5.4, .16),
+      [182, 186, 192], fl({ bias: -140 }));
+  }
+  /* Edge lights, flush in the plate. These are the only lights in the hall
+     you look straight into, so they are what tells you the plate is lit at
+     all when the camera is down at wheel height. */
+  const NED = FINE ? 24 : 14;
+  for (let i = 0; i < NED; i++) {
+    const a = (i + .5) / NED * TAU;
+    const ex = STG.x + Math.cos(a) * (SR - 1.18), ez = STG.z + Math.sin(a) * (SR - 1.18);
+    sh.disc(ex, SY + .014, ez, .22, 5, 1, [255, 246, 220], { two: true, emit: 1.25, bias: -120 });
+    LIGHTS.push({ x: ex, y: SY + .30, z: ez, r: 3.2, p: .55, c: [1.0, .93, .78] });
+  }
+
+  /* Posts and chain round three sides of the plate. A circle painted on a
+     floor is a mark; a circle you are kept out of is a stage. The quarter
+     the aeroplane leaves by is left open, because it has to. */
+  const NPOST = FINE ? 18 : 11;
+  const POST = [];
+  for (let i = 0; i < NPOST; i++) {
+    const a = (i / NPOST) * TAU;
+    if (Math.cos(a) > .60) { POST.push(null); continue; }      // the way out
+    const px2 = STG.x + Math.cos(a) * (SR + 1.5), pz2 = STG.z + Math.sin(a) * (SR + 1.5);
+    POST.push([px2, pz2]);
+    sh.cyl(px2, y0 + .52, pz2, .055, .055, 1.00, 6, [168, 172, 178], lit(), 1, 0);
+    sh.cyl(px2, y0 + 1.05, pz2, .075, .030, .12, 6, [196, 200, 206], lit(), 1, 0);
+    sh.cyl(px2, y0 + .06, pz2, .20, .16, .12, 8, [44, 47, 54], lit(), 1, 0);
+  }
+  const NCH = FINE ? 3 : 1;                       // how many links a span sags in
+  for (let i = 0; i < NPOST; i++) {
+    const a2 = POST[i], b2 = POST[(i + 1) % NPOST];
+    if (!a2 || !b2) continue;
+    const sag = s => y0 + .90 - .17 * Math.sin(s * Math.PI);
+    for (let k = 0; k < NCH; k++) {
+      const s0 = k / NCH, s1 = (k + 1) / NCH;
+      const ax2 = lerp(a2[0], b2[0], s0), az2 = lerp(a2[1], b2[1], s0);
+      const bx2 = lerp(a2[0], b2[0], s1), bz2 = lerp(a2[1], b2[1], s1);
+      const y1 = sag(s0), y2 = sag(s1);
+      sh.quad([ax2, y1 + .035, az2], [bx2, y2 + .035, bz2], [bx2, y2 - .035, bz2], [ax2, y1 - .035, az2],
+        [126, 130, 136], lit());
+    }
+  }
+  /* The bay is numbered and signed, because a building this size is run by
+     somebody. A sign is the cheapest thing in the world to build and the
+     first thing that says a place is used. */
+  const sign = (sx, sy, sz, w2, h2, face, col, glow) => {
+    const o = glow ? { two: true, emit: glow, spec: .3, gloss: 24 } : lit();
+    if (face === 0) sh.box(sx, sy, sz, .12, h2, w2, col, o);
+    else sh.box(sx, sy, sz, w2, h2, .12, col, o);
+  };
+  sign(X - HW + .5, y0 + 9.2, Z - 6, 7.0, 3.4, 0, [196, 200, 206], 0);   // BAY 1 placard
+  sign(X - HW + .62, y0 + 9.2, Z - 6, 5.6, 2.2, 0, [28, 44, 68], 0);
+  sign(X - HW + .70, y0 + 9.2, Z - 7.6, 1.5, 1.5, 0, [210, 176, 54], .55);
+  for (const zz of [Z - 21, Z + 21]) {
+    sign(X - HW + .62, y0 + 6.4, zz, 2.6, 1.0, 0, [182, 56, 46], .45);   // fire point
+    sign(X - HW + .62, y0 + 5.0, zz, 1.4, 1.4, 0, [40, 128, 70], .50);   // way out
+  }
+  for (const s2 of [-1, 1])
+    sign(X + 2, y0 + 6.0, Z + s2 * (HD - .55), 9.0, 2.6, 1, [34, 48, 70], .22);
+  // bollards flanking the door, and a kerb line into it
+  for (const s2 of [-1, 1]) for (let k = 0; k < 3; k++) {
+    const bx2 = X + HW - 3.2 - k * 3.0, bz2 = Z + s2 * 23.6;
+    sh.cyl(bx2, y0 + .48, bz2, .20, .20, .92, 8, [206, 164, 40], lit(), 1, 0);
+    sh.cyl(bx2, y0 + .88, bz2, .21, .21, .16, 8, [36, 38, 42], lit(), 1, 0);
+  }
+
+  /* ===== the rig you can see =============================================
+
+     The lights are baked into the walls either way; what makes the hall
+     read as a stage is seeing where they come from. So the truss is built,
+     the heads are built, and the air under each head is built as well. */
+  const TRUSSX0 = X - HW + 5, TRUSSX1 = X + HW - 5;
+  for (const s2 of [-1, 1]) {
+    const tz = STG.z + s2 * RIGZ, L2 = TRUSSX1 - TRUSSX0, cx2 = (TRUSSX0 + TRUSSX1) * .5;
+    for (const dy of [-.46, .46]) for (const dz of [-.40, .40])
+      sh.box(cx2, RIGY + dy, tz + dz, L2, .17, .17, [58, 62, 70], lit());
+    const NB = FINE ? 15 : 9;
+    for (let i = 0; i <= NB; i++) {
+      const bx = TRUSSX0 + i * (L2 / NB);
+      sh.box(bx, RIGY, tz, .09, .95, .09, [50, 54, 62], lit());
+      if (FINE && i < NB) {
+        const bx2 = bx + L2 / (NB * 2);
+        sh.box(bx2, RIGY, tz, .07, .07, .84, [50, 54, 62], lit());
+      }
+    }
+    // hung off the roof
+    for (let i = 0; i < 5; i++) {
+      const hx = TRUSSX0 + (i + .5) * (L2 / 5);
+      const ry2 = y0 + HH + 4.2 * (1 - Math.abs(tz - Z) / HD) - .5;
+      sh.box(hx, (RIGY + .46 + ry2) * .5, tz, .10, ry2 - RIGY - .46, .10, [46, 50, 58], lit());
+    }
+  }
+  for (let i = 0; i < 4; i++) {
+    const cx2 = STG.x - 18 + i * 12;
+    sh.box(cx2, RIGY + .40, STG.z, .14, .14, RIGZ * 2, [50, 54, 62], lit());
+  }
+  /* A head: a yoke, a barrel, and a lens with the beam coming out of it.
+     The barrel is built straight down and the beam is built along the real
+     aim, which at thirteen metres up nobody is ever going to measure. */
+  const head = (hx, hy, hz, t, lens, pr, alph) => {
+    sh.box(hx, hy - .30, hz, .62, .44, .18, [40, 43, 50], lit());
+    sh.box(hx, hy - .30, hz, .18, .44, .62, [40, 43, 50], lit());
+    sh.cyl(hx, hy - 1.05, hz, .38, .44, 1.20, FINE ? 10 : 7, [34, 37, 44], lit(), 1, 1);
+    sh.cyl(hx, hy - 1.72, hz, .44, .40, .16, FINE ? 10 : 7, [26, 28, 34], lit(), 1, 0);
+    sh.disc(hx, hy - 1.80, hz, .38, FINE ? 10 : 7, 1, lens, { two: true, emit: 1.35 });
+    // the air it is shining through
+    const ax = t[0] - hx, ay = t[1] - (hy - 1.8), az = t[2] - hz;
+    const al = Math.hypot(ax, ay, az) || 1;
+    const ux = ax / al, uy = ay / al, uz2 = az / al;
+    let px = -uz2, py = 0, pz = ux; const pl = Math.hypot(px, pz) || 1; px /= pl; pz /= pl;
+    const qx = uy * pz - uz2 * py, qy = uz2 * px - ux * pz, qz = ux * py - uy * px;
+    const NC = FINE ? 7 : 5;
+    for (let i = 0; i < NC; i++) {
+      const a0 = i / NC * TAU, a1 = (i + 1) / NC * TAU;
+      const rim = (a, r, k) => [hx + ux * al * k + (px * Math.cos(a) + qx * Math.sin(a)) * r,
+                                (hy - 1.8) + uy * al * k + (py * Math.cos(a) + qy * Math.sin(a)) * r,
+                                hz + uz2 * al * k + (pz * Math.cos(a) + qz * Math.sin(a)) * r];
+      sh.quad(rim(a0, .34, 0), rim(a0, pr, 1), rim(a1, pr, 1), rim(a1, .34, 0), lens,
+        { two: true, alpha: alph, bias: -30 });
+    }
+  };
+  for (const s of SPOTS) head(s[0], s[1] - .62, s[2], s[3], [255, 247, 226], 2.3, .075);
+  for (const r of RIMS) {
+    sh.box(r[0], (y0 + r[1]) * .5, r[2], .34, r[1] - y0, .34, [44, 48, 56], lit());
+    sh.box(r[0], y0 + .12, r[2], 1.3, .24, 1.3, [36, 40, 46], lit());
+    head(r[0], r[1] + .62, r[2], r[3], [186, 214, 255], 2.6, .060);
+  }
+  /* The uplights are a slot in the floor with a lamp in it. */
+  for (const u of UPS) {
+    sh.box(u[0], y0 + .09, u[1], 1.05, .18, .62, [38, 41, 48], lit());
+    sh.quad([u[0] - .40, y0 + .19, u[1] - .20], [u[0] + .40, y0 + .19, u[1] - .20],
+            [u[0] + .40, y0 + .19, u[1] + .20], [u[0] - .40, y0 + .19, u[1] + .20],
+            [255, 236, 200], { two: true, emit: 1.2, bias: -110 });
   }
 
   // ---- walls: a lined inner skin, an outer one, and columns between ------
@@ -3593,20 +3877,25 @@ function buildHangar() {
   sh.box(X - 24, y0 + 1.05, Z - HD + .14, 1.0, 2.1, .16, [58, 66, 76], lit());
   sh.box(X - 24, y0 + 1.02, Z - HD + .26, .78, .07, .07, ALU, lit());
   sh.box(X - 24, y0 + 2.30, Z - HD + .18, .52, .20, .08, [36, 120, 62], { two: true, emit: 1.0 });
-  // clerestory glazing, high up where a shed puts it
+  // clerestory glazing: black glass with the rig reflected in it
   for (let i = 0; i < 9; i++)
-    sh.box(X - HW + 6 + i * 7.5, y0 + 15.4, Z - HD + .10, 4.4, 1.7, .10, [140, 168, 190],
-      { two: true, emit: .95, spec: .5, gloss: 40 });
+    sh.box(X - HW + 6 + i * 7.5, y0 + 15.4, Z - HD + .10, 4.4, 1.7, .10, [26, 32, 42],
+      { two: true, emit: .18, spec: .85, gloss: 64 });
 
   // ---- roof --------------------------------------------------------------
   const ridge = y0 + HH + 4.2;
   for (let i = 0; i < 14; i++) {
     const x0 = X - HW + i * (HANGAR.w / 14), x1 = x0 + HANGAR.w / 14;
     if (i % 4 === 2) {
-      sh.quad([x0 + .3, y0 + HH, Z - HD], [x1 - .3, y0 + HH, Z - HD], [x1 - .3, ridge, Z], [x0 + .3, ridge, Z],
-        [206, 222, 238], { two: true, emit: .92 });
-      sh.quad([x0 + .3, ridge, Z], [x1 - .3, ridge, Z], [x1 - .3, y0 + HH, Z + HD], [x0 + .3, y0 + HH, Z + HD],
-        [196, 214, 232], { two: true, emit: .88 });
+      /* It is night outside and the hall is lit by its rig, so a roof light
+         is not a hole full of sun any more: it is a dark panel with the sky
+         behind it, and the only thing it does is break the deck up. */
+      sh.quad([x0, y0 + HH - .22, Z - HD], [x1, y0 + HH - .22, Z - HD], [x1, ridge - .22, Z], [x0, ridge - .22, Z],
+        [30, 35, 44], { two: true, emit: .10 });
+      sh.quad([x0, ridge - .22, Z], [x1, ridge - .22, Z], [x1, y0 + HH - .22, Z + HD], [x0, y0 + HH - .22, Z + HD],
+        [26, 31, 40], { two: true, emit: .10 });
+      sh.quad([x0, y0 + HH, Z - HD], [x0, ridge, Z], [x1, ridge, Z], [x1, y0 + HH, Z - HD], [44, 48, 56], OUT);
+      sh.quad([x0, ridge, Z], [x0, y0 + HH, Z + HD], [x1, y0 + HH, Z + HD], [x1, ridge, Z], [40, 44, 52], OUT);
     } else {
       const c = shade(SKIN, i & 1 ? 1.03 : .97);
       // liner inside, deck outside
@@ -3614,27 +3903,6 @@ function buildHangar() {
       sh.quad([x0, ridge - .22, Z], [x1, ridge - .22, Z], [x1, y0 + HH - .22, Z + HD], [x0, y0 + HH - .22, Z + HD], shade(c, .88), fl());
       sh.quad([x0, y0 + HH, Z - HD], [x0, ridge, Z], [x1, ridge, Z], [x1, y0 + HH, Z - HD], c, OUT);
       sh.quad([x0, ridge, Z], [x0, y0 + HH, Z + HD], [x1, y0 + HH, Z + HD], [x1, ridge, Z], shade(c, .96), OUT);
-    }
-  }
-  /* Shafts. A roof light is a hole in a roof; what says so is the slab of
-     pale air under it and the bright patch of floor at the bottom of that.
-     Four faint faces and a patch, per panel, and the shed stops being a
-     model of a shed. */
-  const SHAFT = [.30, .16];                       // how far the light leans
-  for (let i = 0; i < 14; i++) {
-    if (i % 4 !== 2) continue;
-    const x0 = X - HW + i * (HANGAR.w / 14) + .3, x1 = x0 + HANGAR.w / 14 - .6;
-    for (const s2 of [-1, 1]) {
-      const za = Z + s2 * HD, zb = Z;
-      const ya = y0 + HH, yb = ridge;
-      const top = [[x0, ya, za], [x1, ya, za], [x1, yb, zb], [x0, yb, zb]];
-      const bot = top.map(p => [p[0] + (p[1] - y0) * SHAFT[0], y0 + .02, p[2] + (p[1] - y0) * SHAFT[1]]);
-      const air = { two: true, alpha: .055 };
-      for (const k of (FINE ? [0, 2] : [0])) {
-        const k2 = (k + 1) % 4;
-        sh.quad(top[k], top[k2], bot[k2], bot[k], [206, 222, 242], air);
-      }
-      sh.quad(bot[0], bot[1], bot[2], bot[3], [196, 214, 236], { two: true, alpha: .17, bias: -40 });
     }
   }
   sh.tri([X - HW, y0 + HH, Z - HD], [X - HW, y0 + HH, Z + HD], [X - HW, ridge, Z], shade(SKIN, .92), fl());
@@ -3680,8 +3948,14 @@ function buildHangar() {
   for (const lx of LAMPX) for (const lz of LAMPZ) {
     sh.cyl(lx, y0 + HH - 1.65, lz, .07, .07, 1.9, 5, [72, 76, 82], lit(), 1, 0);
     sh.cyl(lx, y0 + HH - 2.76, lz, .30, .86, .56, FINE ? 12 : 8, [42, 44, 48], lit(), 1, 0);
-    if (FINE) sh.cyl(lx, y0 + HH - 3.00, lz, .86, .90, .08, 12, ALU, lit({ gain: 1.8 }), 1, 0);
-    sh.disc(lx, y0 + HH - 3.04, lz, .78, FINE ? 12 : 8, 1, [255, 250, 232], { two: true, emit: 1.45 });
+    if (FINE) sh.cyl(lx, y0 + HH - 3.00, lz, .86, .90, .08, 12, ALU, lit({ gain: 1.25 }), 1, 0);
+    sh.disc(lx, y0 + HH - 3.04, lz, .78, FINE ? 12 : 8, 1, [214, 204, 176], { two: true, emit: .62 });
+  }
+
+  for (const [px2, pz2] of PACK) {
+    sh.box(px2, y0 + 6.62, pz2, .52, .34, .52, [46, 50, 58], lit());
+    sh.cyl(px2, y0 + 6.30, pz2, .36, .46, .36, FINE ? 9 : 6, [38, 41, 48], lit(), 1, 0);
+    sh.disc(px2, y0 + 6.11, pz2, .36, FINE ? 9 : 6, 1, [244, 232, 200], { two: true, emit: .95 });
   }
 
   // ---- the back wall is somebody's workshop ------------------------------
@@ -3767,7 +4041,9 @@ function buildHangar() {
   // fuel bowser
   const bx = X - 26, bz = Z - 17;
   occ(bx, y0 + 1.6, bz, 7.4, 3.2, 2.9);
-  det.cyl(bx - .5, y0 + 1.72, bz, 1.22, 1.22, 6.1, FINE ? 12 : 9, [48, 70, 98], lit(), 0, 2);
+  det.cyl(bx - .5, y0 + 1.72, bz, 1.22, 1.22, 6.1, FINE ? 12 : 9, [96, 126, 164], lit(), 0, 2);
+  det.cyl(bx - .5, y0 + 1.72, bz, 1.25, 1.25, .70, FINE ? 12 : 9, [222, 226, 230], lit(), 0, 0);
+  det.cyl(bx + 1.9, y0 + 1.72, bz, 1.25, 1.25, .34, FINE ? 12 : 9, [196, 84, 44], lit(), 0, 0);
   det.box(bx, y0 + .72, bz, 7.2, .55, 2.3, [40, 44, 52], lit());
   det.box(bx + 4.1, y0 + 1.95, bz, 2.6, 2.4, 2.5, [38, 52, 72], lit());
   det.box(bx + 4.1, y0 + 2.55, bz, 2.2, .9, 2.3, [128, 158, 186], { two: true, emit: .55, spec: .5, gloss: 40 });
@@ -3795,8 +4071,8 @@ function buildHangar() {
   for (let k = 0; k < 4; k++)
     det.box(tx, y0 + .26 + k * .30, tz + .53, 2.3, .22, .05, [196, 82, 66], lit());
   det.box(tx, y0 + 1.36, tz, 2.6, .08, 1.15, [190, 192, 196], lit());
-  det.box(X + 9, y0 + .48, Z + 6.2, 1.1, .90, .70, [60, 96, 130], lit());
-  det.box(X + 9, y0 + .96, Z + 6.2, 1.2, .07, .78, [190, 192, 196], lit());
+  det.box(X + 9, y0 + .48, Z - 6.2, 1.1, .90, .70, [60, 96, 130], lit());
+  det.box(X + 9, y0 + .96, Z - 6.2, 1.2, .07, .78, [190, 192, 196], lit());
   // drums with lids
   for (let k = 0; k < (FINE ? 6 : 3); k++) {
     const dx2 = X - 35 + (k % 3) * 1.1, dz2 = Z + 16 + ((k / 3) | 0) * 1.1;
@@ -3805,13 +4081,16 @@ function buildHangar() {
     det.cyl(dx2, y0 + .62, dz2, .45, .45, .07, FINE ? 11 : 8, shade(c, .84), lit(), 1, 0);
   }
   occ(X - 34, y0 + .5, Z + 16.5, 3.4, 1, 2.2);
-  // crates, tyres, pallets
+  /* Crates, tyres and pallets, stacked down the DARK side of the bay. They
+     used to sit between the camera and the aeroplane, where a stack of
+     black tyres is a black lump in the middle of the shot and nothing
+     else. A store is kept out of the way; so is this one. */
   for (let k = 0; k < 3; k++)
-    obox(det, X - 12 + k * 2.7, y0 + .72, Z + 21, 2.3, 1.44, 1.7, [138, 126, 100]);
+    obox(det, X + 16 + k * 2.7, y0 + .72, Z - 24, 2.3, 1.44, 1.7, [138, 126, 100]);
   for (let k = 0; k < 4; k++)
-    det.cyl(X - 5.5, y0 + .22 + k * .40, Z + 22, .57, .57, .38, FINE ? 10 : 7, [30, 30, 34], lit(), 1, k === 3 ? 1 : 0);
+    det.cyl(X - 33, y0 + .22 + k * .40, Z - 26, .57, .57, .38, FINE ? 10 : 7, [30, 30, 34], lit(), 1, k === 3 ? 1 : 0);
   for (let k = 0; k < 4; k++)
-    det.box(X - 20, y0 + .08 + k * .16, Z + 25, 1.2, .12, 1.0, WOOD, lit());
+    det.box(X - 24, y0 + .08 + k * .16, Z - 27, 1.2, .12, 1.0, WOOD, lit());
   // pallet racking down the back wall
   for (let b2 = 0; b2 < (FINE ? 3 : 2); b2++) {
     const rz = Z - 24 + b2 * 3.2, rx2 = X - HW + 2.6;
@@ -3920,7 +4199,7 @@ function buildHangar() {
 
   const LGT = {
     occ: OCC, occNP: OCC.slice(0, OCC.length - 1),   // everything but the pilot
-    lights: LIGHTS, amb: [.078, .086, .104], aoR: 9, aoK: .80,
+    lights: LIGHTS, amb: [.034, .039, .050], aoR: 9, aoK: .78,
     inx: X, iny: y0 + 6.5, inz: Z
   };
   HANGAR.light = LGT;
@@ -3939,7 +4218,12 @@ const STAGE = {
   want: "wide", pos: null, look: null, fov: 1.05, init: false,
   hover: null, glow: 0, glowWhat: null, cap: "", capT: 0, t: 0,
   pick: { plane: null, pilot: null }, offX: 0, offY: 0, insetT: 0,
-  free: { x0: 0, y0: 0, x1: 1, y1: 1 }
+  /* `free` is the screen the card has left. `fit` is the part of THAT the
+     subject may have: the caption sits across the top of the free rect and
+     the way-out hint across the bottom, and a head behind a caption is not
+     a head you can see. Everything is framed on `fit`. */
+  free: { x0: 0, y0: 0, x1: 1, y1: 1 },
+  fit: { x0: 0, y0: 0, x1: 1, y1: 1 }
 };
 /* Which way the pilot is standing is a framing decision as much as a
    staging one: face them at the aeroplane and the camera that sees their
@@ -3953,49 +4237,77 @@ STAGE.pilotPos = () => HANGAR.pilot;
 PILOTMESH = bakePilot(PILOTMESH);
 /* Where the eye stands for each shot. Every one of them drifts a little:
    a locked-off camera on a static model looks like a crash, not a hangar. */
-/* How far back the eye has to stand for something this wide and this tall to
-   fit in the part of the screen the card has left. Guessing a distance works
-   on exactly one screen; asking the frustum works on all of them. */
-function stageDist(fov, halfW, halfH, dmin, dmax) {
-  const F2 = (H * .5) / Math.tan(fov * .5), f = STAGE.free;
-  const hax = Math.max(Math.atan((f.x1 - f.x0) * .5 / F2), .06);
-  const hay = Math.max(Math.atan((f.y1 - f.y0) * .5 / F2), .06);
-  return clamp(Math.max(halfW / Math.tan(hax), halfH / Math.tan(hay)), dmin, dmax);
+/* How big a subject looks is the lens AND the distance, and inside a shed
+   only one of them is free: at some point the eye is in the wall. Every
+   earlier version of this fixed the lens and solved for the distance, which
+   worked on a desktop and walked the camera straight out through the north
+   wall on a phone held upright, where the strip of screen the card has left
+   is half as wide as the aeroplane needs.
+
+   So it is solved the other way round. The eye stands as far back as the
+   shed allows, and the LENS is whatever makes the subject fit from there.
+   `fov` here is measured over the whole canvas, not over the strip, so a
+   wide number is not a fish-eye: on a phone the strip only ever shows the
+   middle fifty-odd degrees of it.
+
+   `k` is what the shot returns, and it is a MULTIPLIER on the screen's own
+   field of view, not an angle — that is what the renderer wants. */
+function stageFit(halfW, halfH, dmin, dmax, kLo, kHi) {
+  const f = STAGE.fit;
+  const fw = Math.max((f.x1 - f.x0) * .5, 8), fh = Math.max((f.y1 - f.y0) * .5, 8);
+  // the longest lens that still fits it from the back of the room
+  let F2 = Math.min(fw * dmax / halfW, fh * dmax / halfH);
+  const k = clamp(2 * Math.atan((H * .5) / F2) / FOVBASE, kLo, kHi);
+  F2 = (H * .5) / Math.tan(FOVBASE * k * .5);
+  // and then how far back that lens needs the eye
+  const d = clamp(Math.max(halfW * F2 / fw, halfH * F2 / fh), dmin, dmax);
+  return { d: d, fov: k };
 }
 function stageShot(name, t) {
   const P = HANGAR.pos;
   if (name === "pilot") {
     const fa = STAGE.pilotFace, hp = STAGE.pilotPos();
     const rt = vnorm(vcross(v3(0, 1, 0), fa));
-    const d = stageDist(.60, .58, 1.14, 2.4, 7.5);
-    const sw = Math.sin(t * .42), c = v3(hp.x, E + .98, hp.z);
-    const off = .30 * d / 3;
+    const s = stageFit(.60, 1.05, 2.1, 7.0, .42, 1.05);
+    const d = s.d;
+    const sw = Math.sin(t * .42), c = v3(hp.x, E + .88, hp.z);
+    const off = .26 * d / 3;
     return {
-      pos: v3(c.x + fa.x * d + rt.x * (off + sw * .10 * d),
-              c.y + .42 + Math.sin(t * .63) * .05,
-              c.z + fa.z * d + rt.z * (off + sw * .10 * d)),
-      look: c, fov: .60
+      pos: v3(c.x + fa.x * d + rt.x * (off + sw * .08 * d),
+              c.y + .40 + Math.sin(t * .63) * .05,
+              c.z + fa.z * d + rt.z * (off + sw * .08 * d)),
+      look: c, fov: s.fov
     };
   }
   if (name === "plane") {
-    /* Thirty-three metres of aeroplane in a fifty-eight metre shed: the shot
-       stands in the far corner of the bay, on the quarter, not in front of
-       the nose where it can only see the nose. */
-    const d = stageDist(.86, 15.8, 5.0, 24, 46);
-    const th = .62 + Math.sin(t * .15) * .06;
-    const c = v3(P.x + 6.0, E + 2.85, P.z);
+    /* Thirty-three metres of aeroplane on a lit plate: the shot stands off
+       the starboard bow and slightly ABOVE it, so what is behind the
+       aeroplane is the plate and not the roof. */
+    const s = stageFit(18.4, 5.6, 17, 32, .60, 1.34);
+    const d = s.d;
+    const th = .66 + Math.sin(t * .15) * .07;
+    /* The aeroplane is not symmetrical about the point the eye is pointed
+       at, so pointing it at the middle of the aeroplane puts the aeroplane
+       off to one side. The look-at slides along the camera's own right
+       hand until the silhouette is centred, which is a pan and keeps the
+       shot square on. */
+    const SHIFT = 3.2;
+    const c = v3(P.x + 1.2 + Math.sin(th) * SHIFT, E + 1.95, P.z - Math.cos(th) * SHIFT);
     return {
-      pos: v3(c.x + Math.cos(th) * d, E + 1.95 + Math.sin(t * .20) * .22, c.z + Math.sin(th) * d),
-      look: c, fov: .86
+      pos: v3(c.x + Math.cos(th) * d, E + 5.10 + Math.sin(t * .20) * .26, c.z + Math.sin(th) * d),
+      look: c, fov: s.fov
     };
   }
   // the whole bay: the aeroplane and the pilot both inside whatever is left
-  const d = stageDist(1.02, 20.0, 6.4, 24, 46);
-  const th = (.30 + Math.sin(t * .09) * .10) * clamp((d < 40 ? 1 : .35), 0, 1);
-  const c = v3(P.x + 1.0, E + 2.70, P.z + 3.0);
+  const s = stageFit(16.8, 5.9, 20, 36, .75, 1.30);
+  const d = s.d;
+  const th = .34 + Math.sin(t * .09) * .11;
+  // the same pan: aeroplane and pilot together are not centred on either
+  const WS = 7.0;
+  const c = v3(P.x + 1.0 + Math.sin(th) * WS, E + 2.40, P.z + 2.4 - Math.cos(th) * WS);
   return {
-    pos: v3(c.x + Math.cos(th) * d, E + 3.55 + Math.sin(t * .105) * .35, c.z + Math.sin(th) * d),
-    look: c, fov: 1.02
+    pos: v3(c.x + Math.cos(th) * d, E + 4.20 + Math.sin(t * .105) * .32, c.z + Math.sin(th) * d),
+    look: c, fov: s.fov
   };
 }
 /* The card eats a side of the screen, so the picture is not centred on the
@@ -4005,19 +4317,21 @@ function stageShot(name, t) {
 function stageInset() {
   const menu = document.getElementById("menu");
   const card = menu && !menu.classList.contains("hide") ? menu.querySelector(".card") : null;
-  const f = STAGE.free;
+  const f = STAGE.free, g = STAGE.fit;
   f.x0 = 0; f.y0 = 0; f.x1 = W; f.y1 = H;
+  g.x0 = 0; g.y0 = 0; g.x1 = W; g.y1 = H;
   if (!card) { STAGE.offX = 0; STAGE.offY = 0; return; }
   const r = card.getBoundingClientRect(), cr = cv.getBoundingClientRect();
   if (!cr.width || !cr.height) return;
   const sx = W / cr.width, sy = H / cr.height;
-  if (r.width < cr.width - 40) {
-    f.x1 = clamp((r.left - cr.left) * sx, W * .25, W);
-    STAGE.offX = (f.x1 - W) * .5; STAGE.offY = 0;
-  } else {
-    f.y1 = clamp((r.top - cr.top) * sy, H * .18, H);
-    STAGE.offX = 0; STAGE.offY = (f.y1 - H) * .5;
-  }
+  if (r.width < cr.width - 40) f.x1 = clamp((r.left - cr.left) * sx, W * .25, W);
+  else f.y1 = clamp((r.top - cr.top) * sy, H * .18, H);
+  const u = UI, pad = 12 * u;
+  g.x0 = f.x0 + pad; g.x1 = Math.max(f.x1 - pad, g.x0 + 60);
+  g.y0 = f.y0 + (STAGE.want === "wide" ? pad : 60 * u);
+  g.y1 = Math.max(f.y1 - (STAGE.want === "wide" ? pad : 36 * u), g.y0 + 60);
+  STAGE.offX = (g.x0 + g.x1) * .5 - W * .5;
+  STAGE.offY = (g.y0 + g.y1) * .5 - H * .5;
 }
 function stageStep(dt) {
   STAGE.t += dt;
@@ -4076,6 +4390,8 @@ function stageHit(x, y) {
 function stageFocus(what, quiet, fromTab) {
   const first = STAGE.want !== what;
   STAGE.want = what;
+  const mn = document.getElementById("menu");
+  if (mn) mn.classList.toggle("look", !GAME.started && what !== "wide");
   STAGE.glow = 1; STAGE.glowWhat = what === "wide" ? null : what;
   if (what !== "wide") {
     STAGE.cap = what === "pilot"
@@ -4141,6 +4457,7 @@ function drawStage() {
   const SUBJ = [["plane", "THE AEROPLANE", "TAP TO CHANGE THE PAINT"],
                 ["pilot", "THE PILOT", "TAP TO CHANGE THE KIT"]];
   for (const [k, label, sub] of SUBJ) {
+    if (w !== "wide") break;                     // one subject at a time, and nothing over it
     if (w === k) continue;                       // you are already standing in front of it
     const b = STAGE.pick[k];
     if (!b) continue;
@@ -9932,14 +10249,15 @@ const LOG_KEY = "skyward.log.v1";
    The number is the point: it is the thing you can quote back when something
    is wrong, and the list under it is what to go and look at. */
 const BUILD = {
-  no: 38,
-  name: "SOMEBODY ELSE'S WINDOW",
-  date: "30 SEP 2026",
+  no: 39,
+  name: "THE BAY",
+  date: "1 OCT 2026",
   notes: [
-    ["THE RIGHT-HAND CONSOLE IS BACK", "Viewed inside another page the right-hand quarter of the panel was off the edge of the screen. A nested document's head is not a head, so the viewport tag ended up in the body where a phone ignores it \u2014 and without it the page can be pinched, and a pinched page lays its fixed panel out to a window wider than the glass. The tag is written into the real head now, and if the page is zoomed anyway the whole interface follows what is actually visible."],
-    ["AND THE INSTRUMENTS ARE BELOW THE TITLE BAR", "Inside a frame every safe-area inset reads zero, so the speed, altitude and g meter had no idea there was a title bar over the top of them. If this is not the top window it assumes one."],
-    ["THE LEFT PEDAL", "Upright it sat inside the top of the area the thumb stick appears in, so a thumb reaching for the stick near the rim could get rudder instead. The stick's area now starts under the pedals."],
-    ["AND FROM LAST TIME", "Drums, wheels, cones, bottles, extinguishers, hose reels, the fuel tank and the lamp reflectors are real cylinders; the undercarriage is tubes and wheels with hubs; and the pilot has half again as many facets with curved fittings set into the suit instead of rectangles stuck on it."]
+    ["THE HANGAR IS A STAGE NOW", "The strip lights are off. What is on is a rig: ten heads on a truss over the aeroplane, six uplights in the floor under the wing, two cold ones behind the tail to cut it out of the dark, and a marked circle of plate under the wheels with its own edge lights. The hall around it is kept dim on purpose, which is how every garage in every game that has ever had a garage is lit \u2014 you came here to look at the machine."],
+    ["AND YOU CAN SEE WHAT YOU ARE CHANGING", "The lens is worked out from the screen instead of guessed: the eye stands as far back as the shed allows and the field of view is whatever makes the subject fit from there. On a phone held upright the old shot put the camera forty metres out, which is inside the north wall. The caption and the way-out hint are kept out of the frame, the other subject's viewfinder is gone while you are in front of one, and the sheet gets out of the way on the two pages that are about looking at something."],
+    ["AT TWO THOUSAND PIXELS", "The start screen is drawn at whatever it takes to put at least 2K on the long edge, whatever the device says its pixel ratio is, and gives it back a third at a time if the frame cannot pay for it. Flight gets the ordinary ratio straight back."],
+    ["EVERY DARK LUMP IN THE SHED", "One occluder box was thrown round each piece of ground equipment, and every part of that equipment was deep inside its own box, so every shadow ray started blocked and the crew stair, the bowser, the tool chest and the racking all baked out black. A box the face is standing inside cannot shadow it."],
+    ["MORE OF THE PLACE", "Posts and chain round three sides of the plate, bay signs and fire points on the wall, bollards at the door, wall packs down the dark end, and the store moved off the shot and against the wall where a store goes."]
   ]
 };
 const NEWS_KEY = "skyward.build";
@@ -11615,6 +11933,9 @@ function menuTab(name, fromStage) {
     s.classList.toggle("on", s.dataset.pane === name));
   const body = document.getElementById("mbody");
   if (body) body.scrollTop = 0;
+  // the sheet shrinks on the two pages that are about looking at something
+  const menu = document.getElementById("menu");
+  if (menu) menu.classList.toggle("look", !GAME.started && (name === "plane" || name === "pilot"));
   /* Turning to the PILOT page in the hangar and leaving the camera at the
      far end of the shed is half an answer: the page and the eye go to the
      same place. */
@@ -11863,6 +12184,7 @@ function startFlight(keepMode) {
   RESET_ARM = 0;
   GAME.t = 0; GAME.over = false; GAME.result = ""; GAME.landScore = null;
   GAME.paused = false; GAME.started = true; dirty = false;
+  resize();                                   // hand the extra pixels back
   PARTS.length = 0; cam.shake = 0; cam.init = 0; cam.off = v3();
   hideBanner();
   resetPlane(SCEN);
@@ -12021,11 +12343,16 @@ function frame(now) {
        aeroplane is lit from above, with a dim cold fill off the walls, and
        it sits in the shed instead of on top of it. */
     const L0 = LIGHT.sun, C0 = LIGHT.sunCol, K0 = LIGHT.skyCol, G0 = LIGHT.gndCol;
-    LIGHT.sun = v3(-.16, .965, .21);
-    LIGHT.sunCol = [.62, .595, .545];
-    LIGHT.skyCol = [.26, .275, .305];
-    LIGHT.gndCol = [.135, .140, .150];
-    drawShadow(.42);
+    /* The rig, as one directional light and a hemisphere: a hot key down
+       out of the truss, a cold fill off the roof and the rim heads, and a
+       warm bounce up off the lit plate, which is what the six uplights in
+       the floor are actually for. A black aeroplane in a dark hall is only
+       a shape if something is paying for its edges. */
+    LIGHT.sun = v3(-.22, .935, .28);
+    LIGHT.sunCol = [1.34, 1.28, 1.16];
+    LIGHT.skyCol = [.33, .39, .54];
+    LIGHT.gndCol = [.42, .345, .250];
+    drawShadow(.52);
     drawAircraft(STAGE.glowWhat === "plane" ? gk : 0);
     LIGHT.sun = L0; LIGHT.sunCol = C0; LIGHT.skyCol = K0; LIGHT.gndCol = G0;
     drawMesh(PILOTMESH, STAGE.pilotPos(), mAxis(0, 1, 0, PILOT_YAW), null,
