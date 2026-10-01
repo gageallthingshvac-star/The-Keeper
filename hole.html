@@ -1750,9 +1750,9 @@ const gU = { uO0: { value: new THREE.Vector2() }, uO1: { value: new THREE.Vector
 // metres from the start point -> lon/lat
 const m2ll = (xm, zm) => ({ lat: ORIGIN.lat - zm / 111320, lon: ORIGIN.lon + xm / (111320 * Math.cos(ORIGIN.lat * Math.PI / 180)) });
 cGround.receiveShadow = true;
-cGround.material.onBeforeCompile = sh => {
-  Object.assign(sh.uniforms, gU);
-  sh.vertexShader = 'varying vec2 vGP;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvGP = (modelMatrix * vec4(transformed, 1.0)).xz;');
+const landGround = U => sh => {
+  Object.assign(sh.uniforms, U);
+  sh.vertexShader = 'varying vec2 vGP;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvGP = (modelMatrix * vec4(transformed, 1.0)).xz - modelMatrix[3].xz;');
   sh.fragmentShader = `uniform vec2 uO0, uO1, uLL0, uHm; uniform float uK0, uK1, uT, uRR, uMPU, uImg; uniform sampler2D tDay, tWater; varying vec2 vGP;
     float th(vec2 p) { p = mod(p, 256.0); vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
     float tn(vec2 p) { vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
@@ -1814,7 +1814,24 @@ cGround.material.onBeforeCompile = sh => {
       float gRough = mix(0.95, 0.2, sea);`)
     .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nroughnessFactor = gRough;');
 };
+cGround.material.onBeforeCompile = landGround(gU);
 cScene.add(cGround);
+// the same countryside lies under and around the city, so zooming out from the city reveals the landscape you grow into
+const cityLandU = { uO0: { value: new THREE.Vector2() }, uO1: { value: new THREE.Vector2() }, uK0: { value: 1 }, uK1: { value: 1 }, uT: { value: 0 }, uRR: { value: 1 },
+  tDay: { value: null }, tWater: { value: null }, uLL0: { value: new THREE.Vector2(ORIGIN.lon, ORIGIN.lat) }, uHm: { value: new THREE.Vector2() }, uMPU: { value: 1 }, uImg: { value: 0 } };
+const cityLand = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95 }));
+cityLand.material.onBeforeCompile = landGround(cityLandU);
+cityLand.receiveShadow = true; cityLand.frustumCulled = false;
+scene.add(cityLand);
+function updateCityLand() {
+  if (!dayTex) loadEarthTextures();
+  cityLand.position.set(hole.x, -0.05, hole.z);
+  cityLand.scale.set(camD * 40 + 800, 1, camD * 40 + 800);
+  const Lr = Math.log10(Math.max(1, hole.r));
+  cityLandU.uHm.value.set(hole.x, hole.z); cityLandU.uRR.value = hole.r;
+  cityLandU.uImg.value = THREE.MathUtils.smoothstep(Lr, 1.7, 3.3) * 0.85 + THREE.MathUtils.smoothstep(Lr, 3.3, 4.6) * 0.15;
+  if (dayTex) { cityLandU.tDay.value = dayTex; cityLandU.tWater.value = waterTex; }
+}
 
 // ---- the hole, in its two forms
 const cHoleSurf = new THREE.Group();
@@ -1912,6 +1929,19 @@ function cEnterSpace() {
   const m = makeVisual('moon', 3); cScene.add(m);
   cosmos.objs.push({ name: 'the Moon', kind: 'moon', L: 6.24, x: cosmos.r * 3, z: -cosmos.r * 1.5, size: Math.pow(10, 6.24 - cosmos.E), mesh: m, state: 0, t: 0, spin: 0.1, surf: false });
 }
+const snapEl = document.createElement('canvas');
+snapEl.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:4;opacity:0';
+document.body.appendChild(snapEl);
+function dissolve(renderOld, ms = 1500) {
+  if (window.__noRender) return;
+  if (renderOld) renderOld();
+  const c = renderer.domElement;
+  snapEl.width = c.width; snapEl.height = c.height;
+  snapEl.getContext('2d').drawImage(c, 0, 0);
+  snapEl.style.transition = 'none'; snapEl.style.opacity = '1';
+  void snapEl.offsetWidth;
+  snapEl.style.transition = `opacity ${ms}ms ease-in-out`; snapEl.style.opacity = '0';
+}
 // a short veil of haze (or dark) covers a stage change; the camera keeps moving underneath it
 function mist(color, peak, inMs, mid, outMs) {
   fadeEl.style.background = color; fadeEl.style.transition = `opacity ${inMs}ms ease-in`; fadeEl.style.opacity = peak;
@@ -1925,14 +1955,17 @@ function beginCosmos() {
   fadeEl.style.background = 'radial-gradient(circle at 50% 45%, rgba(236,242,246,0.97), rgba(201,214,223,0.99))';
   fadeEl.style.transition = 'opacity 1200ms ease-in'; fadeEl.style.opacity = 0.93;
 }
-function startCosmos() {
+function startCosmos(cityCamD) {
   cosmos.on = true; cosmos.leaving = 0;
   cosmos.E = 0; cosmos.r = Math.max(hole.r, CITY_EXIT_R); cosmos.targetR = Math.max(hole.targetR, CITY_EXIT_R); cosmos.hx = hole.x; cosmos.hz = hole.z;
-  cosmos.stage = 'surface'; cosmos.camK = 2.4;       // start high, then settle: the climb out of the city continues
+  // open with exactly the city's framing, then keep pulling back
+  cosmos.stage = 'surface'; cosmos.camK = cityCamD ? cityCamD / (15 * cosmos.r) : 1;
   loadEarthTextures();
+  // the city you came from is still there, as a town around the hole
+  const town = makeVisual('blockC', 7); cScene.add(town);
+  cosmos.objs.push({ name: 'Hole City', kind: 'blockC', L: Math.log10(C * 4.5), x: 0, z: 0, size: C * 4.5, mesh: town, state: 0, t: 0, spin: 0, surf: true });
   cFill();
   scene.visible = false;
-  setTimeout(() => { fadeEl.style.transition = 'opacity 1400ms ease-out'; fadeEl.style.opacity = 0; }, 60);
   updateHud();
 }
 function jumpCosmos(L) {           // test hook: jump straight to a given log10 hole radius
@@ -2378,6 +2411,7 @@ function globeOrient() {
   return { e, n };
 }
 function enterGlobe() {
+  dissolve(() => renderStage(cScene, cCam, cBloom.strength));
   buildGlobe();
   cosmos.mode = 'globe'; globe.on = true;
   globe.r = globe.targetR = Math.max(100, Math.pow(10, cLogR()) / 1000);
@@ -2461,7 +2495,6 @@ function globeFrame(dt) {
     gs = Math.max(0.001, 1 - globe.gone);
     globe.group.scale.setScalar(gs); globe.group.position.set(0, GR * (1 - gs), 0);
     D = Math.max(D, 3000);
-    if (globe.gone >= 0.9 && !globe.veiled) { globe.veiled = true; mist('#000', 1, 350, null, 900); }
     if (globe.gone >= 1) { enterSolar(); return; }
   }
   gHoleU.uGC.value.copy(globe.group.position);
@@ -2606,6 +2639,7 @@ function buildSolar() {
   belt(420, 2.1, 3.3, 25, 1.6); belt(360, 30, 50, 90, 1.2);
 }
 function enterSolar() {
+  dissolve(() => renderStage(gScene, gCam, 0.25), 1800);
   if (!solar.bodies.length) buildSolar();
   cosmos.mode = 'solar'; solar.on = true;
   solar.r = solar.targetR = Math.max(globe.r, RE * 1.05);
@@ -2650,7 +2684,6 @@ function solarFrame(dt) {
     let s = b.r * f;
     if (b.state === 1) {
       b.t += dt * 0.9;
-      if (b.sun && b.t > 0.75 && !solar.veiled) { solar.veiled = true; mist('#000', 1, 300, null, 900); }
       if (b.t >= 1) { b.state = 2; sScene.remove(b.mesh); sScene.remove(b.glint); if (b.sun) { enterSpaceFromSolar(); return; } continue; }
       const k = b.t * b.t, ang = b.t * 6;
       const d0 = Math.hypot(b.fx - solar.hx, b.fz - solar.hz) * (1 - k);
@@ -2694,6 +2727,7 @@ function solarFrame(dt) {
   renderStage(sScene, sCam, 0.7);
 }
 function enterSpaceFromSolar() {
+  dissolve(() => renderStage(sScene, sCam, 0.7), 1800);
   cosmos.mode = 'cosmic';
   cosmos.stage = 'space'; cosmos.stageFade = 1;
   cosmos.E = 3; cosmos.r = cosmos.targetR = solar.r; cosmos.hx = solar.hx; cosmos.hz = solar.hz;
@@ -2773,8 +2807,11 @@ function frame(now) {
     if (Math.floor(now / 250) !== Math.floor((now - dt * 1000) / 250)) updateHud();
     return;
   }
-  if (started && !cosmos.leaving && hole.targetR >= CITY_EXIT_R) beginCosmos();
-  if (cosmos.leaving && now >= cosmos.leaving) { startCosmos(); return; }
+  if (started && hole.r >= CITY_EXIT_R * 0.98) {
+    toast("You've outgrown the city");
+    dissolve(() => { if (HQ) composer.render(); else renderer.render(scene, camera); });
+    startCosmos(camD); return;
+  }
   updateHoleMesh();
 
   // camera
@@ -2784,7 +2821,6 @@ function frame(now) {
   view.pitch += (PITCHES[pitchIdx] * Math.PI / 180 - view.pitch) * Math.min(1, dt * 5);
   const low = Math.max(0, (45 * Math.PI / 180 - view.pitch) / (23 * Math.PI / 180));   // 0 at 45°, 1 at 22°
   camD = Math.min(420, (22 + hole.r * 9) * (1 - low * 0.12));
-  if (cosmos.leaving) { const p = 1 - Math.max(0, (cosmos.leaving - now) / 1300); camD *= 1 + 2.2 * p * p; }
   loadRange = camD * (2.8 + low * 1.4) + 30;
   camTarget.x += (hole.x - camTarget.x) * Math.min(1, dt * 8);
   camTarget.z += (hole.z - camTarget.z) * Math.min(1, dt * 8);
@@ -2841,6 +2877,7 @@ function frame(now) {
   }
   timeU.value = now / 1000;
   sky.position.copy(camera.position);
+  updateCityLand();
   for (const k in TYPES) { TYPES[k].pool.flush(); if (TYPES[k].poolLo !== TYPES[k].pool) TYPES[k].poolLo.flush(); }
   if (window.__noRender) return;
   if (HQ) {
