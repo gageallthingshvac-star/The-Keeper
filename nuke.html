@@ -328,8 +328,8 @@ function treeSegs(d,h,H,rc,trunkR,v,leaf,conifer){
 }
 /* A car down to the cupholders. la runs front (+) to back, lo across; metres.
    The convertible has its top down so you can look in. */
-const CARI={tire:LIN(0x1b1b1d),hub:LIN(0x9a9ea3),carpet:LIN(0x2a2a2c),leather:LIN(0x8a6446),cloth:LIN(0x3a3b40),console:LIN(0x1d1e21),
-  dash:LIN(0x2a2b2f),glass:LIN(0x1c2a36),light:LIN(0xf4ecd0),tail:LIN(0x9a1414),cup:LIN(0xf1ede4),sleeve:LIN(0x9a6a3a),lid:LIN(0x3a2a20),
+const CARI={tire:LIN(0x1b1b1d),hub:LIN(0x9a9ea3),carpet:LIN(0x2a2a2c),leather:LIN(0x8a6446),cloth:LIN(0x3a3b40),console:LIN(0x45474d),
+  dash:LIN(0x34363b),liner:LIN(0x6e665a),glass:LIN(0x1c2a36),light:LIN(0xf4ecd0),tail:LIN(0x9a1414),cup:LIN(0xf1ede4),sleeve:LIN(0x9a6a3a),lid:LIN(0x3a2a20),
   crumb:LIN(0xc99a5a),crumb2:LIN(0x8b5a2b),chrome:LIN(0xb8bcc0),wheel:LIN(0x1a1a1c),coin:LIN(0xc4a24a)};
 function detailedCar(la,lo,h,c,v,conv){
   const al=Math.abs(lo);
@@ -373,10 +373,10 @@ function detailedCar(la,lo,h,c,v,conv){
   // centre console with two cupholders
   if(al<0.14&&la>-0.1&&la<0.95){
     const dA=Math.hypot(la-0.55,lo),dB=Math.hypot(la-0.36,lo);
-    if(dA<0.042){Y(0.36,0.52,CARI.console);
+    if(dA<0.042){Y(0.36,0.52,dA<0.036?CARI.liner:CARI.console);
       if(dA<0.036){Y(0.52,0.66,dA>0.03?CARI.sleeve:CARI.cup);Y(0.66,0.69,CARI.lid);}
       return true;}
-    if(dB<0.042){Y(0.36,0.52,CARI.console);
+    if(dB<0.042){Y(0.36,0.52,CARI.liner);
       // crumbs at the bottom of the empty cupholder, and a coin
       const cs=0.004,ix=Math.floor(la/cs),iz=Math.floor(lo/cs),r=hash3(ix,iz,411);
       if(Math.hypot(la-0.36+0.012,lo-0.01)<0.0095)Y(0.52,0.5218,CARI.coin,C_SMALL);
@@ -804,7 +804,7 @@ float h2(vec2 p){return hh(vec3(p,7.13));}
 vec3 cityPattern(vec2 lp,float I,out float w){
   vec2 W=lp+uOff3+50.0,B=floor(W/100.0)+uBlk,L=W-floor(W/100.0)*100.0;
   vec2 fw=fwidth(lp);float px=max(fw.x,fw.y);
-  w=1.0-smoothstep(3.0,12.0,px);
+  w=1.0-smoothstep(4.0,16.0,px);
   vec2 dE=min(L,100.0-L);float e=min(dE.x,dE.y);
   if(e<7.0){
     vec3 c=vec3(0.035,0.037,0.042);
@@ -1723,7 +1723,9 @@ const $=id=>document.getElementById(id);
 let sel=0,customKt=1,burst='surface',speed=1,showRings=true;
 function fmtDist(m){
   if(m<=0)return '—';
-  if(m<1)return (m*100).toFixed(0)+' cm';
+  if(m<0.001)return (m*1e6).toFixed(m<1e-5?1:0)+' µm';
+  if(m<0.01)return (m*1000).toFixed(1)+' mm';
+  if(m<1)return (m*100).toFixed(m<0.1?1:0)+' cm';
   if(m<10)return m.toFixed(1)+' m';
   if(m<1000)return m.toFixed(0)+' m';
   if(m<10000)return (m/1000).toFixed(2)+' km';
@@ -1731,6 +1733,8 @@ function fmtDist(m){
   return (m/1000).toFixed(0)+' km';
 }
 function fmtYield(kt){
+  if(kt<1e-9)return +(kt*1e12).toPrecision(3)+' mg';
+  if(kt<1e-6)return +(kt*1e9).toPrecision(3)+' g';
   if(kt<1e-3)return +(kt*1e6).toPrecision(3)+' kg';
   if(kt<1)return +(kt*1e3).toPrecision(3)+' t';
   if(kt<1000)return +kt.toPrecision(3)+' kt';
@@ -1773,7 +1777,7 @@ function buildChips(){
 }
 const TARGETS=[
   {n:'Ants',x:-7.38,z:-4.72,S:0.14},
-  {n:'Cupholder crumbs',x:-8.64,z:-6,S:0.09},
+  {n:'Cupholder crumbs',x:-8.64,z:-6,S:0.16,top:true},
   {n:'Convertible',x:-9,z:-6,S:7},
   {n:'Park kiosk',x:0,z:0,S:30},
   {n:'Great Pyramid',x:-2600,z:-1900,S:1000},
@@ -1798,7 +1802,7 @@ function buildTargets(){
       if(t.moon){focus='moon';gzAnim={from:controls.target.clone(),to:MOONC.clone(),t:0,y:true};}
       else{
         const back=focus==='moon';focus='ground';
-        if(t.S<1){const D=camera.position.distanceTo(controls.target);camera.position.copy(controls.target).addScaledVector(new THREE.Vector3(0.42,0.82,0.39).normalize(),D);}
+        if(t.S<1){const D=camera.position.distanceTo(controls.target);camera.position.copy(controls.target).addScaledVector(t.top?new THREE.Vector3(0.12,0.97,0.2).normalize():new THREE.Vector3(0.42,0.82,0.39).normalize(),D);}
         gzAnim={from:controls.target.clone(),to:new THREE.Vector3(t.x,back?6:controls.target.y,t.z),t:0,y:back};
       }
       view.targetS=t.S;hideHint();
