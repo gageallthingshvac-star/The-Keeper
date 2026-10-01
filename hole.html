@@ -1963,7 +1963,7 @@ function startCosmos(cityCamD) {
   loadEarthTextures();
   // the city you came from is still there, as a town around the hole
   const town = makeVisual('blockC', 7); cScene.add(town);
-  cosmos.objs.push({ name: 'Hole City', kind: 'blockC', L: Math.log10(C * 4.5), x: 0, z: 0, size: C * 4.5, mesh: town, state: 0, t: 0, spin: 0, surf: true });
+  cosmos.objs.push({ name: 'Hole City', kind: 'blockC', L: Math.log10(C * 4.5), x: 0, z: 0, size: C * 4.5, mesh: town, state: 1, t: 0, sx: 0, sz: 0, ang: 0, d0: 0, spin: 0, surf: true, town: true });
   cFill();
   scene.visible = false;
   updateHud();
@@ -2007,14 +2007,14 @@ function cosmicFrame(dt, now) {
     let s = o.size * f, y = 0, px = o.x * f, pz = o.z * f;
     if (o.born) { const k = Math.min(1, (performance.now() - o.born) / 700); s *= 1 - Math.pow(1 - k, 3); if (k >= 1) o.born = 0; }
     if (o.state === 1) {
-      o.t += dt * (o.surf ? 1.3 : 1.0);
+      o.t += dt * (o.town ? 0.45 : o.surf ? 1.3 : 1.0);
       if (o.t >= 1) { cRemove(o); cosmos.objs.splice(i, 1); continue; }
       const e = o.t * o.t, ang = o.ang + o.t * (o.surf ? 1.5 : 7);
       const d = o.d0 * (1 - e) * f;
       px = Math.cos(ang) * d; pz = Math.sin(ang) * d;
-      s *= o.surf ? 1 - 0.3 * o.t : Math.pow(1 - o.t, 0.8);
-      y = o.surf ? -e * RR * 6 : 0;
-      o.mesh.rotation.x = o.surf ? o.t * 1.2 : o.mesh.rotation.x;
+      s *= o.town ? 1 - 0.85 * e : o.surf ? 1 - 0.3 * o.t : Math.pow(1 - o.t, 0.8);
+      y = o.town ? -e * RR * 2 : o.surf ? -e * RR * 6 : 0;
+      o.mesh.rotation.x = o.town ? 0 : o.surf ? o.t * 1.2 : o.mesh.rotation.x;
       if (!o.surf) o.mesh.scale.set(s * (1 + o.t * 1.5), s, s * (1 - o.t * 0.6));
     }
     o.mesh.position.set(px, o.surf ? y : y, pz);
