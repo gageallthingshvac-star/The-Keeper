@@ -136,6 +136,26 @@
   section[data-pane].on{display:block;animation:panefade .22s ease}
   @keyframes panefade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
   section[data-pane] h2:first-child{margin-top:2px}
+  /* The edge of the interface, drawn over the top of everything including
+     the card: if a corner of this is off the glass, so is a control. */
+  #fitedge{z-index:60;border:3px solid rgba(120,228,255,.92)}
+  #fitedge i{position:absolute;width:30px;height:30px;border:0 solid rgba(255,255,255,.96)}
+  #fitedge i:nth-child(1){left:0;top:0;border-left-width:8px;border-top-width:8px}
+  #fitedge i:nth-child(2){right:0;top:0;border-right-width:8px;border-top-width:8px}
+  #fitedge i:nth-child(3){left:0;bottom:0;border-left-width:8px;border-bottom-width:8px}
+  #fitedge i:nth-child(4){right:0;bottom:0;border-right-width:8px;border-bottom-width:8px}
+  #fitedge b{position:absolute;left:50%;top:26%;transform:translate(-50%,-50%);max-width:82%;
+    background:rgba(6,14,22,.90);border:1px solid rgba(120,228,255,.55);border-radius:12px;
+    padding:10px 15px;font-size:11px;line-height:1.55;letter-spacing:.09em;color:#d6f4ff;text-align:center}
+  #fitedge b.off{display:none}
+  .fitrow{display:flex;align-items:stretch;gap:10px;margin:6px 0 2px}
+  .fitb{flex:0 0 64px;font:inherit;font-size:24px;font-weight:700;color:var(--ink);
+    background:rgba(255,255,255,.06);border:1px solid var(--edge);border-radius:11px;cursor:pointer}
+  .fitb:active{background:rgba(120,228,255,.18);border-color:rgba(120,228,255,.6)}
+  .fitval{flex:1 1 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(255,255,255,.03);border:1px solid var(--edge);border-radius:11px;padding:9px 6px}
+  .fitval b{font-size:20px;letter-spacing:.08em}
+  .fitval i{font-style:normal;font-size:10px;letter-spacing:.06em;color:var(--dim);margin-top:3px}
   .ghost{width:100%;margin-top:8px;padding:11px;font:inherit;font-size:11px;letter-spacing:.14em;
     background:rgba(255,255,255,.04);border:1px solid var(--edge);color:var(--dim);
     border-radius:9px;cursor:pointer}
@@ -202,6 +222,7 @@
 <div id="wrap">
   <canvas id="c"></canvas>
   <div class="layer"><div id="toast"></div><div id="banner"></div></div>
+  <div class="layer hide" id="fitedge"><i></i><i></i><i></i><i></i><b id="fitBadge"></b></div>
 
   <div class="modal hide" id="news">
     <div class="card newscard">
@@ -234,6 +255,7 @@
       <div class="mbody" id="mbody">
         <section data-pane="flight" class="on">
           <div class="tapnote">Tap the <b>aeroplane</b> or the <b>pilot</b> in the hangar to walk up to them. Tap the floor to step back.</div>
+          <div class="tapnote" id="fitTip">Edges cut off, or the controls too big for the screen? <b>SET-UP &middot; SCREEN FIT</b> and <b>PANEL SIZE</b> fix both.</div>
           <h2>Where you start</h2>
           <div class="row" id="scenRow">
             <button class="opt on" data-scen="free"><b>FREE FLIGHT</b><i>Cold on runway 18 at Keeper Field, Lewis County, Tennessee. Brakes set, engines at idle. No top end and no ceiling: orbit is 17,500 mph, the Moon a couple of minutes past that, and all of it comes back as heat on the way down.</i></button>
@@ -264,6 +286,26 @@
         </section>
 
         <section data-pane="setup">
+          <h2>Screen fit</h2>
+          <div class="fitrow">
+            <button class="fitb" id="fitMinus" aria-label="smaller">&minus;</button>
+            <div class="fitval"><b id="fitPct">100%</b><i id="fitInfo"></i></div>
+            <button class="fitb" id="fitPlus" aria-label="bigger">+</button>
+          </div>
+          <div class="row">
+            <button class="opt" id="fitReset"><b>IF THE EDGES ARE CUT OFF</b><i>A cyan border is drawn round the edge of the interface while you are on this page. If any of it is off your screen, press &minus; until the whole rectangle and all four corner marks are visible. Tap here to go back to 100%.</i></button>
+          </div>
+
+          <h2>Panel size</h2>
+          <div class="fitrow">
+            <button class="fitb" id="uikMinus" aria-label="smaller">&minus;</button>
+            <div class="fitval"><b id="uikPct">100%</b><i id="uikInfo">INSTRUMENTS AND CONTROLS</i></div>
+            <button class="fitb" id="uikPlus" aria-label="bigger">+</button>
+          </div>
+          <div class="row">
+            <button class="opt" id="uikReset"><b>IF THE CONTROLS ARE TOO BIG</b><i>This is how much of the glass the instruments and the panel take, and therefore how much is left to fly through. Below about 90% the buttons are smaller than a thumb is supposed to get, which is your call to make. Tap here to go back to 100%.</i></button>
+          </div>
+
           <h2>Pitch sense</h2>
           <div class="row" id="pitchRow">
             <button class="opt on" data-pitch="real"><b>PULL BACK TO CLIMB</b><i>What a control stick really does. <kbd>&darr;</kbd> or thumb back raises the nose. Swap any time with <kbd>T</kbd>.</i></button>
@@ -1674,21 +1716,63 @@ function readSafe() {
   SAFE.b = parseFloat(cs.paddingBottom) || 0; SAFE.l = parseFloat(cs.paddingLeft) || 0;
   if (EMBEDDED) SAFE.t = Math.max(SAFE.t, HOST_BAR);
 }
-/* If the page is zoomed anyway, follow what is actually on the glass. A
-   fixed element is laid out to the LAYOUT viewport; the visual viewport is
-   the part of it you can see, and under a pinch they are not the same
-   rectangle. Pin the whole interface to the second one. */
-function fitVisual() {
-  const vv = window.visualViewport, w = document.getElementById("wrap");
-  if (!vv || !w) return;
-  if (Math.abs(vv.width - window.innerWidth) > 1 || Math.abs(vv.height - window.innerHeight) > 1) {
-    w.style.left = vv.offsetLeft + "px"; w.style.top = vv.offsetTop + "px";
-    w.style.right = "auto"; w.style.bottom = "auto";
-    w.style.width = vv.width + "px"; w.style.height = vv.height + "px";
-  } else if (w.style.width) {
-    w.style.left = w.style.top = w.style.right = w.style.bottom = "0";
-    w.style.width = w.style.height = "";
+/* ===== how big the glass actually is ==================================
+
+   Every one of these numbers is a claim, and inside somebody else's page
+   they are not all true. `innerWidth` is the LAYOUT viewport, which under a
+   pinch, or in a frame whose page is wider than the window, is bigger than
+   anything you can see. `documentElement.clientWidth` is the layout box of
+   the root. `visualViewport` is the part of the layout viewport that is on
+   the glass, and it is the only one that knows about a pinch — but it is
+   not always there.
+
+   So the smallest of whichever of them answered is taken as the truth. An
+   interface that is too small for the screen looks wrong; an interface that
+   is bigger than the screen has its corners off the edge, and you cannot
+   press what you cannot see. */
+function visibleBox() {
+  const de = document.documentElement, vv = window.visualViewport;
+  let w = 1e9, h = 1e9, x = 0, y = 0;
+  if (window.innerWidth > 0) { w = window.innerWidth; h = window.innerHeight; }
+  if (de && de.clientWidth > 0) { w = Math.min(w, de.clientWidth); h = Math.min(h, de.clientHeight); }
+  if (vv && vv.width > 0) {
+    if (vv.width <= w) { w = vv.width; x = vv.offsetLeft || 0; }
+    if (vv.height <= h) { h = vv.height; y = vv.offsetTop || 0; }
   }
+  if (!(w > 0) || w > 1e8) w = 360;
+  if (!(h > 0) || h > 1e8) h = 640;
+  return { x: x, y: y, w: w, h: h };
+}
+/* And when even that is a lie — a host that reports a window bigger than the
+   sheet it is drawing into, which is what an artifact viewer on a phone can
+   do — there is a number the pilot sets by eye. The border drawn round the
+   canvas on the SET-UP page is the edge of the interface: wind this down
+   until the whole of it is on the screen and nothing can be off it. */
+const FIT_KEY = "skyward.fit", UIK_KEY = "skyward.uik";
+let SCREENFIT = 1, FITSHOW = 0;
+/* And how much of that rectangle the panel is allowed to have. The twelve
+   controls are drawn at forty-four points because that is the smallest
+   thing a thumb reliably hits; on a six-inch screen held upright that is
+   most of the glass, and some pilots would rather have the view. */
+let UIK = 1;
+(function readFit() {
+  let v = NaN, k = NaN;
+  try { v = parseFloat(localStorage.getItem(FIT_KEY)); k = parseFloat(localStorage.getItem(UIK_KEY)); } catch (e) {}
+  /* Inside somebody else's page there is chrome over the top of this one
+     and no way to measure it, so the default leaves a margin rather than
+     betting the corners on a number the host did not give us. */
+  SCREENFIT = (v >= .55 && v <= 1) ? v : (EMBEDDED ? .92 : 1);
+  if (k >= .70 && k <= 1.30) UIK = k;
+})();
+function fitVisual() {
+  const w = document.getElementById("wrap");
+  if (!w) return;
+  const b = visibleBox();
+  const fw = Math.max(200, Math.round(b.w * SCREENFIT)), fh = Math.max(200, Math.round(b.h * SCREENFIT));
+  w.style.left = Math.round(b.x + (b.w - fw) * .5) + "px";
+  w.style.top = Math.round(b.y + (b.h - fh) * .5) + "px";
+  w.style.right = "auto"; w.style.bottom = "auto";
+  w.style.width = fw + "px"; w.style.height = fh + "px";
 }
 /* Resolution on the start screen.
 
@@ -1726,6 +1810,7 @@ function resize() {
      and 932 wide — drew its switches at 28 points, which is a screen you
      have to aim at. */
   if (MOBILE || COARSE) UI = Math.max(UI, DPR);
+  UI *= UIK;                       // and then whatever the pilot asked for
   // a phone held upright has almost no horizontal view, so widen the lens
   FOVBASE = (PORTRAIT ? 78 : MOBILE ? 68 : 62) * DEG;
   FOV = FOVBASE;
@@ -1737,6 +1822,7 @@ function resize() {
      the old one — and a hit test against it misses. */
   if (typeof stageInset === "function" && !GAME.started) { stageInset(); STAGE.insetT = .25; }
   if (typeof layoutTouch === "function") layoutTouch();
+  if (typeof fitLabel === "function") fitLabel();
 }
 window.addEventListener("resize", resize);
 window.addEventListener("orientationchange", () => setTimeout(resize, 120));
@@ -10249,15 +10335,13 @@ const LOG_KEY = "skyward.log.v1";
    The number is the point: it is the thing you can quote back when something
    is wrong, and the list under it is what to go and look at. */
 const BUILD = {
-  no: 39,
-  name: "THE BAY",
+  no: 40,
+  name: "SCREEN FIT",
   date: "1 OCT 2026",
   notes: [
-    ["THE HANGAR IS A STAGE NOW", "The strip lights are off. What is on is a rig: ten heads on a truss over the aeroplane, six uplights in the floor under the wing, two cold ones behind the tail to cut it out of the dark, and a marked circle of plate under the wheels with its own edge lights. The hall around it is kept dim on purpose, which is how every garage in every game that has ever had a garage is lit \u2014 you came here to look at the machine."],
-    ["AND YOU CAN SEE WHAT YOU ARE CHANGING", "The lens is worked out from the screen instead of guessed: the eye stands as far back as the shed allows and the field of view is whatever makes the subject fit from there. On a phone held upright the old shot put the camera forty metres out, which is inside the north wall. The caption and the way-out hint are kept out of the frame, the other subject's viewfinder is gone while you are in front of one, and the sheet gets out of the way on the two pages that are about looking at something."],
-    ["AT TWO THOUSAND PIXELS", "The start screen is drawn at whatever it takes to put at least 2K on the long edge, whatever the device says its pixel ratio is, and gives it back a third at a time if the frame cannot pay for it. Flight gets the ordinary ratio straight back."],
-    ["EVERY DARK LUMP IN THE SHED", "One occluder box was thrown round each piece of ground equipment, and every part of that equipment was deep inside its own box, so every shadow ray started blocked and the crew stair, the bowser, the tool chest and the racking all baked out black. A box the face is standing inside cannot shadow it."],
-    ["MORE OF THE PLACE", "Posts and chain round three sides of the plate, bay signs and fire points on the wall, bollards at the door, wall packs down the dark end, and the store moved off the shot and against the wall where a store goes."]
+    ["IF THE EDGES ARE CUT OFF, YOU CAN NOW FIX IT", "Inside another page every number the browser gives for the size of the window can be wrong \u2014 the layout viewport, the root box and the visual viewport disagree, and a host with its own title bar over the top of the frame tells you none of it. The smallest of the three is taken now instead of the first one that answers, and on top of that there is a SCREEN FIT on the SET-UP page with a cyan border drawn round the edge of the interface: wind it down until the whole border and all four corner marks are on the glass. Framed in another page it starts at 92 per cent rather than betting the corners on a number nobody supplied."],
+    ["AND A PANEL SIZE TO GO WITH IT", "How much of the screen the instruments and the twelve controls take, from 70 to 130 per cent. They are drawn at forty-four points because that is the smallest thing a thumb reliably hits; on a phone held upright that is most of the glass, and whether you would rather have the view is your call. Both settings are remembered."],
+    ["AND FROM LAST TIME", "The hangar is lit like a garage: ten heads on a truss, uplights in the floor, a marked plate under the wheels, and a dark hall round it. The shot works its lens out from the screen instead of guessing, so the aeroplane and the pilot fit whatever shape of screen is left. The start screen draws at 2K where the frame can pay for it."]
   ]
 };
 const NEWS_KEY = "skyward.build";
@@ -12195,6 +12279,68 @@ function startFlight(keepMode) {
     SCEN === "land" ? "RUNWAY 18 AHEAD · CHUTE ON TOUCHDOWN WITH X" :
       SCEN === "rings" ? "FLY THROUGH THE GREEN GATE" : "AIRBORNE · PRESS L FOR CONTROLS", 3.6);
 }
+/* ===== screen fit =====================================================
+
+   The page cannot always find out how big the glass is (see visibleBox),
+   and when it gets it wrong the interface is laid out to a rectangle larger
+   than the screen: the picture looks magnified and the controls nearest the
+   edges are off it. This is the manual override, and the cyan border is how
+   you aim it — wind the number down until the whole border and all four
+   corner marks are on the screen. */
+function fitLabel() {
+  const p = document.getElementById("fitPct"), i = document.getElementById("fitInfo");
+  if (p) p.textContent = Math.round(SCREENFIT * 100) + "%";
+  if (i) {
+    const b = visibleBox();
+    i.textContent = Math.round(b.w) + " \u00d7 " + Math.round(b.h) + " PT \u00b7 DRAWN "
+      + W + " \u00d7 " + H + " \u00b7 TOP " + Math.round(SAFE.t);
+  }
+  const u = document.getElementById("uikPct");
+  if (u) u.textContent = Math.round(UIK * 100) + "%";
+  const g = document.getElementById("fitBadge");
+  if (g) g.innerHTML = "SCREEN FIT " + Math.round(SCREENFIT * 100)
+    + "%<br>THE WHOLE BORDER AND ALL FOUR<br>CORNERS MUST BE ON THE SCREEN";
+}
+function setUIK(v) {
+  UIK = clamp(v, .70, 1.30);
+  try { localStorage.setItem(UIK_KEY, UIK.toFixed(3)); } catch (e) {}
+  resize();
+}
+function setFit(v) {
+  SCREENFIT = clamp(v, .55, 1);
+  try { localStorage.setItem(FIT_KEY, SCREENFIT.toFixed(3)); } catch (e) {}
+  FITSHOW = 5;
+  resize();
+}
+function fitEdgeWanted() {
+  if (FITSHOW > 0) return true;
+  const m = document.getElementById("menu");
+  if (!m || m.classList.contains("hide")) return false;
+  const s = document.querySelector("#mbody section[data-pane=\"setup\"]");
+  return !!(s && s.classList.contains("on"));
+}
+let fitEdgeOn = null, fitBadgeOn = null;
+function fitEdgeStep(dt) {
+  if (FITSHOW > 0) FITSHOW = Math.max(0, FITSHOW - dt);
+  const el = document.getElementById("fitedge"), bg = document.getElementById("fitBadge");
+  if (!el) return;
+  const want = fitEdgeWanted(), badge = FITSHOW > 0;
+  if (want !== fitEdgeOn) { el.classList.toggle("hide", !want); fitEdgeOn = want; }
+  if (bg && badge !== fitBadgeOn) { bg.classList.toggle("off", !badge); fitBadgeOn = badge; }
+}
+(function wireFit() {
+  const m = document.getElementById("fitMinus"), p = document.getElementById("fitPlus"),
+        r = document.getElementById("fitReset");
+  if (m) m.addEventListener("click", () => setFit(SCREENFIT - .04));
+  if (p) p.addEventListener("click", () => setFit(SCREENFIT + .04));
+  if (r) r.addEventListener("click", () => setFit(1));
+  const m2 = document.getElementById("uikMinus"), p2 = document.getElementById("uikPlus"),
+        r2 = document.getElementById("uikReset");
+  if (m2) m2.addEventListener("click", () => setUIK(UIK - .05));
+  if (p2) p2.addEventListener("click", () => setUIK(UIK + .05));
+  if (r2) r2.addEventListener("click", () => setUIK(1));
+  fitLabel();
+})();
 document.querySelectorAll("#pitchRow .opt").forEach(b => b.addEventListener("click", () => {
   PITCH_REAL = b.dataset.pitch === "real";
   document.querySelectorAll("#pitchRow .opt").forEach(o => o.classList.toggle("on", o === b));
@@ -12377,6 +12523,7 @@ function frame(now) {
     drawArrive();
     drawMap();
   }
+  fitEdgeStep(dt);
   tuneQuality(dt, performance.now() - work0);
   requestAnimationFrame(frame);
 }
