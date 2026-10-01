@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#3E9BF0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sunny Sports">
+<meta name="format-detection" content="telephone=no">
+<meta name="description" content="Bowling, tennis, baseball and golf with your Pals. Swipe to play!">
+<title>Sunny Sports</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='28' fill='%23FFC93C'/%3E%3Cpath d='M18 36q14 14 28 0' stroke='%23fff' stroke-width='6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+<style>
+  /* Boot styles: just enough to look right before css/style.css and the scripts arrive. */
+  @font-face { font-family: 'Fredoka'; font-weight: 700; font-style: normal; font-display: swap;
+    src: url('fonts/fredoka-latin-700-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'Nunito'; font-weight: 800; font-style: normal; font-display: swap;
+    src: url('fonts/nunito-latin-800-normal.woff2') format('woff2'); }
+
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+    position: fixed; inset: 0; overscroll-behavior: none;
+    background: #CDEBFF; color: #24324a;
+    touch-action: none; -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  * { touch-action: manipulation; }
+  input, textarea, [contenteditable] { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+  #ss-canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; outline: none; }
+
+  /* Loading screen */
+  #ss-loading {
+    position: fixed; inset: 0; z-index: 1000; overflow: hidden;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: linear-gradient(180deg, #3E9BF0 0%, #7EC4FA 52%, #CDEBFF 100%);
+    font-family: 'Fredoka', 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    transition: opacity .45s ease, visibility 0s linear .45s;
+  }
+  #ss-loading.is-hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+  #ss-loading[hidden] { display: none; }
+  .ssl-sun {
+    position: absolute; top: calc(env(safe-area-inset-top) + 6vh); right: 12vw;
+    width: 76px; height: 76px; border-radius: 50%;
+    background: radial-gradient(circle closest-side, #FFFBE6 0 58%, #FFE27D 64% 100%);
+    box-shadow: 0 0 0 12px rgba(255, 238, 170, .35), 0 0 70px 34px rgba(255, 244, 200, .5);
+    animation: ssl-glow 3s ease-in-out infinite alternate;
+  }
+  .ssl-cloud {
+    position: absolute; height: 34px; border-radius: 34px; background: #fff; opacity: .92;
+    box-shadow: 0 6px 0 rgba(120, 170, 220, .18);
+    animation: ssl-drift 18s linear infinite;
+  }
+  .ssl-cloud::before, .ssl-cloud::after { content: ''; position: absolute; background: #fff; border-radius: 50%; }
+  .ssl-cloud::before { width: 46px; height: 46px; left: 14px; top: -22px; }
+  .ssl-cloud::after { width: 34px; height: 34px; left: 48px; top: -14px; }
+  .ssl-cloud.c1 { width: 110px; top: 18%; left: -12%; }
+  .ssl-cloud.c2 { width: 86px; top: 30%; left: 64%; transform: scale(.8); animation-duration: 24s; animation-delay: -9s; }
+  .ssl-hills { position: absolute; left: -10%; right: -10%; bottom: 0; height: 26vh; pointer-events: none; }
+  .ssl-hills::before, .ssl-hills::after { content: ''; position: absolute; bottom: -30vh; border-radius: 50%; }
+  .ssl-hills::before { left: -5%; width: 70%; height: 46vh; background: #7CC56B; }
+  .ssl-hills::after { right: -5%; width: 75%; height: 40vh; background: #5FAE57; }
+
+  .ssl-center { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; margin-bottom: 6vh; }
+  .ssl-word {
+    margin: 0; text-align: center; line-height: .92; font-weight: 700; letter-spacing: .01em;
+    font-size: clamp(52px, 17vw, 104px);
+  }
+  .ssl-word span { display: block; paint-order: stroke fill; -webkit-text-stroke: .14em #1667B8; }
+  .ssl-word .w1 { color: #FFC93C; text-shadow: 0 .09em 0 #1667B8; transform: rotate(-4deg); }
+  .ssl-word .w2 { color: #fff; text-shadow: 0 .09em 0 #1667B8; transform: rotate(-4deg) translateX(.35em); }
+
+  .ssl-loader { position: relative; width: 120px; height: 110px; margin-top: 18px; }
+  .ssl-ball {
+    position: absolute; left: 41px; top: 0; width: 38px; height: 38px; border-radius: 50%;
+    background: radial-gradient(circle at 34% 30%, #fff 0 14%, #FF7A7E 16%, #FF5A5F 55%, #D9363C 100%);
+    box-shadow: inset -3px -4px 0 rgba(0, 0, 0, .08);
+    animation: ssl-bounce .7s cubic-bezier(.5, 0, .5, 1) infinite alternate;
+    transform-origin: 50% 100%;
+  }
+  .ssl-ball::after {
+    content: ''; position: absolute; inset: 4px; border-radius: 50%;
+    border: 3px solid transparent; border-top-color: rgba(255, 255, 255, .9);
+    transform: rotate(-35deg);
+  }
+  .ssl-shadow {
+    position: absolute; left: 36px; bottom: 6px; width: 48px; height: 10px; border-radius: 50%;
+    background: rgba(20, 70, 130, .28);
+    animation: ssl-shadow .7s cubic-bezier(.5, 0, .5, 1) infinite alternate;
+  }
+  .ssl-text {
+    margin-top: 6px; color: #fff; font: 800 15px/1 'Nunito', system-ui, sans-serif;
+    letter-spacing: .18em; text-transform: uppercase; text-shadow: 0 2px 0 rgba(22, 103, 184, .45);
+  }
+  @keyframes ssl-bounce {
+    0% { transform: translateY(0) scale(1, 1); }
+    80% { transform: translateY(52px) scale(1, 1); }
+    100% { transform: translateY(60px) scale(1.18, .8); }
+  }
+  @keyframes ssl-shadow {
+    0% { transform: scale(.45); opacity: .35; }
+    100% { transform: scale(1.05); opacity: 1; }
+  }
+  @keyframes ssl-glow { from { transform: scale(1); } to { transform: scale(1.08); } }
+  @keyframes ssl-drift { from { translate: 0 0; } to { translate: 125vw 0; } }
+  @media (prefers-reduced-motion: reduce) {
+    .ssl-ball, .ssl-shadow, .ssl-cloud, .ssl-sun { animation-duration: 2.4s; }
+    .ssl-cloud { animation: none; }
+  }
+  @media (orientation: landscape) and (max-height: 500px) {
+    .ssl-word { font-size: clamp(40px, 13vh, 76px); }
+    .ssl-loader { height: 86px; transform: scale(.85); }
+    .ssl-center { margin-bottom: 0; }
+  }
+</style>
+</head>
+<body>
+<canvas id="ss-canvas" aria-label="Sunny Sports game view"></canvas>
+
+<div id="ss-root">
+  <div id="ss-hud"></div>
+  <div id="ss-screens"></div>
+  <div id="ss-overlay"></div>
+  <div id="ss-fx" aria-live="polite"></div>
+  <div id="ss-fade"></div>
+</div>
+
+<div id="ss-loading" role="progressbar" aria-label="Loading Sunny Sports">
+  <div class="ssl-sun"></div>
+  <div class="ssl-cloud c1"></div>
+  <div class="ssl-cloud c2"></div>
+  <div class="ssl-hills"></div>
+  <div class="ssl-center">
+    <h1 class="ssl-word"><span class="w1">Sunny</span><span class="w2">Sports</span></h1>
+    <div class="ssl-loader"><div class="ssl-shadow"></div><div class="ssl-ball"></div></div>
+    <div class="ssl-text">Loading</div>
+  </div>
+</div>
+
+<noscript>
+  <div style="position:fixed;inset:0;z-index:2000;display:flex;align-items:center;justify-content:center;background:#3E9BF0;color:#fff;font:700 20px system-ui,sans-serif;text-align:center;padding:24px">
+    Sunny Sports needs JavaScript turned on to play.
+  </div>
+</noscript>
+
+<script src="lib/three.min.js"></script>
+<script src="js/util.js"></script>
+<script src="js/save.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/world.js"></script>
+<script src="js/pals.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/sports/bowling.js"></script>
+<script src="js/sports/tennis.js"></script>
+<script src="js/sports/baseball.js"></script>
+<script src="js/sports/golf.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

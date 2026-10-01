@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sunny Sports — Art Gallery</title>
+<style>
+  @font-face { font-family: 'Fredoka'; font-weight: 600; src: url('../fonts/fredoka-latin-600-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'Fredoka'; font-weight: 700; src: url('../fonts/fredoka-latin-700-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'Nunito'; font-weight: 800; src: url('../fonts/nunito-latin-800-normal.woff2') format('woff2'); }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #CDEBFF; font-family: 'Nunito', system-ui, sans-serif; }
+  #ss-canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #nav { position: fixed; top: 0; left: 0; right: 0; display: flex; gap: 4px; padding: 6px; overflow-x: auto;
+         background: rgba(255,255,255,0.75); backdrop-filter: blur(6px); z-index: 5; }
+  #nav a { flex: none; font: 800 12px 'Nunito', sans-serif; color: #24324A; text-decoration: none; padding: 5px 9px;
+           border-radius: 999px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+  #nav a.on { background: #1FA2FF; color: #fff; }
+  #labels { position: fixed; inset: 0; pointer-events: none; z-index: 3; }
+  .lbl { position: absolute; transform: translate(-50%, 0); font: 600 12px 'Fredoka', sans-serif; color: #fff;
+         background: rgba(20,32,56,0.6); padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  #status { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 4; font: 700 15px 'Fredoka', sans-serif;
+            color: #fff; background: rgba(20,32,56,0.6); padding: 6px 14px; border-radius: 999px; }
+  #status:empty { display: none; }
+  #grid { position: fixed; inset: 44px 0 0 0; overflow-y: auto; display: none; z-index: 2; padding: 14px;
+          grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 12px; align-content: start;
+          background: linear-gradient(#CDEBFF, #EAF6FF); }
+  .card { background: #fff; border-radius: 18px; box-shadow: 0 4px 14px rgba(30,60,110,0.12); padding: 8px 6px 10px; text-align: center; }
+  .card canvas { width: 88px; height: 88px; border-radius: 50%; background: radial-gradient(circle at 50% 35%, #FFFFFF, #DDEFFF); }
+  .card b { display: block; font: 700 15px 'Fredoka', sans-serif; color: #24324A; margin-top: 4px; }
+  .card i { display: block; font: 800 11px 'Nunito', sans-serif; color: #1FA2FF; font-style: normal; }
+</style>
+</head>
+<body>
+<canvas id="ss-canvas"></canvas>
+<div id="labels"></div>
+<div id="grid"></div>
+<div id="status"></div>
+<nav id="nav"></nav>
+<script src="../lib/three.min.js"></script>
+<script src="../js/util.js"></script>
+<script src="../js/engine.js"></script>
+<script src="../js/world.js"></script>
+<script src="../js/pals.js"></script>
+<script>
+(function () {
+  'use strict';
+  const SS = window.SS;
+  const THREE = window.THREE;
+  const params = new URLSearchParams(location.search);
+  const VIEWS = ['lineup', 'faces', 'anims', 'poses', 'crowd', 'env', 'indoor', 'textures', 'fx', 'portraits'];
+  const view = VIEWS.includes(params.get('view')) ? params.get('view') : 'lineup';
+  const portrait = () => innerHeight > innerWidth;
+
+  // ---- minimal stand-in when the engine is not available (keeps the gallery self-sufficient) ----
+  if (!SS.engine) {
+    const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('ss-canvas'), antialias: true });
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    const updates = [];
+    const size = { w: innerWidth, h: innerHeight, aspect: innerWidth / innerHeight, dpr: 1 };
+    SS.engine = {
+      renderer, scene: null, camera: null, quality: 'high', time: 0, size,
+      init() { return true; }, setQuality() {}, onQuality() { return () => {}; },
+      setView(s, c) { this.scene = s; this.camera = c; },
+      addUpdate(fn) { updates.push(fn); return () => {}; },
+      project(v, cam) { const p = v.clone().project(cam || this.camera); return { x: (p.x + 1) / 2 * size.w, y: (1 - p.y) / 2 * size.h, visible: p.z < 1 }; },
+      disposeObject() {},
+    };
+    renderer.setSize(innerWidth, innerHeight, false);
+    let last = performance.now();
+    (function loop(now) {
+      requestAnimationFrame(loop);
+      const dt = Math.min(0.05, (now - last) / 1000); last = now;
+      SS.engine.time += dt;
+      for (const fn of updates) fn(dt, SS.engine.time);
+      SS.world.update(dt);
+      const c = SS.engine.camera;
+      if (c) { c.aspect = innerWidth / innerHeight; c.updateProjectionMatrix(); }
+      if (SS.engine.scene && c) renderer.render(SS.engine.scene, c);
+    })(last);
+  } else {
+    SS.engine.init(document.getElementById('ss-canvas'));
+    SS.engine.setQuality(params.get('quality') || 'high');
+  }
+  if (params.get('slow')) SS.engine.timeScale = Number(params.get('slow'));
+
+  const nav = document.getElementById('nav');
+  for (const v of VIEWS) {
+    const a = document.createElement('a');
+    a.href = '?view=' + v; a.textContent = v; if (v === view) a.className = 'on';
+    nav.appendChild(a);
+  }
+  const statusEl = document.getElementById('status');
+
+  // ---- scene scaffolding ----
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 2000);
+  camera.userData.fit = { vFov: 40, minHFov: 50 };
+  SS.engine.setView(scene, camera);
+
+  const labels = [];
+  const labelLayer = document.getElementById('labels');
+  function label(text, obj, dy = 0) {
+    const el = document.createElement('div');
+    el.className = 'lbl'; el.textContent = text;
+    labelLayer.appendChild(el);
+    labels.push({ el, obj, dy });
+    return el;
+  }
+  const _p = new THREE.Vector3();
+  SS.engine.addUpdate(() => {
+    for (const l of labels) {
+      l.obj.getWorldPosition(_p); _p.y += l.dy;
+      const s = SS.engine.project(_p, camera);
+      l.el.style.left = s.x + 'px'; l.el.style.top = s.y + 'px';
+      l.el.style.display = s.visible ? '' : 'none';
+    }
+  });
+
+  const pals = [];
+  SS.engine.addUpdate(dt => { for (const p of pals) p.update(dt); });
+  function addPal(profile, x, z, opts) {
+    const pal = SS.pals.create(profile, opts);
+    pal.root.position.set(x, 0, z);
+    scene.add(pal.root);
+    pals.push(pal);
+    return pal;
+  }
+  function grassFloor(size = 60) {
+    const g = new THREE.Mesh(new THREE.PlaneGeometry(size, size),
+      SS.world.mat(0xffffff, { map: SS.world.texture('grass_stripes', { repeat: [size / 8, size / 8] }) }));
+    g.rotation.x = -Math.PI / 2; g.receiveShadow = true;
+    scene.add(g);
+    return g;
+  }
+  function gridLayout(n, colsLandscape, colsPortrait, sx, sz) {
+    const cols = Math.min(n, portrait() ? colsPortrait : colsLandscape);
+    const rows = Math.ceil(n / cols);
+    return Array.from({ length: n }, (_, i) => ({
+      x: ((i % cols) - (cols - 1) / 2) * sx,
+      z: (Math.floor(i / cols) - (rows - 1) / 2) * sz,
+      cols, rows,
+    }));
+  }
+  /** Places the camera so a w×h box (meters) centered at (0, cy, cz) fills the view, seen from slightly above. */
+  function frame(w, h, cy, cz = 0, pitch = 0.22, depth = 0) {
+    // same rule the engine applies on resize: vertical fov unless the horizontal one gets too narrow
+    const aspect = innerWidth / innerHeight, fit = camera.userData.fit;
+    let v = THREE.MathUtils.degToRad(fit.vFov) / 2;
+    const minH = THREE.MathUtils.degToRad(fit.minHFov) / 2;
+    if (Math.atan(Math.tan(v) * aspect) < minH) v = Math.atan(Math.tan(minH) / aspect);
+    const hh = Math.atan(Math.tan(v) * aspect);
+    const d = Math.max(w / 2 / Math.tan(hh), h / 2 / Math.tan(v)) + 0.6 + depth / 2;
+    camera.position.set(0, cy + Math.sin(pitch) * d, cz + Math.cos(pitch) * d);
+    camera.lookAt(0, cy, cz);
+  }
+  const rng = SS.util.rng(Number(params.get('seed')) || 42);
+  window.gallery = { scene, camera, pals, SS };
+
+  // ---- views ----
+  const views = {
+    lineup() {
+      const env = SS.world.environment(scene, { shadow: { center: new THREE.Vector3(0, 0, 0), size: 14 } });
+      grassFloor();
+      const n = 10;
+      const P = gridLayout(n, 5, 3, 1.2, 1.6);
+      for (let i = 0; i < n; i++) {
+        const prof = SS.pals.randomProfile(rng, SS.pals.OPTIONS.hairStyles[i].name);
+        prof.hairStyle = i;
+        if (i === 0) Object.assign(prof, SS.pals.defaultProfile('You'), { hairStyle: 0 });
+        const pal = addPal(prof, P[i].x, P[i].z);
+        pal.play('idle');
+        label(SS.pals.OPTIONS.hairStyles[i].name, pal.root, -0.12);
+      }
+      const rows = P[0].rows, cols = P[0].cols;
+      frame(cols * 1.2 + 0.4, 1.7 + (rows - 1) * 0.5, 0.8, 0, 0.3, (rows - 1) * 1.6);
+      env.setShadowFocus(new THREE.Vector3(0, 0, 0), 12);
+    },
+
+    faces() {
+      SS.world.environment(scene, { trees: false, clouds: 4 });
+      grassFloor();
+      const ex = params.get('expr');
+      const names = ex ? [ex] : SS.pals.EXPRESSIONS;
+      const cols = Math.min(names.length, portrait() ? 2 : 4), rows = Math.ceil(names.length / cols);
+      names.forEach((name, i) => {
+        const prof = SS.pals.randomProfile(rng);
+        const r = Math.floor(i / cols), c = i % cols;
+        const pal = addPal(prof, (c - (cols - 1) / 2) * 0.66, 0, { detail: 'high' });
+        pal.root.position.y = ((rows - 1) / 2 - r) * 0.72 - pal.headCenter.y + 1.2;
+        // a clean sheet of heads: hide everything below the neck
+        pal.root.children.forEach(o => { if (o !== pal.parts.body) o.visible = false; });
+        pal.parts.body.children[0].visible = false;
+        pal.setExpression(name);
+        label(name, pal.root, pal.headCenter.y - 0.36);
+      });
+      frame(cols * 0.66, rows * 0.72, 1.2, 0, 0.05);
+    },
+
+    anims() {
+      const env = SS.world.environment(scene, { shadow: { center: new THREE.Vector3(0, 0, 0), size: 16 } });
+      grassFloor();
+      const one = params.get('anim');
+      const names = one ? [one] : SS.pals.ANIMATIONS;
+      const P = gridLayout(names.length, 7, 4, 1.25, 1.9);
+      names.forEach((name, i) => {
+        const pal = addPal(SS.pals.randomProfile(rng), P[i].x, P[i].z);
+        const loopIt = () => { if (name === 'walk' || name === 'run') { pal.setSpeed(name === 'run' ? 4 : 1.3); pal.play(name); } else pal.play(name, { loop: true }); };
+        loopIt();
+        label(name, pal.root, -0.12);
+      });
+      const rows = P[0].rows, cols = P[0].cols;
+      if (one) frame(1.6, 2.1, 0.8, 0, 0.12);
+      else frame(cols * 1.25 + 0.4, 1.7 + (rows - 1) * 0.6, 0.8, 0, 0.3, (rows - 1) * 1.9);
+      env.setShadowFocus(new THREE.Vector3(0, 0, 0), Math.max(cols * 1.3, rows * 2) + 4);
+    },
+
+    poses() {
+      const env = SS.world.environment(scene, { shadow: { center: new THREE.Vector3(0, 0, 0), size: 10 } });
+      grassFloor();
+      const W = SS.world;
+      const racket = new THREE.Group();
+      { const h = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.02, 0.3, 8), W.mat(0x333344, { kind: 'phong' }));
+        h.position.y = 0.12; const head = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.015, 8, 24), W.mat(0xFF5A5F, { kind: 'phong' }));
+        head.position.y = 0.4; head.scale.set(0.85, 1.1, 1); racket.add(h, head); }
+      const bat = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.018, 0.85, 12), W.mat(0xD9A066, { kind: 'phong' }));
+      bat.geometry.translate(0, 0.4, 0);
+      const club = new THREE.Group();
+      { const s = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.01, 0.95, 6), W.mat(0xC0C8D0, { kind: 'phong' })); s.position.y = -0.45;
+        const h = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.035, 0.05), W.mat(0x30343C, { kind: 'phong' })); h.position.set(0.035, -0.92, 0); club.add(s, h); }
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(0.11, 20, 14), W.mat(0x2F5FD8, { kind: 'phong', shininess: 80 }));
+
+      const P = gridLayout(4, 4, 2, 1.6, 2.2);
+      const specs = [
+        { name: 'tennis forehand', item: racket, side: 'R', rot: [0.2, 0, -1.2] },
+        { name: 'batting', item: bat, side: 'R', rot: [0, 0, 1.4] },
+        { name: 'golf swing', item: club, side: 'L', rot: [0, 0, 0] },
+        { name: 'bowling roll', item: ball, side: 'R', rot: [0, 0, 0] },
+      ];
+      const V = (x, y, z) => new THREE.Vector3(x, y, z);
+      const posers = specs.map((s, i) => {
+        const pal = addPal(SS.pals.randomProfile(rng), P[i].x, P[i].z);
+        pal.play('idle_ready');
+        pal.attach(s.item, s.side, { position: V(0, 0, 0.02), rotation: new THREE.Euler(...s.rot) });
+        label(s.name, pal.root, -0.12);
+        return pal;
+      });
+      let t = 0;
+      SS.engine.addUpdate(dt => {
+        t += dt;
+        const c = (t % 2.4) / 2.4;
+        const swing = c < 0.45 ? -c / 0.45 : c < 0.6 ? -1 + (c - 0.45) / 0.15 * 2 : 1 - (c - 0.6) / 0.4;
+        const k = Math.max(-1, Math.min(1, swing));
+        const a = k * 1.4;
+        // tennis: forehand around the body
+        posers[0].pose({ handR: V(-0.42 * Math.cos(a), 0.85 + 0.1 * Math.sin(a), 0.35 * Math.sin(a) + 0.1), handL: V(0.25, 0.85, 0.3),
+          twist: -k * 0.7, crouch: 0.35, stance: 0.6, lean: 0.15 });
+        posers[0].attach(racket, 'R').rotation.set(0.2, 0, -1.2 - k * 0.6);
+        // batting: hands together, level swing
+        const bh = V(-0.28 * Math.cos(a * 1.1) + 0.05, 1.0 - 0.1 * (1 - Math.abs(k)), 0.3 * Math.sin(a * 1.1) + 0.05);
+        posers[1].pose({ handR: bh, handL: bh.clone().add(V(0.04, -0.07, 0)), twist: -k * 0.9, crouch: 0.3, stance: 0.8 });
+        bat.rotation.set(0, -a * 1.1, 1.4);
+        // golf: pendulum
+        const g = a * 1.2;
+        const gh = V(Math.sin(g) * 0.45, 0.62 + (1 - Math.cos(g)) * 0.45, 0.28);
+        posers[2].pose({ handL: gh, handR: gh.clone().add(V(-0.02, -0.06, 0.02)), twist: k * 0.6, lean: 0.35, crouch: 0.25, stance: 0.5 });
+        club.rotation.set(0, 0, g + 3.14);
+        // bowling: arm pendulum front/back
+        const b = -a * 1.2;
+        posers[3].pose({ handR: V(-0.3, 0.75 - Math.cos(b) * 0.38 + 0.38, Math.sin(b) * 0.55 + 0.05), handL: V(0.45, 0.95, 0.1),
+          lean: 0.25 + 0.2 * Math.max(0, k), crouch: 0.4 + 0.3 * Math.max(0, k), stance: 0.3 });
+      });
+      const rows = P[0].rows, cols = P[0].cols;
+      frame(cols * 1.6 + 0.6, 1.8 + (rows - 1) * 0.6, 0.85, 0, 0.25, (rows - 1) * 2.2);
+      env.setShadowFocus(V(0, 0, 0), 10);
+    },
+
+    crowd() {
+      const env = SS.world.environment(scene, { trees: { ring: 60, count: 30 } });
+      grassFloor(80);
+      const st1 = SS.world.stands(scene, { x: 0, z: -3, width: 18, rows: 7, facing: 0, color: 0x1FA2FF });
+      const st2 = SS.world.stands(scene, { x: -12.5, z: 4, width: 12, rows: 7, facing: Math.PI / 2, color: 0xFF5A5F });
+      const st3 = SS.world.stands(scene, { x: 12.5, z: 4, width: 12, rows: 7, facing: -Math.PI / 2, color: 0xFFC93C });
+      const rows = [].concat(st1.userData.rows, st2.userData.rows, st3.userData.rows);
+      const crowd = SS.world.crowd(scene, { rows, density: 0.9, seed: 3 });
+      window.gallery.crowd = crowd;
+      const banner = new THREE.Mesh(new THREE.PlaneGeometry(9, 1.2), SS.world.mat(0xffffff, { map: SS.world.texture('banner', { text: 'SUNNY SPORTS' }) }));
+      banner.position.set(0, 4.8, -9.2); scene.add(banner);
+      frame(26, 6, 2.2, -2, 0.18);
+      env.setShadowFocus(new THREE.Vector3(0, 0, 0), 34);
+      const seq = params.get('do') ? [params.get('do')] : ['idle', 'cheer', 'gasp', 'wave', 'tense'];
+      let i = -1;
+      const next = () => {
+        i = (i + 1) % seq.length;
+        const m = seq[i];
+        crowd.setMood(m === 'tense' ? 'tense' : 'idle');
+        if (m === 'cheer') crowd.cheer(1, 2.4);
+        if (m === 'gasp') crowd.gasp();
+        if (m === 'wave') crowd.wave();
+        statusEl.textContent = 'crowd: ' + m + ' · ' + crowd.count + ' fans';
+      };
+      next();
+      setInterval(next, 3200);
+    },
+
+    env() {
+      const sky = params.get('sky') || 'day';
+      const env = SS.world.environment(scene, { sky, shadow: { center: new THREE.Vector3(0, 0, 0), size: 20 } });
+      const ground = new THREE.Mesh(new THREE.PlaneGeometry(90, 90), SS.world.mat(0xffffff, { map: SS.world.texture('fairway', { repeat: [9, 9] }) }));
+      ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+      const green = new THREE.Mesh(new THREE.CircleGeometry(6, 48), SS.world.mat(0xffffff, { map: SS.world.texture('green', { repeat: [1.5, 1.5] }) }));
+      green.rotation.x = -Math.PI / 2; green.position.set(-4, 0.01, -12); green.receiveShadow = true; scene.add(green);
+      const sand = new THREE.Mesh(new THREE.CircleGeometry(2.6, 36), SS.world.mat(0xffffff, { map: SS.world.texture('sand', { repeat: [1, 1] }) }));
+      sand.rotation.x = -Math.PI / 2; sand.position.set(4.5, 0.012, -9); sand.scale.set(1.5, 1, 1); scene.add(sand);
+      const r = SS.util.rng(9);
+      for (let i = 0; i < 16; i++) {
+        const kind = ['round', 'pine', 'bush'][i % 3];
+        const t = SS.world.tree(kind, r.range(1.2, 2), r);
+        const side = i % 2 ? 1 : -1;
+        t.position.set(side * r.range(9, 22), 0, -r.range(4, 40));
+        scene.add(t);
+      }
+      const pal = addPal(SS.pals.defaultProfile('You'), 0, 0);
+      pal.play('idle');
+      const flag = new THREE.Group();
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 2.4, 8), SS.world.mat(0xffffff, { kind: 'phong' }));
+      pole.position.y = 1.2;
+      const cloth = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.45), SS.world.mat(0xFF5A5F, { side: THREE.DoubleSide }));
+      cloth.position.set(0.35, 2.15, 0);
+      flag.add(pole, cloth); flag.position.set(-4, 0, -12); scene.add(flag);
+      let a = 0;
+      SS.engine.addUpdate(dt => {
+        a += dt * 0.12;
+        const R = portrait() ? 9 : 6.5;
+        camera.position.set(Math.sin(a) * R * 0.4, 2.4, R);
+        camera.lookAt(0, 1.4, -6);
+      });
+      env.setShadowFocus(new THREE.Vector3(0, 0, -3), 22);
+      statusEl.textContent = 'sky: ' + sky;
+    },
+
+    indoor() {
+      const env = SS.world.environment(scene, { sky: 'indoor' });
+      const W = SS.world;
+      const lane = new THREE.Mesh(new THREE.PlaneGeometry(1.06, 22), W.mat(0xffffff, { kind: 'phong', shininess: 80, map: W.texture('wood_lane', { repeat: [1, 6] }) }));
+      lane.rotation.x = -Math.PI / 2; lane.position.set(0, 0.005, -9); lane.receiveShadow = true; scene.add(lane);
+      for (const x of [-1.6, 1.6]) {
+        const l2 = lane.clone(); l2.position.x = x; scene.add(l2);
+      }
+      const floor = new THREE.Mesh(new THREE.PlaneGeometry(14, 30), W.mat(0xffffff, { map: W.texture('carpet', { repeat: [5, 10] }) }));
+      floor.rotation.x = -Math.PI / 2; floor.position.set(0, 0, -6); scene.add(floor);
+      const wall = new THREE.Mesh(new THREE.PlaneGeometry(14, 5), W.mat(0xffffff, { map: W.texture('brick', { repeat: [5, 2] }) }));
+      wall.position.set(0, 2.5, -20); scene.add(wall);
+      const side = new THREE.Mesh(new THREE.PlaneGeometry(30, 5), W.mat(0xffffff, { map: W.texture('wood', { repeat: [6, 1] }) }));
+      side.rotation.y = Math.PI / 2; side.position.set(-6, 2.5, -6); scene.add(side);
+      const ban = new THREE.Mesh(new THREE.PlaneGeometry(6, 1), W.mat(0xffffff, { map: W.texture('banner', { text: 'STRIKE ZONE', bg: '#FF5A5F' }) }));
+      ban.position.set(0, 3.6, -19.9); scene.add(ban);
+      const pal = addPal(SS.pals.CPU_ROSTER[6].profile, 0.35, 0.3);
+      pal.play('idle_ready');
+      pal.setFacing(Math.PI);
+      const pal2 = addPal(SS.pals.CPU_ROSTER[2].profile, -1.4, 1.2);
+      pal2.play('clap', { loop: true });
+      pal2.setFacing(Math.PI * 0.8);
+      camera.position.set(0.9, 1.9, 3.6);
+      camera.lookAt(0, 0.9, -4);
+      env.sun.castShadow = true;
+      env.setShadowFocus(new THREE.Vector3(0, 0, -2), 12);
+    },
+
+    textures() {
+      SS.world.environment(scene, { sky: 'day', trees: false, clouds: 6, hills: true });
+      const names = ['grass', 'grass_stripes', 'fairway', 'rough', 'green', 'sand', 'dirt', 'clay', 'hardcourt',
+        'wood_lane', 'wood', 'carpet', 'brick', 'checker', 'noise', 'banner'];
+      const P = gridLayout(names.length, 8, 4, 1.15, 1.25);
+      names.forEach((n, i) => {
+        const tex = n === 'banner' ? SS.world.texture('banner', { text: 'HOME RUN!', bg: '#FFC93C', color: '#24324A' }) : SS.world.texture(n);
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(1, n === 'banner' ? 0.25 : 1), new THREE.MeshBasicMaterial({ map: tex }));
+        m.position.set(P[i].x, -P[i].z + 1.5, 0);
+        scene.add(m);
+        label(n, m, -0.62);
+      });
+      const rows = P[0].rows, cols = P[0].cols;
+      frame(cols * 1.15, rows * 1.25 + 0.3, 1.5 - 0.06, 0, 0);
+    },
+
+    fx() {
+      const env = SS.world.environment(scene, { shadow: { center: new THREE.Vector3(0, 0, 0), size: 16 } });
+      grassFloor();
+      const W = SS.world;
+      const pal = addPal(SS.pals.CPU_ROSTER[4].profile, -1.3, 0);
+      pal.play('cheer', { loop: true });
+      const ballMesh = new THREE.Mesh(new THREE.SphereGeometry(0.12, 20, 14), W.mat(0xFFFFFF, { kind: 'phong' }));
+      scene.add(ballMesh);
+      const shadow = W.blobShadow(0.22, 0.4); scene.add(shadow);
+      const tr = W.trail(ballMesh, { color: 0xFFC93C, width: 0.18, length: 28, opacity: 0.8 });
+      const dist = W.label3d('245 m', { size: 0.42 });
+      dist.position.set(1.8, 2.4, -1); scene.add(dist);
+      const tag = W.label3d('NICE!', { size: 0.5, color: '#FFC93C', bg: null });
+      tag.position.set(-1.3, 2.2, 0); scene.add(tag);
+      let t = 0, phase = -1;
+      SS.engine.addUpdate(dt => {
+        t += dt;
+        const c = t % 2.2;
+        const x = -3 + c / 2.2 * 7, y = 0.12 + Math.max(0, 3.2 * Math.sin(c / 2.2 * Math.PI));
+        ballMesh.position.set(x, y, -1.2);
+        shadow.position.set(x, 0.01, -1.2);
+        shadow.material.opacity = 0.45 / (1 + y * 0.6);
+        const p = Math.floor(t / 2.2);
+        if (p !== phase) {
+          phase = p;
+          W.ring(scene, new THREE.Vector3(4, 0, -1.2), { color: 0xFFFFFF, radius: 1.2, life: 0.8 });
+          W.burst(scene, new THREE.Vector3(4, 0.1, -1.2), { count: 26, color: 0xD8C29A, speed: 2.5, size: 0.06 });
+          W.confetti(scene, new THREE.Vector3(0, 0.4, 0.6), { count: 140, spread: 3 });
+          if (p % 2 === 0) W.fireworks(scene, new THREE.Vector3(0, 0, -30), { count: 3 });
+          tr.clear();
+          W.burst(scene, new THREE.Vector3(-1.3, 1.6, 0), { count: 18, colors: [0xFFF3A0, 0xFFFFFF], speed: 2, size: 0.05, gravity: -2, life: 0.9 });
+          dist.userData.setText((200 + p * 7) + ' m');
+        }
+      });
+      window.gallery.trail = tr;
+      frame(7.5, 5.5, 2.2, -1, 0.08);
+      env.setShadowFocus(new THREE.Vector3(0, 0, 0), 12);
+    },
+
+    portraits() {
+      SS.world.environment(scene, { trees: false });
+      camera.position.set(0, 2, 10); camera.lookAt(0, 2, 0);
+      const grid = document.getElementById('grid');
+      grid.style.display = 'grid';
+      const add = (profile, title) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.appendChild(SS.pals.portrait(profile, 176));
+        card.insertAdjacentHTML('beforeend', '<b></b><i></i>');
+        card.querySelector('b').textContent = profile.name;
+        card.querySelector('i').textContent = title;
+        grid.appendChild(card);
+      };
+      requestAnimationFrame(() => {
+        for (const e of SS.pals.CPU_ROSTER) add(e.profile, e.title + ' · ' + Math.round(e.skill * 100));
+        add(SS.pals.defaultProfile('You'), 'Default');
+        for (let i = 0; i < 5; i++) add(SS.pals.randomProfile(rng, 'Guest ' + (i + 1)), 'Random');
+        const img = new Image();
+        img.src = SS.pals.portraitURL(SS.pals.CPU_ROSTER[0].profile, 64);
+        window.gallery.portraitReady = true;
+      });
+    },
+  };
+
+  views[view]();
+  window.gallery.ready = true;
+})();
+</script>
+</body>
+</html>

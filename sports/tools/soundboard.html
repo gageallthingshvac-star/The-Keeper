@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sunny Sports Soundboard</title>
+<style>
+  @font-face { font-family: 'Fredoka'; font-weight: 600; src: url('../fonts/fredoka-latin-600-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'Nunito'; font-weight: 800; src: url('../fonts/nunito-latin-800-normal.woff2') format('woff2'); }
+  :root {
+    --bg: #EAF6FF; --panel: #fff; --ink: #24324a; --ink-soft: #6b7a93; --blue: #1FA2FF;
+    --yellow: #FFC93C; --green: #3BC45B; --coral: #FF5A5F; --line: #d8e7f5;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 800 14px/1.35 'Nunito', system-ui, sans-serif;
+    padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 40px max(16px, env(safe-area-inset-left));
+  }
+  h1 { font: 600 28px/1 'Fredoka', system-ui, sans-serif; margin: 4px 0 4px; color: var(--blue); }
+  h2 { font: 600 17px/1 'Fredoka', system-ui, sans-serif; margin: 0 0 10px; }
+  .sub { color: var(--ink-soft); margin: 0 0 16px; }
+  .panel { background: var(--panel); border-radius: 18px; padding: 14px; margin-bottom: 14px; box-shadow: 0 4px 14px rgba(40, 90, 150, .1); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(138px, 1fr)); gap: 8px; }
+  button {
+    font: inherit; border: 0; border-radius: 12px; min-height: 44px; padding: 8px 10px; cursor: pointer;
+    background: #eef6fd; color: var(--ink); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .07);
+    transition: transform .06s ease, background .15s ease; text-align: left; overflow-wrap: anywhere;
+  }
+  button:hover { background: #dff0fd; }
+  button:active { transform: translateY(1px) scale(.98); }
+  button.on { background: var(--green); color: #fff; }
+  button.accent { background: var(--blue); color: #fff; }
+  button.warn { background: var(--coral); color: #fff; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .sliders { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px 18px; }
+  label.sl { display: grid; grid-template-columns: 74px 1fr 40px; align-items: center; gap: 8px; color: var(--ink-soft); }
+  label.sl output { color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; accent-color: var(--blue); }
+  .group-title { color: var(--ink-soft); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; margin: 12px 0 6px; }
+  .group-title:first-of-type { margin-top: 0; }
+  #status { color: var(--ink-soft); }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { padding: 5px 6px; border-bottom: 1px solid var(--line); text-align: right; }
+  th:first-child, td:first-child { text-align: left; }
+  td.bad { color: var(--coral); }
+  .table-wrap { overflow-x: auto; }
+</style>
+</head>
+<body>
+<h1>Soundboard</h1>
+<p class="sub">Every Sunny Sports sound, synthesized live. Tap anything to hear it. <span id="status">Audio locked until the first tap.</span></p>
+
+<section class="panel">
+  <h2>Controls</h2>
+  <div class="sliders">
+    <label class="sl">Intensity <input id="intensity" type="range" min="0" max="1" step="0.05" value="1"><output>1</output></label>
+    <label class="sl">Volume <input id="vol" type="range" min="0" max="1" step="0.05" value="1"><output>1</output></label>
+    <label class="sl">Rate <input id="rate" type="range" min="0.5" max="2" step="0.05" value="1"><output>1</output></label>
+    <label class="sl">Pan <input id="pan" type="range" min="-1" max="1" step="0.1" value="0"><output>0</output></label>
+    <label class="sl">Music vol <input id="musicVol" type="range" min="0" max="1" step="0.05" value="0.6"><output>0.6</output></label>
+    <label class="sl">SFX vol <input id="sfxVol" type="range" min="0" max="1" step="0.05" value="0.9"><output>0.9</output></label>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Music</h2>
+  <div class="grid" id="music"></div>
+  <div class="row" style="margin-top:10px">
+    <button class="warn" id="musicStop">Stop music</button>
+    <button id="duck">Duck</button>
+    <button id="pause">Pause game</button>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Loops</h2>
+  <p class="sub" style="margin-bottom:10px">Volume and Rate sliders above also steer the running loops.</p>
+  <div class="grid" id="loops"></div>
+</section>
+
+<section class="panel">
+  <h2>Sound effects</h2>
+  <div id="sfx"></div>
+</section>
+
+<section class="panel">
+  <h2>Offline analysis</h2>
+  <div class="row"><button class="accent" id="analyze">Analyze everything</button><span id="analyzeStatus" class="sub" style="margin:0"></span></div>
+  <div class="table-wrap"><table id="results" hidden>
+    <thead><tr><th>Sound</th><th>Peak</th><th>RMS</th><th>Length s</th><th>Build ms</th></tr></thead>
+    <tbody></tbody>
+  </table></div>
+</section>
+
+<script src="../js/util.js"></script>
+<script src="../js/audio.js"></script>
+<script>
+(function () {
+  'use strict';
+  const A = window.SS.audio;
+  const $ = id => document.getElementById(id);
+
+  const GROUPS = [
+    ['UI', ['ui_tap', 'ui_select', 'ui_back', 'ui_open', 'ui_close', 'ui_error', 'ui_tick', 'ui_toggle', 'pop', 'swish', 'star', 'coin', 'levelup', 'count_beep', 'count_go', 'type']],
+    ['Generic', ['whoosh', 'swing_light', 'swing_heavy', 'thud', 'bounce_soft', 'splash', 'wood_knock', 'camera_flash', 'firework', 'confetti']],
+    ['Crowd & people', ['crowd_cheer', 'crowd_aww', 'crowd_gasp', 'crowd_ooh', 'crowd_applause', 'crowd_laugh', 'whistle', 'voice_yay', 'voice_aw', 'voice_hup']],
+    ['Fanfares', ['fanfare_small', 'fanfare_big', 'fanfare_record', 'jingle_win', 'jingle_lose', 'jingle_start', 'jingle_perfect']],
+    ['Bowling', ['bowl_release', 'pins_hit', 'pin_clatter', 'gutter_drop', 'ball_return', 'sweep']],
+    ['Tennis', ['racket_hit', 'racket_frame', 'ball_bounce_court', 'serve_toss', 'net_hit', 'line_call']],
+    ['Baseball', ['bat_crack', 'bat_foul', 'mitt_pop', 'pitch_whoosh', 'ump_strike', 'ball_land_grass']],
+    ['Golf', ['golf_drive', 'golf_iron', 'golf_chip', 'golf_putt', 'golf_cup', 'golf_land_grass', 'golf_land_sand', 'golf_tree', 'golf_water', 'flag_flap']],
+  ];
+  const listed = new Set(GROUPS.flatMap(g => g[1]));
+  const extra = A.names.sfx.filter(n => !listed.has(n));
+  if (extra.length) GROUPS.push(['Other', extra]);
+
+  const num = id => Number($(id).value);
+  const opts = () => ({ intensity: num('intensity'), vol: num('vol'), rate: num('rate'), pan: num('pan') });
+
+  function button(label, onClick, cls) {
+    const b = document.createElement('button');
+    b.textContent = label;
+    if (cls) b.className = cls;
+    b.addEventListener('click', onClick);
+    return b;
+  }
+
+  // Sliders mirror their value and push volume changes live.
+  document.querySelectorAll('label.sl input').forEach(inp => {
+    const out = inp.nextElementSibling;
+    inp.addEventListener('input', () => {
+      out.textContent = inp.value;
+      if (inp.id === 'musicVol' || inp.id === 'sfxVol') A.setVolumes({ music: num('musicVol'), sfx: num('sfxVol') });
+      if (inp.id === 'vol' || inp.id === 'rate') for (const h of activeLoops.values()) { h.setVolume(num('vol')); h.setRate(num('rate')); }
+    });
+  });
+
+  // SFX grid
+  for (const [title, names] of GROUPS) {
+    const t = document.createElement('div');
+    t.className = 'group-title';
+    t.textContent = title;
+    const grid = document.createElement('div');
+    grid.className = 'grid';
+    for (const n of names) grid.appendChild(button(n, () => A.sfx(n, opts())));
+    $('sfx').append(t, grid);
+  }
+
+  // Music
+  const musicButtons = new Map();
+  for (const id of A.names.music) {
+    const b = button(id, () => { A.music(id); refreshMusic(); });
+    musicButtons.set(id, b);
+    $('music').appendChild(b);
+  }
+  function refreshMusic() { for (const [id, b] of musicButtons) b.classList.toggle('on', A.track === id); }
+  $('musicStop').addEventListener('click', () => { A.music(null); refreshMusic(); });
+  $('duck').addEventListener('click', () => A.duck(0.6, 1.5));
+  let paused = false;
+  $('pause').addEventListener('click', e => {
+    paused = !paused;
+    if (paused) A.suspend(); else A.resumeAll();
+    e.currentTarget.classList.toggle('on', paused);
+    e.currentTarget.textContent = paused ? 'Resume game' : 'Pause game';
+  });
+
+  // Loops
+  const activeLoops = new Map();
+  for (const name of A.names.loops) {
+    const b = button(name, () => {
+      if (activeLoops.has(name)) { activeLoops.get(name).stop(0.4); activeLoops.delete(name); }
+      else activeLoops.set(name, A.loop(name, { vol: num('vol'), rate: num('rate') }));
+      b.classList.toggle('on', activeLoops.has(name));
+    });
+    $('loops').appendChild(b);
+  }
+
+  // Status
+  function refreshStatus() {
+    const ctx = A.ctx;
+    $('status').textContent = ctx ? `Audio ${ctx.state} · ${ctx.sampleRate} Hz` : 'Audio locked until the first tap.';
+  }
+  setInterval(refreshStatus, 500);
+
+  // Offline analysis of everything
+  $('analyze').addEventListener('click', async () => {
+    const names = [...A.names.sfx, ...A.names.loops.map(n => 'loop:' + n), ...A.names.music.map(n => 'music:' + n)];
+    const body = $('results').querySelector('tbody');
+    body.textContent = '';
+    $('results').hidden = false;
+    for (let i = 0; i < names.length; i++) {
+      $('analyzeStatus').textContent = `Rendering ${i + 1} / ${names.length}…`;
+      const r = await A._analyze(names[i], { intensity: num('intensity') });
+      const tr = document.createElement('tr');
+      const cells = [names[i], r.peak.toFixed(3), r.rms.toFixed(3), r.duration.toFixed(2), r.scheduleMs.toFixed(1)];
+      cells.forEach((c, k) => {
+        const td = document.createElement('td');
+        td.textContent = c;
+        if ((k === 1 && (r.peak > 0.98 || r.peak < 0.01))) td.className = 'bad';
+        tr.appendChild(td);
+      });
+      body.appendChild(tr);
+    }
+    $('analyzeStatus').textContent = `Done: ${names.length} sounds.`;
+  });
+})();
+</script>
+</body>
+</html>
