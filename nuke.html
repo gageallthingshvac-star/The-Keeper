@@ -18,6 +18,7 @@
     --warm:#ffb347;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  [hidden]{display:none!important}
   html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
     font:14px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden;
     user-select:none;-webkit-user-select:none;touch-action:none}
@@ -115,6 +116,22 @@
   #cutNextName span{color:var(--dim);font-weight:500;font-size:13px}
   #cutRow{margin-top:14px}
   #cutGo{background:linear-gradient(#e0421a,#a8260b);border-color:#ff7a4d;color:#fff;font-weight:800;letter-spacing:.06em;padding:11px 26px;font-size:15px}
+  #pickBomb{display:flex;align-items:baseline;justify-content:space-between;gap:10px;width:100%;text-align:left;
+    background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+  #pickBomb .pbMain{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+  #pickBomb .pbHint{font-size:11px;color:var(--dim);white-space:nowrap}
+  #drawer{position:fixed;inset:0;z-index:40;display:flex;align-items:flex-end;justify-content:center;
+    background:rgba(4,4,6,.55);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+  #drawerCard{width:min(760px,100%);max-height:78vh;display:flex;flex-direction:column;background:var(--panel);
+    border:1px solid var(--line);border-radius:16px 16px 0 0;padding:12px 12px calc(12px + env(safe-area-inset-bottom));
+    animation:din .28s ease}
+  @keyframes din{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
+  #drawerHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+  #drawerBody{overflow-y:auto;-webkit-overflow-scrolling:touch}
+  #drawer #chips,#drawer #targets{display:flex;flex-wrap:wrap;overflow:visible;gap:7px;margin:0}
+  #drawer #targets{margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+  #drawer .chip{flex:0 0 auto}
+  .drawerLabel{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin:2px 0 6px}
   #err{position:fixed;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:30px;color:var(--dim)}
   @media (max-width:560px){
     #hud{top:calc(46px + env(safe-area-inset-top))}
@@ -168,18 +185,32 @@
 </div>
 <div id="hint">Pick a bomb · tap anywhere to fire it there · drag to orbit · pinch or scroll to zoom</div>
 <div id="panel">
-  <div id="info"><span id="bname"></span><span id="byield"></span></div>
+  <button id="pickBomb" title="Choose a different bomb">
+    <span class="pbMain"><span id="bname"></span><span id="byield"></span></span>
+    <span class="pbHint">tap to change ▾</span>
+  </button>
   <div id="bdesc"></div>
   <div id="beff"></div>
   <div class="row" id="customRow"><label>Yield</label><input type="range" id="cy" min="0" max="1000" value="500" /></div>
-  <div id="chips"></div>
-  <div id="targets" class="chips2"></div>
   <div class="row"><label>Scale</label><input type="range" id="scale" min="0" max="1000" value="200" /><span id="scaleVal"></span></div>
   <div class="row">
     <div class="seg" id="burst"><button data-v="surface" class="on">Surface</button><button data-v="air">Airburst</button></div>
     <div class="seg" id="speed"><button data-v="0.1">0.1×</button><button data-v="1" class="on">1×</button><button data-v="5">5×</button></div>
+    <button id="goto">Go to…</button>
     <button id="fit">Fit</button>
     <button id="go">FIRE</button>
+  </div>
+</div>
+<div id="drawer" hidden>
+  <div id="drawerCard">
+    <div id="drawerHead">
+      <div class="seg" id="drawerTabs"><button data-t="bombs" class="on">Arsenal</button><button data-t="targets">Locations</button></div>
+      <button id="drawerClose">Close ✕</button>
+    </div>
+    <div id="drawerBody">
+      <div id="chips"></div>
+      <div id="targets" class="chips2"></div>
+    </div>
   </div>
 </div>
 <div id="err">Couldn't load the 3D engine. This page needs an internet connection the first time it opens.</div>
@@ -2388,7 +2419,7 @@ function buildChips(){
     const el=document.createElement('button');
     el.className='chip'+(b.kind==='planet'?' end':b.kind?' nat':b.nuc?' nuc':'')+(i===sel?' on':'');
     el.innerHTML=b.custom?'Custom…':`${b.n}<small>${fmtYield(b.kt)}</small>`;
-    el.onclick=()=>{select(i,false);};
+    el.onclick=()=>{select(i,false);closeDrawer();};
     box.appendChild(el);
   });
 }
@@ -2432,7 +2463,7 @@ function buildTargets(){
           gzAnim={from:controls.target.clone(),to:new THREE.Vector3(t.x,back?6:controls.target.y,t.z),t:0,y:back};
         }
       }
-      view.targetS=t.S;hideHint();
+      view.targetS=t.S;hideHint();closeDrawer();
     };
     box.appendChild(el);
   });
@@ -2469,6 +2500,24 @@ function fitView(){
   const R=Math.max(f.r1,f.Rth,f.Rfb*3,f.Rc*4);
   view.targetS=clamp(R*2.3,SMIN*1.5,SMAX);
 }
+function openDrawer(tab){
+  if(tab)setDrawerTab(tab);
+  $('drawer').hidden=false;
+  // scroll the selected bomb into view
+  const on=$('chips').querySelector('.chip.on');if(on&&$('drawerTabs').querySelector('[data-t=bombs]').classList.contains('on'))on.scrollIntoView({block:'nearest'});
+}
+function closeDrawer(){$('drawer').hidden=true;}
+function setDrawerTab(t){
+  [...$('drawerTabs').children].forEach(c=>c.classList.toggle('on',c.dataset.t===t));
+  $('chips').style.display=t==='bombs'?'flex':'none';
+  $('targets').style.display=t==='targets'?'flex':'none';
+}
+$('pickBomb').onclick=()=>openDrawer('bombs');
+$('goto').onclick=()=>openDrawer('targets');
+$('drawerClose').onclick=closeDrawer;
+$('drawerTabs').onclick=e=>{const t=e.target.dataset&&e.target.dataset.t;if(t)setDrawerTab(t);};
+$('drawer').onclick=e=>{if(e.target.id==='drawer')closeDrawer();};
+setDrawerTab('bombs');
 $('fit').onclick=()=>fitView();
 const sToSlider=S=>Math.log(S/SMIN)/Math.log(SMAX/SMIN)*1000;
 $('scale').oninput=()=>{view.targetS=SMIN*Math.pow(SMAX/SMIN,$('scale').value/1000);hideHint();};
