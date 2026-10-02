@@ -7,8 +7,8 @@
  *     arrow, swipe up to bowl (swipe speed → ball speed, swipe drift → line, swipe bend → hook).
  *   · Physics: an oiled-lane ball model (skid → hook → roll) and a compact deterministic rigid-body
  *     pin simulation (compound-sphere pins, sequential impulses, sleeping) at a fixed 240 Hz.
- *   · Modes: 10 Frames (1–4 hot-seat, exact ten-pin scoring), Spare Challenge (10 preset leaves) and
- *     Power Pins (a bigger rack every round on a flared deck).
+ *   · Modes: 10 Frames (1–4 hot-seat, exact ten-pin scoring), Spare Challenge (10 preset leaves, 10 points
+ *     a pick-up plus 5 for each back-to-back one) and Power Pins (a bigger rack every round on a flared deck).
  *   · Debug: instance.debug = { autoplay, throw, setLeave, simulate, ... } and debugState().
  */
 (function () {
@@ -59,11 +59,12 @@
         'Strikes love the pocket, right beside the head pin.',
         'Hooks curve late: start wide and let it bend back in.',
         'Swipe straight to keep the ball on your arrow.',
+        'Spare Challenge: back-to-back pick-ups score bonus points.',
       ],
     },
     medals: [
       { id: 'bronze', name: 'Bronze', desc: 'Score 120 in 10 Frames' },
-      { id: 'silver', name: 'Silver', desc: 'Score 170 in 10 Frames' },
+      { id: 'silver', name: 'Silver', desc: 'Score 170 in 10 Frames, or 350 in Power Pins' },
       { id: 'gold', name: 'Gold', desc: 'Score 220 in 10 Frames' },
       { id: 'platinum', name: 'Platinum', desc: 'Score 250, or pick up 8 leaves in Spare Challenge' },
     ],
@@ -83,7 +84,6 @@
   const ROW_DZ = PIN_DX * Math.sqrt(3) / 2;
   const RELEASE_Z = 0.22;                  // the ball touches down just before the foul line
   const BALL_R = 0.108;
-  const PIN_H = 0.381;
   const BOARD = 1.054 / 39;
   const DEG = Math.PI / 180;
 
@@ -140,15 +140,16 @@
   for (let k = 0; k < RIM_N; k++) { RIM_C.push(Math.cos(k / RIM_N * Math.PI * 2) * PIN_RIM); RIM_S.push(Math.sin(k / RIM_N * Math.PI * 2) * PIN_RIM); }
   const DOWN_COS = Math.cos(35 * DEG);
   const OIL_END = 12.2, DRY_START = 13.9;
-  const MU = { oil: 0.04, dry: 0.2, deck: 0.2, pinFloor: 0.2, pinPin: 0.2, ballPin: 0.1, wall: 0.3 };
-  const REST = { pinFloor: 0.22, pinPin: 0.65, ballPin: 0.6, wall: 0.6, back: 0.1, ceil: 0.2 };
+  const MU = { oil: 0.025, dry: 0.24, deck: 0.2, pinFloor: 0.2, pinPin: 0.2, ballPin: 0.1, wall: 0.3 };
+  const REST = { pinFloor: 0.22, pinPin: 0.4, ballPin: 0.6, wall: 0.6, back: 0.1, ceil: 0.2 };
   const MAX_V = 14, MAX_W = 90;
   const STEP_DEEP = 0.035;                 // a contact point this far below a floor is beside a step
-  const SPIN_MAX = 18;                     // rad/s of side rotation at spin = 1 (at 8.5 m/s)
-  const SPIN_SPEED_EXP = 2.5;              // side spin grows with speed so the break barely depends on speed
+  const SPIN_MAX = 24;                     // rad/s of side rotation at spin = 1 (at 8.5 m/s)
+  const SPIN_LIMIT = 2.0;                  // an over-bent swipe over-hooks (spin 1 is a big, makeable hook)
+  const SPIN_SPEED_EXP = 2.0;              // side spin grows with speed, a little less than the hook needs: slow balls hook more
   // Entry-angle "drive": a ball that comes into the pocket at an angle carries through the rack (heavier
   // effective mass) while a flat, straight ball deflects more. Effective mass = BALL_M × (BASE + K × angle/DEG).
-  const DRIVE_BASE = 0.6, DRIVE_K = 1.4, DRIVE_DEG = 2.5;
+  const DRIVE_BASE = 0.5, DRIVE_K = 1.5, DRIVE_DEG = 3.0;
   const ROLL_FRAC = 0.5;                  // share of natural forward roll at release
 
   function laneMu(z) {
@@ -589,9 +590,10 @@
     p.vx = p.vy = p.vz = p.wx = p.wy = p.wz = 0;
   };
 
-  /** Advances by dt seconds (fixed substeps, capped). */
+  /** Advances by dt seconds (fixed substeps; a hitch is capped at 16 steps, but a long frame under a
+   *  debug time-scale still simulates all of its game time). */
   PinWorld.prototype.advance = function (dt) {
-    this.acc = Math.min(this.acc + dt, H * 16);
+    this.acc = Math.min(this.acc + dt, Math.max(H * 16, dt + H));
     while (this.acc >= H) { this.acc -= H; this.stepOnce(); }
   };
 
@@ -619,6 +621,20 @@
       if (p.m11 > 0.5 || v2 > 0.06 || w2 > 6) k++;
     }
     return k;
+  };
+
+  /** Nothing can change the count any more: standing pins are still and no deadwood or ball is
+   *  sliding around the deck (a messenger pin could still take one out). */
+  PinWorld.prototype.quiet = function () {
+    const L = this.L, b = this.ball;
+    if (b.mode === 'lane' && b.z > L.pitZ && b.z < HEAD_Z + 0.6 && b.vx * b.vx + b.vz * b.vz > 0.25) return false;
+    for (const p of this.pins) {
+      if (!p.active || p.lifted || !p.awake) continue;
+      const v2 = p.vx * p.vx + p.vy * p.vy + p.vz * p.vz, w2 = p.wx * p.wx + p.wy * p.wy + p.wz * p.wz;
+      if (this.isStanding(p)) { if (w2 > 0.25 || v2 > 0.01) return false; }
+      else if (p.y > -0.1 && p.z > L.pitZ && v2 > 0.36) return false;
+    }
+    return true;
   };
 
   /** True once the ball is done and nothing that matters moves. */
@@ -727,24 +743,26 @@
     return left.size > 0;
   }
 
-  // Ten leaves of rising difficulty. Every one is makeable: the first six have wide lines, the last four
-  // (the splits that need a pin to slide across) have a window about as narrow as a strike's.
+  // Ten leaves of rising difficulty (measured conversion windows at the front pin: ~30 cm down to ~4.5 cm).
+  // The brief's 4-6 / 7-10 / 6-7-10 / 4-7-10 have no makeable line in this pin model, so the last three are
+  // the hardest leaves that still can be picked up: the washout and two splits that need a sliding pin.
   const LEAVES = [
+    { pins: [6, 10], name: '6-10' },
     { pins: [10], name: 'Ten Pin' },
     { pins: [7], name: 'Seven Pin' },
     { pins: [3, 6, 10], name: '3-6-10' },
     { pins: [2, 4, 5, 8], name: 'The Bucket' },
     { pins: [2, 7], name: '2-7 Baby Split' },
     { pins: [3, 10], name: '3-10 Baby Split' },
-    { pins: [2, 10], name: '2-10 Split' },
-    { pins: [4, 9], name: '4-9 Split' },
-    { pins: [5, 10], name: '5-10 Split' },
+    { pins: [1, 2, 10], name: 'The Washout' },
     { pins: [5, 7], name: '5-7 Split' },
+    { pins: [2, 10], name: '2-10 Split' },
   ];
-  const SPARE_PTS = 10, SPARE_RUN_BONUS = 5;     // per pick-up, plus a clean-run bonus for back-to-back pick-ups
+  const SPARE_PTS = 10, SPARE_RUN_BONUS = 5;     // per pick-up, plus a bonus for each back-to-back pick-up
 
   const POWER_ROUNDS = 10;
   const POWER_CLEAR_BONUS = 25;
+  const POWER_SILVER = 350;                      // Power Pins score that also earns the silver medal
   const powerRows = round => 4 + round;          // 10, 15, 21 … 91 pins
   const STRIKE_WORDS = ['STRIKE!', 'DOUBLE!', 'TURKEY!'];
 
@@ -752,7 +770,7 @@
   // 5. Shot planning (autoplay, simulate) and the human-input model
   // =============================================================================================
 
-  const POCKET_X = 0.05;                   // ball centre at the head pin for a right-hander's 1-3 pocket
+  const POCKET_X = 0.07;                   // ball centre at the head pin for a right-hander's 1-3 pocket
 
   /** Ball-only trace to zStop → { x, angle } (x = ±9 when the ball found the gutter first). */
   function traceShot(L, shot, zStop) {
@@ -761,6 +779,15 @@
     while (w.ball.mode === 'lane' && w.ball.z > zStop && w.t < 8) w.stepOnce();
     const b = w.ball;
     return { x: b.mode === 'lane' ? b.x : (b.x > 0 ? 9 : -9), angle: Math.atan2(b.vx, -b.vz) };
+  }
+
+  /** Where the rolling ball will cross the head pin's line (null if it finds the gutter first). */
+  function predictHeadX(world) {
+    const w = new PinWorld(world.L), b = w.ball, s = world.ball;
+    for (const k of ['x', 'y', 'z', 'vx', 'vy', 'vz', 'wx', 'wy', 'wz', 'qx', 'qy', 'qz', 'qw', 'mode', 'active', 'dyn', 'im']) b[k] = s[k];
+    b.pitT = 0;
+    while (b.mode === 'lane' && b.z > HEAD_Z && w.t < 3) w.stepOnce();
+    return b.mode === 'lane' ? b.x : null;
   }
 
   /** Release angle that brings the ball to targetX at zTarget (the path is monotonic in the angle). */
@@ -776,7 +803,7 @@
   /** A pocket shot in a given style ({ speed, spin 0..1 }) for hand = 1 (right) or -1 (left). */
   function strikeShot(L, style, hand) {
     const spin = style.spin * hand;
-    const x = hand * (0.1 + 0.24 * style.spin);
+    const x = hand * (0.1 + 0.3 * Math.min(1, style.spin));
     return { x, angle: aimAngle(L, x, style.speed, spin, hand * POCKET_X, HEAD_Z), speed: style.speed, spin };
   }
 
@@ -805,6 +832,9 @@
     return { knocked: before - standing.length, standing, gutter: w.ev.gutterAt !== null, hit: w.ev.hit };
   }
 
+  /** The default profile is called "You": "Your turn!", "You Win!". */
+  function isYou(name) { return String(name).trim().toLowerCase() === 'you'; }
+
   function gauss(rng) {
     const u = Math.max(1e-9, rng.next()), v = rng.next();
     return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
@@ -817,7 +847,7 @@
       x: Math.max(-0.5, Math.min(0.5, shot.x + gauss(rng) * 0.05 * k)),
       angle: shot.angle + gauss(rng) * 1.2 * DEG * k,
       speed: Math.max(SPEED_MIN, Math.min(SPEED_MAX, shot.speed + gauss(rng) * 0.9 * k)),
-      spin: Math.max(-1, Math.min(1, shot.spin + gauss(rng) * 0.3 * k)),
+      spin: Math.max(-SPIN_LIMIT, Math.min(SPIN_LIMIT, shot.spin + gauss(rng) * 0.3 * k)),
     };
   }
 
@@ -827,11 +857,14 @@
 
   const SPEED_MIN = 5.5, SPEED_MAX = 10.5;
   const AIM_MAX = 3.5 * DEG;               // beyond this every line is a gutter ball
+  const AIM_TAP = 0.05 * DEG;              // one tap of an aim button: ~1.6 cm at the pins (the pocket is ~5 cm)
   const X_MAX = 0.46;                      // release positions on the approach (ball centre)
+  const BEND_DEAD = 0.04, BEND_FULL = 0.30; // swipe bow (short sides) → spin: dead zone, then spin 1 per BEND_FULL
+  const DRIFT_DEAD = 4, DRIFT_GAIN = 0.025;  // swipe tilt (deg) → line offset (deg per deg past the dead zone, ≤ 1°)
 
   /** Release speed (short sides / s; real flicks are about 2–10) → ball speed over the whole range. */
   function swipeSpeed(nspeed) {
-    const k = Math.max(0, Math.min(1, (nspeed - 1.2) / 8));
+    const k = Math.max(0, Math.min(1, (nspeed - 1.0) / 5.5));
     return SPEED_MIN + (SPEED_MAX - SPEED_MIN) * Math.pow(k, 0.85);
   }
 
@@ -840,11 +873,13 @@
     const up = -s.dy / shortSide;
     const dirDeg = Math.atan2(s.dx, -s.dy) / DEG;
     if (up < 0.07 || Math.abs(dirDeg) > 55) return null;
-    // a swipe tilted past 10° pulls the line a little (1° moves the ball ~30 cm at the pins)
-    const drift = Math.sign(dirDeg) * Math.min(1, Math.max(0, Math.abs(dirDeg) - 10) * 0.04) * DEG;
+    // a tilted swipe pulls the line a little (0.1° moves the ball ~3 cm at the pins): a straight ball
+    // still needs a straight swipe
+    const drift = Math.sign(dirDeg) * Math.min(1, Math.max(0, Math.abs(dirDeg) - DRIFT_DEAD) * DRIFT_GAIN) * DEG;
     // hook: the swipe's bow plus a late turn of the finger (both say "curve back to the left" when +).
-    // A natural thumb arc (< 5% of the screen) stays straight; a deliberate bend of ~20% is a big hook.
-    const bow = Math.sign(s.lateral) * Math.max(0, Math.abs(s.lateral) - 0.05) / 0.2;
+    // A natural thumb arc (< 4% of the screen) stays straight; past that the hook grows linearly with the
+    // bend (a third of the screen is a big hook) and keeps growing, so a wild bend over-hooks.
+    const bow = Math.sign(s.lateral) * Math.max(0, Math.abs(s.lateral) - BEND_DEAD) / BEND_FULL;
     let turn = 0;
     const path = s.path || [];
     if (path.length > 4) {
@@ -859,8 +894,7 @@
       while (d < -Math.PI) d += 2 * Math.PI;
       turn = Math.sign(d) * Math.max(0, Math.abs(d) - 0.2);
     }
-    const u = bow - turn * 0.4;
-    const spin = Math.sign(u) * Math.pow(Math.min(1, Math.abs(u)), 1.3);
+    const spin = Math.max(-SPIN_LIMIT, Math.min(SPIN_LIMIT, bow - turn * 0.4));
     // release speed; a short hold before lifting the finger shouldn't kill a good flick
     return { speed: swipeSpeed(Math.max(s.nspeed, (s.npeakSpeed || 0) * 0.75)), spin, drift };
   }
@@ -936,7 +970,8 @@
   const FONT = "'Fredoka', 'Nunito', system-ui, sans-serif";
   const LANE_PITCH = 1.7;                  // centre-to-centre of standard lanes
   const AIM_Z = 1.45;                      // where the bowler stands while aiming
-  const NB_Z = 0.5;                        // where neighbouring bowlers wait
+  const CUT_Z = -14.8;                     // the follow cam hands over to the pin cam here (after the break)
+  const NB_Z = 2.4, NB_LINE = 0.45, NB_WALK = 1.5;   // neighbours wait by the seats (out of the aim view), bowl from the line
   const CEIL_Y = 3.8;
   const MONITOR = { x: 0, y: 3.22, z: -1.1, w: 1.04, h: 0.585 };
   const HOOD = { x: 0.85, z: 2.1 };        // ball return (on the side away from the bowling hand)
@@ -1060,6 +1095,14 @@
     return c;
   }
 
+  /** One soft dot (repeated along the spare guide line). */
+  function dotCanvas() {
+    const c = makeCanvas(32, 64), g = c.getContext('2d');
+    g.fillStyle = 'rgba(255,214,70,0.95)';
+    g.beginPath(); g.arc(16, 32, 11, 0, Math.PI * 2); g.fill();
+    return c;
+  }
+
   /** A marbled bowling-ball skin in the player's colour, with finger holes. */
   function ballCanvas(hex, seed) {
     const c = makeCanvas(256, 128), g = c.getContext('2d');
@@ -1094,8 +1137,7 @@
     return g;
   }
 
-  /** The static alley, merged into a handful of meshes (one per material). Returns { roomHalf, mask }:
-   *  `mask` holds the masking-unit meshes so a high pin camera can hide them. */
+  /** The static alley, merged into a handful of meshes (one per material). Returns { roomHalf }. */
   function buildAlley(ctx, L, laneXs, opts) {
     const { THREE, world, scene } = ctx;
     const paint = world.paint;
@@ -1305,11 +1347,11 @@
     add('markings', world.mergeGeometries(decal), decalMat);
     add('carpet', world.mergeGeometries(carpet), world.mat(0xFFFFFF, { map: world.texture('carpet') }));
     add('lights', world.mergeGeometries(glow), world.mat(0xFFFFFF, { kind: 'basic', vertexColors: true }));
-    const mask = [add('mask', world.mergeGeometries(maskParts), world.mat(0xFFFFFF, { vertexColors: true }))];
+    add('mask', world.mergeGeometries(maskParts), world.mat(0xFFFFFF, { vertexColors: true }));
     // masking logos (one shared canvas)
     const logoTex = canvasTexture(THREE, logoCanvas());
-    mask.push(add('logos', world.mergeGeometries(logos.map(cx => new THREE.PlaneGeometry(1.5, 0.75).translate(cx, MY + 0.69, L.maskZ + 0.012))),
-      new THREE.MeshBasicMaterial({ map: logoTex })));
+    add('logos', world.mergeGeometries(logos.map(cx => new THREE.PlaneGeometry(1.5, 0.75).translate(cx, MY + 0.69, L.maskZ + 0.012))),
+      new THREE.MeshBasicMaterial({ map: logoTex }));
     // mural walls (sides and back)
     const muralTex = canvasTexture(THREE, muralCanvas(rng), true);
     const murals = [];
@@ -1324,7 +1366,7 @@
     const buv = back.attributes.uv; for (let i = 0; i < buv.count; i++) buv.setX(i, buv.getX(i) * roomHalf * 2 / 9);
     murals.push(back);
     add('mural', world.mergeGeometries(murals), new THREE.MeshLambertMaterial({ map: muralTex }));
-    return { roomHalf, mask };
+    return { roomHalf };
   }
 
   // =============================================================================================
@@ -1368,6 +1410,7 @@
   background: rgba(255, 255, 255, .18); transition: background .25s, transform .25s; }
 .bw-pins i.up { background: #fff; box-shadow: inset 0 -3px 0 #E8343A; }
 .bw-pins i.hit { transform: scale(.6); }
+.bw-pins.big { transform: scale(1.45); transform-origin: 0 0; }
 .bw-mini { display: flex; align-items: center; gap: 5px; padding: 2px 9px 2px 2px; font-size: 12px; opacity: .78; }
 .bw-mini .ss-portrait { width: 22px; height: 22px; }
 .bw-mini.cur { opacity: 1; box-shadow: 0 0 0 2px #FFC93C, var(--shadow-soft); }
@@ -1385,7 +1428,10 @@
   white-space: nowrap; transition: opacity .25s; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .bw-swipe svg { width: 22px; height: 22px; animation: bw-bob 1.2s ease-in-out infinite; }
 @keyframes bw-bob { 0%, 100% { transform: translateY(4px); } 50% { transform: translateY(-4px); } }
-.bw-speed { position: absolute; bottom: calc(var(--sab) + 96px); left: 50%; transform: translateX(-50%); transition: opacity .3s; }
+.bw-speed { position: absolute; top: calc(var(--sat) + 126px); left: 50%; transform: translateX(-50%); transition: opacity .3s;
+  white-space: nowrap; }
+.bw-tip { font-size: 12px; gap: 5px; padding: 5px 12px 5px 8px; }
+.bw-tip .ss-icon { width: 18px; height: 18px; color: #F2A900; }
 .bw-turnwrap { position: absolute; left: 0; right: 0; top: 30%; display: flex; justify-content: center; transition: opacity .25s, transform .25s; }
 .bw-turnwrap.out { opacity: 0; transform: translateY(-14px) scale(.95); }
 .bw-turncard { display: flex; align-items: center; gap: 12px; max-width: calc(100% - 28px); padding: 10px 22px 10px 10px;
@@ -1400,10 +1446,15 @@
   .bw-side { top: calc(var(--sat) + 74px); }
   .bw-side.l { left: calc(var(--sal) + 12px); top: calc(var(--sat) + 76px); }
   .bw-turnwrap { top: 36%; }
-  .bw-speed { bottom: calc(var(--sab) + 70px); }
+  .bw-speed { top: calc(var(--sat) + 112px); }
   .bw-aim { bottom: calc(var(--sab) + 14px); }
 }
 @media (max-width: 340px) { .bw-f .m span { font-size: 10px; } .bw-f .t { font-size: 11px; } }
+@media (max-width: 380px) and (orientation: portrait) {
+  .bw-mini span { display: none; }
+  .bw-mini { padding-right: 8px; }
+  .bw-speed { top: calc(var(--sat) + 176px); }
+}
 `;
 
   // =============================================================================================
@@ -1504,6 +1555,20 @@
     const marker = new THREE.Mesh(markGeo, new THREE.MeshBasicMaterial({ color: 0xFFD646, transparent: true, depthWrite: false, opacity: 0 }));
     marker.renderOrder = 3;
     scene.add(arrow, marker);
+    // spare balls: a faint dotted line carries the aim on to the pins, with a ring where it meets them
+    const GUIDE_Z0 = -5.25, guideLen = RELEASE_Z - HEAD_Z + GUIDE_Z0 + 0.4;
+    const dotTex = canvasTexture(THREE, dotCanvas(), true);
+    dotTex.repeat.set(1, Math.round(guideLen / 0.42));
+    const guideGeo = new THREE.PlaneGeometry(0.04, guideLen);
+    guideGeo.rotateX(-Math.PI / 2);
+    guideGeo.translate(0, 0, GUIDE_Z0 - guideLen / 2);
+    const guideMat = new THREE.MeshBasicMaterial({ map: dotTex, transparent: true, depthWrite: false, opacity: 0 });
+    const guide = new THREE.Mesh(guideGeo, guideMat);
+    const ringGeo = new THREE.RingGeometry(0.075, 0.1, 28);
+    ringGeo.rotateX(-Math.PI / 2);
+    const guideRing = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0xFFD646, transparent: true, depthWrite: false, opacity: 0 }));
+    guide.renderOrder = guideRing.renderOrder = 3;
+    arrow.add(guide, guideRing);
 
     // ---- overhead monitors ----------------------------------------------------------------------
     const monCanvas = makeCanvas(512, 288);
@@ -1540,12 +1605,12 @@
     // ---- state ----------------------------------------------------------------------------------
     const stats = players.map(() => ({
       strikes: 0, spares: 0, gutters: 0, splits: 0, pickups: 0, first: 0, firstN: 0, streak: 0, bestStreak: 0,
-      topSpeed: 0, conversions: 0, pins: 0, clears: 0,
+      topSpeed: 0, conversions: 0, sparePts: 0, pins: 0, clears: 0,
     }));
     const rolls = players.map(() => []);
     const leaveLog = players.map(() => []);      // spare mode: true/false per leave
     const powerLog = players.map(() => []);      // power mode: pins per round
-    const aims = players.map(() => ({ x: 0.12 * hand, angle: -0.2 * DEG * hand }));
+    const aims = players.map(() => ({ x: 0, angle: 0 }));   // dead centre: finding the pocket is the first thing to learn
     let phase = 'intro';
     let turn = null;                               // { p, frame | leave | round, ball, fresh }
     let autoplay = false;
@@ -1554,7 +1619,8 @@
     let standingBefore = [];
     let splitLeft = false;
     let lastShot = null, lastOutcome = null;
-    let hintHandle = null, firstThrowDone = false;
+    let hintHandle = null, firstThrowDone = false, curveHinted = false, throwsDone = 0, tipShown = false;
+    let hurry = false;                             // the player tapped through: the pinsetter speeds up
     let turnDir = 0, turnHeld = 0;
     let throwAnim = null;
     let rollInfo = null;                           // per-ball bookkeeping while the ball runs
@@ -1567,7 +1633,7 @@
     const hud = buildHud();
 
     // ---- camera ---------------------------------------------------------------------------------
-    const cam = { shot: 'setup', pos: V(0, 2.2, AIM_Z + 3.4), look: V(0, 0, -10), fov: 55, lambda: 4 };
+    const cam = { shot: 'setup', pos: V(0, 2.2, AIM_Z + 3.4), look: V(0, 0, -10), fov: 55, lambda: 4, followX: 0 };
 
     function fovFor(vFov, minH) {
       const a = engine.size.aspect;
@@ -1582,22 +1648,28 @@
       const pal = turn ? bowlers[turn.p].pal : null;
       let fov;
       if (cam.shot === 'setup') {
+        // high and to the ball side of the bowler, so the arrow and the whole lane read past their head
         const x = turn ? aims[turn.p].x : 0;
-        if (portrait) { _gp.set(x + 0.28 * hand, 2.5, AIM_Z + 2.9); _gl.set(x * 0.3 + 0.04 * hand, 0, -7.6); fov = fovFor(50, 31); }
-        else { _gp.set(x + 0.3 * hand, 2.1, AIM_Z + 2.8); _gl.set(x * 0.3 + 0.04 * hand, 0.1, -6.8); fov = fovFor(46, 30); }
+        if (portrait) { _gp.set(x + 0.4 * hand, 2.7, AIM_Z + 2.6); _gl.set(x * 0.3 + 0.08 * hand, 0, -9); fov = fovFor(46, 31); }
+        else { _gp.set(x + 0.75 * hand, 2.3, AIM_Z + 2.4); _gl.set(x * 0.3 + 0.1 * hand, 0, -9); fov = fovFor(34, 30); }
       } else if (cam.shot === 'follow') {
         const b = W.ball;
         const z = Math.max(b.z, HEAD_Z + 4.2);
-        // stay high while passing over the bowler, then drop in low behind the ball
+        // stay high while passing over the bowler, then drop in low behind the ball. Sideways it barely
+        // follows, and stops following past mid-lane, so the hook reads as a curve on screen.
+        if (b.z > -8) cam.followX = b.x;
+        const fx = cam.followX;
         const over = U.smoothstep(-3.2, 0.9, z + 2.5);
-        _gp.set(b.x * 0.7 + 0.35 * hand * over, 0.78 + 1.55 * over, z + 2.5); _gl.set(b.x * 0.45, portrait ? -0.12 : 0.05, Math.max(z - 6.5, HEAD_Z - 0.5));
+        _gp.set(fx * 0.25 + 0.35 * hand * over, 0.78 + 1.55 * over, z + 2.5);
+        _gl.set(fx * 0.3 + (b.x - fx) * 0.25, portrait ? -0.12 : 0.05, Math.max(z - 6.5, HEAD_Z - 0.5));
         fov = fovFor(46, 36);
       } else if (cam.shot === 'pins') {
         if (L.wide) {
-          // frame the current rack: 4 rows up close, 13 rows from further back
+          // frame the current rack: low and close for 4 rows, higher and further back for 13
           const rows = turn ? powerRows(turn.round) : 4, k = (rows - 4) / 9;
-          _gp.set(0, 1.2 + 0.95 * k, HEAD_Z + 2.4 + 1.0 * k); _gl.set(0, 0, HEAD_Z - 0.4 - 1.3 * k);
-          fov = fovFor(40, portrait ? 31 + 14 * k : 40 + 20 * k);
+          // (portrait stays low and lets the outer pins fly out of frame rather than shrink the rack)
+          if (portrait) { _gp.set(0, 0.95 + 0.1 * k, HEAD_Z + 1.9 + 0.5 * k); _gl.set(0, 0, HEAD_Z - 0.8 - 0.6 * k); fov = fovFor(40, 34 + 10 * k); }
+          else { _gp.set(0, 0.9 + 0.7 * k, HEAD_Z + 1.8 + 0.8 * k); _gl.set(0, 0, HEAD_Z - 1.0 - 1.6 * k); fov = fovFor(40, 44 + 20 * k); }
         }
         else if (portrait) { _gp.set(hand * 0.22, 1.1, HEAD_Z + 2.95); _gl.set(0, 0.08, HEAD_Z - 0.5); fov = fovFor(40, 31); }
         else { _gp.set(hand * 0.32, 1.05, HEAD_Z + 2.6); _gl.set(0, 0.12, HEAD_Z - 0.45); fov = fovFor(31, 40); }
@@ -1605,7 +1677,7 @@
         const r = pal.root.position;
         // from down the lane, looking back at the bowler with the cheering seating area behind
         if (portrait) { _gp.set(r.x - 0.25 * hand, 1.2, r.z - 2.9); _gl.set(r.x, 0.86, r.z); fov = fovFor(40, 40); }
-        else { _gp.set(r.x - 0.35 * hand, 1.3, r.z - 2.45); _gl.set(r.x - 0.12 * hand, 1.08, r.z); fov = fovFor(38, 30); }
+        else { _gp.set(r.x - 0.35 * hand, 1.3, r.z - 2.6); _gl.set(r.x - 0.12 * hand, 1.2, r.z); fov = fovFor(42, 30); }
       } else { _gp.copy(cam.pos); _gl.copy(cam.look); fov = cam.fov; }
       return fov;
     }
@@ -1675,7 +1747,7 @@
       const mkAim = (side, icon, dir) => {
         const wrap = ui.el('div', 'bw-aim ' + side + ' bw-off');
         const b = ui.button(dir < 0 ? 'Aim left' : 'Aim right', null, { kind: 'round', icon, className: 'light ss-block', sfx: null });
-        const start = e => { if (phase !== 'aim' || autoplay) return; e.preventDefault(); turnDir = dir; turnHeld = 0; nudgeAim(dir * 0.15 * DEG); ui.sfx('ui_tick'); };
+        const start = e => { if (phase !== 'aim' || autoplay) return; e.preventDefault(); turnDir = dir; turnHeld = 0; nudgeAim(dir * AIM_TAP); ui.sfx('ui_tick'); };
         const stop = () => { turnDir = 0; };
         b.addEventListener('pointerdown', start);
         b.addEventListener('pointerup', stop);
@@ -1689,8 +1761,9 @@
       const aimR = mkAim('r', 'rotate-right', 1);
       const swipe = ui.el('div', 'bw-swipe bw-off', ui.icon('up') + '<span>SWIPE UP TO BOWL</span>');
       const speed = ui.el('div', 'ss-chip dark bw-speed bw-off');
-      root.append(top, card, strip, sideL, sideR, swipe, speed);
-      return { top, nameChip, infoChip, totalChip, card, frames, strip, pinBox, pinDots, minis, aimL, aimR, swipe, speed, nameFor: -1 };
+      const tip = ui.el('div', 'ss-chip bw-speed bw-tip bw-off');
+      root.append(top, card, strip, sideL, sideR, swipe, speed, tip);
+      return { top, nameChip, infoChip, totalChip, card, frames, strip, pinBox, pinDots, minis, aimL, aimR, swipe, speed, tip, nameFor: -1 };
     }
 
     function setAimUi(on) {
@@ -1710,7 +1783,7 @@
 
     function playerTotal(i) {
       if (mode === 'game') return knownTotal(rolls[i]);
-      if (mode === 'spare') return stats[i].conversions;
+      if (mode === 'spare') return stats[i].sparePts;
       return stats[i].pins;
     }
 
@@ -1723,8 +1796,12 @@
         hud.nameChip.append(ui.portraitImg(prof, 30), ui.el('span', '', ui.esc(prof.name)));
       }
       if (mode === 'game') {
+        // the frame on show is the one being bowled until the next turn starts (a STRIKE banner keeps
+        // its frame highlighted)
         const st = frameState(rolls[p]);
-        hud.infoChip.textContent = st.done ? 'Done' : 'Frame ' + (st.frame + 1);
+        const cf = turn && turn.p === p ? turn.frame : st.frame;
+        const done = st.done && phase === 'done';
+        hud.infoChip.textContent = done ? 'Done' : 'Frame ' + (cf + 1);
         hud.totalChip.textContent = String(knownTotal(rolls[p]));
         const fr = scoreFrames(rolls[p]);
         fr.forEach((f, i) => {
@@ -1733,12 +1810,12 @@
           if (i < 9 && f.marks[0] === 'X') marks.unshift('<span></span>');
           h.m.innerHTML = marks.join('');
           h.t.textContent = f.total === null ? '' : String(f.total);
-          h.cell.classList.toggle('cur', !st.done && st.frame === i);
+          h.cell.classList.toggle('cur', !done && cf === i);
         });
       } else if (mode === 'spare') {
         const k = turn ? turn.leave : 0;
         hud.infoChip.textContent = LEAVES[Math.min(k, 9)].name;
-        hud.totalChip.textContent = stats[p].conversions + '/10';
+        hud.totalChip.textContent = stats[p].sparePts + ' pts';
         hud.card.classList.add('ss-hidden');
         hud.strip.classList.remove('ss-hidden');
         hud.strip.innerHTML = LEAVES.map((lv, i) => {
@@ -1758,7 +1835,7 @@
           return '<span class="big ' + (v != null ? (v === n ? 'ok' : '') : i === r ? 'cur' : '') + '">' + (v != null ? v : n) + '</span>';
         }).join('');
       }
-      hud.minis.forEach((m, i) => { m.sc.textContent = mode === 'spare' ? playerTotal(i) + '/10' : String(playerTotal(i)); m.chip.classList.toggle('cur', i === p); });
+      hud.minis.forEach((m, i) => { m.sc.textContent = String(playerTotal(i)); m.chip.classList.toggle('cur', i === p); });
       refreshPins();
       drawMonitor();
     }
@@ -1766,6 +1843,7 @@
     function refreshPins(hitFlash) {
       if (L.wide) return;
       const up = new Set(W.standing());
+      hud.pinBox.classList.toggle('big', up.size > 0 && up.size <= 4);   // a small leave reads bigger
       hud.pinDots.forEach((d, i) => {
         const n = SPOTS10[i].n;
         d.classList.toggle('up', up.has(n));
@@ -1787,13 +1865,13 @@
       g.textAlign = 'left'; g.fillStyle = '#FFFFFF'; g.font = '700 38px ' + FONT;
       g.fillText(prof.name, 20, 80);
       g.textAlign = 'right'; g.fillStyle = '#FFC93C'; g.font = '700 56px ' + FONT;
-      g.fillText(mode === 'spare' ? stats[p].conversions + '/10' : String(playerTotal(p)), 492, 84);
+      g.fillText(mode === 'spare' ? stats[p].sparePts + ' pts' : String(playerTotal(p)), 492, 84);
       if (mode === 'game') {
         const fr = scoreFrames(rolls[p]);
         const cw = 47, x0 = 20, y0 = 130;
         fr.forEach((f, i) => {
           const w = i === 9 ? cw + 14 : cw, x = x0 + i * cw;
-          g.fillStyle = i === frameState(rolls[p]).frame ? '#3A4BB0' : '#1E276A';
+          g.fillStyle = i === (turn ? turn.frame : 0) ? '#3A4BB0' : '#1E276A';
           g.fillRect(x + 1, y0, w - 2, 110);
           g.fillStyle = '#9FB2FF'; g.font = '700 16px ' + FONT; g.textAlign = 'center';
           g.fillText(String(i + 1), x + w / 2, y0 + 14);
@@ -1828,7 +1906,7 @@
       const card = ui.el('div', 'bw-turncard ss-pop');
       const sub = mode === 'game' ? 'Frame ' + (turn.frame + 1) : mode === 'spare' ? LEAVES[turn.leave].name : 'Round ' + (turn.round + 1);
       card.append(ui.portraitImg(prof, 64));
-      card.appendChild(ui.el('div', '', '<h3>' + ui.esc(prof.name) + "'s turn!</h3><p>" + ui.esc(sub) + '</p>'));
+      card.appendChild(ui.el('div', '', '<h3>' + ui.esc(isYou(prof.name) ? 'Your' : prof.name + "'s") + ' turn!</h3><p>' + ui.esc(sub) + '</p>'));
       wrap.appendChild(card);
       ctx.hud.appendChild(wrap);
       audio.sfx('ui_open');
@@ -1872,7 +1950,10 @@
       writeAll();
       scene.add(mesh);
       const roster = pals.CPU_ROSTER.slice();
-      const who = [roster[ambRng.int(0, roster.length - 1)], roster[ambRng.int(0, roster.length - 1)]];
+      const i0 = ambRng.int(0, roster.length - 1);
+      let i1 = ambRng.int(0, roster.length - 2);
+      if (i1 >= i0) i1++;
+      const who = [roster[i0], roster[i1]];
       const ballM = new THREE.MeshPhongMaterial({ color: 0x8E5BE0, shininess: 80 });
       const bowlersN = [1, 2].map((laneIdx, j) => {
         const cx = lanes[laneIdx];
@@ -1897,17 +1978,20 @@
         if (nb.t < 0) {
           nb.next -= dt;
           if (nb.next <= 0 && phase !== 'intro') {
-            nb.t = 0; nb.hit = false;
-            nb.pal.play('walk'); nb.pal.setSpeed(1.4);
+            nb.t = 0; nb.hit = false; nb.thrown = false; nb.back = false;
+            nb.pal.play('walk'); nb.pal.setSpeed(1.3);
           }
           continue;
         }
         nb.t += dt;
         const root = nb.pal.root;
-        if (nb.t < 0.9) {
-          root.position.z = NB_Z - nb.t * 0.3;
-          nb.shadow.position.z = root.position.z;
-        } else if (!nb.ball.visible && nb.t < 1.2) {
+        // walk up from the seats, bowl, watch, walk back
+        if (nb.t < NB_WALK) root.position.z = U.lerp(NB_Z, NB_LINE, nb.t / NB_WALK);
+        else if (nb.t > 5.2) root.position.z = U.lerp(NB_LINE, NB_Z, Math.min(1, (nb.t - 5.2) / NB_WALK));
+        nb.shadow.position.z = root.position.z;
+        if (nb.t > 5.2 && !nb.back) { nb.back = true; nb.pal.setFacing(0); nb.pal.play('walk'); nb.pal.setSpeed(1.3); }
+        if (nb.t >= NB_WALK && !nb.thrown) {
+          nb.thrown = true;
           nb.pal.play('idle');
           nb.ball.visible = true;
           nb.x = nb.cx + ambRng.range(-0.15, 0.2); nb.z = RELEASE_Z; nb.v = ambRng.range(6.5, 8.5);
@@ -1933,10 +2017,10 @@
           }
           if (nb.z < HEAD_Z - 1.2) nb.ball.visible = false;
         }
-        if (nb.t > 4.6) {
+        if (nb.t > 5.2 + NB_WALK) {
           for (const s of ambient.state) if (Math.floor(s.i / 10) === nb.lane) { U.killTweens(s); s.tilt = 0; s.fall = 0; }
-          root.position.z = NB_Z;
-          nb.shadow.position.z = root.position.z;
+          nb.pal.setFacing(Math.PI);
+          nb.pal.play('idle');
           nb.t = -1; nb.next = 10 + ambRng.range(0, 10);
         }
         dirty = true;
@@ -1960,8 +2044,22 @@
       syncPins();
     }
 
+    /** Resolves like p while the game runs; never after exit (like ctx.wait), so async flows just stop. */
+    function live(p) {
+      return p.then(v => (ctx.alive ? v : new Promise(() => {})));
+    }
+
     function tweenP(target, props, dur, ease) {
-      return U.tween(target, props, Math.max(0.01, dur), { ease: ease || 'inOutQuad' });
+      return live(U.tween(target, props, Math.max(0.01, dur), { ease: ease || 'inOutQuad' }));
+    }
+
+    /** Pinsetter tempo: brisk by default, faster when the player taps through (or autoplay runs). */
+    const setterK = () => (autoplay ? 0.6 : hurry ? 0.5 : 0.65);
+
+    /** Starts the pinsetter after a short beat (cut short by a tap). */
+    async function pinsetterAfter(delay, kind, rack) {
+      for (let t = 0; t < delay && !hurry && !autoplay; t += 0.05) await ctx.wait(0.05);
+      await runPinsetter(kind, rack);
     }
 
     /**
@@ -1969,40 +2067,39 @@
      * kind 'rack': everything swept and a new rack lowered. Runs on game time (pauses with the game).
      */
     async function runPinsetter(kind, rack) {
-      const k = autoplay ? 0.7 : 1;
       audio.sfx('sweep', { vol: 0.55 });
-      await tweenP(sweepBar.position, { y: 0.09 }, 0.3 * k, 'outQuad');
+      await tweenP(sweepBar.position, { y: 0.09 }, 0.3 * setterK(), 'outQuad');
       if (kind === 'respot') {
         const keep = W.pins.filter(p => W.isStanding(p));
-        await tweenP(table.position, { y: 0.42 }, 0.32 * k);
+        await tweenP(table.position, { y: 0.42 }, 0.32 * setterK());
         for (const p of keep) {
           placePin(p, p.x - p.m01 * PIN_YC, p.z - p.m21 * PIN_YC, Math.atan2(p.m02, p.m00));
           p.lifted = true;
         }
         liftY = 0;
-        await tweenLift(0.5, 0.3 * k);
-        await sweepDeadwood(0.5 * k);
-        await tweenP(sweepBar.position, { z: BAR_FRONT }, 0.3 * k);
-        await tweenLift(0, 0.3 * k);
+        await tweenLift(0.5, 0.3 * setterK());
+        await sweepDeadwood(0.5 * setterK());
+        await tweenP(sweepBar.position, { z: BAR_FRONT }, 0.3 * setterK());
+        await tweenLift(0, 0.3 * setterK());
         for (const p of keep) p.lifted = false;
       } else {
-        await sweepDeadwood(0.5 * k);
-        await tweenP(sweepBar.position, { z: BAR_FRONT }, 0.28 * k);
+        await sweepDeadwood(0.5 * setterK());
+        await tweenP(sweepBar.position, { z: BAR_FRONT }, 0.28 * setterK());
         W.setRack(rack.spots, rack.standing);
         for (const p of W.pins) if (p.active) p.lifted = true;
         liftY = TABLE_UP - 0.42;
         table.position.y = TABLE_UP;
-        await tweenLift(0, 0.42 * k, 'outQuad');
+        await tweenLift(0, 0.42 * setterK(), 'outQuad');
         audio.sfx('wood_knock', { vol: 0.35, rate: 0.8 });
         for (const p of W.pins) p.lifted = false;
       }
-      await Promise.all([tweenP(table.position, { y: TABLE_UP }, 0.32 * k), tweenP(sweepBar.position, { y: BAR_UP }, 0.3 * k)]);
-      refreshPins();
+      await Promise.all([tweenP(table.position, { y: TABLE_UP }, 0.32 * setterK()), tweenP(sweepBar.position, { y: BAR_UP }, 0.3 * setterK())]);
+      if (phase !== 'react') refreshPins();
     }
 
     function tweenLift(to, dur, ease) {
       const o = { v: liftY };
-      return U.tween(o, { v: to }, Math.max(0.01, dur), { ease: ease || 'inOutQuad', onUpdate: () => { liftY = o.v; table.position.y = 0.42 + liftY; } });
+      return live(U.tween(o, { v: to }, Math.max(0.01, dur), { ease: ease || 'inOutQuad', onUpdate: () => { liftY = o.v; table.position.y = 0.42 + liftY; } }));
     }
 
     async function sweepDeadwood(dur) {
@@ -2065,8 +2162,7 @@
       let prevP = -1;
       let reset = Promise.resolve();
       while (ctx.alive && turn) {
-        await prepareTurn(turn, prevP);     // the pinsetter may still be finishing meanwhile
-        await reset;
+        await prepareTurn(turn, prevP, reset);
         prevP = turn.p;
         const shot = await waitForShot();
         await bowl(shot);
@@ -2074,47 +2170,70 @@
         const next = nextTurn(turn);
         returnFor = next ? next.p : turn.p;
         const resetKind = !next ? null : mode === 'game' && next.p === turn.p && !next.fresh ? 'respot' : 'rack';
-        reset = resetKind ? ctx.wait(0.9).then(() => runPinsetter(resetKind, rackFor(next))) : Promise.resolve();
-        await react(out, !next);
+        hurry = false;
+        reset = resetKind ? pinsetterAfter(0.3, resetKind, rackFor(next)) : Promise.resolve();
+        await react(out, !next, resetKind === 'respot');
         turn = next;
         if (turn) refreshHud();
       }
       if (ctx.alive) finishGame();
     }
 
-    async function prepareTurn(t, prevP) {
+    /** Puts bowler t.p on the approach (the others leave) and resets their pose. */
+    function standUp(t, show) {
+      const b = bowlers[t.p], a = aims[t.p];
+      if (show) bowlers.forEach((o, i) => { o.pal.root.visible = i === t.p; o.shadow.visible = i === t.p; });
+      U.killTweens(b.pal.root.position);
+      b.pal.root.position.set(a.x - 0.2 * hand, 0, AIM_Z);
+      b.pal.setFacing(Math.PI);
+      b.pal.releasePose(0);
+      b.pal.play('idle');
+      b.pal.lookAt(null);
+      b.pal.setExpression('neutral');
+    }
+
+    async function prepareTurn(t, prevP, reset) {
       phase = 'turn';
       const b = bowlers[t.p];
       const a = aims[t.p];
+      const switching = prevP !== t.p;
       if (W.ball.mode !== 'gone' && W.ball.mode !== 'held') { W.ball.mode = 'gone'; W.ball.active = false; W.ball.dyn = false; }
       if (ballVis.mode !== 'rack' && ballVis.mode !== 'hand') { ball.visible = false; ballVis.mode = 'hidden'; }
-      if (ballVis.mode === 'hidden') { ballReturn(); await ctx.wait(autoplay ? 0.3 : 0.6); }
-      if (prevP !== t.p) {
-        bowlers.forEach((o, i) => { o.pal.root.visible = i === t.p; o.shadow.visible = i === t.p; });
-        b.pal.root.position.set(a.x - 0.2 * hand, 0, AIM_Z);
-        b.pal.setFacing(Math.PI);
-        b.pal.releasePose(0);
-        b.pal.play('idle');
-        b.pal.lookAt(null);
-        b.pal.setExpression('neutral');
-        hud.nameFor = -1;
-        refreshHud();
+      if (ballVis.mode === 'hidden') ballReturn();
+      if (switching) { hud.nameFor = -1; refreshHud(); }
+      if (mode === 'spare' || !t.fresh) {
+        // "here's your leave": hold on the pins while the pinsetter finishes, then swing back to the bowler
+        if (cam.shot !== 'pins') setShot('pins', 4, true);
+        standUp(t, switching);
+        await reset;
+        refreshPins();
+        if (switching && players.length > 1) await showTurnCard(t.p);
+        else {
+          if (players.length === 1) introBanner(t);
+          await skippable(autoplay ? 0.3 : 0.45);
+        }
+        setShot('setup', 3.4);
+      } else if (switching) {
+        standUp(t, true);
         setShot('setup', 3.2, true);
         if (players.length > 1) await showTurnCard(t.p);
+        else introBanner(t);
       } else {
-        // same bowler: walk back to the spot
+        // same bowler, new rack: walk back to the spot
         const pal = b.pal;
         pal.releasePose(0.2);
         pal.play('walk');
         pal.setSpeed(1.6);
         pal.setFacing(0);
         setShot('setup', 3.2, true);
-        const r = pal.root.position;
-        await Promise.all([tweenP(r, { x: a.x - 0.2 * hand, z: AIM_Z }, 0.55)]);
+        introBanner(t);
+        await tweenP(pal.root.position, { x: a.x - 0.2 * hand, z: AIM_Z }, 0.55);
         pal.setFacing(Math.PI);
         pal.play('idle');
       }
-      if (players.length === 1) introBanner(t);
+      await reset;
+      refreshPins();
+      ball.material = ballMats[t.p];
       await ballToHand(b.pal);
     }
 
@@ -2138,7 +2257,7 @@
       ball.visible = true;
       const target = heldBallPos(pal, V(0, 0, 0));
       U.killTweens(ball.position);
-      await U.tween(ball.position, { x: target.x, y: target.y, z: target.z }, autoplay ? 0.15 : 0.3, { ease: 'outQuad' });
+      await live(U.tween(ball.position, { x: target.x, y: target.y, z: target.z }, autoplay ? 0.15 : 0.3, { ease: 'outQuad' }));
       ballVis.mode = 'hand';
       poseHold(pal, false);
     }
@@ -2157,18 +2276,33 @@
       pal.pose(Object.assign(hand > 0 ? { handR: bh, handL: oh } : { handL: bh, handR: oh }, extra), { lambda });
     }
 
+    // ready crouch (finger down) and the top of the backswing; a swipe in progress blends between them
+    const POSE_READY = { bh: [-0.12, 0.8, 0.27], oh: [0.07, 0.83, 0.3], crouch: 0.38, lean: 0.24, stance: 0.35 };
+    const POSE_BACK = { bh: [-0.24, 0.66, -0.36], oh: [0.34, 0.86, 0.2], crouch: 0.45, lean: 0.32, stance: 0.6 };
+
+    function poseWindup(pal, k, lambda) {
+      const l = (a, b) => a + (b - a) * k;
+      const lv = (a, b) => [l(a[0], b[0]), l(a[1], b[1]), l(a[2], b[2])];
+      const R = POSE_READY, B = POSE_BACK;
+      poseHands(pal, lv(R.bh, B.bh), lv(R.oh, B.oh), { crouch: l(R.crouch, B.crouch), lean: l(R.lean, B.lean), stance: l(R.stance, B.stance) }, lambda);
+    }
+
     function poseHold(pal, ready) {
-      if (ready) poseHands(pal, [-0.12, 0.8, 0.27], [0.07, 0.83, 0.3], { crouch: 0.38, lean: 0.24, stance: 0.35 }, 14);
+      if (ready) poseWindup(pal, 0, 14);
       else poseHands(pal, [-0.27, 0.6, 0.14], [0.3, 0.7, 0.08], { crouch: 0.06, lean: 0.04 }, 10);
     }
 
     function waitForShot() {
       phase = 'aim';
-      if (!firstThrowDone && !autoplay && !hintHandle && !(save.settings && save.settings.hints === false)) {
+      const hints = !autoplay && !hintHandle && !(save.settings && save.settings.hints === false);
+      if (hints && (!firstThrowDone || (!curveHinted && (throwsDone >= 3 || stats[turn.p].strikes > 0)))) {
+        // first the plain swipe; a few balls in, the curve that makes the ball hook
+        const curve = firstThrowDone;
+        curveHinted = curveHinted || curve;
         const sz = engine.size;
-        hintHandle = ui.hint(sz.h <= 520 && sz.aspect > 1
-          ? { gesture: 'swipe-up-curve', text: 'Swipe up to bowl!', x: sz.w * 0.66, y: sz.h * 0.56 }
-          : { gesture: 'swipe-up-curve', text: 'Swipe up to bowl!' });
+        const text = curve ? 'Bend your swipe to hook!' : sz.w < 360 ? 'Swipe up!' : 'Swipe up to bowl!';
+        const gesture = curve ? 'swipe-up-curve' : 'swipe-up';
+        hintHandle = ui.hint(sz.h <= 520 && sz.aspect > 1 ? { gesture, text, x: sz.w * 0.66, y: sz.h * 0.56 } : { gesture, text });
       }
       setAimUi(true);
       arrowGlow = 1;
@@ -2188,6 +2322,7 @@
       turnDir = 0;
       if (hintHandle) { hintHandle.hide(); hintHandle = null; }
       firstThrowDone = true;
+      throwsDone++;
       w(shot);
       return true;
     }
@@ -2196,21 +2331,38 @@
       const pal = bowlers[turn.p].pal;
       lastShot = { x: shot.x, angleDeg: shot.angle / DEG, speed: shot.speed, spin: shot.spin };
       standingBefore = W.standing();
-      throwAnim = { t: 0, shot, launched: false, pal, z0: pal.root.position.z };
+      // a swipe already played the backswing under the finger: go straight into the forward swing
+      throwAnim = { t: shot.swiped ? 0.11 : 0, t0: shot.swiped ? 0.11 : 0, shot, launched: false, pal, z0: pal.root.position.z };
       audio.sfx('swish', { vol: 0.4, rate: 0.8 });
       while (!throwAnim.launched) await ctx.wait(0.02);
       phase = 'roll';
-      rollInfo = { hitSeen: false, gutterSeen: false, t: 0, settleT: 0, lastClack: 0 };
+      rollInfo = { hitSeen: false, gutterSeen: false, predicted: false, t: 0, settleT: 0, lastClack: 0, sig: '', sigT: 0, skip: false };
+      cam.followX = W.ball.x;
       setShot('follow', 5.5);
+      crowd.setMood('tense');
+      audio.duck(0.7, 3);
       const s = stats[turn.p];
       s.topSpeed = Math.max(s.topSpeed, shot.speed);
       showSpeed(shot.speed, shot.spin);
-      // ride along until the pins settle (or a generous timeout)
+      // ride along until the count can't change any more (or a generous timeout)
       while (ctx.alive) {
         await ctx.wait(0.05);
-        const r = rollInfo;
-        if (cam.shot === 'follow' && (W.ball.z < -11.8 || W.ball.mode !== 'lane')) setShot('pins', 4);
-        if (W.ev.hit || W.ball.mode === 'gone' || W.ball.mode === 'pit') r.settleT += 0.05;
+        const r = rollInfo, bm = W.ball.mode;
+        // the follow cam keeps a gutter ball in view; it hands over to the pin cam just before impact
+        if (cam.shot === 'follow' && (W.ball.z < CUT_Z || bm === 'pit' || bm === 'gone')) setShot('pins', 5);
+        if (W.ev.gutterAt !== null && !W.ev.hit) {
+          // nothing more can happen to the pins: call it (a tap calls it at once)
+          if (r.skip || W.t - W.ev.gutterAt > 0.6) break;
+          continue;
+        }
+        if (W.ev.hit || bm === 'gone' || bm === 'pit') r.settleT += 0.05;
+        if (W.ev.hit) {
+          const up = W.standing();
+          const sig = up.join(',');
+          if (sig !== r.sig) { r.sig = sig; r.sigT = 0; } else r.sigT += 0.05;
+          if (up.length === 0 && r.sigT >= 0.3) break;             // everything is down
+          if (r.sigT >= 0.4 && W.quiet()) break;                   // the leave is final
+        }
         if (W.settled() && r.settleT > 0.6) break;
         if (r.settleT > (L.wide ? 6 : 4.8)) break;
         if (r.t > 12) break;
@@ -2254,8 +2406,14 @@
         if (frameState(rolls[t.p]).done && total === 300) out.kind = 'perfect';
       } else if (mode === 'spare') {
         const ok = after.length === 0;
+        const run = ok && leaveLog[t.p][leaveLog[t.p].length - 1] === true;
         leaveLog[t.p].push(ok);
-        if (ok) { s.conversions++; s.spares++; }
+        if (ok) {
+          s.conversions++; s.spares++;
+          out.pts = SPARE_PTS + (run ? SPARE_RUN_BONUS : 0);
+          out.run = run;
+          s.sparePts += out.pts;
+        }
         out.kind = ok ? (isSplit(LEAVES[t.leave].pins) ? 'pickup' : 'spare') : knocked > 0 ? 'close' : out.kind;
         if (ok && s.conversions === 10) out.kind = 'perfectSpares';
       } else {
@@ -2280,8 +2438,9 @@
     // Celebrations
     // =============================================================================================
 
-    async function react(out, last) {
+    async function react(out, last, respot) {
       phase = 'react';
+      crowd.setMood('idle');
       const pal = bowlers[turn.p].pal;
       const deck = V(0, 0.6, HEAD_Z - 0.5);
       let anim = 'shrug', expr = 'neutral', big = false;
@@ -2313,7 +2472,7 @@
           anim = 'jump'; expr = 'joy';
           break;
         case 'spare':
-          ui.banner('SPARE!', { kind: 'great', duration: 1.5 });
+          ui.banner('SPARE!', { kind: 'great', sub: spareSub(out), duration: 1.5 });
           audio.sfx('star');
           audio.sfx('crowd_applause', { intensity: 0.7 });
           crowd.cheer(0.6, 1.6);
@@ -2321,7 +2480,7 @@
           break;
         case 'pickup':
           big = true;
-          ui.banner('NICE PICK-UP!', { kind: 'great', sub: mode === 'spare' ? LEAVES[turn.leave].name : 'Split converted', duration: 1.8 });
+          ui.banner('NICE PICK-UP!', { kind: 'great', sub: mode === 'spare' ? spareSub(out) : 'Split converted', duration: 1.8 });
           audio.sfx('fanfare_small');
           audio.sfx('crowd_cheer', { intensity: 0.85 });
           crowd.cheer(0.9, 2.2);
@@ -2340,6 +2499,7 @@
         case 'split':
           ui.banner('SPLIT!', { kind: 'info', sub: out.sub, duration: 1.5 });
           audio.sfx('crowd_gasp');
+          crowd.gasp();
           anim = 'shrug'; expr = 'surprised';
           break;
         case 'gutter':
@@ -2381,7 +2541,10 @@
         }
       }
       if (big) hapticBuzz(30);
+      if (out.kind !== 'strike' && out.kind !== 'perfect') maybeTip();
       await skippable(autoplay ? 0.5 : big ? 1.0 : 0.8);
+      // a plain count on a first ball: stay on the pins and watch the pinsetter set up the spare
+      if (respot && out.kind === 'count') return;
       // reaction shot: the bowler celebrates toward us, the crowd behind
       pal.releasePose(0.25);
       pal.lookAt(null);
@@ -2396,6 +2559,22 @@
 
     function hapticBuzz(ms) { if (ui.haptic) ui.haptic(ms); }
 
+    function spareSub(out) {
+      if (mode !== 'spare') return null;
+      return out.run ? '+' + out.pts + ' · back-to-back!' : '+' + out.pts;
+    }
+
+    /** Once a game: a first ball that met the head pin square or on the wrong side gets a pointer. */
+    function maybeTip() {
+      const h = W.ev.hit;
+      if (tipShown || autoplay || mode !== 'game' || standingBefore.length < 10 || !h || h.pin !== 1) return;
+      if (h.x * hand > 0.03) return;
+      tipShown = true;
+      hud.tip.innerHTML = ui.icon('bulb') + '<span>Move a little ' + (hand > 0 ? 'right' : 'left') + ' to hit the pocket</span>';
+      hud.tip.classList.remove('bw-off');
+      ctx.wait(4).then(() => hud.tip.classList.add('bw-off'));
+    }
+
     // =============================================================================================
     // The throw: release animation, ball launch, rolling feedback
     // =============================================================================================
@@ -2405,12 +2584,13 @@
       if (!a) return;
       a.t += dt;
       const pal = a.pal, t = a.t;
-      if (t < 0.11) poseHands(pal, [-0.24, 0.66, -0.36], [0.34, 0.86, 0.2], { crouch: 0.45, lean: 0.32, stance: 0.6 }, 30);
-      else if (t < 0.25) poseHands(pal, [-0.2, 0.16, 0.42], [0.46, 0.74, 0.08], { crouch: 0.78, lean: 0.62, stance: 1 }, 34);
+      // backswing (already shown under the finger for a swipe) → forward swing → release → follow-through
+      if (t < 0.11) poseWindup(pal, 1, 30);
+      else if (t < 0.2) poseHands(pal, [-0.2, 0.16, 0.42], [0.46, 0.74, 0.08], { crouch: 0.78, lean: 0.62, stance: 1 }, 34);
       else poseHands(pal, [-0.17, 0.98, 0.5], [0.46, 0.8, -0.02], { crouch: 0.66, lean: 0.5, stance: 1 }, 9);
-      const k = U.ease.outCubic(Math.min(1, t / 0.32));
+      const k = U.ease.outCubic(Math.min(1, (t - a.t0) / 0.28));
       pal.root.position.z = U.lerp(a.z0, 0.62, k);
-      if (!a.launched && t >= 0.25) {
+      if (!a.launched && t >= 0.15) {
         a.launched = true;
         W.launch(a.shot);
         ballVis.mode = 'free';
@@ -2419,6 +2599,7 @@
         trail.clear();
         trail.visible = true;
         audio.sfx('bowl_release', { intensity: U.clamp((a.shot.speed - 5) / 5, 0.3, 1) });
+        hapticBuzz(12);
         if (a.shot.speed > 9) audio.sfx('voice_hup', { vol: 0.6 });
         if (rollLoop) rollLoop.stop(0.05);
         rollLoop = audio.loop('ball_roll', { vol: 0.75, rate: a.shot.speed / 8 });
@@ -2472,6 +2653,12 @@
         audio.sfx('gutter_drop');
         if (!W.ev.hit) audio.sfx('crowd_aww', { intensity: 0.4, vol: 0.6 });
       }
+      // late in the lane, a ball on its way into the pocket draws an "ooh" from the seats
+      if (!r.predicted && b.mode === 'lane' && b.z < -12.5 && !L.wide && standingBefore.length >= 9) {
+        r.predicted = true;
+        const px = predictHeadX(W);
+        if (px !== null && Math.abs(px - hand * POCKET_X) < 0.035) audio.sfx('crowd_ooh', { vol: 0.45 });
+      }
       const h = W.ev.hit;
       if (h && !r.hitSeen) {
         r.hitSeen = true;
@@ -2513,7 +2700,7 @@
       const a = aims[turn.p];
       if (phase === 'aim' && turnDir) {
         turnHeld += dt;
-        const rate = (1.5 + 5 * Math.min(1, turnHeld / 0.9)) * DEG;
+        const rate = (0.8 + 3.2 * Math.min(1, turnHeld / 1.0)) * DEG;
         nudgeAim(turnDir * rate * dt);
         if (Math.floor(turnHeld / 0.12) !== Math.floor((turnHeld - dt) / 0.12)) ui.sfx('ui_tick');
       }
@@ -2525,6 +2712,16 @@
       arrow.visible = marker.visible = arrowMat.opacity > 0.01;
       arrow.position.set(a.x, 0.004, RELEASE_Z);
       arrow.rotation.y = -a.angle;
+      // spare balls: the guide runs on to the front standing pin
+      const spareAim = show && turn && (mode === 'spare' || !turn.fresh);
+      guideMat.opacity = U.damp(guideMat.opacity, spareAim ? arrowMat.opacity * 0.85 : 0, 10, dt);
+      guideRing.material.opacity = guideMat.opacity;
+      guide.visible = guideRing.visible = guideMat.opacity > 0.01;
+      if (guide.visible) {
+        let front = HEAD_Z;
+        for (const p of W.pins) if (W.isStanding(p)) front = Math.max(front, p.z);
+        guideRing.position.set(0, 0.001, (front - RELEASE_Z) / Math.cos(a.angle));
+      }
       marker.position.set(a.x, 0.004, RELEASE_Z);
       // the bowler follows the release spot while aiming
       if (phase === 'aim' && turn) {
@@ -2551,6 +2748,8 @@
         else if (p.dy < -12 && ay > ax) press.mode = 'swipe';
       }
       if (press.mode === 'drag') moveTo(press.startX + p.ndx * 1.15);
+      // the swipe up is the backswing; lifting the finger lets the ball go
+      else if (press.mode === 'swipe') poseWindup(bowlers[turn.p].pal, U.clamp(-p.ndy / 0.25, 0, 1), 26);
     });
     ctx.input.on('up', () => {
       const m = press.mode;
@@ -2567,22 +2766,28 @@
       if (!read || press.last === 'drag') return;
       if (s.start.y < engine.size.h * 0.18) return;
       const a = aims[turn.p];
-      commitShot({ x: a.x, angle: U.clamp(a.angle + read.drift, -AIM_MAX - 3 * DEG, AIM_MAX + 3 * DEG), speed: read.speed, spin: read.spin });
+      commitShot({ x: a.x, angle: U.clamp(a.angle + read.drift, -AIM_MAX - 3 * DEG, AIM_MAX + 3 * DEG), speed: read.speed, spin: read.spin, swiped: true });
     });
-    ctx.input.on('tap', () => {
-      if (skipWaiter && (phase === 'react' || phase === 'turn')) skipWaiter();
-    });
+    /** Tap / Space: skip the current beat; after a gutter ball, call the result at once. */
+    function skipBeat() {
+      if (phase === 'roll' && rollInfo && W.ev.gutterAt !== null && !W.ev.hit) { rollInfo.skip = true; return true; }
+      if (!skipWaiter || (phase !== 'react' && phase !== 'turn')) return false;
+      hurry = true;
+      skipWaiter();
+      return true;
+    }
+    ctx.input.on('tap', skipBeat);
     ctx.input.on('key', k => {
       if (!k.down || !turn) return;
-      if ((phase === 'react' || phase === 'turn') && (k.key === ' ' || k.key === 'Enter') && skipWaiter) { skipWaiter(); return; }
+      if ((k.key === ' ' || k.key === 'Enter') && phase !== 'aim' && skipBeat()) return;
       if (phase !== 'aim' || autoplay) return;
-      if (k.key === 'ArrowLeft') moveTo(aims[turn.p].x - 0.025);
-      else if (k.key === 'ArrowRight') moveTo(aims[turn.p].x + 0.025);
-      else if (k.key === 'a' || k.key === 'A') nudgeAim(-0.25 * DEG);
-      else if (k.key === 'd' || k.key === 'D') nudgeAim(0.25 * DEG);
+      if (k.key === 'ArrowLeft') moveTo(aims[turn.p].x - BOARD / 2);
+      else if (k.key === 'ArrowRight') moveTo(aims[turn.p].x + BOARD / 2);
+      else if (k.key === 'a' || k.key === 'A') nudgeAim(-2 * AIM_TAP);
+      else if (k.key === 'd' || k.key === 'D') nudgeAim(2 * AIM_TAP);
       else if ((k.key === ' ' || k.key === 'Enter') && !k.repeat) {
         const a = aims[turn.p];
-        commitShot({ x: a.x, angle: a.angle, speed: 8.4, spin: 0.35 * hand });
+        commitShot({ x: a.x, angle: a.angle, speed: 8.4, spin: 0 });   // keyboard fallback: a firm straight ball
       }
     });
 
@@ -2592,12 +2797,12 @@
 
     async function autoShot() {
       const t = turn;
-      const live = W.pins.filter(p => W.isStanding(p));
+      const up = W.pins.filter(p => W.isStanding(p));
       let plan;
-      if (live.length === W.pins.length && (mode !== 'spare')) {
+      if (up.length === W.pins.length && (mode !== 'spare')) {
         plan = strikeShot(L, { speed: 7.8 + rng.next() * 1.4, spin: 0.5 + rng.next() * 0.45 }, hand);
       } else {
-        const spots = live.map(p => ({ n: p.n, x: p.x, z: p.z }));
+        const spots = up.map(p => ({ n: p.n, x: p.x, z: p.z }));
         const set = new Set(spots.map(s => s.n));
         const cands = spareCandidates(L, spots, hand);
         const scores = [];
@@ -2610,7 +2815,7 @@
       const shot = humanize(plan, 0.9, rng);
       // show the line being picked, then bowl
       const a = aims[t.p];
-      await Promise.all([U.tween(a, { x: shot.x, angle: shot.angle }, 0.45, { ease: 'inOutQuad' })]);
+      await live(U.tween(a, { x: shot.x, angle: shot.angle }, 0.45, { ease: 'inOutQuad' }));
       arrowGlow = 1;
       await ctx.wait(0.2);
       if (!autoplay || turn !== t || phase !== 'aim') return;
@@ -2629,7 +2834,8 @@
       const scores = players.map((p, i) => playerTotal(i));
       const order = scores.map((s, i) => ({ s, i })).sort((a, b) => b.s - a.s || (stats[b.i].pins - stats[a.i].pins));
       const placeOf = i => 1 + order.filter(o => o.s > scores[i]).length;
-      const fmtScore = i => (mode === 'spare' ? scores[i] + '/10' : String(scores[i]));
+      const fmtScore = i => (mode === 'spare' ? scores[i] + ' pts' : String(scores[i]));
+      const conv = stats.map(st => st.conversions);
       // records
       const records = [];
       const best = order[0];
@@ -2646,7 +2852,11 @@
           const who = players[stats.findIndex(s => s.strikes === mostStrikes)].profile;
           rec('strikes', mostStrikes, 'Most Strikes', '{v} strikes', who);
         }
-      } else if (mode === 'spare') rec('spare', best.s, 'Spare Challenge', '{v}/10');
+      } else if (mode === 'spare') {
+        const most = Math.max(...conv);
+        rec('spare', most, 'Spare Challenge', '{v}/10', players[conv.indexOf(most)].profile);
+        rec('sparePts', best.s, 'Spare Points', '{v} pts');
+      }
       else rec('power', best.s, 'Power Pins', '{v} pins');
       // medals (first player)
       const medals = [];
@@ -2657,15 +2867,16 @@
         if (s0 >= 170) award('silver');
         if (s0 >= 220) award('gold');
         if (s0 >= 250) award('platinum');
-      } else if (mode === 'spare' && s0 >= 8) award('platinum');
+      } else if (mode === 'spare' && conv[0] >= 8) award('platinum');
+      else if (mode === 'hundred' && s0 >= POWER_SILVER) award('silver');
       // skill
       const deltaFor = i => {
         const lvl = ctx.skillFor(players[i].profile);
         const k = lvl / 2500;
         let d;
         if (mode === 'game') d = (scores[i] - (70 + 160 * k)) * 0.45 + 8;
-        else if (mode === 'spare') d = (scores[i] - (2 + 5 * k)) * 12 + 6;
-        else d = (scores[i] - (140 + 130 * k)) * 0.3 + 6;
+        else if (mode === 'spare') d = (conv[i] - (2 + 5 * k)) * 12 + 6;
+        else d = (scores[i] - (220 + 180 * k)) * 0.2 + 6;
         return Math.round(U.clamp(d, -40, 80));
       };
       const st0 = stats[0];
@@ -2679,6 +2890,7 @@
           topSpeed);
       } else if (mode === 'spare') {
         statsOut.push({ label: 'Leaves Converted', value: st0.conversions + '/10' },
+          { label: 'Back-to-Back Bonus', value: String(st0.sparePts - SPARE_PTS * st0.conversions) },
           { label: 'Splits Picked Up', value: String(leaveLog[0].filter((ok, i) => ok && isSplit(LEAVES[i].pins)).length) }, topSpeed);
       } else {
         statsOut.push({ label: 'Pins Knocked', value: String(powerLog[0].reduce((a, b) => a + b, 0)) },
@@ -2687,16 +2899,18 @@
       }
       const solo = players.length === 1;
       let title;
-      if (!solo) title = players[best.i].profile.name + ' Wins!';
+      const tied = scores.filter(v => v === best.s).length > 1;
+      const winner = players[best.i].profile.name;
+      if (!solo) title = tied ? "It's a Tie!" : isYou(winner) ? 'You Win!' : winner + ' Wins!';
       else if (mode === 'game') title = s0 >= 300 ? 'Perfect Game!' : s0 >= 220 ? 'Bowling Legend!' : s0 >= 170 ? 'Great Game!' : s0 >= 120 ? 'Nice Game!' : 'Good Effort!';
-      else if (mode === 'spare') title = s0 >= 10 ? 'Clean Sweep!' : s0 >= 8 ? 'Spare Master!' : s0 >= 5 ? 'Nice Pick-ups!' : 'Keep Practising!';
-      else title = s0 >= 300 ? 'Pin Crusher!' : s0 >= 200 ? 'Power Bowler!' : 'Nice Rolling!';
-      const good = mode === 'game' ? s0 >= 120 : mode === 'spare' ? s0 >= 5 : s0 >= 200;
+      else if (mode === 'spare') title = conv[0] >= 10 ? 'Clean Sweep!' : conv[0] >= 8 ? 'Spare Master!' : conv[0] >= 5 ? 'Nice Pick-ups!' : 'Keep Practising!';
+      else title = s0 >= POWER_SILVER ? 'Pin Crusher!' : s0 >= 220 ? 'Power Bowler!' : 'Nice Rolling!';
+      const good = mode === 'game' ? s0 >= 120 : mode === 'spare' ? conv[0] >= 5 : s0 >= 220;
       ctx.finish({
-        outcome: solo ? (good ? 'win' : 'done') : 'done',
+        outcome: solo ? (good ? 'win' : 'done') : tied ? 'draw' : 'done',
         title,
         headline: fmtScore(solo ? 0 : best.i),
-        headlineLabel: mode === 'game' ? 'Final Score' : mode === 'spare' ? 'Leaves Converted' : 'Pins',
+        headlineLabel: mode === 'game' ? 'Final Score' : mode === 'spare' ? 'Points' : 'Pins',
         players: players.map((p, i) => ({
           profileId: p.profile.id, name: p.profile.name, profile: p.profile, score: fmtScore(i),
           place: placeOf(i), isCpu: false, skillDelta: deltaFor(i),
@@ -2753,7 +2967,7 @@
         if (ambience) ambience.stop(0.3);
         rollLoop = ambience = null;
         if (hintHandle) hintHandle.hide();
-        for (const o of [ball.position, sweepBar.position, table.position, ...aims, ...ambient.state]) U.killTweens(o);
+        for (const o of [ball.position, sweepBar.position, table.position, ...aims, ...ambient.state, ...bowlers.map(b => b.pal.root.position)]) U.killTweens(o);
         for (const o of bowlers) o.pal.dispose();
         for (const m of ballMats) { m.map.dispose(); m.dispose(); }
         for (const nb of ambient.bowlers) nb.pal.dispose();
@@ -2788,7 +3002,7 @@
           }
           return autoplay;
         },
-        /** Bowls now: { x (m), angleDeg, speed (m/s), spin (-1..1, + hooks left) }. */
+        /** Bowls now: { x (m), angleDeg, speed (m/s), spin (-1.5..1.5, + hooks left) }. */
         throw(o = {}) {
           if (!turn || phase !== 'aim') return false;
           const a = aims[turn.p];
@@ -2797,7 +3011,7 @@
           return commitShot({
             x: a.x, angle: a.angle,
             speed: U.clamp(o.speed == null ? 8.5 : o.speed, SPEED_MIN, SPEED_MAX),
-            spin: U.clamp(o.spin == null ? 0 : o.spin, -1, 1),
+            spin: U.clamp(o.spin == null ? 0 : o.spin, -SPIN_LIMIT, SPIN_LIMIT),
           });
         },
         /** Replaces the rack with these standing pins (10-pin numbering; Power Pins numbering in that mode). */
@@ -2824,7 +3038,7 @@
         /** Headless stats for n frames at quality 0..1 (no rendering). */
         simulate(n = 100, quality = 0.8) { return simulateFrames(Math.max(1, Math.min(2000, n | 0)), quality, ctx.seed + 17, hand); },
         /** Skips the current celebration / turn card. */
-        skip() { if (skipWaiter) skipWaiter(); return true; },
+        skip() { return skipBeat(); },
         /** Jumps to frame / leave / round n (1-based) for everyone, counting the skipped ones as zeros. */
         skipTo(n) {
           if (phase !== 'aim' || !turn) return false;

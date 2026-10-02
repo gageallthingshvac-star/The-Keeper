@@ -99,7 +99,7 @@
 
   // Serve
   const TOSS_FROM = 1.3, TOSS_APEX = 2.45;
-  const SERVE_PERFECT = 0.07, SERVE_GOOD = 0.16, SERVE_EDGE = 0.28;
+  const SERVE_PERFECT = 0.05, SERVE_GOOD = 0.14, SERVE_EDGE = 0.26;
 
   const NAMES = ['LOVE', '15', '30', '40'];
   const BOARD_PTS = ['0', '15', '30', '40'];
@@ -425,15 +425,16 @@
     };
   }
 
-  const PLAYER_VMAX = 6.5, PLAYER_ACCEL = 10;
+  const PLAYER_VMAX = 6.5, PLAYER_ACCEL = 10, SERVE_REACT = 0.6;
   const cpuTimingSd = skill => 0.02 + 0.062 * Math.pow(1 - skill, 1.5);
   const cpuMotion = skill => ({ vmax: 3.8 + 2.2 * skill, accel: 8 + 6 * skill, react: 0.42 - 0.27 * skill });
   /** Timing scatter under pressure: fast incoming balls and late arrivals make everyone less precise. */
   // (serves are expected to be quick, so they only start to hurry the returner above 30 m/s)
   const pressure = plan => Math.max(0, plan.launch - (plan.serve ? 30 : 20));
-  // ...and a hard ball you had to sprint for is the hardest of all
+  // ...and a hard ball you had to sprint for is the hardest of all; a big serve near the lines too
+  const servePressure = plan => (plan.serve ? Math.min(0.1, Math.max(0, plan.launch - 33) * 0.009) + (plan.bounce && plan.bounce.margin < 0.35 ? 0.03 : 0) : 0);
   const cpuPressureSd = (skill, plan) => cpuTimingSd(skill) + (1 - 0.5 * skill) * (Math.min(0.06, pressure(plan) * 0.0045) + (plan.deficit > -0.3 ? 0.03 : 0) +
-    clamp((plan.run - 2.2) * 0.02, 0, 0.04) * (plan.speed > 20 ? 1 : 0.5));
+    clamp((plan.run - 2.2) * 0.02, 0, 0.04) * (plan.speed > 20 ? 1 : 0.5) + servePressure(plan) * (1 - 0.45 * skill));
   const playerPressureSd = (sd, plan) => sd * (1 + 0.04 * pressure(plan)) + (plan.deficit > -0.4 ? 0.015 : 0);
 
   /** Rally heat: from the 4th shot both players hit a little harder each time, so long rallies build to a finish. */
@@ -478,19 +479,20 @@
     const q = tier === 'perfect' ? 1 : tier === 'good' ? lerp(0.85, 0.6, (a - SERVE_PERFECT) / (SERVE_GOOD - SERVE_PERFECT)) : tier === 'edge' ? 0.4 : 0.15;
     let p = clamp(input.pace, 0, 1);
     if (info.second) p *= 0.72;
-    const power = Math.max(0, p - 0.7) * (0.15 + (1 - q));   // big serves only stray when mistimed
+    // A big first serve is a gamble: power only pays off (and stays in) when the toss is met cleanly.
+    const power = info.second ? 0 : Math.max(0, p - 0.7) * (0.5 + 2.2 * (1 - q));
     const aim = clamp(input.aimX, -1, 1);   // world x direction of the swipe
     const center = info.boxSign * HALF_W / 2;
     const tx = clamp(center + aim * 1.6, info.boxSign > 0 ? 0.3 : -HALF_W + 0.3, info.boxSign > 0 ? HALF_W - 0.3 : -0.3);
     const depth = info.second ? SERVICE_Z - 0.95 : SERVICE_Z - 0.62;   // aim deep; a mistimed toss sprays
-    const k = 1;
+    const k = 1 + 2.2 * power;
     return {
       tier, q, tx, depth,
-      vh: (20 + 23 * p) * (0.7 + 0.3 * q),
+      vh: tier === 'perfect' && !info.second ? 20 + 30 * p : (20 + 23 * p) * (0.7 + 0.3 * q),
       spin: info.second ? 0.9 : 0.25 + 0.25 * clamp(input.uy, 0, 1),
-      sx: (0.2 + 0.9 * (1 - q)) * (1 + 1.5 * power) * k,
-      sz: (0.25 + 0.9 * (1 - q)) * (1 + 1.5 * power) * k,
-      svy: (0.08 + 0.4 * (1 - q) + 0.5 * power) * k + (tier === 'whiff' ? 1.2 : 0),
+      sx: (0.2 + 0.9 * (1 - q)) * k,
+      sz: (0.25 + 0.9 * (1 - q)) * k,
+      svy: (0.08 + 0.4 * (1 - q)) * k + 0.5 * power + (tier === 'whiff' ? 1.2 : 0),
       minClear: info.second ? 0.35 : 0.07, frame: tier === 'edge' || tier === 'whiff', pace: p,
     };
   }
@@ -1401,7 +1403,7 @@
     const score = { pts: [0, 0], games: [0, 0], server: 0, serveNo: 1 };
     const pt = {
       phase: 'idle', hitter: -1, bounces: 0, shots: 0, netTouch: false,
-      decided: false, lastHitAt: 0, boxSign: 1, tossApex: 0, serveSwung: false, lastKind: '',
+      decided: false, decidedAt: -1, lastHitAt: 0, boxSign: 1, tossApex: 0, serveSwung: false, lastKind: '',
     };
     const stats = {
       won: [0, 0], aces: [0, 0], winners: [0, 0], errors: [0, 0], doubles: [0, 0],
@@ -1675,7 +1677,7 @@
       const recv = 1 - who, ra = ath[recv], ha = ath[who];
       ha.plan = null;
       ha.setTarget(clamp(ball.x * 0.25, -1.4, 1.4), ha.H * (HALF_L + 0.8));
-      const react = opts && opts.serve ? Math.min(ra.reactTime, 0.08) : ra.reactTime;   // receivers anticipate the serve
+      const react = opts && opts.serve ? ra.reactTime * SERVE_REACT : ra.reactTime;   // receivers anticipate the serve
       const plan = planIntercept({ idx: recv, x: ra.pos.x, z: ra.pos.z, vmax: ra.vmax, accel: ra.accel, react, hand: ra.hand }, pred, simTime, opts);
       ra.plan = plan;
       ra.react = react;
@@ -1974,9 +1976,9 @@
     }
 
     function fault(kind) {
-      pt.decided = true;
       const server = pt.hitter;
       if (score.serveNo === 1) {
+        pt.decided = true;
         const id = nextFlow();
         phase = 'fault';
         ui.banner('FAULT', { kind: server === 0 ? 'bad' : 'info', sub: kind === 'NET' ? 'Into the net' : 'Out of the box', duration: 1.1 });
@@ -1986,7 +1988,7 @@
         hold(id, 1.5).then(ok => { if (ok) setupServe(); });
       } else {
         stats.doubles[server]++;
-        pointOver(1 - server, 'double');
+        pointOver(1 - server, 'double', { force: true });
       }
     }
 
@@ -2396,10 +2398,14 @@
         popupAt(player, 'Toss again', '#FFFFFF');
         if (!autoplay) showHint('tap', 'Tap to toss, then swipe up near the top');
       }
-      // Live ball soft-lock guard
+      // Soft-lock guards: a live ball nobody can play, or a point decided without moving the flow on.
       if ((pt.phase === 'serve' || pt.phase === 'rally') && !pt.decided && phase === 'play' && simTime - pt.lastHitAt > 9) {
         pointOver(pt.bounces >= 1 ? pt.hitter : 1 - pt.hitter, 'winner');
       }
+      if (phase === 'play' && pt.decided) {
+        if (pt.decidedAt < 0) pt.decidedAt = simTime;
+        else if (simTime - pt.decidedAt > 3) setupPoint();
+      } else pt.decidedAt = -1;
       if (pt.decided && ball.live && (phase === 'pointOver' || phase === 'done' || phase === 'fault') && Math.abs(ball.z) > WALL_Z + 6) hideBall();
       updateInfo(dt);
       updateTimingBar(dt);
@@ -2581,7 +2587,7 @@
       const mk = (idx, m) => ({ idx, H: sideSign(idx), hand: 1, pos: { x: 0, z: 0 }, vx: 0, vz: 0, tx: 0, tz: 0, vmax: m.vmax, accel: m.accel, react: m.react, frozen: false });
       const A = [mk(0, { vmax: PLAYER_VMAX, accel: PLAYER_ACCEL, react: 0 }), mk(1, cpuMotion(skill))];
       const place = (a, x, z) => { a.pos.x = a.tx = x; a.pos.z = a.tz = z; a.vx = a.vz = 0; };
-      const res = { points: 0, won: [0, 0], rallies: [], reasons: {}, kmh: 0, serves: 0, reachMiss: [0, 0], tiers: {}, tactics: {} };
+      const res = { points: 0, won: [0, 0], rallies: [], reasons: {}, kmh: 0, serves: 0, reachMiss: [0, 0], tiers: {}, tactics: {}, unreturned: 0, smashes: 0 };
       const DT = 1 / 120;
       for (let k = 0; k < (n || 50); k++) {
         let who, it, from, serveNo = 0, boxSign = 0, shots = 0, reason = null, winner = -1;
@@ -2605,8 +2611,9 @@
           const H = sideSign(who), recv = 1 - who, ha = A[who], ra = A[recv];
           const isServe = serveNo > 0 && shots === 0;
           if (isServe) {
-            const input = who === 0 ? { pace: r.range(0.45, 0.95), uy: 0.9, aimX: r.range(-0.8, 0.8) } : { pace: clamp(0.45 + 0.5 * skill + r.range(-0.12, 0.12), 0, 1), uy: 0.6, aimX: r.range(-1, 1) };
-            const err = gauss(r) * (who === 0 ? 0.05 : 0.09 - 0.065 * skill);
+            const input = who === 0 ? { pace: o.servePace != null ? o.servePace : r.range(0.45, 0.95), uy: 0.9, aimX: o.serveAim != null ? o.serveAim : r.range(-0.8, 0.8) }
+              : { pace: clamp(0.45 + 0.5 * skill + r.range(-0.12, 0.12), 0, 1), uy: 0.6, aimX: r.range(-1, 1) };
+            const err = who === 0 && o.serveErr != null ? o.serveErr : gauss(r) * (who === 0 ? 0.05 : 0.09 - 0.065 * skill);
             it = serveIntent(input, err, { H, boxSign, second: serveNo === 2 });
           }
           const sol = launchFromIntent(from, H, it, r);
@@ -2622,7 +2629,7 @@
           }
           shots++;
           ha.tx = clamp(from.x * 0.25, -1.4, 1.4); ha.tz = ha.H * (HALF_L + 0.8);   // the hitter recovers
-          const react = isServe ? Math.min(ra.react, 0.08) : ra.react;
+          const react = isServe ? ra.react * SERVE_REACT : ra.react;
           const plan = planIntercept({ idx: recv, x: ra.pos.x, z: ra.pos.z, vmax: ra.vmax, accel: ra.accel, react, hand: 1 }, pr, 0, isServe ? { serve: { boxSign } } : null);
           if (!plan.ok) { reason = isServe ? 'ace' : 'unreached'; winner = who; break; }
           const err = recv === 0 ? (o.bias || 0) + gauss(r) * playerPressureSd(sd, plan) : cpuStrokeErr(skill, plan, r, false, shots);
@@ -2653,13 +2660,14 @@
         res.points++;
         res.won[winner]++;
         res.rallies.push(shots);
+        if (serveBy >= 0 && shots === 1 && winner === serveBy) res.unreturned++;
         const key = (winner === 0 ? 'you:' : 'cpu:') + reason;
         res.reasons[key] = (res.reasons[key] || 0) + 1;
       }
       const avg = res.rallies.reduce((sum, v) => sum + v, 0) / Math.max(1, res.rallies.length);
       return { points: res.points, youWon: res.won[0], cpuWon: res.won[1], winPct: Math.round(res.won[0] / Math.max(1, res.points) * 100),
-        avgRally: +avg.toFixed(1), maxRally: Math.max(0, ...res.rallies), reasons: res.reasons, reachMiss: res.reachMiss, tiers: res.tiers, tactics: res.tactics,
-        serveKmh: res.serves ? Math.round(res.kmh / res.serves) : null };
+        avgRally: +avg.toFixed(1), maxRally: Math.max(0, ...res.rallies), ge10: res.rallies.filter(v => v >= 10).length, ge15: res.rallies.filter(v => v >= 15).length, smashes: res.smashes, reasons: res.reasons, reachMiss: res.reachMiss, tiers: res.tiers, tactics: res.tactics,
+        serveKmh: res.serves ? Math.round(res.kmh / res.serves) : null, unreturnedPct: Math.round(res.unreturned / Math.max(1, res.points) * 100) };
     }
 
     function debugState() {
