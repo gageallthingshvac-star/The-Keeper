@@ -101,6 +101,20 @@
     #mission{top:calc(78px + env(safe-area-inset-top));width:44vw;padding:7px 8px}
     #mName{font-size:12px}.stat b{font-size:15px}
   }
+  #cut{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:18px;
+    background:radial-gradient(circle at 50% 40%,rgba(20,14,10,.82),rgba(4,4,6,.94));backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+  #cutCard{width:min(560px,100%);background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px 20px 16px;text-align:center;
+    box-shadow:0 20px 60px rgba(0,0,0,.6);animation:cin .35s ease}
+  @keyframes cin{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1}}
+  #cutKick{font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--warm)}
+  #cutDone{font-size:21px;font-weight:800;margin-top:3px}
+  #cutDone small{display:block;font-size:12px;font-weight:500;color:var(--dim);letter-spacing:.04em;margin-top:2px}
+  #cutCanvas{width:100%;height:auto;margin:12px 0 6px;display:block}
+  #cutScale{font-size:13px;color:var(--warm);font-variant-numeric:tabular-nums}
+  #cutNextName{font-size:16px;font-weight:700;margin-top:6px}
+  #cutNextName span{color:var(--dim);font-weight:500;font-size:13px}
+  #cutRow{margin-top:14px}
+  #cutGo{background:linear-gradient(#e0421a,#a8260b);border-color:#ff7a4d;color:#fff;font-weight:800;letter-spacing:.06em;padding:11px 26px;font-size:15px}
   #err{position:fixed;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:30px;color:var(--dim)}
   @media (max-width:560px){
     #hud{top:calc(46px + env(safe-area-inset-top))}
@@ -142,6 +156,16 @@
   <div id="mRow"><button id="mGo">Take me there</button><button id="mSkip">Skip</button></div>
 </div>
 <div id="toasts"></div>
+<div id="cut" hidden>
+  <div id="cutCard">
+    <div id="cutKick">Target destroyed</div>
+    <div id="cutDone"></div>
+    <canvas id="cutCanvas" width="640" height="300"></canvas>
+    <div id="cutScale"></div>
+    <div id="cutNextName"></div>
+    <div id="cutRow"><button id="cutGo">Continue</button></div>
+  </div>
+</div>
 <div id="hint">Pick a bomb · tap anywhere to fire it there · drag to orbit · pinch or scroll to zoom</div>
 <div id="panel">
   <div id="info"><span id="bname"></span><span id="byield"></span></div>
@@ -2378,6 +2402,7 @@ const TARGETS=[
   {n:'828 m supertall',x:300,z:200,S:2600},
   {n:'Carrier group',x:60000,z:0,S:2200},
   {n:'City',x:0,z:0,S:14000},
+  {n:'Radio mast',x:-400,z:-1300,S:700},
   {n:'Volcano',x:VOLC.x,z:VOLC.z,S:80000},
   {n:'Megalopolis',x:MEGA.x,z:MEGA.z,S:160000},
   {n:'Mountain range',x:RANGE.x,z:RANGE.z,S:600000},
@@ -2763,44 +2788,152 @@ function updateHUD(){
   $('sCost').textContent=fmtMoney(shownV);
 }
 
-const MISSIONS=[
-  {n:'Anthill',d:'Kill 20 ants with a bang snap.',bomb:'Bang snap',go:'Ants',ok:()=>stats.ants>=20},
-  {n:'Clean the cupholder',d:'Blow the crumbs out of the cupholder.',bomb:'Toy gun cap',go:'Cupholder crumbs',ok:()=>psiAtPoint(-8.64,-6)>=5},
-  {n:'Flip the convertible',d:'Hit the park convertible with 5 psi.',bomb:'M-80',go:'Convertible',ok:()=>psiAtPoint(-9,-6)>=5},
-  {n:'Chain reaction',d:'Set off 3 gas stations or tanks from one shot.',bomb:'Hand grenade',go:'City',ok:()=>stats.chainBest>=3},
-  {n:'Fuel depot',d:'Cook off all nine fuel tanks.',bomb:'Mk 84 bomb',go:'Fuel depot',ok:()=>stats.tanks.size>=9},
-  {n:'Topple the tower',d:'Bring down the 828 m supertall.',bomb:'Mk 84 bomb',go:'828 m supertall',ok:()=>psiAtPoint(300,200)>=5},
-  {n:'Flatten downtown',d:'250,000 casualties in one go.',bomb:'W76-1',go:'City',ok:()=>tally().c>=250000},
-  {n:'City killer',d:'One million casualties.',bomb:'B83',go:'City',ok:()=>tally().c>=1e6},
-  {n:'Moon shot',d:'Crater the Moon.',bomb:'Cherry bomb',go:'Moon',ok:()=>moon.flying.length>0||!!moon.brk},
-  {n:'Break the Moon',d:'Shatter the Moon.',bomb:'Moon shatterer',go:'Moon',ok:()=>!!moon.brk},
-  {n:'Red planet',d:'Shatter Mars.',bomb:'Mars shatterer',go:'Mars',ok:()=>!!(bodies.mars&&bodies.mars.brk)},
-  {n:'The end',d:'Destroy the Earth.',bomb:'Earth shatterer',go:'Whole Earth',ok:()=>!!earth.brk},
+/* =====================================================================
+   Ranked campaign: destroy one thing at a time, each bigger than the
+   last, with a cut-scene between levels comparing their sizes.
+   size = the target's real size in metres (longest dimension).
+   ===================================================================== */
+const CAMPAIGN=[
+  {n:'An ant',          size:0.008,   icon:'ant',    bomb:'Bang snap',    go:'Ants',            ok:()=>stats.ants>=5},
+  {n:'Cupholder crumbs',size:0.09,    icon:'cup',    bomb:'Toy gun cap',  go:'Cupholder crumbs',ok:()=>psiAtPoint(-8.64,-6)>=5},
+  {n:'A convertible',   size:4.5,     icon:'car',    bomb:'M-80',         go:'Convertible',     ok:()=>psiAtPoint(-9,-6)>=5},
+  {n:'The park',        size:12,      icon:'kiosk',  bomb:'Cherry bomb',  go:'Park kiosk',      ok:()=>psiAtPoint(0,0)>=5},
+  {n:'A fuel tank',     size:17,      icon:'tank',   bomb:'Hand grenade', go:'Fuel depot',      ok:()=>stats.tanks.size>=1},
+  {n:'The fuel depot',  size:170,     icon:'depot',  bomb:'Mk 84 bomb',   go:'Fuel depot',      ok:()=>stats.tanks.size>=9},
+  {n:'The Great Pyramid',size:230,    icon:'pyramid',bomb:'Hiroshima',    go:'Great Pyramid',   ok:()=>psiAtPoint(-2600,-1900)>=20},
+  {n:'The stadium',     size:280,     icon:'stadium',bomb:'MOAB',         go:'Stadium',         ok:()=>psiAtPoint(-700,500)>=10},
+  {n:'The radio mast',  size:300,     icon:'mast',   bomb:'Mk 84 bomb',   go:'Radio mast',      ok:()=>psiAtPoint(-400,-1300)>=3},
+  {n:'A carrier group', size:333,     icon:'ship',   bomb:'MOAB',         go:'Carrier group',   ok:()=>psiAtPoint(60000,0)>=5},
+  {n:'The 828 m tower', size:828,     icon:'tower',  bomb:'Mk 84 bomb',   go:'828 m supertall', ok:()=>psiAtPoint(300,200)>=5},
+  {n:'The whole city',  size:4000,    icon:'city',   bomb:'W76-1',        go:'City',            ok:()=>tally().c>=250000},
+  {n:'A volcano',       size:24000,   icon:'volcano',bomb:'Tsar Bomba',   go:'Volcano',         ok:()=>psiAtPoint(VOLC.x,VOLC.z)>=20},
+  {n:'The Moon',        size:3.474e6, icon:'moon',   bomb:'Moon shatterer',go:'Moon',           ok:()=>!!moon.brk},
+  {n:'Mars',            size:6.779e6, icon:'mars',   bomb:'Mars shatterer',go:'Mars',           ok:()=>!!bodies.mars.brk},
+  {n:'The Earth',       size:1.2742e7,icon:'earth',  bomb:'Earth shatterer',go:'Whole Earth',   ok:()=>!!earth.brk},
+  {n:'Jupiter',         size:1.3982e8,icon:'jupiter',bomb:'Jupiter shatterer',go:'Saturn',      ok:()=>!!bodies.jupiter.brk},
 ];
 let mIndex=0,mDone=false;
+function fmtMult(r){
+  if(r<10)return '×'+r.toFixed(1);
+  if(r<1000)return '×'+Math.round(r);
+  if(r<1e6)return '×'+(r/1e3).toFixed(r<1e4?1:0)+'k';
+  if(r<1e9)return '×'+(r/1e6).toFixed(1)+' million';
+  return '×'+(r/1e9).toFixed(1)+' billion';
+}
 function showMission(){
-  const m=MISSIONS[mIndex];
-  $('mNo').textContent=(mIndex+1)+'/'+MISSIONS.length;
-  $('mName').textContent=m.n;$('mDesc').textContent=m.d;
+  const m=CAMPAIGN[mIndex];
+  $('mNo').textContent=(mIndex+1)+'/'+CAMPAIGN.length;
+  $('mName').textContent='Target: '+m.n;
+  $('mDesc').textContent=fmtDist(m.size)+' · recommended '+m.bomb;
   $('mStatus').textContent='';$('mission').classList.remove('done');
+  $('mGo').textContent='Arm & go';$('mSkip').textContent='Skip';
   mDone=false;
 }
 function missionCheck(){
   if(mDone||!gameOn)return;
-  const m=MISSIONS[mIndex];
-  if(m.ok()){
-    mDone=true;$('mission').classList.add('done');$('mStatus').textContent='Complete! Tap Next.';
-    $('mSkip').textContent='Next ▶';toast('Mission complete: '+m.n,'win');
+  if(CAMPAIGN[mIndex].ok()){
+    mDone=true;$('mission').classList.add('done');
+    $('mStatus').textContent='Destroyed!';toast('Destroyed: '+CAMPAIGN[mIndex].n,'win');
+    setTimeout(openCutscene,1500);
   }
 }
 function gotoTarget(name){const el=[...$('targets').children].find(c=>c.textContent.includes(name));if(el)el.click();}
-function nextMission(){mIndex=(mIndex+1)%MISSIONS.length;$('mSkip').textContent='Skip';showMission();}
-$('mGo').onclick=()=>{const m=MISSIONS[mIndex];const bi=BOMBS.findIndex(b=>b.n.includes(m.bomb));if(bi>=0)select(bi,false);gotoTarget(m.go);};
-$('mSkip').onclick=()=>{nextMission();};
-$('bGame').onclick=e=>{gameOn=!gameOn;e.target.classList.toggle('on',gameOn);updateHUD();};
+function armLevel(){const m=CAMPAIGN[mIndex];const bi=BOMBS.findIndex(b=>b.n.includes(m.bomb));if(bi>=0)select(bi,false);gotoTarget(m.go);}
+function advanceLevel(){
+  if(mIndex>=CAMPAIGN.length-1){mIndex=0;showMission();armLevel();return;}
+  mIndex++;showMission();armLevel();
+}
+$('mGo').onclick=armLevel;
+$('mSkip').onclick=()=>{mIndex=(mIndex+1)%CAMPAIGN.length;showMission();};
+$('bGame').onclick=e=>{gameOn=!gameOn;e.target.classList.toggle('on',gameOn);updateHUD();if(!gameOn)$('cut').hidden=true;};
+
+/* ---------- the cut-scene ---------- */
+function openCutscene(){
+  if(!gameOn)return;
+  const done=CAMPAIGN[mIndex],last=mIndex>=CAMPAIGN.length-1,next=last?null:CAMPAIGN[mIndex+1];
+  $('cutKick').textContent=last?'Campaign complete':'Target destroyed';
+  $('cutDone').innerHTML=done.n+'<small>'+fmtDist(done.size)+'</small>';
+  if(next){
+    const r=next.size/done.size;
+    $('cutScale').textContent='Next target is '+fmtMult(r)+' bigger';
+    $('cutNextName').innerHTML='Up next: '+next.n+' <span>'+fmtDist(next.size)+'</span>';
+    $('cutGo').textContent='Continue';
+  }else{
+    $('cutScale').textContent='You destroyed everything, up to Jupiter.';
+    $('cutNextName').innerHTML='<span>Tap to start over from the ant.</span>';
+    $('cutGo').textContent='Play again';
+  }
+  drawCompare(done,next);
+  $('cut').hidden=false;
+}
+$('cutGo').onclick=()=>{$('cut').hidden=true;advanceLevel();};
+
+const ICOL='#ff8a4d',ICOL2='#ffd08a';
+function drawCompare(a,b){
+  const cv=$('cutCanvas'),g=cv.getContext('2d'),W=cv.width,H=cv.height;
+  g.clearRect(0,0,W,H);
+  const baseY=H-46,maxH=H-96;
+  const big=b?Math.max(a.size,b.size):a.size;
+  // pixel height for a given real size, larger target filling maxH
+  const px=s=>Math.max(3,Math.min(maxH,maxH*Math.sqrt(s/big)));  // sqrt so small ones stay visible-ish
+  const slots=b?[[W*0.27,a,ICOL2,'just now'],[W*0.73,b,ICOL,'next']]:[[W*0.5,a,ICOL,'done']];
+  g.font='13px system-ui';g.textAlign='center';
+  for(const [cx,obj,col,tag] of slots){
+    drawIcon(g,obj.icon,cx,baseY,px(obj.size),col);
+    g.fillStyle='#e9e6e1';g.fillText(obj.n,cx,baseY+20);
+    g.fillStyle='#9a958d';g.fillText(fmtDist(obj.size),cx,baseY+36);
+  }
+  if(b){g.strokeStyle='rgba(255,255,255,.25)';g.beginPath();g.moveTo(W*0.5,24);g.lineTo(W*0.5,baseY+4);g.stroke();
+    g.fillStyle=ICOL;g.font='bold 15px system-ui';g.fillText('➜',W*0.5,baseY-maxH*0.5);}
+}
+/* schematic silhouettes, bottom-aligned at (cx,baseY), pixel height h */
+function drawIcon(g,type,cx,baseY,h,col){
+  g.save();g.fillStyle=col;g.strokeStyle=col;g.lineWidth=Math.max(1,h*0.03);
+  const w=h, L=cx-w/2, T=baseY-h, box=(x,y,ww,hh)=>g.fillRect(cx+x*w-ww*w/2,baseY-y*h-hh*h,ww*w,hh*h);
+  const circle=(r,cyr)=>{g.beginPath();g.arc(cx,baseY-cyr*h,r*h,0,7);g.fill();};
+  switch(type){
+    case 'ant':{const u=h/3;g.beginPath();g.arc(cx-u*0.9,baseY-u,u*0.7,0,7);g.arc(cx,baseY-u,u*0.6,0,7);g.arc(cx+u,baseY-u,u,0,7);g.fill();
+      g.lineWidth=h*0.05;for(const s of[-1,1])for(let i=-1;i<=1;i++){g.beginPath();g.moveTo(cx,baseY-u);g.lineTo(cx+s*u*(1.4+i*0.2),baseY);g.stroke();}
+      g.beginPath();g.moveTo(cx-u*1.4,baseY-u*1.3);g.lineTo(cx-u*2,baseY-u*2);g.moveTo(cx-u*1.5,baseY-u*1.1);g.lineTo(cx-u*2.2,baseY-u*1.6);g.stroke();break;}
+    case 'cup':{g.beginPath();g.moveTo(L+w*0.2,T);g.lineTo(L+w*0.8,T);g.lineTo(L+w*0.68,baseY);g.lineTo(L+w*0.32,baseY);g.closePath();g.fill();
+      g.fillStyle='#3a2a20';g.fillRect(L+w*0.18,T,w*0.64,h*0.12);break;}
+    case 'car':{g.beginPath();g.moveTo(L+w*0.05,baseY-h*0.35);g.lineTo(L+w*0.22,baseY-h*0.35);g.lineTo(L+w*0.34,baseY-h*0.7);g.lineTo(L+w*0.66,baseY-h*0.7);
+      g.lineTo(L+w*0.8,baseY-h*0.35);g.lineTo(L+w*0.95,baseY-h*0.35);g.lineTo(L+w*0.9,baseY-h*0.12);g.lineTo(L+w*0.1,baseY-h*0.12);g.closePath();g.fill();
+      g.fillStyle='#1b1b1d';g.beginPath();g.arc(L+w*0.3,baseY-h*0.1,h*0.1,0,7);g.arc(L+w*0.72,baseY-h*0.1,h*0.1,0,7);g.fill();break;}
+    case 'kiosk':{box(-0.04,0,0.08,0.45);box(0,0.55,0.7,0.12);g.beginPath();g.moveTo(L+w*0.1,T+h*0.45);g.lineTo(cx,T);g.lineTo(L+w*0.9,T+h*0.45);g.closePath();g.fill();break;}
+    case 'tank':{g.beginPath();g.ellipse(cx,T+h*0.08,w*0.42,h*0.1,0,0,7);g.fill();g.fillRect(L+w*0.08,T+h*0.08,w*0.84,h*0.92);
+      g.fillStyle='rgba(0,0,0,.18)';g.fillRect(L+w*0.08,T+h*0.4,w*0.84,h*0.08);break;}
+    case 'depot':{for(let i=0;i<3;i++){const x=L+w*(0.18+i*0.32);g.fillRect(x,baseY-h*(0.6+(i%2)*0.1),w*0.22,h*(0.6+(i%2)*0.1));
+      g.beginPath();g.ellipse(x+w*0.11,baseY-h*(0.6+(i%2)*0.1),w*0.11,h*0.05,0,0,7);g.fill();}
+      g.fillRect(L,baseY-h*0.08,w,h*0.06);break;}
+    case 'pyramid':{g.beginPath();g.moveTo(cx,T);g.lineTo(L+w,baseY);g.lineTo(L,baseY);g.closePath();g.fill();
+      g.strokeStyle='rgba(0,0,0,.25)';g.beginPath();g.moveTo(cx,T);g.lineTo(cx,baseY);g.stroke();break;}
+    case 'stadium':{g.beginPath();g.ellipse(cx,baseY-h*0.3,w*0.5,h*0.3,0,0,7);g.fill();
+      g.fillStyle='#2a2b2f';g.beginPath();g.ellipse(cx,baseY-h*0.3,w*0.3,h*0.17,0,0,7);g.fill();
+      g.fillStyle='#4f9a3a';g.beginPath();g.ellipse(cx,baseY-h*0.3,w*0.22,h*0.12,0,0,7);g.fill();break;}
+    case 'mast':{g.lineWidth=h*0.03;for(let i=0;i<6;i++){const y0=baseY-h*i/6,y1=baseY-h*(i+1)/6,x0=cx-(1-i/6)*w*0.18,x1=cx-(1-(i+1)/6)*w*0.18;
+      g.beginPath();g.moveTo(cx-(1-i/6)*w*0.18,y0);g.lineTo(cx+(1-i/6)*w*0.18,y0);g.moveTo(x0,y0);g.lineTo(cx+(1-(i+1)/6)*w*0.18,y1);g.moveTo(cx+(1-i/6)*w*0.18,y0);g.lineTo(x1,y1);g.stroke();}
+      g.beginPath();g.moveTo(cx,baseY-h);g.lineTo(cx,baseY-h*1.12);g.stroke();break;}
+    case 'ship':{g.beginPath();g.moveTo(L,baseY-h*0.45);g.lineTo(L+w,baseY-h*0.45);g.lineTo(L+w*0.86,baseY-h*0.1);g.lineTo(L+w*0.14,baseY-h*0.1);g.closePath();g.fill();
+      g.fillRect(L+w*0.6,baseY-h*0.8,w*0.14,h*0.35);g.fillStyle='rgba(0,0,0,.2)';g.fillRect(L+w*0.1,baseY-h*0.5,w*0.8,h*0.05);break;}
+    case 'tower':{g.beginPath();g.moveTo(L+w*0.32,baseY);g.lineTo(L+w*0.4,T+h*0.05);g.lineTo(L+w*0.6,T+h*0.05);g.lineTo(L+w*0.68,baseY);g.closePath();g.fill();
+      g.fillRect(cx-w*0.015,T-h*0.08,w*0.03,h*0.08);break;}
+    case 'city':{const bars=[0.4,0.7,0.55,0.95,0.6,0.8,0.45,0.75,0.5];const bw=w/bars.length;
+      bars.forEach((b,i)=>g.fillRect(L+i*bw,baseY-h*b,bw*0.82,h*b));break;}
+    case 'volcano':{g.beginPath();g.moveTo(L,baseY);g.lineTo(L+w*0.36,T+h*0.1);g.lineTo(L+w*0.64,T+h*0.1);g.lineTo(L+w,baseY);g.closePath();g.fill();
+      g.fillStyle='#ff5a1f';g.beginPath();g.moveTo(L+w*0.4,T+h*0.12);g.lineTo(cx,T-h*0.25);g.lineTo(L+w*0.6,T+h*0.12);g.closePath();g.fill();break;}
+    case 'moon':{circle(0.5,0.5);g.fillStyle='rgba(0,0,0,.18)';g.beginPath();g.arc(cx-h*0.15,baseY-h*0.6,h*0.1,0,7);g.arc(cx+h*0.12,baseY-h*0.4,h*0.07,0,7);g.fill();break;}
+    case 'mars':{circle(0.5,0.5);g.fillStyle='rgba(255,255,255,.5)';g.beginPath();g.arc(cx,baseY-h*0.92,h*0.1,0,7);g.fill();break;}
+    case 'earth':{circle(0.5,0.5);g.fillStyle='#4f9a3a';g.beginPath();g.arc(cx-h*0.1,baseY-h*0.6,h*0.14,0,7);g.arc(cx+h*0.14,baseY-h*0.42,h*0.1,0,7);g.fill();break;}
+    case 'jupiter':{circle(0.5,0.5);g.fillStyle='rgba(0,0,0,.14)';for(let i=-2;i<=2;i++){g.fillRect(cx-h*0.5,baseY-h*0.5+i*h*0.14,h,h*0.06);}
+      g.fillStyle='#c0392b';g.beginPath();g.ellipse(cx+h*0.12,baseY-h*0.42,h*0.1,h*0.06,0,0,7);g.fill();break;}
+    default:box(-0.3,0,0.6,0.8);
+  }
+  g.restore();
+}
 showMission();
 
-window.__sim={D,blasts,view,levels,select,detonate,controls,camera,setSpeed:s=>speed=s,fit:fitView,
+window.__sim={D,blasts,view,levels,openCutscene:()=>openCutscene(),campIndex:()=>mIndex,setCamp:(i)=>{mIndex=i;showMission();},select,detonate,controls,camera,setSpeed:s=>speed=s,fit:fitView,
   advance:(sec)=>{let n=Math.ceil(sec*30),t=performance.now();while(n--){t+=1000/30;step(1/30,t);}},
   regenMs:()=>{const t=performance.now();regen();return performance.now()-t;}};
 </script>
