@@ -925,7 +925,7 @@ class Level{
     scene.add(m);this.mesh=m;
     this.M=m.instanceMatrix.array;this.C=m.instanceColor.array;this.A=am.array;
     this.colX=new Float64Array(n2);this.colZ=new Float64Array(n2);this.colN=new Uint8Array(n2);this.skip=new Uint8Array(n2);
-    this.cy0=new Float64Array(cnt);this.cy1=new Float64Array(cnt);this.ccol=new Float32Array(cnt*3);this.cmat=new Float32Array(cnt*2);
+    this.cy0=new Float64Array(cnt);this.cy1=new Float64Array(cnt);this.ccol=new Float32Array(cnt*3);this.cmat=new Float32Array(cnt*2);this.ccls=new Int8Array(cnt);
     this.gTop=new Float32Array(n2);this.oTop=new Float32Array(n2);
   }
   dispose(){scene.remove(this.mesh);this.mesh.geometry.dispose();this.mesh.dispose();this.mat.dispose();}
@@ -940,7 +940,7 @@ class Level{
     const b=ci*K;
     for(let k=0;k<SC.n;k++){
       const s=b+k;this.cy0[s]=SC.y0[k];this.cy1[s]=SC.y1[k];
-      this.ccol[s*3]=SC.r[k];this.ccol[s*3+1]=SC.g[k];this.ccol[s*3+2]=SC.b[k];this.cmat[s*2]=SC.mat[k];this.cmat[s*2+1]=SC.m2[k];
+      this.ccol[s*3]=SC.r[k];this.ccol[s*3+1]=SC.g[k];this.ccol[s*3+2]=SC.b[k];this.cmat[s*2]=SC.mat[k];this.cmat[s*2+1]=SC.m2[k];this.ccls[s]=SC.cls[k];
     }
   }
   writeCol(ci){
@@ -967,7 +967,7 @@ class Level{
     this.gTop[ci]=gt;this.oTop[ci]=Math.max(top,gt);
   }
   layout(v,cx,cz,inner){
-    const N=this.N;
+    const N=this.N;piles.clear();
     this.v=v;this.cx=cx;this.cz=cz;this.mesh.position.set(cx,0,cz);
     for(let iz=0;iz<N;iz++)for(let ix=0;ix<N;ix++){
       const ci=iz*N+ix,x=(ix-N/2+0.5)*v,z=(iz-N/2+0.5)*v;
@@ -1065,70 +1065,149 @@ function groundAt(x,z){
 /* =====================================================================
    Flying blocks: debris and dust
    ===================================================================== */
-const DMAX=coarse?3000:8000;
+/* Pieces are boxes with their own width and height. Types:
+   0 rubble: falls, bounces, lands on whatever is below and piles up
+   1 light dust, 3 heavy collapse dust that rolls out and hangs
+   2 a piece of a toppling body (a tower's upper floors, a tree): it swings
+     about a hinge until it breaks into rubble (towers) or lies down (trees) */
+const DMAX=coarse?7000:22000,GMAX=coarse?800:2500;
 const debGeo=new THREE.BoxGeometry(1,1,1);
 debGeo.setAttribute('aMat',new THREE.InstancedBufferAttribute(new Float32Array(DMAX*2),2));
 const debMesh=new THREE.InstancedMesh(debGeo,boxMat,DMAX);
 debMesh.instanceColor=new THREE.InstancedBufferAttribute(new Float32Array(DMAX*3),3);
 debMesh.frustumCulled=false;debMesh.castShadow=true;debMesh.count=0;scene.add(debMesh);
-const D={n:0,p:new Float64Array(DMAX*3),vel:new Float32Array(DMAX*3),rot:new Float32Array(DMAX*3),rv:new Float32Array(DMAX*3),
-  s:new Float32Array(DMAX),life:new Float32Array(DMAX),type:new Uint8Array(DMAX),c:new Float32Array(DMAX*3),g:new Float32Array(DMAX),rest:new Uint8Array(DMAX),heat:new Float32Array(DMAX)};
-function spawn(x,y,z,vx,vy,vz,s,r,g,b,type,grav,heat){
-  if(D.n>=DMAX)return;
+const F32=n=>new Float32Array(n);
+const D={n:0,p:new Float64Array(DMAX*3),vel:F32(DMAX*3),rot:F32(DMAX*3),rv:F32(DMAX*3),sx:F32(DMAX),sy:F32(DMAX),
+  life:F32(DMAX),type:new Uint8Array(DMAX),c:F32(DMAX*3),g:F32(DMAX),rest:new Uint8Array(DMAX),heat:F32(DMAX),
+  delay:F32(DMAX),keep:F32(DMAX),grp:new Int32Array(DMAX),oy:F32(DMAX)};
+const G={px:new Float64Array(GMAX),py:F32(GMAX),pz:new Float64Array(GMAX),ax:F32(GMAX),az:F32(GMAX),H:F32(GMAX),th:F32(GMAX),om:F32(GMAX),
+  delay:F32(GMAX),life:F32(GMAX),tree:new Uint8Array(GMAX),state:new Uint8Array(GMAX),grav:F32(GMAX),cnt:new Int32Array(GMAX),brk:F32(GMAX)};
+let gCursor=0;
+const debOrigin={x:0,z:0};
+const piles=new Map();   // extra height that landed rubble has added on top of a column
+function spawn(x,y,z,vx,vy,vz,sx,sy,r,g,b,type,grav,heat,delay,keep){
+  if(D.n>=DMAX)return -1;
+  if(D.n===0){debOrigin.x=grid.cx;debOrigin.z=grid.cz;}
   const i=D.n++;
   D.p[i*3]=x;D.p[i*3+1]=y;D.p[i*3+2]=z;D.vel[i*3]=vx;D.vel[i*3+1]=vy;D.vel[i*3+2]=vz;
-  D.rot[i*3]=Math.random()*6;D.rot[i*3+1]=Math.random()*6;D.rot[i*3+2]=Math.random()*6;
-  const sp=type?1:8;D.rv[i*3]=(Math.random()-0.5)*sp;D.rv[i*3+1]=(Math.random()-0.5)*sp;D.rv[i*3+2]=(Math.random()-0.5)*sp;
-  D.s[i]=s;D.life[i]=0;D.type[i]=type;D.c[i*3]=r;D.c[i*3+1]=g;D.c[i*3+2]=b;D.g[i]=grav;D.rest[i]=0;D.heat[i]=heat||0;
+  const spin=type===0?4:type===2?0:1;
+  for(let a=0;a<3;a++){D.rot[i*3+a]=type===0?(Math.random()-0.5)*0.4:0;D.rv[i*3+a]=(Math.random()-0.5)*spin;}
+  D.sx[i]=sx;D.sy[i]=sy;D.life[i]=0;D.type[i]=type;D.c[i*3]=r;D.c[i*3+1]=g;D.c[i*3+2]=b;D.g[i]=grav;D.rest[i]=0;D.heat[i]=heat||0;
+  D.delay[i]=delay||0;D.keep[i]=keep||9;D.grp[i]=-1;D.oy[i]=0;
+  return i;
+}
+function newGroup(px,py,pz,ax,az,H,delay,tree,grav){
+  for(let k=0;k<GMAX;k++){
+    const gi=(gCursor+k)%GMAX;
+    if(G.cnt[gi]>0)continue;
+    gCursor=gi+1;
+    G.px[gi]=px;G.py[gi]=py;G.pz[gi]=pz;G.ax[gi]=ax;G.az[gi]=az;G.H[gi]=Math.max(H,1e-6);G.th[gi]=0.02+0.04*Math.random();G.om[gi]=0;
+    G.delay[gi]=delay;G.life[gi]=0;G.tree[gi]=tree?1:0;G.state[gi]=0;G.grav[gi]=grav;G.cnt[gi]=0;G.brk[gi]=0.85+0.35*Math.random();
+    return gi;
+  }
+  return -1;
 }
 function killDeb(i){
+  if(D.type[i]===2&&D.grp[i]>=0)G.cnt[D.grp[i]]--;
   const j=--D.n;if(i===j)return;
   for(let a=0;a<3;a++){D.p[i*3+a]=D.p[j*3+a];D.vel[i*3+a]=D.vel[j*3+a];D.rot[i*3+a]=D.rot[j*3+a];D.rv[i*3+a]=D.rv[j*3+a];D.c[i*3+a]=D.c[j*3+a];}
-  D.s[i]=D.s[j];D.life[i]=D.life[j];D.type[i]=D.type[j];D.g[i]=D.g[j];D.rest[i]=D.rest[j];D.heat[i]=D.heat[j];
+  D.sx[i]=D.sx[j];D.sy[i]=D.sy[j];D.life[i]=D.life[j];D.type[i]=D.type[j];D.g[i]=D.g[j];D.rest[i]=D.rest[j];D.heat[i]=D.heat[j];
+  D.delay[i]=D.delay[j];D.keep[i]=D.keep[j];D.grp[i]=D.grp[j];D.oy[i]=D.oy[j];
+  // keep the GPU copy in step so resting pieces never need rewriting
+  const M=debMesh.instanceMatrix.array,C=debMesh.instanceColor.array,A=debGeo.attributes.aMat.array;
+  M.copyWithin(i*16,j*16,j*16+16);C.copyWithin(i*3,j*3,j*3+3);A.copyWithin(i*2,j*2,j*2+2);
 }
-const _m=new THREE.Matrix4(),_q=new THREE.Quaternion(),_e=new THREE.Euler(),_p=new THREE.Vector3(),_s=new THREE.Vector3();
+const _m=new THREE.Matrix4(),_q=new THREE.Quaternion(),_e=new THREE.Euler(),_p=new THREE.Vector3(),_s=new THREE.Vector3(),_ax=new THREE.Vector3();
+function surfaceUnder(x,z){
+  const lv=levelAt(x,z);if(!lv)return null;
+  return lv.L.oTop[lv.ci]+(piles.get(lv.L.li*1e8+lv.ci)||0);
+}
 function updateDebris(dt){
-  const ox=grid.cx,oz=grid.cz;
+  const ox=debOrigin.x,oz=debOrigin.z;
   debMesh.position.set(ox,0,oz);
-  const C=debMesh.instanceColor.array,A=debGeo.attributes.aMat.array;
+  const M=debMesh.instanceMatrix.array,C=debMesh.instanceColor.array,A=debGeo.attributes.aMat.array;
+  // hinged bodies swing under gravity: a rod pivoting at its base
+  for(let gi=0;gi<GMAX;gi++){
+    if(G.cnt[gi]<=0||G.state[gi])continue;
+    G.life[gi]+=dt;if(G.life[gi]<G.delay[gi])continue;
+    G.om[gi]+=1.5*G.grav[gi]/G.H[gi]*Math.sin(Math.max(G.th[gi],0.03))*dt;
+    G.th[gi]+=G.om[gi]*dt;
+    if(G.tree[gi]){if(G.th[gi]>=1.5){G.th[gi]=1.5;G.om[gi]=0;G.state[gi]=1;}}
+    else if(G.th[gi]>=G.brk[gi])G.state[gi]=2;
+  }
   for(let i=0;i<D.n;i++){
     D.life[i]+=dt;
-    const t=D.type[i],life=D.life[i];
-    if((t===0&&life>9)||(t===1&&life>3)){killDeb(i);i--;continue;}
-    const p=i*3;
-    if(t===0){
-      if(!D.rest[i]){
-        D.vel[p+1]-=D.g[i]*dt;
-        const drag=Math.exp(-0.25*dt);D.vel[p]*=drag;D.vel[p+2]*=drag;
-        D.p[p]+=D.vel[p]*dt;D.p[p+1]+=D.vel[p+1]*dt;D.p[p+2]+=D.vel[p+2]*dt;
-        for(let a=0;a<3;a++)D.rot[p+a]+=D.rv[p+a]*dt;
-        const lv=levelAt(D.p[p],D.p[p+2]);
-        if(!lv){killDeb(i);i--;continue;}
-        const gy=lv.L.gTop[lv.ci]+D.s[i]*0.5;
-        if(D.p[p+1]<gy&&D.vel[p+1]<0){
-          D.p[p+1]=gy;D.vel[p+1]*=-0.25;D.vel[p]*=0.5;D.vel[p+2]*=0.5;
-          for(let a=0;a<3;a++)D.rv[p+a]*=0.5;
-          if(Math.abs(D.vel[p+1])<D.g[i]*0.05){D.rest[i]=1;D.rot[p]=Math.round(D.rot[p]/1.5708)*1.5708;D.rot[p+2]=Math.round(D.rot[p+2]/1.5708)*1.5708;}
+    const t=D.type[i],life=D.life[i],p=i*3;
+    if(life>D.keep[i]){killDeb(i);i--;continue;}
+    const fading=life>D.keep[i]-1.2;
+    if(D.rest[i]===2&&!fading)continue;   // settled and already drawn
+    let sx=D.sx[i],sy=D.sy[i];
+    const waiting=life<D.delay[i];
+    if(t===2){
+      const gi=D.grp[i];
+      if(G.state[gi]===2){ // the tower top has hit its breaking angle: it shatters into rubble
+        const th=G.th[gi],om=G.om[gi],r=D.oy[i];
+        D.vel[p]=G.ax[gi]*Math.cos(th)*om*r+(Math.random()-0.5)*D.sx[i]*3;D.vel[p+1]=-Math.sin(th)*om*r;D.vel[p+2]=G.az[gi]*Math.cos(th)*om*r+(Math.random()-0.5)*D.sx[i]*3;
+        D.rot[p]=0;D.rot[p+1]=0;D.rot[p+2]=0;D.rv[p]=(Math.random()-0.5)*3;D.rv[p+1]=(Math.random()-0.5)*3;D.rv[p+2]=(Math.random()-0.5)*3;
+        _ax.set(G.az[gi],0,-G.ax[gi]);_q.setFromAxisAngle(_ax,th);_e.setFromQuaternion(_q);D.rot[p]=_e.x;D.rot[p+1]=_e.y;D.rot[p+2]=_e.z;
+        G.cnt[gi]--;D.type[i]=0;D.grp[i]=-1;D.life[i]=0;D.delay[i]=0;D.keep[i]=45;
+      }else{
+        const th=G.th[gi],r=D.oy[i];
+        D.p[p]=G.px[gi]+G.ax[gi]*Math.sin(th)*r;D.p[p+1]=G.py[gi]+Math.cos(th)*r;D.p[p+2]=G.pz[gi]+G.az[gi]*Math.sin(th)*r;
+        _ax.set(G.az[gi],0,-G.ax[gi]);_q.setFromAxisAngle(_ax,th);
+        if(G.state[gi]===1&&!fading)D.rest[i]=1;
+      }
+    }
+    if(D.type[i]===0&&!waiting&&!D.rest[i]){
+      D.vel[p+1]-=D.g[i]*dt;
+      const drag=Math.exp(-0.25*dt);D.vel[p]*=drag;D.vel[p+2]*=drag;
+      const nx=D.p[p]+D.vel[p]*dt,nz=D.p[p+2]+D.vel[p+2]*dt,ny=D.p[p+1]+D.vel[p+1]*dt;
+      const base=surfaceUnder(nx,nz);
+      if(base===null){killDeb(i);i--;continue;}
+      const half=D.sy[i]*0.5;
+      if(ny-half<base-Math.max(D.sy[i],D.sx[i])*0.8&&D.vel[p+1]>-D.g[i]*2){
+        // ran into the side of something standing: bounce back off the wall
+        D.vel[p]*=-0.3;D.vel[p+2]*=-0.3;D.p[p+1]=ny;
+      }else{
+        D.p[p]=nx;D.p[p+2]=nz;D.p[p+1]=ny;
+        if(ny-half<base&&D.vel[p+1]<0){
+          D.p[p+1]=base+half;D.vel[p+1]*=-0.2;D.vel[p]*=0.45;D.vel[p+2]*=0.45;
+          for(let a=0;a<3;a++)D.rv[p+a]*=0.4;
+          if(Math.abs(D.vel[p+1])<D.g[i]*0.06){
+            D.rest[i]=1;D.rot[p]=Math.round(D.rot[p]/1.5708)*1.5708;D.rot[p+2]=Math.round(D.rot[p+2]/1.5708)*1.5708;
+            // rubble piles up where it lands
+            const lv=levelAt(nx,nz);
+            if(lv&&D.sy[i]>lv.L.v*0.25){const k=lv.L.li*1e8+lv.ci;piles.set(k,Math.min(lv.L.v*2.5,(piles.get(k)||0)+D.sy[i]*D.sx[i]*D.sx[i]/(lv.L.v*lv.L.v)*0.15));}
+            if(D.sx[i]>grid.v*1.5&&Math.random()<0.25)spawn(nx,base+half,nz,(Math.random()-0.5)*D.sx[i],D.sx[i]*0.4,(Math.random()-0.5)*D.sx[i],D.sx[i]*0.8,D.sx[i]*0.8,P.dust[0],P.dust[1],P.dust[2],1,0,0,0,3);
+          }
         }
       }
-    }else{
-      const drag=Math.exp(-1.2*dt);
-      D.vel[p]*=drag;D.vel[p+1]*=drag;D.vel[p+2]*=drag;
-      D.p[p]+=D.vel[p]*dt;D.p[p+1]+=D.vel[p+1]*dt;D.p[p+2]+=D.vel[p+2]*dt;
+      for(let a=0;a<3;a++)D.rot[p+a]+=D.rv[p+a]*dt;
+    }else if(D.type[i]===1||D.type[i]===3){
+      if(!waiting){
+        const heavy=D.type[i]===3,drag=Math.exp(-(heavy?0.7:1.2)*dt);
+        D.vel[p]*=drag;D.vel[p+2]*=drag;D.vel[p+1]=D.vel[p+1]*drag+(heavy?D.sx[i]*0.015*dt:0);
+        D.p[p]+=D.vel[p]*dt;D.p[p+1]+=D.vel[p+1]*dt;D.p[p+2]+=D.vel[p+2]*dt;
+        D.rot[p+1]+=D.rv[p+1]*dt*0.3;
+      }
+      const age=Math.max(0,life-D.delay[i]),k=D.keep[i]-D.delay[i];
+      const grow=D.type[i]===3?(1+age*0.3):(1+age*0.5);
+      const f=waiting?0:grow*Math.max(0,Math.min(1,(k-age)/(k*0.45)));
+      sx*=f;sy*=f;
     }
-    let sc=D.s[i];
-    if(t===0){if(life>8)sc*=Math.max(0,9-life);}
-    else sc*=(1+life*0.5)*Math.max(0,1-life/3);
+    if(fading&&D.type[i]!==1&&D.type[i]!==3){const f=Math.max(0,(D.keep[i]-life)/1.2);sx*=f;sy*=f;}
     _p.set(D.p[p]-ox,D.p[p+1],D.p[p+2]-oz);
-    _q.setFromEuler(_e.set(D.rot[p],D.rot[p+1],D.rot[p+2]));
-    _s.set(sc,sc,sc);_m.compose(_p,_q,_s);_m.toArray(debMesh.instanceMatrix.array,i*16);
+    if(D.type[i]!==2)_q.setFromEuler(_e.set(D.rot[p],D.rot[p+1],D.rot[p+2]));
+    _s.set(sx,sy,sx);_m.compose(_p,_q,_s);_m.toArray(M,i*16);
     C[p]=D.c[p];C[p+1]=D.c[p+1];C[p+2]=D.c[p+2];
     const hb=D.heat[i]*Math.max(0,1-life/1.5);
     A[i*2]=hb>0.01?M_CLOUD:M_NAT;A[i*2+1]=hb;
+    if(D.rest[i]===1&&!fading&&hb<=0.01)D.rest[i]=2;   // stop redrawing once it has cooled and settled
   }
   debMesh.count=D.n;
   debMesh.instanceMatrix.needsUpdate=true;debMesh.instanceColor.needsUpdate=true;debGeo.attributes.aMat.needsUpdate=true;
 }
+function clearDebris(){D.n=0;G.cnt.fill(0);piles.clear();}
 
 /* =====================================================================
    Ants — a trail between the anthill and a dropped cookie by the car
@@ -1609,8 +1688,13 @@ function spaceImpact(body,worldP,b){
 }
 let extraFlash=0;
 
-/* sweep the shock front through the block grid, rebuilding columns it crosses */
+/* sweep the shock front through the block grid, rebuilding columns it crosses.
+   What a column loses is handed to the debris system to fall the way that
+   thing would: towers pancake floor onto floor or topple about a failing
+   storey, houses fold in, trees go over downwind, cars and loose things are
+   thrown, glass blows out ahead of the wall. */
 let spawnBudget=0;
+const oldSegs=[];for(let k=0;k<K;k++)oldSegs.push({y0:0,y1:0,c:[0,0,0],cls:0});
 function sweep(){
   const act=[];
   for(const b of blasts){
@@ -1619,7 +1703,8 @@ function sweep(){
     if(hi>lo||th)act.push({b,lo,hi,th,thR:b.Rth*1.6});
   }
   if(!act.length)return;
-  spawnBudget=coarse?180:500;
+  spawnBudget=coarse?500:1600;
+  const tx=controls.target.x,tz=controls.target.z,near=view.S*0.9;
   for(const Lv of levels){
     const v=Lv.v,K=Lv.K;let changed=false,lo=1e9,hi=-1;
     const debris=Lv.li<=1;
@@ -1633,29 +1718,75 @@ function sweep(){
         if(a.th&&d<a.thR)hitB=a.b;
       }
       if(!hitB)continue;
-      const oldTop=Lv.oTop[ci],oldN=Lv.colN[ci];
-      let oc=null;
-      if(oldN>1){const s=(ci*K+oldN-1)*3;oc=[Lv.ccol[s],Lv.ccol[s+1],Lv.ccol[s+2]];}
+      // remember what stood here
+      const oldN=Lv.colN[ci],oldTop=Lv.oTop[ci];
+      let nOld=0;
+      for(let k=1;k<oldN;k++){const s=ci*K+k,o=oldSegs[nOld++];o.y0=Lv.cy0[s];o.y1=Lv.cy1[s];o.c[0]=Lv.ccol[s*3];o.c[1]=Lv.ccol[s*3+1];o.c[2]=Lv.ccol[s*3+2];o.cls=Lv.ccls[s];}
       Lv.sampleInto(ci);Lv.writeCol(ci);changed=true;if(ci<lo)lo=ci;hi=ci;
-      if(shock&&debris&&spawnBudget>0){
-        const drop=oldTop-Lv.oTop[ci],psi=DM.psi;
-        const dx=wx-hitB.x,dz=wz-hitB.z,dd=Math.hypot(dx,dz)||1;
-        const ux=dx/dd,uz=dz/dd,pk=Math.min(1,psi/25);
-        if(drop>=v*0.9&&oc){
-          const cnt=Math.min(3,Math.ceil(drop/v*0.5));
-          for(let c=0;c<cnt&&spawnBudget>0;c++){
-            spawnBudget--;
-            const sp=v*(8+34*pk)*(0.5+Math.random()),y=Lv.oTop[ci]+Math.random()*drop;
-            spawn(wx+(Math.random()-0.5)*v,y,wz+(Math.random()-0.5)*v,
-              ux*sp+(Math.random()-0.5)*v*8,v*(6+22*Math.random())*(0.4+pk),uz*sp+(Math.random()-0.5)*v*8,
-              v*(0.3+0.45*Math.random()),oc[0],oc[1],oc[2],0,v*45,DM.therm>1?0.5:0);
+      if(!(shock&&debris&&spawnBudget>0&&nOld))continue;
+      if(Math.abs(wx-tx)>near||Math.abs(wz-tz)>near)continue;   // only spend pieces where you can see them
+      const newTop=Lv.oTop[ci],psi=DM.psi;
+      if(oldTop-newTop<v*0.6&&!(psi>0.8&&psi<6))continue;
+      const dx=wx-hitB.x,dz=wz-hitB.z,dd=Math.hypot(dx,dz)||1,ux=dx/dd,uz=dz/dd,pk=Math.min(1,psi/25);
+      const main=oldSegs[0].cls,e=psi/STR[main],hot=DM.therm>1?0.5:0;
+      const reg=hash2(Math.floor(wx/38),Math.floor(wz/38));   // roughly one building
+      const isTree=main===C_TRUNK||main===C_CANOPY,light=main===C_CAR||main===C_SMALL||main===C_CROP;
+      const heavy=main===C_TOWER||main===C_MID||main===C_HOUSE||main===C_STONE;
+      if(DM.fb){ // vaporised: a few glowing scraps at most
+        if(Math.random()<0.15){spawnBudget--;const o=oldSegs[nOld-1];spawn(wx,newTop+v,wz,ux*v*30,v*12,uz*v*30,v*0.4,v*0.4,o.c[0],o.c[1],o.c[2],0,v*45,1,0,4);}
+        continue;
+      }
+      // windows blow out first, well before the structure gives
+      if(heavy&&(main===C_TOWER||main===C_MID)&&psi>0.8&&v<3&&Math.random()<0.5){
+        const n=Math.min(3,spawnBudget);
+        for(let c=0;c<n;c++){spawnBudget--;const y=newTop>Lv.gTop[ci]+v?Lv.gTop[ci]+Math.random()*(Math.max(oldTop,newTop)-Lv.gTop[ci]):newTop;
+          spawn(wx-ux*v*0.5,y,wz-uz*v*0.5,ux*v*(12+20*pk)*(0.6+Math.random()),v*(1+3*Math.random()),uz*v*(12+20*pk)*(0.6+Math.random()),v*0.14,v*0.05,0.55,0.68,0.78,0,v*45,0,0,8);}
+      }
+      if(oldTop-newTop<v*0.6)continue;
+      // decide how this column comes down
+      let mode;
+      if(e>=12)mode=light?'throw':'blast';
+      else if(isTree)mode='fell';
+      else if(light)mode='throw';
+      else if(heavy&&oldTop-newTop>v*5&&oldTop-newTop>12&&reg<0.4&&e<9)mode='topple';
+      else mode='pancake';
+      const H=oldTop-newTop,delay=mode==='blast'||mode==='throw'?0:0.12+0.6*reg+Math.random()*0.08;
+      let gi=-1;
+      if(mode==='topple'||mode==='fell'){
+        const jitter=(reg-0.5)*0.6,ax=ux*Math.cos(jitter)-uz*Math.sin(jitter),az=uz*Math.cos(jitter)+ux*Math.sin(jitter);
+        gi=newGroup(wx,newTop,wz,ax,az,H,mode==='fell'?0.05:delay,mode==='fell',v*45);
+        if(gi<0)mode='pancake';
+      }
+      const maxPer=mode==='blast'?3:mode==='throw'?2:10;
+      for(let k=0;k<nOld&&spawnBudget>0;k++){
+        const o=oldSegs[k],from=Math.max(o.y0,newTop),L=o.y1-from;
+        if(L<v*0.5)continue;
+        const n=Math.max(1,Math.min(maxPer,Math.round(L/v))),ph=L/n;
+        for(let c=0;c<n&&spawnBudget>0;c++){
+          spawnBudget--;
+          const yc=from+(c+0.5)*ph,col=o.c,w=v*0.97,hgt=Math.min(ph*0.97,v*6);
+          if(mode==='topple'||mode==='fell'){
+            const i=spawn(wx,yc,wz,0,0,0,w,ph*0.98,col[0],col[1],col[2],2,v*45,hot,0,mode==='fell'?60:45);
+            if(i>=0){D.grp[i]=gi;D.oy[i]=yc-newTop;G.cnt[gi]++;}
+          }else if(mode==='pancake'){
+            // the floors above the failure drop together and spill downwind
+            const sp=v*(1.5+5*pk)*(0.4+Math.random()),a=Math.random()*6.283,sd=v*(0.5+1.5*Math.random());
+            spawn(wx+(Math.random()-0.5)*v*0.2,yc,wz+(Math.random()-0.5)*v*0.2,ux*sp+Math.cos(a)*sd,0,uz*sp+Math.sin(a)*sd,w*(0.6+0.5*Math.random()),Math.min(hgt*0.45,v*1.5),col[0],col[1],col[2],0,v*45,hot,delay+c*0.015,45);
+          }else{
+            const sp=v*(light?10+28*pk:8+34*pk)*(0.5+Math.random());
+            spawn(wx+(Math.random()-0.5)*v,yc,wz+(Math.random()-0.5)*v,ux*sp+(Math.random()-0.5)*v*6,v*(4+16*Math.random())*(0.4+pk),uz*sp+(Math.random()-0.5)*v*6,
+              v*(0.35+0.5*Math.random()),Math.min(hgt,v*(0.35+0.5*Math.random())),col[0],col[1],col[2],0,v*45,hot,0,light?40:20);
           }
         }
-        if(psi>2.5&&Math.random()<(Lv.li?0.02:0.05)&&spawnBudget>0){
-          spawnBudget--;
-          const c=P.dust;
-          spawn(wx,Lv.gTop[ci]+v*0.5,wz,ux*v*(6+10*pk),v*(1+3*Math.random()),uz*v*(6+10*pk),v*(0.22+0.25*Math.random()),c[0],c[1],c[2],1,0,0);
-        }
+      }
+      // collapse dust rolling out from the base of falling buildings
+      if(heavy&&mode!=='blast'&&spawnBudget>0&&Math.random()<0.3){
+        spawnBudget--;const dc=P.dust,sz=Math.min(H*0.25,v*1.2)*(0.6+0.5*Math.random());
+        spawn(wx,newTop+sz*0.4,wz,ux*v*(1.5+3*pk)+(Math.random()-0.5)*v*2,v*0.3,uz*v*(1.5+3*pk)+(Math.random()-0.5)*v*2,sz,sz*0.7,dc[0]*0.95,dc[1]*0.93,dc[2]*0.9,3,0,0,delay+0.3,delay+6);
+      }
+      if(psi>2.5&&Math.random()<(Lv.li?0.02:0.05)&&spawnBudget>0){
+        spawnBudget--;const c=P.dust;
+        spawn(wx,Lv.gTop[ci]+v*0.5,wz,ux*v*(6+10*pk),v*(1+3*Math.random()),uz*v*(6+10*pk),v*0.35,v*0.35,c[0],c[1],c[2],1,0,0,0,3);
       }
     }
     if(changed)Lv.dirty(lo,hi);
@@ -1849,7 +1980,7 @@ $('bSound').onclick=e=>{soundOn=!soundOn;e.target.classList.toggle('on',soundOn)
 $('bRings').onclick=e=>{showRings=!showRings;e.target.classList.toggle('on',showRings);ringGroup.visible=showRings;};
 $('bDetail').onclick=()=>{detail=(detail+1)%DETAILS.length;N=DETAILS[detail];$('bDetail').textContent='Detail: '+DETAIL_NAMES[detail];buildWorld();maybeRegen(performance.now(),true);};
 $('bDetail').textContent='Detail: '+DETAIL_NAMES[detail];
-$('bReset').onclick=()=>{for(const b of blasts)b.dispose();blasts.length=0;D.n=0;resetPlanet();resetAnts();maybeRegen(performance.now(),true);};
+$('bReset').onclick=()=>{for(const b of blasts)b.dispose();blasts.length=0;clearDebris();resetPlanet();resetAnts();maybeRegen(performance.now(),true);};
 let hintHidden=false;function hideHint(){if(!hintHidden){hintHidden=true;$('hint').style.opacity=0;}}
 setTimeout(hideHint,12000);
 
