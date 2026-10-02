@@ -376,6 +376,16 @@
             <button class="opt" id="uikReset"><b>IF THE CONTROLS ARE TOO BIG</b><i>This is how much of the glass the instruments and the panel take, and therefore how much is left to fly through. Below about 90% the buttons are smaller than a thumb is supposed to get, which is your call to make. Tap here to go back to 100%.</i></button>
           </div>
 
+          <h2>Graphics</h2>
+          <div class="fitrow">
+            <button class="fitb" id="gfxMinus" aria-label="less">&minus;</button>
+            <div class="fitval"><b id="gfxName">AUTO</b><i id="gfxInfo">&nbsp;</i></div>
+            <button class="fitb" id="gfxPlus" aria-label="more">+</button>
+          </div>
+          <div class="row">
+            <button class="opt" id="gfxReset"><b>DETAIL, AND WHAT IT COSTS</b><i>AUTO protects the frame rate and spends whatever is left on the ground, which is right nearly all of the time and will never give you everything. The six settings pin the detail instead and let the frame rate go where it goes. ULTRA and MAX draw towns out to forty and sixty kilometres instead of twenty-six, trees to nine, and the ground in finer pieces &mdash; which is what makes fifteen thousand feet look like fifteen thousand feet. Tap here to go back to AUTO.</i></button>
+          </div>
+
           <h2>Pitch sense</h2>
           <div class="row" id="pitchRow">
             <button class="opt on" data-pitch="real"><b>PULL BACK TO CLIMB</b><i>What a control stick really does. <kbd>&darr;</kbd> or thumb back raises the nose. Swap any time with <kbd>T</kbd>.</i></button>
@@ -1672,11 +1682,24 @@ const MOBILE = COARSE || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent ||
 /* More LOD rings than a propeller aeroplane needs: at Mach 3 you cross the
    old draw distance in eight seconds, and from 24 km you can see most of it. */
 const QLEVELS = [
-  { dpr: 1.00, lev: 13, half: 6, base: 78, trees: .22, treeR: 1700, clouds: 34000, glare: 0, vig: 0, shadow: 1, stars: 0, terrShadow: 0, cloudShadow: 0, buildings: 380 },
-  { dpr: 1.25, lev: 14, half: 7, base: 62, trees: .30, treeR: 2400, clouds: 56000, glare: 1, vig: 1, shadow: 1, stars: 1, terrShadow: 1, cloudShadow: 0, buildings: 720 },
-  { dpr: 1.50, lev: 15, half: 9, base: 52, trees: .38, treeR: 3300, clouds: 84000, glare: 1, vig: 1, shadow: 1, stars: 1, terrShadow: 1, cloudShadow: 1, buildings: 1200 },
-  { dpr: 2.00, lev: 16, half: 10, base: 44, trees: .44, treeR: 4100, clouds: 112000, glare: 1, vig: 1, shadow: 1, stars: 1, terrShadow: 1, cloudShadow: 1, buildings: 1700 }
+  { dpr: 1.00, lev: 13, half: 6, base: 78, trees: .22, treeR: 1700, clouds: 34000, glare: 0, vig: 0, shadow: 1, stars: 0, terrShadow: 0, cloudShadow: 0, buildings: 380, townR: 26000 },
+  { dpr: 1.25, lev: 14, half: 7, base: 62, trees: .30, treeR: 2400, clouds: 56000, glare: 1, vig: 1, shadow: 1, stars: 1, terrShadow: 1, cloudShadow: 0, buildings: 720, townR: 26000 },
+  { dpr: 1.50, lev: 15, half: 9, base: 52, trees: .38, treeR: 3300, clouds: 84000, glare: 1, vig: 1, shadow: 1, stars: 1, terrShadow: 1, cloudShadow: 1, buildings: 1200, townR: 26000 },
+  { dpr: 2.00, lev: 16, half: 10, base: 44, trees: .44, treeR: 4100, clouds: 112000, glare: 1, vig: 1, shadow: 1, stars: 1, terrShadow: 1, cloudShadow: 1, buildings: 1700, townR: 26000 },
+  /* Two rungs above anything the tuner will climb to on its own. They are
+     for a machine with headroom and a pilot who would rather spend it on
+     the county than on the frame rate: more of the ground described in
+     finer pieces, trees to nine kilometres, and — the one that actually
+     makes fifteen thousand feet look like fifteen thousand feet — towns
+     drawn out to sixty kilometres instead of twenty-six, so the country
+     under you has towns in it rather than name tags on farmland. */
+  { dpr: 2.00, lev: 17, half: 12, base: 38, trees: .52, treeR: 6200, clouds: 150000, glare: 1, vig: 1, shadow: 1, stars: 1, terrShadow: 1, cloudShadow: 1, buildings: 3000, townR: 42000, cloudFar: .55, puffK: 1.5 },
+  { dpr: 2.40, lev: 18, half: 14, base: 32, trees: .62, treeR: 9000, clouds: 200000, glare: 1, vig: 1, shadow: 1, stars: 1, terrShadow: 1, cloudShadow: 1, buildings: 5000, townR: 62000, cloudFar: 1, puffK: 2 }
 ];
+/* The tuner climbs to HIGH on its own and no further: the two rungs above
+   it cost more than any machine can be assumed to have, and a ladder that
+   auto-climbs into them spends its life oscillating. They are chosen. */
+const QAUTO_TOP = 3;
 /* On top of the rungs, a continuous detail scale. The rungs are coarse, they
    change the resolution of the canvas, and they only ever move when the frame
    is already in trouble; between one rung and the next there can be four
@@ -1697,6 +1720,54 @@ const Q = { i: MOBILE ? 1 : 3, auto: true, work: 9, hold: 0, det: 1, q: QLEVELS[
 function applyQuality() {
   Q.q = QLEVELS[Q.i];
   resize();
+}
+/* ===== graphics, by hand =============================================
+
+   The tuner's job is to protect the frame, and it does it by never
+   spending what it has not measured as free. That is the right default and
+   it is also why it will never show you everything: from fifteen thousand
+   feet the county is a hundred kilometres across and the ladder is still
+   budgeting for the aerodrome under the nose.
+
+   So the ladder can be pinned. AUTO is the tuner; the six rungs are a
+   choice, and the two at the top are above anything it would climb to on
+   its own. */
+const GFX_KEY = "skyward.gfx";
+const GFX_NAME = ["LOW", "MEDIUM", "HIGH", "VERY HIGH", "ULTRA", "MAX"];
+let GFX = -1;
+(function readGfx() {
+  let v = NaN;
+  try { v = parseInt(localStorage.getItem(GFX_KEY), 10); } catch (e) {}
+  if (v >= -1 && v < QLEVELS.length) GFX = v;
+})();
+function gfxApply() {
+  if (GFX < 0) { Q.auto = true; return; }
+  Q.auto = false;
+  Q.i = clamp(GFX, 0, QLEVELS.length - 1);
+  /* The rung carries the detail at these settings; the continuous scale on
+     top of it is what the TUNER uses to spend headroom, and pinning both
+     is how you end up asking for eight thousand buildings. */
+  Q.det = GFX >= QLEVELS.length - 1 ? 1.25 : 1;
+  applyQuality();
+}
+function setGfx(v) {
+  GFX = clamp(Math.round(v), -1, QLEVELS.length - 1);
+  try { localStorage.setItem(GFX_KEY, String(GFX)); } catch (e) {}
+  gfxApply();
+  if (typeof gfxLabel === "function") gfxLabel();
+}
+function gfxLabel() {
+  const n = document.getElementById("gfxName"), i = document.getElementById("gfxInfo");
+  if (n) n.textContent = GFX < 0 ? "AUTO" : GFX_NAME[GFX];
+  if (!i) return;
+  /* This can be called while the file is still being parsed \u2014 the buttons
+     are wired before the loop declares its frame counter \u2014 and reading a
+     `let` that has not been reached yet throws rather than returning
+     undefined, which took the whole of the rest of the script with it. */
+  let f = 0;
+  try { f = fps; } catch (e) {}
+  i.textContent = (f ? Math.round(f) + " FPS \u00b7 " : "") + (GFX < 0 ? "AT " + GFX_NAME[Q.i] : "PINNED")
+    + " \u00b7 TOWNS TO " + Math.round((Q.q.townR || 26000) / 1000) + " KM";
 }
 /* Tuned on the time spent inside the frame, not the frame interval: vsync
    pins the interval at 16.7 ms whatever the load, so it can never show
@@ -1743,7 +1814,7 @@ function tuneQuality(dt, workMs) {
   const floored = Q.det <= DET_MIN + .02;
   if ((Q.work > 11.5 || fps < 24 || (floored && Q.work > 10.2)) && Q.i > 0) {
     Q.i--; Q.det = 1; Q.hold = 3; applyQuality();
-  } else if (Q.work < 6.0 && fps > 48 && Q.det > DET_MAX - .02 && Q.i < QLEVELS.length - 1) {
+  } else if (Q.work < 6.0 && fps > 48 && Q.det > DET_MAX - .02 && Q.i < QAUTO_TOP) {
     Q.i++; Q.det = 1; Q.hold = 4; applyQuality();
   }
 }
@@ -1958,7 +2029,14 @@ function sprite(r, g, b, profile) {
    watches for it — ninety per cent full pulls the detail scale down — so the
    larger list is headroom for the tuner to manage rather than a licence to
    spend. */
-const DLMAX = 14000;
+/* The display list is the other ceiling, and running into it does not slow
+   the frame down: it silently drops whatever asked LAST, which is the near
+   detail. Fourteen thousand was sized for the ladder the tuner climbs; the
+   two rungs above it fill that on their own at fifteen thousand feet over a
+   county, so the near ground would have gone missing exactly where the
+   setting was supposed to add it. Thirty-four thousand entries is about two
+   and a half megabytes of typed array, allocated once. */
+const DLMAX = 34000;
 const DL = {
   n: 0, kind: new Uint8Array(DLMAX), depth: new Float64Array(DLMAX),
   off: new Int32Array(DLMAX), cnt: new Int32Array(DLMAX),
@@ -5167,7 +5245,7 @@ function drawUrban(budget) {
      the BUDGET is what decides how many get drawn either way: a wider reach
      spreads the same seventeen hundred boxes over the country instead of
      piling them on the field under the nose. */
-  const reach = Math.min(2700 * (1 << lvl), 26000) * (Q.q.buildings < 700 ? .74 : 1);
+  const reach = Math.min(2700 * (1 << lvl), Q.q.townR || 26000) * (Q.q.buildings < 700 ? .74 : 1);
   const fx = cam.m[6], fz = cam.m[8];
   const cell = (i, j) => {
     const bx = i * PITCH, bz = j * PITCH;
@@ -5858,11 +5936,21 @@ function drawShadow(k) {
 /* volumetric-ish cloud field */
 const CLOUDS = [];
 (function makeClouds() {
-  for (let i = 0; i < 150; i++) {
-    const a = hash2(i, 11) * TAU, r = 900 + hash2(i, 12) * 21000;
+  /* Two fields. The near one is the deck that has always been there and is
+     untouched, because it is what the frame rate was measured against. The
+     outer one only exists for the two settings above the ladder: from
+     fifteen thousand feet you are looking DOWN on the deck and out to the
+     horizon, and a deck that stops at twenty-one kilometres is a disc of
+     cloud sitting on an empty county.
+
+     Every cloud is also built with twice the puffs it needs. Which half is
+     drawn is the setting; building them is free and building them twice is
+     nearly free, and it means MAX has something to spend on. */
+  const make = (i, r, far) => {
+    const a = hash2(i, 11) * TAU;
     const base = 760 + hash2(i, 13) * 1350;
     const puffs = [];
-    const np = 5 + ((hash2(i, 14) * 7) | 0);
+    const np = (5 + ((hash2(i, 14) * 7) | 0)) * 2;
     const sc = .7 + hash2(i, 19) * 1.4;
     for (let k = 0; k < np; k++) {
       puffs.push({
@@ -5872,15 +5960,22 @@ const CLOUDS = [];
         r: (70 + hash2(i * 13 + k, 18) * 130) * sc
       });
     }
-    CLOUDS.push({ p: v3(Math.cos(a) * r, base, Math.sin(a) * r), puffs, t: hash2(i, 21) });
-  }
+    CLOUDS.push({ p: v3(Math.cos(a) * r, base, Math.sin(a) * r), puffs, far: far,
+      pri: hash2(i, 23), t: hash2(i, 21) });
+  };
+  for (let i = 0; i < 150; i++) make(i, 900 + hash2(i, 12) * 21000, 0);
+  for (let i = 150; i < 600; i++) make(i, 20000 + Math.sqrt(hash2(i, 12)) * 42000, 1);
 })();
 function drawClouds() {
+  const far = Q.q.cloudFar || 0, pk = clamp((Q.q.puffK || 1) * .5, .25, 1);
   for (const cl of CLOUDS) {
+    if (cl.far && cl.pri > far) continue;
     const dx = cl.p.x - cam.pos.x, dz = cl.p.z - cam.pos.z;
     const d2 = dx * dx + dz * dz;
     if (d2 > Q.q.clouds * Q.q.clouds) continue;
-    for (const pf of cl.puffs) {
+    const pn = Math.max(3, Math.round(cl.puffs.length * pk));
+    for (let pi = 0; pi < pn; pi++) {
+      const pf = cl.puffs[pi];
       const wp = v3(cl.p.x + pf.x, cl.p.y + pf.y, cl.p.z + pf.z);
       const sp = projectPoint(wp);
       if (!sp) continue;
@@ -10505,14 +10600,14 @@ const LOG_KEY = "skyward.log.v1";
    The number is the point: it is the thing you can quote back when something
    is wrong, and the list under it is what to go and look at. */
 const BUILD = {
-  no: 41,
-  name: "THE GARAGE",
+  no: 42,
+  name: "ALL OF IT",
   date: "2 OCT 2026",
   notes: [
-    ["TWO LEVERS ON THE PLANE PAGE", "POWER is a speed scale: the burner is multiplied by the square of it, so \u00d72 is four times the thrust and roughly four times the acceleration, and the five settings run from twenty-one seconds to Mach 3 down to under one. AGILITY is three things at once because one of them alone does nothing \u2014 more lift, a later stall, and control power that no longer halves itself past Mach 2. Both are remembered with the rest of the kit."],
-    ["AND VECTORING NOZZLES, WHICH IS THE PART THAT MATTERS", "A control surface needs air and gets weaker the faster and thinner it goes, which is why the aeroplane went numb exactly where it was most exciting. A nozzle does not care. On SPORT and COMBAT the engines point, and the flight control laws were told about it, because a loop that does not know about an actuator over-drives it. Sustained turn at Mach 2.8 and sixteen kilometres: four degrees a second as built, six on SPORT, nine on COMBAT. Roll: 83, 116, 154 degrees a second. SPORT is the new default."],
-    ["THE HANGAR IS LAID OUT LIKE A GARAGE", "A card down one side was a settings dialog over a picture. Now it is a strip along the top with the tabs on it, a column of whatever page you are on, and a bar along the bottom with the machine\u2019s numbers on the left and the one button that matters on the right \u2014 and the aeroplane in the middle of all of it. The four bars are live: change POWER or AGILITY and they move while you are looking at them. Upright it stacks instead of splitting."],
-    ["AND THE CAMERA ASKS THE LAYOUT HOW MUCH ROOM IT HAS", "The middle cell of that grid is deliberately empty, and the shot is framed on it. One piece of code now frames correctly with a column down one side, with a drawer along the bottom, and on a phone held sideways where what is left is a two-to-one letterbox."]
+    ["A GRAPHICS SETTING, AND TWO RUNGS ABOVE THE LADDER", "The quality tuner\u2019s job is to protect the frame rate, which is right nearly all of the time and is also why it would never show you everything: from fifteen thousand feet the county is a hundred kilometres across and it is still budgeting for the aerodrome under the nose. SET-UP \u00b7 GRAPHICS pins it instead. AUTO is the tuner; LOW through MAX are a choice, and ULTRA and MAX are above anything it will climb to on its own."],
+    ["WHAT THEY ACTUALLY BUY", "Towns drawn out to forty and sixty-two kilometres instead of twenty-six, so the country under you has towns in it rather than name tags on farmland. Five thousand buildings instead of seventeen hundred. Trees to nine kilometres. The ground described in finer pieces, further out. And a second cloud field past twenty-one kilometres with twice the puffs in each cloud \u2014 from fifteen thousand feet you are looking DOWN on the deck, and a deck that stopped at twenty-one kilometres was a disc of cloud sitting on an empty county."],
+    ["AND THE DISPLAY LIST GREW TO FIT", "Running out of display list does not slow the frame down: it silently drops whatever asked last, which is the near detail. Fourteen thousand entries was sized for the ladder the tuner climbs, and the new rungs filled it on their own \u2014 so the near ground would have gone missing exactly where the setting was supposed to add it. Thirty-four thousand now, about two and a half megabytes, allocated once."],
+    ["AND FROM LAST TIME", "POWER and AGILITY on the PLANE page, vectoring nozzles, and the hangar laid out like a garage."]
   ]
 };
 const NEWS_KEY = "skyward.build";
@@ -12545,8 +12640,13 @@ function fitEdgeWanted() {
   return !!(s && s.classList.contains("on"));
 }
 let fitEdgeOn = null, fitBadgeOn = null;
+let gfxT = 0;
 function fitEdgeStep(dt) {
   if (FITSHOW > 0) FITSHOW = Math.max(0, FITSHOW - dt);
+  /* The frame rate is the whole point of the read-out, so it has to be the
+     frame rate NOW and not the one when the page was opened. */
+  gfxT -= dt;
+  if (gfxT <= 0) { gfxT = .4; if (fitEdgeWanted()) gfxLabel(); }
   const el = document.getElementById("fitedge"), bg = document.getElementById("fitBadge");
   if (!el) return;
   const want = fitEdgeWanted(), badge = FITSHOW > 0;
@@ -12564,7 +12664,12 @@ function fitEdgeStep(dt) {
   if (m2) m2.addEventListener("click", () => setUIK(UIK - .05));
   if (p2) p2.addEventListener("click", () => setUIK(UIK + .05));
   if (r2) r2.addEventListener("click", () => setUIK(1));
-  fitLabel();
+  const m3 = document.getElementById("gfxMinus"), p3 = document.getElementById("gfxPlus"),
+        r3 = document.getElementById("gfxReset");
+  if (m3) m3.addEventListener("click", () => setGfx(GFX - 1));
+  if (p3) p3.addEventListener("click", () => setGfx(GFX + 1));
+  if (r3) r3.addEventListener("click", () => setGfx(-1));
+  fitLabel(); gfxLabel();
 })();
 document.querySelectorAll("#pitchRow .opt").forEach(b => b.addEventListener("click", () => {
   PITCH_REAL = b.dataset.pitch === "real";
@@ -12753,6 +12858,7 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 applyQuality();
+gfxApply();
 resetPlane("free");
 qMat(PLANE.q, PLANE.m);
 requestAnimationFrame(frame);
