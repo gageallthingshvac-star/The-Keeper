@@ -102,33 +102,69 @@
   .fld input{width:100%;font:inherit;font-size:14px;letter-spacing:.06em;color:var(--ink);
     background:rgba(255,255,255,.05);border:1px solid var(--edge);border-radius:9px;padding:10px 12px}
   .fld input:focus{outline:none;border-color:var(--accent);background:rgba(111,211,255,.08)}
-  /* The menu is DOCKED, not draped. The hangar has to stay visible and
-     touchable, so the card takes one side of the screen and the backdrop
-     goes away entirely. */
+  /* ===== the bay, as a garage =========================================
+
+     A card down one side is a settings dialog over a picture. A garage is
+     not that shape: the machine is the middle of the screen and the
+     furniture is a strip along the top, a column down one side and a bar
+     along the bottom with its numbers on the left and the one button that
+     matters on the right.
+
+     So the card is not a card any more. It is a three-row grid over the
+     whole screen, almost all of it transparent, and the only parts that
+     take a tap are the strips themselves. The middle-right cell is empty
+     on purpose: it is #stagewin, and the camera asks it how much room the
+     aeroplane has. */
   #menu{background:none;backdrop-filter:none;pointer-events:none;overflow:visible;
-    padding:0;align-items:stretch;justify-content:flex-end}
-  /* The card is a fixed head, a scrolling middle and a fixed foot. One long
-     scroll meant the button that actually starts the flight was four screens
-     down, and the tabs mean nothing is more than one tap away. */
-  #menu .card{pointer-events:auto;width:min(470px,42vw);margin:0;height:100%;overflow:hidden;
-    display:flex;flex-direction:column;padding:0;
-    border-radius:0;border-width:0 0 0 1px;box-shadow:-24px 0 60px rgba(0,0,0,.55);
-    background:linear-gradient(180deg,rgba(6,11,18,.95),rgba(4,8,13,.975));
-    --padx:20px; --padr:calc(20px + env(safe-area-inset-right));
+    padding:0;align-items:stretch;justify-content:stretch}
+  #menu .card{pointer-events:none;width:100%;height:100%;margin:0;overflow:hidden;
+    display:grid;grid-template-columns:min(430px,34vw) 1fr;grid-template-rows:auto 1fr auto;
+    padding:0;border:0;border-radius:0;box-shadow:none;background:none;
+    --padx:calc(18px + env(safe-area-inset-left)); --padr:calc(18px + env(safe-area-inset-right));
     /* --hostbar is set from script: inside a frame the safe-area insets all
-       read zero and the card's title ends up under the host's title bar. */
-    --padt:calc(16px + env(safe-area-inset-top) + var(--hostbar,0px));
-    --padb:calc(14px + env(safe-area-inset-bottom))}
-  .mhead{flex:0 0 auto;padding:var(--padt) var(--padr) 0 var(--padx);
-    border-bottom:1px solid var(--edge);background:rgba(3,7,12,.5)}
-  .mbody{flex:1 1 auto;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;
-    padding:14px var(--padr) 10px var(--padx)}
-  .mfoot{flex:0 0 auto;padding:12px var(--padr) var(--padb) var(--padx);
-    border-top:1px solid var(--edge);background:rgba(3,7,12,.62)}
-  .mfoot .go{margin-top:0}
-  .tabs{display:flex;gap:3px;margin:12px 0 0}
-  .tabs button{flex:1 1 0;min-width:0;font:inherit;font-size:10.5px;letter-spacing:.10em;font-weight:700;
-    padding:11px 2px 9px;border:0;border-bottom:2px solid transparent;background:none;color:var(--dim);
+       read zero and the title ends up under the host's title bar. */
+    --padt:calc(10px + env(safe-area-inset-top) + var(--hostbar,0px));
+    --padb:calc(10px + env(safe-area-inset-bottom))}
+  .mhead{grid-column:1/3;grid-row:1;pointer-events:auto;
+    display:flex;align-items:flex-end;gap:16px;
+    padding:var(--padt) var(--padr) 0 var(--padx);
+    border-bottom:1px solid var(--edge);
+    background:linear-gradient(180deg,rgba(3,7,12,.97),rgba(3,7,12,.80))}
+  .mhead h1{margin:0 0 9px;white-space:nowrap}
+  .mhead .sub{margin:0 0 11px;flex:0 1 auto;min-width:0;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  .mbody{grid-column:1;grid-row:2;pointer-events:auto;min-height:0;overflow:auto;
+    -webkit-overflow-scrolling:touch;padding:14px var(--padr) 14px var(--padx);
+    border-right:1px solid var(--edge);
+    background:linear-gradient(90deg,rgba(5,10,16,.95),rgba(5,10,16,.80))}
+  #stagewin{grid-column:2;grid-row:2;pointer-events:none}
+  .mfoot{grid-column:1/3;grid-row:3;pointer-events:auto;
+    display:flex;align-items:center;gap:18px;
+    padding:9px var(--padr) var(--padb) var(--padx);
+    border-top:1px solid var(--edge);
+    background:linear-gradient(0deg,rgba(3,7,12,.97),rgba(3,7,12,.80))}
+  .mfoot .go{margin:0;flex:0 0 min(340px,32vw)}
+  .mfoot .ghost{margin:0;flex:0 0 min(340px,32vw);width:auto}
+  .mfoot .foot{display:none}
+  /* ---- the numbers, which is what a garage is really for -------------- */
+  #statbar{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:16px}
+  .statname{flex:0 0 auto;min-width:0}
+  .statname b{display:block;font-size:13px;letter-spacing:.14em;color:var(--ink);white-space:nowrap}
+  .statname i{display:block;font-style:normal;font-size:9.5px;letter-spacing:.12em;
+    color:var(--dim);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .stats{flex:1 1 auto;min-width:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px 16px}
+  .stat{min-width:0}
+  .stat .k{display:flex;justify-content:space-between;gap:6px;font-size:9px;letter-spacing:.11em;
+    color:var(--dim);margin-bottom:3px;white-space:nowrap}
+  .stat .k span{overflow:hidden;text-overflow:ellipsis}
+  .stat .k em{font-style:normal;color:var(--ink);font-weight:700;white-space:nowrap}
+  .stat .bar{height:5px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden}
+  .stat .bar u{display:block;height:100%;border-radius:3px;
+    background:linear-gradient(90deg,#3f8fb8,#7fe4ff);transition:width .35s ease}
+  .stat.hot .bar u{background:linear-gradient(90deg,#b8703f,#ffc27f)}
+  .tabs{display:flex;gap:3px;margin:0;flex:1 1 auto;justify-content:flex-end}
+  .tabs button{flex:0 1 112px;min-width:0;font:inherit;font-size:10.5px;letter-spacing:.10em;font-weight:700;
+    padding:11px 8px 9px;border:0;border-bottom:2px solid transparent;background:none;color:var(--dim);
     cursor:pointer;border-radius:8px 8px 0 0;transition:color .15s,background .15s,border-color .15s}
   .tabs button:hover{color:var(--ink);background:rgba(255,255,255,.05)}
   .tabs button.on{color:var(--accent);border-bottom-color:var(--accent);background:rgba(111,211,255,.09)}
@@ -161,25 +197,41 @@
     border-radius:9px;cursor:pointer}
   .ghost:hover{color:#ffd9cf;border-color:rgba(255,120,96,.55);background:rgba(255,120,96,.10)}
   @media (max-width:900px),(orientation:portrait){
-    #menu{align-items:flex-end;justify-content:stretch}
-    #menu .card{width:100%;height:60%;border-width:1px 0 0;border-radius:16px 16px 0 0;
-      box-shadow:0 -24px 60px rgba(0,0,0,.55);transition:height .28s ease;
-      --padx:calc(15px + env(safe-area-inset-left)); --padr:calc(15px + env(safe-area-inset-right));
-      --padt:12px; --padb:calc(12px + env(safe-area-inset-bottom))}
+    /* Upright there is no room for a column beside the machine, so the
+       garage stacks instead: strip, machine, drawer, numbers, button. */
+    #menu .card{grid-template-columns:1fr;grid-template-rows:auto 1fr auto auto;
+      --padx:calc(14px + env(safe-area-inset-left)); --padr:calc(14px + env(safe-area-inset-right));
+      --padt:calc(10px + env(safe-area-inset-top) + var(--hostbar,0px));
+      --padb:calc(10px + env(safe-area-inset-bottom))}
+    .mhead{grid-column:1;grid-row:1;flex-wrap:wrap;align-items:baseline;gap:2px 12px;padding-bottom:0}
+    .mhead h1{margin:0 0 2px;font-size:20px;letter-spacing:.15em}
+    .mhead .sub{display:none}
+    #stagewin{grid-column:1;grid-row:2}
+    .mbody{grid-column:1;grid-row:3;max-height:52vh;border-right:0;
+      border-top:1px solid var(--edge);border-radius:16px 16px 0 0;
+      box-shadow:0 -22px 50px rgba(0,0,0,.55);transition:max-height .28s ease;
+      background:linear-gradient(180deg,rgba(6,11,18,.96),rgba(4,8,13,.97));
+      padding-top:16px}
+    .mbody::before{content:"";display:block;width:44px;height:4px;border-radius:3px;
+      background:rgba(150,190,225,.35);margin:-6px auto 12px}
+    .mfoot{grid-column:1;grid-row:4;flex-direction:column;align-items:stretch;gap:8px;padding-top:8px}
+    .mfoot .go,.mfoot .ghost{flex:0 0 auto;width:100%}
+    #statbar{flex-direction:column;align-items:stretch;gap:7px}
+    .statname{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+    .statname b{font-size:11.5px}
+    .stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 14px}
     /* Choosing a paint for something you cannot see is a colour swatch, not
        a customiser. On the two pages where the subject IS the point, the
-       sheet gets out of the way and gives the model most of the glass. */
-    #menu.look .card{height:46%}
-    #menu.look .mhead .sub{display:none}
-    #menu.look .mhead h1{font-size:19px;letter-spacing:.14em}
-    .mhead::before{content:"";display:block;width:44px;height:4px;border-radius:3px;
-      background:rgba(150,190,225,.35);margin:-4px auto 10px}
-    .tabs button{font-size:10px;padding:10px 1px 8px;letter-spacing:.06em}
+       drawer gets out of the way and gives the model most of the glass. */
+    #menu.look .mbody{max-height:40vh}
+    .tabs{justify-content:space-between}
+    .tabs button{flex:1 1 0;font-size:10px;padding:10px 1px 8px;letter-spacing:.06em}
     .mfoot .foot{display:none}
     /* One option per line reads as a list; two ragged columns of different
        lengths read as a mess. The blurb is clamped to three lines unless it
        is the one you have chosen, which is the only one you need to read. */
-    #scenRow .opt,#livRow .opt,#pitchRow .opt,#safeRow .opt,#freeRow .opt{flex:1 1 100%}
+    #scenRow .opt,#livRow .opt,#pitchRow .opt,#safeRow .opt,#freeRow .opt,
+    #pwrRow .opt,#aglRow .opt{flex:1 1 100%}
     .opt i{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
     .opt.on i{-webkit-line-clamp:99}
   }
@@ -187,19 +239,31 @@
      and the card has to live inside that: the title shrinks, the strapline
      and the key line go, and what is left is the part you came for. */
   @media (max-height:560px){
-    #menu .card{--padt:calc(10px + env(safe-area-inset-top));--padb:calc(8px + env(safe-area-inset-bottom))}
-    .mhead h1{font-size:18px;letter-spacing:.13em}
+    /* Four hundred points of glass from top to bottom, and the garage still
+       has to be a garage: the strips thin out, the column narrows, and the
+       numbers go to two lines of two rather than one line of four. */
+    #menu .card{grid-template-columns:min(300px,30vw) 1fr;
+      --padt:calc(8px + env(safe-area-inset-top) + var(--hostbar,0px));
+      --padb:calc(7px + env(safe-area-inset-bottom))}
+    .mhead h1{font-size:18px;letter-spacing:.13em;margin-bottom:7px}
     .mhead .sub{display:none}
-    .tabs{margin-top:8px}
-    .tabs button{padding:8px 1px 7px;font-size:9.5px;letter-spacing:.05em}
+    .tabs{margin-top:0}
+    .tabs button{padding:8px 4px 7px;font-size:9.5px;letter-spacing:.05em;flex:0 1 92px}
     .mbody{padding-top:10px}
-    .mfoot{padding-top:8px}
+    .mfoot{padding-top:7px;gap:12px}
+    .mfoot .go,.mfoot .ghost{flex:0 0 min(240px,26vw)}
+    .statname b{font-size:11px}
+    .statname i{font-size:8.5px}
+    .stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:3px 12px}
+    .stat .k{font-size:8.5px;margin-bottom:2px}
+    .stat .bar{height:4px}
     .mfoot .foot{display:none}
     .mfoot .go{padding:12px;font-size:13px}
     .ghost{padding:9px;font-size:10px}
     .tapnote{padding:7px 9px;margin-bottom:10px;font-size:10px;line-height:1.4}
     h2{margin:10px 0 6px}
-    #scenRow .opt,#livRow .opt,#pitchRow .opt,#safeRow .opt,#freeRow .opt{flex:1 1 100%}
+    #scenRow .opt,#livRow .opt,#pitchRow .opt,#safeRow .opt,#freeRow .opt,
+    #pwrRow .opt,#aglRow .opt{flex:1 1 100%}
     .opt i{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
     .opt.on i{-webkit-line-clamp:99}
   }
@@ -252,6 +316,8 @@
         </nav>
       </div>
 
+      <div id="stagewin"></div>
+
       <div class="mbody" id="mbody">
         <section data-pane="flight" class="on">
           <div class="tapnote">Tap the <b>aeroplane</b> or the <b>pilot</b> in the hangar to walk up to them. Tap the floor to step back.</div>
@@ -267,6 +333,10 @@
         </section>
 
         <section data-pane="plane" class="sect" id="secPlane">
+          <h2>Power</h2>
+          <div class="row" id="pwrRow"></div>
+          <h2>Agility</h2>
+          <div class="row" id="aglRow"></div>
           <h2>Livery</h2>
           <div class="row" id="livRow"></div>
           <h2>Trim colour</h2>
@@ -336,6 +406,10 @@
       </div>
 
       <div class="mfoot">
+        <div id="statbar">
+          <div class="statname"><b>SR-71A &middot; KEEPER FIELD</b><i id="statKit">&nbsp;</i></div>
+          <div class="stats" id="stats"></div>
+        </div>
         <button class="go" id="startBtn">BEGIN FLIGHT</button>
         <button class="ghost hide" id="baseBtn">END THE FLIGHT &middot; BACK TO THE HANGAR</button>
         <div class="foot">Esc or P pauses &middot; H goes back to the hangar &middot; R restarts &middot; K toggles safe mode &middot; L shows the control card &middot; Z flies the autopilot</div>
@@ -3008,13 +3082,13 @@ const VISORS = [["GOLD", [214, 172, 66]], ["SMOKE", [42, 46, 54]], ["MIRROR", [1
                 ["CLEAR", [120, 150, 170]]];
 const SUITS = [["PRESSURE SILVER", [176, 180, 188]], ["FLIGHT GREEN", [92, 104, 74]],
                ["ORANGE", [214, 118, 48]], ["SLATE", [64, 70, 82]], ["TAN", [172, 156, 124]]];
-const KIT = { liv: 0, trim: 0, helm: 0, visor: 0, suit: 0, name: "", call: "" };
+const KIT = { liv: 0, trim: 0, helm: 0, visor: 0, suit: 0, name: "", call: "", pwr: 0, agl: 1 };
 const KIT_KEY = "skyward.kit";
 (function kitLoad() {
   try {
     const o = JSON.parse(localStorage.getItem(KIT_KEY) || "null");
     if (!o) return;
-    for (const k of ["liv", "trim", "helm", "visor", "suit"])
+    for (const k of ["liv", "trim", "helm", "visor", "suit", "pwr", "agl"])
       if (typeof o[k] === "number" && o[k] >= 0) KIT[k] = o[k] | 0;
     if (typeof o.name === "string") KIT.name = o.name.slice(0, 18);
     if (typeof o.call === "string") KIT.call = o.call.slice(0, 10);
@@ -4354,7 +4428,7 @@ function stageShot(name, t) {
   if (name === "pilot") {
     const fa = STAGE.pilotFace, hp = STAGE.pilotPos();
     const rt = vnorm(vcross(v3(0, 1, 0), fa));
-    const s = stageFit(.60, 1.05, 2.1, 7.0, .42, 1.05);
+    const s = stageFit(.60, 1.05, 2.1, 7.0, .42, 1.15);
     const d = s.d;
     const sw = Math.sin(t * .42), c = v3(hp.x, E + .88, hp.z);
     const off = .26 * d / 3;
@@ -4369,7 +4443,7 @@ function stageShot(name, t) {
     /* Thirty-three metres of aeroplane on a lit plate: the shot stands off
        the starboard bow and slightly ABOVE it, so what is behind the
        aeroplane is the plate and not the roof. */
-    const s = stageFit(18.4, 5.6, 17, 32, .60, 1.34);
+    const s = stageFit(18.4, 5.6, 17, 32, .60, 1.52);
     const d = s.d;
     const th = .66 + Math.sin(t * .15) * .07;
     /* The aeroplane is not symmetrical about the point the eye is pointed
@@ -4385,7 +4459,11 @@ function stageShot(name, t) {
     };
   }
   // the whole bay: the aeroplane and the pilot both inside whatever is left
-  const s = stageFit(16.8, 5.9, 20, 36, .75, 1.30);
+  /* The subject here is the aeroplane AND the pilot standing beside it,
+     which is wider than the aeroplane: asking the solver to fit 16.8 metres
+     when the pair of them span 18.3 is how the nose ended up off the edge
+     on a phone held sideways. The allowance is the pair, with margin. */
+  const s = stageFit(18.0, 6.1, 20, 38, .75, 1.60);
   const d = s.d;
   const th = .34 + Math.sin(t * .09) * .11;
   // the same pan: aeroplane and pilot together are not centred on either
@@ -4402,20 +4480,27 @@ function stageShot(name, t) {
    the only way the two can never disagree. */
 function stageInset() {
   const menu = document.getElementById("menu");
-  const card = menu && !menu.classList.contains("hide") ? menu.querySelector(".card") : null;
+  const win = menu && !menu.classList.contains("hide")
+    ? document.getElementById("stagewin") : null;
   const f = STAGE.free, g = STAGE.fit;
   f.x0 = 0; f.y0 = 0; f.x1 = W; f.y1 = H;
   g.x0 = 0; g.y0 = 0; g.x1 = W; g.y1 = H;
-  if (!card) { STAGE.offX = 0; STAGE.offY = 0; return; }
-  const r = card.getBoundingClientRect(), cr = cv.getBoundingClientRect();
-  if (!cr.width || !cr.height) return;
+  if (!win) { STAGE.offX = 0; STAGE.offY = 0; return; }
+  /* The layout decides how much room the aeroplane gets, and it says so by
+     leaving one cell of the grid empty. Measuring THAT instead of guessing
+     from the edge of a panel is why the same code frames it correctly with
+     a column down one side and with a drawer along the bottom. */
+  const r = win.getBoundingClientRect(), cr = cv.getBoundingClientRect();
+  if (!cr.width || !cr.height || r.width < 30 || r.height < 30) return;
   const sx = W / cr.width, sy = H / cr.height;
-  if (r.width < cr.width - 40) f.x1 = clamp((r.left - cr.left) * sx, W * .25, W);
-  else f.y1 = clamp((r.top - cr.top) * sy, H * .18, H);
-  const u = UI, pad = 12 * u;
+  f.x0 = clamp((r.left - cr.left) * sx, 0, W);
+  f.x1 = clamp((r.right - cr.left) * sx, f.x0 + 40, W);
+  f.y0 = clamp((r.top - cr.top) * sy, 0, H);
+  f.y1 = clamp((r.bottom - cr.top) * sy, f.y0 + 40, H);
+  const u = UI, pad = 10 * u;
   g.x0 = f.x0 + pad; g.x1 = Math.max(f.x1 - pad, g.x0 + 60);
-  g.y0 = f.y0 + (STAGE.want === "wide" ? pad : 60 * u);
-  g.y1 = Math.max(f.y1 - (STAGE.want === "wide" ? pad : 36 * u), g.y0 + 60);
+  g.y0 = f.y0 + (STAGE.want === "wide" ? pad : 52 * u);
+  g.y1 = Math.max(f.y1 - (STAGE.want === "wide" ? pad : 30 * u), g.y0 + 60);
   STAGE.offX = (g.x0 + g.x1) * .5 - W * .5;
   STAGE.offY = (g.y0 + g.y1) * .5 - H * .5;
 }
@@ -6361,6 +6446,73 @@ const FBW = {
   zetaY: .55          // damping ratio the yaw loop holds the dutch roll to
 };
 
+/* The numbers above are the aeroplane as built. Keep a copy, because two
+   of the settings in the hangar rewrite them. */
+const FBW0 = JSON.parse(JSON.stringify(FBW));
+
+/* ===== the two levers in the hangar ===================================
+
+   This airframe is a reconnaissance aeroplane. It was built to go very fast
+   in a straight line at eighty thousand feet and it was emphatically not
+   built to turn, and STOCK on both of these is what that actually flies
+   like. The other settings are not realism and are not pretending to be:
+   they are what you came here for.
+
+   POWER is a top-speed scale. Drag goes as the square of speed, so doubling
+   the speed takes four times the thrust — the multiplier below is squared
+   before it reaches the burner, and the military rating is left alone so
+   that taking off and landing are unchanged.
+
+   AGILITY is three things at once, because one of them on its own does not
+   work. More lift is what makes the turn tighter at any speed; a later
+   stall is what lets you use it; and control power that does NOT collapse
+   past Mach 2 is what lets you ask for it when it matters. */
+const POWERS = [
+  ["STOCK", 1, "The aeroplane as built. Twenty-one seconds from a slow circuit to Mach 3 at twelve kilometres, and a bit over a minute to Mach 10."],
+  ["FAST", 2, "Four times the burner. Mach 3 in six seconds, Mach 10 in seventeen."],
+  ["BLISTERING", 3.2, "Ten times the burner. Mach 3 in three seconds and Mach 10 in seven."],
+  ["RIDICULOUS", 5, "Twenty-five times. Under two seconds to Mach 3, and the airframe will be glowing."],
+  ["LUDICROUS", 8, "Sixty-four times the burner. Mach 3 inside a second. Everything past here is a decision about heat, not about thrust."]
+];
+const AGILS = [
+  ["STOCK", { lift: 1, alpha: 1, hiMach: .55, rate: 1, gMax: 9, vec: 0 },
+    "A reconnaissance delta with no business turning. Honest, and it will not do any of this: thirteen degrees a second down low and four at Mach 2.8."],
+  ["SPORT", { lift: 1.22, alpha: 1.10, hiMach: .74, rate: 1.40, gMax: 11, vec: .07 },
+    "Forty per cent more roll, a quarter more lift, vectoring nozzles, and the control power stays with you past Mach 2. Sixteen degrees a second down low and six at Mach 2.8. This is the one to fly."],
+  ["COMBAT", { lift: 1.50, alpha: 1.22, hiMach: .92, rate: 1.85, gMax: 14, vec: .16 },
+    "Thrust-fighter numbers on an aeroplane that should not have them: a hundred and fifty-four degrees a second of roll, fourteen g, a wing that still bites at thirty-three degrees, and the nozzles doing the pointing. Twenty degrees a second down low and nine at Mach 2.8, which is more than twice what it came with."]
+];
+const TUNE = { thrust: 1, spd: 1, lift: 1, alpha: 1, hiMach: .55, rate: 1, vec: 0 };
+/* Vectoring nozzles, as a moment. This is the part that works where nothing
+   else does: a control surface needs air and gets weaker the thinner and the
+   faster it goes, and a nozzle does not care. It is what lets the nose come
+   round at Mach 3 and at eighty thousand feet, and it is the single biggest
+   reason the COMBAT setting feels like a different aeroplane.
+
+   Both the flight control laws and the moment equation call this, because a
+   loop that does not know about an actuator over-drives it — which is the
+   mistake the thrusters taught this file once already. */
+function vecMoment(P) {
+  return TUNE.vec * SPECS.thrustAB * 2 * 6.0
+    * clamp(P.rpm || 0, 0, 1) * (.35 + .65 * (P.abSm || 0));
+}
+function applyTune() {
+  const p = POWERS[clamp(KIT.pwr | 0, 0, POWERS.length - 1)];
+  const a = AGILS[clamp(KIT.agl | 0, 0, AGILS.length - 1)][1];
+  TUNE.spd = p[1];
+  TUNE.thrust = p[1] * p[1];
+  TUNE.lift = a.lift; TUNE.alpha = a.alpha; TUNE.hiMach = a.hiMach; TUNE.rate = a.rate;
+  TUNE.vec = a.vec;
+  FBW.gMax = a.gMax;
+  FBW.pMax = FBW0.pMax * a.rate;
+  FBW.qMax = FBW0.qMax * a.rate;
+  FBW.kRoll = FBW0.kRoll * (1 + (a.rate - 1) * .55);
+  FBW.pSmooth = FBW0.pSmooth * (1 + (a.rate - 1) * .70);
+  FBW.aoaMax = FBW0.aoaMax * a.alpha;
+}
+
+applyTune();
+
 /* A stick curve. Straight through would give the same gearing everywhere,
    which makes small corrections at speed impossible: a couple of degrees of
    thumb is already a hard pull. This keeps the middle of the travel soft and
@@ -6508,9 +6660,19 @@ function flightControl(P, dt, e, cE, cA, cR) {
   const aeroShare = clamp(1 - rcsAuth, 0, 1);
   const qS = qbar * SPECS.S;
   // control power actually available, in the units each loop works in
-  const ctlM = lerp(1, .55, sstep(1.0, 2.2, P.mach || 0));
+  /* Control power past Mach 2. Stock it halves, which is honest for a
+     surface this far behind a shock and is also why the aeroplane went
+     numb exactly where it was most exciting. AGILITY buys it back. */
+  const ctlM = lerp(1, TUNE.hiMach, sstep(1.0, 2.2, P.mach || 0));
+  /* How much ANGLE OF ATTACK a unit of elevator buys, which is what the
+     tail and the nozzles between them actually decide, and from that the g.
+     Written as a ratio of moments it is the old expression exactly when
+     there are no nozzles, and still right when there are. */
+  const vecT = vecMoment(P);
+  const alphaPer = clamp((qS * SPECS.cbar * SPECS.CmE * ctlM + vecT)
+    / Math.max(qS * SPECS.cbar * SPECS.CmA, 1e-6), 0, 1.4);
   // g per unit of elevator
-  const gPer = Math.max(qS * claOfMach(P.mach || 0) * (SPECS.CmE / Math.max(SPECS.CmA, .05)) * ctlM / W, .18);
+  const gPer = Math.max(qS * claOfMach(P.mach || 0) * TUNE.lift * alphaPer / W, .18);
 
   /* Control authority per unit of stick — and it has to count the THRUSTERS,
      not just the surfaces.
@@ -6528,9 +6690,9 @@ function flightControl(P, dt, e, cE, cA, cR) {
   const rcsQ = SPECS.rcsP * rcsAuth / SPECS.Ipitch;
   const rcsR = SPECS.rcsR * rcsAuth / SPECS.Iroll;
   const rcsY = SPECS.rcsY * rcsAuth / SPECS.Iyaw;
-  const qPer = Math.max(qS * SPECS.cbar * SPECS.CmE * ctlM / SPECS.Ipitch + rcsQ, .02);
+  const qPer = Math.max((qS * SPECS.cbar * SPECS.CmE * ctlM + vecT) / SPECS.Ipitch + rcsQ, .02);
   const pPer = Math.max(qS * SPECS.b * SPECS.Cla * ctlM / SPECS.Iroll + rcsR, .02);
-  const rPer = Math.max(qS * SPECS.b * SPECS.Cndr * ctlM / SPECS.Iyaw + rcsY, .01);
+  const rPer = Math.max((qS * SPECS.b * SPECS.Cndr * ctlM + vecT * .70) / SPECS.Iyaw + rcsY, .01);
 
   /* How much of the low-speed (rate) pitch law to use. The rate law is for
      the runway — it is what makes rotation the same controllable thing at any
@@ -7075,7 +7237,7 @@ function physics(P, dt) {
   const ram = 1 + 2.4 * sstep(.4, 5, P.mach) + 1.6 * sstep(5, 14, P.mach)
     - 2.6 * sstep(18, 26.5, P.mach);
   const dens = Math.max(Math.pow(clamp(rho / 1.225, .0005, 1), .62), .14);
-  const perEngine = SPECS.thrustMil * clamp(P.rpm, 0, 1) + SPECS.thrustAB * abSm;
+  const perEngine = SPECS.thrustMil * clamp(P.rpm, 0, 1) + SPECS.thrustAB * abSm * TUNE.thrust;
   const thrust = 2 * perEngine * ram * dens;
 
   /* Gravity. It used to be a flat 9.81 straight down at every altitude and
@@ -7179,14 +7341,18 @@ function physics(P, dt) {
     // angle back: the wing lets go a couple of degrees EARLIER with flap out.
     // The stall SPEED still falls, because the lift increment more than pays
     // for the lost angle.
-    const aStall = (27 - P.flap * 2) * DEG;
+    const aStall = (27 * TUNE.alpha - P.flap * 2) * DEG;
     let st = 1 - sstep(aStall, aStall + 12 * DEG, Math.abs(P.alpha));
     if (AP.on) st = Math.max(st, .55);
     const sa = Math.sin(P.alpha);
     const vortex = 1.55 * sa * sa * Math.cos(P.alpha) * Math.sign(P.alpha);
     const CLlin = SPECS.CL0 + claOfMach(M8) * P.alpha + vortex + .35 * P.flap;
     const CLstall = 1.15 * Math.sin(2 * P.alpha) + .12 * P.flap;
-    const CL = lerp(CLstall, CLlin, st);
+    /* The one number that decides how tight the turn is at any speed and
+       any height: lift is what bends the flight path, and everything else
+       is just permission to use it. The drag below is computed from the
+       scaled figure, so the turn still costs what a turn costs. */
+    const CL = lerp(CLstall, CLlin, st) * TUNE.lift;
     /* A stall is a wing that has stopped working, and a wing that was never
        working cannot stop. In vacuum `alpha` is just the angle between the
        nose and the velocity vector, and coasting it runs to eighty degrees
@@ -7346,7 +7512,7 @@ function physics(P, dt) {
          inside a quarter of an hour, which is not flying anything. Eighty
          thousand puts the Moon a couple of minutes out on a burn-and-brake
          and Mars in the half hour it deserves to be. */
-      const aAir = 12 + 26 * Math.log10(1 + Math.max(P.mach, 0));
+      const aAir = (12 + 26 * Math.log10(1 + Math.max(P.mach, 0))) * TUNE.spd;
       /* A flat eighty thousand g is a lot until you ask it for ten times the
          speed of light: three thousand seconds of holding the lever. Made
          proportional to the speed already achieved it becomes exponential
@@ -7374,10 +7540,14 @@ function physics(P, dt) {
        the same pinned speed as everything else. */
     const cq = .5 * rho * P.vAero * SPECS.S;
     const dET = clamp(P.dE, -1.3, 1.3);   // the trim datum lives in the command, not here
-    // control power falls away supersonically as the shock moves aft
-    const ctlM = lerp(1, .55, sstep(1.0, 2.2, M8));
-    M.x = qS * SPECS.cbar * (SPECS.CmA * P.alpha - SPECS.CmE * ctlM * dET + .070 * P.flap) - cq * SPECS.cbar * SPECS.cbar * SPECS.CmQ * P.w.x;
-    M.y = qS * SPECS.b * (SPECS.Cnb * P.beta + SPECS.Cndr * ctlM * P.dR - .020 * P.dA) - cq * SPECS.b * SPECS.b * SPECS.Cnr * P.w.y;
+    // control power falls away supersonically as the shock moves aft, and
+    // how far it is allowed to fall is one of the two levers in the hangar
+    const ctlM = lerp(1, TUNE.hiMach, sstep(1.0, 2.2, M8));
+    const vecT = vecMoment(P);
+    M.x = qS * SPECS.cbar * (SPECS.CmA * P.alpha - SPECS.CmE * ctlM * dET + .070 * P.flap)
+      - vecT * dET - cq * SPECS.cbar * SPECS.cbar * SPECS.CmQ * P.w.x;
+    M.y = qS * SPECS.b * (SPECS.Cnb * P.beta + SPECS.Cndr * ctlM * P.dR - .020 * P.dA)
+      + vecT * .70 * P.dR - cq * SPECS.b * SPECS.b * SPECS.Cnr * P.w.y;
     M.z = qS * SPECS.b * (-SPECS.Cla * ctlM * P.dA + SPECS.Clb * P.beta) - cq * SPECS.b * SPECS.b * SPECS.Clp * P.w.z;
     /* Asymmetric stall: wing drop and buffet. These were flat newton-metre
        constants rather than aerodynamic moments, so they did not scale with
@@ -10335,13 +10505,14 @@ const LOG_KEY = "skyward.log.v1";
    The number is the point: it is the thing you can quote back when something
    is wrong, and the list under it is what to go and look at. */
 const BUILD = {
-  no: 40,
-  name: "SCREEN FIT",
-  date: "1 OCT 2026",
+  no: 41,
+  name: "THE GARAGE",
+  date: "2 OCT 2026",
   notes: [
-    ["IF THE EDGES ARE CUT OFF, YOU CAN NOW FIX IT", "Inside another page every number the browser gives for the size of the window can be wrong \u2014 the layout viewport, the root box and the visual viewport disagree, and a host with its own title bar over the top of the frame tells you none of it. The smallest of the three is taken now instead of the first one that answers, and on top of that there is a SCREEN FIT on the SET-UP page with a cyan border drawn round the edge of the interface: wind it down until the whole border and all four corner marks are on the glass. Framed in another page it starts at 92 per cent rather than betting the corners on a number nobody supplied."],
-    ["AND A PANEL SIZE TO GO WITH IT", "How much of the screen the instruments and the twelve controls take, from 70 to 130 per cent. They are drawn at forty-four points because that is the smallest thing a thumb reliably hits; on a phone held upright that is most of the glass, and whether you would rather have the view is your call. Both settings are remembered."],
-    ["AND FROM LAST TIME", "The hangar is lit like a garage: ten heads on a truss, uplights in the floor, a marked plate under the wheels, and a dark hall round it. The shot works its lens out from the screen instead of guessing, so the aeroplane and the pilot fit whatever shape of screen is left. The start screen draws at 2K where the frame can pay for it."]
+    ["TWO LEVERS ON THE PLANE PAGE", "POWER is a speed scale: the burner is multiplied by the square of it, so \u00d72 is four times the thrust and roughly four times the acceleration, and the five settings run from twenty-one seconds to Mach 3 down to under one. AGILITY is three things at once because one of them alone does nothing \u2014 more lift, a later stall, and control power that no longer halves itself past Mach 2. Both are remembered with the rest of the kit."],
+    ["AND VECTORING NOZZLES, WHICH IS THE PART THAT MATTERS", "A control surface needs air and gets weaker the faster and thinner it goes, which is why the aeroplane went numb exactly where it was most exciting. A nozzle does not care. On SPORT and COMBAT the engines point, and the flight control laws were told about it, because a loop that does not know about an actuator over-drives it. Sustained turn at Mach 2.8 and sixteen kilometres: four degrees a second as built, six on SPORT, nine on COMBAT. Roll: 83, 116, 154 degrees a second. SPORT is the new default."],
+    ["THE HANGAR IS LAID OUT LIKE A GARAGE", "A card down one side was a settings dialog over a picture. Now it is a strip along the top with the tabs on it, a column of whatever page you are on, and a bar along the bottom with the machine\u2019s numbers on the left and the one button that matters on the right \u2014 and the aeroplane in the middle of all of it. The four bars are live: change POWER or AGILITY and they move while you are looking at them. Upright it stacks instead of splitting."],
+    ["AND THE CAMERA ASKS THE LAYOUT HOW MUCH ROOM IT HAS", "The middle cell of that grid is deliberately empty, and the shot is framed on it. One piece of code now frames correctly with a column down one side, with a drawer along the bottom, and on a phone held sideways where what is left is a two-to-one letterbox."]
   ]
 };
 const NEWS_KEY = "skyward.build";
@@ -12058,10 +12229,59 @@ function fillLiveries() {
     L.name + "</b><i>" + L.note + "</i></button>").join("");
   el.querySelectorAll(".opt").forEach(btn => btn.addEventListener("click", () => {
     KIT.liv = +btn.dataset.i; kitSave(); rebuildAircraft(); fillLiveries();
+    if (typeof fillStats === "function") fillStats();
     if (!GAME.started) stageFocus("plane", true);
   }));
 }
 fillLiveries();
+/* ===== the two levers, and the numbers they move =====================
+
+   A garage shows you what the machine is before you take it out, and it
+   shows it as bars because a bar is a comparison and a number is a fact
+   you have to already understand. These four are live: change POWER or
+   AGILITY and they move while you are looking at them. */
+function fillTune() {
+  const mk = (el, list, key) => {
+    if (!el) return;
+    el.innerHTML = list.map((L, i) =>
+      "<button class=\"opt" + (KIT[key] === i ? " on" : "") + "\" data-i=\"" + i + "\"><b>" +
+      L[0] + (key === "pwr" ? " \u00b7 \u00d7" + L[1] : "") + "</b><i>" + L[2] + "</i></button>").join("");
+    el.querySelectorAll(".opt").forEach(btn => btn.addEventListener("click", () => {
+      KIT[key] = +btn.dataset.i; kitSave(); applyTune(); fillTune(); fillStats();
+      if (!GAME.started) stageFocus("plane", true);
+      audio.beep(key === "pwr" ? 660 : 820, .08, .05);
+    }));
+  };
+  mk(document.getElementById("pwrRow"), POWERS, "pwr");
+  mk(document.getElementById("aglRow"), AGILS, "agl");
+}
+/* Sustained turn rate at Mach 1.6 and nine kilometres, measured off this
+   build rather than guessed: it is the number that actually decides whether
+   you can bring the nose round, and it is the one a pilot would ask for. */
+const TURN_AT_M16 = [7, 9, 12];
+function fillStats() {
+  const el = document.getElementById("stats");
+  if (!el) return;
+  const s = TUNE.spd;
+  // time from 300 m/s to Mach 3 at twelve kilometres: 21 s stock, and it
+  // falls off as the scale to the power of about 1.6
+  const t3 = 21 / Math.pow(s, 1.6);
+  const bar = (lab, val, frac, hot) =>
+    "<div class=\"stat" + (hot ? " hot" : "") + "\"><div class=\"k\"><span>" + lab +
+    "</span><em>" + val + "</em></div><div class=\"bar\"><u style=\"width:" +
+    Math.round(clamp(frac, 0, 1) * 100) + "%\"></u></div></div>";
+  el.innerHTML =
+    bar("POWER", "\u00d7" + s, (Math.log(s) / Math.log(8)) * .88 + .12, s > 3) +
+    bar("0\u2192M3", (t3 >= 10 ? Math.round(t3) : t3.toFixed(1)) + "s", 1 - t3 / 22, s > 3) +
+    bar("ROLL", Math.round(FBW.pMax * 57.3) + "\u00b0/s", FBW.pMax / 2.9, KIT.agl > 1) +
+    bar("TURN", TURN_AT_M16[clamp(KIT.agl | 0, 0, 2)] + "\u00b0/s \u00b7 "
+      + FBW.gMax + "g", FBW.gMax / 15, KIT.agl > 1);
+  const k = document.getElementById("statKit");
+  if (k) k.textContent = LIVERIES[KIT.liv].name.toUpperCase() + " \u00b7 "
+    + AGILS[clamp(KIT.agl | 0, 0, AGILS.length - 1)][0] + " \u00b7 "
+    + POWERS[clamp(KIT.pwr | 0, 0, POWERS.length - 1)][0];
+}
+fillTune(); fillStats();
 swatches(document.getElementById("trimRow"), TRIMS, "trim");
 swatches(document.getElementById("helmRow"), HELMETS, "helm");
 swatches(document.getElementById("visorRow"), VISORS, "visor");
@@ -12275,6 +12495,11 @@ function startFlight(keepMode) {
   if (SCEN === "rings") buildRingCourse(); else GAME.rings = [];
   document.getElementById("menu").classList.add("hide");
   audio.init();
+  /* Which aeroplane you just took out, because the two levers in the
+     hangar change it enough that you should be told. */
+  if (KIT.pwr || KIT.agl !== 1)
+    setTimeout(() => toast(AGILS[clamp(KIT.agl | 0, 0, AGILS.length - 1)][0] + " · POWER ×"
+      + POWERS[clamp(KIT.pwr | 0, 0, POWERS.length - 1)][1], 2.4), 3800);
   toast(SCEN === "free" ? "BRAKES SET · THROTTLE UP WITH W · PRESS L FOR CONTROLS" :
     SCEN === "land" ? "RUNWAY 18 AHEAD · CHUTE ON TOUCHDOWN WITH X" :
       SCEN === "rings" ? "FLY THROUGH THE GREEN GATE" : "AIRBORNE · PRESS L FOR CONTROLS", 3.6);
