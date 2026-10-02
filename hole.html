@@ -52,6 +52,19 @@
   #start h1{font-size:clamp(40px,10vw,84px);font-weight:900;letter-spacing:-.02em;text-shadow:0 5px 0 #000}
   #start p{max-width:460px;line-height:1.45;opacity:.92}
   #start .go{margin-top:6px;background:var(--accent);color:var(--ink);font-weight:800;padding:12px 26px;border-radius:30px;font-size:18px}
+  #goal{position:fixed;left:calc(14px + env(safe-area-inset-left));top:calc(128px + env(safe-area-inset-top));padding:10px 14px 11px;z-index:5;pointer-events:none;width:min(330px,46vw);font-size:13px;line-height:1.35}
+  #goal .path{font-size:10px;letter-spacing:.02em;opacity:.6;margin-bottom:6px}
+  #goal .path b{color:var(--accent);opacity:1}
+  #goal .t{font-weight:800;font-size:15px;color:#fff}
+  #goal .t:before{content:'GOAL';font-size:10px;font-weight:800;color:var(--ink);background:var(--accent);border-radius:6px;padding:1px 6px;margin-right:7px;vertical-align:2px}
+  #goal .sub{margin-top:3px;color:#c9d3de;font-size:12px}
+  #goal .gbar{margin-top:6px;height:5px;border-radius:3px;background:rgba(255,255,255,.15);overflow:hidden}
+  #goal .gbar i{display:block;height:100%;background:var(--accent2)}
+  #goal ul{list-style:none;margin-top:6px;display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;font-size:11.5px}
+  #goal li{display:flex;justify-content:space-between;gap:6px;color:#dfe6f2}
+  #goal li.done{color:var(--accent2)}
+  #goal li span:last-child{font-variant-numeric:tabular-nums;opacity:.8}
+  @media (max-height:430px){#goal ul{display:none}}
   #err{position:fixed;inset:auto 10px 10px 10px;background:#400;color:#fff;padding:10px;font:12px monospace;white-space:pre-wrap;display:none;z-index:20}
 </style>
 </head>
@@ -64,6 +77,7 @@
   <div id="bar"><div id="fill"></div></div>
   <div id="next">Next: benches</div>
 </div>
+<div id="goal" class="panel" hidden></div>
 <div id="toast"></div>
 <div id="fade"></div>
 <div id="joy"><i class="u"></i><i class="d"></i><i class="l"></i><i class="r"></i><div id="knob"></div></div>
@@ -71,7 +85,8 @@
 <div id="btns"><button id="rotL" title="Rotate (Q)">&#10226;</button><button id="view" title="Camera angle (V)">View 45&deg;</button><button id="rotR" title="Rotate (E)">&#10227;</button><button id="mute">&#128266;</button><button id="hq" title="Graphics quality">HQ</button><button id="boost" title="Hold to travel fast (Shift)" hidden>Boost</button><span id="fps"></span></div>
 <div id="start">
   <h1>HOLE CITY</h1>
-  <p>You are a hole in the ground. Swallow anything smaller than you: cones, people, cars, buses, houses, then whole towers. The city doesn't end.</p>
+  <p>You are a hole in the ground. Anything smaller than you falls in and makes you bigger.</p>
+  <p style="font-weight:700">Eat the city &rsaquo; break out into the land &rsaquo; swallow every country on Earth &rsaquo; the Earth &rsaquo; the planets &rsaquo; the Sun &rsaquo; the universe</p>
   <p style="opacity:.75;font-size:14px">Drag anywhere (touch or mouse) or use WASD / arrow keys.<br>Q / E rotate the view, V changes the camera angle.</p>
   <div class="go">Tap to start</div>
 </div>
@@ -1075,13 +1090,15 @@ function toast(msg) { toastEl.textContent = msg; toastEl.classList.add('on'); cl
 const hudCmp = $('cmp'), fadeEl = $('fade');
 function updateHud() {
   if (hole.eaten >= 12) hintEl.classList.add('gone');
+  if (goalOn) updateGoal();
+  if (cosmos.on) hintEl.classList.add('gone');
   hudScore.textContent = hole.score.toLocaleString('en-US');
   if (cosmos.on) {
     const Ld = curLogR() + Math.log10(2), c = compare(Ld);
     hudSize.textContent = fmtLen(Ld);
     hudCmp.textContent = c.text;
     hudFill.style.width = (Math.max(0, Math.min(1, c.p)) * 100).toFixed(1) + '%';
-    hudNext.textContent = stageNote() || (c.next ? 'Next: bigger than ' + c.next[0] : (cosmos.stage === 'space' ? 'Past everything we have names for' : ''));
+    hudNext.textContent = (c.next ? 'Next: bigger than ' + c.next[0] : (cosmos.stage === 'space' ? 'Past everything we have names for' : ''));
     return;
   }
   const Ld = Math.log10(hole.r * 2), c = compare(Ld);
@@ -1093,6 +1110,40 @@ function updateHud() {
   const p = tierIdx + 1 >= TIERS.length ? 1 : (can - cur) / (nxt[0] - cur);
   hudFill.style.width = (Math.max(0, Math.min(1, p)) * 100).toFixed(1) + '%';
   hudNext.textContent = tierIdx + 1 >= TIERS.length ? 'Nothing left that can stop you' : 'Next: ' + nxt[1];
+}
+
+// the objective panel: where you are in the journey and what to do next
+var goalOn = false;
+const goalEl = $('goal');
+const STEPS = ['City', 'Land', 'Countries', 'Earth', 'Planets', 'Sun', 'Universe'];
+let goalHtml = '';
+function updateGoal() {
+  let step, t, sub = '', p = -1, list = null;
+  const pct = x => Math.max(0, Math.min(1, x));
+  if (!cosmos.on) {
+    step = 0; t = 'Grow to ' + fmtLen(Math.log10(CITY_EXIT_R * 2)) + ' to break out of the city';
+    sub = 'Swallow whatever fits through the hole.'; p = pct((hole.r - 1) / (CITY_EXIT_R - 1));
+  } else if (cosmos.mode === 'globe') {
+    const done = globe.countries.filter(c => c.state).length, all = globe.countries.length;
+    if (done < all) {
+      step = 2; t = 'Swallow every country: ' + done + ' / ' + all;
+      sub = '<span style="color:#7cf29a">Green outline</span> = fits now. <span style="color:#ffc861">Amber</span> = grow first.'; p = done / all;
+      list = WORLD.continents.map((n, i) => [n, globe.contTotal[i] - globe.contLeft[i], globe.contTotal[i]]);
+    } else { step = 3; t = globe.r >= RE ? 'Swallow the Earth' : 'Grow to ' + fmtLen(Math.log10(RE * 2000)) + ' to swallow the Earth'; sub = 'Every country is gone.'; p = pct(globe.r / RE); }
+  } else if (cosmos.mode === 'solar') {
+    const pl = solar.bodies.filter(b => b.planet), left = pl.filter(b => !b.state).length;
+    if (left) { step = 4; t = 'Swallow the other ' + pl.length + ' planets: ' + (pl.length - left) + ' / ' + pl.length; sub = 'Follow the labels. Moons make you grow.'; p = 1 - left / pl.length; list = pl.map(b => [b.name, b.state ? 1 : 0, 1]); }
+    else { step = 5; t = 'Swallow the Sun'; sub = 'Only the Sun is left.'; }
+  } else if (cosmos.stage === 'surface') {
+    step = 1; t = 'Grow to ' + fmtLen(5 + Math.log10(2)) + ' to rise above the Earth';
+    sub = 'Towns, lakes, forests and mountains: eat what fits.'; p = pct((cLogR() - Math.log10(CITY_EXIT_R)) / (5 - Math.log10(CITY_EXIT_R)));
+  } else { step = 6; t = 'Keep growing. There is no end.'; const c = compare(curLogR() + Math.log10(2)); sub = c.next ? 'Next: bigger than ' + c.next[0] : ''; }
+  let h = '<div class="path">' + STEPS.map((n, i) => i === step ? '<b>' + n + '</b>' : n).join(' › ') + '</div><div class="t">' + t + '</div>';
+  if (sub) h += '<div class="sub">' + sub + '</div>';
+  if (p >= 0) h += '<div class="gbar"><i style="width:' + (p * 100).toFixed(1) + '%"></i></div>';
+  if (list) h += '<ul>' + list.map(([n, a, b]) => '<li' + (a >= b ? ' class="done"' : '') + '><span>' + (a >= b ? '✓ ' : '') + n + '</span><span>' + (b > 1 ? a + '/' + b : '') + '</span></li>').join('') + '</ul>';
+  if (h !== goalHtml) { goalEl.innerHTML = goalHtml = h; }
+  goalEl.hidden = false;
 }
 
 // floating popups
@@ -2343,6 +2394,45 @@ function countryGeo(polys) {
   g.computeBoundingSphere();
   return g;
 }
+// every country's border drawn on the globe: green = fits through the hole now, amber = too big yet
+let outlineCol = null, outlineAlpha = -1;
+function buildOutlines() {
+  const pos = [], seg = (a, b) => {
+    const n = Math.max(1, Math.ceil(Math.hypot(a[0] - b[0], a[1] - b[1]) / 1.5));
+    for (let k = 0; k < n; k++) {
+      const p = ll2v(a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n).multiplyScalar(GR * 1.0018);
+      const q = ll2v(a[0] + (b[0] - a[0]) * (k + 1) / n, a[1] + (b[1] - a[1]) * (k + 1) / n).multiplyScalar(GR * 1.0018);
+      pos.push(p.x, p.y, p.z, q.x, q.y, q.z);
+    }
+  };
+  WORLD.countries.forEach((c, i) => {
+    const gc = globe.countries[i]; gc.lo = pos.length / 3;
+    for (const rings of c.p) for (const r of rings) for (let j = 0; j < r.length; j++) seg(r[j], r[(j + 1) % r.length]);
+    gc.hi = pos.length / 3;
+    gc.ang = 0; for (const v of gc.verts) gc.ang = Math.max(gc.ang, Math.acos(Math.min(1, v.dot(gc.cen))));
+  });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  outlineCol = new THREE.BufferAttribute(new Float32Array(pos.length / 3 * 4), 4); outlineCol.setUsage(THREE.DynamicDrawUsage);
+  g.setAttribute('col', outlineCol);
+  const lines = new THREE.LineSegments(g, new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, uniforms: gHoleU,
+    vertexShader: 'attribute vec4 col; varying vec4 vC; varying vec3 vGW; void main(){ vC = col; vec4 w = modelMatrix * vec4(position, 1.0); vGW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }',
+    fragmentShader: 'uniform vec3 uHoleW, uGC; uniform float uCosRim, uTime; varying vec4 vC; varying vec3 vGW; void main(){ if (dot(normalize(vGW - uGC), uHoleW) > uCosRim) discard; float a = vC.a; if (vC.g > 0.9) a *= 0.7 + 0.3 * sin(uTime * 5.0); gl_FragColor = vec4(vC.rgb, a); }',
+  }));
+  lines.renderOrder = 2; lines.frustumCulled = false;
+  globe.group.add(lines);
+}
+function updateOutlines(alpha, force) {
+  if (!outlineCol || (!force && Math.abs(alpha - outlineAlpha) < outlineAlpha * 0.01)) return;
+  outlineAlpha = alpha;
+  const a = outlineCol.array;
+  for (const c of globe.countries) {
+    const col = c.state ? [0, 0, 0, 0] : c.ang <= alpha ? [0.49, 1, 0.6, 1] : [1, 0.78, 0.38, 0.6];
+    for (let i = c.lo; i < c.hi; i++) a.set(col, i * 4);
+  }
+  outlineCol.needsUpdate = true;
+}
 const gPit = new THREE.Group();
 function buildGlobe() {
   if (globe.built) return;
@@ -2383,6 +2473,7 @@ function buildGlobe() {
     globe.countries.push({ name: c.n, cont: c.c, r: c.r, mesh, verts, cen, state: 0, t: 0 });
     globe.contLeft[c.c]++; globe.contTotal[c.c]++;
   }
+  buildOutlines();
   // cities
   const disc = new THREE.CircleGeometry(1, 40);
   for (const [name, lat, lon, rk] of CITY_LIST) {
@@ -2435,6 +2526,7 @@ function eatGlobeThing(o, kind) {
   if (kind === 'country') {
     const c = o.cont;
     if (--globe.contLeft[c] === 0) { globe.contDone.push(WORLD.continents[c]); toast('You swallowed ' + WORLD.continents[c] + '!'); }
+    updateOutlines(outlineAlpha, true);
   }
   updateHud();
 }
@@ -2449,6 +2541,7 @@ function globeFrame(dt) {
   globe.r += (globe.targetR - globe.r) * Math.min(1, dt * 2.5);
   const alpha = Math.min(globe.r / RE, Math.PI * 0.49), cosA = Math.cos(alpha);
   gHoleU.uCosA.value = cosA; gHoleU.uCosRim.value = Math.cos(alpha * 1.04 + 0.002);
+  updateOutlines(alpha);
   // what fits: every border point of a country must be inside the hole
   if (!globe.gone) {
     for (const c of globe.countries) {
@@ -2509,11 +2602,14 @@ function globeFrame(dt) {
   gHoleU.uSunV.value.copy(GSUN).transformDirection(gCam.matrixWorldInverse);
   gSky.position.copy(gCam.position);
   const near = [];
-  const consider = (o, v) => { if (o.state || o.r > globe.r) return; near.push({ o, v, d: Math.acos(Math.min(1, v.dot(globe.h))) }); };
-  for (const c of globe.countries) consider(c, c.cen);
-  for (const c of globe.cities) consider(c, c.n);
+  for (const c of globe.countries) if (!c.state) near.push({ o: c, d: Math.acos(Math.min(1, c.cen.dot(globe.h))) });
   near.sort((a, b) => a.d - b.d);
-  placeMarkers(near.slice(0, 4).filter(m => m.d > alpha).map(m => ({ pos: globe.group.localToWorld(m.v.clone().multiplyScalar(GR)), px: 0, fits: true, label: m.o.name + ' · ' + fmtLen(Math.log10(Math.max(1, (m.d - alpha) * RE) * 1000)) })), gCam);
+  const fitsFirst = near.filter(m => m.o.ang <= alpha).slice(0, 3), big = near.filter(m => m.o.ang > alpha).slice(0, 2);
+  if (!globe.gone) placeMarkers([...fitsFirst, ...big].map(m => {
+    const fits = m.o.ang <= alpha, km = Math.max(0, m.d - alpha) * RE;
+    return { pos: globe.group.localToWorld(m.o.cen.clone().multiplyScalar(GR)), px: 0, fits,
+      label: m.o.name + (fits ? ' ✓ fits' + (km > 50 ? ' · ' + fmtLen(Math.log10(km * 1000)) + ' away' : '') : ' · needs ' + fmtLen(Math.log10(m.o.ang * 2 * RE * 1000))) };
+  }), gCam); else hideMarkers();
   renderStage(gScene, gCam, 0.25);
 }
 
@@ -2743,19 +2839,6 @@ function curLogR() {
   if (cosmos.mode === 'solar') return Math.log10(solar.r * 1000);
   return cLogR();
 }
-function stageNote() {
-  if (cosmos.mode === 'globe') {
-    const left = WORLD.continents.filter((c, i) => globe.contLeft[i] > 0);
-    if (!left.length) return globe.r >= RE ? 'Swallow the Earth' : 'Every continent gone · grow to ' + fmtLen(Math.log10(RE * 2000)) + ' to take the Earth';
-    const pct = c => { const i = WORLD.continents.indexOf(c); return Math.round((1 - globe.contLeft[i] / globe.contTotal[i]) * 100) + '%'; };
-    return (7 - left.length) + '/7 continents · ' + left.map(c => c + ' ' + pct(c)).join(', ');
-  }
-  if (cosmos.mode === 'solar') {
-    const left = solar.bodies.filter(b => b.planet && !b.state).map(b => b.name);
-    return left.length ? 'Planets left: ' + left.join(', ') : 'Only the Sun is left';
-  }
-  return null;
-}
 
 // ---------------------------------------------------------------- main loop
 let started = false, last = performance.now(), elapsed = 0, shownSec = -1, shake = 0;
@@ -2893,7 +2976,7 @@ requestAnimationFrame(frame);
 $('start').addEventListener('pointerdown', e => {
   e.stopPropagation();
   $('start').style.display = 'none';
-  started = true;
+  started = true; goalOn = true; updateHud();
   try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (_) { }
 });
 window.__game = { botStats, hole, chunks, dyn, active, TYPES, cosmos, jumpCosmos, globe, solar, enterGlobe, enterSolar, start: () => $('start').dispatchEvent(new PointerEvent('pointerdown')) };
