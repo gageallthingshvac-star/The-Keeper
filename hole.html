@@ -37,6 +37,7 @@
   #fps{align-self:center;font-size:12px;color:#fff;opacity:.8;text-shadow:0 1px 2px #000;font-variant-numeric:tabular-nums;min-width:48px}
   .mark{position:fixed;left:0;top:0;display:none;font-size:12px;font-weight:600;color:#dfe6f2;background:rgba(10,14,24,.62);padding:3px 8px;border-radius:10px;pointer-events:none;z-index:4;white-space:nowrap}
   .mark.fit{color:#9ff0b0}
+  .mark.place{color:#ffd76a}
   #btns button{background:var(--panel);color:var(--text);border:0;border-radius:12px;padding:7px 11px;font-size:13px;cursor:pointer}
   #joy{position:fixed;left:calc(22px + env(safe-area-inset-left));bottom:calc(22px + env(safe-area-inset-bottom));width:clamp(120px,26vw,170px);aspect-ratio:1;border-radius:50%;border:2px solid rgba(255,255,255,.7);background:rgba(20,30,40,.28);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);z-index:6;pointer-events:none}
   #joy i{position:absolute;width:0;height:0;border:8px solid transparent;opacity:.85}
@@ -66,6 +67,8 @@
   #goal li span:last-child{font-variant-numeric:tabular-nums;opacity:.8}
   @media (max-height:430px){#goal ul{display:none}}
   #radar{position:fixed;top:auto;left:auto;right:calc(14px + env(safe-area-inset-right));bottom:calc(22px + env(safe-area-inset-bottom));width:clamp(130px,30vw,190px);height:clamp(130px,30vw,190px);border-radius:50%;z-index:5;pointer-events:none;display:none}
+  #combo{position:fixed;left:50%;bottom:calc(26px + env(safe-area-inset-bottom));transform:translateX(-50%) scale(.9);font-weight:900;font-size:clamp(15px,3vw,22px);color:var(--accent);text-shadow:0 2px 0 #000,0 0 14px rgba(0,0,0,.5);opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;z-index:6;white-space:nowrap}
+  #combo.on{opacity:1;transform:translateX(-50%) scale(1)}
   #err{position:fixed;inset:auto 10px 10px 10px;background:#400;color:#fff;padding:10px;font:12px monospace;white-space:pre-wrap;display:none;z-index:20}
 </style>
 </head>
@@ -81,6 +84,7 @@
 <div id="goal" class="panel" hidden></div>
 <canvas id="radar" class="panel"></canvas>
 <div id="toast"></div>
+<div id="combo"></div>
 <div id="fade"></div>
 <div id="joy"><i class="u"></i><i class="d"></i><i class="l"></i><i class="r"></i><div id="knob"></div></div>
 <div id="hint" class="panel"><svg viewBox="0 0 64 56" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="6" width="30" height="15" rx="3" transform="rotate(-32 25 13.5)"/><path d="M52 10v22M45 26l7 7 7-7"/><path d="M8 38c0 7 11 12 24 12s24-5 24-12"/><path d="M8 38c0-4 5-7 12-8"/></svg><span>Move under objects to make them fall in. Only what fits through the hole drops.</span></div>
@@ -88,7 +92,7 @@
 <div id="start">
   <h1>HOLE CITY</h1>
   <p>You are a hole in the ground. Anything smaller than you falls in and makes you bigger.</p>
-  <p style="font-weight:700">Eat the city &rsaquo; break out into the land &rsaquo; swallow every country on Earth &rsaquo; the Earth &rsaquo; the planets &rsaquo; the Sun &rsaquo; the universe</p>
+  <p style="font-weight:700">Eat the city and its landmarks &rsaquo; swallow every country on Earth &rsaquo; the Earth &rsaquo; the planets &rsaquo; the Sun &rsaquo; the universe</p>
   <p style="opacity:.75;font-size:14px">Drag anywhere (touch or mouse) or use WASD / arrow keys.<br>Q / E rotate the view, V changes the camera angle.</p>
   <div class="go">Tap to start</div>
 </div>
@@ -581,6 +585,31 @@ const TYPES = {
   bike:     { g: () => merge([P(new THREE.TorusGeometry(0.33, 0.025, 6, 20), COL.tire, 0, 0.35, 0.55, 0, Math.PI / 2), P(new THREE.TorusGeometry(0.33, 0.025, 6, 20), COL.tire, 0, 0.35, -0.55, 0, Math.PI / 2), box(0.04, 0.04, 0.95, TINT, 0, 0.64, 0), box(0.04, 0.5, 0.04, TINT, 0, 0.35, -0.2), box(0.04, 0.04, 0.6, TINT, 0, 0.4, -0.3), box(0.2, 0.05, 0.26, COL.dark, 0, 0.84, -0.25), box(0.5, 0.03, 0.03, COL.dark, 0, 0.95, 0.5)]), s: 0.6, h: 1.0, name: 'Bike', tintRM: [0.35, 0.5] },
   railing:  { g: () => merge([cyl(0.035, 0.035, 4, 0x2e3338, 0, 1.0, 0, 8, 0, Math.PI / 2), cyl(0.025, 0.025, 4, 0x2e3338, 0, 0.55, 0, 8, 0, Math.PI / 2), ...[-1.95, -0.65, 0.65, 1.95].map(x => cyl(0.03, 0.03, 1.05, 0x2e3338, x, 0, 0, 8))]), s: 1.3, h: 1.05, name: 'Railing' },
   sailboat: { g: () => merge([rbox(2.0, 0.9, 5.4, 0.3, 0xf4f4f0, 0, 0, 0), cone(1.0, 1.4, 0xf4f4f0, 0, 0, 3.3), box(1.8, 0.1, 5.0, COL.wood, 0, 0.88, 0), box(2.02, 0.12, 5.42, 0x1f3f6e, 0, 0.3, 0), cyl(0.06, 0.07, 7.5, 0xdcdcdc, 0, 0.9, 0.6, 8), box(0.03, 6.0, 2.4, 0xfdfdf8, 0, 1.8, -0.7), box(0.03, 4.5, 1.2, 0xfdfdf8, 0, 2.2, 1.4)]), s: 3.0, h: 8.4, name: 'Sailboat' },
+  // real-world landmarks at real size
+  liberty:  { g: () => merge([box(26, 6, 26, 0xa9a08e), box(19, 27, 19, 0xbdb39f, 0, 6), box(21, 2, 21, 0xa9a08e, 0, 20), box(15, 13, 15, 0xbdb39f, 0, 33),
+              cyl(4.2, 6.5, 22, 0x6fa58f, 0, 46, 0, 18), cyl(3.4, 4.2, 9, 0x6fa58f, 0, 68, 0, 16), ball(2.4, 0x6fa58f, 0, 79.5, 0, 2),
+              ...[0, 1, 2, 3, 4, 5, 6].map(i => { const a = -1.4 + i * 0.47; return cone(0.35, 2.8, 0x6fa58f, Math.sin(a) * 2.4, 80.5, Math.cos(a) * 2.4 * 0.5 - 0.3); }),
+              cyl(1.1, 1.1, 13, 0x6fa58f, 4.2, 82, 0, 10, 0, -0.18), cyl(1.6, 0.8, 2.5, 0xd9a93a, 5.4, 88.5, 0, 10), cone(1.4, 3.5, 0xf2c64a, 5.4, 89.5, 0, 10),
+              box(3.5, 6, 1.2, 0x5e9580, -4.2, 63, 1.5)]), s: 0, h: 93, name: 'the Statue of Liberty', landmark: true },
+  pisa:     { g: () => { const p = [cyl(8.6, 8.6, 2, 0xd9d2c2, 0, 0, 0, 28)]; for (let i = 0; i < 7; i++) { p.push(cyl(7.7, 7.8, 6.6, 0xf1ebdd, 0, 2 + i * 7, 0, 28)); p.push(cyl(8.3, 8.3, 0.6, 0xd9d2c2, 0, 8.6 + i * 7, 0, 28)); }
+              p.push(cyl(5.4, 5.6, 6, 0xf1ebdd, 0, 51, 0, 24), cyl(5.9, 5.9, 0.5, 0xd9d2c2, 0, 56.5, 0, 24)); const g = merge(p); g.rotateZ(0.07); return g; }, s: 0, h: 56, name: 'the Leaning Tower of Pisa', landmark: true },
+  bigben:   { g: () => merge([box(12.5, 55, 12.5, 0xc9b27c), ...[0, 1, 2, 3].map(i => box(0.6, 52, 0.6, 0xa89262, (i & 1 ? 1 : -1) * 6.3, 2, (i & 2 ? 1 : -1) * 6.3)),
+              box(13.5, 11, 13.5, 0xd2bb85, 0, 55), ...[[0, 6.8, 0], [0, -6.8, Math.PI], [6.8, 0, Math.PI / 2], [-6.8, 0, -Math.PI / 2]].map(([x, z, r]) => P(new THREE.CylinderGeometry(3.6, 3.6, 0.4, 32), 0xf2eee0, x, 60.5, z, Math.PI / 2, r, 0)),
+              box(11.5, 9, 11.5, 0xc9b27c, 0, 66), P(new THREE.ConeGeometry(9, 19, 4), 0x3c4a3e, 0, 84.5, 0, 0, Math.PI / 4, 0), cyl(0.3, 0.3, 3, 0xd9a93a, 0, 94)]), s: 0, h: 97, name: 'Big Ben', landmark: true },
+  arc:      { g: () => merge([box(14.5, 29, 22, 0xd9ceb4, -15.25, 0, 0), box(14.5, 29, 22, 0xd9ceb4, 15.25, 0, 0), box(16, 8, 22, 0xd2c6aa, 0, 29, 0), box(45, 11, 22, 0xd9ceb4, 0, 37),
+              box(46, 1.2, 23, 0xc4b89c, 0, 36), box(46, 2, 23, 0xc4b89c, 0, 48), box(8, 8, 0.6, 0xbfb196, -15.25, 15, 11.2), box(8, 8, 0.6, 0xbfb196, 15.25, 15, 11.2)]), s: 0, h: 50, name: 'the Arc de Triomphe', landmark: true },
+  moai:     { g: () => merge([box(3.2, 1, 2.6, 0x5a4b3e), box(2.8, 5.2, 2.2, 0x6b5a4a, 0, 1), box(2.6, 3.6, 2.5, 0x6b5a4a, 0, 6.2), box(0.7, 2.2, 0.8, 0x5e4f40, 0, 6.6, 1.5), box(2.7, 0.7, 2.6, 0x4e4034, 0, 9.6),
+              cyl(0.75, 0.8, 1.0, 0x9a4a32, 0, 10.3, 0, 12)]), s: 0, h: 11.3, name: 'a Moai statue', landmark: true },
+  christ:   { g: () => merge([box(9.5, 8, 9.5, 0xcfcac0), box(8, 1, 8, 0xbdb8ae, 0, 8), cyl(2.2, 3.6, 21, 0xe6e2d8, 0, 9, 0, 16), box(28, 2.4, 2.6, 0xe6e2d8, 0, 26.5), cyl(1.6, 2.2, 5, 0xe6e2d8, 0, 25, 0, 14),
+              ball(1.7, 0xe6e2d8, 0, 32.4, 0, 2)]), s: 0, h: 38, name: 'Christ the Redeemer', landmark: true },
+  obelisk:  { g: () => merge([P(new THREE.CylinderGeometry(7.4, 11.9, 152, 4, 1), 0xe8e2d4, 0, 76, 0, 0, Math.PI / 4, 0), P(new THREE.ConeGeometry(7.4, 17, 4), 0xdcd6c6, 0, 160.5, 0, 0, Math.PI / 4, 0),
+              box(30, 1.2, 30, 0xb9b3a4)]), s: 0, h: 169, name: 'the Washington Monument', landmark: true },
+  needle:   { g: () => merge([box(30, 2, 30, 0xb7b2a8), ...[0, 1, 2].map(i => { const a = i * 2.094; return P(new THREE.CylinderGeometry(0.9, 1.4, 160, 8), 0xf0f0ee, Math.cos(a) * 6, 80, Math.sin(a) * 6, 0, 0, 0); }),
+              cyl(3, 3, 150, 0xe8e8e6, 0, 0, 0, 10), cyl(22, 14, 9, 0xe8e8e6, 0, 149, 0, 32), cyl(23, 23, 1.4, 0xd88a2a, 0, 154, 0, 32), cyl(16, 20, 4, 0xd9dcde, 0, 158, 0, 32), cyl(0.5, 0.5, 22, COL.metal, 0, 162, 0, 6)]), s: 0, h: 184, name: 'the Space Needle', landmark: true },
+  stonehenge: { g: () => { const p = []; for (let i = 0; i < 30; i++) { const a = i / 30 * 6.283; if (i % 7 === 3) continue; p.push(box(2.1, 4.1, 1.1, 0x8f8b82, Math.cos(a) * 15, 0, Math.sin(a) * 15, -a)); if (i % 2 === 0 && i % 7 !== 2) p.push(box(3.4, 0.8, 1.0, 0x86827a, Math.cos(a + 0.1) * 15, 4.1, Math.sin(a + 0.1) * 15, -a - 0.1 - Math.PI / 2 + Math.PI / 2)); }
+              for (let i = 0; i < 5; i++) { const a = Math.PI * 0.2 + i / 4 * Math.PI * 1.2; p.push(box(2.4, 7, 1.4, 0x7f7b72, Math.cos(a) * 8, 0, Math.sin(a) * 8, -a + Math.PI / 2)); p.push(box(5, 1, 1.4, 0x7a766e, Math.cos(a) * 8, 7, Math.sin(a) * 8, -a + Math.PI / 2)); }
+              return merge(p); }, s: 0, h: 8, name: 'Stonehenge', landmark: true },
+  louvre:   { g: () => merge([P(new THREE.ConeGeometry(24.7, 21.6, 4, 1), 0x9fc6d8, 0, 10.8, 0, 0, Math.PI / 4, 0), box(40, 0.4, 40, 0xcfc8b8)]), s: 0, h: 21.6, name: 'the Louvre Pyramid', landmark: true },
   bldg:     { g: () => { const g = new THREE.BoxGeometry(1, 1, 1); g.translate(0, 0.5, 0); return g; }, mat: bldgMat, s: 0, h: 0, name: 'Building', raw: true },
 };
 for (const k in TYPES) {
@@ -720,11 +749,12 @@ const chunks = new Map();
 
 function blockType(cx, cz, rng) {
   if (cx === 0 && cz === 0) return 'park';
+  if (cx === 1 && cz === 0) return 'landmark';
   const near = Math.abs(cx) <= 1 && Math.abs(cz) <= 1;
   const d = Math.hypot(cx, cz);
   const r = rng();
   const downtown = near ? 0 : Math.min(0.28, 0.06 + d * 0.02);
-  const table = [['park', 0.16], ['parking', 0.16], ['residential', 0.3 - downtown * 0.5], ['commercial', 0.26], ['downtown', downtown], ['waterfront', near ? 0 : 0.09]];
+  const table = [['park', 0.16], ['parking', 0.16], ['residential', 0.3 - downtown * 0.5], ['commercial', 0.26], ['downtown', downtown], ['waterfront', near ? 0 : 0.09], ['landmark', near ? 0 : 0.09]];
   let tot = 0; for (const [, w] of table) tot += w;
   let acc = 0; for (const [k, w] of table) { acc += w / tot; if (r < acc) return k; }
   return 'commercial';
@@ -808,7 +838,7 @@ function genChunk(cx, cz) {
     for (let t = 13; t < 54; t += 13) { const [x, z] = side(s, t, 6.6); add('lamp', x, z, lampRot[s]); }
     for (let t = 19.5; t < 52; t += 13) if (rng() < 0.75) { const [x, z] = side(s, t, 7.5); add(rng() < 0.7 ? 'treeS' : 'bush', x, z, rng() * 6.28); }
     for (let t = 10.5; t < 54; t += 2.2) {
-      if (rng() > 0.2) continue;
+      if (rng() > 0.2) { if (rng() < 0.1) add('person', ...side(s, t, 7 + rng() * 3), rng() * 6.28, { tint: pick(rng, PALETTES.shirt) }); continue; }
       const [x, z] = side(s, t, 8.4);
       const r = rng();
       if (r < 0.22) add('trash', x, z, 0);
@@ -865,7 +895,7 @@ function genChunk(cx, cz) {
     }
     for (const d of [-16, 16]) { add('lamp', MID + 2, MID + d, 0); add('lamp', MID + d, MID + 2, Math.PI / 2); }
     for (let i = 0; i < 3; i++) { const x = inLot(4), z = inLot(4); if (Math.abs(x - MID) > 5 && Math.abs(z - MID) > 5) add('picnic', x, z, rng() * 3); }
-    for (let i = 0; i < 7; i++) { const t = LOT0 + 2 + rng() * (L - 4); const onX = rng() < 0.5; add('person', onX ? t : MID + (rng() - 0.5) * 2.4, onX ? MID + (rng() - 0.5) * 2.4 : t, rng() * 6.28, { tint: pick(rng, PALETTES.shirt) }); }
+    for (let i = 0; i < 16; i++) { const t = LOT0 + 2 + rng() * (L - 4); const onX = rng() < 0.5; add('person', onX ? t : MID + (rng() - 0.5) * 2.4, onX ? MID + (rng() - 0.5) * 2.4 : t, rng() * 6.28, { tint: pick(rng, PALETTES.shirt) }); }
     if (rng() < 0.6) add('kiosk', MID + 6, MID + 6, 0, { tint: pick(rng, PALETTES.kiosk) });
   } else if (type === 'parking') {
     lot(COL.asphalt2, 0.02);
@@ -947,6 +977,24 @@ function genChunk(cx, cz) {
       if (rng() < 0.4) add('person', LOT0 + 2, t, rng() * 6.28, { tint: pick(rng, PALETTES.shirt) });
       if (rng() < 0.4) add(rng() < 0.5 ? 'treeS' : 'planter', LOT1 - 2, t + 2, 0);
     }
+  } else if (type === 'landmark') {
+    lot(COL.grass, 0.03);
+    overlay(LOT0 + 3, LOT0 + 3, LOT1 - 3, LOT1 - 3, COL.plaza);
+    const LM = ['liberty', 'pisa', 'bigben', 'arc', 'moai', 'christ', 'obelisk', 'needle', 'stonehenge', 'louvre'];
+    const lm = cx === 1 && cz === 0 ? 'moai' : LM[hash2(cx * 7 + 3, cz * 13 + 5) % LM.length];
+    ch.landmark = lm;
+    if (lm === 'moai') {
+      overlay(MID - 15, MID - 3, MID + 15, MID + 3, 0x7a6e60, 0.05);
+      for (let i = 0; i < 5; i++) add('moai', MID - 12 + i * 6, MID, 0);
+    } else add(lm, MID, MID, lm === 'arc' ? 0 : rng() * 0.3);
+    // tourists
+    for (let i = 0; i < 26; i++) {
+      const a = rng() * 6.283, d = 14 + rng() * 7;
+      add('person', MID + Math.cos(a) * d, MID + Math.sin(a) * d, a + Math.PI / 2 + (rng() - 0.5), { tint: pick(rng, PALETTES.shirt) });
+    }
+    for (const [x, z] of [[LOT0 + 3, LOT0 + 3], [LOT1 - 3, LOT0 + 3], [LOT0 + 3, LOT1 - 3], [LOT1 - 3, LOT1 - 3]]) { add('lamp', x, z, Math.atan2(MID - z, MID - x)); add('treeB', x + (x < MID ? -1.5 : 1.5), z + (z < MID ? 3 : -3), 0); }
+    for (const d of [-10, 10]) { add('bench', MID + d, LOT0 + 2, 0); add('bench', MID + d, LOT1 - 2, Math.PI); }
+    if (rng() < 0.8) add('kiosk', LOT1 - 6, LOT0 + 6, 0, { tint: pick(rng, PALETTES.kiosk) });
   } else { // downtown
     lot(COL.plaza, 0.02);
     const two = rng() < 0.45;
@@ -964,12 +1012,13 @@ function genChunk(cx, cz) {
     for (let x = LOT0 + 3; x < LOT1 - 2; x += 5) {
       const r = rng();
       add(r < 0.4 ? 'planter' : r < 0.7 ? 'bench' : r < 0.85 ? 'bollard' : 'trash', x, LOT0 + 2.2, 0);
-      if (rng() < 0.5) add('person', x + 2, LOT0 + 3.5, rng() * 6.28, { tint: pick(rng, PALETTES.shirt) });
+      if (rng() < 0.9) add('person', x + 2, LOT0 + 3.5 + rng() * 2, rng() * 6.28, { tint: pick(rng, PALETTES.shirt) });
     }
     if (rng() < 0.5) add('fountain', MID + 12, LOT0 + 3.5, 0);
     add('treeS', LOT0 + 1.5, LOT0 + 1.5, 0); add('treeS', LOT1 - 1.5, LOT0 + 1.5, 0);
   }
 
+  ch.lms = ch.objs.filter(o => o.t.landmark);
   ch.mesh = g.mesh();
   scene.add(ch.mesh);
   chunks.set(key, ch);
@@ -987,7 +1036,7 @@ function dropChunk(ch) {
 
 // ---------------------------------------------------------------- moving traffic & pedestrians
 const dyn = [];
-const TRAFFIC = 34, WALKERS = 46;
+const TRAFFIC = 34, WALKERS = 110;
 function placeDyn(o, kind, near) {
   const R = loadRange * 0.9;
   const alongX = Math.random() < 0.5;
@@ -1015,8 +1064,33 @@ function makeDyn(kind, near) {
   o.kind = kind; stepDyn(o, 0); dyn.push(o);
   return o;
 }
+// people run from a hole that could swallow them, scattering a little, and stop once they feel safe
+function blockedAt(x, z) {
+  const ch = chunks.get(Math.floor(x / C) + ',' + Math.floor(z / C)); if (!ch) return false;
+  const lx = x - ch.cx * C, lz = z - ch.cz * C, m = ch.type === 'waterfront' ? 4 : 2.5;
+  if (ch.type !== 'commercial' && ch.type !== 'downtown' && ch.type !== 'waterfront') return false;
+  return lx > LOT0 + m && lx < LOT1 - m && lz > LOT0 + m && lz < LOT1 - m;
+}
+function flee(o, dt) {
+  const dx = o.x - hole.x, dz = o.z - hole.z, dd = Math.hypot(dx, dz) || 1e-3;
+  if (dd < hole.r * 2.5 + 9 && o.size <= hole.r * 1.1) o.panic = 1.6 + Math.random();
+  if (!(o.panic > 0)) return false;
+  o.panic -= dt;
+  if (o.jit == null) o.jit = (Math.random() - 0.5) * 1.3;
+  const c = Math.cos(o.jit), sn = Math.sin(o.jit), ux = (dx * c - dz * sn) / dd, uz = (dx * sn + dz * c) / dd;
+  const sp = Math.min(6.5, 3.6 + hole.r * 0.25) * dt;
+  const wasIn = blockedAt(o.x, o.z);
+  if (wasIn || !blockedAt(o.x + ux * sp, o.z)) o.x += ux * sp;
+  if (wasIn || !blockedAt(o.x, o.z + uz * sp)) o.z += uz * sp;
+  o.ry = Math.atan2(ux, uz);
+  o.runPh = (o.runPh || 0) + dt * 15;
+  o.y = groundY(o.x, o.z) + (o.panic > 0 ? Math.abs(Math.sin(o.runPh)) * 0.14 : 0);
+  writeMatrix(o);
+  return true;
+}
 function stepDyn(o, dt) {
   const d = o.dyn;
+  if (o.kind === 'walker' && (flee(o, dt) || d.free)) { d.free = true; return; }
   d.along += d.dir * d.speed * dt;
   if (d.alongX) { o.x = d.along; o.z = d.line; o.ry = d.dir > 0 ? Math.PI / 2 : -Math.PI / 2; }
   else { o.z = d.along; o.x = d.line; o.ry = d.dir > 0 ? 0 : Math.PI; }
@@ -1089,7 +1163,7 @@ const $ = id => document.getElementById(id);
 const hudSize = $('size'), hudScore = $('score'), hudClock = $('clock'), hintEl = $('hint'), hudFill = $('fill'), hudNext = $('next'), toastEl = $('toast');
 let toastTimer = 0;
 function toast(msg) { toastEl.textContent = msg; toastEl.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove('on'), 1800); }
-const hudCmp = $('cmp'), fadeEl = $('fade');
+const hudCmp = $('cmp'), fadeEl = $('fade'), comboEl = $('combo');
 function updateHud() {
   if (hole.eaten >= 12) hintEl.classList.add('gone');
   if (goalOn) updateGoal();
@@ -1117,29 +1191,26 @@ function updateHud() {
 // the objective panel: where you are in the journey and what to do next
 var goalOn = false;
 const goalEl = $('goal');
-const STEPS = ['City', 'Land', 'Countries', 'Earth', 'Planets', 'Sun', 'Universe'];
+const STEPS = ['City', 'Countries', 'Earth', 'Planets', 'Sun', 'Universe'];
 let goalHtml = '';
 function updateGoal() {
   let step, t, sub = '', p = -1, list = null;
   const pct = x => Math.max(0, Math.min(1, x));
   if (!cosmos.on) {
     step = 0; t = 'Grow to ' + fmtLen(Math.log10(CITY_EXIT_R * 2)) + ' to break out of the city';
-    sub = 'Swallow whatever fits through the hole.'; p = pct((hole.r - 1) / (CITY_EXIT_R - 1));
+    sub = 'People run from you. Chain swallows for a combo. Landmarks are worth ×5.'; p = pct((hole.r - 1) / (CITY_EXIT_R - 1));
   } else if (cosmos.mode === 'globe') {
     const done = globe.countries.filter(c => c.state).length, all = globe.countries.length;
     if (done < all) {
-      step = 2; t = 'Swallow every country: ' + done + ' / ' + all;
-      sub = '<span style="color:#7cf29a">Green outline</span> = fits now. <span style="color:#ffc861">Amber</span> = grow first.'; p = done / all;
+      step = 1; t = 'Swallow every country: ' + done + ' / ' + all;
+      sub = '<span style="color:#7cf29a">Green outline</span> = fits now. <span style="color:#ffc861">Amber</span> = grow first. <span style="color:#ffd76a">★ Famous places</span> eaten: ' + globe.places.filter(q => q.state).length + ' / ' + globe.places.length; p = done / all;
       list = WORLD.continents.map((n, i) => [n, globe.contTotal[i] - globe.contLeft[i], globe.contTotal[i]]);
-    } else { step = 3; t = globe.r >= RE ? 'Swallow the Earth' : 'Grow to ' + fmtLen(Math.log10(RE * 2000)) + ' to swallow the Earth'; sub = 'Every country is gone.'; p = pct(globe.r / RE); }
+    } else { step = 2; t = globe.r >= RE ? 'Swallow the Earth' : 'Grow to ' + fmtLen(Math.log10(RE * 2000)) + ' to swallow the Earth'; sub = 'Every country is gone.'; p = pct(globe.r / RE); }
   } else if (cosmos.mode === 'solar') {
     const pl = solar.bodies.filter(b => b.planet), left = pl.filter(b => !b.state).length;
-    if (left) { step = 4; t = 'Swallow the other ' + pl.length + ' planets: ' + (pl.length - left) + ' / ' + pl.length; sub = '<span style="color:#7cf29a">Green</span> = fits now. Too big? Eat moons, dwarf planets and asteroids first. The map shows where everything is.'; p = 1 - left / pl.length; list = pl.map(b => [b.name, b.state ? 1 : 0, 1]); }
-    else { step = 5; t = 'Swallow the Sun'; sub = 'Only the Sun is left.'; }
-  } else if (cosmos.stage === 'surface') {
-    step = 1; t = 'Grow to ' + fmtLen(5 + Math.log10(2)) + ' to rise above the Earth';
-    sub = 'Towns, lakes, forests and mountains: eat what fits.'; p = pct((cLogR() - Math.log10(CITY_EXIT_R)) / (5 - Math.log10(CITY_EXIT_R)));
-  } else { step = 6; t = 'Keep growing. There is no end.'; const c = compare(curLogR() + Math.log10(2)); sub = c.next ? 'Next: bigger than ' + c.next[0] : ''; }
+    if (left) { step = 3; t = 'Swallow the other ' + pl.length + ' planets: ' + (pl.length - left) + ' / ' + pl.length; sub = '<span style="color:#7cf29a">Green</span> = fits now. Too big? Eat moons, dwarf planets and asteroids first. The map shows where everything is.'; p = 1 - left / pl.length; list = pl.map(b => [b.name, b.state ? 1 : 0, 1]); }
+    else { step = 4; t = 'Swallow the Sun'; sub = 'Only the Sun is left.'; }
+  } else { step = 5; t = 'Keep growing. There is no end.'; const c = compare(curLogR() + Math.log10(2)); sub = c.next ? 'Next: bigger than ' + c.next[0] : ''; }
   let h = '<div class="path">' + STEPS.map((n, i) => i === step ? '<b>' + n + '</b>' : n).join(' › ') + '</div><div class="t">' + t + '</div>';
   if (sub) h += '<div class="sub">' + sub + '</div>';
   if (p >= 0) h += '<div class="gbar"><i style="width:' + (p * 100).toFixed(1) + '%"></i></div>';
@@ -1290,12 +1361,18 @@ function deactivate(o, i) {
   }
 }
 const loose = [];
+const combo = { n: 0, t: 0, timer: 0 };
 function consume(o) {
   o.state = 2;
   if (o.id && !o.dyn) eatenIds.add(o.id);
   hole.eaten++;
-  const pts = Math.max(1, Math.round(o.size * o.size * 10));
+  const now = performance.now();
+  combo.n = now - combo.t < 1500 ? combo.n + 1 : 1; combo.t = now;
+  const mult = Math.min(5, 1 + Math.floor(combo.n / 6)) * (o.t.landmark ? 5 : 1);
+  const pts = Math.max(1, Math.round(o.size * o.size * 10)) * mult;
   hole.score += pts;
+  if (combo.n >= 6) { comboEl.textContent = 'COMBO ×' + Math.min(5, 1 + Math.floor(combo.n / 6)) + ' · ' + combo.n + ' in a row'; comboEl.classList.add('on'); clearTimeout(combo.timer); combo.timer = setTimeout(() => comboEl.classList.remove('on'), 1500); }
+  if (o.t.landmark) toast('You swallowed ' + o.name + '! ' + Math.round(o.h) + ' m tall · ×5');
   hole.mass += o.size * o.size;
   hole.targetR = Math.sqrt(R0 * R0 + GROW_K * hole.mass);
   if (o.size >= Math.max(1.5, hole.r * 0.45)) popText(o.name + (o.t.raw ? ' · ' + Math.round(o.h) + ' m tall' : '') + ' +' + pts, o.x, o.z, true);
@@ -2131,7 +2208,7 @@ function botSteer() {
   } else if (cosmos.mode === 'globe') {
     const { e, n } = globeOrient();
     const pick = (v, rr) => { const d = Math.acos(Math.min(1, v.dot(globe.h))); if (d < best) { best = d; const t = tmpV.copy(v).addScaledVector(globe.h, -v.dot(globe.h)); wx = t.dot(e); wz = -t.dot(n); } };
-    for (const c of globe.countries) if (!c.state && c.r <= globe.r * 0.97) pick(c.cen, c.r);
+    for (const c of globe.countries) if (!c.state && c.ang <= globe.r / RE * 0.97) pick(c.cen, c.r);
     for (const c of globe.cities) if (!c.state && c.r <= globe.r) pick(c.n, c.r);
     for (const c of (globe.fill || [])) if (!c.state && c.r <= globe.r) pick(c.n, c.r);
   } else if (cosmos.mode === 'solar') {
@@ -2226,7 +2303,7 @@ function placeMarkers(list, cam) {
     let ax = sx, ay = sy;
     if (!on) { const cx = W / 2, cy = H / 2, dx = sx - cx, dy = sy - cy, k = Math.min((W / 2 - pad) / Math.abs(dx || 1e-6), (H / 2 - pad) / Math.abs(dy || 1e-6)); ax = cx + dx * k; ay = cy + dy * k; }
     el.style.display = 'block';
-    el.className = 'mark' + (it.fits ? ' fit' : '');
+    el.className = 'mark' + (it.fits ? ' fit' : '') + (it.cls ? ' ' + it.cls : '');
     el.textContent = (on ? '' : '➤ ') + it.label;
     const hw = el.offsetWidth / 2 + 6;
     ax = Math.min(W - hw, Math.max(hw, ax)); ay = Math.min(H - bot, Math.max(top, ay));
@@ -2248,8 +2325,8 @@ function renderStage(sc, cam, bloomK) {
 // Country borders: Natural Earth 1:110m (public domain). Imagery: NASA Blue Marble / Black Marble.
 const WORLD = JSON.parse(document.getElementById('worlddata').textContent);
 const CITY_LIST = WORLD.cities;
-const RE = 6371, GR = 1000, KG = 0.24;
-const FILL_N = 4000, FILL_MIN = 8, FILL_MAX = 400, FILL_SKEW = 2.2, KF = 0.08;
+const RE = 6371, GR = 1000;
+const FILL_N = 6000, FILL_MIN = 4, FILL_MAX = 400, FILL_SKEW = 2.2;
 const gScene = new THREE.Scene();
 gScene.background = new THREE.Color(0x000000);
 const gCam = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.3, 60000);
@@ -2308,7 +2385,13 @@ function globeMat(kind, cut = true) {
         vec3 rock = vec3(0.2, 0.13, 0.09) * (0.7 + 0.6 * fbm(vMapUv * vec2(400.0, 200.0)));
         diffuseColor.rgb = mix(rock, diffuseColor.rgb, smoothstep(0.35, 0.65, wet));` : ''}`)
       .replace('#include <color_fragment>', `#include <color_fragment>
-        ${kind === 'land' ? `float eaten = smoothstep(0.3, 0.7, texture2D(tEat, vMapUv).r);
+        ${kind === 'land' ? `
+        // close up the satellite image is soft: add fields, woods and relief below its resolution
+        vec2 dq = vMapUv * vec2(9000.0, 4500.0);
+        float dpx = length(fwidth(dq)), dk = 1.0 - smoothstep(0.4, 1.4, dpx);
+        float fieldN = hash12(floor(dq * 0.5)), wood = smoothstep(0.55, 0.7, fbm(dq * 0.13));
+        diffuseColor.rgb *= mix(1.0, 1.45 * (0.82 + 0.3 * fieldN) * mix(1.0, 0.72, wood) * (0.9 + 0.2 * fbm(dq * 0.9)), dk);
+        float eaten = smoothstep(0.3, 0.7, texture2D(tEat, vMapUv).r);
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.2, 0.13, 0.09) * (0.7 + 0.6 * fbm(vMapUv * vec2(400.0, 200.0))), eaten);` : 'float eaten = 0.0;'}
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.45, 0.22, 0.1) * (0.8 + 0.4 * vnoise(vGW.xz * 0.5)), rim);`)
       .replace('#include <metalnessmap_fragment>', `#include <metalnessmap_fragment>
@@ -2398,6 +2481,24 @@ function countryGeo(polys) {
   g.computeBoundingSphere();
   return g;
 }
+// famous places at their real location and real extent (km, half-width); swallowing one is a bonus
+const PLACES = [
+  ['Manhattan', 40.78, -73.97, 10], ['Niagara Falls', 43.08, -79.07, 2], ['the Grand Canyon', 36.1, -112.1, 150], ['Yellowstone', 44.6, -110.5, 50],
+  ['Death Valley', 36.5, -117, 70], ['the Golden Gate Bridge', 37.82, -122.48, 2], ['the Hawaiian Islands', 20.8, -156.3, 300], ['Mount Rushmore', 43.88, -103.46, 1],
+  ['the Great Lakes', 45.5, -84.5, 550], ['the Everglades', 25.9, -80.9, 60], ['the Rocky Mountains', 43, -110, 1200], ['the Mississippi Delta', 29.3, -89.6, 80],
+  ['Chichén Itzá', 20.68, -88.57, 2], ['the Panama Canal', 9.1, -79.7, 40], ['the Amazon Rainforest', -4, -62, 1300], ['Machu Picchu', -13.16, -72.55, 2],
+  ['the Galápagos Islands', -0.6, -90.5, 150], ['the Atacama Desert', -24.5, -69.25, 450], ['Iguazu Falls', -25.69, -54.44, 3], ['Patagonia', -46, -70, 900],
+  ['the Eiffel Tower', 48.858, 2.294, 0.5], ['the Alps', 46.4, 9.5, 500], ['the Colosseum', 41.89, 12.49, 0.5], ['Mount Vesuvius', 40.82, 14.43, 8],
+  ['Mount Etna', 37.75, 15, 20], ['Stonehenge', 51.18, -1.83, 0.5], ['Venice', 45.42, 12.33, 25], ['the Norwegian Fjords', 61.5, 6.5, 250], ['the Acropolis', 37.97, 23.73, 0.5],
+  ['the Pyramids of Giza', 29.98, 31.13, 2], ['the Nile Delta', 30.9, 31, 120], ['the Sahara Desert', 23, 13, 2300], ['Mount Kilimanjaro', -3.07, 37.35, 40],
+  ['Victoria Falls', -17.92, 25.86, 2], ['the Serengeti', -2.33, 34.83, 150], ['the Okavango Delta', -19.3, 22.9, 80], ['Lake Victoria', -1, 33, 170],
+  ['Table Mountain', -33.96, 18.4, 5], ['the Congo Rainforest', -1, 22, 900], ['Mount Everest', 27.99, 86.93, 15], ['the Himalayas', 29, 84, 1100],
+  ['the Great Wall of China', 40, 110, 900], ['the Forbidden City', 39.92, 116.39, 1], ['the Taj Mahal', 27.17, 78.04, 0.5], ['Mount Fuji', 35.36, 138.73, 20],
+  ['Angkor Wat', 13.41, 103.87, 3], ['Lake Baikal', 53.5, 108.2, 320], ['the Gobi Desert', 42.6, 103.4, 700], ['the Dead Sea', 31.5, 35.5, 40], ['Petra', 30.33, 35.44, 2],
+  ['the Burj Khalifa', 25.197, 55.274, 0.2], ['the Siberian Taiga', 62, 100, 1800], ['Ha Long Bay', 20.9, 107.2, 30], ['Uluru', -25.34, 131.04, 4],
+  ['the Great Barrier Reef', -18.3, 147.7, 700], ['the Sydney Opera House', -33.857, 151.215, 0.2], ['the Australian Outback', -25, 134, 1400], ['Milford Sound', -44.64, 167.9, 10],
+  ['the South Pole', -89.9, 0, 50], ['the Ross Ice Shelf', -81.5, -175, 500], ['the Greenland Ice Sheet', 72, -40, 1000],
+];
 // every country's border drawn on the globe: green = fits through the hole now, amber = too big yet
 let outlineCol = null, outlineAlpha = -1;
 function buildOutlines() {
@@ -2415,6 +2516,13 @@ function buildOutlines() {
     gc.hi = pos.length / 3;
     gc.ang = 0; for (const v of gc.verts) gc.ang = Math.max(gc.ang, Math.acos(Math.min(1, v.dot(gc.cen))));
   });
+  for (const pl of globe.places) {
+    pl.lo = pos.length / 3;
+    const a = pl.r / RE, n = pl.n, e1 = new V3(0, 1, 0).cross(n); if (e1.lengthSq() < 1e-6) e1.set(1, 0, 0); e1.normalize(); const e2 = new V3().crossVectors(n, e1);
+    const pt = t => new V3().copy(n).multiplyScalar(Math.cos(a)).addScaledVector(e1, Math.sin(a) * Math.cos(t)).addScaledVector(e2, Math.sin(a) * Math.sin(t)).multiplyScalar(GR * 1.002);
+    for (let i = 0; i < 48; i++) { const p = pt(i / 48 * 6.2832), q = pt((i + 1) / 48 * 6.2832); pos.push(p.x, p.y, p.z, q.x, q.y, q.z); }
+    pl.hi = pos.length / 3;
+  }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   outlineCol = new THREE.BufferAttribute(new Float32Array(pos.length / 3 * 4), 4); outlineCol.setUsage(THREE.DynamicDrawUsage);
@@ -2432,9 +2540,10 @@ function updateOutlines(alpha, force) {
   outlineAlpha = alpha;
   const a = outlineCol.array;
   for (const c of globe.countries) {
-    const col = c.state ? [0, 0, 0, 0] : c.ang <= alpha ? [0.49, 1, 0.6, 1] : [1, 0.78, 0.38, 0.6];
+    const col = c.state ? [0, 0, 0, 0] : c.ang <= alpha * 1.1 ? [0.49, 1, 0.6, 1] : [1, 0.78, 0.38, 0.6];
     for (let i = c.lo; i < c.hi; i++) a.set(col, i * 4);
   }
+  for (const pl of globe.places) { const col = pl.state ? [0, 0, 0, 0] : pl.r <= globe.r ? [1, 0.84, 0.3, 1] : [1, 0.84, 0.3, 0.45]; for (let i = pl.lo; i < pl.hi; i++) a.set(col, i * 4); }
   outlineCol.needsUpdate = true;
 }
 const gPit = new THREE.Group();
@@ -2477,6 +2586,7 @@ function buildGlobe() {
     globe.countries.push({ name: c.n, cont: c.c, r: c.r, mesh, verts, cen, state: 0, t: 0 });
     globe.contLeft[c.c]++; globe.contTotal[c.c]++;
   }
+  globe.places = PLACES.map(([name, lat, lon, r]) => ({ name, lat, lon, r, n: ll2v(lon, lat), state: 0 }));
   buildOutlines();
   // cities
   const disc = new THREE.CircleGeometry(1, 40);
@@ -2489,6 +2599,8 @@ function buildGlobe() {
     globe.cities.push({ name, r: rk, n, lon, lat, mesh, state: 0, t: 0 });
   }
   globe.fill = buildFill();
+  globe.eatA = 0;
+  globe.totA = globe.fill.length + globe.countries.length * 3 + globe.places.length * 2 + globe.cities.length;
   // the pit: dirt walls down into the planet from the rim
   const wall = new THREE.Mesh(holeWall.geometry, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide }));
   const bottom = new THREE.Mesh(holeFloor.geometry, new THREE.MeshBasicMaterial({ color: 0x000000 }));
@@ -2505,6 +2617,19 @@ function globeOrient() {
   globe.group.quaternion.setFromRotationMatrix(m);
   return { e, n };
 }
+// straight from the city to the whole planet: the camera starts right over the hole and pulls back
+const GLOBE_R0 = 30;   // km
+function startGlobe() {
+  cosmos.on = true; cosmos.leaving = 0;
+  loadEarthTextures(); buildGlobe();
+  cosmos.mode = 'globe'; globe.on = true;
+  globe.r = globe.targetR = GLOBE_R0;
+  const ll = m2ll(hole.x, hole.z); ll2v(ll.lon, ll.lat, globe.h);
+  gHoleU.uCloud.value = 0; globe.intro = 1;
+  scene.visible = false; hideMarkers();
+  toast('You burst out of the city · now ' + fmtLen(Math.log10(GLOBE_R0 * 2000)) + ' wide');
+  updateHud();
+}
 function enterGlobe() {
   dissolve(() => renderStage(cScene, cCam, cBloom.strength));
   buildGlobe();
@@ -2516,12 +2641,19 @@ function enterGlobe() {
   toast('The whole Earth: land swallows as you cross it');
   updateHud();
 }
+// the hole's size follows how much of the world's land you've taken, so it can't run away from you:
+// it reaches the size of the Earth only once (nearly) all of it is gone
+function globeGrow(a) {
+  globe.eatA += a;
+  const f = Math.min(1, globe.eatA / globe.totA * 1.06);
+  globe.targetR = Math.max(globe.targetR, GLOBE_R0 * Math.pow(RE * 1.02 / GLOBE_R0, Math.pow(f, 0.3)));
+}
 function eatGlobeThing(o, kind) {
   o.state = 1; o.t = 0;
   if (kind === 'country') o.mesh.material = landFallMat; else { o.mesh.material = cityFallMat; paintEaten(o.lon, o.lat, o.r); }
   globe.falling.push(o);
   const rel = o.r / globe.r;
-  globe.targetR = Math.sqrt(globe.targetR * globe.targetR + KG * o.r * o.r);
+  globeGrow(kind === 'country' ? 3 : 1);
   const pts = Math.round(40 + 400 * rel * rel);
   hole.score += pts; hole.eaten++;
   popText(o.name + ' · ' + fmtLen(Math.log10(o.r * 2000)), 0, 0, rel > 0.3, gCam, GR * 1.002);
@@ -2538,31 +2670,47 @@ function globeFrame(dt) {
   const { e, n } = globeOrient();
   // move over the surface along great circles
   const mv = moveInput();
-  const ang = 2.4 * globe.r / RE * dt * boostK();
+  // cruise: cross empty ocean fast, slow down again near the next thing that fits
+  const ang = Math.max(2.4 * globe.r / RE, 0.7 * Math.max(0, globe.dn || 0)) * dt * boostK();
   if (mv.len > 0.01 && !globe.gone) {
     globe.h.addScaledVector(e, mv.wx * ang).addScaledVector(n, -mv.wz * ang).normalize();
   }
-  globe.r += (globe.targetR - globe.r) * Math.min(1, dt * 2.5);
+  globe.r += Math.min((globe.targetR - globe.r) * Math.min(1, dt * 2.5), globe.r * 0.09 * dt);
   const alpha = Math.min(globe.r / RE, Math.PI * 0.49), cosA = Math.cos(alpha);
   gHoleU.uCosA.value = cosA; gHoleU.uCosRim.value = Math.cos(alpha * 1.04 + 0.002);
   updateOutlines(alpha);
   // what fits: every border point of a country must be inside the hole
   if (!globe.gone) {
+    const cosFit = Math.cos(alpha * 1.1);
     for (const c of globe.countries) {
       if (c.state) continue;
       const cd = Math.acos(Math.min(1, c.cen.dot(globe.h)));
-      if (cd > alpha + c.r / RE + 0.02) continue;
+      if (cd > alpha * 1.1 + 0.002 || c.ang > alpha * 1.1) continue;
       let ok = true;
-      for (const v of c.verts) if (v.dot(globe.h) < cosA) { ok = false; break; }
+      for (const v of c.verts) if (v.dot(globe.h) < cosFit) { ok = false; break; }
       if (ok) eatGlobeThing(c, 'country');
     }
-    for (const c of globe.cities) if (!c.state && Math.acos(Math.min(1, c.n.dot(globe.h))) + c.r / RE <= alpha) eatGlobeThing(c, 'city');
-    for (const c of globe.fill) if (!c.state && c.r <= globe.r && Math.acos(Math.min(1, c.n.dot(globe.h))) + c.r / RE <= alpha) {
+    for (const c of globe.cities) if (!c.state && c.r <= globe.r && Math.acos(Math.min(1, c.n.dot(globe.h))) + c.r / RE * 0.5 <= alpha) eatGlobeThing(c, 'city');
+    for (const pl of globe.places) if (!pl.state && pl.r <= globe.r && Math.acos(Math.min(1, pl.n.dot(globe.h))) + pl.r / RE * 0.5 <= alpha) {
+      pl.state = 1; paintEaten(pl.lon, pl.lat, pl.r);
+      globeGrow(2);
+      const pts = Math.round(500 + 3000 * (pl.r / globe.r) ** 2); hole.score += pts; hole.eaten++;
+      const nm = pl.name[0].toUpperCase() + pl.name.slice(1);
+      popText(nm + ' +' + pts, 0, 0, true, gCam, GR * 1.002);
+      if (pl.r > globe.r * 0.2 || !globe.placeToast || performance.now() - globe.placeToast > 2500) { toast('You swallowed ' + pl.name + '!'); globe.placeToast = performance.now(); }
+      blip(3); updateOutlines(outlineAlpha, true); updateHud();
+    }
+    let dn = Infinity;
+    for (const c of globe.fill) {
+      if (c.state || c.r > globe.r) continue;
+      const d = Math.acos(Math.min(1, c.n.dot(globe.h)));
+      if (d + c.r / RE * 0.5 > alpha) { if (d - alpha < dn) dn = d - alpha; continue; }
       c.state = 1; paintEaten(c.lon, c.lat, c.r);
-      globe.targetR = Math.sqrt(globe.targetR * globe.targetR + KF * c.r * c.r);
+      globeGrow(1);
       hole.score += Math.round(10 + 100 * (c.r / globe.r) ** 2); hole.eaten++;
       if (c.r > globe.r * 0.35) popText(c.name + ' · ' + fmtLen(Math.log10(c.r * 2000)), 0, 0, false, gCam, GR * 1.002);
     }
+    globe.dn = dn;
   }
   for (let i = globe.falling.length - 1; i >= 0; i--) {
     const o = globe.falling[i]; o.t += dt * 0.8;
@@ -2594,6 +2742,7 @@ function globeFrame(dt) {
     D = Math.max(D, 3000);
     if (globe.gone >= 1) { enterSolar(); return; }
   }
+  if (globe.intro > 0) { globe.intro = Math.max(0, globe.intro - dt / 2.5); const k = 1 - globe.intro; D *= 0.3 + 0.7 * k * k * (3 - 2 * k); }
   gHoleU.uGC.value.copy(globe.group.position);
   const tgt = new V3(0, GR, 0);
   gCam.position.set(Math.sin(view.yaw) * Math.cos(view.pitch) * D, GR + Math.sin(view.pitch) * D, Math.cos(view.yaw) * Math.cos(view.pitch) * D);
@@ -2608,12 +2757,16 @@ function globeFrame(dt) {
   const near = [];
   for (const c of globe.countries) if (!c.state) near.push({ o: c, d: Math.acos(Math.min(1, c.cen.dot(globe.h))) });
   near.sort((a, b) => a.d - b.d);
-  const fitsFirst = near.filter(m => m.o.ang <= alpha).slice(0, 3), big = near.filter(m => m.o.ang > alpha).slice(0, 2);
-  if (!globe.gone) placeMarkers([...fitsFirst, ...big].map(m => {
-    const fits = m.o.ang <= alpha, km = Math.max(0, m.d - alpha) * RE;
+  const fitsFirst = near.filter(m => m.o.ang <= alpha * 1.1 && m.d * RE < Math.max(1500, globe.r * 25)).slice(0, 3), big = near.filter(m => m.o.ang > alpha * 1.1).slice(0, 2);
+  const pls = globe.places.filter(p => !p.state).map(p => ({ p, d: Math.acos(Math.min(1, p.n.dot(globe.h))) })).sort((a, b) => a.d - b.d).slice(0, 2).map(({ p, d }) => {
+    const fits = p.r <= globe.r, nm = p.name[0].toUpperCase() + p.name.slice(1), km = Math.max(0, d - alpha) * RE;
+    return { pos: globe.group.localToWorld(p.n.clone().multiplyScalar(GR)), px: 0, fits, cls: 'place', label: '★ ' + nm + (fits ? (km > 30 ? ' · ' + fmtLen(Math.log10(km * 1000)) + ' away' : '') : ' · needs ' + fmtLen(Math.log10(p.r * 2000))) };
+  });
+  if (!globe.gone) placeMarkers([...pls, ...[...fitsFirst, ...big].map(m => {
+    const fits = m.o.ang <= alpha * 1.1, km = Math.max(0, m.d - alpha) * RE;
     return { pos: globe.group.localToWorld(m.o.cen.clone().multiplyScalar(GR)), px: 0, fits,
       label: m.o.name + (fits ? ' ✓ fits' + (km > 50 ? ' · ' + fmtLen(Math.log10(km * 1000)) + ' away' : '') : ' · needs ' + fmtLen(Math.log10(m.o.ang * 2 * RE * 1000))) };
-  }), gCam); else hideMarkers();
+  })], gCam); else hideMarkers();
   renderStage(gScene, gCam, 0.25);
 }
 
@@ -2936,9 +3089,8 @@ function frame(now) {
     return;
   }
   if (started && hole.r >= CITY_EXIT_R * 0.98) {
-    toast("You've outgrown the city");
     dissolve(() => { if (HQ) composer.render(); else renderer.render(scene, camera); });
-    startCosmos(camD); return;
+    startGlobe(); return;
   }
   updateHoleMesh();
 
@@ -2966,6 +3118,16 @@ function frame(now) {
   sun.position.copy(sun.target.position).addScaledVector(SUN_DIR, ext * 2 + 100);
 
   streamChunks(started ? 2.5 : 30);
+  // the nearest landmarks get a label: what they are, and whether they fit yet
+  if (started) {
+    const lms = [];
+    for (const ch of chunks.values()) for (const o of ch.lms) if (o.state === 0) lms.push(o);
+    lms.sort((a, b) => Math.hypot(a.x - hole.x, a.z - hole.z) - Math.hypot(b.x - hole.x, b.z - hole.z));
+    placeMarkers(lms.slice(0, 2).map(o => {
+      const fits = o.size <= hole.r, nm = o.name.replace(/^(the|a) /, '');
+      return { pos: new V3(o.x, o.h * 0.75, o.z), px: 0, fits, label: nm[0].toUpperCase() + nm.slice(1) + ' · ' + Math.round(o.h) + ' m' + (fits ? ' ✓ fits' : ' · needs a ' + fmtLen(Math.log10(o.size * 2)) + ' hole') };
+    }), camera);
+  }
 
   // traffic
   while (dyn.length < TRAFFIC + WALKERS) makeDyn(dyn.filter(o => o.kind === 'car').length < TRAFFIC ? 'car' : 'walker', true);
@@ -2984,13 +3146,13 @@ function frame(now) {
   }
   // swallow statics near the hole
   if (started) {
-    const reach = hole.r + 40;
+    const reach = Math.max(hole.r + 40, hole.r * 2.5 + 14);
     const cx0 = Math.floor((hole.x - reach) / C), cx1 = Math.floor((hole.x + reach) / C);
     const cz0 = Math.floor((hole.z - reach) / C), cz1 = Math.floor((hole.z + reach) / C);
     for (let cz = cz0; cz <= cz1; cz++) for (let cx = cx0; cx <= cx1; cx++) {
       const ch = chunks.get(cx + ',' + cz); if (!ch) continue;
       let dead = 0;
-      for (const o of ch.objs) { tryEat(o); if (o.state > 1) dead++; }
+      for (const o of ch.objs) { if (o.t === TYPES.person && o.state === 0) flee(o, dt); tryEat(o); if (o.state > 1) dead++; }
       if (dead > 32) ch.objs = ch.objs.filter(o => o.state <= 1);
     }
   }
@@ -3024,7 +3186,9 @@ $('start').addEventListener('pointerdown', e => {
   started = true; goalOn = true; updateHud();
   try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (_) { }
 });
-window.__game = { botStats, hole, chunks, dyn, active, TYPES, cosmos, jumpCosmos, globe, solar, enterGlobe, enterSolar, start: () => $('start').dispatchEvent(new PointerEvent('pointerdown')) };
+// the planet is built while the title screen is up, so leaving the city never stalls
+setTimeout(() => { loadEarthTextures(); const t = performance.now(); buildGlobe(); renderer.compile(gScene, gCam); window.__globeBuildMs = performance.now() - t; }, 800);
+window.__game = { botStats, hole, chunks, dyn, active, TYPES, cosmos, jumpCosmos, globe, solar, enterGlobe, enterSolar, startGlobe, start: () => $('start').dispatchEvent(new PointerEvent('pointerdown')) };
 </script>
 </body>
 </html>
