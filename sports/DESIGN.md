@@ -88,6 +88,8 @@ sports/
   js/sports/golf.js
   js/main.js               boot, screens, menu scene, editor, results flow  (ui owner)
   tools/shoot.mjs          headless playtest driver (Playwright)
+  tools/gallery.html       dev showcase of SS.world + SS.pals (?view=lineup|faces|anims|…)
+  tools/soundboard.html    dev board: play/analyze every sfx, loop and music track
 ```
 
 A sport file must not edit any other file. If a sport needs something generic, it implements a
@@ -213,8 +215,10 @@ SS.debug = {      // test hooks used by tools/shoot.mjs and agents
 **URL parameters** (parsed in engine, acted on by main.js):
 `?sport=<id>` jump straight into a sport after boot (skips title/menu/how-to/title card when `skip=1`),
 `&mode=<modeId>`, `&players=<n>` (hot-seat count, auto-creates guest Pals), `&opp=<rosterIndex>`,
-`&seed=<int>`, `&quality=low|medium|high`, `&mute=1`, `&debug=1`, `&screen=menu|editor|records|settings|results`
-(open a screen directly for screenshots), `&reset=1` (wipe save first).
+`&seed=<int>`, `&quality=low|medium|high`, `&mute=1`, `&debug=1`, `&screen=menu|editor|records|settings|pals|results`
+(open a screen directly for screenshots; `results` shows sample data over the menu), `&reset=1` (wipe save first).
+Without `skip=1`, `?sport=` still jumps straight in but shows the first-visit how-to and the title card.
+Unknown sports/screens fall back to the title screen.
 
 ### 6.4 `js/audio.js` — `SS.audio` (100 % synthesized with WebAudio, no files)
 
@@ -485,3 +489,127 @@ expected score gains more. Levels 0–2500, "Pro" at 1000.
 - Runs ≥ 50 fps on mid phones at 'medium' (keep draw calls modest: merge static geometry, instancing).
 - Text fits at 320 px wide. Touch targets ≥ 44 px. Safe areas respected.
 - Code: readable, sectioned, no dead code, no `TODO`s left.
+
+---------------------------------------------------------------------------------------------------
+
+## 10. As built: extensions & clarifications (binding, same weight as §6)
+
+Everything in §6 works as written. The items below are what the implementation adds or pins down;
+sport modules may rely on all of them.
+
+### 10.1 Sport files today
+`js/sports/*.js` currently hold **placeholder modules**: the `SS.registerSport` metadata (name, tagline,
+accent/tint, icon, music, players/opponent, modes, howTo, medals) is final and tuned for the menu; `create()`
+is a three-shot practice scene. A sport owner keeps the metadata (adjusting medal wording to the real
+rules if needed) and replaces `create()` and everything below it.
+
+| id | accent / tint | modes | players / opponent |
+|----|---------------|-------|--------------------|
+| bowling | `#FF5A5F` / `#FFE8E6` | `game` 10 Frames · `spare` Spare Challenge · `hundred` 100-Pin | 1–4 / – |
+| tennis | `#8E5BE0` / `#F1EAFF` | `quick` Quick Match · `match` Match · `rally` Rally Challenge | 1 / CPU |
+| baseball | `#2E86F0` / `#E4F0FF` | `derby` Home Run Derby · `sudden` Sudden Death | 1 / CPU |
+| golf | `#2FAE55` / `#E5F7E8` | `beginner` Beginner 3 · `expert` Expert 3 · `full9` Full 9 | 1–4 / – |
+
+Keep taglines ≤ 23 characters (they are single-line on landscape menu cards).
+
+### 10.2 Sport module obligations (learned from integration)
+- **Fill your HUD inside `create()`**, not in `start()`: the HUD is visible under the how-to and title card.
+- **Stop your own audio loops in `dispose()`** (`handle.stop()`); main.js does not track them.
+- `instance.debug.autoplay(on)` must take effect from the current state (if the sport is waiting for input
+  when it is switched on, it plays that shot), and must drive the game to `ctx.finish()` unattended.
+- Use `ctx.input` (auto-cleared), `ctx.wait/every/onUpdate` (auto-cancelled). Anything else you register
+  (engine events, world handles you update manually, DOM listeners outside `ctx.hud`) is yours to remove.
+- Records: call `SS.save.record()` yourself; `fmt` may be a `SS.util.fmt` name (`'meters'`, `'time'`, `'int'`)
+  or a template like `'{v} pins'` — the Records screen formats stored values with it.
+- `ctx.awardMedal(id)` credits the **first** player (null for a guest); a mid-game award shows a toast + `coin`
+  and is added to the results' medal list automatically even if `result.medals` omits it.
+- Skill is applied and games/wins are counted only for saved, non-guest humans; `ctx.skillFor(guest)` is 0.
+- After Restart or Play Again there is **no title card**: `start()` is called right after the iris opens.
+- `ctx.hud` children: sports should put `.ss-pop` on chips/children, not on `.ss-hud-*` anchors
+  (those use `transform` for centering).
+
+### 10.3 Shell behaviour (main.js, ui.js)
+- The core pause button is `#ss-pause`, a sibling of `#ss-hud` (a sport emptying the HUD can't remove it).
+- While a game is loaded `#ss-root` has class `is-playing`; toasts then sit below the top-center HUD row.
+- Banners, hints and pop-ups are hidden while the pause menu or a modal is open; don't rely on banners during
+  your own `ui.choose()`.
+- In short landscape (height ≤ 520 px) a default-positioned `ui.hint()` tucks into the bottom-right corner.
+- `.ss-hud-top` is capped to the width between the side buttons (pause at top-left) and wraps its children
+  onto a second row on narrow phones; keep top-center HUD rows to two or three short chips.
+- On every exit (quit, restart, finish → menu, launch) main.js also clears `#ss-fx` (banners, hints, toasts,
+  countdowns, title cards **and DOM confetti**), resets slow-mo, re-enables `SS.input`, and resumes the engine.
+- `SS.ui` extensions: `events` ('pause' when the pause button is pressed, 'back' for Escape with no modal open),
+  `esc`, `sfx`, `haptic(ms)`, `letters(text)`, `gestureSVG(name)`, `modal({className, dismissValue, backdrop})`
+  → `{el, panel, close(v), result}`, `closeTop()`, `modalOpen()`, `confetti({count, colors})` (DOM, over panels),
+  `clearFx()`, `pauseButton`, `GESTURES`, `ICONS`. Extra icons: edit plus trash dice lock sparkle chart bulb crown.
+  `button()` also takes `className`, `haptic`, `sfx: null` (silent); `confirm()` takes `{ danger: true }`.
+- `SS.app` (tests): `showScreen(id, opts)`, `launch(cfg, {intro})`, `openSetup(sport)`, `openPause()`,
+  `sampleResults()`, `plaza`, getters `game`, `screen`.
+  `SS.debug.screen` ∈ title · menu · editor · pals · records · settings · play · results.
+- Setup choices are remembered per sport in `SS.save.settings.lastSetup` (wiped by reset).
+
+### 10.4 Engine & input (engine.js)
+- `addUpdate(fn, priority)`: **lower priority runs first** (stable). Use ~100 for a camera follow.
+- Pausing is *claimed*: auto-pauses (tab hidden, blur, context lost) resume by themselves unless
+  `engine.pause()` was called meanwhile. Window blur counts as hidden (desktop: clicking browser chrome pauses).
+- While paused or `input.enabled === false`, pointer events are dropped and only the Escape key is delivered;
+  a press in progress gets an `up` with `cancelled: true` (no tap/swipe).
+- Pointer `move` fires only while pressed. Swipe `vx/vy` use screen axes (vy > 0 = moving down), like dx/dy.
+  Extra fields: `pointerType`, `cancelled`. Release velocity ignores a lift-off gap < 50 ms; a longer stop
+  before lifting reads as slow (nspeed → 0). A 400 ms press without moving is neither tap nor swipe.
+- Extras: `engine.tier` (`{shadows, shadowMapSize, dpr, maxPixels}`), `QUALITY_TIERS`, `qualitySetting`
+  ('auto' or a tier), `hidden`, event `'contextrestored'`, `project()` also returns `behind` and `z`,
+  `slowmo()` returns a Promise, `init()` returns false (with a friendly card) without WebGL.
+- `fitCamera(cam, opts)`: explicit opts are written back into `cam.userData.fit`, so the automatic refit keeps them.
+  Cameras without `userData.fit` just get their aspect synced each frame.
+- Auto quality: medium on phones / high on desktop, measures 3 s after a 1.2 s warm-up once a scene has ≥ 8 draw
+  calls, steps down below 42 fps (at most twice), re-measures on `setView`. Headless runs settle at low:
+  pass `&quality=high` for art screenshots.
+
+### 10.5 util.js & save.js
+- `tween()` promise has `.cancel(complete=false)` and always resolves; `SS.util.killTweens(target)`;
+  a newer tween on the same property takes it over. Easing may be a function or a name (`'outBack'`).
+- `fmt.meters` keeps one decimal below 10 m (`'3.4 m'`); `fmt.time` shows h:mm:ss past an hour.
+  `angleDiff(a, b) = wrap(b − a)`.
+- `rankFor()` also returns `index` and `next` (next rank or null). Extras: `SS.save.RANKS`, `LEVEL_MAX`,
+  `medalInfo(sportId, medalId)` → `{profileId, name, date}`, `persistent` (false without storage),
+  events `'reset' 'profile' 'active' 'medal'` besides `'setting'`.
+- `addSkill` also bumps `skill.games` and `best`. `upsertProfile` assigns id/created when missing.
+  `deleteProfile` removes that profile's skills and stats (records stay). A null profileId is stored as `'_'`.
+
+### 10.6 Audio (audio.js)
+- `SS.audio.names = { sfx, loops, music }`, `SS.audio.track` (current track id), `_analyze()` (tools).
+- Before the first user gesture sfx are silent no-ops; `music()` and `loop()` handles are held and start on unlock.
+- `suspend()` (game paused, page visible): loops fade out, music ducks behind the pause menu, **UI sfx still play**.
+  Tab hidden: the AudioContext itself is suspended. `?mute=1` creates no sound at all.
+- Volumes follow `SS.save.settings` automatically. `ui_toggle` plays 'on' for intensity ≥ 0.5, else 'off'.
+
+### 10.7 World (world.js)
+- Environments, crowds, trails and FX are advanced by `SS.world.update(dt)` (called by the engine). Calling a
+  handle's own `update()` switches that handle to manual mode. Disposing the scene stops them automatically.
+- `environment()` extras: `ground` (grass apron at y = −0.3, default true outdoors — pass `false` for pits/water
+  below that), `seed`, `sunAzimuth`, `sunElevation`, `background` (indoor). Handle has `group`, `sunDir`;
+  `setShadowFocus(size)` alone is fine. Indoor sun is configured but `castShadow = false` (set it if wanted).
+  Shadow-map size follows the quality tier. Clouds are one merged mesh.
+- `texture(name, { repeat:[x,y] })` returns a cached repeating copy (never mutate returned textures);
+  ground textures take `color`; `checker` takes `colors`, `cells`; `banner` takes `width`, `height`.
+- `mat()` also takes `vertexColors`, `flatShading`, `fog`, `depthWrite`.
+- `stands()` group has `userData.rows` ready for `crowd({ rows })`; crowd handle has `count`.
+- `burst({colors})`, `confetti({floor})` (pieces settle at y = floor), `trail({maxJump})` + `handle.mesh`,
+  `label3d()` sprite has `userData.setText(text)`; `bg: null` draws outlined text without a pill.
+- Exports `mergeGeometries(list)`, `paint(geo, hex)` (vertex colors), `gradient`, `SKIES`.
+
+### 10.8 Pals (pals.js)
+- `play()` resolves when a one-shot ends **or is replaced**; replaying the running loop only updates speed;
+  after a one-shot the pal returns to its last loop (idle by default). Walk/run default to 1.3 / 4 m/s.
+- Emotional anims set a matching expression only if the face is neutral or auto-set (a sport's explicit
+  `setExpression` is never overridden).
+- `pose()` with `lambda: Infinity` (or ≥ 1000) snaps. `create(p, { shadows:false })` casts no shadow —
+  add `SS.world.blobShadow()` under it if it needs contact.
+- Extras: `SS.pals.ANIMATIONS`, `EXPRESSIONS`, `OPTIONS.shirtNames`, roster entries have `tag` (flavour line),
+  `pal.parts.neck`. A pal costs ~15 draw calls (+ the same again in the shadow pass) — budget accordingly.
+- Portraits use one dedicated alpha renderer (one extra WebGL context), are synchronous and cached.
+
+### 10.9 Performance reference (menu plaza, 390×844)
+low: ~62 draw calls / 98k triangles · medium (shadows): ~103 calls / 161k triangles. Title view (whole plaza):
+~124 / ~165 calls. Seven Pals account for ~105 of the low-quality calls.

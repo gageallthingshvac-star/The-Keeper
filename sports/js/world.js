@@ -941,14 +941,18 @@
         cloudGroup = new THREE.Group();
         cloudGroup.name = 'clouds';
         const cmat = cloudMaterial(preset);
+        // All clouds share one material: merged into a single draw call that drifts as a whole.
+        const parts = [];
         for (let i = 0; i < o.clouds; i++) {
           const a = (i / o.clouds) * TAU + rng.range(-0.25, 0.25);
           const r = rng.range(170, 330);
-          const m = new THREE.Mesh(cloudGeometry(rng.range(2.6, 4.6), rng, preset), cmat);
-          m.position.set(Math.cos(a) * r, rng.range(55, 105), Math.sin(a) * r);
-          m.rotation.y = -a + Math.PI / 2 + rng.range(-0.3, 0.3);
-          cloudGroup.add(m);
+          const g = cloudGeometry(rng.range(2.6, 4.6), rng, preset);
+          const y = rng.range(55, 105);
+          g.rotateY(-a + Math.PI / 2 + rng.range(-0.3, 0.3));
+          g.translate(Math.cos(a) * r, y, Math.sin(a) * r);
+          parts.push(g);
         }
+        cloudGroup.add(new THREE.Mesh(mergeGeometries(parts), cmat));
         group.add(cloudGroup);
       }
 
