@@ -1,15 +1,23 @@
 /* Sunny Sports — sports/bowling.js
- * Placeholder module. The registration (menu card, modes, how-to, medals) is final; create()
- * builds a small practice alley — swipe up to roll, three rolls per player — so the whole
- * product flow (setup → how-to → play → results) works end to end until the full sport lands.
+ * BOWLING at "Sunny Lanes": the flagship sport.
+ *   · Venue: a bright indoor alley — glossy maple lane with real markings, gutters, kickbacks, pin deck,
+ *     pit & curtain, a masking unit with the sun logo, ball return, neighbouring lanes with ambient pals,
+ *     overhead score monitor, carpeted seating area with spectators, wall mural and ceiling light strips.
+ *   · Controls: drag sideways to slide along the approach, hold the round buttons to turn the aim
+ *     arrow, swipe up to bowl (swipe speed → ball speed, swipe drift → line, swipe bend → hook).
+ *   · Physics: an oiled-lane ball model (skid → hook → roll) and a compact deterministic rigid-body
+ *     pin simulation (compound-sphere pins, sequential impulses, sleeping) at a fixed 240 Hz.
+ *   · Modes: 10 Frames (1–4 hot-seat, exact ten-pin scoring), Spare Challenge (10 preset leaves) and
+ *     Power Pins (a bigger rack every round on a flared deck).
+ *   · Debug: instance.debug = { autoplay, throw, setLeave, simulate, ... } and debugState().
  */
 (function () {
   'use strict';
   const SS = window.SS = window.SS || {};
 
-  // ---------------------------------------------------------------------------------------------
-  // Registration data
-  // ---------------------------------------------------------------------------------------------
+  // =============================================================================================
+  // 1. Registration
+  // =============================================================================================
 
   const ICON =
     '<svg viewBox="0 0 64 64" aria-hidden="true">' +
@@ -37,287 +45,2800 @@
     opponent: false,
     modes: [
       { id: 'game', name: '10 Frames', desc: 'A full game. Can you roll a 200?' },
-      { id: 'spare', name: 'Spare Challenge', desc: 'Tricky leaves, one ball each. Pick them all up!' },
-      { id: 'hundred', name: '100-Pin', desc: 'Ten rolls, one huge rack. Knock down as many as you can.' },
+      { id: 'spare', name: 'Spare Challenge', desc: 'Ten tricky leaves, one ball each. Pick them all up!' },
+      { id: 'hundred', name: 'Power Pins', desc: 'Ten rolls, and the rack grows every time. Up to 91 pins!' },
     ],
     howTo: {
       steps: [
-        { gesture: 'drag-h', text: 'Drag sideways to line up your shot' },
-        { gesture: 'swipe-up', text: 'Swipe up to roll — faster swipe, faster ball' },
+        { gesture: 'drag-h', text: 'Drag sideways to move along the approach' },
+        { gesture: 'hold', text: 'Hold the turn buttons to aim the arrow' },
+        { gesture: 'swipe-up', text: 'Swipe up to bowl. A faster swipe rolls a faster ball' },
         { gesture: 'swipe-up-curve', text: 'Bend your swipe to hook the ball into the pocket' },
       ],
       tips: [
-        'Aim just right of the head pin for the most strikes.',
-        'A gentle hook beats a fast straight ball.',
+        'Strikes love the pocket, right beside the head pin.',
+        'Hooks curve late: start wide and let it bend back in.',
+        'Swipe straight to keep the ball on your arrow.',
       ],
     },
     medals: [
       { id: 'bronze', name: 'Bronze', desc: 'Score 120 in 10 Frames' },
       { id: 'silver', name: 'Silver', desc: 'Score 170 in 10 Frames' },
       { id: 'gold', name: 'Gold', desc: 'Score 220 in 10 Frames' },
-      { id: 'platinum', name: 'Platinum', desc: 'Pick up all 10 spares in Spare Challenge' },
+      { id: 'platinum', name: 'Platinum', desc: 'Score 250, or pick up 8 leaves in Spare Challenge' },
     ],
     create,
   };
 
-  // ---------------------------------------------------------------------------------------------
-  // Practice alley
-  // ---------------------------------------------------------------------------------------------
+  // =============================================================================================
+  // 2. Lane geometry, racks & rules data
+  // =============================================================================================
 
-  const ROLLS = 3;
-  const LANE_W = 1.066;
-  const HEAD_PIN_Z = -18.29;
-  const BALL_R = 0.109;
-  const PIN_SPOTS = [[0, 0], [-0.5, 1], [0.5, 1], [-1, 2], [0, 2], [1, 2], [-1.5, 3], [-0.5, 3], [0.5, 3], [1.5, 3]];
+  const LANE_HALF = 0.527;                 // 41.5" lane
+  const GUTTER_W = 0.235;
+  const GUTTER_Y = -0.052;                 // gutter channel floor (simplified flat)
+  const PIT_Y = -0.42;
+  const HEAD_Z = -18.29;                   // foul line (z = 0) → head pin
+  const PIN_DX = 0.3048;                   // 12" pin spacing
+  const ROW_DZ = PIN_DX * Math.sqrt(3) / 2;
+  const RELEASE_Z = 0.22;                  // the ball touches down just before the foul line
+  const BALL_R = 0.108;
+  const PIN_H = 0.381;
+  const BOARD = 1.054 / 39;
+  const DEG = Math.PI / 180;
 
-  function pinGeometry(THREE) {
-    const prof = [[0, 0], [0.026, 0], [0.042, 0.03], [0.058, 0.09], [0.06, 0.125], [0.053, 0.17], [0.036, 0.215],
-      [0.025, 0.25], [0.026, 0.272], [0.033, 0.31], [0.033, 0.345], [0.022, 0.372], [0, 0.38]];
-    return new THREE.LatheGeometry(prof.map(([r, y]) => new THREE.Vector2(r, y)), 16);
+  /** Pin spots of a triangular rack with `rows` rows, numbered 1.. from the head pin, left → right. */
+  function rackSpots(rows) {
+    const out = [];
+    let n = 1;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c <= r; c++) out.push({ n: n++, row: r, x: (c - r / 2) * PIN_DX, z: HEAD_Z - r * ROW_DZ });
+    }
+    return out;
+  }
+  const SPOTS10 = rackSpots(4);
+
+  /** Mode-dependent lane shape. Power Pins flares the back of the lane into a wide deck. */
+  function makeLayout(mode) {
+    const wide = mode === 'hundred';
+    const rows = wide ? 13 : 4;
+    const pitZ = HEAD_Z - (rows - 1) * ROW_DZ - 0.076;
+    const deckHalf = wide ? 2.05 : LANE_HALF;
+    const flare0 = -10.4, flare1 = -16.1;
+    const halfAt = !wide ? () => LANE_HALF : (z) => {
+      if (z > flare0) return LANE_HALF;
+      if (z < flare1) return deckHalf;
+      const t = (flare0 - z) / (flare0 - flare1);
+      return LANE_HALF + (deckHalf - LANE_HALF) * t * t * (3 - 2 * t);
+    };
+    return {
+      mode, wide, rows, pitZ, deckHalf, flare0, flare1, halfAt,
+      pitBack: pitZ - 0.86,
+      maskZ: HEAD_Z + 0.42,
+      ceilY: wide ? 1.6 : 0.93,             // underside of the masking unit
+      wallAt: z => halfAt(Math.max(z, pitZ)) + GUTTER_W,
+    };
   }
 
-  function create(ctx) {
-    const { THREE, scene, camera, world, pals, ui, audio, util: U } = ctx;
-    const players = ctx.players;
+  // =============================================================================================
+  // 3. Physics: oiled-lane ball model + compact rigid-body pins (sequential impulses)
+  // =============================================================================================
 
-    world.environment(scene, { sky: 'indoor', background: 0x2B2840, fogNear: 24, fogFar: 60 });
+  const H = 1 / 240;                       // fixed physics step
+  const GRAV = 9.81;
+  const ITERS = 8;
+  const BALL_M = 9.0;
+  const BALL_IINV = 1 / (0.4 * BALL_M * BALL_R * BALL_R);
+  const PIN_M = 1.53;
+  const PIN_YC = 0.148;                    // centre of mass above the base
+  const PIN_IP_INV = 1 / 0.012;            // about a horizontal axis through the CoM
+  const PIN_IA_INV = 1 / 0.0013;           // about the pin's own axis
+  const PIN_RIM = 0.026;                   // base contact ring (a pin stands up to ~10° of tilt)
+  const PIN_SPH = [[0.062, 0.05], [0.132, 0.0605], [0.216, 0.046], [0.322, 0.033]].map(([y, r]) => ({ dy: y - PIN_YC, r }));
+  const RIM_N = 8;
+  const RIM_C = [], RIM_S = [];
+  for (let k = 0; k < RIM_N; k++) { RIM_C.push(Math.cos(k / RIM_N * Math.PI * 2) * PIN_RIM); RIM_S.push(Math.sin(k / RIM_N * Math.PI * 2) * PIN_RIM); }
+  const DOWN_COS = Math.cos(35 * DEG);
+  const OIL_END = 12.2, DRY_START = 13.9;
+  const MU = { oil: 0.04, dry: 0.2, deck: 0.2, pinFloor: 0.2, pinPin: 0.2, ballPin: 0.1, wall: 0.3 };
+  const REST = { pinFloor: 0.22, pinPin: 0.65, ballPin: 0.6, wall: 0.6, back: 0.1, ceil: 0.2 };
+  const MAX_V = 14, MAX_W = 90;
+  const STEP_DEEP = 0.035;                 // a contact point this far below a floor is beside a step
+  const SPIN_MAX = 18;                     // rad/s of side rotation at spin = 1 (at 8.5 m/s)
+  const SPIN_SPEED_EXP = 2.5;              // side spin grows with speed so the break barely depends on speed
+  // Entry-angle "drive": a ball that comes into the pocket at an angle carries through the rack (heavier
+  // effective mass) while a flat, straight ball deflects more. Effective mass = BALL_M × (BASE + K × angle/DEG).
+  const DRIVE_BASE = 0.6, DRIVE_K = 1.4, DRIVE_DEG = 2.5;
+  const ROLL_FRAC = 0.5;                  // share of natural forward roll at release
 
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(16, 34), world.mat(0xffffff, { map: world.texture('carpet', { repeat: [6, 12] }) }));
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.set(0, -0.01, -12);
-    floor.receiveShadow = true;
-    scene.add(floor);
+  function laneMu(z) {
+    const d = -z;
+    if (d < OIL_END) return MU.oil;
+    if (d < DRY_START) return MU.oil + (MU.dry - MU.oil) * (d - OIL_END) / (DRY_START - OIL_END);
+    return d > -HEAD_Z - 0.35 ? MU.deck : MU.dry;
+  }
 
-    const laneMat = world.mat(0xffffff, { map: world.texture('wood_lane', { repeat: [1, 6] }) });
-    const gutterMat = world.mat(0x8E99A8);
-    for (const x of [-2.1, 0, 2.1]) {
-      const lane = new THREE.Mesh(new THREE.BoxGeometry(LANE_W, 0.05, 21), laneMat);
-      lane.position.set(x, -0.025, -9.5);
-      lane.receiveShadow = true;
-      scene.add(lane);
-      for (const side of [-1, 1]) {
-        const gutter = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.04, 21), gutterMat);
-        gutter.position.set(x + side * (LANE_W / 2 + 0.12), -0.04, -9.5);
-        scene.add(gutter);
+  function makeBody(kind) {
+    return {
+      kind, n: 0, im: kind === 'ball' ? 1 / BALL_M : 1 / PIN_M,
+      active: true, awake: false, lifted: false, sleepT: 0, touched: false, spot: null,
+      x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, wx: 0, wy: 0, wz: 0,
+      qx: 0, qy: 0, qz: 0, qw: 1,
+      m00: 1, m01: 0, m02: 0, m10: 0, m11: 1, m12: 0, m20: 0, m21: 0, m22: 1,
+    };
+  }
+
+  function syncAxes(b) {
+    const x = b.qx, y = b.qy, z = b.qz, w = b.qw;
+    b.m00 = 1 - 2 * (y * y + z * z); b.m01 = 2 * (x * y - z * w); b.m02 = 2 * (x * z + y * w);
+    b.m10 = 2 * (x * y + z * w); b.m11 = 1 - 2 * (x * x + z * z); b.m12 = 2 * (y * z - x * w);
+    b.m20 = 2 * (x * z - y * w); b.m21 = 2 * (y * z + x * w); b.m22 = 1 - 2 * (x * x + y * y);
+  }
+
+  function placePin(b, x, z, yaw) {
+    b.x = x; b.y = PIN_YC; b.z = z;
+    b.vx = b.vy = b.vz = b.wx = b.wy = b.wz = 0;
+    const h = (yaw || 0) / 2;
+    b.qx = 0; b.qy = Math.sin(h); b.qz = 0; b.qw = Math.cos(h);
+    b.active = true; b.awake = false; b.lifted = false; b.sleepT = 0; b.touched = false;
+    syncAxes(b);
+  }
+
+  const _iv = [0, 0, 0];
+  /** World inverse inertia × (x, y, z) into _iv. Sleeping pins behave as static. */
+  function invInertia(b, x, y, z) {
+    if (b.kind === 'ball') { _iv[0] = x * BALL_IINV; _iv[1] = y * BALL_IINV; _iv[2] = z * BALL_IINV; return; }
+    const ax = b.m01, ay = b.m11, az = b.m21;
+    const d = (x * ax + y * ay + z * az) * (PIN_IA_INV - PIN_IP_INV);
+    _iv[0] = x * PIN_IP_INV + d * ax; _iv[1] = y * PIN_IP_INV + d * ay; _iv[2] = z * PIN_IP_INV + d * az;
+  }
+
+  /** Effective inverse mass of body b at offset r along direction d. */
+  function kAlong(b, rx, ry, rz, dx, dy, dz) {
+    if (!b || !b.dyn) return 0;
+    const cx = ry * dz - rz * dy, cy = rz * dx - rx * dz, cz = rx * dy - ry * dx;
+    invInertia(b, cx, cy, cz);
+    return b.im + cx * _iv[0] + cy * _iv[1] + cz * _iv[2];
+  }
+
+  function applyImpulse(b, px, py, pz, rx, ry, rz) {
+    if (!b || !b.dyn) return;
+    b.vx += px * b.im; b.vy += py * b.im; b.vz += pz * b.im;
+    invInertia(b, ry * pz - rz * py, rz * px - rx * pz, rx * py - ry * px);
+    b.wx += _iv[0]; b.wy += _iv[1]; b.wz += _iv[2];
+  }
+
+  function makeContact() {
+    return {
+      a: null, b: null, nx: 0, ny: 0, nz: 0, rax: 0, ray: 0, raz: 0, rbx: 0, rby: 0, rbz: 0,
+      t1x: 0, t1y: 0, t1z: 0, t2x: 0, t2y: 0, t2z: 0, kn: 0, kt1: 0, kt2: 0,
+      jn: 0, jt1: 0, jt2: 0, mu: 0, target: 0, vbx: 0, vbz: 0, kind: 0, vn0: 0,
+    };
+  }
+
+  const CK_FLOOR = 1, CK_PIN = 2, CK_BALL = 3, CK_WALL = 4;
+
+  /**
+   * The pin deck world. Bodies: one ball + pins. Fixed-step, deterministic, never allocates in step().
+   * Ball modes: 'held' 'lane' 'gutter' 'pit' 'gone'.
+   */
+  function PinWorld(layout) {
+    this.L = layout;
+    this.pins = [];
+    this.ball = makeBody('ball');
+    this.ball.mode = 'held';
+    this.ball.active = false;
+    this.pool = [];
+    this.nc = 0;
+    this.t = 0;
+    this.acc = 0;
+    this.sweep = null;     // { z, vz } kinematic deadwood sweep bar
+    this.resetEvents();
+  }
+
+  PinWorld.prototype.resetEvents = function () {
+    this.ev = {
+      hit: null,           // first ball → pin contact { t, x, z, angle, speed }
+      gutterAt: null, pitAt: null, launchedAt: null,
+      clatter: 0, wallHits: 0,          // strongest pin-pin / pin-wall impact speed since last read
+    };
+  };
+
+  /** Sets the rack: spots = [{n, x, z}], standing = optional Set of pin numbers to place. */
+  PinWorld.prototype.setRack = function (spots, standing) {
+    this.pins.length = 0;
+    for (const s of spots) {
+      const b = makeBody('pin');
+      b.n = s.n; b.spot = s;
+      placePin(b, s.x, s.z, (s.n * 1.37) % (Math.PI * 2));
+      if (standing && !standing.has(s.n)) b.active = false;
+      this.pins.push(b);
+    }
+  };
+
+  /** Launches the ball: x0 at the release line, angle (rad, + = toward +x), speed m/s, spin -1..1 (+ hooks left). */
+  PinWorld.prototype.launch = function (o) {
+    const b = this.ball;
+    const sa = Math.sin(o.angle), ca = Math.cos(o.angle);
+    b.active = true; b.dyn = true; b.mode = 'lane'; b.im = 1 / BALL_M;
+    b.x = o.x; b.y = BALL_R; b.z = RELEASE_Z;
+    b.vx = o.speed * sa; b.vy = 0; b.vz = -o.speed * ca;
+    // natural roll is (vz, 0, -vx) / r; side rotation spins about the travel direction
+    const s = (o.spin || 0) * SPIN_MAX * Math.pow(o.speed / 8.5, SPIN_SPEED_EXP);
+    b.wx = ROLL_FRAC * b.vz / BALL_R - s * sa;
+    b.wy = 0;
+    b.wz = -ROLL_FRAC * b.vx / BALL_R + s * ca;
+    b.qx = 0; b.qy = 0; b.qz = 0; b.qw = 1;
+    b.pitT = 0;
+    this.resetEvents();
+    this.ev.launchedAt = this.t;
+  };
+
+  PinWorld.prototype.floorAt = function (x, z) {
+    const L = this.L;
+    if (z < L.pitZ) return PIT_Y;
+    return Math.abs(x) <= L.halfAt(z) ? 0 : GUTTER_Y;
+  };
+
+  PinWorld.prototype.contact = function (a, b, nx, ny, nz, px, py, pz, pen, mu, e, kind) {
+    let c = this.pool[this.nc];
+    if (!c) { c = makeContact(); this.pool.push(c); }
+    this.nc++;
+    c.a = a; c.b = b; c.nx = nx; c.ny = ny; c.nz = nz; c.kind = kind;
+    c.rax = px - a.x; c.ray = py - a.y; c.raz = pz - a.z;
+    if (b) { c.rbx = px - b.x; c.rby = py - b.y; c.rbz = pz - b.z; } else { c.rbx = c.rby = c.rbz = 0; }
+    c.vbx = 0; c.vbz = 0;
+    if (Math.abs(nx) < 0.57) { // t1 = n × X
+      const l = Math.hypot(nz, ny) || 1; c.t1x = 0; c.t1y = nz / l; c.t1z = -ny / l;
+    } else { // t1 = n × Y
+      const l = Math.hypot(nz, nx) || 1; c.t1x = -nz / l; c.t1y = 0; c.t1z = nx / l;
+    }
+    c.t2x = ny * c.t1z - nz * c.t1y; c.t2y = nz * c.t1x - nx * c.t1z; c.t2z = nx * c.t1y - ny * c.t1x;
+    c.kn = 1 / Math.max(1e-9, kAlong(a, c.rax, c.ray, c.raz, nx, ny, nz) + kAlong(b, c.rbx, c.rby, c.rbz, nx, ny, nz));
+    c.kt1 = 1 / Math.max(1e-9, kAlong(a, c.rax, c.ray, c.raz, c.t1x, c.t1y, c.t1z) + kAlong(b, c.rbx, c.rby, c.rbz, c.t1x, c.t1y, c.t1z));
+    c.kt2 = 1 / Math.max(1e-9, kAlong(a, c.rax, c.ray, c.raz, c.t2x, c.t2y, c.t2z) + kAlong(b, c.rbx, c.rby, c.rbz, c.t2x, c.t2y, c.t2z));
+    c.jn = c.jt1 = c.jt2 = 0;
+    c.mu = mu;
+    const vn = this.relN(c);
+    c.vn0 = vn;
+    const bounce = vn < -0.35 ? -e * vn : 0;
+    const bias = Math.min(0.6, 0.22 * Math.max(0, pen - 0.0006) / H);
+    c.target = Math.max(bounce, bias);
+    return c;
+  };
+
+  /** Relative velocity of A w.r.t. B at the contact, along the normal. */
+  PinWorld.prototype.relN = function (c) {
+    const a = c.a, b = c.b;
+    let vx = a.vx + a.wy * c.raz - a.wz * c.ray;
+    let vy = a.vy + a.wz * c.rax - a.wx * c.raz;
+    let vz = a.vz + a.wx * c.ray - a.wy * c.rax;
+    if (b && b.dyn) {
+      vx -= b.vx + b.wy * c.rbz - b.wz * c.rby;
+      vy -= b.vy + b.wz * c.rbx - b.wx * c.rbz;
+      vz -= b.vz + b.wx * c.rby - b.wy * c.rbx;
+    } else { vx -= c.vbx; vz -= c.vbz; }
+    return vx * c.nx + vy * c.ny + vz * c.nz;
+  };
+
+  PinWorld.prototype.solveContact = function (c) {
+    const a = c.a, b = c.b;
+    let vx = a.vx + a.wy * c.raz - a.wz * c.ray;
+    let vy = a.vy + a.wz * c.rax - a.wx * c.raz;
+    let vz = a.vz + a.wx * c.ray - a.wy * c.rax;
+    const bd = b && b.dyn;
+    if (bd) {
+      vx -= b.vx + b.wy * c.rbz - b.wz * c.rby;
+      vy -= b.vy + b.wz * c.rbx - b.wx * c.rbz;
+      vz -= b.vz + b.wx * c.rby - b.wy * c.rbx;
+    } else { vx -= c.vbx; vz -= c.vbz; }
+    // normal
+    const vn = vx * c.nx + vy * c.ny + vz * c.nz;
+    let j = (c.target - vn) * c.kn;
+    const jn = Math.max(0, c.jn + j);
+    j = jn - c.jn; c.jn = jn;
+    if (j !== 0) {
+      const px = j * c.nx, py = j * c.ny, pz = j * c.nz;
+      applyImpulse(a, px, py, pz, c.rax, c.ray, c.raz);
+      if (bd) applyImpulse(b, -px, -py, -pz, c.rbx, c.rby, c.rbz);
+    }
+    if (c.mu <= 0 || c.jn <= 0) return;
+    // friction (re-evaluate relative velocity after the normal impulse)
+    vx = a.vx + a.wy * c.raz - a.wz * c.ray;
+    vy = a.vy + a.wz * c.rax - a.wx * c.raz;
+    vz = a.vz + a.wx * c.ray - a.wy * c.rax;
+    if (bd) {
+      vx -= b.vx + b.wy * c.rbz - b.wz * c.rby;
+      vy -= b.vy + b.wz * c.rbx - b.wx * c.rbz;
+      vz -= b.vz + b.wx * c.rby - b.wy * c.rbx;
+    } else { vx -= c.vbx; vz -= c.vbz; }
+    const lim = c.mu * c.jn;
+    let jt = -(vx * c.t1x + vy * c.t1y + vz * c.t1z) * c.kt1;
+    let acc = Math.max(-lim, Math.min(lim, c.jt1 + jt));
+    jt = acc - c.jt1; c.jt1 = acc;
+    let px = jt * c.t1x, py = jt * c.t1y, pz = jt * c.t1z;
+    jt = -(vx * c.t2x + vy * c.t2y + vz * c.t2z) * c.kt2;
+    acc = Math.max(-lim, Math.min(lim, c.jt2 + jt));
+    jt = acc - c.jt2; c.jt2 = acc;
+    px += jt * c.t2x; py += jt * c.t2y; pz += jt * c.t2z;
+    applyImpulse(a, px, py, pz, c.rax, c.ray, c.raz);
+    if (bd) applyImpulse(b, -px, -py, -pz, c.rbx, c.rby, c.rbz);
+  };
+
+  /** Wakes a sleeping pin (it becomes dynamic from the next contact pass). */
+  function wake(p) { if (!p.awake) { p.awake = true; p.dyn = true; p.sleepT = 0; p.touched = true; } }
+
+  PinWorld.prototype.pinStatics = function (p) {
+    const L = this.L;
+    // spheres: floor, walls, back cushion, masking-unit ceiling, sweep bar
+    for (let k = 0; k < 4; k++) {
+      const s = PIN_SPH[k];
+      const cx = p.x + p.m01 * s.dy, cy = p.y + p.m11 * s.dy, cz = p.z + p.m21 * s.dy, r = s.r;
+      const fy = this.floorAt(cx, cz);
+      const pen = fy - (cy - r);
+      // deeper than a step means we are beside it, not on it: the step faces below take over
+      if (pen > -0.002 && pen < STEP_DEEP) this.contact(p, null, 0, 1, 0, cx, cy - r, cz, pen, MU.pinFloor, REST.pinFloor, CK_FLOOR);
+      if (cz < L.pitZ) {
+        if (cy - r < -0.01 && cz + r > L.pitZ) this.contact(p, null, 0, 0, -1, cx, cy, cz + r, cz + r - L.pitZ, MU.wall, REST.back, CK_WALL);
+      } else if (cy - r < -0.006) {
+        const hw = L.halfAt(cz), ax = Math.abs(cx);
+        if (ax > hw && ax - r < hw) { const sx = cx > 0 ? 1 : -1; this.contact(p, null, sx, 0, 0, cx - sx * r, cy, cz, hw - (ax - r), MU.wall, REST.wall, CK_WALL); }
+      }
+      const wx = L.wallAt(cz);
+      if (cx + r > wx) this.contact(p, null, -1, 0, 0, cx + r, cy, cz, cx + r - wx, MU.wall, REST.wall, CK_WALL);
+      else if (cx - r < -wx) this.contact(p, null, 1, 0, 0, cx - r, cy, cz, -wx - (cx - r), MU.wall, REST.wall, CK_WALL);
+      if (cz - r < L.pitBack) this.contact(p, null, 0, 0, 1, cx, cy, cz - r, L.pitBack - (cz - r), 0.6, REST.back, CK_WALL);
+      if (cz < L.maskZ && cy + r > L.ceilY) this.contact(p, null, 0, -1, 0, cx, cy + r, cz, cy + r - L.ceilY, 0.3, REST.ceil, CK_WALL);
+      if (this.sweep && cz + r > this.sweep.z && cy - r < 0.25) {
+        const c = this.contact(p, null, 0, 0, -1, cx, cy, cz + r, cz + r - this.sweep.z, 0.4, 0, CK_WALL);
+        c.vbz = this.sweep.vz;
+        c.target = Math.max(c.target, -this.sweep.vz);
       }
     }
-    const back = new THREE.Mesh(new THREE.PlaneGeometry(16, 3), world.mat(0x3B3560));
-    back.position.set(0, 1.5, -20.2);
-    scene.add(back);
-    const sign = world.label3d('SUNNY LANES', { color: '#FFC93C', bg: null, size: 0.7 });
-    sign.position.set(0, 2.2, -20);
-    scene.add(sign);
-
-    const pinGeo = pinGeometry(THREE);
-    const pinMat = world.mat(0xFFFFFF, { kind: 'phong', shininess: 60 });
-    const stripeGeo = new THREE.TorusGeometry(0.027, 0.006, 6, 16);
-    const stripeMat = world.mat(0xE8343A, { kind: 'phong' });
-    const pins = PIN_SPOTS.map(([col, row]) => {
-      const g = new THREE.Group();
-      const body = new THREE.Mesh(pinGeo, pinMat);
-      body.castShadow = true;
-      const stripe = new THREE.Mesh(stripeGeo, stripeMat);
-      stripe.rotation.x = Math.PI / 2;
-      stripe.position.y = 0.245;
-      g.add(body, stripe);
-      g.userData.home = new THREE.Vector3(col * 0.3048, 0, HEAD_PIN_Z - row * 0.2639);
-      g.position.copy(g.userData.home);
-      scene.add(g);
-      return g;
-    });
-
-    const ball = new THREE.Mesh(new THREE.SphereGeometry(BALL_R, 24, 16), world.mat(0x3C6BE0, { kind: 'phong', shininess: 80 }));
-    ball.castShadow = true;
-    scene.add(ball);
-
-    const bowlers = players.map(p => {
-      const pal = pals.create(p.profile);
-      pal.setFacing(Math.PI);
-      pal.root.position.set(-0.42, 0, 0.7);
-      pal.setVisible(false);
-      scene.add(pal.root);
-      return pal;
-    });
-
-    const homeCamera = () => { camera.position.set(0.15, 2.3, 4.6); camera.lookAt(0, 0.1, -11); };
-    homeCamera();
-
-    // HUD ----------------------------------------------------------------------------------------
-    const top = ui.el('div', 'ss-hud-top');
-    const turnChip = ui.el('div', 'ss-chip');
-    const scoreChip = ui.el('div', 'ss-chip dark');
-    top.append(turnChip, scoreChip);
-    ctx.hud.appendChild(top);
-
-    // State --------------------------------------------------------------------------------------
-    const scores = players.map(() => 0);
-    let turn = 0;                 // index into the roll sequence (player-major per round)
-    let phase = 'wait';           // 'aim' | 'roll' | 'wait' | 'done'
-    let roll = null;              // { vx, speed, curve, loop }
-    let hint = null;
-    let autoplay = false;
-    let ambience = null;
-
-    const current = () => turn % players.length;
-    const round = () => Math.floor(turn / players.length) + 1;
-
-    function refreshHud() {
-      const p = players[current()].profile;
-      turnChip.textContent = (players.length > 1 ? p.name + ' · ' : '') + 'Roll ' + Math.min(ROLLS, round()) + ' / ' + ROLLS;
-      scoreChip.textContent = scores[current()] + ' pins';
+    // base rim
+    const bx = p.x - p.m01 * PIN_YC, by = p.y - p.m11 * PIN_YC, bz = p.z - p.m21 * PIN_YC;
+    if (by > 0.05 && by > this.floorAt(bx, bz) + 0.05) return;
+    for (let k = 0; k < RIM_N; k++) {
+      const lx = RIM_C[k], lz = RIM_S[k];
+      const px = bx + p.m00 * lx + p.m02 * lz, py = by + p.m10 * lx + p.m12 * lz, pz = bz + p.m20 * lx + p.m22 * lz;
+      const fy = this.floorAt(px, pz);
+      const pen = fy - py;
+      if (pen > -0.0015 && pen < STEP_DEEP) this.contact(p, null, 0, 1, 0, px, py, pz, pen, MU.pinFloor, REST.pinFloor, CK_FLOOR);
     }
+  };
 
-    function resetRack() {
-      for (const pin of pins) {
-        U.killTweens(pin.rotation);
-        U.killTweens(pin.position);
-        pin.position.copy(pin.userData.home);
-        pin.rotation.set(0, 0, 0);
+  PinWorld.prototype.pinPair = function (p, q) {
+    const dx0 = p.x - q.x, dz0 = p.z - q.z, dy0 = p.y - q.y;
+    if (dx0 * dx0 + dz0 * dz0 + dy0 * dy0 > 0.25) return;
+    for (let i = 0; i < 4; i++) {
+      const si = PIN_SPH[i];
+      const ax = p.x + p.m01 * si.dy, ay = p.y + p.m11 * si.dy, az = p.z + p.m21 * si.dy;
+      for (let j = 0; j < 4; j++) {
+        const sj = PIN_SPH[j];
+        const bx = q.x + q.m01 * sj.dy, by = q.y + q.m11 * sj.dy, bz = q.z + q.m21 * sj.dy;
+        const dx = ax - bx, dy = ay - by, dz = az - bz, rr = si.r + sj.r;
+        const d2 = dx * dx + dy * dy + dz * dz;
+        if (d2 >= rr * rr || d2 < 1e-12) continue;
+        const d = Math.sqrt(d2), nx = dx / d, ny = dy / d, nz = dz / d;
+        if (!q.awake) {
+          // an awake pin bumping a sleeping one wakes it when it actually pushes
+          const appr = -(p.vx * nx + p.vy * ny + p.vz * nz);
+          if (appr > 0.03 || rr - d > 0.003) wake(q);
+        }
+        const px = bx + nx * sj.r, py = by + ny * sj.r, pz = bz + nz * sj.r;
+        this.contact(p, q, nx, ny, nz, px, py, pz, rr - d, MU.pinPin, REST.pinPin, CK_PIN);
       }
     }
+  };
 
-    function readyBowler() {
-      bowlers.forEach((pal, i) => pal.setVisible(i === current()));
-      const pal = bowlers[current()];
-      pal.play('idle_ready');
-      pal.setExpression('focus');
-      ball.position.set(-0.05, BALL_R, 0.62);
-      phase = 'aim';
-      refreshHud();
-      if (turn === 0) hint = ui.hint({ gesture: 'swipe-up', text: 'Swipe up to roll!' });
-      if (autoplay) ctx.wait(0.8).then(autoRoll);
+  PinWorld.prototype.ballPin = function (ball, p) {
+    const dx0 = ball.x - p.x, dz0 = ball.z - p.z;
+    if (dx0 * dx0 + dz0 * dz0 > 0.16) return;
+    for (let i = 0; i < 4; i++) {
+      const s = PIN_SPH[i];
+      const cx = p.x + p.m01 * s.dy, cy = p.y + p.m11 * s.dy, cz = p.z + p.m21 * s.dy;
+      const dx = ball.x - cx, dy = ball.y - cy, dz = ball.z - cz, rr = BALL_R + s.r;
+      const d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 >= rr * rr || d2 < 1e-12) continue;
+      const d = Math.sqrt(d2), nx = dx / d, ny = dy / d, nz = dz / d;
+      wake(p);
+      if (!this.ev.hit) {
+        const sp = Math.hypot(ball.vx, ball.vz);
+        const angle = Math.atan2(ball.vx, -ball.vz);
+        this.ev.hit = { t: this.t, x: ball.x, z: ball.z, pin: p.n, speed: sp, angle };
+        // entry angle toward the pin's side (into the pocket) drives through; a flat ball deflects
+        const into = Math.max(0, -Math.sign(ball.x - p.x) * angle) / DEG;
+        ball.im = 1 / (BALL_M * (DRIVE_BASE + DRIVE_K * Math.min(1, into / DRIVE_DEG)));
+      }
+      this.contact(ball, p, nx, ny, nz, cx + nx * s.r, cy + ny * s.r, cz + nz * s.r, rr - d, MU.ballPin, REST.ballPin, CK_BALL);
     }
+  };
 
-    function onSwipe(s) {
-      if (phase !== 'aim' || s.dy > -30 || s.nspeed < 0.35) return;
-      throwBall(s.nspeed, s.lateral, s.dx / Math.max(1, ctx.engine.size.w));
+  /** Ball forces before contacts: oil/dry friction (skid → hook → roll), gutters, pit. */
+  PinWorld.prototype.ballForces = function (b) {
+    const L = this.L;
+    if (b.mode === 'lane') {
+      if (b.z < L.pitZ) { b.mode = 'pit'; this.ev.pitAt = this.t; }
+      else if (Math.abs(b.x) > L.halfAt(b.z)) { b.mode = 'gutter'; this.ev.gutterAt = this.t; b.gutterSide = b.x > 0 ? 1 : -1; }
+    } else if (b.mode === 'gutter' && b.z < L.pitZ) { b.mode = 'pit'; this.ev.pitAt = this.t; }
+    if (b.mode === 'lane') {
+      const mu = laneMu(b.z);
+      const ux = b.vx + BALL_R * b.wz, uz = b.vz - BALL_R * b.wx;
+      const u = Math.hypot(ux, uz);
+      if (u > 1e-7) {
+        const J = Math.min(mu * BALL_M * GRAV * H, BALL_M * u / 3.5);
+        const fx = -J * ux / u, fz = -J * uz / u;
+        b.vx += fx / BALL_M; b.vz += fz / BALL_M;
+        b.wx += -BALL_R * fz * BALL_IINV; b.wz += BALL_R * fx * BALL_IINV;
+      }
+      // a little rolling resistance
+      const v = Math.hypot(b.vx, b.vz);
+      if (v > 0.05) { const k = Math.max(0, 1 - 0.06 * H / v); b.vx *= k; b.vz *= k; b.wx *= k; b.wz *= k; }
+    } else if (b.mode === 'gutter') {
+      const gx = b.gutterSide * (L.halfAt(b.z) + GUTTER_W / 2);
+      b.vx += ((gx - b.x) * 40 - b.vx * 9) * H;
+      if (b.vz < -0.5) b.vz += 0.25 * H;
+      b.wx = b.vz / BALL_R; b.wz = -b.vx / BALL_R;
+    } else if (b.mode === 'pit') {
+      b.vy -= GRAV * H;
+      b.pitT += H;
     }
+  };
 
-    function throwBall(nspeed, lateral, aimX) {
-      if (hint) { hint.hide(); hint = null; }
-      phase = 'roll';
-      const pal = bowlers[current()];
-      pal.play('hop');
-      audio.sfx('bowl_release', { intensity: U.clamp(nspeed / 3, 0.2, 1) });
-      roll = {
-        vx: U.clamp(aimX * 0.8, -0.25, 0.25),
-        speed: U.clamp(5 + nspeed * 2.6, 5, 13),
-        curve: U.clamp(lateral * 2.2, -0.8, 0.8),
-        loop: audio.loop('ball_roll', { vol: 0.8, rate: 1 }),
-      };
+  PinWorld.prototype.ballConstraints = function (b) {
+    const L = this.L;
+    if (b.mode === 'lane') { b.y = BALL_R; b.vy = 0; }
+    else if (b.mode === 'gutter') {
+      const gy = GUTTER_Y + BALL_R * 0.78;
+      b.y += (gy - b.y) * Math.min(1, 14 * H);
+      b.vy = 0;
+    } else if (b.mode === 'pit') {
+      if (b.y < PIT_Y + BALL_R) { b.y = PIT_Y + BALL_R; if (b.vy < 0) b.vy = -b.vy * 0.2; b.vx *= 0.96; b.vz *= 0.96; }
+      if (b.z - BALL_R < L.pitBack) { b.z = L.pitBack + BALL_R; if (b.vz < 0) b.vz = -b.vz * 0.12; }
+      const wx = L.wallAt(b.z) - BALL_R;
+      if (Math.abs(b.x) > wx) { b.x = Math.sign(b.x) * wx; b.vx *= -0.2; }
+      if (b.pitT > 1.4) { b.mode = 'gone'; b.active = false; b.dyn = false; }
     }
+  };
 
-    function autoRoll() {
-      if (!ctx.alive || phase !== 'aim' || !autoplay) return;
-      throwBall(2.2 + ctx.rng.range(-0.4, 0.6), ctx.rng.range(-0.12, 0.05), ctx.rng.range(-0.04, 0.06));
+  function integrate(b, h) {
+    const v2 = b.vx * b.vx + b.vy * b.vy + b.vz * b.vz;
+    if (v2 > MAX_V * MAX_V) { const k = MAX_V / Math.sqrt(v2); b.vx *= k; b.vy *= k; b.vz *= k; }
+    const w2 = b.wx * b.wx + b.wy * b.wy + b.wz * b.wz;
+    if (w2 > MAX_W * MAX_W) { const k = MAX_W / Math.sqrt(w2); b.wx *= k; b.wy *= k; b.wz *= k; }
+    b.x += b.vx * h; b.y += b.vy * h; b.z += b.vz * h;
+    const { wx, wy, wz } = b;
+    let { qx, qy, qz, qw } = b;
+    const hh = 0.5 * h;
+    const nx = qx + hh * (wx * qw + wy * qz - wz * qy);
+    const ny = qy + hh * (wy * qw + wz * qx - wx * qz);
+    const nz = qz + hh * (wz * qw + wx * qy - wy * qx);
+    const nw = qw + hh * (-wx * qx - wy * qy - wz * qz);
+    const l = 1 / Math.sqrt(nx * nx + ny * ny + nz * nz + nw * nw);
+    b.qx = nx * l; b.qy = ny * l; b.qz = nz * l; b.qw = nw * l;
+    syncAxes(b);
+  }
+
+  PinWorld.prototype.stepOnce = function () {
+    const pins = this.pins, ball = this.ball, h = H;
+    this.t += h;
+    if (this.sweep) this.sweep.z += this.sweep.vz * h;
+    // 1. forces
+    for (const p of pins) {
+      p.dyn = p.active && p.awake && !p.lifted;
+      if (!p.dyn) continue;
+      p.vy -= GRAV * h;
+      // gentle air drag; much stronger once a pin is nearly at rest so wobbles and rolls settle
+      // the pit cushion soaks up energy fast
+      const calm = p.vx * p.vx + p.vy * p.vy + p.vz * p.vz < 0.09 && p.wx * p.wx + p.wy * p.wy + p.wz * p.wz < 9;
+      const pit = p.y < PIT_Y + 0.2;
+      const lk = 1 - (pit ? 4 : calm ? 2.5 : 0.15) * h, ak = 1 - (pit ? 6 : calm ? 4 : 0.9) * h;
+      p.vx *= lk; p.vy *= lk; p.vz *= lk; p.wx *= ak; p.wy *= ak; p.wz *= ak;
     }
-
-    function knockPins(ballX) {
-      const miss = Math.abs(ballX - 0.06);
-      const count = Math.abs(ballX) > LANE_W / 2 ? 0 : U.clamp(Math.round(10 - miss * 26 + ctx.rng.range(-1.2, 1.2)), 1, 10);
-      const order = pins.slice().sort((a, b) => Math.abs(a.position.x - ballX) - Math.abs(b.position.x - ballX));
-      order.slice(0, count).forEach((pin, i) => {
-        const dir = Math.sign(pin.position.x - ballX) || (i % 2 ? 1 : -1);
-        U.tween(pin.rotation, { x: -1.45, z: dir * ctx.rng.range(0.2, 0.9) }, 0.45, { delay: i * 0.03, ease: 'outQuad' });
-        U.tween(pin.position, { x: pin.position.x + dir * ctx.rng.range(0.05, 0.3), z: pin.position.z - 0.25, y: 0.06 }, 0.45, { delay: i * 0.03 });
-      });
-      return count;
+    const ballLive = ball.active && ball.mode !== 'held' && ball.mode !== 'gone';
+    ball.dyn = ballLive;
+    if (ballLive) this.ballForces(ball);
+    // 2. contacts
+    this.nc = 0;
+    const n = pins.length;
+    for (let i = 0; i < n; i++) {
+      const p = pins[i];
+      if (!p.active || p.lifted) continue;
+      if (p.dyn) this.pinStatics(p);
+      for (let j = i + 1; j < n; j++) {
+        const q = pins[j];
+        if (!q.active || q.lifted || (!p.awake && !q.awake)) continue;
+        if (p.awake) this.pinPair(p, q); else this.pinPair(q, p);
+      }
+      if (ballLive && ball.mode === 'lane') this.ballPin(ball, p);   // a gutter ball never reaches the deck
     }
+    // refresh dyn flags for pins woken during contact generation (they join next step's solve as dynamic)
+    // 3. solve
+    const nc = this.nc, pool = this.pool;
+    for (let it = 0; it < ITERS; it++) for (let k = 0; k < nc; k++) this.solveContact(pool[k]);
+    // 4. events
+    for (let k = 0; k < nc; k++) {
+      const c = pool[k];
+      const sp = -c.vn0;
+      if (sp < 0.5) continue;
+      if (c.kind === CK_PIN) this.ev.clatter = Math.max(this.ev.clatter, sp);
+      else if (c.kind === CK_WALL && sp > 0.8) this.ev.wallHits = Math.max(this.ev.wallHits, sp);
+    }
+    // 5. integrate + sleep
+    for (const p of pins) {
+      if (!p.dyn) continue;
+      integrate(p, h);
+      if (!(p.x === p.x && p.y === p.y && p.z === p.z && p.qw === p.qw)) { this.bury(p); continue; }
+      const v2 = p.vx * p.vx + p.vy * p.vy + p.vz * p.vz, w2 = p.wx * p.wx + p.wy * p.wy + p.wz * p.wz;
+      if (v2 < 0.0025 && w2 < 0.5) {
+        p.sleepT += h;
+        if (p.sleepT > 0.3) { p.awake = false; p.dyn = false; p.vx = p.vy = p.vz = p.wx = p.wy = p.wz = 0; }
+      } else p.sleepT = 0;
+      if (p.y < PIT_Y - 1) this.bury(p);
+    }
+    if (ballLive) {
+      integrate(ball, h);
+      this.ballConstraints(ball);
+    }
+  };
 
-    async function resolveRoll(ballX) {
-      phase = 'wait';
-      if (roll && roll.loop) roll.loop.stop(0.2);
-      const gutter = Math.abs(ballX) > LANE_W / 2;
-      const count = gutter ? 0 : knockPins(ballX);
-      const who = current();
-      scores[who] += count;
-      refreshHud();
-      const pal = bowlers[who];
-      if (gutter) {
-        audio.sfx('gutter_drop');
-        audio.sfx('crowd_aww', { intensity: 0.5 });
-        ui.banner('GUTTER', { kind: 'bad', duration: 1.1 });
-        pal.play('sad');
-      } else {
-        audio.sfx('pins_hit', { intensity: count / 10 });
-        if (count === 10) {
-          audio.sfx('crowd_cheer', { intensity: 1 });
-          audio.duck(0.5, 1.6);
-          ctx.engine.shake(0.08, 0.35);
-          ui.banner('STRIKE!', { kind: 'huge', duration: 1.6 });
-          world.confetti(scene, new THREE.Vector3(0, 0.6, HEAD_PIN_Z - 0.4), { count: 90 });
-          pal.play('cheer');
+  /** Removes a pin that left the world (or went numerically bad). */
+  PinWorld.prototype.bury = function (p) {
+    p.active = false; p.awake = false; p.dyn = false;
+    p.x = p.spot.x; p.y = PIT_Y + 0.06; p.z = this.L.pitZ - 0.4;
+    p.vx = p.vy = p.vz = p.wx = p.wy = p.wz = 0;
+  };
+
+  /** Advances by dt seconds (fixed substeps, capped). */
+  PinWorld.prototype.advance = function (dt) {
+    this.acc = Math.min(this.acc + dt, H * 16);
+    while (this.acc >= H) { this.acc -= H; this.stepOnce(); }
+  };
+
+  PinWorld.prototype.isStanding = function (p) {
+    if (!p.active) return false;
+    if (p.lifted) return true;
+    if (p.m11 < DOWN_COS) return false;
+    const bx = p.x - p.m01 * PIN_YC, bz = p.z - p.m21 * PIN_YC, by = p.y - p.m11 * PIN_YC;
+    if (bz < this.L.pitZ || Math.abs(bx) > this.L.halfAt(bz) || by < -0.03) return false;
+    return true;
+  };
+
+  PinWorld.prototype.standing = function () {
+    const out = [];
+    for (const p of this.pins) if (this.isStanding(p)) out.push(p.n);
+    return out;
+  };
+
+  /** Awake pins that can still change the count: on the deck and either upright-ish or moving with purpose. */
+  PinWorld.prototype.liveCount = function () {
+    let k = 0;
+    for (const p of this.pins) {
+      if (!p.active || !p.awake || p.lifted || p.y < -0.15) continue;
+      const v2 = p.vx * p.vx + p.vy * p.vy + p.vz * p.vz, w2 = p.wx * p.wx + p.wy * p.wy + p.wz * p.wz;
+      if (p.m11 > 0.5 || v2 > 0.06 || w2 > 6) k++;
+    }
+    return k;
+  };
+
+  /** True once the ball is done and nothing that matters moves. */
+  PinWorld.prototype.settled = function () {
+    const b = this.ball;
+    const resting = b.mode === 'lane' && b.z < HEAD_Z + 0.3 && b.vx * b.vx + b.vz * b.vz < 0.04;   // stopped among the pins
+    return (b.mode === 'gone' || b.mode === 'held' || resting || (b.mode === 'pit' && b.pitT > 0.5)) && this.liveCount() === 0;
+  };
+
+  // =============================================================================================
+  // 4. Rules: ten-pin scoring, splits, Spare Challenge leaves, Power Pins racks
+  // =============================================================================================
+
+  /** Frames for a list of rolls: [{ marks: [..], total: number|null }], totals only once known. */
+  function scoreFrames(rolls) {
+    const frames = [];
+    let i = 0, running = 0, known = true;
+    const at = k => (k < rolls.length ? rolls[k] : null);
+    for (let f = 0; f < 10; f++) {
+      const fr = { marks: [], total: null };
+      frames.push(fr);
+      if (i >= rolls.length) continue;
+      if (f < 9) {
+        const a = rolls[i];
+        let value = null;
+        if (a === 10) {
+          fr.marks.push('X');
+          if (at(i + 2) !== null) value = 10 + rolls[i + 1] + rolls[i + 2];
+          i += 1;
         } else {
-          ui.banner(count + (count === 1 ? ' PIN' : ' PINS'), { kind: count >= 7 ? 'good' : 'info', duration: 1.1 });
-          pal.play(count >= 7 ? 'clap' : 'shrug');
+          fr.marks.push(a === 0 ? '-' : String(a));
+          const b = at(i + 1);
+          if (b !== null) {
+            fr.marks.push(a + b === 10 ? '/' : b === 0 ? '-' : String(b));
+            if (a + b < 10) value = a + b;
+            else if (at(i + 2) !== null) value = 10 + rolls[i + 2];
+          }
+          i += 2;
+        }
+        if (known && value !== null) { running += value; fr.total = running; } else known = false;
+      } else {
+        const r = rolls.slice(i, i + 3);
+        const mark = (v, prev, fresh) => (v === 10 && fresh ? 'X' : !fresh && prev + v === 10 ? '/' : v === 0 ? '-' : String(v));
+        let fresh = true, prev = 0;
+        for (const v of r) {
+          fr.marks.push(mark(v, prev, fresh));
+          if (fresh) { fresh = v === 10; prev = v === 10 ? 0 : v; } else { fresh = true; prev = 0; }
+        }
+        const done = r.length === 3 || (r.length === 2 && r[0] !== 10 && r[0] + r[1] < 10);
+        if (known && done) { running += r.reduce((s, v) => s + v, 0); fr.total = running; }
+      }
+    }
+    return frames;
+  }
+
+  /** What the next ball is for a list of rolls: { frame 0..9, ball 0..2, fresh (full rack), done }. */
+  function frameState(rolls) {
+    let i = 0;
+    for (let f = 0; f < 9; f++) {
+      if (i >= rolls.length) return { frame: f, ball: 0, fresh: true, done: false };
+      if (rolls[i] === 10) { i += 1; continue; }
+      if (i + 1 >= rolls.length) return { frame: f, ball: 1, fresh: false, done: false };
+      i += 2;
+    }
+    const r = rolls.slice(i);
+    if (r.length === 0) return { frame: 9, ball: 0, fresh: true, done: false };
+    if (r.length === 1) return { frame: 9, ball: 1, fresh: r[0] === 10, done: false };
+    if (r.length === 2) {
+      if (r[0] !== 10 && r[0] + r[1] < 10) return { frame: 9, ball: 2, fresh: false, done: true };
+      return { frame: 9, ball: 2, fresh: (r[0] === 10 && r[1] === 10) || (r[0] !== 10 && r[0] + r[1] === 10), done: false };
+    }
+    return { frame: 9, ball: 3, fresh: false, done: true };
+  }
+
+  /** Latest known running total. */
+  function knownTotal(rolls) {
+    let t = 0;
+    for (const f of scoreFrames(rolls)) if (f.total !== null) t = f.total;
+    return t;
+  }
+
+  /** Pins next to each other (same row / diagonal) or hidden right behind each other (sleepers). */
+  const ADJ10 = (() => {
+    const adj = {};
+    for (const a of SPOTS10) {
+      adj[a.n] = [];
+      for (const b of SPOTS10) {
+        if (a === b) continue;
+        const d = Math.hypot(a.x - b.x, a.z - b.z);
+        if (d < 0.31 || (Math.abs(a.x - b.x) < 0.01 && d < 0.54)) adj[a.n].push(b.n);
+      }
+    }
+    return adj;
+  })();
+
+  /** A split: head pin down and the standing pins fall into separate groups. */
+  function isSplit(standing) {
+    if (standing.length < 2 || standing.indexOf(1) >= 0) return false;
+    const left = new Set(standing);
+    const stack = [standing[0]];
+    left.delete(standing[0]);
+    while (stack.length) {
+      const n = stack.pop();
+      for (const m of ADJ10[n]) if (left.has(m)) { left.delete(m); stack.push(m); }
+    }
+    return left.size > 0;
+  }
+
+  // Ten leaves of rising difficulty. Every one is makeable: the first six have wide lines, the last four
+  // (the splits that need a pin to slide across) have a window about as narrow as a strike's.
+  const LEAVES = [
+    { pins: [10], name: 'Ten Pin' },
+    { pins: [7], name: 'Seven Pin' },
+    { pins: [3, 6, 10], name: '3-6-10' },
+    { pins: [2, 4, 5, 8], name: 'The Bucket' },
+    { pins: [2, 7], name: '2-7 Baby Split' },
+    { pins: [3, 10], name: '3-10 Baby Split' },
+    { pins: [2, 10], name: '2-10 Split' },
+    { pins: [4, 9], name: '4-9 Split' },
+    { pins: [5, 10], name: '5-10 Split' },
+    { pins: [5, 7], name: '5-7 Split' },
+  ];
+  const SPARE_PTS = 10, SPARE_RUN_BONUS = 5;     // per pick-up, plus a clean-run bonus for back-to-back pick-ups
+
+  const POWER_ROUNDS = 10;
+  const POWER_CLEAR_BONUS = 25;
+  const powerRows = round => 4 + round;          // 10, 15, 21 … 91 pins
+  const STRIKE_WORDS = ['STRIKE!', 'DOUBLE!', 'TURKEY!'];
+
+  // =============================================================================================
+  // 5. Shot planning (autoplay, simulate) and the human-input model
+  // =============================================================================================
+
+  const POCKET_X = 0.05;                   // ball centre at the head pin for a right-hander's 1-3 pocket
+
+  /** Ball-only trace to zStop → { x, angle } (x = ±9 when the ball found the gutter first). */
+  function traceShot(L, shot, zStop) {
+    const w = new PinWorld(L);
+    w.launch(shot);
+    while (w.ball.mode === 'lane' && w.ball.z > zStop && w.t < 8) w.stepOnce();
+    const b = w.ball;
+    return { x: b.mode === 'lane' ? b.x : (b.x > 0 ? 9 : -9), angle: Math.atan2(b.vx, -b.vz) };
+  }
+
+  /** Release angle that brings the ball to targetX at zTarget (the path is monotonic in the angle). */
+  function aimAngle(L, x0, speed, spin, targetX, zTarget) {
+    let lo = -8 * DEG, hi = 8 * DEG;
+    for (let i = 0; i < 20; i++) {
+      const m = (lo + hi) / 2;
+      if (traceShot(L, { x: x0, angle: m, speed, spin }, zTarget).x < targetX) lo = m; else hi = m;
+    }
+    return (lo + hi) / 2;
+  }
+
+  /** A pocket shot in a given style ({ speed, spin 0..1 }) for hand = 1 (right) or -1 (left). */
+  function strikeShot(L, style, hand) {
+    const spin = style.spin * hand;
+    const x = hand * (0.1 + 0.24 * style.spin);
+    return { x, angle: aimAngle(L, x, style.speed, spin, hand * POCKET_X, HEAD_Z), speed: style.speed, spin };
+  }
+
+  /** Candidate spare lines: a firm, nearly straight ball crossing the lane through each target. */
+  function spareCandidates(L, pins, hand) {
+    let minX = Infinity, maxX = -Infinity, frontZ = -Infinity;
+    for (const p of pins) { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); frontZ = Math.max(frontZ, p.z); }
+    const out = [];
+    const lim = L.halfAt(frontZ) - 0.06;
+    for (let tx = Math.max(-lim, minX - 0.16); tx <= Math.min(lim, maxX + 0.16) + 1e-9; tx += 0.024) {
+      const side = Math.abs(tx) < 0.08 ? hand : Math.sign(tx);
+      const x = -side * 0.26, spin = 0.12 * hand, speed = 8.8;
+      out.push({ x, angle: aimAngle(L, x, speed, spin, tx, frontZ + 0.2), speed, spin });
+    }
+    return out;
+  }
+
+  /** Full simulation of one ball against a rack → { knocked, standing, gutter, hit }. */
+  function simulateShot(L, spots, standingSet, shot, tMax = 7) {
+    const w = new PinWorld(L);
+    w.setRack(spots, standingSet);
+    const before = w.pins.filter(p => p.active).length;
+    w.launch(shot);
+    while (!w.settled() && w.t < tMax) w.stepOnce();
+    const standing = w.standing();
+    return { knocked: before - standing.length, standing, gutter: w.ev.gutterAt !== null, hit: w.ev.hit };
+  }
+
+  function gauss(rng) {
+    const u = Math.max(1e-9, rng.next()), v = rng.next();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  }
+
+  /** A human-ish execution of a planned shot: quality 1 = robot, 0 = wild. */
+  function humanize(shot, quality, rng) {
+    const k = 1 - Math.max(0, Math.min(1, quality));
+    return {
+      x: Math.max(-0.5, Math.min(0.5, shot.x + gauss(rng) * 0.05 * k)),
+      angle: shot.angle + gauss(rng) * 1.2 * DEG * k,
+      speed: Math.max(SPEED_MIN, Math.min(SPEED_MAX, shot.speed + gauss(rng) * 0.9 * k)),
+      spin: Math.max(-1, Math.min(1, shot.spin + gauss(rng) * 0.3 * k)),
+    };
+  }
+
+  // =============================================================================================
+  // 6. Swipe → shot mapping
+  // =============================================================================================
+
+  const SPEED_MIN = 5.5, SPEED_MAX = 10.5;
+  const AIM_MAX = 3.5 * DEG;               // beyond this every line is a gutter ball
+  const X_MAX = 0.46;                      // release positions on the approach (ball centre)
+
+  /** Release speed (short sides / s; real flicks are about 2–10) → ball speed over the whole range. */
+  function swipeSpeed(nspeed) {
+    const k = Math.max(0, Math.min(1, (nspeed - 1.2) / 8));
+    return SPEED_MIN + (SPEED_MAX - SPEED_MIN) * Math.pow(k, 0.85);
+  }
+
+  /** An upward swipe → { speed, spin, drift } (null when it isn't a bowl). */
+  function readSwipe(s, shortSide) {
+    const up = -s.dy / shortSide;
+    const dirDeg = Math.atan2(s.dx, -s.dy) / DEG;
+    if (up < 0.07 || Math.abs(dirDeg) > 55) return null;
+    // a swipe tilted past 10° pulls the line a little (1° moves the ball ~30 cm at the pins)
+    const drift = Math.sign(dirDeg) * Math.min(1, Math.max(0, Math.abs(dirDeg) - 10) * 0.04) * DEG;
+    // hook: the swipe's bow plus a late turn of the finger (both say "curve back to the left" when +).
+    // A natural thumb arc (< 5% of the screen) stays straight; a deliberate bend of ~20% is a big hook.
+    const bow = Math.sign(s.lateral) * Math.max(0, Math.abs(s.lateral) - 0.05) / 0.2;
+    let turn = 0;
+    const path = s.path || [];
+    if (path.length > 4) {
+      let len = 0;
+      for (let i = 1; i < path.length; i++) len += Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y);
+      let acc = 0, k = 0;
+      for (let i = 1; i < path.length && acc < len * 0.7; i++) { acc += Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y); k = i; }
+      const end = path[path.length - 1], mid = path[Math.min(k, path.length - 2)];
+      const head = Math.atan2(end.x - mid.x, -(end.y - mid.y)), chord = Math.atan2(s.dx, -s.dy);
+      let d = head - chord;
+      while (d > Math.PI) d -= 2 * Math.PI;
+      while (d < -Math.PI) d += 2 * Math.PI;
+      turn = Math.sign(d) * Math.max(0, Math.abs(d) - 0.2);
+    }
+    const u = bow - turn * 0.4;
+    const spin = Math.sign(u) * Math.pow(Math.min(1, Math.abs(u)), 1.3);
+    // release speed; a short hold before lifting the finger shouldn't kill a good flick
+    return { speed: swipeSpeed(Math.max(s.nspeed, (s.npeakSpeed || 0) * 0.75)), spin, drift };
+  }
+
+  /** Picks the most forgiving line: the middle of the longest run of best-scoring candidates. */
+  function bestCandidate(cands, scores) {
+    let best = -1;
+    for (const s of scores) best = Math.max(best, s);
+    let runStart = -1, bestRun = null;
+    for (let i = 0; i <= scores.length; i++) {
+      if (i < scores.length && scores[i] === best) { if (runStart < 0) runStart = i; continue; }
+      if (runStart >= 0) {
+        if (!bestRun || i - runStart > bestRun[1] - bestRun[0]) bestRun = [runStart, i];
+        runStart = -1;
+      }
+    }
+    return cands[Math.floor((bestRun[0] + bestRun[1] - 1) / 2)];
+  }
+
+  /**
+   * Headless outcome statistics for n frames of a bowler of the given quality (0..1): pocket-seeking
+   * first balls in varied styles, planned spare balls, all executed with human-like noise.
+   */
+  function simulateFrames(n, quality, seed, hand = 1) {
+    const L = makeLayout('game');
+    const rng = SS.util ? SS.util.rng(seed) : null;
+    const spareCache = new Map();
+    const st = { frames: 0, strikes: 0, spareChances: 0, spares: 0, gutters: 0, balls: 0, pins1: 0, splits: 0, pocket: 0, pocketStrikes: 0, leaves: {} };
+    for (let f = 0; f < n; f++) {
+      const style = { speed: 7.6 + rng.next() * 1.6, spin: 0.45 + rng.next() * 0.5 };
+      const r1 = simulateShot(L, SPOTS10, null, humanize(strikeShot(L, style, hand), quality, rng));
+      st.frames++; st.balls++; st.pins1 += r1.knocked;
+      if (r1.gutter) st.gutters++;
+      if (r1.hit && r1.hit.pin <= 3) {
+        const pocketHit = Math.abs(Math.abs(r1.hit.angle) / DEG - 4.5) < 1.8 && r1.hit.x * hand > 0.02 && r1.hit.x * hand < 0.13;
+        if (pocketHit) { st.pocket++; if (!r1.standing.length) st.pocketStrikes++; }
+      }
+      if (!r1.standing.length) { st.strikes++; continue; }
+      const key = r1.standing.join('-');
+      st.leaves[key] = (st.leaves[key] || 0) + 1;
+      if (isSplit(r1.standing)) st.splits++;
+      const set = new Set(r1.standing);
+      let plan = spareCache.get(key);
+      if (!plan) {
+        const cands = spareCandidates(L, SPOTS10.filter(s => set.has(s.n)), hand);
+        plan = bestCandidate(cands, cands.map(c => simulateShot(L, SPOTS10, set, c).knocked));
+        spareCache.set(key, plan);
+      }
+      const r2 = simulateShot(L, SPOTS10, set, humanize(plan, quality, rng));
+      st.spareChances++; st.balls++;
+      if (r2.gutter) st.gutters++;
+      if (!r2.standing.length) st.spares++;
+    }
+    const pct = (a, b) => (b ? Math.round(1000 * a / b) / 10 : 0);
+    const topLeaves = Object.entries(st.leaves).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, v]) => k + ' ×' + v);
+    return {
+      frames: st.frames, quality,
+      strikePct: pct(st.strikes, st.frames),
+      sparePct: pct(st.spares, st.spareChances),
+      gutterPct: pct(st.gutters, st.balls),
+      avgPins: Math.round(100 * st.pins1 / st.frames) / 100,
+      splitPct: pct(st.splits, st.frames),
+      pocketPct: pct(st.pocket, st.frames),
+      pocketStrikePct: pct(st.pocketStrikes, st.pocket),
+      topLeaves,
+    };
+  }
+
+  // =============================================================================================
+  // 7. Art: canvas textures, the alley, pins and balls
+  // =============================================================================================
+
+  const FONT = "'Fredoka', 'Nunito', system-ui, sans-serif";
+  const LANE_PITCH = 1.7;                  // centre-to-centre of standard lanes
+  const AIM_Z = 1.45;                      // where the bowler stands while aiming
+  const NB_Z = 0.5;                        // where neighbouring bowlers wait
+  const CEIL_Y = 3.8;
+  const MONITOR = { x: 0, y: 3.22, z: -1.1, w: 1.04, h: 0.585 };
+  const HOOD = { x: 0.85, z: 2.1 };        // ball return (on the side away from the bowling hand)
+  const RACK_SPOT = { y: 0.5, z: 3.05 };
+  const KICK_COLORS = [0xFFC93C, 0x22C3B5, 0xFF6FAE, 0x8E7BFF, 0xFF8A3D];
+  const SEAT_COLORS = [0xFF5A5F, 0x1FA2FF, 0xFFC93C, 0x3BC45B, 0x8E7BFF];
+
+  function makeCanvas(w, h) {
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    return c;
+  }
+
+  function canvasTexture(THREE, c, repeat) {
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 4;
+    if (repeat) t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    return t;
+  }
+
+  function drawSun(g, x, y, r, rays) {
+    g.save();
+    g.translate(x, y);
+    g.fillStyle = '#FFB020';
+    for (let i = 0; i < rays; i++) {
+      g.rotate(Math.PI * 2 / rays);
+      g.beginPath();
+      g.moveTo(-r * 0.2, -r * 1.05); g.lineTo(0, -r * 1.55); g.lineTo(r * 0.2, -r * 1.05);
+      g.closePath(); g.fill();
+    }
+    g.fillStyle = '#FFC93C';
+    g.beginPath(); g.arc(0, 0, r, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#FFE58A';
+    g.beginPath(); g.arc(-r * 0.25, -r * 0.3, r * 0.45, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#5A3A10';
+    g.beginPath(); g.ellipse(-r * 0.33, -r * 0.1, r * 0.09, r * 0.14, 0, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.ellipse(r * 0.33, -r * 0.1, r * 0.09, r * 0.14, 0, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = '#5A3A10'; g.lineWidth = r * 0.09; g.lineCap = 'round';
+    g.beginPath(); g.arc(0, r * 0.12, r * 0.42, 0.2 * Math.PI, 0.8 * Math.PI); g.stroke();
+    g.fillStyle = 'rgba(255,110,110,.55)';
+    g.beginPath(); g.ellipse(-r * 0.58, r * 0.2, r * 0.14, r * 0.09, 0, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.ellipse(r * 0.58, r * 0.2, r * 0.14, r * 0.09, 0, 0, Math.PI * 2); g.fill();
+    g.restore();
+  }
+
+  /** The masking-unit panel: sun logo + SUNNY LANES. */
+  function logoCanvas() {
+    const c = makeCanvas(1024, 512), g = c.getContext('2d');
+    g.scale(2, 2);
+    const grd = g.createLinearGradient(0, 0, 0, 256);
+    grd.addColorStop(0, '#3C47A8'); grd.addColorStop(1, '#262C72');
+    g.fillStyle = grd; g.fillRect(0, 0, 512, 256);
+    g.fillStyle = 'rgba(255,255,255,.07)';
+    for (let i = 0; i < 9; i++) { g.beginPath(); g.arc(256, 300, 90 + i * 40, Math.PI, 2 * Math.PI); g.lineWidth = 14; g.strokeStyle = i % 2 ? 'rgba(255,255,255,.05)' : 'rgba(255,201,60,.08)'; g.stroke(); }
+    drawSun(g, 256, 96, 52, 14);
+    g.font = '700 46px ' + FONT;
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.lineWidth = 10; g.strokeStyle = '#1A1F55'; g.lineJoin = 'round';
+    g.strokeText('SUNNY LANES', 256, 206);
+    g.fillStyle = '#FFFFFF'; g.fillText('SUNNY LANES', 256, 206);
+    g.fillStyle = '#FFC93C'; g.fillRect(0, 248, 512, 8);
+    return c;
+  }
+
+  /** Long, cheerful wall mural: hills, a big sun, smiling pins and confetti. */
+  function muralCanvas(rng) {
+    const W = 1024, Hh = 256, c = makeCanvas(W, Hh), g = c.getContext('2d');
+    const sky = g.createLinearGradient(0, 0, 0, Hh);
+    sky.addColorStop(0, '#5BB8F5'); sky.addColorStop(0.7, '#BDE6FF'); sky.addColorStop(1, '#E8F7FF');
+    g.fillStyle = sky; g.fillRect(0, 0, W, Hh);
+    // stripes of a rainbow arc
+    const rb = ['#FF5A5F', '#FF8A3D', '#FFC93C', '#3BC45B', '#1FA2FF', '#8E7BFF'];
+    rb.forEach((col, i) => { g.strokeStyle = col; g.lineWidth = 10; g.beginPath(); g.arc(700, 260, 170 - i * 10, Math.PI, 2 * Math.PI); g.stroke(); });
+    drawSun(g, 180, 70, 34, 12);
+    for (let i = 0; i < 6; i++) {
+      const x = rng.range(0, W), y = rng.range(20, 90), s = rng.range(18, 30);
+      g.fillStyle = '#FFFFFF';
+      for (const [dx, dy, r] of [[0, 0, 1], [0.9, 0.15, 0.8], [-0.9, 0.2, 0.75], [0.4, -0.4, 0.75]]) { g.beginPath(); g.arc(x + dx * s, y + dy * s, r * s, 0, Math.PI * 2); g.fill(); }
+    }
+    const hill = (col, base, amp, ph) => {
+      g.fillStyle = col; g.beginPath(); g.moveTo(0, Hh);
+      for (let x = 0; x <= W; x += 8) g.lineTo(x, base - amp * (0.5 + 0.5 * Math.sin(x / W * Math.PI * 4 + ph)));
+      g.lineTo(W, Hh); g.closePath(); g.fill();
+    };
+    hill('#86C48A', 200, 50, 0.3); hill('#7CC56B', 222, 40, 2.1); hill('#5FAE57', 246, 26, 4.0);
+    // smiling pins
+    for (let i = 0; i < 5; i++) {
+      const x = 90 + i * 210, y = 236, s = 1.15;
+      g.save(); g.translate(x, y); g.scale(s, s); g.rotate((i % 2 ? 1 : -1) * 0.12);
+      g.fillStyle = '#FFFFFF'; g.strokeStyle = '#2B3170'; g.lineWidth = 3;
+      g.beginPath();
+      g.moveTo(0, -92); g.bezierCurveTo(16, -92, 18, -70, 11, -58); g.bezierCurveTo(8, -50, 26, -34, 26, -10);
+      g.bezierCurveTo(26, 6, 20, 14, 14, 18); g.lineTo(-14, 18); g.bezierCurveTo(-20, 14, -26, 6, -26, -10);
+      g.bezierCurveTo(-26, -34, -8, -50, -11, -58); g.bezierCurveTo(-18, -70, -16, -92, 0, -92); g.closePath();
+      g.fill(); g.stroke();
+      g.fillStyle = '#E8343A'; g.fillRect(-9, -60, 18, 4); g.fillRect(-9, -53, 18, 4);
+      g.fillStyle = '#2B3170';
+      g.beginPath(); g.ellipse(-6, -77, 2.2, 3, 0, 0, Math.PI * 2); g.ellipse(6, -77, 2.2, 3, 0, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.lineWidth = 2; g.arc(0, -73, 5, 0.2 * Math.PI, 0.8 * Math.PI); g.stroke();
+      g.restore();
+    }
+    const cols = ['#FF5A5F', '#FFC93C', '#22C3B5', '#FF6FAE', '#8E7BFF'];
+    for (let i = 0; i < 70; i++) {
+      g.fillStyle = cols[i % cols.length];
+      g.save(); g.translate(rng.range(0, W), rng.range(0, 150)); g.rotate(rng.range(0, 3));
+      if (i % 3) g.fillRect(-4, -2, 8, 4); else { g.beginPath(); g.arc(0, 0, 3.4, 0, Math.PI * 2); g.fill(); }
+      g.restore();
+    }
+    return c;
+  }
+
+  /** Aim arrow: bright chevrons fading out along the lane. */
+  function arrowCanvas() {
+    const c = makeCanvas(64, 512), g = c.getContext('2d');
+    for (let i = 0; i < 9; i++) {
+      const y = 470 - i * 54, a = 1 - i / 10;
+      g.fillStyle = 'rgba(255,214,70,' + a.toFixed(2) + ')';
+      g.beginPath(); g.moveTo(32, y - 30); g.lineTo(60, y); g.lineTo(47, y + 6); g.lineTo(32, y - 10); g.lineTo(17, y + 6); g.lineTo(4, y); g.closePath(); g.fill();
+    }
+    return c;
+  }
+
+  /** A marbled bowling-ball skin in the player's colour, with finger holes. */
+  function ballCanvas(hex, seed) {
+    const c = makeCanvas(256, 128), g = c.getContext('2d');
+    const base = '#' + ('000000' + hex.toString(16)).slice(-6);
+    g.fillStyle = base; g.fillRect(0, 0, 256, 128);
+    const rng = SS.util.rng(seed);
+    for (let i = 0; i < 26; i++) {
+      g.strokeStyle = i % 3 ? 'rgba(255,255,255,0.16)' : 'rgba(0,0,0,0.18)';
+      g.lineWidth = rng.range(3, 9);
+      g.beginPath();
+      const y = rng.range(10, 118);
+      g.moveTo(-10, y);
+      g.bezierCurveTo(70, y + rng.range(-40, 40), 160, y + rng.range(-40, 40), 266, y + rng.range(-20, 20));
+      g.stroke();
+    }
+    g.fillStyle = '#141826';
+    for (const [x, y, r] of [[64, 50, 6.5], [57, 74, 5.2], [71, 74, 5.2]]) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); }
+    g.fillStyle = 'rgba(255,255,255,0.25)';
+    for (const [x, y, r] of [[64, 50, 6.5], [57, 74, 5.2], [71, 74, 5.2]]) { g.beginPath(); g.arc(x - 1.2, y - 1.6, r * 0.5, 0, Math.PI * 2); g.fill(); }
+    return c;
+  }
+
+  /** Real-ish pin profile (radius, height) with two red neck stripes painted by vertex colour. */
+  function pinGeometry(THREE, world, segs) {
+    const prof = [[0, 0], [0.0258, 0], [0.031, 0.006], [0.0359, 0.019], [0.0496, 0.0381], [0.0573, 0.0572], [0.0601, 0.0857],
+      [0.0605, 0.114], [0.0590, 0.135], [0.0568, 0.149], [0.0498, 0.184], [0.0385, 0.219], [0.0335, 0.2315], [0.0333, 0.2325],
+      [0.0297, 0.2425], [0.0295, 0.2435], [0.0268, 0.2495], [0.0266, 0.2505], [0.0244, 0.2605], [0.0243, 0.2615], [0.0235, 0.276],
+      [0.0267, 0.298], [0.0318, 0.321], [0.0324, 0.343], [0.028, 0.365], [0.018, 0.377], [0.008, 0.3805], [0, 0.381]];
+    const g = new THREE.LatheGeometry(prof.map(([r, y]) => new THREE.Vector2(r, y)), segs);
+    const red = new THREE.Color(0xE8343A), white = new THREE.Color(0xFFFFFF);
+    world.paint(g, (x, y, z, out) => out.copy((y > 0.232 && y < 0.243) || (y > 0.250 && y < 0.261) ? red : white));
+    return g;
+  }
+
+  /** The static alley, merged into a handful of meshes (one per material). Returns { roomHalf, mask }:
+   *  `mask` holds the masking-unit meshes so a high pin camera can hide them. */
+  function buildAlley(ctx, L, laneXs, opts) {
+    const { THREE, world, scene } = ctx;
+    const paint = world.paint;
+    const rng = SS.util.rng(4242);
+    const solid = [], glow = [], wood = [], carpet = [], decal = [], logos = [], maskParts = [];
+    const box = (w, h, d, x, y, z, col, list = solid) => { const g = new THREE.BoxGeometry(w, h, d); g.translate(x, y, z); list.push(paint(g, col)); return g; };
+    const roomHalf = opts.roomHalf;
+    const backZ = Math.min(L.pitBack, HEAD_Z - 3 * ROW_DZ - 0.95) - 0.6;
+    const zFront = 10.5;
+    const MY = L.ceilY;
+
+    /** Horizontal strip between xl(z) and xr(z) at height y (normal up), uv in metres. */
+    function strip(xl, xr, y, z0, z1, segs, list, uvScale, uvOff) {
+      const pos = [], uv = [], idx = [];
+      for (let i = 0; i <= segs; i++) {
+        const z = z0 + (z1 - z0) * i / segs;
+        const a = xl(z), b = xr(z);
+        pos.push(a, y, z, b, y, z);
+        if (uvScale) uv.push((a - uvOff) * uvScale[0] + 0.5, z * uvScale[1], (b - uvOff) * uvScale[0] + 0.5, z * uvScale[1]);
+        if (i < segs) { const k = i * 2; idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      if (uvScale) g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      g.setIndex(idx);
+      g.computeVertexNormals();
+      list.push(g);
+      return g;
+    }
+
+    /** Vertical face along x(z) from y0 to y1, facing `side` (+1 → +x). */
+    function wallStrip(xf, y0, y1, z0, z1, segs, side, col) {
+      const pos = [], idx = [];
+      for (let i = 0; i <= segs; i++) {
+        const z = z0 + (z1 - z0) * i / segs, x = xf(z);
+        pos.push(x, y0, z, x, y1, z);
+        if (i < segs) {
+          const k = i * 2;
+          if ((side > 0) === (z1 < z0)) idx.push(k, k + 2, k + 1, k + 1, k + 2, k + 3); else idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2);
         }
       }
-      await ctx.wait(1.9);
-      resetRack();
-      turn += 1;
-      if (turn >= ROLLS * players.length) finishGame();
-      else readyBowler();
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setIndex(idx);
+      g.computeVertexNormals();
+      solid.push(paint(g, col));
     }
+
+    /** Half-pipe gutter following the lane edge. */
+    function gutter(halfAt, cx, side, z0, z1, segs) {
+      const K = 8, rx = GUTTER_W / 2, depth = 0.058;
+      const pos = [], idx = [];
+      for (let i = 0; i <= segs; i++) {
+        const z = z0 + (z1 - z0) * i / segs, c = cx + side * (halfAt(z) + rx);
+        for (let k = 0; k <= K; k++) { const a = Math.PI * k / K; pos.push(c - rx * Math.cos(a), -depth * Math.sin(a) - 0.002, z); }
+        if (i < segs) for (let k = 0; k < K; k++) {
+          const p = i * (K + 1) + k, q = p + K + 1;
+          idx.push(p, p + 1, q, p + 1, q + 1, q);
+        }
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setIndex(idx);
+      g.computeVertexNormals();
+      solid.push(paint(g, 0xB9C3D3));
+    }
+
+    const disc = (r, x, z, col, y = 0.0018) => { const g = new THREE.CircleGeometry(r, 14); g.rotateX(-Math.PI / 2); g.translate(x, y, z); decal.push(paint(g, col)); };
+
+    // ---- lanes (centre lane follows the layout; neighbours are standard) ------------------------
+    laneXs.forEach((cx, li) => {
+      const main = li === opts.mainIndex;
+      const halfAt = main ? L.halfAt : () => LANE_HALF;
+      const pitZ = main ? L.pitZ : HEAD_Z - 3 * ROW_DZ - 0.076;
+      const pitBack = main ? L.pitBack : pitZ - 0.86;
+      const wide = main && L.wide;
+      const segs = wide ? 48 : 1;
+      const wallAt = z => halfAt(Math.max(z, pitZ)) + GUTTER_W;
+      // lane + deck (wood), approach (wood)
+      strip(z => cx - halfAt(z), z => cx + halfAt(z), 0, 0, pitZ, segs, wood, [1 / 1.054, 0.22], cx);
+      strip(() => cx - 0.938, () => cx + 0.938, 0, zFront - 5.7, 0, 1, wood, [1 / 1.054, 0.22], cx);
+      // gutters + their outer lips
+      for (const side of [-1, 1]) {
+        gutter(halfAt, cx, side, 0, pitZ, segs);
+        wallStrip(z => cx + side * halfAt(z), -0.06, 0, 0, pitZ, segs, side, 0x9AA6B8);
+      }
+      // kickbacks (side boards beside the pin deck)
+      const kz0 = HEAD_Z + 0.75, kcol = KICK_COLORS[(li + 1) % KICK_COLORS.length];
+      for (const side of [-1, 1]) {
+        const x = cx + side * (wallAt(kz0 - 1) + 0.03);
+        box(0.06, MY - PIT_Y, kz0 - pitBack, x, (MY + PIT_Y) / 2, (kz0 + pitBack) / 2, kcol);
+      }
+      // pit: floor, deck edge, cushion & curtain with folds
+      const pw = wallAt(pitZ - 0.1) * 2;
+      box(pw, 0.04, pitZ - pitBack, cx, PIT_Y - 0.02, (pitZ + pitBack) / 2, 0x151724);
+      box(pw, -PIT_Y, 0.03, cx, PIT_Y / 2, pitZ - 0.015, 0x3A2A1C);
+      const cur = new THREE.PlaneGeometry(pw, MY - PIT_Y, 24, 1);
+      const cp = cur.attributes.position;
+      for (let i = 0; i < cp.count; i++) cp.setZ(i, Math.sin(cp.getX(i) * 26) * 0.025);
+      cur.computeVertexNormals();
+      cur.translate(cx, (MY + PIT_Y) / 2, pitBack - 0.02);
+      solid.push(paint(cur, (x, y, z, out) => out.setHex(0x1F2350).offsetHSL(0, 0, Math.sin((x - cx) * 26) * 0.035)));
+      // capping to the right of this lane (to the next lane's gutter, which may flare), plus the far-left edge
+      const nextX = laneXs[li + 1];
+      const nextMain = li + 1 === opts.mainIndex;
+      const capR = nextX == null ? () => cx + 0.938 + 0.2 : nextMain ? z => nextX - L.wallAt(z) : () => nextX - 0.762;
+      const capSegs = nextMain && L.wide ? 48 : segs;
+      paint(strip(z => cx + wallAt(z), capR, 0.035, 0, L.maskZ, capSegs, solid), 0x2E56A6);
+      wallStrip(z => cx + wallAt(z), -0.06, 0.035, 0, L.maskZ, segs, -1, 0x24478C);
+      if (nextX != null) wallStrip(capR, -0.06, 0.035, 0, L.maskZ, capSegs, 1, 0x24478C);
+      if (li === 0) {
+        paint(strip(() => cx - 0.938 - 0.2, z => cx - wallAt(z), 0.035, 0, L.maskZ, segs, solid), 0x2E56A6);
+        wallStrip(z => cx - wallAt(z), -0.06, 0.035, 0, L.maskZ, segs, 1, 0x24478C);
+      }
+      // markings: foul line, dots, arrows, pin spots
+      decal.push(paint(new THREE.PlaneGeometry(1.054, 0.022).rotateX(-Math.PI / 2).translate(cx, 0.0018, 0), 0x1C2340));
+      for (const b of [3, 5, 8, 11, 14]) {
+        for (const s of [-1, 1]) {
+          const x = cx + s * (19.5 - b + 0.5) * BOARD;
+          disc(0.011, x, -2.13, 0x3A2A1C);
+          for (const z of [0.6, 3.66]) disc(0.013, x, z, 0x3A2A1C);
+        }
+      }
+      for (let i = 0; i < 7; i++) {
+        const b = 5 + i * 5, x = cx + (b - 20) * BOARD, z = -(4.88 - Math.abs(i - 3) * 0.3);
+        const tri = new THREE.BufferGeometry();
+        tri.setAttribute('position', new THREE.Float32BufferAttribute([x, 0.0018, z - 0.17, x - 0.022, 0.0018, z + 0.07, x + 0.022, 0.0018, z + 0.07], 3));
+        tri.setAttribute('normal', new THREE.Float32BufferAttribute([0, 1, 0, 0, 1, 0, 0, 1, 0], 3));
+        decal.push(paint(tri, 0xE8343A));
+      }
+      const spots = main ? rackSpots(L.rows) : SPOTS10;
+      for (const s of spots) disc(0.028, cx + s.x, s.z, 0xB98A57, 0.0012);
+      logos.push(cx);
+    });
+
+    // ---- masking unit, walls, ceiling, light strips -----------------------------------------
+    box(roomHalf * 2, 1.4, L.maskZ - backZ, 0, MY + 0.7, (L.maskZ + backZ) / 2, 0x272C66, maskParts);
+    box(roomHalf * 2, 0.06, 0.08, 0, MY + 0.02, L.maskZ + 0.02, 0xFFC93C, maskParts);
+    box(roomHalf * 2, 0.06, 0.08, 0, MY + 1.38, L.maskZ + 0.02, 0xFFC93C, maskParts);
+    box(roomHalf * 2, CEIL_Y - MY - 1.4, 0.1, 0, (CEIL_Y + MY + 1.4) / 2, L.maskZ - 0.3, 0x2F3478, maskParts);
+    box(roomHalf * 2, 0.08, zFront - backZ, 0, CEIL_Y + 0.04, (zFront + backZ) / 2, 0x262A57);
+    box(roomHalf * 2, CEIL_Y, 0.1, 0, CEIL_Y / 2, zFront + 0.05, 0x3B3F86);
+    for (let i = 0; i <= laneXs.length; i++) {
+      const x = i === 0 ? laneXs[0] - LANE_PITCH / 2 : i === laneXs.length ? laneXs[i - 1] + LANE_PITCH / 2 : (laneXs[i - 1] + laneXs[i]) / 2;
+      box(0.16, 0.05, zFront - 1 - (L.maskZ + 0.6), x, CEIL_Y - 0.03, (zFront - 1 + L.maskZ + 0.6) / 2, 0xFFF6DD, glow);
+      box(0.3, 0.03, zFront - 1 - (L.maskZ + 0.6), x, CEIL_Y - 0.01, (zFront - 1 + L.maskZ + 0.6) / 2, 0x3A3F8E);
+    }
+    for (let i = 0; i < 16; i++) {      // party bulbs along the masking unit
+      const x = -roomHalf + 0.4 + i * (roomHalf * 2 - 0.8) / 15;
+      const g = new THREE.SphereGeometry(0.045, 8, 6); g.translate(x, MY + 1.52, L.maskZ + 0.04);
+      maskParts.push(paint(g, KICK_COLORS[i % KICK_COLORS.length]));
+    }
+    // floors beside the outer lanes and the seating area
+    const outerL = laneXs[0] - 0.938 - 0.2, outerR = laneXs[laneXs.length - 1] + 0.938 + 0.2;
+    strip(() => -roomHalf, () => outerL, -0.005, zFront, L.maskZ, 1, carpet, [0.5, 0.5], 0);
+    strip(() => outerR, () => roomHalf, -0.005, zFront, L.maskZ, 1, carpet, [0.5, 0.5], 0);
+    strip(() => -roomHalf, () => roomHalf, -0.004, zFront, zFront - 5.7, 1, carpet, [0.5, 0.5], 0);
+    // seating: a cushioned U-bench and a score console per lane, a bar ledge at the back
+    laneXs.forEach((cx, li) => {
+      const col = SEAT_COLORS[li % SEAT_COLORS.length];
+      box(1.5, 0.42, 0.55, cx, 0.21, 7.2, col);
+      box(1.5, 0.5, 0.14, cx, 0.55, 7.47, col);
+      box(0.5, 0.42, 0.55, cx - 0.82, 0.21, 6.7, col);
+      box(0.5, 0.42, 0.55, cx + 0.82, 0.21, 6.7, col);
+      box(0.6, 0.7, 0.38, cx + 0.85, 0.35, 5.4, 0x2E56A6);
+      box(0.62, 0.05, 0.42, cx + 0.85, 0.72, 5.4, 0xFFC93C);
+    });
+    box(roomHalf * 2, 0.34, 1.6, 0, 0.17, 9.7, 0x2F3478);
+    box(roomHalf * 2, 0.55, 0.16, 0, 0.275, 8.55, 0x24478C);
+    box(roomHalf * 2, 0.05, 0.28, 0, 0.575, 8.55, 0xFFC93C);
+    // ball return hood + rack rails beside the bowler (one per lane pair)
+    laneXs.forEach((cx, li) => {
+      if (li % 2 === 1 && li !== opts.mainIndex) return;
+      const hx = cx + (li === opts.mainIndex ? opts.hoodX : HOOD.x);
+      const hood = new THREE.CylinderGeometry(0.21, 0.21, 0.8, 16, 1, false, -Math.PI / 2, Math.PI);
+      hood.rotateX(-Math.PI / 2);
+      hood.translate(hx, 0.24, HOOD.z);
+      solid.push(paint(hood, 0xFF5A5F));
+      box(0.42, 0.24, 0.8, hx, 0.12, HOOD.z, 0xE8484D);
+      const mouth = new THREE.CircleGeometry(0.13, 16); mouth.translate(hx, 0.24, HOOD.z + 0.402);
+      solid.push(paint(mouth, 0x1A1D33));
+      for (const s of [-1, 1]) box(0.03, 0.03, RACK_SPOT.z - HOOD.z, hx + s * 0.07, RACK_SPOT.y - 0.12, (RACK_SPOT.z + HOOD.z) / 2 + 0.2, 0xC9D2E0);
+      box(0.2, 0.12, 0.05, hx, RACK_SPOT.y - 0.08, RACK_SPOT.z + 0.15, 0xC9D2E0);
+      box(0.14, RACK_SPOT.y - 0.14, 0.14, hx, (RACK_SPOT.y - 0.14) / 2, RACK_SPOT.z + 0.15, 0x24478C);
+      box(0.12, RACK_SPOT.y - 0.14, 0.1, hx, (RACK_SPOT.y - 0.14) / 2, HOOD.z + 0.5, 0x24478C);
+    });
+    // overhead score monitors (screens are separate textured meshes)
+    laneXs.forEach(cx => {
+      box(MONITOR.w + 0.1, MONITOR.h + 0.1, 0.08, cx + MONITOR.x, MONITOR.y, MONITOR.z - 0.05, 0x1B1F3B);
+      box(0.06, CEIL_Y - MONITOR.y - 0.4, 0.06, cx + MONITOR.x, (CEIL_Y + MONITOR.y + 0.4) / 2, MONITOR.z - 0.08, 0x9AA6B8);
+    });
+
+    // ---- meshes --------------------------------------------------------------------------------
+    const add = (name, geo, material, o = {}) => {
+      const m = new THREE.Mesh(geo, material);
+      m.name = name;
+      m.matrixAutoUpdate = false;
+      m.updateMatrix();
+      if (o.receive) m.receiveShadow = true;
+      scene.add(m);
+      return m;
+    };
+    const woodTex = world.texture('wood_lane', { boards: 39 });
+    add('lanes', world.mergeGeometries(wood), world.mat(0xFFFFFF, { kind: 'phong', map: woodTex, shininess: 70 }), { receive: true });
+    add('alley', world.mergeGeometries(solid), world.mat(0xFFFFFF, { vertexColors: true }), { receive: true });
+    const decalMat = new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    add('markings', world.mergeGeometries(decal), decalMat);
+    add('carpet', world.mergeGeometries(carpet), world.mat(0xFFFFFF, { map: world.texture('carpet') }));
+    add('lights', world.mergeGeometries(glow), world.mat(0xFFFFFF, { kind: 'basic', vertexColors: true }));
+    const mask = [add('mask', world.mergeGeometries(maskParts), world.mat(0xFFFFFF, { vertexColors: true }))];
+    // masking logos (one shared canvas)
+    const logoTex = canvasTexture(THREE, logoCanvas());
+    mask.push(add('logos', world.mergeGeometries(logos.map(cx => new THREE.PlaneGeometry(1.5, 0.75).translate(cx, MY + 0.69, L.maskZ + 0.012))),
+      new THREE.MeshBasicMaterial({ map: logoTex })));
+    // mural walls (sides and back)
+    const muralTex = canvasTexture(THREE, muralCanvas(rng), true);
+    const murals = [];
+    for (const s of [-1, 1]) {
+      const g = new THREE.PlaneGeometry(zFront - L.maskZ, CEIL_Y);
+      g.rotateY(-s * Math.PI / 2); g.translate(s * roomHalf, CEIL_Y / 2, (zFront + L.maskZ) / 2);
+      const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * (zFront - L.maskZ) / 9);
+      murals.push(g);
+    }
+    const back = new THREE.PlaneGeometry(roomHalf * 2, CEIL_Y);
+    back.rotateY(Math.PI); back.translate(0, CEIL_Y / 2, zFront);
+    const buv = back.attributes.uv; for (let i = 0; i < buv.count; i++) buv.setX(i, buv.getX(i) * roomHalf * 2 / 9);
+    murals.push(back);
+    add('mural', world.mergeGeometries(murals), new THREE.MeshLambertMaterial({ map: muralTex }));
+    return { roomHalf, mask };
+  }
+
+  // =============================================================================================
+  // 8. HUD styles
+  // =============================================================================================
+
+  const HUD_CSS = `
+.bw-card { position: absolute; top: calc(var(--sat) + 66px); left: 0; right: 0; margin: 0 auto;
+  width: calc(100% - 20px - var(--sal) - var(--sar)); max-width: 560px; display: grid;
+  grid-template-columns: repeat(9, 1fr) 1.45fr; background: #fff; border-radius: 12px; overflow: hidden;
+  box-shadow: 0 4px 14px rgba(22, 40, 80, .22); font: 800 12px/1 var(--font-ui); color: var(--ink); }
+.bw-card.ss-hidden { display: none; }
+.bw-f { border-left: 1px solid #E3E8F0; min-width: 0; }
+.bw-f:first-child { border-left: 0; }
+.bw-f .n { background: var(--accent); color: #fff; font: 600 10px/1 var(--font-display); text-align: center; padding: 3px 0 2px; }
+.bw-f .m { display: flex; justify-content: flex-end; height: 15px; }
+.bw-f .m span { flex: 0 0 42%; max-width: 15px; text-align: center; line-height: 15px; border-left: 1px solid #EDF1F6;
+  border-bottom: 1px solid #EDF1F6; font-weight: 900; }
+.bw-f .m span.x, .bw-f .m span.s { color: var(--accent); }
+.bw-f.ten .m span { flex-basis: 30%; }
+.bw-f .t { text-align: center; height: 17px; line-height: 17px; font: 700 13px/17px var(--font-display); }
+.bw-f.cur { background: var(--tint); }
+.bw-f.cur .n { background: #FFC93C; color: #5A3A10; }
+.bw-strip { position: absolute; top: calc(var(--sat) + 66px); left: 0; right: 0; margin: 0 auto; width: max-content;
+  max-width: calc(100% - 20px); display: flex; gap: 4px; padding: 5px 6px; background: #fff; border-radius: 12px;
+  box-shadow: 0 4px 14px rgba(22, 40, 80, .22); font: 800 11px/1 var(--font-ui); color: var(--ink); }
+.bw-strip span { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: #EEF2F7; color: #8592A6; flex: none; }
+.bw-strip span.ok { background: #3BC45B; color: #fff; }
+.bw-strip span.no { background: #FFD9DA; color: #D9363C; }
+.bw-strip span.cur { background: #FFC93C; color: #5A3A10; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #FFC93C; }
+.bw-strip span.big { width: auto; min-width: 24px; padding: 0 5px; border-radius: 12px; }
+.bw-chip-name { gap: 6px; padding: 3px 12px 3px 3px; }
+.bw-chip-name .ss-portrait { width: 30px; height: 30px; }
+.bw-total { font: 700 18px/1 var(--font-display); padding: 6px 12px; min-width: 44px; justify-content: center; }
+.bw-side { position: absolute; top: calc(var(--sat) + 124px); display: flex; flex-direction: column; gap: 6px; }
+.bw-side.l { left: calc(var(--sal) + 10px); align-items: flex-start; }
+.bw-side.r { right: calc(var(--sar) + 10px); align-items: flex-end; }
+.bw-pins { position: relative; width: 66px; height: 58px; background: rgba(20, 32, 56, .62); border-radius: 12px; }
+.bw-pins i { position: absolute; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; border-radius: 50%;
+  background: rgba(255, 255, 255, .18); transition: background .25s, transform .25s; }
+.bw-pins i.up { background: #fff; box-shadow: inset 0 -3px 0 #E8343A; }
+.bw-pins i.hit { transform: scale(.6); }
+.bw-mini { display: flex; align-items: center; gap: 5px; padding: 2px 9px 2px 2px; font-size: 12px; opacity: .78; }
+.bw-mini .ss-portrait { width: 22px; height: 22px; }
+.bw-mini.cur { opacity: 1; box-shadow: 0 0 0 2px #FFC93C, var(--shadow-soft); }
+.bw-mini b { font: 700 14px/1 var(--font-display); }
+.bw-aim { position: absolute; bottom: calc(var(--sab) + 22px); display: flex; flex-direction: column; align-items: center; gap: 4px;
+  transition: opacity .2s, transform .2s; }
+.bw-aim.l { left: calc(var(--sal) + 14px); }
+.bw-aim.r { right: calc(var(--sar) + 14px); }
+.bw-aim .ss-btn.round { width: 58px; height: 58px; }
+.bw-aim .ss-btn.round .ss-icon { width: 28px; height: 28px; }
+.bw-aim small { font: 900 10px/1 var(--font-ui); letter-spacing: .1em; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.5); }
+.bw-off { opacity: 0; pointer-events: none !important; transform: translateY(12px); }
+.bw-swipe { position: absolute; bottom: calc(var(--sab) + 40px); left: 50%; transform: translateX(-50%);
+  font: 900 13px/1 var(--font-ui); letter-spacing: .06em; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,.55);
+  white-space: nowrap; transition: opacity .25s; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.bw-swipe svg { width: 22px; height: 22px; animation: bw-bob 1.2s ease-in-out infinite; }
+@keyframes bw-bob { 0%, 100% { transform: translateY(4px); } 50% { transform: translateY(-4px); } }
+.bw-speed { position: absolute; bottom: calc(var(--sab) + 96px); left: 50%; transform: translateX(-50%); transition: opacity .3s; }
+.bw-turnwrap { position: absolute; left: 0; right: 0; top: 30%; display: flex; justify-content: center; transition: opacity .25s, transform .25s; }
+.bw-turnwrap.out { opacity: 0; transform: translateY(-14px) scale(.95); }
+.bw-turncard { display: flex; align-items: center; gap: 12px; max-width: calc(100% - 28px); padding: 10px 22px 10px 10px;
+  background: #fff; border-radius: 44px; box-shadow: 0 10px 30px rgba(22, 40, 80, .3); }
+.bw-turncard .ss-portrait { width: 64px; height: 64px; }
+.bw-turncard h3 { margin: 0; font: 700 clamp(20px, 6.4vw, 28px)/1.05 var(--font-display); color: var(--ink); white-space: nowrap; }
+.bw-turncard p { margin: 4px 0 0; font: 800 13px/1 var(--font-ui); color: var(--ink-soft); }
+.bw-info { font-size: 12px; padding: 5px 10px; }
+@media (max-height: 520px) and (orientation: landscape) {
+  .bw-card, .bw-strip { top: calc(var(--sat) + 58px); max-width: 470px; width: calc(100% - 200px); }
+  .bw-strip { width: max-content; }
+  .bw-side { top: calc(var(--sat) + 74px); }
+  .bw-side.l { left: calc(var(--sal) + 12px); top: calc(var(--sat) + 76px); }
+  .bw-turnwrap { top: 36%; }
+  .bw-speed { bottom: calc(var(--sab) + 70px); }
+  .bw-aim { bottom: calc(var(--sab) + 14px); }
+}
+@media (max-width: 340px) { .bw-f .m span { font-size: 10px; } .bw-f .t { font-size: 11px; } }
+`;
+
+  // =============================================================================================
+  // 9. The sport instance
+  // =============================================================================================
+
+  function create(ctx) {
+    const { THREE, scene, camera, world, pals, ui, audio, engine, save, util: U } = ctx;
+    const mode = ctx.mode;
+    const L = makeLayout(mode);
+    const players = ctx.players;
+    const rng = ctx.rng;
+    const hand = save.settings && save.settings.leftHanded ? -1 : 1;
+    const V = (x, y, z) => new THREE.Vector3(x, y, z);
+
+    // ---- world ------------------------------------------------------------------------------
+    const env = world.environment(scene, {
+      sky: 'indoor', background: 0x1E2148, fog: true, fogNear: 34, fogFar: 80,
+      shadow: { center: V(0, 0, HEAD_Z - (L.wide ? 1.6 : 0.6)), size: L.wide ? 7.5 : 4.2 },
+    });
+    env.sun.castShadow = true;
+    env.hemi.intensity = 2.1;
+    const outer = L.wide ? L.deckHalf + GUTTER_W + 0.176 + 0.762 : LANE_PITCH;
+    const laneXs = [-(outer + LANE_PITCH), -outer, 0, outer, outer + LANE_PITCH];
+    const hoodX = -HOOD.x * hand;
+    const alley = buildAlley(ctx, L, laneXs, { mainIndex: 2, roomHalf: outer + LANE_PITCH + 0.938 + 1.1, hoodX });
+
+    camera.near = 0.05;
+    camera.far = 90;
+    delete camera.userData.fit;
+
+    // ---- pins (main rack + neighbours, instanced) ----------------------------------------------
+    const W = new PinWorld(L);
+    const maxSpots = rackSpots(L.rows);
+    const pinGeo = pinGeometry(THREE, world, L.wide ? 12 : 16);
+    const pinGeoLow = pinGeometry(THREE, world, 8);
+    const pinMat = world.mat(0xFFFFFF, { kind: 'phong', vertexColors: true, shininess: 70 });
+    const pinMesh = new THREE.InstancedMesh(pinGeo, pinMat, maxSpots.length);
+    pinMesh.castShadow = true;
+    pinMesh.frustumCulled = false;
+    scene.add(pinMesh);
+    const ZERO_M = new THREE.Matrix4().makeScale(0, 0, 0);
+    const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _one = new THREE.Vector3(1, 1, 1);
+    const PIN_BASE = new THREE.Matrix4().makeTranslation(0, -PIN_YC, 0);
+    let liftY = 0;                       // render offset of pins held by the setting table
+
+    function syncPins() {
+      for (let i = 0; i < maxSpots.length; i++) {
+        const b = W.pins[i];
+        if (!b || !b.active) { pinMesh.setMatrixAt(i, ZERO_M); continue; }
+        _p.set(b.x, b.y + (b.lifted ? liftY : 0), b.z);
+        _q.set(b.qx, b.qy, b.qz, b.qw);
+        _m.compose(_p, _q, _one).multiply(PIN_BASE);
+        pinMesh.setMatrixAt(i, _m);
+      }
+      pinMesh.instanceMatrix.needsUpdate = true;
+    }
+
+    // ---- balls --------------------------------------------------------------------------------
+    const ballGeo = new THREE.SphereGeometry(BALL_R, 28, 18);
+    const ballMats = players.map((p, i) => {
+      const col = pals.OPTIONS.shirts[p.profile.shirt] != null ? pals.OPTIONS.shirts[p.profile.shirt] : 0x3C6BE0;
+      return new THREE.MeshPhongMaterial({ map: canvasTexture(THREE, ballCanvas(col, 31 + i)), shininess: 95, specular: 0x777777 });
+    });
+    const ball = new THREE.Mesh(ballGeo, ballMats[0]);
+    ball.castShadow = true;
+    scene.add(ball);
+    const ballShadow = world.blobShadow(0.17, 0.42);
+    scene.add(ballShadow);
+    const trail = world.trail(ball, { color: 0xFFE27A, width: 0.075, length: 40, opacity: 0.6, maxJump: 1.5 });
+    trail.visible = false;
+    const ballVis = { mode: 'rack', blend: 0, from: V(0, 0, 0) };   // 'rack' | 'hand' | 'free' | 'hidden'
+    ball.position.set(hoodX, RACK_SPOT.y, RACK_SPOT.z);
+
+    // ---- pinsetter: sweep bar + setting table ------------------------------------------------
+    const deckW = L.wallAt(HEAD_Z - 0.3) * 2;
+    const sweepBar = new THREE.Mesh(new THREE.BoxGeometry(deckW + 0.04, 0.17, 0.05), world.mat(0xE9EDF4, { kind: 'phong' }));
+    const sweepStripe = new THREE.Mesh(new THREE.BoxGeometry(deckW + 0.05, 0.05, 0.055), world.mat(0xFF5A5F));
+    sweepStripe.position.y = 0.02;
+    sweepBar.add(sweepStripe);
+    const tableDepth = (L.rows - 1) * ROW_DZ + 0.42;
+    const table = new THREE.Mesh(new THREE.BoxGeometry(L.deckHalf * 2 + 0.12, 0.07, tableDepth), world.mat(0x3D4366, { kind: 'phong' }));
+    const BAR_UP = L.ceilY + 0.32, TABLE_UP = L.ceilY + 0.42, BAR_FRONT = HEAD_Z + 0.32;
+    sweepBar.position.set(0, BAR_UP, BAR_FRONT);
+    table.position.set(0, TABLE_UP, HEAD_Z - tableDepth / 2 + 0.2);
+    scene.add(sweepBar, table);
+
+    // ---- aim arrow + release marker -------------------------------------------------------------
+    const arrowTex = canvasTexture(THREE, arrowCanvas());
+    const arrowGeo = new THREE.PlaneGeometry(0.12, 5.2);
+    arrowGeo.rotateX(-Math.PI / 2);
+    arrowGeo.translate(0, 0, -2.6);
+    const arrowMat = new THREE.MeshBasicMaterial({ map: arrowTex, transparent: true, depthWrite: false, opacity: 0 });
+    const arrow = new THREE.Mesh(arrowGeo, arrowMat);
+    arrow.renderOrder = 3;
+    const markGeo = new THREE.RingGeometry(0.05, 0.075, 24);
+    markGeo.rotateX(-Math.PI / 2);
+    const marker = new THREE.Mesh(markGeo, new THREE.MeshBasicMaterial({ color: 0xFFD646, transparent: true, depthWrite: false, opacity: 0 }));
+    marker.renderOrder = 3;
+    scene.add(arrow, marker);
+
+    // ---- overhead monitors ----------------------------------------------------------------------
+    const monCanvas = makeCanvas(512, 288);
+    const monTex = canvasTexture(THREE, monCanvas);
+    const monitor = new THREE.Mesh(new THREE.PlaneGeometry(MONITOR.w, MONITOR.h), new THREE.MeshBasicMaterial({ map: monTex }));
+    monitor.position.set(MONITOR.x, MONITOR.y, MONITOR.z - 0.004);
+    scene.add(monitor);
+    const ambRng = U.rng((ctx.seed || 0) + 991);      // ambience never disturbs the game's own rng stream
+    const sideCanvas = neighbourScreen(ambRng);
+    const sideScreens = new THREE.Mesh(
+      world.mergeGeometries(laneXs.filter((x, i) => i !== 2).map(x => new THREE.PlaneGeometry(MONITOR.w, MONITOR.h).translate(x + MONITOR.x, MONITOR.y, MONITOR.z - 0.004))),
+      new THREE.MeshBasicMaterial({ map: canvasTexture(THREE, sideCanvas) }));
+    scene.add(sideScreens);
+
+    // ---- people: bowlers, spectators, neighbours -------------------------------------------
+    const bowlers = players.map(p => {
+      const pal = pals.create(p.profile, { shadows: false });
+      pal.setFacing(Math.PI);
+      pal.root.visible = false;
+      const shadow = world.blobShadow(0.36, 0.3);
+      scene.add(pal.root, shadow);
+      return { pal, shadow };
+    });
+    const roomHalf = alley.roomHalf;
+    const crowd = world.crowd(scene, {
+      rows: [{ x: 0, y: 0.34, z: 9.45, length: roomHalf * 2 - 1.2, facing: Math.PI }, { x: 0, y: 0, z: 8.05, length: roomHalf * 2 - 2.4, facing: Math.PI }],
+      spacing: 0.72, density: 0.72, seed: ctx.seed,
+    });
+    const ambient = buildNeighbours();
+
+    // ---- audio --------------------------------------------------------------------------------
+    let ambience = null, rollLoop = null;
+
+    // ---- state ----------------------------------------------------------------------------------
+    const stats = players.map(() => ({
+      strikes: 0, spares: 0, gutters: 0, splits: 0, pickups: 0, first: 0, firstN: 0, streak: 0, bestStreak: 0,
+      topSpeed: 0, conversions: 0, pins: 0, clears: 0,
+    }));
+    const rolls = players.map(() => []);
+    const leaveLog = players.map(() => []);      // spare mode: true/false per leave
+    const powerLog = players.map(() => []);      // power mode: pins per round
+    const aims = players.map(() => ({ x: 0.12 * hand, angle: -0.2 * DEG * hand }));
+    let phase = 'intro';
+    let turn = null;                               // { p, frame | leave | round, ball, fresh }
+    let autoplay = false;
+    let skipWaiter = null;
+    let shotWaiter = null;
+    let standingBefore = [];
+    let splitLeft = false;
+    let lastShot = null, lastOutcome = null;
+    let hintHandle = null, firstThrowDone = false;
+    let turnDir = 0, turnHeld = 0;
+    let throwAnim = null;
+    let rollInfo = null;                           // per-ball bookkeeping while the ball runs
+    let returnFor = 0;                             // whose ball comes back up the return
+    let arrowGlow = 0;
+    let started = false;
+
+    // ---- HUD ------------------------------------------------------------------------------------
+    ui.css('bowling-hud', HUD_CSS);
+    const hud = buildHud();
+
+    // ---- camera ---------------------------------------------------------------------------------
+    const cam = { shot: 'setup', pos: V(0, 2.2, AIM_Z + 3.4), look: V(0, 0, -10), fov: 55, lambda: 4 };
+
+    function fovFor(vFov, minH) {
+      const a = engine.size.aspect;
+      let v = vFov * DEG;
+      if (2 * Math.atan(Math.tan(v / 2) * a) < minH * DEG) v = 2 * Math.atan(Math.tan(minH * DEG / 2) / a);
+      return v / DEG;
+    }
+
+    const _gp = V(0, 0, 0), _gl = V(0, 0, 0);
+    function cameraGoal() {
+      const portrait = engine.size.aspect < 0.85;
+      const pal = turn ? bowlers[turn.p].pal : null;
+      let fov;
+      if (cam.shot === 'setup') {
+        const x = turn ? aims[turn.p].x : 0;
+        if (portrait) { _gp.set(x + 0.28 * hand, 2.5, AIM_Z + 2.9); _gl.set(x * 0.3 + 0.04 * hand, 0, -7.6); fov = fovFor(50, 31); }
+        else { _gp.set(x + 0.3 * hand, 2.1, AIM_Z + 2.8); _gl.set(x * 0.3 + 0.04 * hand, 0.1, -6.8); fov = fovFor(46, 30); }
+      } else if (cam.shot === 'follow') {
+        const b = W.ball;
+        const z = Math.max(b.z, HEAD_Z + 4.2);
+        // stay high while passing over the bowler, then drop in low behind the ball
+        const over = U.smoothstep(-3.2, 0.9, z + 2.5);
+        _gp.set(b.x * 0.7 + 0.35 * hand * over, 0.78 + 1.55 * over, z + 2.5); _gl.set(b.x * 0.45, portrait ? -0.12 : 0.05, Math.max(z - 6.5, HEAD_Z - 0.5));
+        fov = fovFor(46, 36);
+      } else if (cam.shot === 'pins') {
+        if (L.wide) {
+          // frame the current rack: 4 rows up close, 13 rows from further back
+          const rows = turn ? powerRows(turn.round) : 4, k = (rows - 4) / 9;
+          _gp.set(0, 1.2 + 0.95 * k, HEAD_Z + 2.4 + 1.0 * k); _gl.set(0, 0, HEAD_Z - 0.4 - 1.3 * k);
+          fov = fovFor(40, portrait ? 31 + 14 * k : 40 + 20 * k);
+        }
+        else if (portrait) { _gp.set(hand * 0.22, 1.1, HEAD_Z + 2.95); _gl.set(0, 0.08, HEAD_Z - 0.5); fov = fovFor(40, 31); }
+        else { _gp.set(hand * 0.32, 1.05, HEAD_Z + 2.6); _gl.set(0, 0.12, HEAD_Z - 0.45); fov = fovFor(31, 40); }
+      } else if (cam.shot === 'react' && pal) {
+        const r = pal.root.position;
+        // from down the lane, looking back at the bowler with the cheering seating area behind
+        if (portrait) { _gp.set(r.x - 0.25 * hand, 1.2, r.z - 2.9); _gl.set(r.x, 0.86, r.z); fov = fovFor(40, 40); }
+        else { _gp.set(r.x - 0.35 * hand, 1.3, r.z - 2.45); _gl.set(r.x - 0.12 * hand, 1.08, r.z); fov = fovFor(38, 30); }
+      } else { _gp.copy(cam.pos); _gl.copy(cam.look); fov = cam.fov; }
+      return fov;
+    }
+
+    function setShot(name, lambda, snap) {
+      cam.shot = name;
+      cam.lambda = lambda;
+      if (snap) { cam.fov = cameraGoal(); cam.pos.copy(_gp); cam.look.copy(_gl); }
+    }
+
+    function updateCamera(dt) {
+      const fov = cameraGoal();
+      U.dampVec3(cam.pos, _gp, cam.lambda, dt);
+      U.dampVec3(cam.look, _gl, cam.lambda * 1.3, dt);
+      cam.fov = U.damp(cam.fov, fov, cam.lambda, dt);
+      camera.position.copy(cam.pos);
+      camera.lookAt(cam.look);
+      if (Math.abs(camera.fov - cam.fov) > 1e-3 || camera.aspect !== engine.size.aspect) {
+        camera.fov = cam.fov;
+        camera.aspect = engine.size.aspect;
+        camera.updateProjectionMatrix();
+      }
+    }
+
+    // =============================================================================================
+    // HUD
+    // =============================================================================================
+
+    function buildHud() {
+      const root = ctx.hud;
+      const top = ui.el('div', 'ss-hud-top');
+      const nameChip = ui.el('div', 'ss-chip bw-chip-name ss-pop');
+      const infoChip = ui.el('div', 'ss-chip dark bw-info');
+      const totalChip = ui.el('div', 'ss-chip bw-total ss-pop');
+      top.append(nameChip, totalChip);
+      const card = ui.el('div', 'bw-card');
+      const frames = [];
+      for (let f = 0; f < 10; f++) {
+        const cell = ui.el('div', 'bw-f' + (f === 9 ? ' ten' : ''));
+        cell.innerHTML = '<div class="n">' + (f + 1) + '</div><div class="m"></div><div class="t"></div>';
+        card.appendChild(cell);
+        frames.push({ cell, m: cell.children[1], t: cell.children[2] });
+      }
+      const strip = ui.el('div', 'bw-strip ss-hidden');
+      const sideL = ui.el('div', 'bw-side l');
+      const sideR = ui.el('div', 'bw-side r');
+      const pinBox = ui.el('div', 'bw-pins');
+      const pinDots = SPOTS10.map(s => {
+        const d = ui.el('i');
+        d.style.left = (33 + s.x / PIN_DX * 13) + 'px';
+        d.style.top = (50 - (s.z - HEAD_Z) / -ROW_DZ * 13.5) + 'px';
+        pinBox.appendChild(d);
+        return d;
+      });
+      sideL.append(infoChip, pinBox);
+      if (L.wide) pinBox.classList.add('ss-hidden');
+      const minis = players.length > 1 ? players.map(p => {
+        const chip = ui.el('div', 'ss-chip bw-mini');
+        chip.append(ui.portraitImg(p.profile, 22));
+        const nm = ui.el('span', '', ui.esc(p.profile.name));
+        const sc = ui.el('b', '', '0');
+        chip.append(nm, sc);
+        sideR.appendChild(chip);
+        return { chip, sc };
+      }) : [];
+      // aim buttons
+      const mkAim = (side, icon, dir) => {
+        const wrap = ui.el('div', 'bw-aim ' + side + ' bw-off');
+        const b = ui.button(dir < 0 ? 'Aim left' : 'Aim right', null, { kind: 'round', icon, className: 'light ss-block', sfx: null });
+        const start = e => { if (phase !== 'aim' || autoplay) return; e.preventDefault(); turnDir = dir; turnHeld = 0; nudgeAim(dir * 0.15 * DEG); ui.sfx('ui_tick'); };
+        const stop = () => { turnDir = 0; };
+        b.addEventListener('pointerdown', start);
+        b.addEventListener('pointerup', stop);
+        b.addEventListener('pointerleave', stop);
+        b.addEventListener('pointercancel', stop);
+        wrap.append(b, ui.el('small', '', 'AIM'));
+        root.appendChild(wrap);
+        return wrap;
+      };
+      const aimL = mkAim('l', 'rotate-left', -1);
+      const aimR = mkAim('r', 'rotate-right', 1);
+      const swipe = ui.el('div', 'bw-swipe bw-off', ui.icon('up') + '<span>SWIPE UP TO BOWL</span>');
+      const speed = ui.el('div', 'ss-chip dark bw-speed bw-off');
+      root.append(top, card, strip, sideL, sideR, swipe, speed);
+      return { top, nameChip, infoChip, totalChip, card, frames, strip, pinBox, pinDots, minis, aimL, aimR, swipe, speed, nameFor: -1 };
+    }
+
+    function setAimUi(on) {
+      hud.aimL.classList.toggle('bw-off', !on || autoplay);
+      hud.aimR.classList.toggle('bw-off', !on || autoplay);
+      // the first-throw hint shows the gesture; without hints a quiet label does
+      hud.swipe.classList.toggle('bw-off', !on || firstThrowDone || autoplay || !!hintHandle);
+    }
+
+    function showSpeed(mps, spin) {
+      const a = Math.abs(spin);
+      const curve = a < 0.12 ? 'straight' : (a > 0.65 ? 'big hook ' : 'hook ') + (spin > 0 ? 'left' : 'right');
+      hud.speed.textContent = Math.round(mps * 3.6) + ' km/h · ' + curve;
+      hud.speed.classList.remove('bw-off');
+      ctx.wait(2.6).then(() => hud.speed.classList.add('bw-off'));
+    }
+
+    function playerTotal(i) {
+      if (mode === 'game') return knownTotal(rolls[i]);
+      if (mode === 'spare') return stats[i].conversions;
+      return stats[i].pins;
+    }
+
+    function refreshHud() {
+      const p = turn ? turn.p : 0;
+      const prof = players[p].profile;
+      if (hud.nameFor !== p) {
+        hud.nameFor = p;
+        hud.nameChip.innerHTML = '';
+        hud.nameChip.append(ui.portraitImg(prof, 30), ui.el('span', '', ui.esc(prof.name)));
+      }
+      if (mode === 'game') {
+        const st = frameState(rolls[p]);
+        hud.infoChip.textContent = st.done ? 'Done' : 'Frame ' + (st.frame + 1);
+        hud.totalChip.textContent = String(knownTotal(rolls[p]));
+        const fr = scoreFrames(rolls[p]);
+        fr.forEach((f, i) => {
+          const h = hud.frames[i];
+          const marks = f.marks.map(m => '<span class="' + (m === 'X' ? 'x' : m === '/' ? 's' : '') + '">' + m + '</span>');
+          if (i < 9 && f.marks[0] === 'X') marks.unshift('<span></span>');
+          h.m.innerHTML = marks.join('');
+          h.t.textContent = f.total === null ? '' : String(f.total);
+          h.cell.classList.toggle('cur', !st.done && st.frame === i);
+        });
+      } else if (mode === 'spare') {
+        const k = turn ? turn.leave : 0;
+        hud.infoChip.textContent = LEAVES[Math.min(k, 9)].name;
+        hud.totalChip.textContent = stats[p].conversions + '/10';
+        hud.card.classList.add('ss-hidden');
+        hud.strip.classList.remove('ss-hidden');
+        hud.strip.innerHTML = LEAVES.map((lv, i) => {
+          const r = leaveLog[p][i];
+          const cls = r === true ? 'ok' : r === false ? 'no' : i === k ? 'cur' : '';
+          return '<span class="' + cls + '">' + (r === true ? '✓' : r === false ? '✕' : i + 1) + '</span>';
+        }).join('');
+      } else {
+        const r = turn ? turn.round : 0;
+        hud.infoChip.textContent = 'Round ' + (Math.min(r, 9) + 1) + '/10';
+        hud.totalChip.textContent = String(stats[p].pins);
+        hud.card.classList.add('ss-hidden');
+        hud.strip.classList.remove('ss-hidden');
+        hud.strip.innerHTML = Array.from({ length: POWER_ROUNDS }, (x, i) => {
+          const v = powerLog[p][i];
+          const n = rackSpots(powerRows(i)).length;
+          return '<span class="big ' + (v != null ? (v === n ? 'ok' : '') : i === r ? 'cur' : '') + '">' + (v != null ? v : n) + '</span>';
+        }).join('');
+      }
+      hud.minis.forEach((m, i) => { m.sc.textContent = mode === 'spare' ? playerTotal(i) + '/10' : String(playerTotal(i)); m.chip.classList.toggle('cur', i === p); });
+      refreshPins();
+      drawMonitor();
+    }
+
+    function refreshPins(hitFlash) {
+      if (L.wide) return;
+      const up = new Set(W.standing());
+      hud.pinDots.forEach((d, i) => {
+        const n = SPOTS10[i].n;
+        d.classList.toggle('up', up.has(n));
+        d.classList.toggle('hit', !!hitFlash && !up.has(n) && standingBefore.indexOf(n) >= 0);
+      });
+    }
+
+    function drawMonitor() {
+      const g = monCanvas.getContext('2d');
+      const p = turn ? turn.p : 0, prof = players[p].profile;
+      const bg = g.createLinearGradient(0, 0, 0, 288);
+      bg.addColorStop(0, '#24307A'); bg.addColorStop(1, '#131A4A');
+      g.fillStyle = bg; g.fillRect(0, 0, 512, 288);
+      g.textBaseline = 'middle';
+      g.fillStyle = '#FFC93C'; g.font = '700 24px ' + FONT; g.textAlign = 'left';
+      g.fillText('SUNNY LANES', 20, 30);
+      g.textAlign = 'right'; g.fillStyle = '#9FB2FF'; g.font = '700 20px ' + FONT;
+      g.fillText(DEF.modes.find(m => m.id === mode).name.toUpperCase(), 492, 30);
+      g.textAlign = 'left'; g.fillStyle = '#FFFFFF'; g.font = '700 38px ' + FONT;
+      g.fillText(prof.name, 20, 80);
+      g.textAlign = 'right'; g.fillStyle = '#FFC93C'; g.font = '700 56px ' + FONT;
+      g.fillText(mode === 'spare' ? stats[p].conversions + '/10' : String(playerTotal(p)), 492, 84);
+      if (mode === 'game') {
+        const fr = scoreFrames(rolls[p]);
+        const cw = 47, x0 = 20, y0 = 130;
+        fr.forEach((f, i) => {
+          const w = i === 9 ? cw + 14 : cw, x = x0 + i * cw;
+          g.fillStyle = i === frameState(rolls[p]).frame ? '#3A4BB0' : '#1E276A';
+          g.fillRect(x + 1, y0, w - 2, 110);
+          g.fillStyle = '#9FB2FF'; g.font = '700 16px ' + FONT; g.textAlign = 'center';
+          g.fillText(String(i + 1), x + w / 2, y0 + 14);
+          g.font = '700 22px ' + FONT;
+          f.marks.forEach((m, j) => {
+            g.fillStyle = m === 'X' || m === '/' ? '#FF7A7E' : '#FFFFFF';
+            const cx = i === 9 ? x + 11 + j * 19 : f.marks.length === 1 ? x + w - 12 : x + 12 + j * 22;
+            g.fillText(m, cx, y0 + 46);
+          });
+          g.fillStyle = '#FFFFFF'; g.font = '700 24px ' + FONT;
+          if (f.total !== null) g.fillText(String(f.total), x + w / 2, y0 + 86);
+        });
+      } else if (mode === 'spare') {
+        const lv = LEAVES[Math.min(turn ? turn.leave : 0, 9)];
+        g.textAlign = 'center'; g.fillStyle = '#FFFFFF'; g.font = '700 40px ' + FONT;
+        g.fillText(lv.name.toUpperCase(), 256, 160);
+        g.fillStyle = '#9FB2FF'; g.font = '700 24px ' + FONT;
+        g.fillText('Leave ' + (Math.min(turn ? turn.leave : 0, 9) + 1) + ' of 10 · pins ' + lv.pins.join('-'), 256, 212);
+      } else {
+        const r = Math.min(turn ? turn.round : 0, 9);
+        g.textAlign = 'center'; g.fillStyle = '#FFFFFF'; g.font = '700 40px ' + FONT;
+        g.fillText('ROUND ' + (r + 1) + ' OF 10', 256, 160);
+        g.fillStyle = '#9FB2FF'; g.font = '700 26px ' + FONT;
+        g.fillText(rackSpots(powerRows(r)).length + ' pins in the rack!', 256, 212);
+      }
+      monTex.needsUpdate = true;
+    }
+
+    async function showTurnCard(p) {
+      const prof = players[p].profile;
+      const wrap = ui.el('div', 'bw-turnwrap');
+      const card = ui.el('div', 'bw-turncard ss-pop');
+      const sub = mode === 'game' ? 'Frame ' + (turn.frame + 1) : mode === 'spare' ? LEAVES[turn.leave].name : 'Round ' + (turn.round + 1);
+      card.append(ui.portraitImg(prof, 64));
+      card.appendChild(ui.el('div', '', '<h3>' + ui.esc(prof.name) + "'s turn!</h3><p>" + ui.esc(sub) + '</p>'));
+      wrap.appendChild(card);
+      ctx.hud.appendChild(wrap);
+      audio.sfx('ui_open');
+      await skippable(autoplay ? 0.5 : 1.3);
+      wrap.classList.add('out');
+      ctx.wait(0.3).then(() => wrap.remove());
+    }
+
+    // =============================================================================================
+    // Neighbouring lanes: pins, a ball, and two pals who bowl now and then
+    // =============================================================================================
+
+    function neighbourScreen(r) {
+      const c = makeCanvas(256, 144), g = c.getContext('2d');
+      const bg = g.createLinearGradient(0, 0, 0, 144);
+      bg.addColorStop(0, '#24307A'); bg.addColorStop(1, '#131A4A');
+      g.fillStyle = bg; g.fillRect(0, 0, 256, 144);
+      drawSun(g, 128, 58, 24, 12);
+      g.fillStyle = '#FFFFFF'; g.font = '700 22px ' + FONT; g.textAlign = 'center';
+      g.fillText('SUNNY LANES', 128, 116);
+      g.fillStyle = '#FFC93C'; g.font = '700 14px ' + FONT;
+      g.fillText('High score today: ' + (180 + Math.floor(r.next() * 90)), 128, 134);
+      return c;
+    }
+
+    function buildNeighbours() {
+      const lanes = [0, 1, 3, 4].map(i => laneXs[i]);
+      const mesh = new THREE.InstancedMesh(pinGeoLow, pinMat, lanes.length * 10);
+      mesh.frustumCulled = false;
+      const state = [];
+      lanes.forEach((cx, li) => SPOTS10.forEach((s, k) => state.push({ i: li * 10 + k, x: cx + s.x, z: s.z, tilt: 0, dir: 0, fall: 0, yaw: k * 1.37 })));
+      const writeAll = () => {
+        for (const s of state) {
+          _p.set(s.x + Math.sin(s.dir) * s.fall * 0.12, 0, s.z - Math.cos(s.dir) * s.fall * 0.12);
+          _q.setFromEuler(new THREE.Euler(-Math.cos(s.dir) * s.tilt, s.yaw, Math.sin(s.dir) * s.tilt, 'YXZ'));
+          _m.compose(_p, _q, _one);
+          mesh.setMatrixAt(s.i, _m);
+        }
+        mesh.instanceMatrix.needsUpdate = true;
+      };
+      writeAll();
+      scene.add(mesh);
+      const roster = pals.CPU_ROSTER.slice();
+      const who = [roster[ambRng.int(0, roster.length - 1)], roster[ambRng.int(0, roster.length - 1)]];
+      const ballM = new THREE.MeshPhongMaterial({ color: 0x8E5BE0, shininess: 80 });
+      const bowlersN = [1, 2].map((laneIdx, j) => {
+        const cx = lanes[laneIdx];
+        const pal = pals.create(who[j].profile, { shadows: false, detail: 'low' });
+        pal.setFacing(Math.PI);
+        const px = cx + Math.sign(cx) * 0.22;
+        pal.root.position.set(px, 0, NB_Z);
+        const sh = world.blobShadow(0.34, 0.28);
+        sh.position.set(px, 0.006, NB_Z);
+        const b = new THREE.Mesh(ballGeo, j ? ballM : world.mat(0x2FAE55, { kind: 'phong', shininess: 80 }));
+        b.visible = false;
+        scene.add(pal.root, sh, b);
+        return { pal, shadow: sh, ball: b, cx, lane: laneIdx, t: -1, next: 6 + ambRng.range(0, 6) + j * 5, x: 0, v: 0, z: 0, hit: false };
+      });
+      return { mesh, state, writeAll, bowlers: bowlersN };
+    }
+
+    function updateNeighbours(dt) {
+      let dirty = false;
+      for (const nb of ambient.bowlers) {
+        nb.pal.update(dt);
+        if (nb.t < 0) {
+          nb.next -= dt;
+          if (nb.next <= 0 && phase !== 'intro') {
+            nb.t = 0; nb.hit = false;
+            nb.pal.play('walk'); nb.pal.setSpeed(1.4);
+          }
+          continue;
+        }
+        nb.t += dt;
+        const root = nb.pal.root;
+        if (nb.t < 0.9) {
+          root.position.z = NB_Z - nb.t * 0.3;
+          nb.shadow.position.z = root.position.z;
+        } else if (!nb.ball.visible && nb.t < 1.2) {
+          nb.pal.play('idle');
+          nb.ball.visible = true;
+          nb.x = nb.cx + ambRng.range(-0.15, 0.2); nb.z = RELEASE_Z; nb.v = ambRng.range(6.5, 8.5);
+          nb.drift = ambRng.range(-0.012, 0.004);
+        }
+        if (nb.ball.visible) {
+          nb.z -= nb.v * dt;
+          nb.x += nb.drift * nb.v * dt;
+          nb.ball.position.set(nb.x, BALL_R, nb.z);
+          nb.ball.rotation.x -= nb.v * dt / BALL_R;
+          if (!nb.hit && nb.z < HEAD_Z + 0.15) {
+            nb.hit = true;
+            const off = nb.x - nb.cx;
+            const pinsDown = Math.abs(off) < 0.12 ? ambRng.int(7, 10) : ambRng.int(3, 8);
+            const lanePins = ambient.state.filter(s => Math.floor(s.i / 10) === nb.lane);
+            lanePins.slice().sort((a, b) => Math.abs(a.x - nb.x) - Math.abs(b.x - nb.x)).slice(0, pinsDown).forEach((s, k) => {
+              s.dir = Math.atan2(s.x - nb.x, -1) + ambRng.range(-0.6, 0.6);
+              U.tween(s, { tilt: 1.5, fall: ambRng.range(0.4, 1.4) }, 0.45, { delay: k * 0.03, ease: 'outQuad' });
+            });
+            const pan = U.clamp(nb.cx / 5, -0.8, 0.8);
+            audio.sfx('pins_hit', { intensity: pinsDown / 10, vol: 0.22, pan });
+            if (pinsDown === 10) nb.pal.play('cheer'); else nb.pal.play(pinsDown > 7 ? 'clap' : 'shrug');
+          }
+          if (nb.z < HEAD_Z - 1.2) nb.ball.visible = false;
+        }
+        if (nb.t > 4.6) {
+          for (const s of ambient.state) if (Math.floor(s.i / 10) === nb.lane) { U.killTweens(s); s.tilt = 0; s.fall = 0; }
+          root.position.z = NB_Z;
+          nb.shadow.position.z = root.position.z;
+          nb.t = -1; nb.next = 10 + ambRng.range(0, 10);
+        }
+        dirty = true;
+      }
+      if (dirty) ambient.writeAll();
+    }
+
+    // =============================================================================================
+    // Racks & the pinsetter
+    // =============================================================================================
+
+    function rackFor(t) {
+      if (mode === 'spare') return { spots: SPOTS10, standing: new Set(LEAVES[t.leave].pins) };
+      if (mode === 'hundred') return { spots: rackSpots(powerRows(t.round)), standing: null };
+      return { spots: SPOTS10, standing: null };
+    }
+
+    function placeRack(rack) {
+      W.setRack(rack.spots, rack.standing);
+      liftY = 0;
+      syncPins();
+    }
+
+    function tweenP(target, props, dur, ease) {
+      return U.tween(target, props, Math.max(0.01, dur), { ease: ease || 'inOutQuad' });
+    }
+
+    /**
+     * Sweep & reset. kind 'respot': standing pins lifted, deadwood swept, pins re-set where they stood.
+     * kind 'rack': everything swept and a new rack lowered. Runs on game time (pauses with the game).
+     */
+    async function runPinsetter(kind, rack) {
+      const k = autoplay ? 0.7 : 1;
+      audio.sfx('sweep', { vol: 0.55 });
+      await tweenP(sweepBar.position, { y: 0.09 }, 0.3 * k, 'outQuad');
+      if (kind === 'respot') {
+        const keep = W.pins.filter(p => W.isStanding(p));
+        await tweenP(table.position, { y: 0.42 }, 0.32 * k);
+        for (const p of keep) {
+          placePin(p, p.x - p.m01 * PIN_YC, p.z - p.m21 * PIN_YC, Math.atan2(p.m02, p.m00));
+          p.lifted = true;
+        }
+        liftY = 0;
+        await tweenLift(0.5, 0.3 * k);
+        await sweepDeadwood(0.5 * k);
+        await tweenP(sweepBar.position, { z: BAR_FRONT }, 0.3 * k);
+        await tweenLift(0, 0.3 * k);
+        for (const p of keep) p.lifted = false;
+      } else {
+        await sweepDeadwood(0.5 * k);
+        await tweenP(sweepBar.position, { z: BAR_FRONT }, 0.28 * k);
+        W.setRack(rack.spots, rack.standing);
+        for (const p of W.pins) if (p.active) p.lifted = true;
+        liftY = TABLE_UP - 0.42;
+        table.position.y = TABLE_UP;
+        await tweenLift(0, 0.42 * k, 'outQuad');
+        audio.sfx('wood_knock', { vol: 0.35, rate: 0.8 });
+        for (const p of W.pins) p.lifted = false;
+      }
+      await Promise.all([tweenP(table.position, { y: TABLE_UP }, 0.32 * k), tweenP(sweepBar.position, { y: BAR_UP }, 0.3 * k)]);
+      refreshPins();
+    }
+
+    function tweenLift(to, dur, ease) {
+      const o = { v: liftY };
+      return U.tween(o, { v: to }, Math.max(0.01, dur), { ease: ease || 'inOutQuad', onUpdate: () => { liftY = o.v; table.position.y = 0.42 + liftY; } });
+    }
+
+    async function sweepDeadwood(dur) {
+      const z1 = L.pitZ - 0.25;
+      W.sweep = { z: BAR_FRONT - 0.03, vz: (z1 - BAR_FRONT) / dur };
+      for (const p of W.pins) if (p.active && !p.lifted && !p.awake) { p.awake = true; p.dyn = true; p.sleepT = 0; }
+      await ctx.wait(dur);
+      W.sweep = null;
+      sweepBar.position.z = z1;
+      for (const p of W.pins) if (!p.lifted) W.bury(p);
+      if (W.ball.mode !== 'held') { W.ball.mode = 'gone'; W.ball.active = false; W.ball.dyn = false; }
+    }
+
+    // =============================================================================================
+    // Turn order
+    // =============================================================================================
+
+    function makeTurn(p) {
+      if (mode === 'game') {
+        const st = frameState(rolls[p]);
+        return { p, frame: st.frame, ball: st.ball, fresh: st.fresh };
+      }
+      if (mode === 'spare') return { p, leave: leaveLog[p].length, ball: 0, fresh: true };
+      return { p, round: powerLog[p].length, ball: 0, fresh: true };
+    }
+
+    /** The turn after `t` (null when everyone is done). Rotates players each frame / leave / round. */
+    function nextTurn(t) {
+      if (mode === 'game') {
+        const st = frameState(rolls[t.p]);
+        if (!st.done && st.frame === t.frame) return makeTurn(t.p);
+        for (let k = 1; k <= players.length; k++) {
+          const q = (t.p + k) % players.length;
+          if (!frameState(rolls[q]).done) return makeTurn(q);
+        }
+        return null;
+      }
+      // everyone takes the same leave / round, in player order
+      const count = i => (mode === 'spare' ? leaveLog[i].length : powerLog[i].length);
+      const limit = mode === 'spare' ? LEAVES.length : POWER_ROUNDS;
+      let q = 0;
+      for (let i = 1; i < players.length; i++) if (count(i) < count(q)) q = i;
+      return count(q) < limit ? makeTurn(q) : null;
+    }
+
+    // =============================================================================================
+    // Flow
+    // =============================================================================================
+
+    function skippable(seconds) {
+      return new Promise(resolve => {
+        let done = false;
+        const finish = () => { if (!done) { done = true; skipWaiter = null; resolve(); } };
+        skipWaiter = finish;
+        ctx.wait(seconds).then(finish);
+      });
+    }
+
+    async function run() {
+      let prevP = -1;
+      let reset = Promise.resolve();
+      while (ctx.alive && turn) {
+        await prepareTurn(turn, prevP);     // the pinsetter may still be finishing meanwhile
+        await reset;
+        prevP = turn.p;
+        const shot = await waitForShot();
+        await bowl(shot);
+        const out = assess(turn);
+        const next = nextTurn(turn);
+        returnFor = next ? next.p : turn.p;
+        const resetKind = !next ? null : mode === 'game' && next.p === turn.p && !next.fresh ? 'respot' : 'rack';
+        reset = resetKind ? ctx.wait(0.9).then(() => runPinsetter(resetKind, rackFor(next))) : Promise.resolve();
+        await react(out, !next);
+        turn = next;
+        if (turn) refreshHud();
+      }
+      if (ctx.alive) finishGame();
+    }
+
+    async function prepareTurn(t, prevP) {
+      phase = 'turn';
+      const b = bowlers[t.p];
+      const a = aims[t.p];
+      if (W.ball.mode !== 'gone' && W.ball.mode !== 'held') { W.ball.mode = 'gone'; W.ball.active = false; W.ball.dyn = false; }
+      if (ballVis.mode !== 'rack' && ballVis.mode !== 'hand') { ball.visible = false; ballVis.mode = 'hidden'; }
+      if (ballVis.mode === 'hidden') { ballReturn(); await ctx.wait(autoplay ? 0.3 : 0.6); }
+      if (prevP !== t.p) {
+        bowlers.forEach((o, i) => { o.pal.root.visible = i === t.p; o.shadow.visible = i === t.p; });
+        b.pal.root.position.set(a.x - 0.2 * hand, 0, AIM_Z);
+        b.pal.setFacing(Math.PI);
+        b.pal.releasePose(0);
+        b.pal.play('idle');
+        b.pal.lookAt(null);
+        b.pal.setExpression('neutral');
+        hud.nameFor = -1;
+        refreshHud();
+        setShot('setup', 3.2, true);
+        if (players.length > 1) await showTurnCard(t.p);
+      } else {
+        // same bowler: walk back to the spot
+        const pal = b.pal;
+        pal.releasePose(0.2);
+        pal.play('walk');
+        pal.setSpeed(1.6);
+        pal.setFacing(0);
+        setShot('setup', 3.2, true);
+        const r = pal.root.position;
+        await Promise.all([tweenP(r, { x: a.x - 0.2 * hand, z: AIM_Z }, 0.55)]);
+        pal.setFacing(Math.PI);
+        pal.play('idle');
+      }
+      if (players.length === 1) introBanner(t);
+      await ballToHand(b.pal);
+    }
+
+    function introBanner(t) {
+      if (mode === 'spare') ui.banner(LEAVES[t.leave].name.toUpperCase(), { kind: 'info', sub: 'Leave ' + (t.leave + 1) + ' of 10', duration: 1.2 });
+      else if (mode === 'hundred') ui.banner(rackSpots(powerRows(t.round)).length + ' PINS', { kind: 'info', sub: 'Round ' + (t.round + 1) + ' of 10', duration: 1.2 });
+    }
+
+    function ballReturn() {
+      ballVis.mode = 'rack';
+      ball.material = ballMats[returnFor];
+      ball.visible = true;
+      ball.position.set(hoodX, 0.24, HOOD.z + 0.3);
+      U.killTweens(ball.position);
+      audio.sfx('ball_return', { vol: 0.6 });
+      U.tween(ball.position, { z: RACK_SPOT.z, y: RACK_SPOT.y }, autoplay ? 0.4 : 0.9, { ease: 'outQuad' });
+    }
+
+    async function ballToHand(pal) {
+      ballVis.mode = 'free';
+      ball.visible = true;
+      const target = heldBallPos(pal, V(0, 0, 0));
+      U.killTweens(ball.position);
+      await U.tween(ball.position, { x: target.x, y: target.y, z: target.z }, autoplay ? 0.15 : 0.3, { ease: 'outQuad' });
+      ballVis.mode = 'hand';
+      poseHold(pal, false);
+    }
+
+    const _hv = new THREE.Vector3();
+    function heldBallPos(pal, out) {
+      const hnd = hand > 0 ? pal.parts.handR : pal.parts.handL;
+      _hv.copy(hnd.position).add(V(0, -0.07, 0.07));
+      pal.root.updateMatrixWorld();
+      return out.copy(_hv).applyMatrix4(pal.root.matrixWorld);
+    }
+
+    /** Hand poses are written for a right-hander and mirrored for lefties. */
+    function poseHands(pal, ballHand, other, extra, lambda) {
+      const bh = V(ballHand[0] * hand, ballHand[1], ballHand[2]), oh = V(other[0] * hand, other[1], other[2]);
+      pal.pose(Object.assign(hand > 0 ? { handR: bh, handL: oh } : { handL: bh, handR: oh }, extra), { lambda });
+    }
+
+    function poseHold(pal, ready) {
+      if (ready) poseHands(pal, [-0.12, 0.8, 0.27], [0.07, 0.83, 0.3], { crouch: 0.38, lean: 0.24, stance: 0.35 }, 14);
+      else poseHands(pal, [-0.27, 0.6, 0.14], [0.3, 0.7, 0.08], { crouch: 0.06, lean: 0.04 }, 10);
+    }
+
+    function waitForShot() {
+      phase = 'aim';
+      if (!firstThrowDone && !autoplay && !hintHandle && !(save.settings && save.settings.hints === false)) {
+        const sz = engine.size;
+        hintHandle = ui.hint(sz.h <= 520 && sz.aspect > 1
+          ? { gesture: 'swipe-up-curve', text: 'Swipe up to bowl!', x: sz.w * 0.66, y: sz.h * 0.56 }
+          : { gesture: 'swipe-up-curve', text: 'Swipe up to bowl!' });
+      }
+      setAimUi(true);
+      arrowGlow = 1;
+      return new Promise(resolve => {
+        shotWaiter = resolve;
+        if (autoplay) autoShot();
+      });
+    }
+
+    /** Commits a shot from any source (swipe, key, autoplay, debug). */
+    function commitShot(shot) {
+      if (phase !== 'aim' || !shotWaiter) return false;
+      const w = shotWaiter;
+      shotWaiter = null;
+      phase = 'release';
+      setAimUi(false);
+      turnDir = 0;
+      if (hintHandle) { hintHandle.hide(); hintHandle = null; }
+      firstThrowDone = true;
+      w(shot);
+      return true;
+    }
+
+    async function bowl(shot) {
+      const pal = bowlers[turn.p].pal;
+      lastShot = { x: shot.x, angleDeg: shot.angle / DEG, speed: shot.speed, spin: shot.spin };
+      standingBefore = W.standing();
+      throwAnim = { t: 0, shot, launched: false, pal, z0: pal.root.position.z };
+      audio.sfx('swish', { vol: 0.4, rate: 0.8 });
+      while (!throwAnim.launched) await ctx.wait(0.02);
+      phase = 'roll';
+      rollInfo = { hitSeen: false, gutterSeen: false, t: 0, settleT: 0, lastClack: 0 };
+      setShot('follow', 5.5);
+      const s = stats[turn.p];
+      s.topSpeed = Math.max(s.topSpeed, shot.speed);
+      showSpeed(shot.speed, shot.spin);
+      // ride along until the pins settle (or a generous timeout)
+      while (ctx.alive) {
+        await ctx.wait(0.05);
+        const r = rollInfo;
+        if (cam.shot === 'follow' && (W.ball.z < -11.8 || W.ball.mode !== 'lane')) setShot('pins', 4);
+        if (W.ev.hit || W.ball.mode === 'gone' || W.ball.mode === 'pit') r.settleT += 0.05;
+        if (W.settled() && r.settleT > 0.6) break;
+        if (r.settleT > (L.wide ? 6 : 4.8)) break;
+        if (r.t > 12) break;
+      }
+      if (rollLoop) { rollLoop.stop(0.3); rollLoop = null; }
+    }
+
+    // =============================================================================================
+    // Assessment & scoring
+    // =============================================================================================
+
+    function assess(t) {
+      phase = 'assess';
+      const after = W.standing();
+      const knocked = standingBefore.length - after.length;
+      const s = stats[t.p];
+      const gutter = W.ev.gutterAt !== null && knocked === 0;
+      const wobbled = W.pins.some(p => p.touched && W.isStanding(p));
+      const out = { knocked, after, gutter, wobbled, kind: 'count', streak: 0, sub: null, pins: knocked };
+      if (gutter) s.gutters++;
+      if (mode === 'game') {
+        const fresh = standingBefore.length === 10 && t.fresh;
+        rolls[t.p].push(knocked);
+        if (fresh) { s.first += knocked; s.firstN++; }
+        if (fresh && knocked === 10) {
+          s.strikes++; s.streak++; s.bestStreak = Math.max(s.bestStreak, s.streak);
+          out.kind = 'strike'; out.streak = s.streak;
+        } else {
+          if (!fresh && after.length === 0) {
+            s.spares++;
+            out.kind = splitLeft ? 'pickup' : 'spare';
+            if (splitLeft) s.pickups++;
+          } else if (fresh && isSplit(after)) {
+            s.splits++;
+            out.kind = 'split'; out.sub = after.join('-');
+          }
+          s.streak = 0;
+        }
+        splitLeft = out.kind === 'split';
+        const total = knownTotal(rolls[t.p]);
+        if (frameState(rolls[t.p]).done && total === 300) out.kind = 'perfect';
+      } else if (mode === 'spare') {
+        const ok = after.length === 0;
+        leaveLog[t.p].push(ok);
+        if (ok) { s.conversions++; s.spares++; }
+        out.kind = ok ? (isSplit(LEAVES[t.leave].pins) ? 'pickup' : 'spare') : knocked > 0 ? 'close' : out.kind;
+        if (ok && s.conversions === 10) out.kind = 'perfectSpares';
+      } else {
+        const rackN = W.pins.length;
+        const clear = after.length === 0;
+        const pts = knocked + (clear ? POWER_CLEAR_BONUS : 0);
+        powerLog[t.p].push(knocked);
+        s.pins += pts;
+        if (clear) s.clears++;
+        out.kind = clear ? 'clear' : 'power';
+        out.pins = knocked;
+        out.rack = rackN;
+      }
+      if (gutter) out.kind = 'gutter';
+      lastOutcome = { kind: out.kind, knocked, standing: after.slice() };
+      refreshHud();
+      refreshPins(true);
+      return out;
+    }
+
+    // =============================================================================================
+    // Celebrations
+    // =============================================================================================
+
+    async function react(out, last) {
+      phase = 'react';
+      const pal = bowlers[turn.p].pal;
+      const deck = V(0, 0.6, HEAD_Z - 0.5);
+      let anim = 'shrug', expr = 'neutral', big = false;
+      switch (out.kind) {
+        case 'strike': {
+          big = true;
+          const n = out.streak;
+          const word = n >= 4 ? n + '-BAGGER!' : STRIKE_WORDS[n - 1];
+          ui.banner(word, { kind: 'huge', sub: n === 1 ? null : n + ' strikes in a row', duration: 1.9 });
+          audio.sfx(n >= 3 ? 'fanfare_big' : 'fanfare_small');
+          audio.sfx('crowd_cheer', { intensity: Math.min(1, 0.7 + n * 0.1) });
+          audio.sfx('voice_yay', { delay: 0.25 });
+          audio.duck(0.45, 2);
+          crowd.cheer(1, 2.6);
+          world.confetti(scene, deck, { count: 110 + n * 20, spread: 1.6 });
+          engine.shake(0.05, 0.4);
+          anim = n >= 3 ? 'jump' : 'cheer'; expr = 'joy';
+          break;
+        }
+        case 'perfect':
+          big = true;
+          ui.banner('PERFECT GAME!', { kind: 'huge', sub: '300!', duration: 3 });
+          audio.sfx('jingle_perfect');
+          audio.sfx('crowd_cheer', { intensity: 1 });
+          audio.duck(0.4, 3.5);
+          crowd.cheer(1, 4);
+          world.confetti(scene, deck, { count: 200, spread: 2 });
+          ui.confetti({ count: 140 });
+          anim = 'jump'; expr = 'joy';
+          break;
+        case 'spare':
+          ui.banner('SPARE!', { kind: 'great', duration: 1.5 });
+          audio.sfx('star');
+          audio.sfx('crowd_applause', { intensity: 0.7 });
+          crowd.cheer(0.6, 1.6);
+          anim = 'clap'; expr = 'happy';
+          break;
+        case 'pickup':
+          big = true;
+          ui.banner('NICE PICK-UP!', { kind: 'great', sub: mode === 'spare' ? LEAVES[turn.leave].name : 'Split converted', duration: 1.8 });
+          audio.sfx('fanfare_small');
+          audio.sfx('crowd_cheer', { intensity: 0.85 });
+          crowd.cheer(0.9, 2.2);
+          world.confetti(scene, deck, { count: 70, spread: 1.4 });
+          anim = 'jump'; expr = 'joy';
+          break;
+        case 'perfectSpares':
+          big = true;
+          ui.banner('CLEAN SWEEP!', { kind: 'huge', sub: 'All 10 leaves!', duration: 2.4 });
+          audio.sfx('jingle_perfect');
+          audio.sfx('crowd_cheer', { intensity: 1 });
+          crowd.cheer(1, 3);
+          world.confetti(scene, deck, { count: 160, spread: 1.8 });
+          anim = 'jump'; expr = 'joy';
+          break;
+        case 'split':
+          ui.banner('SPLIT!', { kind: 'info', sub: out.sub, duration: 1.5 });
+          audio.sfx('crowd_gasp');
+          anim = 'shrug'; expr = 'surprised';
+          break;
+        case 'gutter':
+          ui.banner('GUTTER BALL', { kind: 'bad', duration: 1.4 });
+          audio.sfx('crowd_aww');
+          audio.sfx('voice_aw', { delay: 0.2 });
+          anim = 'sad'; expr = 'sad';
+          break;
+        case 'clear':
+          big = true;
+          ui.banner('CLEARED!', { kind: 'huge', sub: out.pins + ' pins +' + POWER_CLEAR_BONUS + ' bonus', duration: 2 });
+          audio.sfx('fanfare_big');
+          audio.sfx('crowd_cheer', { intensity: 1 });
+          crowd.cheer(1, 2.6);
+          world.confetti(scene, V(0, 0.8, HEAD_Z - 1.4), { count: 180, spread: 2.4 });
+          anim = 'jump'; expr = 'joy';
+          break;
+        case 'power': {
+          const frac = out.pins / out.rack;
+          ui.banner(out.pins + (out.pins === 1 ? ' PIN!' : ' PINS!'), { kind: frac > 0.6 ? 'great' : 'good', sub: 'of ' + out.rack, duration: 1.5 });
+          audio.sfx(frac > 0.6 ? 'crowd_cheer' : 'crowd_applause', { intensity: 0.4 + frac * 0.6 });
+          if (frac > 0.6) crowd.cheer(frac, 2);
+          anim = frac > 0.6 ? 'cheer' : frac > 0.3 ? 'clap' : 'shrug'; expr = frac > 0.3 ? 'happy' : 'neutral';
+          break;
+        }
+        case 'close':
+          ui.banner('SO CLOSE!', { kind: 'info', sub: out.knocked + ' of ' + standingBefore.length + ' pins', duration: 1.4 });
+          audio.sfx('crowd_ooh');
+          anim = 'shrug'; expr = 'wince';
+          break;
+        default: {
+          const n = out.knocked;
+          const teeter = out.wobbled && n >= 6;
+          ui.banner(n === 0 ? 'MISS' : n === 1 ? '1 PIN' : n + ' PINS', { kind: n >= 7 ? 'good' : 'info', sub: teeter ? 'It wobbled… and stayed up!' : null, duration: 1.3 });
+          if (n === 9 || teeter) audio.sfx('crowd_ooh');
+          else if (n >= 7) audio.sfx('crowd_applause', { intensity: 0.35 });
+          anim = n >= 7 ? 'clap' : n >= 3 ? 'shrug' : 'sad';
+          expr = n >= 7 ? 'happy' : n >= 3 ? 'neutral' : 'wince';
+        }
+      }
+      if (big) hapticBuzz(30);
+      await skippable(autoplay ? 0.5 : big ? 1.0 : 0.8);
+      // reaction shot: the bowler celebrates toward us, the crowd behind
+      pal.releasePose(0.25);
+      pal.lookAt(null);
+      setShot('react', 5, true);
+      pal.setExpression(expr, 2.4);
+      pal.play(anim);
+      if (out.kind === 'strike' || out.kind === 'perfect' || out.kind === 'pickup' || out.kind === 'clear') {
+        world.confetti(scene, V(pal.root.position.x, 1.7, pal.root.position.z + 0.4), { count: 60, spread: 0.9 });
+      }
+      await skippable(autoplay ? 0.6 : last ? 2.2 : big ? 1.9 : 1.4);
+    }
+
+    function hapticBuzz(ms) { if (ui.haptic) ui.haptic(ms); }
+
+    // =============================================================================================
+    // The throw: release animation, ball launch, rolling feedback
+    // =============================================================================================
+
+    function updateThrow(dt) {
+      const a = throwAnim;
+      if (!a) return;
+      a.t += dt;
+      const pal = a.pal, t = a.t;
+      if (t < 0.11) poseHands(pal, [-0.24, 0.66, -0.36], [0.34, 0.86, 0.2], { crouch: 0.45, lean: 0.32, stance: 0.6 }, 30);
+      else if (t < 0.25) poseHands(pal, [-0.2, 0.16, 0.42], [0.46, 0.74, 0.08], { crouch: 0.78, lean: 0.62, stance: 1 }, 34);
+      else poseHands(pal, [-0.17, 0.98, 0.5], [0.46, 0.8, -0.02], { crouch: 0.66, lean: 0.5, stance: 1 }, 9);
+      const k = U.ease.outCubic(Math.min(1, t / 0.32));
+      pal.root.position.z = U.lerp(a.z0, 0.62, k);
+      if (!a.launched && t >= 0.25) {
+        a.launched = true;
+        W.launch(a.shot);
+        ballVis.mode = 'free';
+        ballVis.blend = 1;
+        ballVis.from.copy(ball.position);
+        trail.clear();
+        trail.visible = true;
+        audio.sfx('bowl_release', { intensity: U.clamp((a.shot.speed - 5) / 5, 0.3, 1) });
+        if (a.shot.speed > 9) audio.sfx('voice_hup', { vol: 0.6 });
+        if (rollLoop) rollLoop.stop(0.05);
+        rollLoop = audio.loop('ball_roll', { vol: 0.75, rate: a.shot.speed / 8 });
+      }
+      if (t > 1.1) {
+        throwAnim = null;
+        pal.releasePose(0.5);
+        pal.play('idle');
+      }
+    }
+
+    function updateBallVisual(dt) {
+      const b = W.ball;
+      if (ballVis.mode === 'hand' && turn) {
+        heldBallPos(bowlers[turn.p].pal, ball.position);
+      } else if (ballVis.mode === 'free' && (b.mode !== 'held')) {
+        if (b.mode === 'gone') {
+          ball.visible = false;
+          ballVis.mode = 'hidden';
+          ctx.wait(1.1).then(() => { if (ballVis.mode === 'hidden') ballReturn(); });
+        }
+        else {
+          _p.set(b.x, b.y, b.z);
+          if (ballVis.blend > 0) {
+            ballVis.blend = Math.max(0, ballVis.blend - dt / 0.09);
+            _p.lerp(ballVis.from, ballVis.blend);
+          }
+          ball.position.copy(_p);
+          ball.quaternion.set(b.qx, b.qy, b.qz, b.qw);
+        }
+      }
+      if (trail.visible && (b.mode !== 'lane' || ballVis.mode !== 'free')) trail.visible = false;
+      ballShadow.visible = ball.visible && ball.position.y < 0.5 && ball.position.z > L.pitZ;
+      if (ballShadow.visible) ballShadow.position.set(ball.position.x, (W.ball.mode === 'gutter' ? GUTTER_Y : 0) + 0.004, ball.position.z);
+    }
+
+    /** Sounds, slow-mo and sparkles driven by physics events. */
+    function rollFeedback(dt) {
+      const r = rollInfo;
+      if (!r) return;
+      r.t += dt;
+      const b = W.ball;
+      if (rollLoop) {
+        const v = Math.hypot(b.vx, b.vz);
+        rollLoop.setRate(U.clamp(v / 8, 0.3, 1.4));
+        rollLoop.setVolume(b.mode === 'gutter' ? 0.5 : b.mode === 'lane' ? 0.75 : 0);
+        if (b.mode === 'pit' || b.mode === 'gone') { rollLoop.stop(0.25); rollLoop = null; audio.sfx('thud', { vol: 0.35, rate: 0.7 }); }
+      }
+      if (!r.gutterSeen && W.ev.gutterAt !== null) {
+        r.gutterSeen = true;
+        audio.sfx('gutter_drop');
+        if (!W.ev.hit) audio.sfx('crowd_aww', { intensity: 0.4, vol: 0.6 });
+      }
+      const h = W.ev.hit;
+      if (h && !r.hitSeen) {
+        r.hitSeen = true;
+        const pocket = (h.pin === 1 || h.pin === 3 || h.pin === 2) && h.speed > 5.8;
+        audio.sfx('pins_hit', { intensity: U.clamp(h.speed / 9, 0.3, 1) * (pocket ? 1 : 0.7) });
+        world.burst(scene, V(h.x, 0.18, h.z - 0.1), { count: 14, color: 0xFFFFFF, speed: 2.2, size: 0.05, life: 0.5 });
+        const bigHit = pocket && Math.abs(h.x) < 0.14 && (L.wide || standingBefore.length >= 9);
+        if (bigHit) { engine.slowmo(0.32, 1.25); engine.shake(0.035, 0.3); }
+      }
+      r.lastClack += dt;
+      if (W.ev.clatter > 0.9 && r.lastClack > 0.07) {
+        audio.sfx('pin_clatter', { intensity: U.clamp(W.ev.clatter / 4.5, 0.15, 1), vol: 0.8 });
+        r.lastClack = 0;
+      } else if (W.ev.wallHits > 1.2 && r.lastClack > 0.1) {
+        audio.sfx('wood_knock', { vol: U.clamp(W.ev.wallHits / 6, 0.15, 0.5), rate: 1.3 });
+        r.lastClack = 0;
+      }
+      W.ev.clatter = 0; W.ev.wallHits = 0;
+    }
+
+    // =============================================================================================
+    // Aiming & input
+    // =============================================================================================
+
+    function nudgeAim(d) {
+      const a = aims[turn.p];
+      a.angle = U.clamp(a.angle + d, -AIM_MAX, AIM_MAX);
+      arrowGlow = 1;
+    }
+
+    function moveTo(x) {
+      const a = aims[turn.p];
+      a.x = U.clamp(x, -X_MAX, X_MAX);
+      arrowGlow = 1;
+    }
+
+    function updateAim(dt) {
+      if (!turn) return;
+      const a = aims[turn.p];
+      if (phase === 'aim' && turnDir) {
+        turnHeld += dt;
+        const rate = (1.5 + 5 * Math.min(1, turnHeld / 0.9)) * DEG;
+        nudgeAim(turnDir * rate * dt);
+        if (Math.floor(turnHeld / 0.12) !== Math.floor((turnHeld - dt) / 0.12)) ui.sfx('ui_tick');
+      }
+      const show = phase === 'aim' || phase === 'turn';
+      arrowGlow = Math.max(0, arrowGlow - dt * 0.6);
+      const target = show ? 0.38 + 0.55 * Math.min(1, arrowGlow) : 0;
+      arrowMat.opacity = U.damp(arrowMat.opacity, target, 10, dt);
+      marker.material.opacity = U.damp(marker.material.opacity, show ? 0.9 : 0, 10, dt);
+      arrow.visible = marker.visible = arrowMat.opacity > 0.01;
+      arrow.position.set(a.x, 0.004, RELEASE_Z);
+      arrow.rotation.y = -a.angle;
+      marker.position.set(a.x, 0.004, RELEASE_Z);
+      // the bowler follows the release spot while aiming
+      if (phase === 'aim' && turn) {
+        const pal = bowlers[turn.p].pal;
+        const tx = a.x - 0.2 * hand;
+        const dx = tx - pal.root.position.x;
+        pal.root.position.x = U.damp(pal.root.position.x, tx, 14, dt);
+        pal.root.rotation.y = Math.PI + U.clamp(-dx * 2, -0.4, 0.4);
+      }
+    }
+
+    const press = { mode: null, startX: 0 };
+    ctx.input.on('down', p => {
+      if (phase !== 'aim' || autoplay) return;
+      press.mode = 'pending';
+      press.startX = aims[turn.p].x;
+      if (p.y > engine.size.h * 0.2) poseHold(bowlers[turn.p].pal, true);
+    });
+    ctx.input.on('move', p => {
+      if (phase !== 'aim' || !press.mode) return;
+      if (press.mode === 'pending') {
+        const ax = Math.abs(p.dx), ay = Math.abs(p.dy);
+        if (ax > 12 && ax > ay * 1.15) press.mode = 'drag';
+        else if (p.dy < -12 && ay > ax) press.mode = 'swipe';
+      }
+      if (press.mode === 'drag') moveTo(press.startX + p.ndx * 1.15);
+    });
+    ctx.input.on('up', () => {
+      const m = press.mode;
+      press.mode = null;
+      if (phase !== 'aim') return;
+      press.last = m;
+      // a swipe event (if any) arrives right after 'up'; relax the pose only when no throw came of it
+      Promise.resolve().then(() => { if (phase === 'aim') poseHold(bowlers[turn.p].pal, false); });
+    });
+    ctx.input.on('swipe', s => {
+      if (phase !== 'aim' || autoplay) return;
+      const short = Math.min(engine.size.w, engine.size.h);
+      const read = readSwipe(s, short);
+      if (!read || press.last === 'drag') return;
+      if (s.start.y < engine.size.h * 0.18) return;
+      const a = aims[turn.p];
+      commitShot({ x: a.x, angle: U.clamp(a.angle + read.drift, -AIM_MAX - 3 * DEG, AIM_MAX + 3 * DEG), speed: read.speed, spin: read.spin });
+    });
+    ctx.input.on('tap', () => {
+      if (skipWaiter && (phase === 'react' || phase === 'turn')) skipWaiter();
+    });
+    ctx.input.on('key', k => {
+      if (!k.down || !turn) return;
+      if ((phase === 'react' || phase === 'turn') && (k.key === ' ' || k.key === 'Enter') && skipWaiter) { skipWaiter(); return; }
+      if (phase !== 'aim' || autoplay) return;
+      if (k.key === 'ArrowLeft') moveTo(aims[turn.p].x - 0.025);
+      else if (k.key === 'ArrowRight') moveTo(aims[turn.p].x + 0.025);
+      else if (k.key === 'a' || k.key === 'A') nudgeAim(-0.25 * DEG);
+      else if (k.key === 'd' || k.key === 'D') nudgeAim(0.25 * DEG);
+      else if ((k.key === ' ' || k.key === 'Enter') && !k.repeat) {
+        const a = aims[turn.p];
+        commitShot({ x: a.x, angle: a.angle, speed: 8.4, spin: 0.35 * hand });
+      }
+    });
+
+    // =============================================================================================
+    // Autoplay: planned shots with human-like noise
+    // =============================================================================================
+
+    async function autoShot() {
+      const t = turn;
+      const live = W.pins.filter(p => W.isStanding(p));
+      let plan;
+      if (live.length === W.pins.length && (mode !== 'spare')) {
+        plan = strikeShot(L, { speed: 7.8 + rng.next() * 1.4, spin: 0.5 + rng.next() * 0.45 }, hand);
+      } else {
+        const spots = live.map(p => ({ n: p.n, x: p.x, z: p.z }));
+        const set = new Set(spots.map(s => s.n));
+        const cands = spareCandidates(L, spots, hand);
+        const scores = [];
+        for (let i = 0; i < cands.length; i++) {
+          scores.push(simulateShot(L, spots, set, cands[i], 5).knocked);
+          if (i % 4 === 3) { await ctx.wait(0); if (!autoplay || turn !== t || phase !== 'aim') return; }
+        }
+        plan = bestCandidate(cands, scores);
+      }
+      const shot = humanize(plan, 0.9, rng);
+      // show the line being picked, then bowl
+      const a = aims[t.p];
+      await Promise.all([U.tween(a, { x: shot.x, angle: shot.angle }, 0.45, { ease: 'inOutQuad' })]);
+      arrowGlow = 1;
+      await ctx.wait(0.2);
+      if (!autoplay || turn !== t || phase !== 'aim') return;
+      poseHold(bowlers[t.p].pal, true);
+      await ctx.wait(0.15);
+      if (autoplay && turn === t && phase === 'aim') commitShot(shot);
+    }
+
+    // =============================================================================================
+    // Results, records, medals, skill
+    // =============================================================================================
 
     function finishGame() {
       phase = 'done';
-      const best = Math.max(...scores);
-      const ranked = scores.map((s, i) => ({ s, i })).sort((a, b) => b.s - a.s);
-      const placeOf = i => 1 + ranked.findIndex(r => r.s === scores[i]);
-      const rec = ctx.save.record(DEF.id, 'practice', best, { label: 'Practice Pins', profileId: players[ranked[0].i].profile.id });
+      setAimUi(false);
+      const scores = players.map((p, i) => playerTotal(i));
+      const order = scores.map((s, i) => ({ s, i })).sort((a, b) => b.s - a.s || (stats[b.i].pins - stats[a.i].pins));
+      const placeOf = i => 1 + order.filter(o => o.s > scores[i]).length;
+      const fmtScore = i => (mode === 'spare' ? scores[i] + '/10' : String(scores[i]));
+      // records
+      const records = [];
+      const best = order[0];
+      const bestProf = players[best.i].profile;
+      const pid = bestProf.isGuest ? null : bestProf.id;
+      const rec = (key, value, label, fmt, who) => {
+        const r = save.record(DEF.id, key, value, { profileId: who ? (who.isGuest ? null : who.id) : pid, label, fmt });
+        records.push({ label, value: fmt === 'int' ? String(value) : fmt.replace('{v}', value), isNew: !!(r && r.isNew) });
+      };
+      if (mode === 'game') {
+        rec('high', best.s, 'High Score', 'int');
+        const mostStrikes = Math.max(...stats.map(s => s.strikes));
+        if (mostStrikes > 0) {
+          const who = players[stats.findIndex(s => s.strikes === mostStrikes)].profile;
+          rec('strikes', mostStrikes, 'Most Strikes', '{v} strikes', who);
+        }
+      } else if (mode === 'spare') rec('spare', best.s, 'Spare Challenge', '{v}/10');
+      else rec('power', best.s, 'Power Pins', '{v} pins');
+      // medals (first player)
+      const medals = [];
+      const award = id => { if (ctx.awardMedal(id)) medals.push(id); };
+      const s0 = scores[0];
+      if (mode === 'game') {
+        if (s0 >= 120) award('bronze');
+        if (s0 >= 170) award('silver');
+        if (s0 >= 220) award('gold');
+        if (s0 >= 250) award('platinum');
+      } else if (mode === 'spare' && s0 >= 8) award('platinum');
+      // skill
+      const deltaFor = i => {
+        const lvl = ctx.skillFor(players[i].profile);
+        const k = lvl / 2500;
+        let d;
+        if (mode === 'game') d = (scores[i] - (70 + 160 * k)) * 0.45 + 8;
+        else if (mode === 'spare') d = (scores[i] - (2 + 5 * k)) * 12 + 6;
+        else d = (scores[i] - (140 + 130 * k)) * 0.3 + 6;
+        return Math.round(U.clamp(d, -40, 80));
+      };
+      const st0 = stats[0];
+      const statsOut = [];
+      const topSpeed = { label: 'Top Speed', value: Math.round(st0.topSpeed * 3.6) + ' km/h' };
+      if (mode === 'game') {
+        statsOut.push({ label: 'Strikes', value: String(st0.strikes) }, { label: 'Spares', value: String(st0.spares) },
+          { label: 'Best Streak', value: String(st0.bestStreak) },
+          { label: 'First-Ball Avg', value: st0.firstN ? (st0.first / st0.firstN).toFixed(1) : '0' },
+          st0.splits ? { label: 'Splits Converted', value: st0.pickups + '/' + st0.splits } : { label: 'Gutter Balls', value: String(st0.gutters) },
+          topSpeed);
+      } else if (mode === 'spare') {
+        statsOut.push({ label: 'Leaves Converted', value: st0.conversions + '/10' },
+          { label: 'Splits Picked Up', value: String(leaveLog[0].filter((ok, i) => ok && isSplit(LEAVES[i].pins)).length) }, topSpeed);
+      } else {
+        statsOut.push({ label: 'Pins Knocked', value: String(powerLog[0].reduce((a, b) => a + b, 0)) },
+          st0.clears ? { label: 'Racks Cleared', value: String(st0.clears) } : { label: 'Best Round', value: String(Math.max(0, ...powerLog[0])) },
+          topSpeed);
+      }
+      const solo = players.length === 1;
+      let title;
+      if (!solo) title = players[best.i].profile.name + ' Wins!';
+      else if (mode === 'game') title = s0 >= 300 ? 'Perfect Game!' : s0 >= 220 ? 'Bowling Legend!' : s0 >= 170 ? 'Great Game!' : s0 >= 120 ? 'Nice Game!' : 'Good Effort!';
+      else if (mode === 'spare') title = s0 >= 10 ? 'Clean Sweep!' : s0 >= 8 ? 'Spare Master!' : s0 >= 5 ? 'Nice Pick-ups!' : 'Keep Practising!';
+      else title = s0 >= 300 ? 'Pin Crusher!' : s0 >= 200 ? 'Power Bowler!' : 'Nice Rolling!';
+      const good = mode === 'game' ? s0 >= 120 : mode === 'spare' ? s0 >= 5 : s0 >= 200;
       ctx.finish({
-        outcome: players.length > 1 ? 'done' : best >= 24 ? 'win' : 'done',
-        title: best >= 24 ? 'Great Rolling!' : 'Nice Practice!',
-        headline: String(scores[0]), headlineLabel: 'Pins',
+        outcome: solo ? (good ? 'win' : 'done') : 'done',
+        title,
+        headline: fmtScore(solo ? 0 : best.i),
+        headlineLabel: mode === 'game' ? 'Final Score' : mode === 'spare' ? 'Leaves Converted' : 'Pins',
         players: players.map((p, i) => ({
-          profileId: p.profile.id, name: p.profile.name, profile: p.profile, score: String(scores[i]),
-          place: placeOf(i), isCpu: false, skillDelta: Math.round((scores[i] - 18) * 2.5),
+          profileId: p.profile.id, name: p.profile.name, profile: p.profile, score: fmtScore(i),
+          place: placeOf(i), isCpu: false, skillDelta: deltaFor(i),
         })),
-        stats: [{ label: 'Rolls', value: String(ROLLS) }, { label: 'Best Roll', value: String(Math.min(10, best)) }],
-        records: [{ label: 'Practice Pins', value: String(best), isNew: rec.isNew }],
-        medals: [],
-        celebrate: best >= 24,
+        stats: statsOut,
+        records,
+        medals,
+        celebrate: good || medals.length > 0 || records.some(r => r.isNew),
       });
     }
 
-    ctx.input.on('swipe', onSwipe);
-    refreshHud();
+    // =============================================================================================
+    // Frame loop & lifecycle
+    // =============================================================================================
 
-    // Lifecycle ----------------------------------------------------------------------------------
+    function update(dt) {
+      W.advance(dt);
+      updateThrow(dt);
+      rollFeedback(dt);
+      syncPins();
+      updateBallVisual(dt);
+      updateAim(dt);
+      for (let i = 0; i < bowlers.length; i++) {
+        const o = bowlers[i];
+        if (!o.pal.root.visible) continue;
+        o.pal.update(dt);
+        o.shadow.position.set(o.pal.root.position.x, 0.006, o.pal.root.position.z);
+        if (phase === 'roll' && turn && i === turn.p && W.ball.mode !== 'gone') o.pal.lookAt(ball.position);
+      }
+      updateNeighbours(dt);
+      updateCamera(dt);
+    }
+
+    // first frame: rack in place, camera behind the bowler
+    turn = makeTurn(0);
+    placeRack(rackFor(turn));
+    bowlers[0].pal.root.visible = true;
+    bowlers[0].pal.root.position.set(aims[0].x - 0.2 * hand, 0, AIM_Z);
+    ball.material = ballMats[0];
+    refreshHud();
+    setShot('setup', 3.2, true);
+    updateCamera(0);
+
     return {
       start() {
+        if (started) return;
+        started = true;
         ambience = audio.loop('alley_ambience', { vol: 0.5 });
-        readyBowler();
+        run();
       },
-      update(dt) {
-        for (const pal of bowlers) pal.update(dt);
-        if (phase !== 'roll' || !roll) return;
-        const p = ball.position;
-        const k = U.clamp(-p.z / 18, 0, 1);
-        p.x += (roll.vx + roll.curve * k * k) * dt;
-        p.z -= roll.speed * dt;
-        ball.rotation.x -= roll.speed * dt / BALL_R;
-        if (Math.abs(p.x) > LANE_W / 2 + 0.05) p.y = Math.max(BALL_R - 0.06, p.y - dt * 0.6);
-        camera.position.z = Math.max(-9, U.damp(camera.position.z, p.z + 3.4, 3, dt));
-        camera.lookAt(0, 0.35, Math.min(-9, p.z - 6));
-        if (p.z <= HEAD_PIN_Z + 0.1) {
-          const x = p.x;
-          roll.loop.stop(0.2);
-          roll = null;
-          resolveRoll(x).then(homeCamera);
-        }
-      },
+      update,
       dispose() {
-        if (roll && roll.loop) roll.loop.stop(0.1);
+        if (rollLoop) rollLoop.stop(0.1);
         if (ambience) ambience.stop(0.3);
-        for (const pin of pins) { U.killTweens(pin.rotation); U.killTweens(pin.position); }
-        for (const pal of bowlers) pal.dispose();
-        pinGeo.dispose();
-        stripeGeo.dispose();
+        rollLoop = ambience = null;
+        if (hintHandle) hintHandle.hide();
+        for (const o of [ball.position, sweepBar.position, table.position, ...aims, ...ambient.state]) U.killTweens(o);
+        for (const o of bowlers) o.pal.dispose();
+        for (const m of ballMats) { m.map.dispose(); m.dispose(); }
+        for (const nb of ambient.bowlers) nb.pal.dispose();
+        shotWaiter = null; skipWaiter = null;
       },
-      debugState() { return { phase, turn, scores: scores.slice() }; },
+      debugState() {
+        const st = turn && mode === 'game' ? frameState(rolls[turn.p]) : null;
+        return {
+          phase, mode, autoplay, hand,
+          player: turn ? turn.p : null,
+          frame: st ? st.frame + 1 : null, ball: turn ? turn.ball : null,
+          leave: mode === 'spare' && turn ? turn.leave + 1 : null,
+          round: mode === 'hundred' && turn ? turn.round + 1 : null,
+          scores: players.map((p, i) => playerTotal(i)),
+          rolls: mode === 'game' ? rolls.map(r => r.slice()) : undefined,
+          standing: W.standing(),
+          awake: W.pins.filter(p => p.awake).length,
+          ballMode: W.ball.mode,
+          aim: turn ? { x: +aims[turn.p].x.toFixed(3), angleDeg: +(aims[turn.p].angle / DEG).toFixed(2) } : null,
+          camera: cam.shot,
+          lastShot, lastOutcome,
+        };
+      },
       debug: {
-        autoplay(on) { autoplay = on !== false; if (autoplay) autoRoll(); },
+        /** Plays every shot (good, slightly varied input) until the game finishes. */
+        autoplay(on) {
+          autoplay = on !== false;
+          if (autoplay) {
+            if (hintHandle) { hintHandle.hide(); hintHandle = null; }
+            if (phase === 'aim' && shotWaiter) autoShot();
+            if (skipWaiter) skipWaiter();
+          }
+          return autoplay;
+        },
+        /** Bowls now: { x (m), angleDeg, speed (m/s), spin (-1..1, + hooks left) }. */
+        throw(o = {}) {
+          if (!turn || phase !== 'aim') return false;
+          const a = aims[turn.p];
+          if (o.x != null) moveTo(o.x);
+          if (o.angleDeg != null) a.angle = U.clamp(o.angleDeg * DEG, -AIM_MAX, AIM_MAX);
+          return commitShot({
+            x: a.x, angle: a.angle,
+            speed: U.clamp(o.speed == null ? 8.5 : o.speed, SPEED_MIN, SPEED_MAX),
+            spin: U.clamp(o.spin == null ? 0 : o.spin, -1, 1),
+          });
+        },
+        /** Replaces the rack with these standing pins (10-pin numbering; Power Pins numbering in that mode). */
+        setLeave(list) {
+          if (phase !== 'aim' || !turn || !Array.isArray(list)) return false;
+          const pins = list.map(Number).filter(n => n >= 1 && n <= (mode === 'hundred' ? rackSpots(powerRows(turn.round)).length : 10));
+          if (mode === 'game') {
+            const st = frameState(rolls[turn.p]);
+            if (st.fresh && pins.length < 10) {
+              // as if a first ball had left exactly these pins
+              rolls[turn.p].push(10 - pins.length);
+              stats[turn.p].streak = 0;
+              turn = makeTurn(turn.p);
+            } else if (!st.fresh) {
+              rolls[turn.p][rolls[turn.p].length - 1] = 10 - pins.length;
+            }
+            splitLeft = isSplit(pins);
+          }
+          W.setRack(mode === 'hundred' ? rackSpots(powerRows(turn.round)) : SPOTS10, new Set(pins));
+          syncPins();
+          refreshHud();
+          return true;
+        },
+        /** Headless stats for n frames at quality 0..1 (no rendering). */
+        simulate(n = 100, quality = 0.8) { return simulateFrames(Math.max(1, Math.min(2000, n | 0)), quality, ctx.seed + 17, hand); },
+        /** Skips the current celebration / turn card. */
+        skip() { if (skipWaiter) skipWaiter(); return true; },
+        /** Jumps to frame / leave / round n (1-based) for everyone, counting the skipped ones as zeros. */
+        skipTo(n) {
+          if (phase !== 'aim' || !turn) return false;
+          const k = U.clamp((n | 0) - 1, 0, 9);
+          players.forEach((p, i) => {
+            if (mode === 'game') { rolls[i].length = 0; for (let f = 0; f < k; f++) rolls[i].push(0, 0); }
+            else if (mode === 'spare') { leaveLog[i].length = 0; for (let f = 0; f < k; f++) leaveLog[i].push(false); }
+            else { powerLog[i].length = 0; for (let f = 0; f < k; f++) powerLog[i].push(0); }
+          });
+          turn = makeTurn(turn.p);
+          placeRack(rackFor(turn));
+          refreshHud();
+          return true;
+        },
       },
     };
   }
