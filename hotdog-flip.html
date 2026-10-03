@@ -2,68 +2,75 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rammetto+One&family=Chivo+Mono:wght@400;700&display=swap">
 <style>
-/* Layout: one full-bleed grill canvas, HUD strip on top, modal cards for start / game over. Single dark look, by choice. */
+/* Layout: side-view kitchen canvas, HUD strip on top, hold-to-flip button bottom right, modal cards for start / game over. Single dark look, by choice. */
 :root {
-  --coal: #17120f;
-  --iron: #2b231e;
-  --ember: #ff7a2f;
+  --coal: #121a1b;
+  --iron: #1f2a2b;
+  --tile: #1d3b3f;
   --mustard: #f2c230;
   --ketchup: #d8342b;
-  --ash: #e9ddd1;
-  --ash-dim: #a8968a;
+  --ash: #e9e1d6;
+  --ash-dim: #93a3a1;
   --display: "Rammetto One", "Arial Black", Impact, sans-serif;
   --mono: "Chivo Mono", ui-monospace, Menlo, Consolas, monospace;
   color-scheme: dark;
 }
 html, body { height: 100%; }
+[hidden] { display: none !important; }
 body {
   background: var(--coal); color: var(--ash);
   font-family: var(--mono); overflow: hidden;
-  -webkit-user-select: none; user-select: none; touch-action: manipulation;
+  -webkit-user-select: none; user-select: none; touch-action: none;
 }
 #app { position: relative; height: 100%; display: flex; flex-direction: column; }
 #hud {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 10px 16px; background: var(--iron); border-bottom: 3px solid #000;
-  flex-wrap: wrap;
+  padding: 10px 16px; background: var(--iron); border-bottom: 3px solid #000; flex-wrap: wrap;
 }
-#hud .brand { font-family: var(--display); font-size: 18px; color: var(--mustard); letter-spacing: .02em; }
+#hud .brand { font-family: var(--display); font-size: 18px; color: var(--mustard); }
 #hud .brand span { color: var(--ketchup); }
-.stats { display: flex; gap: 18px; font-variant-numeric: tabular-nums; font-size: 13px; }
+.stats { display: flex; gap: 18px; font-variant-numeric: tabular-nums; font-size: 13px; flex-wrap: wrap; }
 .stat b { display: block; font-size: 10px; letter-spacing: .14em; color: var(--ash-dim); font-weight: 400; }
 .stat .v { font-weight: 700; font-size: 18px; }
-#combo .v { color: var(--mustard); }
+#streak .v { color: var(--mustard); }
 #lives .v { color: var(--ketchup); letter-spacing: .1em; }
 #stage { position: relative; flex: 1; min-height: 0; }
-canvas { display: block; width: 100%; height: 100%; cursor: pointer; }
+canvas { display: block; width: 100%; height: 100%; }
+#flipBtn {
+  position: absolute; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  width: 120px; height: 120px; border-radius: 50%; overflow: hidden;
+  font-family: var(--display); font-size: 15px; line-height: 1.1; color: #fff;
+  background: var(--ketchup); border: 4px solid #000; box-shadow: 5px 5px 0 #000; cursor: pointer;
+  touch-action: none;
+}
+#flipBtn .fill { position: absolute; left: 0; right: 0; bottom: 0; height: 0%; background: var(--mustard); }
+#flipBtn .lbl { position: relative; pointer-events: none; text-shadow: 2px 2px 0 #000; }
+#flipBtn.held { transform: translate(3px, 3px); box-shadow: 2px 2px 0 #000; }
+#flipBtn:disabled { filter: grayscale(.7) brightness(.7); cursor: default; }
+#flipBtn:focus-visible { outline: 3px solid var(--mustard); outline-offset: 3px; }
 .overlay {
   position: absolute; inset: 0; display: grid; place-items: center;
-  background: rgba(10, 7, 5, .72); padding: 16px;
+  background: rgba(6, 10, 10, .74); padding: 16px; z-index: 2;
 }
 .card {
-  max-width: 420px; width: 100%; background: var(--iron); border: 3px solid #000;
+  max-width: 430px; width: 100%; background: var(--iron); border: 3px solid #000;
   box-shadow: 6px 6px 0 #000; padding: 24px 22px; display: flex; flex-direction: column; gap: 14px;
 }
 .card h1 {
   font-family: var(--display); font-size: clamp(30px, 8vw, 44px); line-height: .95; margin: 0;
   color: var(--mustard); text-shadow: 3px 3px 0 var(--ketchup); text-wrap: balance;
 }
-.card p { margin: 0; line-height: 1.55; font-size: 13px; color: var(--ash); }
+.card p { margin: 0; line-height: 1.55; font-size: 13px; }
 .card ul { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.6; }
 .card .key { color: var(--mustard); font-weight: 700; }
-.legend { display: flex; height: 10px; border: 2px solid #000; }
-.legend i { flex: 1; }
-.legend-labels { display: flex; justify-content: space-between; font-size: 10px; color: var(--ash-dim); letter-spacing: .1em; margin-top: -8px; }
-button {
+.card button {
   font-family: var(--display); font-size: 18px; padding: 12px 18px; cursor: pointer;
   background: var(--ketchup); color: #fff; border: 3px solid #000; box-shadow: 4px 4px 0 #000;
 }
-button:hover { background: #e8443a; }
-button:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #000; }
-button:focus-visible { outline: 3px solid var(--mustard); outline-offset: 2px; }
-.final { font-family: var(--display); font-size: 40px; color: var(--ash); font-variant-numeric: tabular-nums; }
+.card button:hover { background: #e8443a; }
+.card button:focus-visible { outline: 3px solid var(--mustard); outline-offset: 2px; }
+.final { font-family: var(--display); font-size: 40px; font-variant-numeric: tabular-nums; }
 .sub { font-size: 12px; color: var(--ash-dim); }
-@media (prefers-reduced-motion: reduce) { button:active { transform: none; } }
 </style>
 
 <div id="app">
@@ -71,37 +78,34 @@ button:focus-visible { outline: 3px solid var(--mustard); outline-offset: 2px; }
     <div class="brand">HOTDOG <span>FLIP</span></div>
     <div class="stats">
       <div class="stat" id="score"><b>SCORE</b><span class="v">0</span></div>
-      <div class="stat" id="combo"><b>COMBO</b><span class="v">x1</span></div>
-      <div class="stat" id="served"><b>SERVED</b><span class="v">0</span></div>
+      <div class="stat" id="streak"><b>STREAK</b><span class="v">0</span></div>
+      <div class="stat" id="level"><b>LEVEL</b><span class="v">1</span></div>
       <div class="stat" id="lives"><b>LIVES</b><span class="v">●●●</span></div>
     </div>
   </div>
   <div id="stage">
     <canvas id="c"></canvas>
+    <button id="flipBtn" aria-label="Hold to charge the pan, release to flip"><span class="fill"></span><span class="lbl">HOLD<br>TO FLIP</span></button>
     <div class="overlay" id="startScreen">
       <div class="card">
         <h1>Hotdog Flip</h1>
-        <p>Dogs drop onto the grill. Only the side touching the grate cooks.</p>
+        <p>A dog flies in from the left and lands in your pan. Launch it onto whatever is sitting on the counter.</p>
         <ul>
-          <li><span class="key">Tap a dog</span> to flip it.</li>
-          <li>When <span class="key">both sides</span> are golden, tap it again to serve.</li>
-          <li>Hit 70–85% on a side for a <span class="key">perfect</span> bonus.</li>
-          <li>Let the underside reach 100% and it burns. Three burns ends your shift.</li>
+          <li><span class="key">Hold</span> the button (or Space) to charge. The meter swings up and down.</li>
+          <li><span class="key">Release</span> to snap the pan up and flip the dog.</li>
+          <li>It has to land <span class="key">flat</span> and <span class="key">on top</span>. Tilted landings bounce off.</li>
+          <li>Targets get smaller, start moving, and wind picks up. Three drops and you're out.</li>
         </ul>
-        <div class="legend" aria-hidden="true">
-          <i style="flex:60;background:#e48b86"></i><i style="flex:10;background:#c8783c"></i><i style="flex:15;background:var(--mustard)"></i><i style="flex:15;background:#7a3a1a"></i>
-        </div>
-        <div class="legend-labels"><span>RAW</span><span>60 DONE</span><span>PERFECT</span><span>100 BURNT</span></div>
-        <button id="startBtn">Light the grill</button>
+        <button id="startBtn">Fire up the pan</button>
         <div class="sub" id="bestLine"></div>
       </div>
     </div>
     <div class="overlay" id="overScreen" hidden>
       <div class="card">
-        <h1>Shift over</h1>
+        <h1>Dropped it</h1>
         <div class="final" id="finalScore">0</div>
         <p id="finalLine"></p>
-        <button id="againBtn">Grill again</button>
+        <button id="againBtn">Flip again</button>
       </div>
     </div>
   </div>
@@ -109,33 +113,32 @@ button:focus-visible { outline: 3px solid var(--mustard); outline-offset: 2px; }
 
 <script>
 (() => {
-  const cv = document.getElementById('c');
-  const ctx = cv.getContext('2d');
-  const stage = document.getElementById('stage');
+  const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+  const stage = document.getElementById('stage'), btn = document.getElementById('flipBtn'), fill = btn.querySelector('.fill');
   const $ = id => document.getElementById(id);
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!CanvasRenderingContext2D.prototype.roundRect) CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h) { this.rect(x, y, w, h); };
 
-  const DONE = 60, PERF_LO = 70, PERF_HI = 85, BURN = 100;
-  let W = 0, H = 0, DPR = 1, slots = [], cols = 3, rows = 2;
+  // ---------- world ----------
+  const WW = 1000, WH = 600, COUNTER = 520, G = 1400;
+  const PAN_X = 200, PAN_Y = 452, DOG_L = 92, DOG_T = 22;
+  let W = 0, H = 0, DPR = 1, S = 1, OX = 0, OY = 0;
+
+  function resize() {
+    const r = stage.getBoundingClientRect();
+    DPR = Math.min(window.devicePixelRatio || 1, 2); W = r.width; H = r.height;
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    S = Math.min(W / WW, H / WH); OX = (W - WW * S) / 2; OY = (H - WH * S) / 2;
+  }
+  new ResizeObserver(resize).observe(stage);
 
   function load(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } }
   function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
-  let best = load('hotdogflip-best', 0);
+  let best = load('hotdogflip-pan-best', 0);
 
-  // ---------- audio (starts on first button press) ----------
-  let ac = null, sizzleGain = null;
-  function initAudio() {
-    if (ac) return;
-    try {
-      ac = new (window.AudioContext || window.webkitAudioContext)();
-      const len = ac.sampleRate * 2, buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
-      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (Math.random() < .3 ? 1 : .25);
-      const src = ac.createBufferSource(); src.buffer = buf; src.loop = true;
-      const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 3000;
-      sizzleGain = ac.createGain(); sizzleGain.gain.value = 0;
-      src.connect(hp).connect(sizzleGain).connect(ac.destination); src.start();
-    } catch { ac = null; }
-  }
+  // ---------- audio ----------
+  let ac = null;
+  function initAudio() { if (ac) return; try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch { ac = null; } }
   function blip(freq, dur, type = 'square', vol = .08, slide = 0) {
     if (!ac) return;
     const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime;
@@ -145,342 +148,418 @@ button:focus-visible { outline: 3px solid var(--mustard); outline-offset: 2px; }
     o.connect(g).connect(ac.destination); o.start(t); o.stop(t + dur);
   }
 
-  // ---------- layout ----------
-  function resize() {
-    const r = stage.getBoundingClientRect();
-    DPR = Math.min(window.devicePixelRatio || 1, 2);
-    W = r.width; H = r.height;
-    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
-    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    const portrait = H > W * 1.1;
-    cols = portrait ? 2 : 3; rows = portrait ? 3 : 2;
-    const padX = Math.max(16, W * .05), padY = Math.max(16, H * .06);
-    const cw = (W - padX * 2) / cols, ch = (H - padY * 2) / rows;
-    const old = slots;
-    slots = [];
-    for (let r2 = 0; r2 < rows; r2++) for (let c = 0; c < cols; c++) {
-      const i = r2 * cols + c;
-      slots.push({
-        x: padX + c * cw + cw / 2, y: padY + r2 * ch + ch / 2, w: cw, h: ch,
-        dog: old[i] ? old[i].dog : null, wait: old[i] ? old[i].wait : 0
-      });
-    }
-  }
-  new ResizeObserver(resize).observe(stage);
+  // ---------- targets ----------
+  // hw = half width of the landable top, h = height above counter, lvl = first level it can appear
+  const KINDS = [
+    { id: 'plate', name: 'Bun on a plate', hw: 52, h: 28, lvl: 1 },
+    { id: 'toaster', name: 'Toaster', hw: 44, h: 92, lvl: 1 },
+    { id: 'books', name: 'Cookbook stack', hw: 38, h: 0, lvl: 2 },
+    { id: 'mug', name: 'Coffee mug', hw: 22, h: 62, lvl: 2 },
+    { id: 'cat', name: 'Sleeping cat', hw: 32, h: 70, lvl: 3, bob: 6 },
+    { id: 'skate', name: 'Rolling skateboard', hw: 44, h: 24, lvl: 4, slide: 110 },
+    { id: 'duck', name: 'Rubber duck', hw: 15, h: 58, lvl: 4 },
+    { id: 'cone', name: 'Traffic cone', hw: 11, h: 112, lvl: 5 },
+    { id: 'balloon', name: 'Balloon', hw: 20, h: 210, lvl: 6, bob: 26, sway: 40 },
+    { id: 'fork', name: 'Upright fork', hw: 8, h: 120, lvl: 7 },
+  ];
+  let target = null, nextTarget = null;
 
-  // ---------- game state ----------
-  let state = 'menu', score = 0, combo = 1, served = 0, lives = 3, elapsed = 0, burns = 0, perfects = 0;
-  const particles = [], popups = [];
+  function makeTarget(lvl) {
+    const pool = KINDS.filter(k => k.lvl <= lvl);
+    // favour the newest unlocks a little
+    const k = pool[Math.floor(Math.pow(Math.random(), .7) * pool.length)];
+    const shrink = Math.max(.6, 1 - (lvl - 1) * .04);
+    const t = {
+      k, hw: Math.max(7, k.hw * (k.id === 'fork' ? 1 : shrink)), h: k.id === 'books' ? 70 + Math.random() * 130 : k.h,
+      bx: 460 + Math.random() * 360, phase: Math.random() * 6.28,
+      speed: .7 + Math.random() * .6 + lvl * .05, slide: k.slide || 0, bob: k.bob || 0, sway: k.sway || 0, enter: 0
+    };
+    if (t.slide) t.bx = Math.min(t.bx, 840 - t.slide);
+    if (lvl >= 5 && !t.slide && Math.random() < .35) t.slide = 30 + Math.random() * 50, t.bx = Math.min(t.bx, 840 - t.slide);
+    return t;
+  }
+  function tpos(t, time) {
+    const x = t.bx + Math.sin(time * t.speed + t.phase) * t.slide + Math.sin(time * .9 + t.phase) * t.sway;
+    const top = COUNTER - t.h + Math.sin(time * 1.8 + t.phase) * t.bob;
+    return { x: x + (1 - easeOut(t.enter)) * 600, top };
+  }
+  const easeOut = u => 1 - Math.pow(1 - Math.min(1, u), 3);
+
+  // ---------- state ----------
+  let state = 'menu', phase = 'enter', phaseT = 0, time = 0;
+  let score = 0, streak = 0, level = 1, lives = 3, landed = 0, throws = 0;
+  let wind = 0, charge = 0, power = 0, panLift = 0, panRot = 0, lastArc = [], arc = [];
+  let dog = null;
+  const popups = [], crumbs = [];
+
+  function newDog() {
+    dog = { x: -80, y: 260, vx: 0, vy: 0, a: -0.4, w: 0, mode: 'enter', t: 0, att: null };
+    phase = 'enter'; phaseT = 0;
+    blip(300, .15, 'triangle', .05, 200);
+  }
 
   function reset() {
-    score = 0; combo = 1; served = 0; lives = 3; elapsed = 0; burns = 0; perfects = 0;
-    particles.length = 0; popups.length = 0;
-    slots.forEach((s, i) => { s.dog = null; s.wait = .4 + i * .5; });
+    score = 0; streak = 0; level = 1; lives = 3; landed = 0; throws = 0; wind = 0;
+    popups.length = 0; crumbs.length = 0; lastArc = []; arc = [];
+    target = makeTarget(1); target.enter = 1; nextTarget = null;
+    newDog(); updateHud();
+  }
+
+  function tri(u) { u %= 2; return u < 1 ? u : 2 - u; }
+
+  function startCharge() {
+    if (state !== 'play' || phase !== 'ready') return;
+    initAudio(); phase = 'charge'; charge = 0; btn.classList.add('held');
+  }
+  function release() {
+    btn.classList.remove('held');
+    if (state !== 'play' || phase !== 'charge') return;
+    launch(power);
+  }
+
+  function launch(p) {
+    const vx = 180 + p * 380, vy = 480 + p * 620;
+    const flips = level >= 6 ? 2 : 1;
+    dog.vx = vx; dog.vy = -vy; dog.w = flips * Math.PI * G / (2 * vy);
+    dog.mode = 'fly'; dog.a = 0;
+    phase = 'flight'; phaseT = 0; panLift = 1; throws++;
+    arc = [];
+    blip(180, .12, 'square', .07, 500);
+  }
+
+  function result(ok, msg, color) {
+    phase = 'result'; phaseT = 0; lastArc = arc;
+    if (ok) {
+      landed++; streak++;
+      if (landed % 3 === 0) level++;
+      wind = level >= 4 ? (Math.random() * 2 - 1) * Math.min(260, 60 + level * 22) : 0;
+      nextTarget = makeTarget(level);
+    } else {
+      streak = 0; lives--;
+    }
+    if (msg) popup(msg, color);
     updateHud();
   }
 
-  function maxDogs() { return Math.min(slots.length, 2 + Math.floor(elapsed / 18)); }
-  function baseRate() { return 13 + Math.min(17, elapsed * .18); }
-
-  function spawn(s) {
-    const r = baseRate() * (0.75 + Math.random() * .5);
-    s.dog = {
-      sides: [Math.random() * 8, Math.random() * 8], up: 0, rate: r,
-      flipT: 1, drop: 0, burnt: 0, servedT: 0, wob: Math.random() * 6.28
-    };
+  function popup(text, color, x, y) {
+    const p = target ? tpos(target, time) : { x: 600, top: 300 };
+    popups.push({ x: x ?? dog.x, y: y ?? Math.min(dog.y, p.top) - 40, text, color, life: 1.3 });
   }
-
-  function activeDogs() { return slots.filter(s => s.dog && !s.dog.servedT && !s.dog.burnt).length; }
 
   function update(dt) {
-    if (state !== 'play') { updateFx(dt); return; }
-    elapsed += dt;
-    let hottest = 0;
-    for (const s of slots) {
-      const d = s.dog;
-      if (!d) {
-        s.wait -= dt;
-        if (s.wait <= 0 && activeDogs() < maxDogs()) spawn(s);
-        continue;
+    time += dt; phaseT += dt;
+    panLift = Math.max(0, panLift - dt * 4);
+    for (let i = popups.length - 1; i >= 0; i--) { const p = popups[i]; p.life -= dt; p.y -= 35 * dt; if (p.life <= 0) popups.splice(i, 1); }
+    for (let i = crumbs.length - 1; i >= 0; i--) { const c = crumbs[i]; c.life -= dt; c.vy += G * .6 * dt; c.x += c.vx * dt; c.y += c.vy * dt; if (c.y > COUNTER) { c.y = COUNTER; c.vy *= -.3; c.vx *= .6; } if (c.life <= 0) crumbs.splice(i, 1); }
+    if (target && target.enter < 1) target.enter += dt * 2;
+    if (state !== 'play' || !dog) { fill.style.height = '0%'; return; }
+
+    // pan pose
+    if (phase === 'charge') {
+      charge += dt; power = tri(charge / .75);
+      panRot = power * .22;
+    } else panRot += (-panLift * .5 - panRot) * Math.min(1, dt * 18);
+    fill.style.height = (phase === 'charge' ? power * 100 : 0) + '%';
+    btn.disabled = !(phase === 'ready' || phase === 'charge');
+
+    const panY = PAN_Y + (phase === 'charge' ? power * 10 : 0) - easeOut(panLift) * 26;
+    const restY = panY - DOG_T / 2 - 4;
+
+    if (dog.mode === 'enter') {
+      // lob from off-screen left into the pan
+      dog.t += dt / .85;
+      const u = Math.min(1, dog.t);
+      dog.x = -80 + (PAN_X + 80) * u;
+      dog.y = 230 + (restY - 230) * u - Math.sin(Math.PI * u) * 120;
+      dog.a = (1 - u) * -2.6;
+      if (u >= 1) { dog.mode = 'pan'; phase = 'ready'; blip(120, .08, 'sine', .12); }
+    } else if (dog.mode === 'pan') {
+      dog.x = PAN_X; dog.y = restY; dog.a = 0;
+    } else if (dog.mode === 'fly' || dog.mode === 'tumble') {
+      const py = dog.y;
+      dog.vx += wind * dt; dog.vy += G * dt;
+      dog.x += dog.vx * dt; dog.y += dog.vy * dt; dog.a += dog.w * dt;
+      if (arc.length === 0 || Math.hypot(dog.x - arc[arc.length - 1][0], dog.y - arc[arc.length - 1][1]) > 14) arc.push([dog.x, dog.y]);
+      const tp = tpos(target, time), bottom = dog.y + DOG_T / 2, pBottom = py + DOG_T / 2;
+      if (dog.mode === 'fly' && dog.vy > 0 && pBottom <= tp.top + 4 && bottom >= tp.top) {
+        const off = dog.x - tp.x;
+        if (Math.abs(off) <= target.hw + 10) {
+          let a = ((dog.a % Math.PI) + Math.PI) % Math.PI, dev = Math.min(a, Math.PI - a);
+          const tol = Math.max(.38, .62 - level * .02);
+          if (dev <= tol) {
+            dog.mode = 'stuck'; dog.att = { off, a: dog.a - (a > Math.PI / 2 ? a - Math.PI : a) };
+            const acc = 1 - Math.min(1, Math.abs(off) / (target.hw + 10)), flat = 1 - dev / tol;
+            const pts = Math.round((100 + acc * 100 + flat * 100) * (1 + streak * .25) * (1 + (level - 1) * .1));
+            score += pts;
+            const perfect = acc > .75 && flat > .7;
+            result(true, (perfect ? 'PERFECT ' : 'LANDED ') + '+' + pts, perfect ? '#f2c230' : '#e9e1d6');
+            blip(660, .08, 'triangle', .1); setTimeout(() => blip(990, .14, 'triangle', .1), 80);
+          } else {
+            dog.mode = 'tumble'; dog.vy = -Math.abs(dog.vy) * .35; dog.vx = (off >= 0 ? 1 : -1) * 120 + dog.vx * .3; dog.w = (Math.random() < .5 ? -1 : 1) * 9;
+            popup('TOO TILTED', '#ff7a5c'); blip(220, .1, 'square', .07, -80);
+          }
+        }
       }
-      if (d.drop < 1) d.drop = Math.min(1, d.drop + dt * 3.5);
-      if (d.servedT) { d.servedT += dt; if (d.servedT > .55) { s.dog = null; s.wait = 1 + Math.random() * 2.2; } continue; }
-      if (d.burnt) { d.burnt += dt; if (Math.random() < .5) smoke(s, 1); if (d.burnt > 1.1) { s.dog = null; s.wait = 1.5 + Math.random() * 2; } continue; }
-      if (d.flipT < 1) { d.flipT = Math.min(1, d.flipT + dt * 2.6); if (d.flipT >= .5 && d.flipped !== true) { d.up = 1 - d.up; d.flipped = true; } continue; }
-      if (d.drop < 1) continue;
-      const bot = 1 - d.up;
-      d.sides[bot] += d.rate * dt;
-      hottest = Math.max(hottest, d.sides[bot]);
-      if (d.sides[bot] > 88 && Math.random() < dt * 14) smoke(s, 1);
-      if (Math.random() < dt * 5) spark(s);
-      if (d.sides[bot] >= BURN) burn(s);
+      if (bottom >= COUNTER && dog.vy > 0) {
+        dog.mode = 'splat'; dog.y = COUNTER - DOG_T / 2; dog.a = Math.round(dog.a / Math.PI) * Math.PI;
+        for (let i = 0; i < 14; i++) crumbs.push({ x: dog.x, y: COUNTER - 4, vx: (Math.random() - .5) * 300, vy: -Math.random() * 300, life: 1, c: Math.random() < .5 ? '#f2c230' : '#d8342b' });
+        result(false, 'SPLAT', '#ff5a3c'); blip(110, .4, 'sawtooth', .12, -60);
+      } else if (dog.x > WW + 120 || dog.x < -150) {
+        result(false, 'MISSED', '#ff5a3c'); dog.mode = 'gone'; blip(140, .3, 'sawtooth', .1, -60);
+      }
+    } else if (dog.mode === 'stuck') {
+      const tp = tpos(target, time);
+      dog.x = tp.x + dog.att.off; dog.y = tp.top - DOG_T / 2;
+      dog.a += (dog.att.a - dog.a) * Math.min(1, dt * 12);
     }
-    if (sizzleGain) sizzleGain.gain.setTargetAtTime(.012 + Math.min(1, activeDogs() / 5) * .03 + (hottest > 88 ? .02 : 0), ac.currentTime, .2);
-    updateFx(dt);
-  }
 
-  function burn(s) {
-    const d = s.dog; d.burnt = .001; d.sides[1 - d.up] = BURN;
-    lives--; burns++; combo = 1;
-    popup(s.x, s.y - s.h * .2, 'BURNT!', '#ff5a3c');
-    for (let i = 0; i < 14; i++) smoke(s, 1.6);
-    blip(140, .5, 'sawtooth', .12, -90);
-    updateHud();
-    if (lives <= 0) setTimeout(gameOver, 700);
-  }
-
-  function tap(px, py) {
-    if (state !== 'play') return;
-    for (const s of slots) {
-      const d = s.dog;
-      if (!d || d.servedT || d.burnt || d.drop < 1) continue;
-      if (Math.abs(px - s.x) < s.w * .45 && Math.abs(py - s.y) < s.h * .42) {
-        if (d.flipT < 1) return;
-        const [a, b] = d.sides;
-        if (a >= DONE && b >= DONE) serve(s); else flip(s);
-        return;
+    if (phase === 'result') {
+      if (phaseT > 1.1 && lives <= 0) return gameOver();
+      if (nextTarget && phaseT > 1.0 && target.leaving == null) target.leaving = 0;
+      if (target.leaving != null) {
+        target.leaving += dt * 1.8; target.bx += 900 * dt;
+      }
+      if (phaseT > 1.6) {
+        if (nextTarget) { target = nextTarget; nextTarget = null; }
+        newDog();
       }
     }
-  }
-
-  function flip(s) {
-    const d = s.dog; d.flipT = 0; d.flipped = false;
-    blip(520, .09, 'square', .05, 300);
-  }
-
-  function serve(s) {
-    const d = s.dog;
-    let pts = 100, perf = 0;
-    for (const v of d.sides) if (v >= PERF_LO && v <= PERF_HI) perf++;
-    pts += perf * 75;
-    if (perf === 2) pts += 100;
-    pts *= combo;
-    score += pts; served++; perfects += perf === 2 ? 1 : 0;
-    combo = Math.min(8, combo + 1);
-    d.servedT = .001;
-    popup(s.x, s.y - s.h * .2, (perf === 2 ? 'PERFECT ' : perf ? 'NICE ' : '') + '+' + pts, perf === 2 ? '#f2c230' : '#e9ddd1');
-    blip(660, .08, 'triangle', .1); setTimeout(() => blip(990, .12, 'triangle', .1), 70);
-    updateHud();
   }
 
   function gameOver() {
     state = 'over';
-    if (sizzleGain) sizzleGain.gain.setTargetAtTime(0, ac.currentTime, .3);
-    const nb = score > best; if (nb) { best = score; save('hotdogflip-best', best); }
+    const nb = score > best; if (nb) { best = score; save('hotdogflip-pan-best', best); }
     $('finalScore').textContent = score.toLocaleString();
-    $('finalLine').textContent = `${served} served, ${perfects} perfect, ${Math.floor(elapsed)}s on the grill. ` + (nb ? 'New best.' : `Best: ${best.toLocaleString()}.`);
-    $('overScreen').hidden = false;
-    $('againBtn').focus();
+    $('finalLine').textContent = `${landed} landed from ${throws} flips, reached level ${level}. ` + (nb ? 'New best.' : `Best: ${best.toLocaleString()}.`);
+    $('overScreen').hidden = false; btn.disabled = true; $('againBtn').focus();
   }
 
   function updateHud() {
     $('score').querySelector('.v').textContent = score.toLocaleString();
-    $('combo').querySelector('.v').textContent = 'x' + combo;
-    $('served').querySelector('.v').textContent = served;
-    $('lives').querySelector('.v').textContent = '●'.repeat(Math.max(0, lives)) + '○'.repeat(3 - Math.max(0, lives));
-  }
-
-  // ---------- fx ----------
-  function smoke(s, k) {
-    if (particles.length > 260) return;
-    particles.push({ t: 'smoke', x: s.x + (Math.random() - .5) * s.w * .4, y: s.y, vx: (Math.random() - .5) * 20, vy: -30 - Math.random() * 40 * k, life: 1.4, max: 1.4, r: 6 + Math.random() * 8 * k });
-  }
-  function spark(s) {
-    if (particles.length > 260) return;
-    particles.push({ t: 'spark', x: s.x + (Math.random() - .5) * s.w * .5, y: s.y + 8, vx: (Math.random() - .5) * 60, vy: -60 - Math.random() * 80, life: .5, max: .5, r: 1.5 });
-  }
-  function popup(x, y, text, color) { popups.push({ x, y, text, color, life: 1.1 }); }
-  function updateFx(dt) {
-    for (let i = particles.length - 1; i >= 0; i--) {
-      const p = particles[i]; p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt;
-      if (p.t === 'spark') p.vy += 220 * dt; else p.r += 10 * dt;
-      if (p.life <= 0) particles.splice(i, 1);
-    }
-    for (let i = popups.length - 1; i >= 0; i--) { popups[i].life -= dt; popups[i].y -= 40 * dt; if (popups[i].life <= 0) popups.splice(i, 1); }
+    $('streak').querySelector('.v').textContent = streak;
+    $('level').querySelector('.v').textContent = level;
+    const l = Math.max(0, lives);
+    $('lives').querySelector('.v').textContent = '●'.repeat(l) + '○'.repeat(3 - l);
   }
 
   // ---------- drawing ----------
-  const stops = [[0, [228, 139, 134]], [35, [214, 120, 92]], [60, [200, 120, 60]], [78, [176, 92, 38]], [92, [110, 52, 22]], [100, [38, 24, 18]]];
-  function cookColor(v) {
-    v = Math.max(0, Math.min(100, v));
-    for (let i = 1; i < stops.length; i++) if (v <= stops[i][0]) {
-      const [a0, c0] = stops[i - 1], [a1, c1] = stops[i], t = (v - a0) / (a1 - a0);
-      return c0.map((c, j) => Math.round(c + (c1[j] - c) * t));
-    }
-    return stops[stops.length - 1][1];
-  }
-  const rgb = (c, a = 1) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
-
   function rr(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
 
-  function drawGrill(t) {
-    // coal bed
-    const g = ctx.createRadialGradient(W / 2, H * .6, 10, W / 2, H * .6, Math.max(W, H) * .8);
-    g.addColorStop(0, '#5a2210'); g.addColorStop(.5, '#2a130b'); g.addColorStop(1, '#120c09');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-    // ember flicker spots
-    for (let i = 0; i < 26; i++) {
-      const ex = (Math.sin(i * 91.7) * .5 + .5) * W, ey = (Math.sin(i * 37.3) * .5 + .5) * H;
-      const f = .35 + .25 * Math.sin(t * (1.3 + i % 5 * .4) + i);
-      const eg = ctx.createRadialGradient(ex, ey, 0, ex, ey, 40 + i % 4 * 14);
-      eg.addColorStop(0, `rgba(255,${110 + i % 3 * 30},40,${f * .45})`); eg.addColorStop(1, 'rgba(255,90,30,0)');
-      ctx.fillStyle = eg; ctx.fillRect(ex - 100, ey - 100, 200, 200);
+  function drawBackground(t) {
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.fillStyle = '#16302f'; ctx.fillRect(0, 0, W, H);
+    ctx.setTransform(DPR * S, 0, 0, DPR * S, DPR * OX, DPR * OY);
+    // tiles, extended past the world edges so letterboxing reads as wall
+    const x0 = -OX / S - 40, x1 = (W - OX) / S + 40, y0 = -OY / S - 40;
+    const ts = 50;
+    for (let y = Math.floor(y0 / ts) * ts; y < COUNTER; y += ts) for (let x = Math.floor(x0 / ts) * ts; x < x1; x += ts) {
+      const n = Math.sin(x * 12.9 + y * 78.2) * .5 + .5;
+      ctx.fillStyle = `rgb(${27 + n * 6},${56 + n * 8},${60 + n * 8})`; ctx.fillRect(x + 2, y + 2, ts - 4, ts - 4);
     }
-    // grates
-    const gap = Math.max(22, Math.min(34, H / 18));
-    for (let y = gap / 2; y < H; y += gap) {
-      const bg = ctx.createLinearGradient(0, y - 4, 0, y + 4);
-      bg.addColorStop(0, '#5c524c'); bg.addColorStop(.45, '#2b2522'); bg.addColorStop(1, '#0d0a09');
-      ctx.fillStyle = bg; ctx.fillRect(0, y - 4, W, 8);
+    // window light
+    const lg = ctx.createRadialGradient(620, 120, 20, 620, 120, 520);
+    lg.addColorStop(0, 'rgba(255,214,150,.16)'); lg.addColorStop(1, 'rgba(255,214,150,0)');
+    ctx.fillStyle = lg; ctx.fillRect(x0, y0, x1 - x0, COUNTER - y0);
+    // counter
+    ctx.fillStyle = '#3b3530'; ctx.fillRect(x0, COUNTER, x1 - x0, 14);
+    ctx.fillStyle = '#2a2521'; ctx.fillRect(x0, COUNTER + 14, x1 - x0, (H - OY) / S - COUNTER + 40);
+    ctx.fillStyle = 'rgba(255,255,255,.08)'; ctx.fillRect(x0, COUNTER, x1 - x0, 2);
+    // stove block under the pan
+    ctx.fillStyle = '#181818'; rr(110, 478, 180, 42, 4); ctx.fill();
+    ctx.fillStyle = '#2c2c2c'; ctx.fillRect(110, 478, 180, 6);
+    for (let i = 0; i < 9; i++) {
+      const fx = 150 + i * 12.5, fh = 10 + Math.sin(t * 14 + i * 1.7) * 4;
+      ctx.fillStyle = i % 2 ? 'rgba(90,150,255,.9)' : 'rgba(255,150,60,.8)';
+      ctx.beginPath(); ctx.moveTo(fx - 4, 478); ctx.quadraticCurveTo(fx, 478 - fh * 1.6, fx + 4, 478); ctx.fill();
+    }
+    // wind flag
+    if (state === 'play' && Math.abs(wind) > 1) {
+      ctx.save(); ctx.translate(500, 40);
+      ctx.fillStyle = '#93a3a1'; ctx.font = '700 14px "Chivo Mono", monospace'; ctx.textAlign = 'center';
+      ctx.fillText('WIND ' + Math.round(Math.abs(wind) / 10) + (wind > 0 ? ' →' : ' ←'), 0, 0);
+      const len = Math.abs(wind) / 2, dir = Math.sign(wind);
+      ctx.strokeStyle = 'rgba(233,225,214,.5)'; ctx.lineWidth = 3;
+      for (let i = 0; i < 3; i++) { const yy = 14 + i * 8, sh = ((t * 120 + i * 40) % 60) * dir; ctx.beginPath(); ctx.moveTo(-len / 2 + sh, yy); ctx.lineTo(len / 2 + sh, yy); ctx.stroke(); }
+      ctx.restore();
     }
   }
 
-  function drawSlotPlate(s) {
-    ctx.save();
-    ctx.strokeStyle = 'rgba(255,170,90,.08)'; ctx.lineWidth = 2; ctx.setLineDash([6, 8]);
-    rr(s.x - s.w * .42, s.y - s.h * .36, s.w * .84, s.h * .72, 14); ctx.stroke();
+  function drawPan() {
+    const charging = phase === 'charge';
+    const py = PAN_Y + (charging ? power * 10 : 0) - easeOut(panLift) * 26;
+    ctx.save(); ctx.translate(PAN_X, py); ctx.rotate(-panRot * (charging ? -1 : 1));
+    // handle
+    ctx.fillStyle = '#111'; rr(-170, 2, 100, 12, 6); ctx.fill();
+    ctx.fillStyle = '#5a3a24'; rr(-178, 0, 62, 16, 8); ctx.fill();
+    // pan body
+    const g = ctx.createLinearGradient(0, -4, 0, 22);
+    g.addColorStop(0, '#4a4a4a'); g.addColorStop(1, '#141414');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.moveTo(-80, -4); ctx.lineTo(80, -4); ctx.lineTo(66, 22); ctx.lineTo(-66, 22); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#6a6a6a'; ctx.fillRect(-80, -6, 160, 4);
     ctx.restore();
   }
 
-  function drawDog(s, t) {
-    const d = s.dog;
-    const L = Math.min(s.w * .72, 230), T = Math.min(L * .26, s.h * .24);
-    let y = s.y - T * .25, scaleY = 1, alpha = 1, rot = 0;
-    // drop in
-    if (d.drop < 1) { const e = 1 - Math.pow(1 - d.drop, 3); y -= (1 - e) * s.h * .6; alpha = e; }
-    // flip arc
-    if (d.flipT < 1) {
-      const ft = d.flipT;
-      y -= Math.sin(Math.PI * ft) * T * 2.4;
-      scaleY = Math.max(.08, Math.abs(Math.cos(Math.PI * ft)));
-      rot = reduceMotion ? 0 : Math.sin(Math.PI * ft) * .18;
-    }
-    if (d.servedT) { const st = d.servedT / .55; y -= st * s.h * .7; alpha = 1 - st; scaleY = 1 + st * .2; }
-    const top = d.sides[d.up];
-    const sizzle = d.flipT >= 1 && !d.servedT && !d.burnt && !reduceMotion ? Math.sin(t * 30 + d.wob) * .6 : 0;
-
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    // shadow on grate
-    ctx.fillStyle = 'rgba(0,0,0,.45)';
-    ctx.beginPath(); ctx.ellipse(s.x, s.y + T * .55, L * .48 * (d.flipT < 1 ? .85 : 1), T * .28, 0, 0, Math.PI * 2); ctx.fill();
-
-    ctx.translate(s.x, y + sizzle); ctx.rotate(rot); ctx.scale(1, scaleY);
-    const col = d.burnt ? [30, 20, 16] : cookColor(top);
-    const body = ctx.createLinearGradient(0, -T / 2, 0, T / 2);
-    body.addColorStop(0, rgb(col.map(c => Math.min(255, c + 40))));
-    body.addColorStop(.45, rgb(col));
-    body.addColorStop(1, rgb(col.map(c => c * .55)));
-    ctx.fillStyle = body;
-    rr(-L / 2, -T / 2, L, T, T / 2); ctx.fill();
-    ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.lineWidth = 2; ctx.stroke();
-
-    // grill marks on the visible side
-    if (top > 25 || d.burnt) {
-      ctx.save(); rr(-L / 2, -T / 2, L, T, T / 2); ctx.clip();
-      const a = d.burnt ? .8 : Math.min(.75, (top - 25) / 60);
-      ctx.strokeStyle = `rgba(30,12,6,${a})`; ctx.lineWidth = T * .16; ctx.lineCap = 'round';
-      for (let i = -3; i <= 3; i++) { const mx = i * L * .13; ctx.beginPath(); ctx.moveTo(mx - T * .35, -T * .5); ctx.lineTo(mx + T * .35, T * .5); ctx.stroke(); }
-      ctx.restore();
-    }
-    // shine
-    ctx.fillStyle = `rgba(255,240,220,${d.burnt ? .05 : .28})`;
-    rr(-L * .38, -T * .36, L * .76, T * .16, T * .08); ctx.fill();
-    // twisted ends
-    ctx.fillStyle = rgb(col.map(c => c * .7));
-    for (const sx of [-1, 1]) { ctx.beginPath(); ctx.ellipse(sx * L / 2, 0, T * .12, T * .2, 0, 0, Math.PI * 2); ctx.fill(); }
+  function drawDog(d) {
+    if (!d || d.mode === 'gone') return;
+    ctx.save(); ctx.translate(d.x, d.y); ctx.rotate(d.a);
+    if (d.mode === 'splat') ctx.scale(1.12, .7);
+    const L = DOG_L, T = DOG_T;
+    const g = ctx.createLinearGradient(0, -T / 2, 0, T / 2);
+    g.addColorStop(0, '#e2875a'); g.addColorStop(.5, '#b8542b'); g.addColorStop(1, '#7a3218');
+    ctx.fillStyle = g; rr(-L / 2, -T / 2, L, T, T / 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 2; ctx.stroke();
+    // grill marks
+    ctx.save(); rr(-L / 2, -T / 2, L, T, T / 2); ctx.clip();
+    ctx.strokeStyle = 'rgba(40,14,6,.55)'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    for (let i = -3; i <= 3; i++) { ctx.beginPath(); ctx.moveTo(i * 12 - 7, -T / 2); ctx.lineTo(i * 12 + 7, T / 2); ctx.stroke(); }
     ctx.restore();
-
-    // ready glow
-    const ready = d.sides[0] >= DONE && d.sides[1] >= DONE && !d.burnt && !d.servedT && d.flipT >= 1;
-    if (ready) {
-      ctx.save(); ctx.globalAlpha = .55 + .35 * Math.sin(t * 6);
-      ctx.strokeStyle = '#f2c230'; ctx.lineWidth = 3; ctx.setLineDash([8, 6]); ctx.lineDashOffset = -t * 30;
-      rr(s.x - L / 2 - 10, y - T / 2 - 10, L + 20, T + 20, T / 2 + 10); ctx.stroke();
-      ctx.restore();
-      ctx.font = `700 ${Math.max(10, T * .32)}px "Chivo Mono", monospace`; ctx.fillStyle = '#f2c230'; ctx.textAlign = 'center';
-      ctx.fillText('TAP TO SERVE', s.x, y - T / 2 - 16);
-    }
-
-    if (!d.servedT) drawMeters(s, d, L, T);
+    // mustard zigzag
+    ctx.strokeStyle = '#f2c230'; ctx.lineWidth = 3.5; ctx.lineJoin = 'round'; ctx.beginPath();
+    for (let i = 0; i <= 10; i++) { const x = -L * .38 + i * (L * .76 / 10), y = -T * .12 + (i % 2 ? -4 : 4); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,240,220,.25)'; rr(-L * .36, -T * .38, L * .72, 4, 2); ctx.fill();
+    ctx.restore();
   }
 
-  function drawMeters(s, d, L, T) {
-    const mw = Math.min(L, 200), mh = Math.max(7, T * .2), x0 = s.x - mw / 2;
-    let y0 = s.y + T * .9;
-    const labels = [['TOP', d.up], ['UNDER', 1 - d.up]];
-    ctx.font = `700 ${Math.max(9, mh * 1.05)}px "Chivo Mono", monospace`; ctx.textBaseline = 'middle';
-    for (const [label, idx] of labels) {
-      const v = Math.min(100, d.sides[idx]);
-      ctx.fillStyle = 'rgba(0,0,0,.65)'; ctx.fillRect(x0 - 2, y0 - 2, mw + 4, mh + 4);
-      // zones
-      ctx.fillStyle = 'rgba(242,194,48,.22)'; ctx.fillRect(x0 + mw * DONE / 100, y0, mw * (BURN - DONE) / 100, mh);
-      ctx.fillStyle = 'rgba(242,194,48,.45)'; ctx.fillRect(x0 + mw * PERF_LO / 100, y0, mw * (PERF_HI - PERF_LO) / 100, mh);
-      ctx.fillStyle = rgb(cookColor(v)); ctx.fillRect(x0, y0 + mh * .2, mw * v / 100, mh * .6);
-      // marker
-      ctx.fillStyle = v > 90 ? '#ff5a3c' : '#e9ddd1'; ctx.fillRect(x0 + mw * v / 100 - 1.5, y0 - 2, 3, mh + 4);
-      ctx.textAlign = 'right'; ctx.fillStyle = idx === 1 - d.up ? '#ff9a55' : '#a8968a';
-      ctx.fillText(label, x0 - 8, y0 + mh / 2);
-      ctx.textAlign = 'left'; ctx.fillStyle = '#e9ddd1';
-      ctx.fillText(Math.floor(v) + '%', x0 + mw + 8, y0 + mh / 2);
-      y0 += mh + 8;
+  function drawTarget(tg) {
+    if (!tg) return;
+    const p = tpos(tg, time), x = p.x, top = p.top, hw = tg.hw, k = tg.k.id;
+    ctx.save();
+    // shadow
+    ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.ellipse(k === 'balloon' ? x : x, COUNTER + 2, Math.max(hw, 20) * 1.1, 5, 0, 0, Math.PI * 2); ctx.fill();
+    const base = COUNTER;
+    if (k === 'plate') {
+      ctx.fillStyle = '#e8e4dc'; ctx.beginPath(); ctx.ellipse(x, base - 4, hw + 22, 6, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#d99a4e'; rr(x - hw, top, hw * 2, base - 8 - top, 10); ctx.fill();
+      ctx.fillStyle = '#efbf74'; rr(x - hw + 4, top + 2, hw * 2 - 8, 6, 3); ctx.fill();
+    } else if (k === 'toaster') {
+      ctx.fillStyle = '#b9c2c4'; rr(x - hw, top, hw * 2, base - top, 12); ctx.fill();
+      ctx.fillStyle = '#7d878a'; ctx.fillRect(x - hw * .6, top, hw * .4, 4); ctx.fillRect(x + hw * .2, top, hw * .4, 4);
+      ctx.fillStyle = '#222'; ctx.fillRect(x + hw - 4, top + 30, 10, 8);
+      ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(x - hw + 8, top + 10, 6, base - top - 20);
+    } else if (k === 'books') {
+      const n = Math.max(2, Math.round(tg.h / 26)), bh = tg.h / n, cols = ['#7a2f3a', '#2f5a7a', '#c9a24a', '#3e6b45', '#5b3f7a', '#a8532c'];
+      for (let i = 0; i < n; i++) {
+        const sx = Math.sin(i * 7.3 + tg.phase) * 6, w = hw + Math.abs(Math.sin(i * 3.1)) * 8;
+        ctx.fillStyle = cols[i % cols.length]; ctx.fillRect(x - w + sx * (i < n - 1 ? 1 : 0), base - (i + 1) * bh, w * 2, bh - 1);
+        ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.fillRect(x - w + 4, base - (i + 1) * bh + 4, w * 2 - 8, 2);
+      }
+    } else if (k === 'mug') {
+      ctx.strokeStyle = '#d8d0c4'; ctx.lineWidth = 7; ctx.beginPath(); ctx.arc(x + hw + 4, top + 26, 13, -Math.PI / 2, Math.PI / 2); ctx.stroke();
+      ctx.fillStyle = '#d8d0c4'; rr(x - hw, top, hw * 2, base - top, 6); ctx.fill();
+      ctx.fillStyle = '#3a2216'; ctx.fillRect(x - hw + 3, top, hw * 2 - 6, 4);
+      ctx.fillStyle = '#d8342b'; ctx.fillRect(x - hw, top + 22, hw * 2, 8);
+    } else if (k === 'cat') {
+      ctx.fillStyle = '#e08a3c';
+      ctx.beginPath(); ctx.ellipse(x, (top + base) / 2 + 4, hw + 26, (base - top) / 2 + 2, 0, Math.PI, 0); ctx.lineTo(x + hw + 26, base); ctx.lineTo(x - hw - 26, base); ctx.fill();
+      ctx.beginPath(); ctx.arc(x - hw - 24, base - 22, 20, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(x - hw - 40, base - 34); ctx.lineTo(x - hw - 36, base - 54); ctx.lineTo(x - hw - 24, base - 40); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(x - hw - 22, base - 40); ctx.lineTo(x - hw - 12, base - 56); ctx.lineTo(x - hw - 6, base - 34); ctx.fill();
+      ctx.strokeStyle = '#1b1b1b'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - hw - 36, base - 24); ctx.lineTo(x - hw - 28, base - 24); ctx.stroke();
+      ctx.strokeStyle = '#b5652a'; ctx.lineWidth = 5;
+      for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.moveTo(x + i * 18, top + 6); ctx.lineTo(x + i * 18 + 6, top + 22); ctx.stroke(); }
+      ctx.fillStyle = '#93a3a1'; ctx.font = '700 13px "Chivo Mono", monospace'; ctx.fillText('z', x - hw - 4, base - 64 - Math.sin(time * 2) * 6);
+    } else if (k === 'skate') {
+      ctx.fillStyle = '#d8342b'; rr(x - hw - 14, top, hw * 2 + 28, 8, 4); ctx.fill();
+      ctx.fillStyle = '#222'; for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(x + s * (hw - 2), base - 7, 7, 0, Math.PI * 2); ctx.fill(); }
+    } else if (k === 'duck') {
+      ctx.fillStyle = '#f2c230';
+      ctx.beginPath(); ctx.ellipse(x + 10, base - 16, 30, 16, 0, Math.PI, 0); ctx.lineTo(x + 40, base); ctx.lineTo(x - 20, base); ctx.fill();
+      ctx.beginPath(); ctx.arc(x, top + hw, hw + 2, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ff7a2f'; ctx.beginPath(); ctx.moveTo(x - hw, top + hw); ctx.lineTo(x - hw - 14, top + hw + 4); ctx.lineTo(x - hw, top + hw + 8); ctx.fill();
+      ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(x - 5, top + hw - 3, 2.5, 0, Math.PI * 2); ctx.fill();
+    } else if (k === 'cone') {
+      ctx.fillStyle = '#ff6a1f'; ctx.beginPath(); ctx.moveTo(x - hw, top); ctx.lineTo(x + hw, top); ctx.lineTo(x + 34, base - 6); ctx.lineTo(x - 34, base - 6); ctx.fill();
+      ctx.fillStyle = '#f5f0e6'; ctx.beginPath(); ctx.moveTo(x - 18, top + 40); ctx.lineTo(x + 18, top + 40); ctx.lineTo(x + 23, top + 58); ctx.lineTo(x - 23, top + 58); ctx.fill();
+      ctx.fillStyle = '#222'; ctx.fillRect(x - 42, base - 6, 84, 6);
+    } else if (k === 'balloon') {
+      ctx.strokeStyle = 'rgba(233,225,214,.6)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x, top + 70); ctx.quadraticCurveTo(x - 20, (top + base) / 2 + 40, tg.bx, base); ctx.stroke();
+      ctx.fillStyle = '#5b8de0'; ctx.beginPath(); ctx.ellipse(x, top + 36, 30, 36, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#e9e1d6'; ctx.fillRect(x - hw, top - 3, hw * 2, 5);
+      ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.beginPath(); ctx.ellipse(x - 10, top + 22, 6, 11, -.4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#333'; ctx.fillRect(tg.bx - 10, base - 10, 20, 10);
+    } else if (k === 'fork') {
+      ctx.fillStyle = '#c9d1d3'; ctx.fillRect(x - 3, top + 30, 6, base - top - 40);
+      for (let i = -1.5; i <= 1.5; i++) ctx.fillRect(x + i * 5 - 1.2, top, 2.6, 34);
+      ctx.fillRect(x - hw, top + 26, hw * 2, 6);
+      ctx.fillStyle = '#5a3a24'; rr(x - 8, base - 26, 16, 26, 3); ctx.fill();
     }
-    ctx.textBaseline = 'alphabetic';
+    // landing zone marker
+    ctx.fillStyle = 'rgba(242,194,48,.85)'; ctx.fillRect(x - hw, top - 2, hw * 2, 2);
+    ctx.restore();
+    // label
+    if (tg === target && state === 'play' && (phase === 'ready' || phase === 'charge' || phase === 'enter')) {
+      ctx.fillStyle = '#93a3a1'; ctx.font = '700 12px "Chivo Mono", monospace'; ctx.textAlign = 'center';
+      ctx.fillText(tg.k.name.toUpperCase(), x, Math.max(16, top - 16));
+    }
   }
 
-  function drawFx() {
-    for (const p of particles) {
-      const a = p.life / p.max;
-      if (p.t === 'smoke') { ctx.fillStyle = `rgba(70,62,58,${a * .45})`; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill(); }
-      else { ctx.fillStyle = `rgba(255,${160 + Math.random() * 80 | 0},60,${a})`; ctx.fillRect(p.x, p.y, 2, 2); }
-    }
-    ctx.textAlign = 'center';
-    for (const p of popups) {
-      ctx.globalAlpha = Math.min(1, p.life * 2);
-      ctx.font = `${Math.max(16, Math.min(26, W / 22))}px "Rammetto One", "Arial Black", sans-serif`;
-      ctx.lineWidth = 5; ctx.strokeStyle = '#000'; ctx.strokeText(p.text, p.x, p.y); ctx.fillStyle = p.color; ctx.fillText(p.text, p.x, p.y);
-      ctx.globalAlpha = 1;
-    }
+  function drawArc(pts, color) {
+    if (pts.length < 2) return;
+    ctx.fillStyle = color;
+    for (const [x, y] of pts) { ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill(); }
   }
 
   function draw(t) {
-    drawGrill(t);
-    for (const s of slots) { if (!s.dog) drawSlotPlate(s); }
-    for (const s of slots) if (s.dog) drawDog(s, t);
-    drawFx();
+    drawBackground(t);
+    if (phase !== 'flight') drawArc(lastArc, 'rgba(233,225,214,.22)');
+    drawTarget(target);
+    if (nextTarget && nextTarget.enter > 0) drawTarget(nextTarget);
+    drawPan();
+    drawDog(dog);
+    for (const c of crumbs) { ctx.fillStyle = c.c; ctx.fillRect(c.x, c.y, 4, 4); }
+    ctx.textAlign = 'center';
+    for (const p of popups) {
+      ctx.globalAlpha = Math.min(1, p.life * 2);
+      ctx.font = '26px "Rammetto One", "Arial Black", sans-serif';
+      ctx.lineWidth = 6; ctx.strokeStyle = '#000'; ctx.strokeText(p.text, p.x, p.y);
+      ctx.fillStyle = p.color; ctx.fillText(p.text, p.x, p.y);
+      ctx.globalAlpha = 1;
+    }
+    if (state === 'play' && phase === 'ready') {
+      ctx.fillStyle = 'rgba(242,194,48,' + (.55 + .35 * Math.sin(t * 5)) + ')';
+      ctx.font = '700 13px "Chivo Mono", monospace'; ctx.fillText('HOLD TO CHARGE', PAN_X, PAN_Y - 54);
+    }
   }
 
   // ---------- loop ----------
   let last = performance.now();
   function frame(now) {
-    const dt = Math.min(.05, (now - last) / 1000); last = now;
-    update(dt); draw(now / 1000);
+    const dt = Math.min(.033, (now - last) / 1000); last = now;
+    update(dt);
+    // during flight the next target slides in after the old one leaves
+    if (phase === 'result' && nextTarget && target.leaving != null && target.leaving > .5) nextTarget.enter = Math.min(1, nextTarget.enter + dt * 2);
+    draw(now / 1000);
     requestAnimationFrame(frame);
   }
 
-  // demo dogs behind the menu so the first frame shows the game
-  function seedDemo() {
-    slots.forEach((s, i) => {
-      if (i % 2 === 0 || i === 1) { spawn(s); s.dog.drop = 1; s.dog.sides = [[72, 30], [40, 10], [88, 66], [20, 5], [64, 79], [10, 0]][i % 6]; s.dog.up = i % 2; }
-    });
-  }
-
-  cv.addEventListener('pointerdown', e => {
-    const r = cv.getBoundingClientRect(); tap(e.clientX - r.left, e.clientY - r.top);
+  // ---------- input ----------
+  stage.addEventListener('pointerdown', e => {
+    if (e.target.closest('.overlay')) return;
+    e.preventDefault(); startCharge();
   });
+  window.addEventListener('pointerup', release);
+  window.addEventListener('pointercancel', release);
+  window.addEventListener('keydown', e => {
+    if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); if (!e.repeat) startCharge(); }
+  });
+  window.addEventListener('keyup', e => { if (e.code === 'Space' || e.code === 'ArrowUp') release(); });
+
   function start() {
     initAudio(); if (ac && ac.state === 'suspended') ac.resume();
     reset(); state = 'play';
     $('startScreen').hidden = true; $('overScreen').hidden = true;
   }
-  $('startBtn').onclick = start;
-  $('againBtn').onclick = start;
+  $('startBtn').onclick = start; $('againBtn').onclick = start;
   if (best) $('bestLine').textContent = 'Your best: ' + best.toLocaleString();
 
-  resize(); seedDemo(); updateHud();
-  if (!CanvasRenderingContext2D.prototype.roundRect) {
-    CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) { this.rect(x, y, w, h); };
-  }
+  // menu backdrop: a dog mid-flip over a toaster
+  resize();
+  target = makeTarget(1); target.k = KINDS[1]; target.h = 92; target.hw = 44; target.bx = 640; target.slide = 0; target.enter = 1;
+  dog = { x: 470, y: 250, a: 2.2, mode: 'menu' };
+  lastArc = Array.from({ length: 20 }, (_, i) => { const u = i / 19; return [PAN_X + (640 - PAN_X) * u, 440 - Math.sin(Math.PI * u) * 260 + u * 0]; });
+  btn.disabled = true;
   requestAnimationFrame(frame);
 })();
 </script>
