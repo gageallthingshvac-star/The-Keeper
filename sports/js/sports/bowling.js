@@ -58,7 +58,8 @@
       tips: [
         'Strikes love the pocket, right beside the head pin.',
         'Hooks curve late: start wide and let it bend back in.',
-        'Swipe straight to keep the ball on your arrow.',
+        'A slower ball hooks more, a faster one hooks less.',
+        'Tap the aim buttons to zoom in on the pins.',
         'Spare Challenge: back-to-back pick-ups score bonus points.',
       ],
     },
@@ -146,10 +147,14 @@
   const STEP_DEEP = 0.035;                 // a contact point this far below a floor is beside a step
   const SPIN_MAX = 24;                     // rad/s of side rotation at spin = 1 (at 8.5 m/s)
   const SPIN_LIMIT = 2.0;                  // an over-bent swipe over-hooks (spin 1 is a big, makeable hook)
-  const SPIN_SPEED_EXP = 2.0;              // side spin grows with speed, a little less than the hook needs: slow balls hook more
+  const SPIN_SPEED_EXP = 1.5;              // side spin grows with speed, but less than the hook needs: a fast ball skids further and hooks less
   // Entry-angle "drive": a ball that comes into the pocket at an angle carries through the rack (heavier
-  // effective mass) while a flat, straight ball deflects more. Effective mass = BALL_M × (BASE + K × angle/DEG).
-  const DRIVE_BASE = 0.5, DRIVE_K = 1.5, DRIVE_DEG = 3.0;
+  // effective mass) while a flat, straight ball deflects off the head pin and leaves the 5, 8 or 10.
+  // Full rack: effective mass = BALL_M × (BASE + K × smoothstep(LO, HI, angle)) — so a straight ball
+  // (≤ ~1.3° from the corner) rarely carries and a real hook (3.5°+) carries most of the time.
+  // Leaves keep the gentler curve the spare shots were tuned with: BALL_M × (0.5 + 1.5 × min(1, angle/3°)).
+  const DRIVE_BASE = 0.3, DRIVE_K = 1.0, DRIVE_LO = 1.0, DRIVE_HI = 4.0;
+  const PIN_JIT = 0.003;                   // pin-spotting tolerance (m, s.d.) — every rack sits a little differently
   const ROLL_FRAC = 0.5;                  // share of natural forward roll at release
 
   function laneMu(z) {
@@ -246,16 +251,23 @@
   };
 
   /** Sets the rack: spots = [{n, x, z}], standing = optional Set of pin numbers to place. */
-  PinWorld.prototype.setRack = function (spots, standing) {
+  PinWorld.prototype.setRack = function (spots, standing, jit) {
     this.pins.length = 0;
     for (const s of spots) {
       const b = makeBody('pin');
       b.n = s.n; b.spot = s;
-      placePin(b, s.x, s.z, (s.n * 1.37) % (Math.PI * 2));
+      if (jit) placePin(b, s.x + jitter(jit), s.z + jitter(jit), jit.next() * Math.PI * 2);
+      else placePin(b, s.x, s.z, (s.n * 1.37) % (Math.PI * 2));
       if (standing && !standing.has(s.n)) b.active = false;
       this.pins.push(b);
     }
   };
+
+  /** Pin-spotting error: a clipped gaussian of PIN_JIT. */
+  function jitter(rng) {
+    const u = Math.max(1e-9, rng.next()), v = rng.next();
+    return Math.max(-2, Math.min(2, Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v))) * PIN_JIT;
+  }
 
   /** Launches the ball: x0 at the release line, angle (rad, + = toward +x), speed m/s, spin -1..1 (+ hooks left). */
   PinWorld.prototype.launch = function (o) {
@@ -271,6 +283,9 @@
     b.wz = -ROLL_FRAC * b.vx / BALL_R + s * ca;
     b.qx = 0; b.qy = 0; b.qz = 0; b.qw = 1;
     b.pitT = 0;
+    let up = 0;
+    for (const p of this.pins) if (p.active) up++;
+    this.fullRack = up === 10 && this.pins.length === 10;
     this.resetEvents();
     this.ev.launchedAt = this.t;
   };
@@ -449,7 +464,11 @@
         this.ev.hit = { t: this.t, x: ball.x, z: ball.z, pin: p.n, speed: sp, angle };
         // entry angle toward the pin's side (into the pocket) drives through; a flat ball deflects
         const into = Math.max(0, -Math.sign(ball.x - p.x) * angle) / DEG;
-        ball.im = 1 / (BALL_M * (DRIVE_BASE + DRIVE_K * Math.min(1, into / DRIVE_DEG)));
+        let k;
+        if (this.fullRack) { const u = Math.max(0, Math.min(1, (into - DRIVE_LO) / (DRIVE_HI - DRIVE_LO))); k = DRIVE_BASE + DRIVE_K * u * u * (3 - 2 * u); }
+        else k = 0.5 + 1.5 * Math.min(1, into / 3);
+        this.ev.hit.drive = k;
+        ball.im = 1 / (BALL_M * k);
       }
       this.contact(ball, p, nx, ny, nz, cx + nx * s.r, cy + ny * s.r, cz + nz * s.r, rr - d, MU.ballPin, REST.ballPin, CK_BALL);
     }
@@ -822,9 +841,9 @@
   }
 
   /** Full simulation of one ball against a rack → { knocked, standing, gutter, hit }. */
-  function simulateShot(L, spots, standingSet, shot, tMax = 7) {
+  function simulateShot(L, spots, standingSet, shot, tMax = 7, jit = null) {
     const w = new PinWorld(L);
-    w.setRack(spots, standingSet);
+    w.setRack(spots, standingSet, jit);
     const before = w.pins.filter(p => p.active).length;
     w.launch(shot);
     while (!w.settled() && w.t < tMax) w.stepOnce();
@@ -859,8 +878,12 @@
   const AIM_MAX = 3.5 * DEG;               // beyond this every line is a gutter ball
   const AIM_TAP = 0.05 * DEG;              // one tap of an aim button: ~1.6 cm at the pins (the pocket is ~5 cm)
   const X_MAX = 0.46;                      // release positions on the approach (ball centre)
-  const BEND_DEAD = 0.04, BEND_FULL = 0.30; // swipe bow (short sides) → spin: dead zone, then spin 1 per BEND_FULL
-  const DRIFT_DEAD = 4, DRIFT_GAIN = 0.025;  // swipe tilt (deg) → line offset (deg per deg past the dead zone, ≤ 1°)
+  const BEND_DEAD = 0.015, BEND_KNEE = 0.05, BEND_FULL = 0.30, SPIN_GAIN0 = 1.6, SPIN_CAP = 1.05; // swipe bow (short sides) → spin: a tiny dead zone, then
+  // a soft knee (a natural thumb arc only nudges the ball), then SPIN_GAIN0 / BEND_FULL spin per short side,
+  // easing into SPIN_CAP (a ~0.3 bow is a near-full hook)
+  // swipe tilt (deg) → line offset: a gentle pull for small tilts (a sloppy swipe strays a little), a stronger
+  // one past DRIFT_KNEE for a deliberate angled swipe, at most DRIFT_MAX
+  const DRIFT_GAIN = 0.015, DRIFT_KNEE = 10, DRIFT_GAIN2 = 0.04, DRIFT_MAX = 1.0;
 
   /** Release speed (short sides / s; real flicks are about 2–10) → ball speed over the whole range. */
   function swipeSpeed(nspeed) {
@@ -874,12 +897,14 @@
     const dirDeg = Math.atan2(s.dx, -s.dy) / DEG;
     if (up < 0.07 || Math.abs(dirDeg) > 55) return null;
     // a tilted swipe pulls the line a little (0.1° moves the ball ~3 cm at the pins): a straight ball
-    // still needs a straight swipe
-    const drift = Math.sign(dirDeg) * Math.min(1, Math.max(0, Math.abs(dirDeg) - DRIFT_DEAD) * DRIFT_GAIN) * DEG;
+    // needs a straight swipe
+    const ad = Math.abs(dirDeg);
+    const drift = Math.sign(dirDeg) * Math.min(DRIFT_MAX, ad * DRIFT_GAIN + Math.max(0, ad - DRIFT_KNEE) * DRIFT_GAIN2) * DEG;
     // hook: the swipe's bow plus a late turn of the finger (both say "curve back to the left" when +).
-    // A natural thumb arc (< 4% of the screen) stays straight; past that the hook grows linearly with the
-    // bend (a third of the screen is a big hook) and keeps growing, so a wild bend over-hooks.
-    const bow = Math.sign(s.lateral) * Math.max(0, Math.abs(s.lateral) - BEND_DEAD) / BEND_FULL;
+    // Only a tremor stays dead straight; past that the hook grows linearly with the bend (a third of the
+    // screen is a big hook) and keeps growing, so a wild bend over-hooks.
+    const ex = Math.max(0, Math.abs(s.lateral) - BEND_DEAD);
+    const bow = Math.sign(s.lateral) * (ex < BEND_KNEE ? ex * ex / (2 * BEND_KNEE) : ex - BEND_KNEE / 2) / BEND_FULL;
     let turn = 0;
     const path = s.path || [];
     if (path.length > 4) {
@@ -894,7 +919,8 @@
       while (d < -Math.PI) d += 2 * Math.PI;
       turn = Math.sign(d) * Math.max(0, Math.abs(d) - 0.2);
     }
-    const spin = Math.max(-SPIN_LIMIT, Math.min(SPIN_LIMIT, bow - turn * 0.4));
+    // the hook saturates: a small bend is fine control, a big confident curve is a repeatable full hook
+    const spin = SPIN_CAP * Math.tanh((bow - turn * 0.4) * SPIN_GAIN0 / SPIN_CAP);
     // release speed; a short hold before lifting the finger shouldn't kill a good flick
     return { speed: swipeSpeed(Math.max(s.nspeed, (s.npeakSpeed || 0) * 0.75)), spin, drift };
   }
@@ -925,7 +951,7 @@
     const st = { frames: 0, strikes: 0, spareChances: 0, spares: 0, gutters: 0, balls: 0, pins1: 0, splits: 0, pocket: 0, pocketStrikes: 0, leaves: {} };
     for (let f = 0; f < n; f++) {
       const style = { speed: 7.6 + rng.next() * 1.6, spin: 0.45 + rng.next() * 0.5 };
-      const r1 = simulateShot(L, SPOTS10, null, humanize(strikeShot(L, style, hand), quality, rng));
+      const r1 = simulateShot(L, SPOTS10, null, humanize(strikeShot(L, style, hand), quality, rng), 7, rng);
       st.frames++; st.balls++; st.pins1 += r1.knocked;
       if (r1.gutter) st.gutters++;
       if (r1.hit && r1.hit.pin <= 3) {
@@ -943,7 +969,7 @@
         plan = bestCandidate(cands, cands.map(c => simulateShot(L, SPOTS10, set, c).knocked));
         spareCache.set(key, plan);
       }
-      const r2 = simulateShot(L, SPOTS10, set, humanize(plan, quality, rng));
+      const r2 = simulateShot(L, SPOTS10, set, humanize(plan, quality, rng), 7, rng);
       st.spareChances++; st.balls++;
       if (r2.gutter) st.gutters++;
       if (!r2.standing.length) st.spares++;
@@ -971,7 +997,9 @@
   const LANE_PITCH = 1.7;                  // centre-to-centre of standard lanes
   const AIM_Z = 1.45;                      // where the bowler stands while aiming
   const CUT_Z = -14.8;                     // the follow cam hands over to the pin cam here (after the break)
-  const NB_Z = 2.4, NB_LINE = 0.45, NB_WALK = 1.5;   // neighbours wait by the seats (out of the aim view), bowl from the line
+  const NB_Z = 2.4, NB_LINE = 0.45, NB_WALK = 1.5;   // neighbours wait by the seats, bowl from the line
+  // (they bowl on the two lanes away from the bowling hand: the setup camera sits on the hand side, so from
+  // there they never cross the aim view, even in a wide landscape frame)
   const CEIL_Y = 3.8;
   const MONITOR = { x: 0, y: 3.22, z: -1.1, w: 1.04, h: 0.585 };
   const HOOD = { x: 0.85, z: 2.1 };        // ball return (on the side away from the bowling hand)
@@ -1427,10 +1455,13 @@
   font: 900 13px/1 var(--font-ui); letter-spacing: .06em; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,.55);
   white-space: nowrap; transition: opacity .25s; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .bw-swipe svg { width: 22px; height: 22px; animation: bw-bob 1.2s ease-in-out infinite; }
+.bw-swipe.bw-flash span { animation: bw-flash .45s ease-in-out 3; }
+@keyframes bw-flash { 0%, 100% { color: #fff; transform: scale(1); } 50% { color: #FFC93C; transform: scale(1.12); } }
 @keyframes bw-bob { 0%, 100% { transform: translateY(4px); } 50% { transform: translateY(-4px); } }
 .bw-speed { position: absolute; top: calc(var(--sat) + 126px); left: 50%; transform: translateX(-50%); transition: opacity .3s;
   white-space: nowrap; }
-.bw-tip { font-size: 12px; gap: 5px; padding: 5px 12px 5px 8px; }
+.bw-tip { position: absolute; bottom: calc(var(--sab) + 104px); left: 50%; transform: translateX(-50%); transition: opacity .3s;
+  white-space: nowrap; font-size: 12px; gap: 5px; padding: 5px 12px 5px 8px; }
 .bw-tip .ss-icon { width: 18px; height: 18px; color: #F2A900; }
 .bw-turnwrap { position: absolute; left: 0; right: 0; top: 30%; display: flex; justify-content: center; transition: opacity .25s, transform .25s; }
 .bw-turnwrap.out { opacity: 0; transform: translateY(-14px) scale(.95); }
@@ -1440,6 +1471,9 @@
 .bw-turncard h3 { margin: 0; font: 700 clamp(20px, 6.4vw, 28px)/1.05 var(--font-display); color: var(--ink); white-space: nowrap; }
 .bw-turncard p { margin: 4px 0 0; font: 800 13px/1 var(--font-ui); color: var(--ink-soft); }
 .bw-info { font-size: 12px; padding: 5px 10px; }
+.bw-target { position: absolute; left: 0; top: 0; width: 18px; height: 16px; margin: -16px 0 0 -9px; pointer-events: none;
+  will-change: transform; filter: drop-shadow(0 1px 2px rgba(0,0,0,.4)); }
+.bw-target svg { display: block; width: 100%; height: 100%; }
 @media (max-height: 520px) and (orientation: landscape) {
   .bw-card, .bw-strip { top: calc(var(--sat) + 58px); max-width: 470px; width: calc(100% - 200px); }
   .bw-strip { width: max-content; }
@@ -1488,6 +1522,7 @@
 
     // ---- pins (main rack + neighbours, instanced) ----------------------------------------------
     const W = new PinWorld(L);
+    const rackRng = U.rng((ctx.seed || 0) + 313);     // pin-spotting jitter: every rack differs, deterministic per seed
     const maxSpots = rackSpots(L.rows);
     const pinGeo = pinGeometry(THREE, world, L.wide ? 12 : 16);
     const pinGeoLow = pinGeometry(THREE, world, 8);
@@ -1497,7 +1532,7 @@
     pinMesh.frustumCulled = false;
     scene.add(pinMesh);
     const ZERO_M = new THREE.Matrix4().makeScale(0, 0, 0);
-    const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _one = new THREE.Vector3(1, 1, 1);
+    const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _eu = new THREE.Euler(), _p = new THREE.Vector3(), _one = new THREE.Vector3(1, 1, 1);
     const PIN_BASE = new THREE.Matrix4().makeTranslation(0, -PIN_YC, 0);
     let liftY = 0;                       // render offset of pins held by the setting table
 
@@ -1526,7 +1561,7 @@
     scene.add(ballShadow);
     const trail = world.trail(ball, { color: 0xFFE27A, width: 0.075, length: 40, opacity: 0.6, maxJump: 1.5 });
     trail.visible = false;
-    const ballVis = { mode: 'rack', blend: 0, from: V(0, 0, 0) };   // 'rack' | 'hand' | 'free' | 'hidden'
+    const ballVis = { mode: 'rack', blend: 0, from: V(0, 0, 0) };   // 'rack' | 'carry' | 'hand' | 'free' | 'hidden'
     ball.position.set(hoodX, RACK_SPOT.y, RACK_SPOT.z);
 
     // ---- pinsetter: sweep bar + setting table ------------------------------------------------
@@ -1610,7 +1645,10 @@
     const rolls = players.map(() => []);
     const leaveLog = players.map(() => []);      // spare mode: true/false per leave
     const powerLog = players.map(() => []);      // power mode: pins per round
-    const aims = players.map(() => ({ x: 0, angle: 0 }));   // dead centre: finding the pocket is the first thing to learn
+    // everyone starts on a forgiving straight line a little right of centre, angled into the pocket:
+    // a fair first ball (mostly 7–9 pins); hooking it in is the next thing to learn
+    const AIM0 = { x: 0.12 * hand, angle: aimAngle(L, 0.12 * hand, 8, 0, 0.05 * hand, HEAD_Z) };
+    const aims = players.map(() => ({ x: AIM0.x, angle: AIM0.angle }));
     let phase = 'intro';
     let turn = null;                               // { p, frame | leave | round, ball, fresh }
     let autoplay = false;
@@ -1619,13 +1657,14 @@
     let standingBefore = [];
     let splitLeft = false;
     let lastShot = null, lastOutcome = null;
-    let hintHandle = null, firstThrowDone = false, curveHinted = false, throwsDone = 0, tipShown = false;
+    let hintHandle = null, firstThrowDone = false, curveHinted = false, throwsDone = 0, tipShown = false, tipPending = false;
     let hurry = false;                             // the player tapped through: the pinsetter speeds up
     let turnDir = 0, turnHeld = 0;
     let throwAnim = null;
     let rollInfo = null;                           // per-ball bookkeeping while the ball runs
     let returnFor = 0;                             // whose ball comes back up the return
     let arrowGlow = 0;
+    let aimPeek = 0, aimInfoT = 0;                 // zoomed peek at the pins while turning; aim readout timer
     let started = false;
 
     // ---- HUD ------------------------------------------------------------------------------------
@@ -1651,7 +1690,17 @@
         // high and to the ball side of the bowler, so the arrow and the whole lane read past their head
         const x = turn ? aims[turn.p].x : 0;
         if (portrait) { _gp.set(x + 0.4 * hand, 2.7, AIM_Z + 2.6); _gl.set(x * 0.3 + 0.08 * hand, 0, -9); fov = fovFor(46, 31); }
-        else { _gp.set(x + 0.75 * hand, 2.3, AIM_Z + 2.4); _gl.set(x * 0.3 + 0.1 * hand, 0, -9); fov = fovFor(34, 30); }
+        else {
+          // very wide screens get a slightly tighter frame (the lane stays big, the room's edges stay out)
+          _gp.set(x + 0.95 * hand, 2.45, AIM_Z + 3.0); _gl.set(x * 0.3 + 0.12 * hand, 0.3, -9);
+          fov = fovFor(34 * 1.9 / Math.max(1.9, engine.size.aspect), 30);
+        }
+        if (aimPeek > 0 && turn) {
+          // peek: same spot, zoomed in on the pins and the target
+          const t = aimTarget();
+          _gl.set(t.x * 0.6, portrait ? 0.16 : 0.3, t.z - 0.35);
+          fov = portrait ? fovFor(5.5, 4.4) : fovFor(4.2, 5);
+        }
       } else if (cam.shot === 'follow') {
         const b = W.ball;
         const z = Math.max(b.z, HEAD_Z + 4.2);
@@ -1690,9 +1739,10 @@
 
     function updateCamera(dt) {
       const fov = cameraGoal();
-      U.dampVec3(cam.pos, _gp, cam.lambda, dt);
-      U.dampVec3(cam.look, _gl, cam.lambda * 1.3, dt);
-      cam.fov = U.damp(cam.fov, fov, cam.lambda, dt);
+      const lam = cam.shot === 'setup' && (aimPeek > 0 || cam.fov < 20) ? 7 : cam.lambda;   // a snappy peek
+      U.dampVec3(cam.pos, _gp, lam, dt);
+      U.dampVec3(cam.look, _gl, lam * 1.3, dt);
+      cam.fov = U.damp(cam.fov, fov, lam, dt);
       camera.position.copy(cam.pos);
       camera.lookAt(cam.look);
       if (Math.abs(camera.fov - cam.fov) > 1e-3 || camera.aspect !== engine.size.aspect) {
@@ -1761,16 +1811,30 @@
       const aimR = mkAim('r', 'rotate-right', 1);
       const swipe = ui.el('div', 'bw-swipe bw-off', ui.icon('up') + '<span>SWIPE UP TO BOWL</span>');
       const speed = ui.el('div', 'ss-chip dark bw-speed bw-off');
-      const tip = ui.el('div', 'ss-chip bw-speed bw-tip bw-off');
-      root.append(top, card, strip, sideL, sideR, swipe, speed, tip);
-      return { top, nameChip, infoChip, totalChip, card, frames, strip, pinBox, pinDots, minis, aimL, aimR, swipe, speed, tip, nameFor: -1 };
+      const tip = ui.el('div', 'ss-chip bw-tip bw-off');
+      const aimInfo = ui.el('div', 'ss-chip dark bw-speed bw-off');
+      const target = ui.el('div', 'bw-target', '<svg viewBox="0 0 20 18"><path d="M2 2h16L10 16Z" fill="#FFD646" stroke="#3A2A10" stroke-width="2.2" stroke-linejoin="round"/></svg>');
+      target.style.opacity = '0';
+      root.append(target, top, card, strip, sideL, sideR, swipe, speed, tip, aimInfo);
+      return { top, nameChip, infoChip, totalChip, card, frames, strip, pinBox, pinDots, minis, aimL, aimR, swipe, speed, tip, aimInfo, target, nameFor: -1 };
+    }
+
+    /** Briefly shows the "swipe up" label (a stroke that was not a bowl). */
+    let flashUntil = 0;
+    function flashSwipe() {
+      flashUntil = engine.time + 1.8;
+      hud.swipe.classList.remove('bw-off');
+      hud.swipe.classList.add('bw-flash');
+      ctx.wait(1.8).then(() => { hud.swipe.classList.remove('bw-flash'); setAimUi(phase === 'aim'); });
     }
 
     function setAimUi(on) {
       hud.aimL.classList.toggle('bw-off', !on || autoplay);
       hud.aimR.classList.toggle('bw-off', !on || autoplay);
       // the first-throw hint shows the gesture; without hints a quiet label does
-      hud.swipe.classList.toggle('bw-off', !on || firstThrowDone || autoplay || !!hintHandle);
+      const flash = on && engine.time < flashUntil;
+      hud.swipe.classList.toggle('bw-off', !flash && (!on || firstThrowDone || autoplay || !!hintHandle));
+      if (!on) hud.swipe.classList.remove('bw-flash');
     }
 
     function showSpeed(mps, spin) {
@@ -1941,7 +2005,7 @@
       const writeAll = () => {
         for (const s of state) {
           _p.set(s.x + Math.sin(s.dir) * s.fall * 0.12, 0, s.z - Math.cos(s.dir) * s.fall * 0.12);
-          _q.setFromEuler(new THREE.Euler(-Math.cos(s.dir) * s.tilt, s.yaw, Math.sin(s.dir) * s.tilt, 'YXZ'));
+          _q.setFromEuler(_eu.set(-Math.cos(s.dir) * s.tilt, s.yaw, Math.sin(s.dir) * s.tilt, 'YXZ'));
           _m.compose(_p, _q, _one);
           mesh.setMatrixAt(s.i, _m);
         }
@@ -1955,11 +2019,11 @@
       if (i1 >= i0) i1++;
       const who = [roster[i0], roster[i1]];
       const ballM = new THREE.MeshPhongMaterial({ color: 0x8E5BE0, shininess: 80 });
-      const bowlersN = [1, 2].map((laneIdx, j) => {
+      const bowlersN = (hand > 0 ? [0, 1] : [3, 2]).map((laneIdx, j) => {
         const cx = lanes[laneIdx];
         const pal = pals.create(who[j].profile, { shadows: false, detail: 'low' });
         pal.setFacing(Math.PI);
-        const px = cx + Math.sign(cx) * 0.22;
+        const px = cx + Math.sign(cx) * 0.4;     // on the far side of their lane, away from our camera
         pal.root.position.set(px, 0, NB_Z);
         const sh = world.blobShadow(0.34, 0.28);
         sh.position.set(px, 0.006, NB_Z);
@@ -2039,7 +2103,7 @@
     }
 
     function placeRack(rack) {
-      W.setRack(rack.spots, rack.standing);
+      W.setRack(rack.spots, rack.standing, rackRng);
       liftY = 0;
       syncPins();
     }
@@ -2085,7 +2149,7 @@
       } else {
         await sweepDeadwood(0.5 * setterK());
         await tweenP(sweepBar.position, { z: BAR_FRONT }, 0.28 * setterK());
-        W.setRack(rack.spots, rack.standing);
+        W.setRack(rack.spots, rack.standing, rackRng);
         for (const p of W.pins) if (p.active) p.lifted = true;
         liftY = TABLE_UP - 0.42;
         table.position.y = TABLE_UP;
@@ -2197,9 +2261,12 @@
       const b = bowlers[t.p];
       const a = aims[t.p];
       const switching = prevP !== t.p;
-      if (W.ball.mode !== 'gone' && W.ball.mode !== 'held') { W.ball.mode = 'gone'; W.ball.active = false; W.ball.dyn = false; }
-      if (ballVis.mode !== 'rack' && ballVis.mode !== 'hand') { ball.visible = false; ballVis.mode = 'hidden'; }
+      // the physics ball is back with the bowler (a 'gone' ball would hide the one we pick up)
+      W.ball.mode = 'held'; W.ball.active = false; W.ball.dyn = false;
+      if (ballVis.mode !== 'rack' && ballVis.mode !== 'hand' && ballVis.mode !== 'carry') { ball.visible = false; ballVis.mode = 'hidden'; }
       if (ballVis.mode === 'hidden') ballReturn();
+      // a ball that came back before the next bowler was known shows their colour from the turn change on
+      ball.material = ballMats[t.p];
       if (switching) { hud.nameFor = -1; refreshHud(); }
       if (mode === 'spare' || !t.fresh) {
         // "here's your leave": hold on the pins while the pinsetter finishes, then swing back to the bowler
@@ -2233,7 +2300,6 @@
       }
       await reset;
       refreshPins();
-      ball.material = ballMats[t.p];
       await ballToHand(b.pal);
     }
 
@@ -2253,19 +2319,20 @@
     }
 
     async function ballToHand(pal) {
-      ballVis.mode = 'free';
+      ballVis.mode = 'carry';            // tweened from the rack to the hand; the physics ball isn't involved
       ball.visible = true;
       const target = heldBallPos(pal, V(0, 0, 0));
       U.killTweens(ball.position);
       await live(U.tween(ball.position, { x: target.x, y: target.y, z: target.z }, autoplay ? 0.15 : 0.3, { ease: 'outQuad' }));
       ballVis.mode = 'hand';
+      ball.visible = true;
       poseHold(pal, false);
     }
 
-    const _hv = new THREE.Vector3();
+    const _hv = new THREE.Vector3(), HELD_OFF = new THREE.Vector3(0, -0.07, 0.07);
     function heldBallPos(pal, out) {
       const hnd = hand > 0 ? pal.parts.handR : pal.parts.handL;
-      _hv.copy(hnd.position).add(V(0, -0.07, 0.07));
+      _hv.copy(hnd.position).add(HELD_OFF);
       pal.root.updateMatrixWorld();
       return out.copy(_hv).applyMatrix4(pal.root.matrixWorld);
     }
@@ -2295,15 +2362,24 @@
     function waitForShot() {
       phase = 'aim';
       const hints = !autoplay && !hintHandle && !(save.settings && save.settings.hints === false);
-      if (hints && (!firstThrowDone || (!curveHinted && (throwsDone >= 3 || stats[turn.p].strikes > 0)))) {
+      // the hook hint only makes sense on a full rack (a spare wants a straight ball)
+      const freshRack = mode === 'hundred' || (mode === 'game' && turn.fresh);
+      if (hints && (!firstThrowDone || (!curveHinted && freshRack && (throwsDone >= 3 || stats[turn.p].strikes > 0)))) {
         // first the plain swipe; a few balls in, the curve that makes the ball hook
         const curve = firstThrowDone;
         curveHinted = curveHinted || curve;
         const sz = engine.size;
         const text = curve ? 'Bend your swipe to hook!' : sz.w < 360 ? 'Swipe up!' : 'Swipe up to bowl!';
         const gesture = curve ? 'swipe-up-curve' : 'swipe-up';
-        hintHandle = ui.hint(sz.h <= 520 && sz.aspect > 1 ? { gesture, text, x: sz.w * 0.66, y: sz.h * 0.56 } : { gesture, text });
+        // over open lane, clear of the ball in the bowler's hand
+        const at = sz.h <= 520 && sz.aspect > 1 ? { x: sz.w * 0.66, y: sz.h * 0.56 }
+          : sz.aspect < 0.85 ? { x: sz.w * (hand > 0 ? 0.42 : 0.58), y: sz.h * 0.5 } : {};
+        hintHandle = ui.hint(Object.assign({ gesture, text }, at));
+        // the core glyph curves for a right-hander's hook; a lefty hooks the other way
+        const svg = hintHandle.el && hintHandle.el.querySelector('svg');
+        if (curve && hand < 0 && svg) svg.style.transform = 'scaleX(-1)';
       }
+      if (tipPending && freshRack && !hintHandle) showTip();
       setAimUi(true);
       arrowGlow = 1;
       return new Promise(resolve => {
@@ -2321,6 +2397,7 @@
       setAimUi(false);
       turnDir = 0;
       if (hintHandle) { hintHandle.hide(); hintHandle = null; }
+      hud.tip.classList.add('bw-off');
       firstThrowDone = true;
       throwsDone++;
       w(shot);
@@ -2336,7 +2413,7 @@
       audio.sfx('swish', { vol: 0.4, rate: 0.8 });
       while (!throwAnim.launched) await ctx.wait(0.02);
       phase = 'roll';
-      rollInfo = { hitSeen: false, gutterSeen: false, predicted: false, t: 0, settleT: 0, lastClack: 0, sig: '', sigT: 0, skip: false };
+      rollInfo = { hitSeen: false, gutterSeen: false, predicted: false, slowmo: false, t: 0, settleT: 0, lastClack: 0, sig: '', sigT: 0, skip: false };
       cam.followX = W.ball.x;
       setShot('follow', 5.5);
       crowd.setMood('tense');
@@ -2349,7 +2426,10 @@
         await ctx.wait(0.05);
         const r = rollInfo, bm = W.ball.mode;
         // the follow cam keeps a gutter ball in view; it hands over to the pin cam just before impact
-        if (cam.shot === 'follow' && (W.ball.z < CUT_Z || bm === 'pit' || bm === 'gone')) setShot('pins', 5);
+        if (cam.shot === 'follow' && (W.ball.z < CUT_Z || bm === 'pit' || bm === 'gone')) {
+          setShot('pins', 5);
+          hud.speed.classList.add('bw-off');     // the pin cam's masking unit sits right under the chip
+        }
         if (W.ev.gutterAt !== null && !W.ev.hit) {
           // nothing more can happen to the pins: call it (a tap calls it at once)
           if (r.skip || W.t - W.ev.gutterAt > 0.6) break;
@@ -2557,6 +2637,13 @@
       await skippable(autoplay ? 0.6 : last ? 2.2 : big ? 1.9 : 1.4);
     }
 
+    function bigMoment() {
+      if (rollInfo.slowmo) return;
+      rollInfo.slowmo = true;
+      engine.slowmo(0.32, 1.25);
+      engine.shake(0.035, 0.3);
+    }
+
     function hapticBuzz(ms) { if (ui.haptic) ui.haptic(ms); }
 
     function spareSub(out) {
@@ -2564,15 +2651,21 @@
       return out.run ? '+' + out.pts + ' · back-to-back!' : '+' + out.pts;
     }
 
-    /** Once a game: a first ball that met the head pin square or on the wrong side gets a pointer. */
+    /** Once a game: a first ball that met the head pin square or on the wrong side earns a pointer,
+     *  shown when the player lines up their next full rack (where it applies). */
     function maybeTip() {
       const h = W.ev.hit;
       if (tipShown || autoplay || mode !== 'game' || standingBefore.length < 10 || !h || h.pin !== 1) return;
       if (h.x * hand > 0.03) return;
       tipShown = true;
-      hud.tip.innerHTML = ui.icon('bulb') + '<span>Move a little ' + (hand > 0 ? 'right' : 'left') + ' to hit the pocket</span>';
+      tipPending = true;
+    }
+
+    function showTip() {
+      tipPending = false;
+      hud.tip.innerHTML = ui.icon('bulb') + '<span>Drag a little ' + (hand > 0 ? 'right' : 'left') + ' to hit the pocket</span>';
       hud.tip.classList.remove('bw-off');
-      ctx.wait(4).then(() => hud.tip.classList.add('bw-off'));
+      ctx.wait(5).then(() => hud.tip.classList.add('bw-off'));
     }
 
     // =============================================================================================
@@ -2594,6 +2687,7 @@
         a.launched = true;
         W.launch(a.shot);
         ballVis.mode = 'free';
+        ball.visible = true;
         ballVis.blend = 1;
         ballVis.from.copy(ball.position);
         trail.clear();
@@ -2665,9 +2759,14 @@
         const pocket = (h.pin === 1 || h.pin === 3 || h.pin === 2) && h.speed > 5.8;
         audio.sfx('pins_hit', { intensity: U.clamp(h.speed / 9, 0.3, 1) * (pocket ? 1 : 0.7) });
         world.burst(scene, V(h.x, 0.18, h.z - 0.1), { count: 14, color: 0xFFFFFF, speed: 2.2, size: 0.05, life: 0.5 });
-        const bigHit = pocket && Math.abs(h.x) < 0.14 && (L.wide || standingBefore.length >= 9);
-        if (bigHit) { engine.slowmo(0.32, 1.25); engine.shake(0.035, 0.3); }
+        // slow-mo is for strikes: a pocket hit with real entry angle right away, or (below) a rack that is
+        // all on the move a beat after impact. Power Pins saves it for the big racks.
+        const into = -h.angle * hand / DEG;
+        const strikey = W.fullRack && !L.wide && h.speed > 5.8 && Math.abs(h.x * hand - POCKET_X) < 0.035 && into >= 2.8;
+        const bigRack = L.wide && W.pins.length >= 36 && Math.abs(h.x) < 0.14 && h.speed > 5.8;
+        if (strikey || bigRack) bigMoment();
       }
+      if (h && !r.slowmo && W.fullRack && !L.wide && W.t - h.t >= 0.25 && W.t - h.t < 0.45 && W.pins.every(p => p.touched)) bigMoment();
       r.lastClack += dt;
       if (W.ev.clatter > 0.9 && r.lastClack > 0.07) {
         audio.sfx('pin_clatter', { intensity: U.clamp(W.ev.clatter / 4.5, 0.15, 1), vol: 0.8 });
@@ -2687,12 +2786,47 @@
       const a = aims[turn.p];
       a.angle = U.clamp(a.angle + d, -AIM_MAX, AIM_MAX);
       arrowGlow = 1;
+      // turning the aim peeks down the lane (zoomed in on the pins) so every tap visibly moves the target
+      if (!autoplay) { aimPeek = 1.1; aimInfo(); }
     }
 
     function moveTo(x) {
       const a = aims[turn.p];
       a.x = U.clamp(x, -X_MAX, X_MAX);
       arrowGlow = 1;
+      if (!autoplay && phase === 'aim') aimInfo();
+    }
+
+    /** "Board 15 · aim 0.3° left" — boards are counted from the bowling-hand side, like the lane's arrows. */
+    function aimInfo() {
+      const a = aims[turn.p];
+      const board = U.clamp(Math.round((LANE_HALF - a.x * hand) / BOARD + 0.5), 1, 39);
+      const deg = Math.round(Math.abs(a.angle) / DEG * 10) / 10;
+      hud.aimInfo.textContent = 'Board ' + board + ' · ' + (deg < 0.05 ? 'aim straight' : 'aim ' + deg.toFixed(1) + '° ' + (a.angle < 0 ? 'left' : 'right'));
+      hud.aimInfo.classList.remove('bw-off');
+      aimInfoT = 1.6;
+    }
+
+    /** Where a straight ball on the current aim meets the front standing pin's row. */
+    const _tgt = new THREE.Vector3();
+    function aimTarget() {
+      const a = aims[turn.p];
+      let front = HEAD_Z;
+      for (const p of W.pins) if (W.isStanding(p)) front = Math.max(front, p.z);
+      return _tgt.set(a.x + Math.tan(a.angle) * (RELEASE_Z - front), 0, front);
+    }
+
+    /** The floating target chevron over the pins (DOM, so it stays crisp and readable at any distance). */
+    function updateTargetMarker() {
+      const op = turn && guide.visible ? guideMat.opacity / 0.85 : 0;
+      const el = hud.target;
+      if (op < 0.02) { if (el.style.opacity !== '0') el.style.opacity = '0'; return; }
+      const t = aimTarget();
+      t.y = 0.45;
+      const pr = engine.project(t);
+      if (!pr.visible) { el.style.opacity = '0'; return; }
+      el.style.opacity = String(Math.min(1, op).toFixed(2));
+      el.style.transform = 'translate3d(' + pr.x.toFixed(1) + 'px,' + pr.y.toFixed(1) + 'px,0)';
     }
 
     function updateAim(dt) {
@@ -2705,6 +2839,10 @@
         if (Math.floor(turnHeld / 0.12) !== Math.floor((turnHeld - dt) / 0.12)) ui.sfx('ui_tick');
       }
       const show = phase === 'aim' || phase === 'turn';
+      if (phase === 'aim' && turnDir) aimPeek = Math.max(aimPeek, 1.1);
+      if (phase !== 'aim') aimPeek = 0;
+      aimPeek = Math.max(0, aimPeek - dt);
+      if (aimInfoT > 0 && (aimInfoT -= dt) <= 0 || (phase !== 'aim' && aimInfoT > 0)) { aimInfoT = 0; hud.aimInfo.classList.add('bw-off'); }
       arrowGlow = Math.max(0, arrowGlow - dt * 0.6);
       const target = show ? 0.38 + 0.55 * Math.min(1, arrowGlow) : 0;
       arrowMat.opacity = U.damp(arrowMat.opacity, target, 10, dt);
@@ -2712,16 +2850,14 @@
       arrow.visible = marker.visible = arrowMat.opacity > 0.01;
       arrow.position.set(a.x, 0.004, RELEASE_Z);
       arrow.rotation.y = -a.angle;
-      // spare balls: the guide runs on to the front standing pin
-      const spareAim = show && turn && (mode === 'spare' || !turn.fresh);
-      guideMat.opacity = U.damp(guideMat.opacity, spareAim ? arrowMat.opacity * 0.85 : 0, 10, dt);
+      // the guide runs the straight line on to the front standing pin (spare balls always; first balls
+      // while hints are on), with a ring on the lane and a chevron over the pins where it gets there
+      const hintsOn = !(save.settings && save.settings.hints === false);
+      const guideOn = show && turn && (mode === 'spare' || !turn.fresh || hintsOn || aimPeek > 0);
+      guideMat.opacity = U.damp(guideMat.opacity, guideOn ? Math.max(arrowMat.opacity, aimPeek > 0 ? 0.9 : 0) * 0.85 : 0, 10, dt);
       guideRing.material.opacity = guideMat.opacity;
       guide.visible = guideRing.visible = guideMat.opacity > 0.01;
-      if (guide.visible) {
-        let front = HEAD_Z;
-        for (const p of W.pins) if (W.isStanding(p)) front = Math.max(front, p.z);
-        guideRing.position.set(0, 0.001, (front - RELEASE_Z) / Math.cos(a.angle));
-      }
+      if (guide.visible) guideRing.position.set(0, 0.001, (aimTarget().z - RELEASE_Z) / Math.cos(a.angle));
       marker.position.set(a.x, 0.004, RELEASE_Z);
       // the bowler follows the release spot while aiming
       if (phase === 'aim' && turn) {
@@ -2742,10 +2878,12 @@
     });
     ctx.input.on('move', p => {
       if (phase !== 'aim' || !press.mode) return;
-      if (press.mode === 'pending') {
+      if (press.mode === 'pending' && Math.hypot(p.dx, p.dy) >= 20) {
+        // a big hook swipe can start out well sideways: anything heading up at more than ~30° is a swipe,
+        // only a clearly sideways move is a drag
         const ax = Math.abs(p.dx), ay = Math.abs(p.dy);
-        if (ax > 12 && ax > ay * 1.15) press.mode = 'drag';
-        else if (p.dy < -12 && ay > ax) press.mode = 'swipe';
+        if (p.dy < 0 && ax < ay * 1.8) press.mode = 'swipe';
+        else if (ax > ay) press.mode = 'drag';
       }
       if (press.mode === 'drag') moveTo(press.startX + p.ndx * 1.15);
       // the swipe up is the backswing; lifting the finger lets the ball go
@@ -2762,10 +2900,17 @@
     ctx.input.on('swipe', s => {
       if (phase !== 'aim' || autoplay) return;
       const short = Math.min(engine.size.w, engine.size.h);
-      const read = readSwipe(s, short);
-      if (!read || press.last === 'drag') return;
-      if (s.start.y < engine.size.h * 0.18) return;
       const a = aims[turn.p];
+      if (press.last === 'drag') {
+        // a press that began sideways but ended as a long upward stroke was a curvy swipe after all
+        if (-s.dy < 0.2 * short || Math.abs(s.dy) < Math.abs(s.dx)) return;
+        moveTo(press.startX);
+      }
+      const read = readSwipe(s, short);
+      if (!read || s.start.y < engine.size.h * 0.18) {
+        if (-s.dy > 0.04 * short) flashSwipe();      // an upward stroke that didn't count: say how
+        return;
+      }
       commitShot({ x: a.x, angle: U.clamp(a.angle + read.drift, -AIM_MAX - 3 * DEG, AIM_MAX + 3 * DEG), speed: read.speed, spin: read.spin, swiped: true });
     });
     /** Tap / Space: skip the current beat; after a gutter ball, call the result at once. */
@@ -2882,7 +3027,17 @@
       const st0 = stats[0];
       const statsOut = [];
       const topSpeed = { label: 'Top Speed', value: Math.round(st0.topSpeed * 3.6) + ' km/h' };
-      if (mode === 'game') {
+      if (players.length > 1) {
+        // hot-seat: one compact line per bowler, so nobody's numbers read as the winner's
+        players.forEach((p, i) => {
+          const st = stats[i], nm = p.profile.name;
+          if (mode === 'game') statsOut.push({ label: nm + ' · strikes · spares', value: st.strikes + ' · ' + st.spares });
+          else if (mode === 'spare') statsOut.push({ label: nm + ' · picked up', value: st.conversions + '/10' });
+          else statsOut.push({ label: nm + ' · best round', value: String(Math.max(0, ...powerLog[i])) });
+        });
+        const fastest = stats.reduce((b, st, i) => (st.topSpeed > stats[b].topSpeed ? i : b), 0);
+        statsOut.push({ label: 'Top Speed · ' + players[fastest].profile.name, value: Math.round(stats[fastest].topSpeed * 3.6) + ' km/h' });
+      } else if (mode === 'game') {
         statsOut.push({ label: 'Strikes', value: String(st0.strikes) }, { label: 'Spares', value: String(st0.spares) },
           { label: 'Best Streak', value: String(st0.bestStreak) },
           { label: 'First-Ball Avg', value: st0.firstN ? (st0.first / st0.firstN).toFixed(1) : '0' },
@@ -2942,6 +3097,7 @@
       }
       updateNeighbours(dt);
       updateCamera(dt);
+      updateTargetMarker();
     }
 
     // first frame: rack in place, camera behind the bowler
@@ -2986,6 +3142,12 @@
           standing: W.standing(),
           awake: W.pins.filter(p => p.awake).length,
           ballMode: W.ball.mode,
+          ballVisible: ball.visible, ballVis: ballVis.mode,
+          // is any part of an ambient neighbour on screen (tests: they must stay out of the aim view)
+          neighboursInView: ambient.bowlers.some(nb => [0.1, 0.6, 1.1].some(y => [-0.3, 0.3].some(dx => {
+            const r = nb.pal.root.position;
+            return engine.project(V(r.x + dx, y, r.z)).visible;
+          }))),
           aim: turn ? { x: +aims[turn.p].x.toFixed(3), angleDeg: +(aims[turn.p].angle / DEG).toFixed(2) } : null,
           camera: cam.shot,
           lastShot, lastOutcome,
@@ -3030,7 +3192,7 @@
             }
             splitLeft = isSplit(pins);
           }
-          W.setRack(mode === 'hundred' ? rackSpots(powerRows(turn.round)) : SPOTS10, new Set(pins));
+          W.setRack(mode === 'hundred' ? rackSpots(powerRows(turn.round)) : SPOTS10, new Set(pins), rackRng);
           syncPins();
           refreshHud();
           return true;

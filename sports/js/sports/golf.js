@@ -8,8 +8,11 @@
  *    slopes, trees, water, OB and cup capture. A shot is simulated in full at impact, then played back,
  *    so the camera always knows where the ball will land.
  *  · Control: drag sideways to aim, pull down for power, flick up to swing. Flick angle → push/pull
- *    and curve, a bent flick shapes the shot, flick speed → strike quality. Putts use the same gesture
- *    with a metre-scaled meter.
+ *    and curve, a bent flick shapes the shot, flick speed and length → strike quality. Putts use the
+ *    same gesture with a metre-scaled meter whose green mark is the right pace.
+ *  · Aids: the landing ring follows the pull (calm-air carry); Beginner and Full 9 add a blue ring for
+ *    where the wind takes it, Beginner a carry mark on the meter. Roll, slope and (in Expert) wind
+ *    stay a read, and every full swing has a small hidden spread, so nothing is a sure thing.
  *  · Modes: beginner (holes 1–3), expert (7–9), full9. 1–4 hot-seat players play each hole in turn.
  *  · Debug: instance.debug = { autoplay, skipTo, shot, simulate, skip, … } and debugState().
  */
@@ -45,7 +48,7 @@
     opponent: false,
     modes: [
       { id: 'beginner', name: 'Beginner 3', desc: 'Three friendly holes to warm up.' },
-      { id: 'expert', name: 'Expert 3', desc: 'Three tricky holes with water and sand.' },
+      { id: 'expert', name: 'Expert 3', desc: 'Three tricky holes with water, sand and wind to read.' },
       { id: 'full9', name: 'Full 9', desc: 'The whole parkland course. Can you beat par?' },
     ],
     howTo: {
@@ -55,9 +58,9 @@
         { gesture: 'swipe-up-curve', text: 'A bent flick curves the ball — use it around trees' },
       ],
       tips: [
-        'The ring shows where a full swing lands. Tap the club to change it.',
-        'Watch the wind arrow: aim a little into the wind.',
-        'On the green, the meter shows metres. Follow the moving dots to read the slope.',
+        'The ring shows where the ball lands and follows your pull. Tap the club to change it.',
+        'The blue ring shows where the wind takes it. In Expert you read the wind yourself!',
+        'On the green, pull to the green mark for the right pace. Arrows flow downhill.',
       ],
     },
     medals: [
@@ -86,7 +89,8 @@
   const SPIN_DECAY = 0.05;         // per second
   const CAPTURE_V = 1.4;           // m/s: slower than this over the cup drops in
   const LIP_V = 2.2;               // m/s: up to this, a centred hit can lip out
-  const PUTT_DECEL = 0.62;         // green rolling resistance (m/s²); the putt meter's metres assume it
+  const PUTT_DECEL = 0.9;          // green rolling resistance (m/s²); the putt meter's metres assume it
+  const GIMME_R = 0.5;             // putts that finish this close are conceded (tapped in)
   const MAX_OVER_PAR = 4;          // pick up at par + 4
 
   // carry: full-swing carry (m, flat, calm). launch: degrees. spin: backspin rad/s at vNom.
@@ -222,57 +226,57 @@
     { name: 'Sunny Start', par: 4, path: [[0, 0], [0, -100], [-3, -200], [4, -284]],
       elev: [[0, 2], [60, 0.4], [200, 0], [284, 0.8]], hills: 2.2, wind: [0, 2.5], treeD: 46,
       fairways: [[36, 262, 40]],
-      green: { rx: 15, rz: 13, rot: 0.2, rise: 0.4, slope: [0.008, 0.012], und: 0.07, pin: [3, 2] },
+      green: { rx: 15, rz: 13, rot: 0.2, rise: 0.4, slope: [0.004, 0.007], und: 0.03, pin: [3, 2] },
       bunkers: [{ s: 214, d: 23, rx: 8, rz: 4.5, rot: 0.3 }, { g: [-15, -4], rx: 6, rz: 3.5, rot: 1.1 }, { g: [14, 7], rx: 5, rz: 3, rot: -0.7 }],
       water: [], clusters: [{ s: 120, d: -40, r: 10, n: 5 }] },
     { name: 'Little Hop', par: 3, path: [[0, 0], [-6, -128]],
       elev: [[0, 7], [40, 3.5], [128, 0.5]], hills: 2.4, wind: [0, 3], treeD: 34,
       fairways: [[96, 118, 22]],
-      green: { rx: 13, rz: 12, rot: -0.4, rise: 0.3, slope: [-0.008, 0.014], und: 0.06, pin: [-3, 1] },
+      green: { rx: 13, rz: 12, rot: -0.4, rise: 0.3, slope: [-0.004, 0.007], und: 0.03, pin: [-3, 1] },
       bunkers: [{ g: [9, -12.5], rx: 7, rz: 3.4, rot: 0.2 }, { g: [-14.5, 2], rx: 4.5, rz: 6, rot: 0.1 }, { g: [2, 14.5], rx: 6, rz: 2.8, rot: 0 }],
       water: [], clusters: [] },
     { name: 'Long Meadow', par: 5, path: [[0, 0], [0, -190], [14, -300], [45, -380], [70, -440]],
       elev: [[0, 1], [150, -1], [300, 1.5], [455, 0.5]], hills: 2.8, wind: [0, 3], treeD: 50,
       fairways: [[38, 432, 38]],
-      green: { rx: 15, rz: 12, rot: 0.5, rise: 0.5, slope: [0.01, 0.008], und: 0.08, pin: [-3, -2] },
+      green: { rx: 15, rz: 12, rot: 0.5, rise: 0.5, slope: [0.006, 0.004], und: 0.035, pin: [-3, -2] },
       bunkers: [{ s: 236, d: -22, rx: 9, rz: 4.5, rot: 0.2 }, { s: 330, d: -9, rx: 6, rz: 3, rot: 0.1 }, { s: 338, d: 10, rx: 5, rz: 3, rot: -0.2 },
         { g: [-16, -2], rx: 6, rz: 4, rot: 0.9 }, { g: [15, -6], rx: 5.5, rz: 3.5, rot: -0.6 }],
       water: [], clusters: [{ s: 285, d: 42, r: 14, n: 7 }] },
     { name: 'Woodland Bend', par: 4, path: [[0, 0], [0, -195], [-22, -258], [-68, -296], [-88, -306]],
       elev: [[0, 1], [195, 0], [344, 2.2]], hills: 2.6, wind: [1, 3.5], treeD: 36,
       fairways: [[34, 322, 32]],
-      green: { rx: 13, rz: 12, rot: -0.3, rise: 0.8, slope: [0.012, 0.01], und: 0.08, pin: [2, 3] },
+      green: { rx: 13, rz: 12, rot: -0.3, rise: 0.8, slope: [0.009, 0.007], und: 0.045, pin: [2, 3] },
       bunkers: [{ s: 229, d: 22, rx: 8, rz: 5, rot: 0.3 }, { g: [-12, -7], rx: 5, rz: 3.2, rot: 0.6 }, { g: [13, 3], rx: 4.5, rz: 3.5, rot: -0.4 }],
       water: [], clusters: [{ s: 214, d: -36, r: 16, n: 11 }, { s: 262, d: -38, r: 13, n: 8 }] },
     { name: 'Lily Pond', par: 3, path: [[0, 0], [3, -152]],
       elev: [[0, 2.5], [152, 1.2]], hills: 2, wind: [1, 4], treeD: 36,
       fairways: [[40, 94, 26]],
-      green: { rx: 14, rz: 12, rot: 0.3, rise: 0.8, slope: [0, 0.016], und: 0.06, pin: [4, -1] },
+      green: { rx: 14, rz: 12, rot: 0.3, rise: 0.8, slope: [0, 0.011], und: 0.04, pin: [4, -1] },
       bunkers: [{ g: [-6, 15], rx: 7, rz: 3, rot: 0.1 }, { g: [16, 2], rx: 3.5, rz: 6, rot: 0 }],
       water: [{ s: 118, d: -3, rx: 24, rz: 13, rot: 0.12 }], clusters: [] },
     { name: 'Hilltop', par: 4, path: [[0, 0], [-6, -170], [0, -270], [8, -346]],
       elev: [[0, 0], [120, 1], [250, 5], [346, 8]], hills: 2.8, wind: [1, 4], treeD: 44, ob: { right: 34 },
       fairways: [[35, 330, 34]],
-      green: { rx: 14, rz: 13, rot: 0.1, rise: 1.2, slope: [0.006, 0.02], und: 0.07, pin: [-4, 4] },
+      green: { rx: 14, rz: 13, rot: 0.1, rise: 1.2, slope: [0.004, 0.013], und: 0.045, pin: [-4, 4] },
       bunkers: [{ s: 205, d: -19, rx: 8, rz: 4, rot: 0.2 }, { s: 233, d: 19, rx: 7, rz: 4.5, rot: -0.3 },
         { g: [-14, -4], rx: 5, rz: 3.5, rot: 0.8 }, { g: [1, -17.5], rx: 9, rz: 3, rot: 0 }],
       water: [], clusters: [] },
     { name: 'Creek Crossing', par: 4, path: [[0, 0], [4, -180], [-4, -280], [2, -366]],
       elev: [[0, 1.5], [220, -0.5], [366, 1.5]], hills: 2.4, wind: [2.5, 5.5], treeD: 40, ob: { right: 30 },
       fairways: [[34, 214, 30], [250, 350, 28]],
-      green: { rx: 12, rz: 11, rot: -0.2, rise: 0.6, slope: [-0.012, 0.012], und: 0.09, pin: [4, 3] },
+      green: { rx: 12, rz: 11, rot: -0.2, rise: 0.6, slope: [-0.01, 0.01], und: 0.05, pin: [4, 3] },
       bunkers: [{ s: 190, d: 18, rx: 7, rz: 4, rot: 0.2 }, { g: [-13, -3], rx: 5, rz: 3.4, rot: 0.9 }, { g: [13, -2], rx: 4.5, rz: 3.6, rot: -0.8 }, { g: [4, 14], rx: 6, rz: 2.8, rot: 0 }],
       water: [{ s: 232, d: 0, rx: 75, rz: 6.5, rot: 0, wob: 0.03 }], clusters: [{ s: 110, d: -34, r: 10, n: 6 }] },
     { name: 'Island Green', par: 3, path: [[0, 0], [-5, -165]],
-      elev: [[0, 4.5], [165, 0.6]], hills: 2, wind: [3, 6], treeD: 40,
+      elev: [[0, 4.5], [165, 0.6]], hills: 2, wind: [2, 4.5], treeD: 40,
       fairways: [],
-      green: { rx: 11.5, rz: 10, rot: 0.2, rise: 1.0, slope: [0.012, -0.01], und: 0.07, pin: [3, 2], island: true },
+      green: { rx: 11.5, rz: 10, rot: 0.2, rise: 1.0, slope: [0.01, -0.008], und: 0.045, pin: [3, 2], island: true },
       bunkers: [{ g: [-10, 8], rx: 4, rz: 2.5, rot: 0.6 }],
       water: [{ s: 158, d: -2, rx: 40, rz: 42, rot: 0.2 }], clusters: [] },
     { name: 'Grand Finale', par: 5, path: [[0, 0], [0, -190], [28, -290], [22, -390], [-8, -478]],
-      elev: [[0, 2], [190, 0], [390, 0.5], [489, 1.8]], hills: 2.6, wind: [2.5, 6], treeD: 46, ob: { right: 34 },
+      elev: [[0, 2], [190, 0], [390, 0.5], [489, 1.8]], hills: 2.6, wind: [2, 5], treeD: 46, ob: { right: 34 },
       fairways: [[40, 232, 32], [252, 470, 28]],
-      green: { rx: 12.5, rz: 11, rot: 0.3, rise: 0.7, slope: [0.014, 0.01], und: 0.09, pin: [-2, 3] },
+      green: { rx: 12.5, rz: 11, rot: 0.3, rise: 0.7, slope: [0.011, 0.008], und: 0.05, pin: [-2, 3] },
       bunkers: [{ s: 222, d: 20, rx: 8, rz: 4.5, rot: 0.2 }, { s: 394, d: 7, rx: 7, rz: 3.2, rot: 0 }, { g: [14, -3], rx: 5, rz: 3.6, rot: -0.7 }, { g: [-2, 15], rx: 6, rz: 2.8, rot: 0 }],
       water: [{ s: 330, d: -40, rx: 24, rz: 68, rot: 0.05 }, { g: [-17, -14], rx: 11, rz: 8, rot: 0.4 }], clusters: [{ s: 300, d: 46, r: 15, n: 8 }] },
   ];
@@ -367,7 +371,7 @@
     M.wob = [wseed.next() * TAU, wseed.next() * TAU, wseed.next() * TAU, wseed.next() * TAU];
     buildFairwayTable(M);
     const ob = def.ob || {};
-    M.ob = { left: ob.left || 75, right: ob.right || 75, back: -45, front: L + 55, staked: { left: !!ob.left, right: !!ob.right } };
+    M.ob = { left: ob.left || 75, right: ob.right || 75, back: -45, front: L + 55 };
 
     // ---- bounds (inner = physics + splat; the mesh skirt extends far beyond) -----------------------
     let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
@@ -378,6 +382,7 @@
 
     // ---- projection grid (s, d) every 2 m --------------------------------------------------------
     buildProjection(M);
+    M.holeLen = Math.round(M.project(M.pin.x, M.pin.z, { s: 0, d: 0 }).s + 1);   // tee ball to pin along the hole
 
     // ---- water levels (from the base terrain at the blob centre) ----------------------------------
     for (const w of M.water) {
@@ -527,7 +532,7 @@
         const F = M.greenFrame;
         const lx = (x - G.x) * -F.tz + (z - G.z) * F.tx, lz = (x - G.x) * F.tx + (z - G.z) * F.tz;
         const gd = G.def;
-        const und = gd.und * Math.sin(lx * 0.31 + M.wob[0]) * Math.sin(lz * 0.27 + M.wob[1]);
+        const und = gd.und * Math.sin(lx * 0.22 + M.wob[0]) * Math.sin(lz * 0.19 + M.wob[1]);
         const hg = M.greenH + gd.slope[0] * lx + gd.slope[1] * lz + und;
         h = lerp(h, hg, wG);
       }
@@ -794,9 +799,11 @@
   }
 
   /**
-   * Simulates a shot. L = { x, y, z, vx, vy, vz, back, side, roll }. opts.wind {x, z}, opts.record.
+   * Simulates a shot. L = { x, y, z, vx, vy, vz, back, side, roll }. opts: wind {x, z}, record,
+   * noTrees, noCup (the ball rolls over the hole), stopAtLand.
    * Returns { outcome: 'rest'|'holed'|'water'|'ob', n (steps), path (Float32Array x,y,z per step),
-   *   events [{ n, type, … }], rest {x, y, z}, surf, land {x, z, n, surf} | null, apex, carry, total }.
+   *   events [{ n, type, … }], rest {x, y, z}, surf, land {x, z, n, surf} | null, apex, carry, total,
+   *   close {d, n} (nearest the ball came to the cup while on the ground) }.
    */
   function simulateShot(M, L, opts = {}) {
     const wind = opts.wind || NO_WIND;
@@ -808,6 +815,8 @@
     let mode = L.roll ? 'roll' : 'air';
     let outcome = 'rest', land = null, apex = st.y, bounces = 0, lipped = false, inCup = false;
     let canopy = null;
+    const noCup = !!opts.noCup;
+    let closeD = Infinity, closeN = 0;
     const g = { h: 0, gx: 0, gz: 0 };
     const near = [];
     const B = M.bounds, pin = M.pin;
@@ -861,7 +870,8 @@
             outcome = 'water'; events.push({ n, type: 'splash', x: st.x, y: wl, z: st.z }); break;
           }
           const dc = Math.hypot(st.x - pin.x, st.z - pin.z);
-          if (dc < CUP_R && Math.hypot(st.vx, st.vz) < 9) {
+          if (dc < closeD) { closeD = dc; closeN = n; }
+          if (!noCup && dc < CUP_R && Math.hypot(st.vx, st.vz) < 9) {
             st.x = pin.x; st.z = pin.z; st.y = g.h - 0.05;
             outcome = 'holed'; events.push({ n, type: 'cup', dunk: true, speed: Math.hypot(st.vx, st.vz) }); break;
           }
@@ -918,7 +928,8 @@
         // the cup
         const cx = pin.x - st.x, cz = pin.z - st.z;
         const dc = Math.sqrt(cx * cx + cz * cz);
-        if (dc < CUP_R) {
+        if (dc < closeD) { closeD = dc; closeN = n; }
+        if (dc < CUP_R && !noCup) {
           const spd = Math.sqrt(st.vx * st.vx + st.vz * st.vz);
           let holed = spd < CAPTURE_V;
           if (!holed && !inCup) {
@@ -969,6 +980,7 @@
     return {
       outcome, n, path, events, land, apex, carry, surf,
       rest: { x: st.x, y: st.y, z: st.z },
+      close: { d: closeD, n: closeN },
       total: Math.hypot(st.x - L.x, st.z - L.z),
     };
   }
@@ -978,39 +990,58 @@
   // =============================================================================================
 
   const ROLL_EST = { D: 15, '3W': 12, '5I': 9, '7I': 5, '9I': 3, PW: 2, SW: 1.5 };
-  const calCache = [];
+  const CURVE_TILT = 28 * DEG;     // spin-axis tilt of a fully bent flick
+  const CURVE_AIM = 0.92;          // share of the curve's sideways drift that the start line takes back
+  const calCache = {};
 
   function clubSpin(club, v) { return club.spin * clamp(v / club.vNom, 0.35, 1.2); }
 
-  /** Flat, calm carry for launch speed v (m). */
-  function flatCarry(club, v, launchDeg) {
+  /** How a lie changes the strike: launch angle (deg) and backspin factor. */
+  function lieStrike(club, surf) {
+    const S = SURF[surf] || SURF.fairway;
+    let launch = club.launch;
+    if (surf === 'rough') launch += 1.5;
+    if (surf === 'sand' && club.id !== 'SW') launch *= 0.85;
+    return { key: launch.toFixed(2) + '/' + S.spin, launch, spinF: S.spin };
+  }
+
+  /** Flat, calm flight at launch speed v: { carry, side } (m; side = sideways drift, + right). */
+  function flatFlight(club, v, launchDeg, spinF, tilt) {
     const la = launchDeg * DEG;
-    const st = { x: 0, y: 0, z: 0, vx: 0, vy: v * Math.sin(la), vz: -v * Math.cos(la), wb: clubSpin(club, v), ws: 0 };
+    const wb = clubSpin(club, v) * spinF;
+    const st = { x: 0, y: 0, z: 0, vx: 0, vy: v * Math.sin(la), vz: -v * Math.cos(la), wb, ws: wb * Math.tan(tilt) };
     for (let i = 0; i < 4000; i++) {
-      const py = st.y, pz = st.z;
+      const px = st.x, py = st.y, pz = st.z;
       aeroStep(st, 0, 0);
       if (st.y < 0 && st.vy < 0) {
         const t = py / (py - st.y);
-        return -(pz + (st.z - pz) * t);
+        return { carry: -(pz + (st.z - pz) * t), side: px + (st.x - px) * t };
       }
     }
-    return -st.z;
+    return { carry: -st.z, side: st.x };
   }
 
-  /** Table carry(v) per club, inverted by interpolation. */
-  function calibration(ci) {
-    if (calCache[ci]) return calCache[ci];
+  /**
+   * carry(v) for a club struck from a lie, inverted by interpolation, so a full swing from any lie
+   * carries exactly club.carry × lieDist (what the HUD promises). Also the curve's drift angle.
+   */
+  function calibration(ci, surf) {
     const club = CLUBS[ci];
+    const ls = lieStrike(club, surf || 'fairway');
+    const id = ci + ':' + ls.key;
+    if (calCache[id]) return calCache[id];
     const vs = [], cs = [];
-    for (let v = 2; v <= 96; v += 1) { vs.push(v); cs.push(flatCarry(club, v, club.launch)); }
-    const cal = { vs, cs };
+    for (let v = 2; v <= 110; v += 1) { vs.push(v); cs.push(flatFlight(club, v, ls.launch, ls.spinF, 0).carry); }
+    const cal = { vs, cs, launch: ls.launch, spinF: ls.spinF };
     cal.vFor = c => {
       if (c <= cs[0]) return vs[0] * c / Math.max(1e-3, cs[0]);
       for (let i = 1; i < cs.length; i++) if (cs[i] >= c) return lerp(vs[i - 1], vs[i], (c - cs[i - 1]) / ((cs[i] - cs[i - 1]) || 1));
       return vs[vs.length - 1];
     };
     cal.vFull = cal.vFor(club.carry);
-    calCache[ci] = cal;
+    const bent = flatFlight(club, cal.vFull, ls.launch, ls.spinF, CURVE_TILT);
+    cal.curveAng = Math.atan2(bent.side, Math.max(1, bent.carry));
+    calCache[id] = cal;
     return cal;
   }
 
@@ -1027,17 +1058,26 @@
     return SURF[surf] ? SURF[surf].dist : 1;
   }
 
+  /** Strike quality from flick crispness (0..1): a lazy flick tops the ball. */
+  function strikeQuality(tempo) { return sstep(0.05, 0.8, tempo); }
+
+  const FLICK_DEAD = 1 * DEG;      // flick angles inside this are dead straight
+  const START_LINE = 0.5;          // share of the flick's angle error that becomes the start line
+  const STRIKE_VAR = 0.012;        // hidden carry spread of a full swing (σ, capped at ±3%)
+  const LINE_VAR = 0.5 * DEG;      // hidden start-line spread of a full 7-iron (σ; scales with the club's length)
+
   /**
    * Gesture → launch. inp = { club, aim (heading rad), power (0..1.1), flick (rad, + right),
    * curve (−1..1 shot shape from a bent flick, + curves right), tempo (0..1 flick crispness) }. rng adds the random
    * parts (overswing and lie scatter); pass null for the no-luck version (landing ring, planner).
+   * A bent flick starts the ball out to the bulge side and curves it back, so it finishes near the aim line.
    */
   function launchFor(M, ball, inp, rng) {
     const club = CLUBS[inp.club];
-    const flick = inp.flick || 0, curve = inp.curve || 0;
+    const flick = inp.flick || 0, curve = club.putter ? 0 : clamp(inp.curve || 0, -1, 1);
     const dPin = Math.hypot(M.pin.x - ball.x, M.pin.z - ball.z);
-    const eff = Math.sign(flick) * Math.max(0, Math.abs(flick) - 2.5 * DEG);
-    const info = { club: club.id, power: inp.power, topped: false, err: 0, tilt: 0 };
+    const eff = Math.sign(flick) * Math.max(0, Math.abs(flick) - FLICK_DEAD);
+    const info = { club: club.id, power: inp.power, topped: false, err: 0, tilt: 0, strike: 1, curve };
     if (club.putter) {
       const scale = inp.scale || puttScale(dPin);
       const dist = clamp(inp.power, 0, 1) * scale;
@@ -1051,23 +1091,20 @@
     const p = clamp(inp.power, 0.02, 1.1);
     const over = Math.max(0, (p - 1) / 0.1);
     const pEff = p <= 1 ? p : 1 + (p - 1) * 0.6;
-    const tempo = inp.tempo == null ? 1 : clamp(inp.tempo, 0, 1);
-    let distF = lieDist(club, ball.surf, dPin);
-    const topped = tempo < 0.28;
-    distF *= topped ? 0.3 + tempo * 0.6 : 0.95 + 0.05 * sstep(0.28, 0.75, tempo);
-    const cal = calibration(inp.club);
-    const v = cal.vFor(club.carry * pEff * distF);
-    let launch = club.launch * (topped ? 0.3 : 1);
-    if (ball.surf === 'rough') launch += 1.5;
-    if (ball.surf === 'sand' && club.id !== 'SW') launch *= 0.85;
+    const q = strikeQuality(inp.tempo == null ? 1 : clamp(inp.tempo, 0, 1));
+    const cal = calibration(inp.club, ball.surf);
+    // no two swings are quite the same: a small hidden spread on carry
+    const vary = rng ? 1 + clamp(gauss(rng) * STRIKE_VAR, -0.03, 0.03) : 1;
+    const v = cal.vFor(club.carry * pEff * lieDist(club, ball.surf, dPin) * lerp(0.6, 1, q) * vary);
+    const launch = cal.launch * lerp(0.45, 1, q);
     let err = eff;
-    if (rng) err += gauss(rng) * over * 3.5 * DEG + gauss(rng) * S.spread * DEG;
-    const psi = inp.aim + err * 0.4;
-    const tilt = clamp(err * 1.25 + curve * 0.5, -35 * DEG, 35 * DEG);
-    const wb = clubSpin(club, v) * S.spin * (topped ? 0.3 : 1);
+    if (rng) err += gauss(rng) * over * 3.5 * DEG + gauss(rng) * S.spread * DEG + clamp(gauss(rng), -2.5, 2.5) * LINE_VAR * club.carry / 135 * Math.min(1, p);
+    const psi = inp.aim + err * START_LINE - curve * cal.curveAng * CURVE_AIM;
+    const tilt = clamp(err * 0.75 + curve * CURVE_TILT, -35 * DEG, 35 * DEG);
+    const wb = clubSpin(club, v) * cal.spinF * lerp(0.35, 1, q);
     const [dx, dz] = headingDir(psi);
     const la = launch * DEG;
-    info.topped = topped; info.err = err; info.tilt = tilt; info.over = over; info.speed = v;
+    info.topped = q < 0.3; info.strike = q; info.err = err; info.tilt = tilt; info.over = over; info.speed = v;
     return {
       L: { x: ball.x, y: ball.y, z: ball.z, vx: dx * v * Math.cos(la), vy: v * Math.sin(la), vz: dz * v * Math.cos(la), back: wb, side: wb * Math.tan(tilt), roll: false },
       info,
@@ -1093,12 +1130,68 @@
     return c.carry * lieDist(c, surf, dPin) + ROLL_EST[c.id];
   }
 
+  /** Where a calm, tree-free shot comes to rest, measured along its aim from the ball (m). */
+  function restAlong(M, ball, inp) {
+    const { L } = launchFor(M, ball, inp, null);
+    const res = simulateShot(M, L, { noTrees: true, noCup: true });
+    const [dx, dz] = headingDir(inp.aim);
+    return (res.rest.x - ball.x) * dx + (res.rest.z - ball.z) * dz;
+  }
+
+  /**
+   * The power that rests the ball `target` metres along `aim` (calm, no trees, slope and roll included):
+   * a binary search over simulated shots. Above 1 when even a full swing comes up short.
+   */
+  function powerFor(M, ball, ci, aim, target, scale) {
+    const club = CLUBS[ci];
+    const inp = { club: ci, aim, power: 1, flick: 0, curve: 0, tempo: 1, scale };
+    const at = pw => { inp.power = pw; return restAlong(M, ball, inp); };
+    const full = at(1);
+    if (full < target) return 1 + (target - full) / Math.max(1, club.putter ? scale : club.carry);
+    let lo = 0.02, hi = 1;
+    for (let k = 0; k < 11; k++) { const m = (lo + hi) / 2; if (at(m) < target) lo = m; else hi = m; }
+    return (lo + hi) / 2;
+  }
+
+  /**
+   * Where a straight, tree-free shot first comes down (calm unless `wind` is given):
+   * { x, y, z, dist (from the ball), along (metres along the aim) }.
+   */
+  function landPoint(M, ball, inp, wind) {
+    const { L } = launchFor(M, ball, inp, null);
+    const res = simulateShot(M, L, { stopAtLand: true, noTrees: true, wind });
+    const e = res.events.length ? res.events[res.events.length - 1] : null;
+    const x = e ? e.x : res.rest.x, z = e ? e.z : res.rest.z;
+    const [dx, dz] = headingDir(inp.aim);
+    return { x, z, y: Math.max(heightAt(M, x, z), waterLevelAt(M, x, z)), dist: Math.hypot(x - ball.x, z - ball.z), along: (x - ball.x) * dx + (z - ball.z) * dz };
+  }
+
+  /** The power whose calm carry comes down `target` metres along `aim` (the Beginner meter's pin mark). */
+  function carryPowerFor(M, ball, ci, aim, target) {
+    const inp = { club: ci, aim, power: 1, flick: 0, curve: 0, tempo: 1 };
+    const at = pw => { inp.power = pw; return landPoint(M, ball, inp).along; };
+    const full = at(1);
+    if (full < target) return 1 + (target - full) / Math.max(1, CLUBS[ci].carry);
+    let lo = 0.02, hi = 1;
+    for (let k = 0; k < 11; k++) { const m = (lo + hi) / 2; if (at(m) < target) lo = m; else hi = m; }
+    return (lo + hi) / 2;
+  }
+
+  /** Putting pace target: die the ball this far past the cup. */
+  const PUTT_PAST = 0.35;
+
   function suggestClub(M, ball) {
     const d = Math.hypot(M.pin.x - ball.x, M.pin.z - ball.z);
     if (ball.surf === 'green') return PUTTER;
     if (ball.surf === 'fringe' && d < 14) return PUTTER;
     const list = clubsFor(ball.surf).filter(i => !CLUBS[i].putter);
-    for (let k = list.length - 1; k >= 0; k--) if (clubReach(list[k], ball.surf, d) >= d * 0.97) return list[k];
+    const aim = headingTo(ball.x, ball.z, M.pin.x, M.pin.z);
+    // the shortest club whose simulated full swing (slope, roll and elevation included) gets there
+    for (let k = list.length - 1; k >= 0; k--) {
+      const ci = list[k];
+      if (clubReach(ci, ball.surf, d) < d * 0.8) continue;
+      if (restAlong(M, ball, { club: ci, aim, power: 1, flick: 0, curve: 0, tempo: 1 }) >= d - 2) return ci;
+    }
     return list[0];
   }
 
@@ -1241,9 +1334,9 @@
       const { L } = launchFor(M, ball, inp, rng);
       const res = simulateShot(M, L, { wind });
       strokes++;
-      if (CLUBS[inp.club].putter) putts++;
+      if (CLUBS[inp.club].putter && ball.surf === 'green') putts++;
       if (strokes === 1 && M.par > 3) fir = res.surf === 'fairway';
-      if (res.outcome === 'holed') { if (strokes <= M.par - 2) gir = true; return { strokes, putts, fir, gir: gir || strokes - putts <= M.par - 2 }; }
+      if (res.outcome === 'holed') return { strokes, putts, fir, gir: gir || strokes <= M.par - 2 };
       if (res.outcome === 'water') {
         strokes++;
         const d = dropPoint(M, res.rest, ball);
@@ -1253,6 +1346,10 @@
       } else {
         ball = { x: res.rest.x, z: res.rest.z, surf: res.surf };
         if ((res.surf === 'green') && strokes <= M.par - 2) gir = true;
+        if ((res.surf === 'green' || res.surf === 'fringe') && Math.hypot(M.pin.x - ball.x, M.pin.z - ball.z) < GIMME_R) {
+          strokes++; putts++;
+          return { strokes: Math.min(strokes, cap), putts, fir, gir };
+        }
       }
       ball.y = heightAt(M, ball.x, ball.z) + BALL_R;
     }
@@ -1357,7 +1454,10 @@
           const stripe = (Math.floor((p.s + 1000) / 9) & 1) ? COL.fairway : COL.fairway2;
           mix(stripe, aa(hw - ad), 1 + n * 0.03);
         }
-        if (p.d < -M.ob.left || p.d > M.ob.right) { r *= 0.93; gg *= 0.94; bb *= 0.93; }
+        // out of bounds: a darker band beyond a mown edge line
+        const obOver = ad - (p.d < 0 ? M.ob.left : M.ob.right);
+        if (obOver > 0) { r *= 0.84; gg *= 0.87; bb *= 0.84; }
+        if (obOver > -0.6 && obOver < 0.6) mix(COL.fairway, aa(0.45 - Math.abs(obOver)) * 0.85);
         const tl = teeLocal(M, x, z);
         const out = Math.max(Math.abs(tl.d) - TEE_HALF, tl.a > 0 ? tl.a - TEE_FRONT : -tl.a - TEE_BACK);
         if (out < 3) {
@@ -1544,6 +1644,19 @@
     return c;
   }
 
+  /** A soft dark halo that keeps a white ball readable against clouds and bright sky. */
+  function haloCanvas() {
+    const c = makeCanvas(64, 64), g = c.getContext('2d');
+    const gr = g.createRadialGradient(32, 32, 9, 32, 32, 30);
+    gr.addColorStop(0, 'rgba(20, 40, 80, 0)');
+    gr.addColorStop(0.18, 'rgba(20, 40, 80, 0.55)');
+    gr.addColorStop(0.45, 'rgba(20, 40, 80, 0.18)');
+    gr.addColorStop(1, 'rgba(20, 40, 80, 0)');
+    g.fillStyle = gr;
+    g.fillRect(0, 0, 64, 64);
+    return c;
+  }
+
   // =============================================================================================
   // 10. HUD styles
   // =============================================================================================
@@ -1588,6 +1701,7 @@
 .gf-club .tx { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
 .gf-club small { font: 800 12px/1 var(--font-ui); color: var(--ink-soft); }
 .gf-club .sw { margin-left: auto; opacity: .45; display: flex; }
+.gf-club .sw.l { margin-left: -2px; margin-right: -4px; order: -1; }
 .gf-club .sw .ss-icon { width: 16px; height: 16px; }
 .gf-cue { font: 900 12px/1 var(--font-ui); letter-spacing: .08em; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,.6);
   white-space: nowrap; display: flex; align-items: center; gap: 6px; transition: opacity .25s; }
@@ -1598,20 +1712,34 @@
 .gf-aim.r { right: calc(var(--sar) + 12px); }
 .gf-aim .ss-btn.round { width: 54px; height: 54px; }
 .gf-aim small { font: 900 10px/1 var(--font-ui); letter-spacing: .1em; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.55); }
-.gf-gauge { position: absolute; left: 0; top: 0; display: flex; align-items: flex-start; gap: 6px; pointer-events: none; }
+.gf-gauge { position: absolute; left: 0; top: 0; width: 26px; pointer-events: none; }
 .gf-gauge .trk { position: relative; width: 20px; border-radius: 10px; background: rgba(20, 32, 56, .5); border: 3px solid #fff;
   box-shadow: var(--shadow-soft); overflow: hidden; }
 .gf-gauge .fill { position: absolute; left: 0; right: 0; top: 0; height: 0; background: linear-gradient(180deg, #FFF4C4, #FFC93C); }
 .gf-gauge .over { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(255, 90, 95, .55); }
 .gf-gauge .full { position: absolute; left: -3px; right: -3px; height: 3px; background: #fff; }
 .gf-gauge .pin { position: absolute; left: -4px; right: -4px; height: 4px; margin-top: -2px; background: #3BC45B; box-shadow: 0 0 0 1.5px #fff; }
-.gf-gauge .val { margin-top: 0; font: 700 20px/1 var(--font-display); color: #fff; text-shadow: 0 2px 0 rgba(20,50,100,.45), 0 0 8px rgba(20,50,100,.5);
-  white-space: nowrap; transform: translateY(-50%); }
+.gf-gauge .val { position: absolute; bottom: calc(100% + 7px); left: 50%; transform: translateX(-50%); font: 700 20px/1 var(--font-display);
+  color: #fff; text-shadow: 0 2px 0 rgba(20,50,100,.45), 0 0 8px rgba(20,50,100,.5); white-space: nowrap; text-align: center; }
+.gf-gauge .val small { display: block; margin-top: 3px; font: 800 12px/1 var(--font-ui); }
+.gf-gauge .val small:empty { display: none; }
+.gf-gauge .val.hit { color: #FFE37A; }
 .gf-gauge.overswing .fill { background: linear-gradient(180deg, #FFF4C4, #FFC93C 85%, #FF5A5F); }
 .gf-gauge.flick .trk { border-color: #FFC93C; }
 .gf-report { position: absolute; left: 50%; bottom: calc(var(--sab) + 96px); transform: translateX(-50%); font-size: 13px;
   transition: opacity .3s; }
 .gf-report b { color: #FFC93C; }
+.gf-tag { position: absolute; left: 0; top: 0; display: flex; align-items: center; gap: 5px; padding: 5px 9px; border-radius: 13px;
+  font: 700 14px/1 var(--font-display); white-space: nowrap; pointer-events: none; transition: opacity .2s; will-change: transform; }
+.gf-tag.pin { background: rgba(24, 70, 40, .86); color: #fff; box-shadow: 0 2px 8px rgba(10, 30, 20, .3); }
+.gf-tag.pin svg { width: 13px; height: 13px; }
+.gf-tag.land { background: rgba(255, 255, 255, .95); color: var(--ink); font-size: 13px; box-shadow: 0 2px 8px rgba(20, 40, 80, .25); }
+.gf-tag.land i { width: 9px; height: 9px; border-radius: 50%; background: #FFC93C; box-shadow: 0 0 0 2px #fff, 0 0 0 3px rgba(20,50,30,.35); }
+.gf-tag.block { background: #FF5A5F; color: #fff; font-size: 12px; }
+.gf-tag.wind { padding: 4px; border-radius: 50%; background: #3FA9F5; color: #fff; box-shadow: 0 0 0 2px #fff, 0 2px 8px rgba(20, 40, 80, .3); }
+.gf-tag.wind svg { width: 14px; height: 14px; }
+.gf-tuck { opacity: 0 !important; }
+.gf-dist.live { background: rgba(20, 32, 56, .72); }
 .gf-turnwrap { position: absolute; left: 0; right: 0; top: 30%; display: flex; justify-content: center; transition: opacity .25s, transform .25s; }
 .gf-turnwrap.out { opacity: 0; transform: translateY(-14px) scale(.95); }
 .gf-turncard { display: flex; align-items: center; gap: 12px; max-width: calc(100% - 28px); padding: 10px 22px 10px 10px;
@@ -1649,7 +1777,7 @@
   .gf-club { height: 50px; min-width: 140px; }
   .gf-club .ic { width: 38px; height: 38px; }
   .gf-aim { bottom: calc(var(--sab) + 12px); }
-  .gf-report { bottom: calc(var(--sab) + 74px); }
+  .gf-report { bottom: calc(var(--sab) + 98px); }
   .gf-turnwrap { top: 34%; }
   .gf-sc { padding: 10px; gap: 8px; }
   .gf-sc h3 { font-size: 20px; }
@@ -1661,13 +1789,15 @@
   // 11. The sport instance
   // =============================================================================================
 
-  const FLICK_V = 0.85;         // short sides / s of upward finger speed that starts a flick
+  const FLICK_V = 0.65;         // short sides / s of upward finger speed that starts a flick
   const ALPHA_TOP = 2.05;       // full backswing arm angle (rad)
   const ALPHA_PUTT = 0.5;
 
   function create(ctx) {
     const { THREE, scene, camera, world, pals, ui, audio, engine, save, util: U } = ctx;
     const mode = MODE_HOLES[ctx.mode] ? ctx.mode : 'beginner';
+    const GUIDE = mode === 'beginner';          // carry mark on the meter for full shots
+    const WIND_RING = mode !== 'expert';        // the blue ring: where the wind takes a shot
     const modeName = (DEF.modes.find(m => m.id === mode) || DEF.modes[0]).name;
     const holeList = MODE_HOLES[mode];
     const players = ctx.players;
@@ -1684,6 +1814,7 @@
       trees: false, ground: false, seed: 11, shadow: { center: V(0, 0, 0), size: 40 },
     });
     const envMovers = env.group.children.filter(o => o.name === 'hills' || o.name === 'hills-far' || o.name === 'clouds');
+    const clouds = envMovers.find(o => o.name === 'clouds') || null;
     camera.near = 0.08;
     camera.far = 2600;
     delete camera.userData.fit;
@@ -1714,18 +1845,24 @@
     scene.add(peg);
     const trail = world.trail(ball, { color: 0xFFFFFF, width: 0.2, length: 44, opacity: 0.55, maxJump: 40 });
     trail.visible = false;
+    const haloTex = keep(new THREE.CanvasTexture(haloCanvas()));
+    haloTex.colorSpace = THREE.SRGBColorSpace;
+    const halo = new THREE.Sprite(keep(new THREE.SpriteMaterial({ map: haloTex, depthWrite: false, fog: false, transparent: true })));
+    halo.visible = false;
+    scene.add(halo);
     const ballMark = new THREE.Sprite(keep(new THREE.SpriteMaterial({ map: markTex, depthTest: false, depthWrite: false, fog: false })));
     ballMark.renderOrder = 8;
     ballMark.visible = false;
     scene.add(ballMark);
 
-    const DOTS = 28;
+    const DOTS = 72;
     const dotGeo = keep(new THREE.CircleGeometry(1, 12));
     dotGeo.rotateX(-Math.PI / 2);
     const dotMat = keep(new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.85, depthWrite: false, fog: false }));
     const dots = new THREE.InstancedMesh(dotGeo, dotMat, DOTS);
     dots.frustumCulled = false;
     dots.renderOrder = 4;
+    for (let i = 0; i < DOTS; i++) dots.setColorAt(i, new THREE.Color(0xFFFFFF));
     scene.add(dots);
     const ringGeo = keep(new THREE.RingGeometry(0.8, 1, 48));
     ringGeo.rotateX(-Math.PI / 2);
@@ -1734,16 +1871,23 @@
     const ring = new THREE.Mesh(ringGeo, ringMat);
     const ringPulse = new THREE.Mesh(ringGeo, ringPulseMat);
     ring.renderOrder = ringPulse.renderOrder = 5;
-    scene.add(ring, ringPulse);
+    // where the wind takes the shot (Beginner / Full 9), and the predicted landing spot in flight
+    const ghostRing = new THREE.Mesh(ringGeo, keep(new THREE.MeshBasicMaterial({ color: 0x5CC2FF, transparent: true, opacity: 0.9, depthWrite: false, fog: false })));
+    ghostRing.renderOrder = 5;
+    ghostRing.visible = false;
+    const flyMarkMat = keep(new THREE.MeshBasicMaterial({ color: 0xFFC93C, transparent: true, opacity: 0.9, depthWrite: false, fog: false }));
+    const flyGeo = keep(new THREE.RingGeometry(0.62, 1, 40));
+    flyGeo.rotateX(-Math.PI / 2);
+    const flyMark = new THREE.Mesh(flyGeo, flyMarkMat);
+    flyMark.renderOrder = 5;
+    flyMark.visible = false;
+    scene.add(ring, ringPulse, ghostRing, flyMark);
     const targetTex = keep(new THREE.CanvasTexture(targetCanvas()));
     targetTex.colorSpace = THREE.SRGBColorSpace;
     const target = new THREE.Sprite(keep(new THREE.SpriteMaterial({ map: targetTex, depthWrite: false, fog: false, transparent: true })));
     target.renderOrder = 6;
     target.center.set(0.5, 0);
     scene.add(target);
-    const pinLabel = world.label3d('0 m', { color: '#FFFFFF', bg: 'rgba(24, 70, 40, 0.78)', size: 1 });
-    pinLabel.renderOrder = 7;
-    scene.add(pinLabel);
 
     // ---- golfers -----------------------------------------------------------------------------------
     function buildClub() {
@@ -1784,7 +1928,7 @@
       scene.add(shadow);
       const club = buildClub();
       pal.root.add(club.group);
-      return { pal, shadow, club, alpha: 0, shown: 0, lambda: 20, dTarget: V(0, -0.94, 0.34).normalize(), dShown: V(0, -0.94, 0.34).normalize(), geom: null, posing: false };
+      return { pal, shadow, club, alpha: 0, shown: 0, lambda: 20, reacting: false, dTarget: V(0, -0.94, 0.34).normalize(), dShown: V(0, -0.94, 0.34).normalize(), geom: null, posing: false };
     });
 
     // ---- per-game state --------------------------------------------------------------------------
@@ -1808,6 +1952,7 @@
     let keyCharge = null;
     let ambience = null, windLoop = null;
     let started = false, startHi = 0;
+    let debugTouched = false;      // skipTo / placeBall used: the round can't earn medals or records
     const totalPar = holeList.reduce((a, h) => a + HOLES[h].par, 0);
 
     // =============================================================================================
@@ -1837,10 +1982,15 @@
       mapBtn.setAttribute('aria-label', 'Map');
       const bottom = ui.el('div', 'gf-bottom');
       const cue = ui.el('div', 'gf-cue', ui.icon('down') + '<span>PULL DOWN · FLICK UP</span>' + ui.icon('up'));
-      const clubBtn = ui.el('button', 'gf-club ss-block', '<span class="ic">7I</span><span class="tx"><span class="nm">7 Iron</span><small>135 m</small></span><span class="sw">' + ui.icon('right') + '</span>');
+      const clubBtn = ui.el('button', 'gf-club ss-block', '<span class="sw l">' + ui.icon('left') + '</span><span class="ic">7I</span><span class="tx"><span class="nm">7 Iron</span><small>135 m</small></span><span class="sw">' + ui.icon('right') + '</span>');
       clubBtn.type = 'button';
-      clubBtn.setAttribute('aria-label', 'Change club');
-      clubBtn.addEventListener('click', () => { if (phase === 'aim' && !autoplay && !pulling()) { cycleClub(1); ui.sfx('ui_tick'); } });
+      clubBtn.setAttribute('aria-label', 'Change club (left side: previous, right side: next)');
+      clubBtn.addEventListener('click', e => {
+        if (phase !== 'aim' || autoplay || pulling()) return;
+        const r = clubBtn.getBoundingClientRect();
+        cycleClub(e.clientX && e.clientX - r.left < r.width * 0.4 ? -1 : 1);
+        ui.sfx('ui_tick');
+      });
       bottom.append(cue, clubBtn);
       const mkAim = (side, icon, dir) => {
         const wrap = ui.el('div', 'gf-aim ' + side);
@@ -1855,13 +2005,19 @@
         return wrap;
       };
       const aimL = mkAim('l', 'rotate-left', -1), aimR = mkAim('r', 'rotate-right', 1);
-      const gauge = ui.el('div', 'gf-gauge gf-off', '<div class="trk"><i class="over"></i><i class="fill"></i><i class="full"></i><i class="pin"></i></div><div class="val"></div>');
+      const gauge = ui.el('div', 'gf-gauge gf-off', '<div class="trk"><i class="over"></i><i class="fill"></i><i class="full"></i><i class="pin"></i></div><div class="val"><span></span><small></small></div>');
       const report = ui.el('div', 'ss-chip dark gf-report gf-off');
-      root.append(top, left, windBox, mapBtn, aimL, aimR, bottom, gauge, report);
+      const pinTag = ui.el('div', 'gf-tag pin gf-off', ui.icon('flag') + '<span></span>');
+      const landTag = ui.el('div', 'gf-tag land gf-off', '<i></i><span></span>');
+      const blockTag = ui.el('div', 'gf-tag block gf-off', 'Blocked');
+      const windTag = ui.el('div', 'gf-tag wind gf-off', ui.icon('wind'));
+      root.append(pinTag, landTag, blockTag, windTag, top, left, windBox, mapBtn, aimL, aimR, bottom, gauge, report);
       return {
         top, holeChip, strokeChip, left, playerChip, distChip, lieChip, windBox, dial, windChip, mapBtn, bottom, cue, clubBtn, aimL, aimR,
         gauge, gTrk: gauge.querySelector('.trk'), gFill: gauge.querySelector('.fill'), gOver: gauge.querySelector('.over'),
-        gFull: gauge.querySelector('.full'), gPin: gauge.querySelector('.pin'), gVal: gauge.querySelector('.val'), report, playerFor: -1,
+        gFull: gauge.querySelector('.full'), gPin: gauge.querySelector('.pin'), gVal: gauge.querySelector('.val'),
+        gPct: gauge.querySelector('.val span'), gCarry: gauge.querySelector('.val small'), report, playerFor: -1,
+        pinTag, pinTxt: pinTag.querySelector('span'), landTag, landTxt: landTag.querySelector('span'), blockTag, windTag,
       };
     }
 
@@ -1894,8 +2050,13 @@
       const bl = cur.ball;
       const d = Math.hypot(M.pin.x - bl.x, M.pin.z - bl.z);
       const dh = groundPin() - (bl.y - BALL_R);
-      const elev = Math.abs(dh) >= 1.5 ? '<em>' + (dh > 0 ? '▲ ' : '▼ ') + Math.round(Math.abs(dh)) + ' m</em>' : '';
+      const onGreen = bl.surf === 'green' || bl.surf === 'fringe';
+      let elev = '';
+      if (onGreen && Math.abs(dh) >= 0.02) elev = '<em>' + (dh > 0 ? '▲ ' : '▼ ') + Math.round(Math.abs(dh) * 100) + ' cm</em>';
+      else if (!onGreen && Math.abs(dh) >= 1.5) elev = '<em>' + (dh > 0 ? '▲ ' : '▼ ') + Math.round(Math.abs(dh)) + ' m</em>';
+      hud.distChip.classList.remove('live');
       hud.distChip.innerHTML = (d < 10 ? d.toFixed(1) : Math.round(d)) + ' m <small>TO PIN</small>' + elev;
+      hud.lieChip.classList.remove('gf-off');
       const sf = bl.surf;
       hud.lieChip.innerHTML = '<i style="background:' + (SURF_DOT[sf] || '#fff') + '"></i>' + (SURF[sf] ? SURF[sf].name : 'Tee');
       const c = CLUBS[cur.club];
@@ -1931,11 +2092,32 @@
 
     function showGauge(on) { hud.gauge.classList.toggle('gf-off', !on); }
 
+    /**
+     * The meter hangs from the press point in a column beside the finger: at the screen edge on the
+     * finger's side when that is free, else stepped inward, always clear of the HUD (wind dial, map
+     * and aim buttons, chips) so nothing it reads sits under it.
+     */
     function placeGauge() {
-      const s = press;
+      const s = press, w = engine.size.w;
+      const cs = getComputedStyle(ui.root);
+      const sal = parseFloat(cs.getPropertyValue('--sal')) || 0, sar = parseFloat(cs.getPropertyValue('--sar')) || 0;
+      const side = s.sx > w / 2 ? 1 : -1;
       const scale = s.scale;
-      const x = s.sx < 90 ? s.sx + 46 : s.sx - 64;
-      hud.gauge.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(s.sy - 3) + 'px)';
+      const top = s.sy - 46, bottom = s.sy + scale * (isPutt() ? 1 : 1.1) + 6;
+      const boxes = [];
+      for (const el of [hud.windBox, hud.mapBtn, hud.aimL, hud.aimR, hud.left, hud.top, hud.bottom]) {
+        if (el.classList.contains('gf-off')) continue;
+        const r = el.getBoundingClientRect();
+        if (r.width > 0) boxes.push(r);
+      }
+      const clear = x => boxes.every(r => x + 32 < r.left || x - 32 > r.right || bottom < r.top || top > r.bottom);
+      const edge = side > 0 ? w - sar - 36 : sal + 36;
+      let cx = null;
+      for (const c of [edge, edge - side * 66, edge - side * 132, s.sx - side * 66, s.sx + side * 66]) {
+        if (Math.abs(c - s.sx) >= 46 && c >= sal + 30 && c <= w - sar - 30 && clear(c)) { cx = c; break; }
+      }
+      if (cx == null) cx = Math.abs(s.sx - edge) >= 46 ? edge : s.sx - side * 58;
+      hud.gauge.style.transform = 'translate(' + Math.round(cx - 13) + 'px,' + Math.round(s.sy - 3) + 'px)';
       hud.gTrk.style.height = Math.round(scale * (isPutt() ? 1 : 1.1)) + 'px';
       hud.gFull.style.top = Math.round(scale - 1.5) + 'px';
       hud.gFull.style.display = isPutt() ? 'none' : '';
@@ -1951,18 +2133,29 @@
       hud.gauge.classList.toggle('overswing', power > 1);
       hud.gauge.classList.toggle('flick', !!s.flick);
       const txt = isPutt() ? (power * puttScale(distToPin())).toFixed(1) + ' m' : Math.round(power * 100) + '%';
-      if (hud.gVal.textContent !== txt) hud.gVal.textContent = txt;
-      hud.gVal.style.marginTop = Math.round(power * s.scale) + 'px';
+      if (hud.gPct.textContent !== txt) hud.gPct.textContent = txt;
+      const pp = pinPower();
+      hud.gVal.classList.toggle('hit', pp > 0 && Math.abs(power - pp) < (isPutt() ? 0.025 : 0.02));
     }
 
-    /** Where the pin sits on the meter (flat distance, ignoring wind, slope and roll). */
+    /**
+     * Where the pin sits on the meter. Putts: the pace that, struck straight at the cup, dies PUTT_PAST
+     * beyond it (simulated, so slope is in it — the read is the line). Full shots get a mark only with
+     * the Beginner guide, and it marks the CARRY to the pin (calm air): roll, slope and wind stay a
+     * judgement. Cached per ball and club; −1 when there is no mark.
+     */
+    let tick = { key: '', power: -1 };
     function pinPower() {
-      if (!cur) return -1;
-      const d = distToPin();
-      const c = CLUBS[cur.club];
-      if (c.putter) return d / puttScale(d);
-      const carry = c.carry * lieDist(c, cur.ball.surf, d);
-      return clamp((d - ROLL_EST[c.id]) / carry, 0, 1.2);
+      if (!cur || !M) return -1;
+      const putt = CLUBS[cur.club].putter;
+      if (!putt && !GUIDE) return -1;
+      const b = cur.ball, key = cur.club + ':' + b.x.toFixed(2) + ':' + b.z.toFixed(2) + ':' + M.index;
+      if (tick.key !== key) {
+        const d = distToPin();
+        const aim = headingTo(b.x, b.z, M.pin.x, M.pin.z);
+        tick = { key, power: putt ? powerFor(M, b, cur.club, aim, d + PUTT_PAST, puttScale(d)) : carryPowerFor(M, b, cur.club, aim, d) };
+      }
+      return tick.power;
     }
 
     function report(text, seconds) {
@@ -2038,13 +2231,18 @@
       // green slope arrows
       const slope = buildSlopeArrows();
       group.add(slope.mesh);
+      // map view: the green highlighted so it pops from the fairway
+      const mapGreen = new THREE.Mesh(blobDisc(THREE, M.green, M.greenH + 1, 3, 48, 10),
+        new THREE.MeshBasicMaterial({ color: 0xD9FFC4, transparent: true, opacity: 0.55, depthTest: false, depthWrite: false, fog: false }));
+      mapGreen.renderOrder = 2;
+      mapGreen.visible = false;
+      group.add(mapGreen);
       scene.add(group);
       // gallery behind the green
       const crowd = buildGallery();
-      vis = { group, flag, slope, crowd };
+      vis = { group, flag, slope, crowd, mapGreen };
       // scenery follows the hole
       for (const o of envMovers) o.position.set(M.center.x, 0, M.center.z);
-      pinLabel.position.set(M.pin.x, groundPin() + 3.6, M.pin.z);
       if (windLoop) windLoop.setVolume(clamp(wind.speed / 6, 0, 1) * 0.35, 0.8);
       refreshWind();
     }
@@ -2072,8 +2270,8 @@
           add(new THREE.CylinderGeometry(0.055, 0.055, 0.14, 6), 0x2B3446, x, y + 1.02, z);
         }
       };
-      if (M.ob.staked.left) stake(-1);
-      if (M.ob.staked.right) stake(1);
+      stake(-1);
+      stake(1);
       // yardage posts (from the green centre): red 100, white 150, blue 200
       for (const [dist, color] of [[100, 0xFF5A5F], [150, 0xFFFFFF], [200, 0x2F8CFF]]) {
         const s = M.L - dist;
@@ -2118,9 +2316,16 @@
       tex.colorSpace = THREE.SRGBColorSpace;
       const clothGeo = new THREE.PlaneGeometry(0.9, 0.6, 10, 3);
       clothGeo.translate(0.45, 2.08, 0);
-      const cloth = new THREE.Mesh(clothGeo, new THREE.MeshLambertMaterial({ map: tex, side: THREE.DoubleSide }));
+      const cloth = new THREE.Mesh(clothGeo, new THREE.MeshLambertMaterial({ map: tex }));
       cloth.castShadow = true;
-      group.add(pole, cloth);
+      // the back face gets its own mirrored texture so the number reads from both sides
+      const texB = tex.clone();
+      texB.wrapS = THREE.RepeatWrapping;
+      texB.repeat.x = -1;
+      texB.offset.x = 1;
+      texB.needsUpdate = true;
+      const clothB = new THREE.Mesh(clothGeo, new THREE.MeshLambertMaterial({ map: texB, side: THREE.BackSide }));
+      group.add(pole, cloth, clothB);
       const base = Float32Array.from(clothGeo.attributes.position.array);
       const markGeo = new THREE.RingGeometry(0.3, 0.36, 40);
       markGeo.rotateX(-Math.PI / 2);
@@ -2136,11 +2341,13 @@
       // flutter downwind; lifted out of the cup when the player is putting
       const yaw = Math.atan2(-wind.z, wind.x || 1e-4);
       f.group.rotation.y = U.damp(f.group.rotation.y, yaw, 2, dt);
-      const want = cur && isPutt() && phase !== 'holed' && phase !== 'card' ? 1 : 0;
+      // the flag stays in for long putts (a target you can see) and comes out for short ones
+      const want = cur && isPutt() && distToPin() < 4 && phase !== 'holed' && phase !== 'card' ? 1 : 0;
       f.lift = U.damp(f.lift, want, 7, dt);
       f.group.visible = f.lift < 0.6;
-      f.mark.material.opacity = f.lift * (0.55 + 0.25 * Math.sin(t * 4));
+      f.mark.material.opacity = f.lift * (0.7 + 0.25 * Math.sin(t * 4));
       f.mark.visible = f.lift > 0.02;
+      if (f.mark.visible) f.mark.scale.setScalar(clamp(camera.position.distanceTo(f.mark.position) * 0.03, 0.3, 1.2) / 0.33);
       f.group.position.y = groundPin() + f.lift * 1.5;
       const pos = f.cloth.geometry.attributes.position;
       const amp = 0.04 + Math.min(1, wind.speed / 6) * 0.08, w = 5 + wind.speed * 1.2;
@@ -2152,58 +2359,57 @@
       pos.needsUpdate = true;
     }
 
+    /** Slope grid: little arrows over the green that flow downhill; faster and warmer where it's steeper. */
     function buildSlopeArrows() {
       const pts = [];
       const G = M.green;
       const g = { h: 0, gx: 0, gz: 0 };
-      for (let x = G.x - G.rmax - 2; x <= G.x + G.rmax + 2; x += 0.9) {
-        for (let z = G.z - G.rmax - 2; z <= G.z + G.rmax + 2; z += 0.9) {
+      const step = 0.75;
+      for (let x = G.x - G.rmax - 2; x <= G.x + G.rmax + 2; x += step) {
+        for (let z = G.z - G.rmax - 2; z <= G.z + G.rmax + 2; z += step) {
           if (blobRho(G, x, z) > M.fringeRho) continue;
-          if (Math.hypot(x - M.pin.x, z - M.pin.z) < 0.35) continue;
+          if (Math.hypot(x - M.pin.x, z - M.pin.z) < 0.4) continue;
           groundAt(M, x, z, g);
           const sl = Math.hypot(g.gx, g.gz);
-          pts.push({ x, z, gx: g.gx, gz: g.gz, sl, ph: phash(x, z) });
+          pts.push({ x, z, h: g.h, gx: g.gx, gz: g.gz, sl, ph: phash(x, z), yaw: Math.atan2(-g.gx, -g.gz) });
         }
       }
       const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0.13, -0.075, 0, -0.06, 0, 0, -0.01, 0, 0, 0.13, 0, 0, -0.01, 0.075, 0, -0.06], 3));
+      geo.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0.17, -0.09, 0, -0.07, 0, 0, -0.01, 0, 0, 0.17, 0, 0, -0.01, 0.09, 0, -0.07], 3));
       geo.computeVertexNormals();
-      const mat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+      const mat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, fog: false });
       const mesh = new THREE.InstancedMesh(geo, mat, Math.max(1, pts.length));
       mesh.frustumCulled = false;
       mesh.renderOrder = 3;
-      const c = new THREE.Color();
+      const c = new THREE.Color(), white = new THREE.Color(0xFFFFFF), yellow = new THREE.Color(0xFFD84A), coral = new THREE.Color(0xFF6A5A);
       pts.forEach((p, i) => {
-        const k = clamp(p.sl / 0.035, 0, 1);
-        c.setRGB(1, lerp(1, 0.55, k), lerp(1, 0.25, k));
+        const k = clamp(p.sl / 0.02, 0, 1);
+        if (k < 0.5) c.copy(white).lerp(yellow, k * 2); else c.copy(yellow).lerp(coral, (k - 0.5) * 2);
         mesh.setColorAt(i, c);
       });
       mesh.count = pts.length;
       mesh.visible = false;
-      return { mesh, mat, pts, on: 0 };
+      return { mesh, mat, pts, on: 0, step };
     }
 
     const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(), _p = new THREE.Vector3(), _e = new THREE.Euler();
     function updateSlope(dt, t) {
       if (!vis) return;
       const S = vis.slope;
-      const want = (phase === 'aim' || phase === 'turn') && cur && isPutt() && !mapOn ? 1 : 0;
+      const want = (phase === 'aim' || phase === 'turn' || phase === 'setup') && cur && isPutt() && !mapOn ? 1 : 0;
       S.on = U.damp(S.on, want, 5, dt);
-      S.mat.opacity = 0.85 * S.on;
+      S.mat.opacity = 0.95 * S.on;
       S.mesh.visible = S.on > 0.02;
       if (!S.mesh.visible) return;
-      const g = { h: 0, gx: 0, gz: 0 };
       S.pts.forEach((p, i) => {
-        const sp = clamp(p.sl * 22, 0.12, 1.1);
-        const f = (t * sp + p.ph) % 1;
+        const flat = p.sl < 0.0025;
+        const f = flat ? 0.5 : (t * clamp(p.sl * 45, 0.18, 1.3) + p.ph) % 1;
         const dx = -p.gx / (p.sl || 1), dz = -p.gz / (p.sl || 1);
-        const off = (f - 0.5) * 0.85;
-        const x = p.x + dx * off, z = p.z + dz * off;
-        groundAt(M, x, z, g);
-        _p.set(x, g.h + 0.035, z);
-        _e.set(0, Math.atan2(dx, dz), 0);
+        const off = flat ? 0 : (f - 0.5) * S.step;
+        _p.set(p.x + dx * off, p.h - p.sl * off + 0.035, p.z + dz * off);
+        _e.set(0, p.yaw, 0);
         _q.setFromEuler(_e);
-        const sc = Math.sin(f * Math.PI) * (p.sl < 0.004 ? 0.55 : 1);
+        const sc = flat ? 0.45 : Math.min(1, f * 7, (1 - f) * 7);
         _s.set(sc, sc, sc);
         S.mesh.setMatrixAt(i, _m4.compose(_p, _q, _s));
       });
@@ -2238,9 +2444,33 @@
     // =============================================================================================
 
     const cam = { mode: 'free', lambda: 4, pos: V(0, 9, 14), look: V(0, 0, -40), up: V(0, 1, 0), fov: 50,
-      goalPos: V(0, 9, 14), goalLook: V(0, 0, -40), goalFov: 50, orbit: 0 };
+      goalPos: V(0, 9, 14), goalLook: V(0, 0, -40), goalFov: 50, cup: null, lift: { key: '', h: 0 } };
     const _gp = V(), _gl = V(), _gu = V(0, 1, 0);
     const camTrees = [];
+
+    /** True when a tree canopy (or trunk) sits on the segment a → b. */
+    function canopyOn(ax, ay, az, bx, by, bz) {
+      const len = Math.hypot(bx - ax, by - ay, bz - az), n = Math.max(2, Math.ceil(len / 1.5));
+      for (let i = 1; i < n; i++) {
+        const t = i / n, x = ax + (bx - ax) * t, y = ay + (by - ay) * t, z = az + (bz - az) * t;
+        for (const tr of treesNear(M, x, z, camTrees)) {
+          const dx = x - tr.x, dz = z - tr.z, dy = y - tr.cy;
+          if (dx * dx + dy * dy + dz * dz < tr.cr * tr.cr * 1.1) return true;
+          if (tr.trunkR > 0 && y < tr.y + tr.trunkH && dx * dx + dz * dz < (tr.trunkR + 0.3) * (tr.trunkR + 0.3)) return true;
+        }
+      }
+      return false;
+    }
+
+    /** Extra caddie-camera height that clears canopies between the camera and the ball (cached). */
+    function aimLift(b, dx, dz, B, H) {
+      const key = b.x.toFixed(1) + ':' + b.z.toFixed(1) + ':' + Math.round(Math.atan2(dx, dz) / DEG) + ':' + Math.round(B) + ':' + Math.round(H);
+      if (cam.lift.key === key) return cam.lift.h;
+      let add = 0;
+      while (add < 18 && canopyOn(b.x - dx * B, b.y + H + add, b.z - dz * B, b.x, b.y + 0.3, b.z)) add += 1.5;
+      cam.lift = { key, h: add };
+      return add;
+    }
 
     function fovFor(vFov, minH) {
       const a = engine.size.aspect;
@@ -2257,25 +2487,32 @@
       if (cam.mode === 'aim' && b) {
         const [dx, dz] = headingDir(cur.aim);
         if (isPutt()) {
-          const back = portrait ? 4.6 : 4.4, up = portrait ? 2.2 : 2.0, side = (portrait ? 0.5 : 0.65) * hand;
-          const ahead = clamp(distToPin() * 0.75, 1.5, 12);
-          _gp.set(b.x - dx * back - dz * side, b.y + up, b.z - dz * back + dx * side);
-          _gl.set(b.x + dx * ahead, heightAt(M, b.x + dx * ahead, b.z + dz * ahead) + 0.1, b.z + dz * ahead);
+          // up and to the side away from the golfer, so the line to the cup is clear of them
+          const back = portrait ? 4.4 : 4.2, up = portrait ? 3.2 : 3.0, side = hand;
           fov = fovFor(46, portrait ? 44 : 58);
+          _gp.set(b.x - dx * back - dz * side, b.y + up, b.z - dz * back + dx * side);
+          const D = clamp(distToPin(), 0.5, 40);
+          const angBall = Math.atan2(up, back), angCup = Math.atan2(_gp.y - groundPin(), back + D);
+          const pitch = Math.max(angCup - 0.04, angBall - fov * DEG * 0.36);
+          _gl.set(_gp.x + dx * Math.cos(pitch) * 10, _gp.y - Math.sin(pitch) * 10, _gp.z + dz * Math.cos(pitch) * 10);
         } else {
           // caddie view: high enough that the ball sits low on screen and the landing ring high up
           fov = fovFor(50, portrait ? 44 : 60);
           const vf = fov * DEG;
-          const D = clamp(ringInfo ? ringInfo.dist : 60, 20, 240);
-          const drop = ringInfo ? b.y - ringInfo.y : 0;
+          const full = ringInfo && ringInfo.dist != null;
+          const D = clamp(full ? ringInfo.dist : 60, 20, 240);
+          const drop = full ? b.y - ringInfo.y : 0;
           const B = (portrait ? 7 : 6) + D * 0.025;
           const sep = vf * lerp(0.3, portrait ? 0.5 : 0.52, clamp((D - 30) / 150, 0, 1));
           const gap = H => Math.atan(H / B) - Math.atan((H + drop) / (B + D)) - sep;
           let lo = 1.5, hi = Math.max(2, Math.sqrt(B * (B + D)));
           if (gap(hi) < 0) lo = hi;
           for (let k = 0; k < 22 && hi - lo > 0.05; k++) { const m = (lo + hi) / 2; if (gap(m) > 0) hi = m; else lo = m; }
-          const H = clamp(lo, 2.4, 42);
-          _gp.set(b.x - dx * B, b.y + H, b.z - dz * B);
+          let H = clamp(lo, 2.4, 42);
+          H += aimLift(b, dx, dz, B, H);                         // rise over canopies in the way
+          // while pulling back, ease in toward the golfer so the backswing reads
+          const k = 1 - 0.15 * clamp(gest.pull, 0, 1);
+          _gp.set(b.x - dx * B * k, b.y + H * k, b.z - dz * B * k);
           const pitch = Math.atan(H / B) - vf * 0.3;
           _gl.set(_gp.x + dx * Math.cos(pitch) * 30, _gp.y - Math.sin(pitch) * 30, _gp.z + dz * Math.cos(pitch) * 30);
         }
@@ -2289,7 +2526,7 @@
         acc(b.x, b.z);
         u0 -= 30; u1 += 30; v0 -= 35; v1 += 35;
         // leave room for the HUD rows at the top and bottom of the screen
-        if (land) { v0 -= 25; v1 += 25; } else { u0 -= (u1 - u0) * 0.12; u1 += (u1 - u0) * 0.16; }
+        if (land) { const su = u1 - u0; v0 -= 25; v1 += 25; u0 -= su * 0.05; u1 += su * 0.12; } else { u0 -= (u1 - u0) * 0.12; u1 += (u1 - u0) * 0.16; }
         const uc = (u0 + u1) / 2, vc = (v0 + v1) / 2;
         const cx = uc * hx - vc * hz, cz = uc * hz + vc * hx;
         const vf = 46 * DEG;
@@ -2300,38 +2537,71 @@
         _gl.set(cx, M.meanH, cz);
         if (land) _gu.set(hz, 0, -hx); else _gu.set(hx, 0, hz);
         fov = 46;
+      } else if (cam.mode === 'react' && cur) {
+        // face to face with the golfer for their reaction
+        const G = golfers[cur.p], pr = G.pal.root.position, yaw = G.pal.root.rotation.y;
+        const dist = portrait ? 3.6 : 3.0;
+        _gp.set(pr.x + Math.sin(yaw) * dist, pr.y + 1.25, pr.z + Math.cos(yaw) * dist);
+        _gl.set(pr.x, pr.y + 0.85, pr.z);
+        fov = fovFor(44, portrait ? 40 : 54);
+      } else if (cam.mode === 'puttroll' && play) {
+        // stay near the putting view: pan with the ball, drift along a little for long putts
+        const P = ball.position, F = play.from, C0 = play.camFrom;
+        _gp.set(C0.x + (P.x - F.x) * 0.55, C0.y, C0.z + (P.z - F.z) * 0.55);
+        _gl.set(lerp(P.x, M.pin.x, 0.3), P.y, lerp(P.z, M.pin.z, 0.3));
+        fov = fovFor(46, portrait ? 44 : 58);
       } else if ((cam.mode === 'follow' || cam.mode === 'land' || cam.mode === 'roll') && play) {
         const P = ball.position;
         const [dx, dz] = play.dir;
         if (cam.mode === 'follow') {
-          // trail the shot along its line, rising with the ball so the whole arc stays in view
-          const F = play.from;
+          // chase the ball a steady distance behind it (so it stays a ball, not a speck), rising with
+          // it, and lean the view toward where it will come down so the landing area rises into frame
+          const F = play.from, L = play.landPt;
           const along = Math.max(0, (P.x - F.x) * dx + (P.z - F.z) * dz);
-          const base = along * (play.short ? 0.72 : 0.62) - (play.short ? 6 : 10);
+          const lag = play.short ? lerp(6, 11, clamp(along / 40, 0, 1)) : lerp(10, 20, clamp(along / 60, 0, 1));
+          const base = Math.max(along * 0.5 - (play.short ? 6 : 10), along - lag);
           const cx = F.x + dx * base, cz = F.z + dz * base;
           const hgt = Math.max(0, P.y - heightAt(M, P.x, P.z));
-          _gp.set(cx, heightAt(M, cx, cz) + (play.short ? 3 : 4.5) + hgt * 0.45, cz);
-          _gl.copy(P);
+          _gp.set(cx, Math.max(heightAt(M, cx, cz), P.y - hgt) + (play.short ? 3 : 4.5) + hgt * 0.6, cz);
+          const k = play.short ? 0.12 : 0.32 * clamp(along / 50, 0, 1);
+          _gl.set(lerp(P.x, L.x, k), lerp(P.y, L.y, k), lerp(P.z, L.z, k));
           fov = fovFor(50, portrait ? 42 : 58);
         } else if (cam.mode === 'land') {
+          // beyond and beside the landing spot: track the ball sideways, but keep the view pitched down
+          // between it and the ground it falls to, so the landing area fills the frame (not the sky)
           const L = play.landPt, sd = play.side;
-          _gp.set(L.x + dx * 17 - dz * 8 * sd, L.y + (play.high ? 16 : 5.5), L.z + dz * 17 + dx * 8 * sd);
-          _gl.copy(P);
+          _gp.set(L.x + dx * 17 - dz * 8 * sd, L.y + (play.high ? 16 : 7.5), L.z + dz * 17 + dx * 8 * sd);
+          _gl.set(P.x, lerp(heightAt(M, P.x, P.z), P.y, 0.45), P.z);
           fov = fovFor(46, portrait ? 40 : 56);
         } else {
           _gp.set(P.x - dx * 2.6, P.y + 1.15, P.z - dz * 2.6);
           _gl.set(P.x + dx * 1.6, P.y, P.z + dz * 1.6);
           fov = fovFor(46, portrait ? 44 : 58);
         }
-      } else if (cam.mode === 'cup') {
-        cam.orbit += dt * 0.22;
-        // circle the cup slowly, keeping the celebrating golfer in the shot
-        const r = 4.6, y = groundPin();
-        const pr = cur ? golfers[cur.p].pal.root.position : null;
-        _gp.set(M.pin.x + Math.sin(cam.orbit) * r, y + 1.9, M.pin.z + Math.cos(cam.orbit) * r);
-        if (pr) _gl.set((M.pin.x + pr.x) / 2, y + 0.6, (M.pin.z + pr.z) / 2); else _gl.set(M.pin.x, y + 0.35, M.pin.z);
+      } else if (cam.mode === 'cup' && cam.cup) {
+        // swing round the celebrating golfer on an arc (never through them or the flagstick)
+        const O = cam.cup;
+        O.aT += O.dir * 0.12 * dt;
+        O.a = U.damp(O.a, O.aT, 1.9, dt);
         fov = fovFor(46, portrait ? 42 : 58);
-      } else if (cam.mode === 'follow' || cam.mode === 'land' || cam.mode === 'roll' || cam.mode === 'aim' || cam.mode === 'map') {
+        // far enough back that both the golfer and the cup fit across a narrow (portrait) frame
+        const hf = Math.atan(Math.tan(fov * DEG / 2) * engine.size.aspect);
+        const rFit = O.half ? O.half / Math.tan(hf * 0.75) + O.half * 0.3 : 0;
+        // fireworks: on a wide (short) frame back off further so the tilt up can keep the golfer in
+        const rGoal = Math.max(portrait ? 5.6 : 5, rFit, O.half && O.lookUp && !portrait ? 9 : 0);
+        O.r = U.damp(O.r, rGoal, 1.5, dt);
+        O.y = U.damp(O.y, 2.3 + (rGoal - 5) * 0.12, 1.5, dt);
+        _gp.set(O.cx + Math.sin(O.a) * O.r, O.gy + O.y, O.cz + Math.cos(O.a) * O.r);
+        let up = O.lookUp || 0;
+        if (O.half && up) {
+          // tilt no further than keeps the golfer's feet above the bottom edge
+          const dg = Math.max(1, O.r - O.half * 0.4);
+          const maxPitch = fov * DEG / 2 - Math.atan(O.y / dg) - 4 * DEG;
+          up = clamp(Math.min(up, O.y - 0.8 + O.r * Math.tan(maxPitch)), 0, up);
+        }
+        O.lift = U.damp(O.lift || 0, up, 2.2, dt);
+        _gl.set(O.cx, O.gy + 0.8 + O.lift, O.cz);
+      } else if (cam.mode === 'follow' || cam.mode === 'land' || cam.mode === 'roll' || cam.mode === 'puttroll' || cam.mode === 'aim' || cam.mode === 'map') {
         _gp.copy(cam.pos);                // the shot is over: hold the last view until the next move
         _gl.copy(cam.look);
         fov = cam.fov;
@@ -2345,6 +2615,7 @@
 
     function updateCamera(dt) {
       const fov = camGoal(dt);
+      if (!(isFinite(cam.pos.x) && isFinite(cam.pos.y) && isFinite(cam.pos.z) && isFinite(cam.look.x))) { cam.pos.copy(_gp); cam.look.copy(_gl); }
       U.dampVec3(cam.pos, _gp, cam.lambda, dt);
       U.dampVec3(cam.look, _gl, cam.lambda * 1.35, dt);
       U.dampVec3(cam.up, _gu, cam.lambda, dt);
@@ -2364,6 +2635,12 @@
             const k = R / (d || 1);
             cam.pos.x = tr.x + (d ? dx * k : R); cam.pos.z = tr.z + dz * k;
           }
+        }
+        // and never inside the golfer
+        if (cur && cam.mode !== 'react') {
+          const pr = golfers[cur.p].pal.root.position;
+          const dx = cam.pos.x - pr.x, dz = cam.pos.z - pr.z, d = Math.hypot(dx, dz);
+          if (d < 1.3 && cam.pos.y < pr.y + 2.2) { const k = 1.3 / (d || 1); cam.pos.x = pr.x + (d ? dx * k : 1.3); cam.pos.z = pr.z + dz * k; }
         }
       }
       camera.position.copy(cam.pos);
@@ -2456,7 +2733,10 @@
       cur.club = ci;
       G.geom = addressGeom(ci);
       G.club.set(ci);
-      if (wasPutt !== isPutt()) cur.aim = defaultAim(cur.ball, ci);
+      if (wasPutt !== isPutt()) {
+        const a = defaultAim(cur.ball, ci);
+        cur.aim = a != null ? a : headingTo(cur.ball.x, cur.ball.z, M.pin.x, M.pin.z);
+      }
       placeGolfer();
       golferPose(G, 0, 30);
       ringDirty = true;
@@ -2513,16 +2793,45 @@
     function distToPin() { return cur ? Math.hypot(M.pin.x - cur.ball.x, M.pin.z - cur.ball.z) : 0; }
     function pulling() { return press.mode === 'swing' || !!keyCharge; }
 
+    /** First tree a full, straight swing on heading psi meets before it lands (or null). */
+    function treeOnLine(b, ci, psi) {
+      const { L } = launchFor(M, b, { club: ci, aim: psi, power: 1, flick: 0, curve: 0, tempo: 1 }, null);
+      const res = simulateShot(M, L, { stopAtLand: true });
+      return res.events.find(e => e.type === 'tree' || e.type === 'trunk') || null;
+    }
+
+    /** At the pin when it is in reach, else down the centre line; steered off any trees in the way. */
     function defaultAim(b, ci) {
       const toPin = headingTo(b.x, b.z, M.pin.x, M.pin.z);
       const c = CLUBS[ci];
       if (c.putter) return toPin;
       const d = Math.hypot(M.pin.x - b.x, M.pin.z - b.z);
       const reach = clubReach(ci, b.surf, d);
-      if (d <= reach * 1.08) return toPin;
       const pr = M.project(b.x, b.z, { s: 0, d: 0 });
-      const F = M.frameAt(Math.min(M.L, pr.s + reach * 0.92));
-      return headingTo(b.x, b.z, F.x, F.z);
+      const F = M.frameAt(Math.min(M.L, pr.s + Math.min(reach, d) * 0.92));
+      const centre = headingTo(b.x, b.z, F.x, F.z);
+      const base = d <= reach * 1.08 ? toPin : centre;
+      if (!treeOnLine(b, ci, base)) return base;
+      const sgn = Math.sign(wrapA(centre - base)) || (pr.d > 0 ? -1 : 1);
+      for (let a = 2; a <= 30; a += 2) {
+        for (const sd of [sgn, -sgn]) {
+          const h = base + sd * a * DEG;
+          if (!treeOnLine(b, ci, h)) return h;
+        }
+      }
+      return null;
+    }
+
+    /** Suggested club and aim: the club that reaches, or a shorter one when trees block every line. */
+    function suggestShot(b) {
+      const ci = suggestClub(M, b);
+      if (CLUBS[ci].putter) return { club: ci, aim: defaultAim(b, ci) };
+      const list = clubsFor(b.surf).filter(i => !CLUBS[i].putter);
+      for (let k = list.indexOf(ci); k >= 0 && k < list.length && k <= list.indexOf(ci) + 3; k++) {
+        const aim = defaultAim(b, list[k]);
+        if (aim != null) return { club: list[k], aim };
+      }
+      return { club: ci, aim: headingTo(b.x, b.z, M.pin.x, M.pin.z) };
     }
 
     function setAim(psi) {
@@ -2533,64 +2842,179 @@
     }
     function nudgeAim(d) { setAim(cur.aim + d); }
 
-    function computeRing() {
-      ringInfo = null;
-      if (!cur || isPutt()) return;
-      const { L } = launchFor(M, cur.ball, { club: cur.club, aim: cur.aim, power: 1, flick: 0, curve: 0, tempo: 1 }, null);
-      const res = simulateShot(M, L, { stopAtLand: true, noTrees: true });
-      const e = res.events.length ? res.events[res.events.length - 1] : null;
-      const x = e ? e.x : res.rest.x, z = e ? e.z : res.rest.z;
-      const wl = waterLevelAt(M, x, z);
-      ringInfo = { x, z, y: Math.max(heightAt(M, x, z), wl), dist: Math.hypot(x - cur.ball.x, z - cur.ball.z) };
+    /**
+     * Where a straight swing at `power` lands in calm air, plus (with the wind ring on) where the
+     * wind takes it: { x, y, z, dist, along, ghost }.
+     */
+    function ringAt(power) {
+      const inp = { club: cur.club, aim: cur.aim, power, flick: 0, curve: 0, tempo: 1 };
+      const R = landPoint(M, cur.ball, inp);
+      R.ghost = null;
+      if (WIND_RING && wind.speed >= 0.5) {
+        const G = landPoint(M, cur.ball, inp, wind);
+        if (Math.hypot(G.x - R.x, G.z - R.z) >= 1.5) R.ghost = G;
+      }
+      return R;
     }
 
-    const _dm = new THREE.Matrix4(), _dq = new THREE.Quaternion(), _dp = V(), _ds = V();
+    /** The ring while pulling: it follows the power (half-percent steps, cached per ball, club and aim). */
+    const liveRing = { key: '', cache: new Map() };
+    function liveRingFor(power) {
+      const key = cur.club + ':' + cur.aim + ':' + cur.ball.x + ':' + cur.ball.z;
+      if (liveRing.key !== key) { liveRing.key = key; liveRing.cache.clear(); }
+      const q = Math.round(power * 200);
+      let R = liveRing.cache.get(q);
+      if (!R) { R = ringAt(q / 200); liveRing.cache.set(q, R); }
+      return R;
+    }
+
+    /** Landing ring (full swing, calm, ignoring trees), the first tree on that line, and the putt preview. */
+    function computeRing() {
+      ringInfo = null;
+      if (!cur) return;
+      const b = cur.ball;
+      if (isPutt()) {
+        // honest preview: the real roll for the first stretch of the putt at the meter's pace
+        const d = distToPin(), scale = puttScale(d), pp = pinPower();
+        const { L } = launchFor(M, b, { club: cur.club, aim: cur.aim, power: clamp(pp > 0 ? pp : d / scale, 0.02, 1), flick: 0, scale }, null);
+        const res = simulateShot(M, L, { record: true, noCup: true });
+        const pts = [], show = Math.max(0.9, d * (d < 3 ? 0.5 : 0.38));
+        let run = 0, next = 0.25;
+        for (let i = 1; i <= res.n && run < show; i++) {
+          const a = res.path, x0 = a[i * 3 - 3], z0 = a[i * 3 - 1], x1 = a[i * 3], z1 = a[i * 3 + 2];
+          run += Math.hypot(x1 - x0, z1 - z0);
+          if (run >= next) { pts.push([x1, a[i * 3 + 1], z1]); next += 0.3; }
+        }
+        ringInfo = { putt: true, pts };
+        return;
+      }
+      ringInfo = ringAt(1);
+      ringInfo.block = null;
+      const hit = treeOnLine(b, cur.club, cur.aim);
+      if (hit) ringInfo.block = { x: hit.x, y: hit.y, z: hit.z, dist: Math.hypot(hit.x - b.x, hit.z - b.z) };
+    }
+
+    /** Places a screen-space tag above a world point; returns its box (or null when off screen). */
+    const _tv = V();
+    let tagTop = 0;
+    function placeTag(el, x, y, z, dx, dy) {
+      const p = engine.project(_tv.set(x, y, z), camera);
+      if (!p.visible) { el.classList.add('gf-off'); return null; }
+      el.classList.remove('gf-off');
+      const w = el.offsetWidth, h = el.offsetHeight;
+      const sx = clamp(p.x + (dx || 0), w / 2 + 6, engine.size.w - w / 2 - 6), sy = Math.max(p.y + (dy || 0), tagTop + h);
+      el.style.transform = 'translate(' + Math.round(sx - w / 2) + 'px,' + Math.round(sy - h) + 'px)';
+      return { x: sx, y: sy, w, h };
+    }
+
+    const _dm = new THREE.Matrix4(), _dq = new THREE.Quaternion(), _dp = V(), _ds = V(), _dc = new THREE.Color();
+    const DOT_WHITE = new THREE.Color(0xFFFFFF), DOT_FAINT = new THREE.Color(0xD6EBDD), DOT_BLOCK = new THREE.Color(0xFF5A5F), DOT_WIND = new THREE.Color(0x5CC2FF);
     function updateAimVisuals(dt, t) {
       const show = (phase === 'aim' || phase === 'turn') && !!cur;
       const camP = camera.position;
-      pinLabel.visible = (show || phase === 'setup') && !!cur && !isPutt();
-      if (pinLabel.visible) {
-        pinLabel.userData.setText(Math.round(distToPin()) + ' m');
-        const ar = pinLabel.scale.x / pinLabel.scale.y;
-        const k = clamp(camP.distanceTo(pinLabel.position) * (mapOn ? 0.032 : 0.04), 0.6, 30);
-        pinLabel.scale.set(ar * k, k, 1);
-        pinLabel.position.set(M.pin.x, groundPin() + 3 + k * (mapOn ? 0.6 : 1.9), M.pin.z);
-      }
+      const tagsOn = (show || phase === 'setup') && !!cur && !isPutt() && cam.mode !== 'react';
       dots.visible = show;
-      const full = show && !isPutt() && !!ringInfo;
+      if (show && ringDirty) { computeRing(); ringDirty = false; }
+      const full = show && !isPutt() && !!ringInfo && !ringInfo.putt;
       ring.visible = ringPulse.visible = target.visible = full;
-      if (!show) return;
-      if (ringDirty) { computeRing(); ringDirty = false; }
-      const b = cur.ball;
-      const [dx, dz] = headingDir(cur.aim);
-      const putt = isPutt();
-      const n = putt ? 6 : DOTS;
-      const len = putt ? 0 : (ringInfo ? ringInfo.dist : 60);
-      for (let i = 0; i < n; i++) {
-        const d = putt ? 0.3 + i * 0.28 : len * (i + 1) / (n + 1);
-        const x = b.x + dx * d, z = b.z + dz * d;
-        const y = heightAt(M, x, z) + (putt ? 0.025 : 0.12);
-        const cd = Math.hypot(x - camP.x, y - camP.y, z - camP.z);
-        const sc = putt ? 0.028 * (1 - i / (n + 2)) : clamp(cd * (mapOn ? 0.0032 : 0.008), 0.06, 8);
-        _dp.set(x, y, z); _ds.set(sc, 1, sc);
-        dots.setMatrixAt(i, _dm.compose(_dp, _dq, _ds));
+      // while pulling, the ring (and the wind ring) slide out with the power
+      const pullNow = full && gest.pull > 0.02 && (press.mode === 'swing' || !!keyCharge || autoplay);
+      const R = full ? (pullNow ? liveRingFor(clamp(gest.pull, 0.02, 1.1)) : ringInfo) : null;
+      const carryTxt = pullNow ? Math.round(R.along) + ' m' : '';
+      if (hud.gCarry.textContent !== carryTxt) hud.gCarry.textContent = carryTxt;
+      const ghost = R && R.ghost;
+      ghostRing.visible = !!ghost;
+      // world → screen scale for constant-size marks
+      const pxW = 2 * Math.tan(camera.fov * DEG / 2) / engine.size.h;
+      if (show || phase === 'setup') { const r = hud.top.getBoundingClientRect(); tagTop = r.bottom + 6; }
+      let landBox = null;
+      if (show) {
+        const b = cur.ball;
+        const [dx, dz] = headingDir(cur.aim);
+        let n = 0;
+        const put = (x, y, z, rpx, col) => {
+          const cd = Math.hypot(x - camP.x, y - camP.y, z - camP.z);
+          const sc = cd * pxW * rpx;
+          _dp.set(x, y, z); _ds.set(sc, 1, sc);
+          dots.setMatrixAt(n, _dm.compose(_dp, _dq, _ds));
+          dots.setColorAt(n, col);
+          n++;
+        };
+        if (isPutt()) {
+          const P = ringInfo && ringInfo.putt ? ringInfo.pts : [];
+          for (const q of P) if (n < DOTS) put(q[0], heightAt(M, q[0], q[2]) + 0.02, q[2], 4.2, DOT_WHITE);
+          // the straight aim line on to the cup's distance (no break shown)
+          const d = distToPin();
+          for (let s = (P.length + 1) * 0.3 + 0.3; s < d && n < DOTS; s += 0.45) {
+            const x = b.x + dx * s, z = b.z + dz * s;
+            put(x, heightAt(M, x, z) + 0.02, z, 2.6, DOT_FAINT);
+          }
+          dotMat.opacity = 0.9;
+        } else {
+          const len = R ? R.dist : 60;
+          const blk = ringInfo && ringInfo.block ? ringInfo.block.dist : Infinity;
+          for (let i = 0; i < 28; i++) {
+            const s = len * (i + 1) / 29;
+            const x = b.x + dx * s, z = b.z + dz * s;
+            put(x, heightAt(M, x, z) + 0.12, z, mapOn ? 3 : 6, s > blk ? DOT_BLOCK : DOT_WHITE);
+          }
+          // the wind's drift: a short blue trail from the ring to where the wind takes the ball
+          if (ghost) {
+            for (let i = 1; i <= 5; i++) {
+              const x = lerp(R.x, ghost.x, i / 6), z = lerp(R.z, ghost.z, i / 6);
+              put(x, Math.max(heightAt(M, x, z), lerp(R.y, ghost.y, i / 6)) + 0.14, z, mapOn ? 3 : 5, DOT_WIND);
+            }
+          }
+          dotMat.opacity = 0.85;
+        }
+        dots.count = n;
+        dots.instanceMatrix.needsUpdate = true;
+        if (dots.instanceColor) dots.instanceColor.needsUpdate = true;
+        if (full) {
+          const cd = camP.distanceTo(_dp.set(R.x, R.y, R.z));
+          const r = Math.max(clamp(cd * (mapOn ? 0.014 : 0.032), 1.2, 40), cd * pxW * (mapOn ? 18 : 0));
+          ring.position.set(R.x, R.y + 0.25, R.z);
+          ring.scale.setScalar(r);
+          const f = (t * 0.8) % 1;
+          ringPulse.position.copy(ring.position);
+          ringPulse.scale.setScalar(r * (0.35 + 0.65 * f));
+          ringPulseMat.opacity = 0.85 * (1 - f);
+          const ts = clamp(cd * 0.08, 0.8, 60) * (mapOn ? 0.6 : 1);
+          target.position.set(R.x, R.y + 0.1, R.z);
+          target.scale.set(ts * 0.667, ts, 1);
+          const lt = Math.round(R.dist) + ' m';
+          if (hud.landTxt.textContent !== lt) hud.landTxt.textContent = lt;
+          landBox = mapOn ? placeTag(hud.landTag, R.x, R.y, R.z, 0, -r / (cd * pxW) - 4)
+            : placeTag(hud.landTag, R.x, R.y + 0.1 + ts * 0.98, R.z, 0, -4);
+          if (ghost) {
+            ghostRing.position.set(ghost.x, ghost.y + 0.22, ghost.z);
+            ghostRing.scale.setScalar(r * 0.85);
+            // the wind icon sits beside the blue ring, on the side it drifted to
+            const gx = engine.project(_tv.set(ghost.x, ghost.y, ghost.z), camera).x, rx = engine.project(_dp.set(R.x, R.y, R.z), camera).x;
+            placeTag(hud.windTag, ghost.x, ghost.y + 0.2, ghost.z, (gx >= rx - 1 ? 1 : -1) * (r * 0.85 / (cd * pxW) + 16), 11);
+          }
+        }
       }
-      dots.count = n;
-      dots.instanceMatrix.needsUpdate = true;
-      dotMat.opacity = putt ? 0.7 : 0.8;
-      if (ringInfo && !putt) {
-        const cd = camP.distanceTo(_dp.set(ringInfo.x, ringInfo.y, ringInfo.z));
-        const r = clamp(cd * (mapOn ? 0.014 : 0.032), 1.2, 40);
-        ring.position.set(ringInfo.x, ringInfo.y + 0.25, ringInfo.z);
-        ring.scale.setScalar(r);
-        const f = (t * 0.8) % 1;
-        ringPulse.position.copy(ring.position);
-        ringPulse.scale.setScalar(r * (0.35 + 0.65 * f));
-        ringPulseMat.opacity = 0.85 * (1 - f);
-        const ts = clamp(cd * 0.08, 0.8, 60) * (mapOn ? 0.6 : 1);
-        target.position.set(ringInfo.x, ringInfo.y + 0.1, ringInfo.z);
-        target.scale.set(ts * 0.667, ts, 1);
-      }
+      if (!full) hud.landTag.classList.add('gf-off');
+      if (!ghost) hud.windTag.classList.add('gf-off');
+      const blk = full && ringInfo.block && !mapOn;
+      if (blk) placeTag(hud.blockTag, ringInfo.block.x, ringInfo.block.y + 0.6, ringInfo.block.z, 0, -6);
+      else hud.blockTag.classList.add('gf-off');
+      // pin distance on the flagstick, pushed clear of the landing tag
+      if (tagsOn) {
+        hud.pinTxt.textContent = Math.round(distToPin()) + ' m';
+        const top = groundPin() + 2.45;
+        // on the map the tag sits beside the green, not on it
+        const gPx = mapOn ? M.green.rmax / (Math.max(1, camP.distanceTo(_tv.set(M.pin.x, top, M.pin.z))) * pxW) : 0;
+        let box = mapOn ? placeTag(hud.pinTag, M.pin.x, top, M.pin.z, hud.pinTag.offsetWidth / 2 + gPx + 8, 12) : placeTag(hud.pinTag, M.pin.x, top, M.pin.z, 0, -4);
+        if (box && landBox && Math.abs(box.x - landBox.x) < (box.w + landBox.w) / 2 + 4 && Math.abs(box.y - landBox.y) < Math.max(box.h, landBox.h) + 4) {
+          // stack it above the landing tag, or beside it when there's no room under the top HUD
+          const up = landBox.y - landBox.h - 6;
+          let x = box.x, y = up;
+          if (up - box.h < tagTop) { y = landBox.y; x = landBox.x + (landBox.w + box.w) / 2 + 6; if (x + box.w / 2 > engine.size.w - 72) x = landBox.x - (landBox.w + box.w) / 2 - 6; }
+          hud.pinTag.style.transform = 'translate(' + Math.round(x - box.w / 2) + 'px,' + Math.round(y - box.h) + 'px)';
+        }
+      } else hud.pinTag.classList.add('gf-off');
     }
 
     // =============================================================================================
@@ -2600,22 +3024,43 @@
     const press = { mode: null, sx: 0, sy: 0, scale: 200, aim0: 0, samples: [], bottom: null, flick: null, power: 0 };
     const gest = { pull: 0 };
 
-    function pullScale(sy) {
-      const h = engine.size.h;
-      return clamp(Math.min(h * 0.32, (h - sy - 14) / 1.12), 64, 320);
+    /**
+     * Pixels of pull for 100% power: the same wherever the press starts, so it can be learned. Short
+     * landscape screens get a longer share of their height so power stays as fine as in portrait.
+     */
+    function pullScale() {
+      const sz = engine.size;
+      return clamp(sz.h * (sz.aspect > 1 && sz.h <= 520 ? 0.44 : 0.3), 110, 260);
     }
 
-    /** Upward finger speed (px/s) over the last `ms` of the current upward run (a rest counts as 16 ms). */
-    function upSpeed(samples, ms) {
-      let span = 0, dy = 0;
-      for (let i = samples.length - 1; i > 0 && span < ms; i--) {
-        const gap = samples[i].t - samples[i - 1].t, d = samples[i - 1].y - samples[i].y;
-        if (d < 0) break;
-        span += Math.min(16, gap);
-        dy += d;
-        if (gap > 40) break;
+    /** The shortest upward flick that swings (shorter lifts cancel: a thumb drifting as it lets go). */
+    function minFlick() { return clamp(0.13 * shortSide(), 40, 90); }
+
+    /**
+     * The latest upward run of the finger: { n (rising sample steps), v (px/s), rise (px) }. Uses the
+     * real sample times, so one late sample after a stall never reads as a fast flick. The window
+     * stretches with the sample spacing, so a phone delivering one sample per frame at 25 fps still
+     * shows its flicks.
+     */
+    function upRun(samples, ms) {
+      const k = samples.length, last = samples[k - 1];
+      let gap = 16;
+      if (k >= 3) {
+        const ds = [];
+        for (let i = Math.max(1, k - 6); i < k; i++) ds.push(samples[i].t - samples[i - 1].t);
+        ds.sort((a, b) => a - b);
+        gap = ds[ds.length >> 1];
       }
-      return span > 4 ? dy / (span / 1000) : 0;
+      const win = Math.max(ms, Math.min(150, 2.5 * gap));
+      let i = k - 1, n = 0;
+      while (i > 0) {
+        const a = samples[i - 1];
+        if (a.y - samples[i].y < 0 || last.t - a.t > win) break;
+        i--; n++;
+      }
+      if (!n) return { n, v: 0, rise: 0 };
+      const first = samples[i], rise = first.y - last.y;
+      return { n, v: rise / (Math.max(8, last.t - first.t) / 1000), rise };
     }
 
     function beginSwing(p) {
@@ -2623,6 +3068,8 @@
       press.bottom = { x: p.x, y: p.y, t: p.t };
       press.flick = null;
       press.power = 0;
+      press.step = 0;
+      press.roomWarned = false;
       if (hintHandle) { hintHandle.hide(); hintHandle = null; }
       hud.cue.classList.add('gf-off');
       placeGauge();
@@ -2631,29 +3078,45 @@
       ui.sfx('ui_tick');
     }
 
+    /** Power feedback you can feel: a rising tick every 10%, a buzz at exactly full. */
+    function powerTicks(power) {
+      const step = Math.floor(power * 10 + 1e-6);
+      if (step > press.step) {
+        ui.sfx('ui_tick', { rate: 0.8 + 0.08 * Math.min(step, 10), vol: step >= 10 ? 0.8 : 0.45 });
+        if (step === 10 && ui.haptic) ui.haptic(12);
+      }
+      press.step = step;
+    }
+
     function swingMove(p) {
       const s = press;
       if (!s.flick) {
         if (p.y >= s.bottom.y) s.bottom = { x: p.x, y: p.y, t: p.t };
         else {
           const up = s.bottom.y - p.y;
-          const v = upSpeed(s.samples, 45) / shortSide();
-          if (up > 5 && v > FLICK_V) {
-            const prev = s.samples[s.samples.length - 2] || s.bottom;
-            s.flick = { x: s.bottom.x, y: s.bottom.y, t: Math.max(s.bottom.t, p.t - Math.min(20, p.t - prev.t) - 8), i: Math.max(0, s.samples.length - 2) };
-          }
-          else if (up > 3) s.bottom = { x: p.x, y: p.y, t: p.t };
+          const run = upRun(s.samples, 70);
+          // two rising samples, or one long one (sparse input at low frame rates)
+          const rising = run.n >= 2 || (run.n === 1 && run.rise >= 18);
+          if (rising && up > 6 && run.v / shortSide() > FLICK_V) {
+            // the flick starts at the bottom of the pull
+            let i = s.samples.length - 1;
+            while (i > 0 && s.samples[i - 1].y >= s.samples[i].y && s.samples[i].y < s.bottom.y) i--;
+            s.flick = { x: s.bottom.x, y: s.bottom.y, t: s.bottom.t, i };
+          } else if (run.n >= 2 && up > 3) s.bottom = { x: p.x, y: p.y, t: p.t };   // easing off the pull
         }
         const maxP = isPutt() ? 1 : 1.1;
         s.power = clamp((s.bottom.y - s.sy) / s.scale, 0, maxP);
         gest.pull = s.power;
         drawGauge(s.power);
-        if (s.power > 1.0 && !s.overTick) { s.overTick = true; ui.sfx('ui_tick', { rate: 1.4 }); }
-        if (s.power <= 1.0) s.overTick = false;
+        powerTicks(s.power);
+        if (!s.roomWarned && p.y > engine.size.h - 14 && s.power < 0.97) {
+          s.roomWarned = true;
+          report('Out of room? Start your pull <b>higher</b>', 2);
+        }
       } else {
         const travel = s.flick.y - p.y;
         if (travel < -4) { s.flick = null; s.bottom = { x: p.x, y: p.y, t: p.t }; drawGauge(s.power); }
-        else if (travel >= Math.max(150, 0.36 * shortSide())) fireFlick(p);
+        else if (travel >= Math.max(240, 0.85 * shortSide())) fireFlick(p);
       }
     }
 
@@ -2667,24 +3130,32 @@
       }
     }
 
+    /**
+     * Reads the flick from the bottom of the pull to its end. Start line = the chord's angle;
+     * shape = the signed bulge of the path off that chord (a bow to the right curves the ball left
+     * after starting it right, like the finger did); speed = strike quality.
+     */
     function fireFlick(endP) {
       const s = press, f = s.flick;
       press.mode = null;
       showGauge(false);
       const dx = endP.x - f.x, dy = endP.y - f.y;
-      if (-dy < 16 || s.power < 0.03) { cancelSwing(s.power < 0.03 ? 'Pull down further for power' : 'Flick up to swing!'); return; }
+      if (-dy < minFlick() || s.power < 0.03) { cancelSwing(s.power < 0.03 ? 'Pull down further for power' : 'Flick <b>up</b> to swing!'); return; }
       const dt = Math.max(0.012, (endP.t - f.t) / 1000);
-      // peak upward speed over the flick (a slow lift-off at the end doesn't spoil a crisp flick)
-      let peak = 0;
       const pts = s.samples.slice(f.i);
+      pts.push({ x: endP.x, y: endP.y, t: endP.t });
+      // peak speed over a ≥ 30 ms window (a slow lift-off at the end doesn't spoil a crisp flick)
+      let peak = 0;
       for (let i = 1; i < pts.length; i++) {
         let j = i - 1;
         while (j > 0 && pts[i].t - pts[j].t < 30) j--;
         const ddt = (pts[i].t - pts[j].t) / 1000;
-        if (ddt > 0.008) peak = Math.max(peak, Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y) / ddt);
+        if (ddt > 0.025) peak = Math.max(peak, Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y) / ddt);
       }
       const nspeed = Math.max(Math.hypot(dx, dy) / dt, peak * 0.85) / shortSide();
-      const tempo = sstep(0.6, 2.0, nspeed);
+      // crispness: speed over the flick (≤ ~350 ms for a thumb's length is crisp, ~600 ms tops it),
+      // and a short poke can't be a full strike however fast it is
+      const tempo = sstep(0.6, 2.3, nspeed) * lerp(0.3, 1, sstep(0.1, 0.3, -dy / shortSide()));
       const angle = Math.atan2(dx, -dy);
       const chord = Math.hypot(dx, dy) || 1;
       const ux = dx / chord, uy = dy / chord;
@@ -2694,8 +3165,36 @@
         if (Math.abs(dev) > Math.abs(bulge)) bulge = dev;
       }
       bulge /= chord;
-      const curve = -Math.sign(bulge) * clamp((Math.abs(bulge) - 0.05) / 0.2, 0, 1);
+      const curve = chord < 70 || isPutt() ? 0 : -Math.sign(bulge) * clamp((Math.abs(bulge) - 0.04) / 0.12, 0, 1);
       commitShot({ club: cur.club, aim: cur.aim, power: s.power, flick: angle, curve, tempo, scale: isPutt() ? puttScale(distToPin()) : undefined });
+    }
+
+    /**
+     * Full-rate touch samples: browsers deliver one pointermove per frame and fold the rest into
+     * getCoalescedEvents(). This capture listener runs just before the engine's own, so the 'move'
+     * handler below can replay every sample in between (a flick takes only a few frames).
+     */
+    const rawMoves = [];
+    function onRawMove(e) {
+      rawMoves.length = 0;
+      rawMoves.ref = null;
+      if (!press.mode || press.mode === 'void' || !e.isPrimary || typeof e.getCoalescedEvents !== 'function') return;
+      const list = e.getCoalescedEvents();
+      if (!list || list.length < 2) return;
+      for (const c of list) rawMoves.push({ cx: c.clientX, cy: c.clientY, t: c.timeStamp });
+      rawMoves.ref = { cx: e.clientX, cy: e.clientY };
+    }
+    window.addEventListener('pointermove', onRawMove, true);
+
+    function addSample(q) {
+      const S = press.samples, last = S[S.length - 1];
+      if (last && (q.t < last.t || (q.t === last.t && q.x === last.x && q.y === last.y))) return false;
+      S.push(q);
+      if (S.length > 160) {
+        S.shift();
+        if (press.flick) press.flick.i = Math.max(0, press.flick.i - 1);
+      }
+      return true;
     }
 
     ctx.input.on('down', p => {
@@ -2704,14 +3203,25 @@
       press.sx = p.x; press.sy = p.y;
       press.aim0 = cur.aim;
       press.samples = [{ x: p.x, y: p.y, t: p.t }];
-      press.scale = pullScale(p.y);
-      press.overTick = false;
+      press.scale = pullScale();
     });
     ctx.input.on('move', p => {
       if (!press.mode || press.mode === 'void') return;
       if (phase !== 'aim' || !cur) { press.mode = null; return; }
-      press.samples.push({ x: p.x, y: p.y, t: p.t });
-      if (press.samples.length > 90) press.samples.splice(0, press.samples.length - 90);
+      // the samples folded into this event (same clock as p.t), then the event itself
+      const fresh = [];
+      if (rawMoves.ref) {
+        const ox = p.x - rawMoves.ref.cx, oy = p.y - rawMoves.ref.cy;
+        for (const c of rawMoves) if (c.t > 0 && c.t < p.t) fresh.push({ x: c.cx + ox, y: c.cy + oy, t: c.t });
+        rawMoves.length = 0;
+        rawMoves.ref = null;
+      }
+      fresh.push({ x: p.x, y: p.y, t: p.t });
+      if (press.mode === 'swing') {
+        for (const q of fresh) if (addSample(q) && press.mode === 'swing') swingMove(q);
+        return;
+      }
+      for (const q of fresh) addSample(q);
       if (press.mode === 'pending') {
         const ax = Math.abs(p.dx), ay = Math.abs(p.dy);
         if (ax > 12 && ax > ay * 1.2) press.mode = 'drag';
@@ -2725,13 +3235,23 @@
       const m = press.mode;
       if (m !== 'swing') { press.mode = null; return; }
       if (p.cancelled || phase !== 'aim') { cancelSwing(null); return; }
-      press.samples.push({ x: p.x, y: p.y, t: p.t });
-      if (press.flick && press.flick.y - p.y >= 16) fireFlick(p);
-      else cancelSwing(press.power > 0.03 ? 'Flick <b>up</b> to swing!' : null);
+      addSample({ x: p.x, y: p.y, t: p.t });
+      const s = press;
+      if (!s.flick) {
+        // no flick seen while moving (too few samples): read the release itself, bottom → lift
+        const rise = s.bottom.y - p.y, dt = Math.max(8, p.t - s.bottom.t) / 1000;
+        if (rise >= minFlick() && rise / dt / shortSide() > FLICK_V) {
+          let i = s.samples.length - 1;
+          while (i > 0 && s.samples[i].t > s.bottom.t) i--;
+          s.flick = { x: s.bottom.x, y: s.bottom.y, t: s.bottom.t, i };
+        }
+      }
+      if (s.flick && s.flick.y - p.y >= minFlick()) fireFlick(p);
+      else cancelSwing(s.power > 0.03 ? 'Flick <b>up</b> to swing!' : null);
     });
     ctx.input.on('tap', () => {
-      if (skipWaiter && (phase === 'react' || phase === 'turn' || phase === 'intro' || phase === 'holed')) { skipWaiter(); return; }
-      if (play && phase === 'shot' && play.t > 0.6 && !play.putt) play.speed = 3;
+      if (skipWaiter && (phase === 'react' || phase === 'turn' || phase === 'intro' || phase === 'holed' || phase === 'setup')) { skipWaiter(); return; }
+      if (play && phase === 'shot' && play.t > 0.6 && !play.putt) { play.speed = 3; showSpeedChip(false); }
     });
     ctx.input.on('key', k => {
       if (k.key === 'Escape') return;
@@ -2741,19 +3261,34 @@
         return;
       }
       if (k.key === 'ArrowLeft' || k.key === 'ArrowRight') { aimDir = k.down ? (k.key === 'ArrowLeft' ? -1 : 1) : 0; if (k.down && !k.repeat) aimHeld = 0; }
-      else if (k.down && !k.repeat && (k.key === 'ArrowUp' || k.key === 'ArrowDown')) { cycleClub(k.key === 'ArrowUp' ? -1 : 1); ui.sfx('ui_tick'); }
-      else if (k.down && !k.repeat && (k.key === 'm' || k.key === 'M')) toggleMap();
+      else if (k.down && !k.repeat && !keyCharge && (k.key === 'ArrowUp' || k.key === 'ArrowDown')) { cycleClub(k.key === 'ArrowUp' ? -1 : 1); ui.sfx('ui_tick'); }
+      else if (k.down && !k.repeat && !keyCharge && (k.key === 'm' || k.key === 'M')) toggleMap();
       else if (k.key === ' ') {
-        if (k.down && !keyCharge) { keyCharge = { t: 0 }; press.sx = engine.size.w * 0.7; press.sy = engine.size.h * 0.4; press.scale = pullScale(press.sy); press.flick = null; placeGauge(); showGauge(true); }
-        else if (!k.down && keyCharge) {
+        if (k.down && !keyCharge) {
+          keyCharge = { t: 0 };
+          press.sx = engine.size.w * 0.75; press.sy = engine.size.h * 0.35; press.scale = pullScale(); press.flick = null; press.step = 0;
+          placeGauge(); showGauge(true);
+        } else if (!k.down && keyCharge) {
           const power = gest.pull;
           keyCharge = null;
           showGauge(false);
           if (power < 0.03) { gest.pull = 0; return; }
-          commitShot({ club: cur.club, aim: cur.aim, power, flick: gauss(rng) * 1.5 * DEG, curve: 0, tempo: 1 });
+          commitShot({ club: cur.club, aim: cur.aim, power, flick: gauss(rng) * 1.5 * DEG, curve: 0, tempo: 1, scale: isPutt() ? puttScale(distToPin()) : undefined });
         }
       }
     });
+
+    /** Drops any swing in progress (pause, blur): nothing fires on its own afterwards. */
+    function dropSwing() {
+      aimDir = 0;
+      if (keyCharge || press.mode) {
+        keyCharge = null;
+        press.mode = null;
+        press.power = 0;
+        gest.pull = 0;
+        showGauge(false);
+      }
+    }
 
     function updateAimInput(dt) {
       if (phase !== 'aim' || !cur) { aimDir = 0; return; }
@@ -2763,27 +3298,35 @@
         nudgeAim(aimDir * rate * dt);
         if (Math.floor(aimHeld / 0.12) !== Math.floor((aimHeld - dt) / 0.12)) ui.sfx('ui_tick', { vol: 0.5 });
       }
+      // a flick that stops without lifting the finger still swings (pointer moves stop arriving)
+      if (press.mode === 'swing' && press.flick) {
+        const last = press.samples[press.samples.length - 1];
+        if (last && press.flick.y - last.y >= Math.max(60, 0.18 * shortSide()) && performance.now() - last.t > 150) fireFlick(last);
+      }
       if (keyCharge) {
         keyCharge.t += dt;
         const max = isPutt() ? 1 : 1.1;
         gest.pull = Math.min(max, keyCharge.t / 1.25);
         press.power = gest.pull;
         drawGauge(gest.pull);
+        powerTicks(gest.pull);
       }
     }
 
     function toggleMap() {
-      if (phase !== 'aim' || !cur) return;
+      if (phase !== 'aim' || !cur || pulling()) return;
       mapOn = !mapOn;
       hud.mapBtn.classList.toggle('on', mapOn);
       setCam(mapOn ? 'map' : 'aim', mapOn ? 3.2 : 5);
       ballMark.visible = mapOn;
+      if (vis) vis.mapGreen.visible = mapOn;
     }
     function closeMap() {
       if (!mapOn) return;
       mapOn = false;
       hud.mapBtn.classList.remove('on');
       ballMark.visible = false;
+      if (vis) vis.mapGreen.visible = false;
     }
 
     function commitShot(inp) {
@@ -2857,9 +3400,12 @@
       ball.position.set(tb.x, tb.y, tb.z);
       ball.visible = true;
       refreshHud();
-      hud.strokeChip.textContent = Math.round(M.L) + ' m';
+      hud.strokeChip.textContent = M.holeLen + ' m';
       const n = holeList[hi] + 1;
-      ui.titleCard('HOLE ' + n, 'Par ' + M.par + ' · ' + Math.round(M.L) + ' m · ' + M.name, { accent: DEF.accent });
+      ui.titleCard('HOLE ' + n, 'Par ' + M.par + ' · ' + M.holeLen + ' m · ' + M.name, { accent: DEF.accent });
+      // the card takes the tap that would skip the flyover (it's .ss-block): one tap skips both
+      const tc = ui.fx.lastElementChild;
+      if (tc && tc.classList.contains('ss-titlecard')) tc.addEventListener('pointerdown', () => { if (phase === 'intro' && skipWaiter && gen === flowGen) skipWaiter(); });
       audio.sfx('flag_flap', { vol: 0.5 });
       const T = M.tee.dir, Fg = M.greenFrame;
       const sMid = Math.min(M.L * 0.55, 230), F = M.frameAt(sMid);
@@ -2869,7 +3415,8 @@
         [at(-T[0] * 16, M.elevAt(0) + 9, -T[1] * 16), at(T[0] * 60, M.elevAt(40), T[1] * 60)],
         [at(F.x - F.tx * 30 - F.tz * 22, M.elevAt(sMid) + 34, F.z - F.tz * 30 + F.tx * 22), at(F.x + F.tx * 60, M.elevAt(sMid + 60), F.z + F.tz * 60)],
         [at(Fg.x - Fg.tx * 30 - Fg.tz * 12, gy + 13, Fg.z - Fg.tz * 30 + Fg.tx * 12), at(M.pin.x, gy, M.pin.z)],
-        [at(Fg.x + Fg.tz * 18 - Fg.tx * 6, gy + 8, Fg.z - Fg.tx * 18 - Fg.tz * 6), at(M.pin.x, gy + 0.5, M.pin.z)],
+        // the green, framed from just short of it and a little to the side
+        [at(M.pin.x - Fg.tx * 22 + Fg.tz * 7, gy + 6, M.pin.z - Fg.tz * 22 - Fg.tx * 7), at(M.pin.x - Fg.tx * 2, gy + 0.8, M.pin.z - Fg.tz * 2)],
         [at(-T[0] * 9, M.elevAt(0) + 4.5, -T[1] * 9), at(T[0] * 50, M.elevAt(50) + 2, T[1] * 50)],
       ];
       const dur = autoplay ? 1.4 : 3.6 + M.L / 140;
@@ -2884,9 +3431,15 @@
     }
 
     let skipChip = null;
-    function showSkip(on) {
-      if (on && !skipChip) { skipChip = ui.el('div', 'ss-chip dark gf-skip', 'Tap to skip'); ctx.hud.appendChild(skipChip); }
+    function showSkip(on, text) {
+      if (on && !skipChip) { skipChip = ui.el('div', 'ss-chip dark gf-skip', text || 'Tap to skip'); ctx.hud.appendChild(skipChip); }
       else if (!on && skipChip) { skipChip.remove(); skipChip = null; }
+    }
+    /** Fast-forward is a tap away during long flights; say so once per game until it has been used. */
+    let speedUsed = 0;
+    function showSpeedChip(on) {
+      if (on && speedUsed < 2 && hintsOn) showSkip(true, 'Tap to speed up');
+      else if (!on && skipChip && skipChip.textContent === 'Tap to speed up') { if (play && play.speed > 1) speedUsed++; showSkip(false); }
     }
 
     function catmull(p0, p1, p2, p3, t, out) {
@@ -2907,13 +3460,13 @@
       catmull(P(i - 1)[1], P(i)[1], P(i + 1)[1], P(i + 2)[1], f, cam.goalLook);
       const gy = heightAt(M, cam.goalPos.x, cam.goalPos.z) + 3;
       if (cam.goalPos.y < gy) cam.goalPos.y = gy;
-      cam.goalFov = fovFor(50, engine.size.aspect < 0.8 ? 44 : 62);
+      cam.goalFov = fovFor(50, engine.size.aspect < 0.8 ? 50 : 62);
     }
 
     // ---- a player's hole ------------------------------------------------------------------------
     async function playHole(p, gen) {
       const live = () => ctx.alive && gen === flowGen;
-      cur = { p, strokes: 0, putts: 0, ball: teeBall(), club: 0, aim: 0, holed: false, pickedUp: false };
+      cur = { p, strokes: 0, putts: 0, ball: teeBall(), club: 0, aim: 0, holed: false, pickedUp: false, gir: false, reaction: null };
       const G = golfers[p];
       G.geom = addressGeom(0);
       showGolfer(p);
@@ -2942,12 +3495,13 @@
       else if (sc - M.par <= -2) st.eagles++;
       else if (sc === M.par) st.pars++;
       st.putts += cur.putts;
-      if (cur.holed && sc - cur.putts <= M.par - 2) st.gir++;
+      if (cur.gir) st.gir++;
       refreshHud();
     }
 
     async function prepareShot(first, quiet) {
       phase = 'setup';
+      const gen = flowGen;
       if (swing) { swing = null; golfers[cur.p].posing = false; }
       const b = cur.ball;
       if (b.surf !== 'tee') b.surf = surfaceAt(M, b.x, b.z);
@@ -2955,28 +3509,46 @@
       ball.position.set(b.x, b.y, b.z);
       ball.scale.setScalar(1);
       ball.visible = true;
+      trail.visible = false;
+      flyMark.visible = false;
       peg.visible = b.surf === 'tee';
       peg.position.set(b.x, b.y - BALL_R - 0.02, b.z);
       const G = golfers[cur.p];
-      const ci = suggestClub(M, b);
-      cur.club = ci;
-      G.geom = addressGeom(ci);
-      G.club.set(ci);
-      cur.aim = defaultAim(b, ci);
-      G.pal.play('idle');
-      G.pal.setExpression('focus');
+      G.reacting = false;
+      const pick = suggestShot(b);
+      cur.club = pick.club;
+      G.geom = addressGeom(pick.club);
+      G.club.set(pick.club);
+      cur.aim = pick.aim;
       placeGolfer();
       G.shown = 0;
       gest.pull = 0;
-      golferPose(G, 0, Infinity);
-      G.pal.lookAt(null);
       closeMap();
       ringDirty = true;
       env.setShadowFocus(V(b.x, b.y, b.z), 30);
       refreshHud();
-      setCam('aim', first ? 2.6 : 3.2, false);
+      const rx = !quiet && !autoplay ? cur.reaction : null;
+      cur.reaction = null;
+      if (rx) {
+        // the pal reacts to the last shot where it came to rest, face to face with the camera
+        G.reacting = true;
+        G.posing = false;
+        G.pal.releasePose(0);
+        G.pal.lookAt(null);
+        if (rx.expr) G.pal.setExpression(rx.expr, 1.4);
+        G.pal.play(rx.anim);
+        setCam('react', 8, true);
+        await skippable(1.0);
+        G.reacting = false;
+        if (gen !== flowGen || !ctx.alive) return;
+      }
+      G.pal.play('idle');
+      G.pal.setExpression('focus');
+      golferPose(G, 0, rx ? 12 : Infinity);
+      G.pal.lookAt(null);
+      setCam('aim', rx ? 2.4 : first ? 2.6 : 3.2, false);
       if (quiet) return;
-      await ctx.wait(autoplay ? 0.4 : first ? 0.7 : 1.0);
+      await ctx.wait(autoplay ? 0.3 : 0.35);
     }
 
     function waitForShot() {
@@ -2985,9 +3557,8 @@
       refreshHud();
       if (!firstSwingDone && !autoplay && hintsOn && !hintHandle) {
         const sz = engine.size;
-        hintHandle = sz.h <= 520 && sz.aspect > 1
-          ? ui.hint({ gesture: 'drag-down-up', text: 'Pull down, then flick up!' })
-          : ui.hint({ gesture: 'drag-down-up', text: 'Pull down, then flick up!', x: sz.w * 0.7, y: sz.h * 0.6 });
+        const short = sz.h <= 520 && sz.aspect > 1;
+        hintHandle = ui.hint({ gesture: 'drag-down-up', text: 'Pull down, then flick up!', x: sz.w * (short ? 0.66 : 0.7), y: sz.h * (short ? 0.42 : 0.6) });
         hud.cue.classList.add('gf-off');
       }
       return new Promise(resolve => {
@@ -3001,7 +3572,8 @@
       const wrap = ui.el('div', 'gf-turnwrap');
       const card = ui.el('div', 'gf-turncard ss-pop');
       card.append(ui.portraitImg(prof, 64));
-      card.appendChild(ui.el('div', '', '<h3>' + ui.esc(prof.name) + "'s turn!</h3><p>Hole " + (holeList[hi] + 1) + ' · Par ' + M.par + ' · ' + toParText(toParFor(p)) + '</p>'));
+      const who = prof.name.toLowerCase() === 'you' ? 'Your turn!' : ui.esc(prof.name) + "'s turn!";
+      card.appendChild(ui.el('div', '', '<h3>' + who + '</h3><p>Hole ' + (holeList[hi] + 1) + ' · Par ' + M.par + ' · ' + toParText(toParFor(p)) + '</p>'));
       wrap.appendChild(card);
       ctx.hud.appendChild(wrap);
       audio.sfx('ui_open');
@@ -3022,8 +3594,10 @@
       cur.aim = inp.aim;
       placeGolfer();
       const from = Object.assign({}, cur.ball);
+      const tickP = pinPower();
       const { L, info } = launchFor(M, cur.ball, inp, rng);
       const res = simulateShot(M, L, { wind, record: true });
+      res.windNote = club.putter ? '' : windNote(L, res, inp.aim);
       lastShot = {
         club: club.id, power: +inp.power.toFixed(3), flickDeg: +((inp.flick || 0) / DEG).toFixed(1), curve: +(inp.curve || 0).toFixed(2),
         tempo: +(inp.tempo == null ? 1 : inp.tempo).toFixed(2), aimDeg: +(wrapA(inp.aim - headingTo(from.x, from.z, M.pin.x, M.pin.z)) / DEG).toFixed(1),
@@ -3031,22 +3605,55 @@
       await runSwing(G, inp);
       if (gen !== flowGen || !ctx.alive) return null;
       cur.strokes++;
-      if (club.putter) cur.putts++;
+      if (club.putter && from.surf === 'green') cur.putts++;
       refreshHud();
-      impactFx(G, club, inp, info, from);
+      impactFx(G, club, inp, info, from, tickP);
       await playback(res, inp, from);
       if (gen !== flowGen || !ctx.alive) return null;
       return { res, inp, info, from };
     }
 
-    function impactFx(G, club, inp, info, from) {
+    /**
+     * What the wind did to a shot, so its scale can be learned: the same launch flown in calm air
+     * (no trees) against where this one came down. '' when it moved the ball less than 1.5 m.
+     */
+    function windNote(L, res, aim) {
+      if (wind.speed < 0.5) return '';
+      const end = r => r.land || r.events.find(e => e.type === 'splash' || e.type === 'ob') || null;
+      const a = end(res);
+      if (!a || res.events.some(e => (e.type === 'tree' || e.type === 'trunk') && e.n <= a.n)) return '';
+      const calm = simulateShot(M, L, { stopAtLand: true, noTrees: true });
+      const b = end(calm);
+      if (!b) return '';
+      const [ax, az] = headingDir(aim);
+      const ddx = a.x - b.x, ddz = a.z - b.z;
+      const along = ddx * ax + ddz * az, side = ddx * -az + ddz * ax;
+      const parts = [];
+      if (Math.abs(side) >= 1.5) parts.push(Math.round(Math.abs(side)) + ' m ' + (side > 0 ? 'right' : 'left'));
+      if (Math.abs(along) >= 1.5) parts.push(Math.round(Math.abs(along)) + ' m ' + (along > 0 ? 'long' : 'short'));
+      return parts.length ? 'Wind <b>' + parts.join(', ') + '</b>' : '';
+    }
+
+    function impactFx(G, club, inp, info, from, tickP) {
       const p = clamp(inp.power, 0, 1.1);
+      // a flush strike: straight flick, crisp tempo, and full power or right on the pin mark
+      const straight = Math.abs(inp.flick || 0) < FLICK_DEAD && Math.abs(inp.curve || 0) < 0.05;
+      const onMark = tickP > 0 && tickP <= 1.1 && Math.abs(p - tickP) < (club.putter ? 0.03 : 0.015);
+      const perfect = straight && (club.putter ? onMark : info.strike > 0.95 && (Math.abs(p - 1) < 0.02 || onMark));
+      if (perfect) {
+        const sp = engine.project(ball.position, camera);
+        ui.scorePopup(club.putter ? 'PURE!' : 'PERFECT!', sp.x, sp.y - 30, { color: '#FFE37A' });
+        world.burst(scene, V(from.x, from.y + 0.1, from.z), { count: 26, colors: [0xFFFFFF, 0xFFE37A, 0xFFC93C], speed: 3, size: 0.06, gravity: -2, life: 0.7 });
+        if (!club.putter) { engine.slowmo(0.08, 0.08); engine.shake(0.06, 0.3); }
+        if (ui.haptic) ui.haptic(25);
+      }
       if (club.putter) audio.sfx('golf_putt', { intensity: clamp(p, 0.2, 1) });
       else {
-        audio.sfx(club.sfx, { intensity: info.topped ? 0.3 : clamp(p, 0.3, 1) });
+        if (perfect) audio.sfx('golf_drive', { intensity: 1, rate: 1.08 });
+        else audio.sfx(club.sfx, { intensity: info.topped ? 0.3 : clamp(p, 0.3, 1) });
         audio.sfx('whoosh', { intensity: clamp(p, 0.3, 1), vol: 0.5 });
         if (p > 0.85) audio.sfx('voice_hup', { vol: 0.7 });
-        if (club.id === 'D' && p > 0.7) engine.shake(0.035, 0.25);
+        if (club.id === 'D' && p > 0.7 && !perfect) engine.shake(0.035, 0.25);
         const at = V(from.x, from.y, from.z);
         if (from.surf === 'sand') world.burst(scene, at, { count: 34, color: 0xEBD39A, speed: 3.2, size: 0.09, life: 0.9 });
         else if (from.surf !== 'tee' && from.surf !== 'green') world.burst(scene, at, { count: 14, colors: [0x5DA845, 0x7CC456, 0x8B6A3E], speed: 2.4, size: 0.06, life: 0.7 });
@@ -3054,17 +3661,16 @@
         trail.visible = true;
       }
       peg.visible = false;
-      if (ui.haptic) ui.haptic(club.putter ? 8 : 16);
-      // what the swing did
+      if (ui.haptic && !perfect) ui.haptic(club.putter ? 8 : 16);
+      // what the swing did, with the start-line error in degrees so the flick can be learned
       const e = info.err / DEG, tilt = info.tilt / DEG;
       const rightWord = hand > 0 ? ['Pushed', 'Pulled'] : ['Pulled', 'Pushed'];
-      let dir = Math.abs(e) < 1.2 ? 'Straight' : (Math.abs(e) < 4.5 ? 'Slightly ' : '') + (e > 0 ? rightWord[0] + ' right' : rightWord[1] + ' left');
-      if (Math.abs(e) >= 1.2 && Math.abs(e) < 4.5) dir = dir.replace('Slightly Pushed', 'Slight push').replace('Slightly Pulled', 'Slight pull');
+      const dir = Math.abs(e) < 0.5 ? 'Straight' : (e > 0 ? rightWord[0] : rightWord[1]) + ' ' + Math.max(1, Math.round(Math.abs(e))) + '° ' + (e > 0 ? 'right' : 'left');
       let shape = '';
       if (!club.putter && Math.abs(tilt) > 7) shape = ' · ' + (tilt > 0 ? (tilt > 16 ? 'Slice' : 'Fade') : (tilt < -16 ? 'Hook' : 'Draw'));
       if (club.putter) report('Putt <b>' + (info.dist || 0).toFixed(1) + ' m</b> · ' + dir, 2.4);
       else {
-        const strike = info.topped ? 'Topped!' : info.over > 0.05 ? 'Overswing' : (inp.tempo == null || inp.tempo > 0.6 ? 'Crisp' : 'Soft');
+        const strike = info.topped ? 'Topped!' : info.over > 0.05 ? 'Overswing' : info.strike < 0.8 ? 'Soft flick' : perfect ? 'Flush' : 'Crisp';
         report('<b>' + Math.round(p * 100) + '%</b> · ' + dir + shape + ' · ' + strike, 2.6);
       }
       G.pal.lookAt(ball.position);
@@ -3080,10 +3686,20 @@
         play = {
           res, inp, from, putt, t: 0, ev: 0, speed: 1, resolve, landPt, dir,
           landN: land ? land.n : null, short: (res.land ? res.carry : res.total) < 55, side: sideL === 'water' ? 1 : -1, slowDone: false,
-          tree: false, lipped: false,
+          tree: false, lipped: false, camFrom: cam.pos.clone(), speedChip: false, landed: false,
           high: treesNear(M, landPt.x, landPt.z, []).filter(t => Math.hypot(t.x - landPt.x, t.z - landPt.z) < 20).length >= 3,
         };
-        setCam(putt ? 'roll' : 'follow', putt ? 2.2 : 3.4, false);
+        // a big moment is coming: holed, a near miss or a lip-out (slow-mo doesn't give the result away)
+        const tense = res.outcome === 'holed' || res.close.d < 0.6 || res.events.some(e => e.type === 'lip');
+        play.tenseN = tense && (putt ? res.total > 2.5 : true) ? (res.outcome === 'holed' ? res.n : res.close.n) : null;
+        setCam(putt ? 'puttroll' : 'follow', putt ? 2.6 : 4.6, false);
+        // the predicted landing spot, so the eye knows where to look while the ball is up
+        flyMark.visible = !putt && !!land && !play.short;
+        if (flyMark.visible) { flyMark.position.set(landPt.x, landPt.y + 0.2, landPt.z); flyMarkMat.opacity = 0.9; }
+        if (!putt) {
+          hud.lieChip.classList.add('gf-off');
+          hud.distChip.classList.add('live');
+        }
       });
     }
 
@@ -3096,21 +3712,37 @@
       const A = P.res.path;
       ball.position.set(lerp(A[i0 * 3], A[i0 * 3 + 3], u), lerp(A[i0 * 3 + 1], A[i0 * 3 + 4], u), lerp(A[i0 * 3 + 2], A[i0 * 3 + 5], u));
       while (P.ev < P.res.events.length && P.res.events[P.ev].n <= f) onEvent(P.res.events[P.ev++]);
-      if (!P.putt && cam.mode === 'follow' && P.landN != null && !P.short && (P.landN - f) * STEP < 1.6) setCam('land', 2.3, false);
+      // cut (not fly) to the landing camera: flying there would pass right by the ball
+      if (!P.putt && cam.mode === 'follow' && P.landN != null && !P.short && (P.landN - f) * STEP < 1.6) setCam('land', 2.3, true);
       if (cam.mode === 'land' && f > (P.landN || 0) + 60 && Math.hypot(ball.position.x - P.landPt.x, ball.position.z - P.landPt.z) > 22) setCam('roll', 1.6, false);
-      if (!P.slowDone && P.res.outcome === 'holed') {
-        const left = (n - f) * STEP;
-        const worth = P.putt ? P.res.total > 3 : true;
-        if (worth && left < (P.putt ? 1.0 : 1.4)) {
-          P.slowDone = true;
-          P.speed = 1;
-          engine.slowmo(cur.strokes === 1 ? 0.22 : 0.35, 1.8);
-          audio.sfx('crowd_gasp', { vol: 0.6 });
-          if (vis && vis.crowd) vis.crowd.setMood('tense');
-        }
+      if (!P.slowDone && P.tenseN != null && (P.tenseN - f) * STEP < (P.putt ? 0.9 : 1.2)) {
+        P.slowDone = true;
+        P.speed = 1;
+        showSpeedChip(false);
+        engine.slowmo(P.res.outcome === 'holed' && !P.putt ? 0.22 : 0.35, 1.2);
+        audio.sfx('crowd_gasp', { vol: 0.6 });
+        if (vis && vis.crowd) vis.crowd.setMood('tense');
+      }
+      if (!P.putt) {
+        // live flight readout, then the distance left once it lands
+        if (P.landN != null && f >= P.landN) P.landed = true;
+        const txt = P.landed
+          ? Math.round(Math.hypot(M.pin.x - ball.position.x, M.pin.z - ball.position.z)) + ' m <small>TO PIN</small>'
+          : Math.round(Math.hypot(ball.position.x - P.from.x, ball.position.z - P.from.z)) + ' m <small>' + (f < 2 ? 'GO!' : 'IN THE AIR') + '</small>';
+        if (hud.distChip.innerHTML !== txt) hud.distChip.innerHTML = txt;
+        if (!P.speedChip && P.t > 1 && P.speed === 1 && (n - f) * STEP > 1.6 && !P.slowDone && !autoplay) { P.speedChip = true; showSpeedChip(true); }
+      }
+      if (flyMark.visible) {
+        const age = P.landed ? (f - P.landN) * STEP : 0;
+        const r = clamp(camera.position.distanceTo(flyMark.position) * 0.04, 1, 30);
+        flyMark.scale.setScalar(r * (1 + age * 1.5 + (P.landed ? 0 : 0.08 * Math.sin(P.t * 9))));
+        flyMarkMat.opacity = 0.9 * clamp(1 - age * 2, 0, 1);
+        if (age > 0.5) flyMark.visible = false;
       }
       if (f >= n) {
         play = null;
+        flyMark.visible = false;
+        showSpeedChip(false);
         trail.visible = false;
         if (P.res.outcome === 'holed' || P.res.outcome === 'water') ball.visible = false;
         P.resolve();
@@ -3130,7 +3762,7 @@
             world.ring(scene, at, { color: 0xFFFFFF, radius: 0.9, life: 0.7 });
             if (e.surf === 'sand') world.burst(scene, at, { count: 26, color: 0xEBD39A, speed: 2.6, size: 0.08, life: 0.8 });
             else world.burst(scene, at, { count: 10, colors: [0x6CC24B, 0x9BE07A], speed: 1.8, size: 0.05, life: 0.5 });
-            if (!P.putt && P.res.carry > 40) report('Carry <b>' + Math.round(P.res.carry) + ' m</b>', 2);
+            if (!P.putt && (P.res.carry > 40 || P.res.windNote)) report('Carry <b>' + Math.round(P.res.carry) + ' m</b>' + (P.res.windNote ? ' · ' + P.res.windNote : ''), 2.6);
           }
           break;
         }
@@ -3148,6 +3780,7 @@
           world.burst(scene, V(e.x, e.y + 0.05, e.z), { count: 44, colors: [0xBFE6FF, 0xFFFFFF, 0x7CC8F2], speed: 4.2, size: 0.1, life: 1 });
           world.ring(scene, V(e.x, e.y + 0.03, e.z), { color: 0xD8F0FF, radius: 1.6, life: 1 });
           ball.visible = false;
+          if (!P.putt && P.res.windNote) report(P.res.windNote, 2.6);
           break;
         case 'lip':
           P.lipped = true;
@@ -3162,6 +3795,10 @@
     }
 
     // ---- reacting to the result ----------------------------------------------------------------
+    /**
+     * Banner + sound for the result. The pal's reaction to a full shot is played when the camera
+     * arrives at the ball for the next stroke (it would be off screen now); putts react right away.
+     */
     async function react(shot, gen) {
       phase = 'react';
       const { res, inp, from } = shot;
@@ -3173,7 +3810,11 @@
       if (res.outcome === 'holed') return celebrate(shot, gen, d0);
       const crowd = vis && vis.crowd;
       if (crowd) crowd.setMood('idle');
-      let wait = 1.5;
+      let wait = 1.2;
+      const feel = (anim, expr) => {
+        if (club.putter) { pal.play(anim); if (expr) pal.setExpression(expr, 1.6); }
+        else cur.reaction = { anim, expr };
+      };
       if (res.outcome === 'water') {
         cur.strokes++;
         st.pens++;
@@ -3181,54 +3822,62 @@
         cur.ball = { x: drop.x, z: drop.z, y: 0, surf: surfaceAt(M, drop.x, drop.z) };
         ui.banner('SPLASH!', { kind: 'bad', sub: 'Penalty stroke · Drop', duration: 1.6 });
         audio.sfx('crowd_aww', { intensity: 0.6 });
-        pal.setExpression('sad', 2); pal.play('sad');
-        wait = 1.9;
+        feel('sad', 'sad');
+        wait = 1.7;
       } else if (res.outcome === 'ob') {
         cur.strokes++;
         st.pens++;
         cur.ball = Object.assign({}, from);
-        ui.banner('OUT OF BOUNDS', { kind: 'bad', sub: 'Stroke and distance', duration: 1.6 });
+        ui.banner('OUT OF BOUNDS', { kind: 'bad', sub: 'Past the white stakes · Replay', duration: 1.6 });
         audio.sfx('crowd_gasp', { vol: 0.7 });
-        pal.setExpression('surprised', 2); pal.play('shrug');
-        wait = 1.9;
+        feel('shrug', 'surprised');
+        wait = 1.7;
       } else {
         cur.ball = { x: res.rest.x, z: res.rest.z, y: res.rest.y, surf: res.surf };
         const d = Math.hypot(M.pin.x - res.rest.x, M.pin.z - res.rest.z);
         const near = d < 30;
         const teeShot = from.surf === 'tee' && M.par > 3;
         if (club.id === 'D' && from.surf === 'tee' && res.surf !== 'ob') st.drive = Math.max(st.drive, res.total);
+        if (res.surf === 'green' && !cur.gir && cur.strokes <= M.par - 2) cur.gir = true;
+        const gimme = (res.surf === 'green' || res.surf === 'fringe') && d < GIMME_R && cur.strokes < M.par + MAX_OVER_PAR;
         if (club.putter) {
-          if (play && play.lipped || lastOutcome.events.indexOf('lip') >= 0) { ui.banner('LIPPED OUT!', { kind: 'bad', sub: d.toFixed(1) + ' m left', duration: 1.4 }); audio.sfx('crowd_aww', { intensity: 0.8 }); pal.play('sad'); }
-          else if (d < 0.6) { ui.banner('SO CLOSE!', { kind: 'info', sub: 'Tap it in', duration: 1.2 }); audio.sfx('crowd_aww', { intensity: 0.5 }); pal.play('shrug'); }
+          if (lastOutcome.events.indexOf('lip') >= 0) { ui.banner('LIPPED OUT!', { kind: 'bad', sub: gimme ? 'Tap it in' : d.toFixed(1) + ' m left', duration: 1.3 }); audio.sfx('crowd_aww', { intensity: 0.8 }); feel('sad', 'wince'); }
+          else if (gimme) { ui.banner('SO CLOSE!', { kind: 'info', sub: 'Tap it in', duration: 1.1 }); audio.sfx('crowd_aww', { intensity: 0.5 }); feel('shrug', 'wince'); }
           else report(d.toFixed(1) + ' m left', 1.8);
-          wait = 1.1;
+          wait = 1.0;
         } else if (lastOutcome.events.indexOf('tree') >= 0 && res.surf !== 'green') {
           ui.banner('TIMBER!', { kind: 'bad', sub: 'Into the trees', duration: 1.4 });
           audio.sfx('crowd_gasp', { vol: 0.5 });
-          pal.play('shrug');
+          feel('shrug', 'surprised');
         } else if (res.surf === 'green') {
-          if (d < 1.6) { ui.banner('STIFFED IT!', { kind: 'great', sub: d.toFixed(1) + ' m to the pin', duration: 1.6 }); audio.sfx('crowd_cheer', { intensity: 0.7 }); if (crowd) crowd.cheer(0.8, 2); pal.play('cheer'); pal.setExpression('joy', 2); }
-          else if (d < 6) { ui.banner('ON THE GREEN!', { kind: 'good', sub: d.toFixed(1) + ' m to the pin', duration: 1.4 }); audio.sfx('crowd_applause', { intensity: 0.5 }); if (crowd) crowd.cheer(0.4, 1.5); pal.play('clap'); }
-          else { ui.banner('ON THE GREEN', { kind: 'info', sub: Math.round(d) + ' m to the pin', duration: 1.2 }); pal.play('clap'); }
+          if (d < 1.6) { ui.banner('STIFFED IT!', { kind: 'great', sub: d.toFixed(1) + ' m to the pin', duration: 1.6 }); audio.sfx('crowd_cheer', { intensity: 0.7 }); if (crowd) crowd.cheer(0.8, 2); feel('cheer', 'joy'); }
+          else if (d < 6) { ui.banner('ON THE GREEN!', { kind: 'good', sub: d.toFixed(1) + ' m to the pin', duration: 1.4 }); audio.sfx('crowd_applause', { intensity: 0.5 }); if (crowd) crowd.cheer(0.4, 1.5); feel('clap', 'happy'); }
+          else { ui.banner('ON THE GREEN', { kind: 'info', sub: Math.round(d) + ' m to the pin', duration: 1.2 }); feel('clap', 'happy'); }
         } else if (res.surf === 'fairway') {
-          if (teeShot && res.total > 232) { ui.banner('MONSTER DRIVE!', { kind: 'great', sub: Math.round(res.total) + ' m', duration: 1.6 }); audio.sfx('crowd_ooh', { vol: 0.7 }); pal.play('cheer'); pal.setExpression('proud', 2); }
-          else if (teeShot) { ui.banner('FAIRWAY!', { kind: 'good', sub: Math.round(res.total) + ' m drive', duration: 1.3 }); pal.play('clap'); }
+          if (teeShot && res.total > 232) { ui.banner('MONSTER DRIVE!', { kind: 'great', sub: Math.round(res.total) + ' m', duration: 1.6 }); audio.sfx('crowd_ooh', { vol: 0.7 }); feel('cheer', 'proud'); }
+          else if (teeShot) { ui.banner('FAIRWAY!', { kind: 'good', sub: Math.round(res.total) + ' m drive', duration: 1.3 }); feel('clap', 'happy'); }
           else ui.banner('FAIRWAY', { kind: 'info', sub: Math.round(d) + ' m to the pin', duration: 1.1 });
         } else if (res.surf === 'fringe') {
           ui.banner('JUST OFF THE GREEN', { kind: 'info', sub: d.toFixed(1) + ' m to the pin', duration: 1.2 });
         } else if (res.surf === 'sand') {
           ui.banner('BUNKER!', { kind: 'bad', sub: near ? 'Splash out with the sand wedge' : 'Sand shots fly shorter', duration: 1.5 });
           if (near) audio.sfx('crowd_aww', { intensity: 0.4 });
-          pal.play('shrug'); pal.setExpression('wince', 1.5);
+          feel('shrug', 'wince');
         } else if (res.surf === 'rough') {
           ui.banner('ROUGH', { kind: 'info', sub: Math.round(d) + ' m to the pin', duration: 1.1 });
-          pal.setExpression('wince', 1.2);
+          if (teeShot) feel('shrug', 'wince');
         } else {
           ui.banner('TEE', { kind: 'info', sub: Math.round(d) + ' m to the pin', duration: 1 });
+        }
+        if (gimme) {
+          await skippable(autoplay ? 0.3 : 0.75);
+          if (gen !== flowGen) return;
+          return tapIn(gen, d);
         }
       }
       if (!cur.holed && cur.strokes >= M.par + MAX_OVER_PAR) {
         cur.pickedUp = true;
+        cur.reaction = null;
         await ctx.wait(autoplay ? 0.3 : 1.0);
         if (gen !== flowGen) return;
         ui.banner('PICKED UP', { kind: 'info', sub: 'Max score is par + ' + MAX_OVER_PAR, duration: 1.6 });
@@ -3238,44 +3887,105 @@
       await skippable(autoplay ? 0.5 : wait);
     }
 
+    /** A gimme: the golfer taps the ball in (one more stroke) and the hole is done. */
+    async function tapIn(gen, d) {
+      const G = golfers[cur.p];
+      cur.reaction = null;
+      cur.club = PUTTER;
+      G.geom = addressGeom(PUTTER);
+      G.club.set(PUTTER);
+      cur.aim = headingTo(cur.ball.x, cur.ball.z, M.pin.x, M.pin.z);
+      G.pal.play('idle');
+      placeGolfer();
+      golferPose(G, 0, Infinity);
+      ball.position.set(cur.ball.x, heightAt(M, cur.ball.x, cur.ball.z) + BALL_R, cur.ball.z);
+      ball.visible = true;
+      report('<b>Gimme!</b> Tapped in', 1.6);
+      audio.sfx('golf_putt', { intensity: 0.2 });
+      await U.tween(ball.position, { x: M.pin.x, z: M.pin.z, y: groundPin() - 0.03 }, autoplay ? 0.15 : 0.32, { ease: 'inQuad' });
+      if (gen !== flowGen) return;
+      audio.sfx('golf_cup');
+      ball.visible = false;
+      cur.strokes++;
+      if (cur.ball.surf === 'green') cur.putts++;
+      refreshHud();
+      return celebrate({ res: { total: d, outcome: 'holed' }, inp: { club: PUTTER }, gimme: true }, gen, d);
+    }
+
+    /** Sets up the celebration orbit, starting from wherever the camera is now. */
+    function cupCam() {
+      const pr = golfers[cur.p].pal.root.position;
+      const rg = Math.hypot(pr.x - M.pin.x, pr.z - M.pin.z);
+      // centre: between the golfer and the cup when they're close, else the cup (the golfer gets a cut later)
+      const C = rg < 6 ? { x: (pr.x + M.pin.x) / 2, z: (pr.z + M.pin.z) / 2 } : { x: M.pin.x, z: M.pin.z };
+      const gy = heightAt(M, C.x, C.z);
+      const a0 = Math.atan2(cam.pos.x - C.x, cam.pos.z - C.z), r0 = Math.hypot(cam.pos.x - C.x, cam.pos.z - C.z);
+      // finish clear of the flagstick: well off the line from the centre to whichever of cup/golfer is farther
+      const ap = rg < 6 ? Math.atan2(M.pin.x - C.x, M.pin.z - C.z) : Math.atan2(pr.x - C.x, pr.z - C.z);
+      const cands = [ap + Math.PI * 0.6, ap - Math.PI * 0.6];
+      const aT = Math.abs(wrapA(cands[0] - a0)) < Math.abs(wrapA(cands[1] - a0)) ? cands[0] : cands[1];
+      const far = r0 > 16;
+      const O = { cx: C.x, cz: C.z, gy, a: far ? aT : a0, aT: a0 + wrapA(aT - a0), r: far ? 6 : r0, y: far ? 2.6 : cam.pos.y - gy, dir: Math.sign(wrapA(aT - a0)) || 1, cut: rg >= 6, half: rg < 6 ? rg / 2 : 0 };
+      cam.cup = O;
+      setCam('cup', 14, far);
+    }
+
     async function celebrate(shot, gen, d0) {
       phase = 'holed';
       const { res, inp } = shot;
-      const pal = golfers[cur.p].pal, st = stats[cur.p];
+      const G = golfers[cur.p], pal = G.pal, st = stats[cur.p];
       const club = CLUBS[inp.club];
       cur.holed = true;
+      cur.reaction = null;
       const strokes = cur.strokes, diff = strokes - M.par;
+      if (strokes <= M.par - 2) cur.gir = true;
+      // the player chip counts this hole now (the card itself is written once the hole is over)
+      const tpNow = toParFor(cur.p) + diff, pb = hud.playerChip.querySelector('b');
+      if (pb) { pb.textContent = toParText(tpNow); pb.classList.toggle('over', tpNow > 0); }
       const name = scoreName(strokes, M.par);
       const crowd = vis && vis.crowd;
       if (crowd) crowd.setMood('idle');
       const pinAt = V(M.pin.x, groundPin() + 0.2, M.pin.z);
-      if (club.putter) st.longPutt = Math.max(st.longPutt, res.total);
-      setCam('cup', 1.8, false);
-      const pr = golfers[cur.p].pal.root.position;
-      cam.orbit = Math.atan2(pr.x - M.pin.x, pr.z - M.pin.z) + Math.PI + 0.6;
-      pal.lookAt(camera.position);
-      let sub = club.putter ? (d0 >= 8 ? 'What a putt! ' + d0.toFixed(1) + ' m' : d0.toFixed(1) + ' m putt') : strokes > 1 ? 'Holed from ' + Math.round(d0) + ' m!' : Math.round(d0) + ' m · ' + CLUBS[inp.club].name;
-      let wait = 2.2;
+      if (club.putter && !shot.gimme) st.longPutt = Math.max(st.longPutt, res.total);
+      if (swing) { swing = null; }
+      G.posing = false;
+      pal.releasePose(0.3);
+      cupCam();
+      pal.lookAt(null);
+      // the HUD shows the result, not the stale pre-shot readout
+      hud.lieChip.classList.add('gf-off');
+      hud.distChip.classList.add('live');
+      hud.distChip.innerHTML = 'IN THE HOLE';
+      // fireworks go up beyond the cup as the camera sees it, and the camera tilts up to catch them
+      const O = cam.cup;
+      const sky = (dist, n) => {
+        const a = O.aT;
+        const x = O.cx - Math.sin(a) * dist, z = O.cz - Math.cos(a) * dist;
+        world.fireworks(scene, V(x, heightAt(M, x, z) + 1, z), { count: n });
+        O.lookUp = 3;
+      };
+      let sub = shot.gimme ? 'Tap-in' : club.putter ? (d0 >= 8 ? 'What a putt! ' + d0.toFixed(1) + ' m' : d0.toFixed(1) + ' m putt') : strokes > 1 ? 'Holed from ' + Math.round(d0) + ' m!' : Math.round(d0) + ' m · ' + CLUBS[inp.club].name;
+      let wait = 2.2, anim = 'clap';
       if (strokes === 1) {
         st.hio++;
         ui.banner('HOLE IN ONE!', { kind: 'huge', sub, duration: 3 });
         audio.sfx('jingle_perfect');
         audio.sfx('crowd_cheer', { intensity: 1 });
         audio.duck(0.3, 3);
-        world.fireworks(scene, V(M.pin.x, groundPin() + 12, M.pin.z), { count: 5 });
+        sky(30, 5);
         world.confetti(scene, V(M.pin.x, groundPin() + 4, M.pin.z), { count: 160, spread: 4 });
         if (crowd) crowd.cheer(1, 4);
-        pal.play('dance'); pal.setExpression('joy', 4);
-        if (cur.p === 0) ctx.awardMedal('platinum');
+        anim = 'dance'; pal.setExpression('joy', 4);
+        if (cur.p === 0 && !debugTouched) ctx.awardMedal('platinum');
         wait = 4;
       } else if (diff <= -2) {
         ui.banner(name.toUpperCase() + '!', { kind: 'huge', sub, duration: 2.6 });
         audio.sfx('fanfare_big');
         audio.sfx('crowd_cheer', { intensity: 1 });
-        world.fireworks(scene, V(M.pin.x, groundPin() + 10, M.pin.z), { count: 3 });
+        sky(28, 3);
         world.confetti(scene, pinAt, { count: 120, spread: 3 });
         if (crowd) crowd.cheer(1, 3.5);
-        pal.play('jump'); pal.setExpression('joy', 3);
+        anim = 'jump'; pal.setExpression('joy', 3);
         wait = 3.2;
       } else if (diff === -1) {
         ui.banner('BIRDIE!', { kind: 'great', sub, duration: 2 });
@@ -3283,19 +3993,29 @@
         audio.sfx('crowd_cheer', { intensity: 0.8 });
         world.confetti(scene, pinAt, { count: 70, spread: 2 });
         if (crowd) crowd.cheer(0.8, 2.5);
-        pal.play('cheer'); pal.setExpression('joy', 2.5);
+        anim = 'cheer'; pal.setExpression('joy', 2.5);
         wait = 2.6;
       } else if (diff === 0) {
         ui.banner('PAR', { kind: 'good', sub, duration: 1.7 });
         audio.sfx('crowd_applause', { intensity: 0.6 });
         if (crowd) crowd.cheer(0.4, 1.5);
-        pal.play('clap'); pal.setExpression('happy', 2);
+        anim = 'clap'; pal.setExpression('happy', 2);
+        wait = 1.9;
       } else {
         ui.banner(name.toUpperCase(), { kind: 'info', sub, duration: 1.6 });
         audio.sfx('crowd_applause', { intensity: 0.25 });
-        pal.play(diff >= 2 ? 'shrug' : 'clap'); pal.setExpression(diff >= 2 ? 'sad' : 'neutral', 2);
+        anim = diff >= 2 ? 'shrug' : 'clap'; pal.setExpression(diff >= 2 ? 'sad' : 'neutral', 2);
+        wait = 1.8;
       }
-      if (club.putter && d0 >= 8 && diff > -1) audio.sfx('crowd_cheer', { intensity: 0.7 });
+      pal.play(anim);
+      if (O.lookUp) ctx.wait(1.9).then(() => { if (cam.cup === O) O.lookUp = 0; });
+      if (club.putter && !shot.gimme && d0 >= 8 && diff > -1) audio.sfx('crowd_cheer', { intensity: 0.7 });
+      // holed from afar: the cup first, then cut to the golfer celebrating
+      if (cam.cup.cut && !autoplay) {
+        ctx.wait(O.lookUp ? 2.5 : Math.min(1.5, wait * 0.45)).then(() => {
+          if (gen === flowGen && phase === 'holed') { setCam('react', 8, true); pal.play(anim); }
+        });
+      }
       await skippable(autoplay ? 0.8 : wait);
     }
 
@@ -3329,6 +4049,9 @@
     async function showScorecard(gen) {
       phase = 'card';
       setAimUi(false);
+      // a skipped celebration must not leave its banner or the shot report over the card
+      hud.report.classList.add('gf-off');
+      ui.fx.querySelectorAll('.ss-banner').forEach(n => n.remove());
       const last = hi === holeList.length - 1;
       const wrap = ui.el('div', 'gf-scwrap ss-block');
       const panel = ui.el('div', 'gf-sc ss-panel ss-pop');
@@ -3356,7 +4079,8 @@
       const order = players.map((p, i) => ({ i, tp: toParFor(i) })).sort((a, b) => a.tp - b.tp);
       const best = order[0];
       const tied = order.filter(o => o.tp === best.tp).length;
-      return tied > 1 ? 'All square at ' + toParText(best.tp) : players[best.i].profile.name + ' leads at ' + toParText(best.tp);
+      const nm = players[best.i].profile.name;
+      return tied > 1 ? 'All square at ' + toParText(best.tp) : (nm.toLowerCase() === 'you' ? 'You lead' : nm + ' leads') + ' at ' + toParText(best.tp);
     }
 
     // =============================================================================================
@@ -3399,7 +4123,7 @@
       const records = [];
       const pid = prof => (prof.isGuest ? null : prof.id);
       const rec = (key, value, label, fmt, prof, higher, shown) => {
-        const r = save.record(DEF.id, key, value, { higherIsBetter: higher, profileId: pid(prof), label, fmt });
+        const r = debugTouched ? null : save.record(DEF.id, key, value, { higherIsBetter: higher, profileId: pid(prof), label, fmt });
         records.push({ label, value: shown, isNew: !!(r && r.isNew) });
       };
       rec('best_' + mode, totals[best], 'Best ' + modeName, '{v} strokes', players[best].profile, false, totals[best] + ' (' + toParText(tps[best]) + ')');
@@ -3412,7 +4136,7 @@
       }
       // medals: the first player's round
       const medals = [];
-      const award = id => { if (ctx.awardMedal(id)) medals.push(id); };
+      const award = id => { if (!debugTouched && ctx.awardMedal(id)) medals.push(id); };
       const tp0 = tps[0];
       if (mode === 'beginner' && tp0 <= 0) award('bronze');
       if (mode === 'expert' && tp0 <= 2) award('silver');
@@ -3426,16 +4150,27 @@
         return Math.round(clamp(6 + perf * per, -40, 80));
       };
       const s0 = stats[0];
-      const statsOut = [
-        { label: 'Birdies or better', value: String(s0.birdies + s0.eagles) },
-        { label: 'Pars', value: String(s0.pars) },
-        { label: 'Putts', value: String(s0.putts) },
-      ];
-      if (s0.firN) statsOut.push({ label: 'Fairways', value: s0.fir + '/' + s0.firN });
-      statsOut.push({ label: 'Greens in Reg.', value: s0.gir + '/' + holeList.length });
-      if (s0.drive > 0) statsOut.push({ label: 'Longest Drive', value: Math.round(s0.drive) + ' m' });
-      if (s0.pens) statsOut.push({ label: 'Penalty Strokes', value: String(s0.pens) });
       const solo = players.length === 1;
+      let statsOut;
+      if (solo) {
+        statsOut = [
+          { label: 'Birdies or better', value: String(s0.birdies + s0.eagles) },
+          { label: 'Pars', value: String(s0.pars) },
+          { label: 'Putts', value: String(s0.putts) },
+        ];
+        if (s0.firN) statsOut.push({ label: 'Fairways', value: s0.fir + '/' + s0.firN });
+        statsOut.push({ label: 'Greens in Reg.', value: s0.gir + '/' + holeList.length });
+        if (s0.drive > 0) statsOut.push({ label: 'Longest Drive', value: Math.round(s0.drive) + ' m' });
+        if (s0.pens) statsOut.push({ label: 'Penalty Strokes', value: String(s0.pens) });
+      } else {
+        // hot-seat: everyone's numbers, each labelled with whose they are
+        statsOut = [];
+        players.forEach((pl, i) => {
+          const st = stats[i], nm = pl.profile.name;
+          statsOut.push({ label: nm + ' · birdies+', value: String(st.birdies + st.eagles) });
+          statsOut.push({ label: nm + ' · putts', value: String(st.putts) });
+        });
+      }
       const hio = stats.some(s => s.hio > 0);
       let title;
       if (!solo) {
@@ -3453,7 +4188,7 @@
         headlineLabel: 'Strokes · ' + (tps[solo ? 0 : best] === 0 ? 'even par' : Math.abs(tps[solo ? 0 : best]) + (tps[solo ? 0 : best] < 0 ? ' under par' : ' over par')),
         players: players.map((p, i) => ({
           profileId: p.profile.id, name: p.profile.name, profile: p.profile, score: totals[i] + ' (' + toParText(tps[i]) + ')',
-          place: placeOf(i), isCpu: false, skillDelta: deltaFor(i),
+          place: placeOf(i), isCpu: false, skillDelta: debugTouched ? 0 : deltaFor(i),
         })),
         stats: statsOut,
         records,
@@ -3471,11 +4206,16 @@
       for (let i = 0; i < golfers.length; i++) {
         const G = golfers[i];
         if (!G.pal.root.visible) continue;
-        if (cur && i === cur.p && !swing && (phase === 'aim' || phase === 'setup' || phase === 'turn')) {
+        if (cur && i === cur.p && !swing && !G.reacting && (phase === 'aim' || phase === 'setup' || phase === 'turn')) {
           const top = isPutt() ? ALPHA_PUTT : ALPHA_TOP;
           const target = gest.pull * top;
           G.shown = U.damp(G.shown, target, 22, dt);
           golferPose(G, G.shown, 26);
+        }
+        if (phase === 'holed' && cam.mode === 'cup' && cur && i === cur.p) {
+          // celebrate toward the camera
+          const pr = G.pal.root.position, want = Math.atan2(cam.pos.x - pr.x, cam.pos.z - pr.z);
+          G.pal.setFacing(G.pal.root.rotation.y + wrapA(want - G.pal.root.rotation.y) * (1 - Math.exp(-5 * dt)));
         }
         G.pal.update(dt);
         syncClub(G, dt);
@@ -3487,7 +4227,12 @@
     function updateBallVisual() {
       const camP = camera.position;
       const cd = camP.distanceTo(ball.position);
-      ball.scale.setScalar(clamp(cd / 9, 1, 12));
+      // in flight the ball is drawn bigger and haloed, so it reads as a ball rather than a speck
+      const flying = !!play && !play.putt && !play.landed && ball.visible;
+      const sc = flying ? clamp(cd / 5, 1, 18) : clamp(cd / 9, 1, 12);
+      ball.scale.setScalar(sc);
+      halo.visible = flying;
+      if (flying) { halo.position.copy(ball.position); halo.scale.setScalar(0.036 * sc * 4.2); }
       ballShadow.visible = ball.visible && !!M;
       if (ballShadow.visible) {
         const g = heightAt(M, ball.position.x, ball.position.z);
@@ -3515,6 +4260,9 @@
       updateSlope(dt, t);
       updateFlag(dt, t);
       updateWindDial();
+      // low clouds would blot the overhead map; a core toast (medal) tucks the left column away
+      if (clouds) clouds.visible = cam.mode !== 'map';
+      hud.left.classList.toggle('gf-tuck', !!ui.fx.querySelector('.ss-toast:not(.is-out)'));
       rippleTex.offset.set((t * 0.012) % 1, (t * 0.02) % 1);
       if (play && !play.putt) env.setShadowFocus(ball.position, 40);
     }
@@ -3532,7 +4280,7 @@
       hud.left.classList.add('gf-off');
       setAimUi(false);
       refreshHud();
-      hud.strokeChip.textContent = Math.round(M.L) + ' m';
+      hud.strokeChip.textContent = M.holeLen + ' m';
       updateCamera(0);
     }
 
@@ -3545,9 +4293,12 @@
         run(startHi);
       },
       update,
-      onPause() { aimDir = 0; },
+      onPause() { dropSwing(); },
+      /** A rotation mid-pull would leave the meter at the old size and place: drop the press. */
+      onResize() { dropSwing(); },
       dispose() {
         flowGen++;
+        window.removeEventListener('pointermove', onRawMove, true);
         if (ambience) ambience.stop(0.3);
         if (windLoop) windLoop.stop(0.3);
         ambience = windLoop = null;
@@ -3573,7 +4324,9 @@
           club: cur ? CLUBS[cur.club].id : null,
           aimDeg: cur ? +(wrapA(cur.aim - headingTo(cur.ball.x, cur.ball.z, M.pin.x, M.pin.z)) / DEG).toFixed(1) : null,
           wind: { speed: +wind.speed.toFixed(1), dirDeg: Math.round(wind.dir / DEG) },
-          ring: ringInfo ? { dist: +ringInfo.dist.toFixed(1) } : null,
+          ring: ringInfo && ringInfo.dist != null ? { dist: +ringInfo.dist.toFixed(1), blocked: !!ringInfo.block, wind: ringInfo.ghost ? { x: +ringInfo.ghost.x.toFixed(1), z: +ringInfo.ghost.z.toFixed(1) } : null } : null,
+          debugTouched,
+          pinPower: cur ? +pinPower().toFixed(3) : null,
           scores: cards.map(c => c.slice()), toPar: players.map((p, i) => toParFor(i)),
           camera: cam.mode, map: mapOn, playing: !!play, lastShot, lastOutcome,
         };
@@ -3595,10 +4348,12 @@
         /** Jumps to hole i (0-based index into this mode's holes); earlier holes count as par. */
         skipTo(i) {
           const k = clamp(i | 0, 0, holeList.length - 1);
+          if (k > 0 || started) debugTouched = true;
           players.forEach((p, pi) => holeList.forEach((h, j) => { cards[pi][j] = j < k ? HOLES[h].par : null; }));
           if (!started) { startHi = k; return true; }
           shotWaiter = null; skipWaiter = null; play = null; swing = null; fly = null;
-          press.mode = null; keyCharge = null; showGauge(false); closeMap();
+          press.mode = null; keyCharge = null; showGauge(false); closeMap(); showSkip(false);
+          trail.visible = false; trail.clear(); flyMark.visible = false;
           if (cur) U.killTweens(cur);
           engine.slowmo(1, 0);
           ctx.hud.querySelectorAll('.gf-scwrap, .gf-turnwrap').forEach(n => n.remove());
@@ -3612,7 +4367,8 @@
           if (o.club != null) { const k = typeof o.club === 'number' ? o.club : CLUBS.findIndex(c => c.id === o.club || c.name === o.club); if (k >= 0) ci = k; }
           if (ci !== cur.club) setClub(ci);
           if (o.aimDeg != null) setAim(headingTo(cur.ball.x, cur.ball.z, M.pin.x, M.pin.z) + o.aimDeg * DEG);
-          const power = o.power != null ? o.power : CLUBS[ci].putter ? distToPin() / puttScale(distToPin()) : 1;
+          const pp = pinPower();
+          const power = o.power != null ? o.power : CLUBS[ci].putter ? (pp > 0 && pp <= 1 ? pp : distToPin() / puttScale(distToPin())) : 1;
           return commitShot({ club: ci, aim: cur.aim, power: clamp(power, 0.02, 1.1), flick: (o.accuracy || 0) * DEG, curve: o.curve || 0, tempo: o.tempo == null ? 1 : o.tempo, scale: CLUBS[ci].putter ? puttScale(distToPin()) : undefined });
         },
         /** Moves the current ball (aim phase): { toPin: m } on the line to the pin, or { x, z }. */
@@ -3625,6 +4381,7 @@
             x = M.pin.x + dx * o.toPin; z = M.pin.z + dz * o.toPin;
           }
           if (x == null || z == null) return false;
+          debugTouched = true;
           cur.ball = { x, z, y: 0, surf: surfaceAt(M, x, z) };
           const w = shotWaiter;
           shotWaiter = null;
@@ -3636,7 +4393,11 @@
           return true;
         },
         /** Skips the current flyover / celebration / turn card / scorecard. */
-        skip() { if (skipWaiter) skipWaiter(); return true; },
+        skip() {
+          if (skipWaiter) skipWaiter();
+          ui.fx.querySelectorAll('.ss-titlecard').forEach(n => n.remove());
+          return true;
+        },
         /**
          * Headless tuning stats: plays n holes per quality with the planner + human error, and measures
          * how flick error maps to dispersion. opts: { quality, hole (course hole 1–9) }.
