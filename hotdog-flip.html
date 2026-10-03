@@ -148,6 +148,37 @@ canvas { display: block; width: 100%; height: 100%; }
     o.connect(g).connect(ac.destination); o.start(t); o.stop(t + dur);
   }
 
+  // Beethoven, Symphony No. 9, "Ode to Joy" (public domain), first phrase
+  const NOTE = { G2: 98, C3: 130.81, G3: 196, C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, G4: 392 };
+  const ODE = [['E4', 1], ['E4', 1], ['F4', 1], ['G4', 1], ['G4', 1], ['F4', 1], ['E4', 1], ['D4', 1],
+               ['C4', 1], ['C4', 1], ['D4', 1], ['E4', 1], ['E4', 1.5], ['D4', .5], ['D4', 2]];
+  const ODE_END = [['E4', 1], ['E4', 1], ['F4', 1], ['G4', 1], ['G4', 1], ['F4', 1], ['E4', 1], ['D4', 1],
+                   ['C4', 1], ['C4', 1], ['D4', 1], ['E4', 1], ['D4', 1.5], ['C4', .5], ['C4', 2]];
+  const BASS = [['C3', 4], ['G2', 4], ['C3', 4], ['G2', 2], ['C3', 2]];
+  let odeBus = null, odeCount = 0;
+  function stopOde() {
+    if (!odeBus || !ac) return;
+    const g = odeBus; g.gain.setTargetAtTime(0, ac.currentTime, .08); setTimeout(() => g.disconnect(), 600); odeBus = null;
+  }
+  function tone(bus, f, t, d, type, vol) {
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.value = f;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + .02);
+    g.gain.setValueAtTime(vol * .8, t + d * .7); g.gain.exponentialRampToValueAtTime(.0001, t + d * .98);
+    o.connect(g).connect(bus); o.start(t); o.stop(t + d);
+  }
+  function playOde() {
+    if (!ac) return;
+    stopOde();
+    const bus = ac.createGain(); bus.gain.value = .9; bus.connect(ac.destination); odeBus = bus;
+    // alternate the half-cadence and full-cadence endings round to round
+    const mel = odeCount++ % 2 ? ODE_END : ODE, beat = .26, t0 = ac.currentTime + .05;
+    let t = t0;
+    for (const [n, b] of mel) { tone(bus, NOTE[n], t, b * beat, 'triangle', .16); tone(bus, NOTE[n] * 2, t, b * beat, 'sine', .035); t += b * beat; }
+    t = t0;
+    for (const [n, b] of BASS) { tone(bus, NOTE[n], t, b * beat, 'sine', .12); tone(bus, NOTE[n] * 1.5, t, b * beat, 'sine', .04); t += b * beat; }
+  }
+
   // ---------- targets ----------
   // hw = half width of the landable top, h = height above counter, lvl = first level it can appear
   const KINDS = [
@@ -188,6 +219,9 @@ canvas { display: block; width: 100%; height: 100%; }
   // ---------- state ----------
   let state = 'menu', phase = 'enter', phaseT = 0, time = 0;
   let score = 0, streak = 0, level = 1, lives = 3, landed = 0, throws = 0;
+  const WIN_DUR = 4.6;
+  let resultDur = 1.6, spot = 0, spotOn = false;
+  const notes = [];
   let wind = 0, charge = 0, power = 0, panLift = 0, panRot = 0, lastArc = [], arc = [];
   let dog = null;
   const popups = [], crumbs = [];
@@ -200,7 +234,7 @@ canvas { display: block; width: 100%; height: 100%; }
 
   function reset() {
     score = 0; streak = 0; level = 1; lives = 3; landed = 0; throws = 0; wind = 0;
-    popups.length = 0; crumbs.length = 0; lastArc = []; arc = [];
+    popups.length = 0; crumbs.length = 0; notes.length = 0; spot = 0; spotOn = false; stopOde(); lastArc = []; arc = [];
     target = makeTarget(1); target.enter = 1; nextTarget = null;
     newDog(); updateHud();
   }
@@ -227,8 +261,14 @@ canvas { display: block; width: 100%; height: 100%; }
     blip(180, .12, 'square', .07, 500);
   }
 
+  function winRound() {
+    dog.won = true; spotOn = true;
+    result(true);
+    playOde();
+  }
+
   function result(ok, msg, color) {
-    phase = 'result'; phaseT = 0; lastArc = arc;
+    phase = 'result'; phaseT = 0; lastArc = arc; resultDur = ok ? WIN_DUR : 1.6;
     if (ok) {
       landed++; streak++;
       if (landed % 3 === 0) level++;
@@ -292,7 +332,8 @@ canvas { display: block; width: 100%; height: 100%; }
             const pts = Math.round((100 + acc * 100 + flat * 100) * (1 + streak * .25) * (1 + (level - 1) * .1));
             score += pts;
             const perfect = acc > .75 && flat > .7;
-            result(true, (perfect ? 'PERFECT ' : 'LANDED ') + '+' + pts, perfect ? '#f2c230' : '#e9e1d6');
+            dog.settle = 0; phase = 'settle'; phaseT = 0; lastArc = arc;
+            popup((perfect ? 'PERFECT ' : 'LANDED ') + '+' + pts, perfect ? '#f2c230' : '#e9e1d6');
             blip(660, .08, 'triangle', .1); setTimeout(() => blip(990, .14, 'triangle', .1), 80);
           } else {
             dog.mode = 'tumble'; dog.vy = -Math.abs(dog.vy) * .35; dog.vx = (off >= 0 ? 1 : -1) * 120 + dog.vx * .3; dog.w = (Math.random() < .5 ? -1 : 1) * 9;
@@ -311,15 +352,22 @@ canvas { display: block; width: 100%; height: 100%; }
       const tp = tpos(target, time);
       dog.x = tp.x + dog.att.off; dog.y = tp.top - DOG_T / 2;
       dog.a += (dog.att.a - dog.a) * Math.min(1, dt * 12);
+      if (!dog.won) { dog.settle += dt; if (dog.settle > .45) winRound(); }
     }
+    if (spotOn) spot = Math.min(1, spot + dt * 3); else spot = Math.max(0, spot - dt * 2.5);
+    if (spot > .5 && Math.random() < dt * 6) {
+      const tp = tpos(target, time);
+      notes.push({ x: tp.x + (Math.random() - .5) * 80, y: tp.top - 10, vx: (Math.random() - .5) * 30, life: 1.6, g: Math.random() < .5 ? '\u266A' : '\u266B' });
+    }
+    for (let i = notes.length - 1; i >= 0; i--) { const n = notes[i]; n.life -= dt; n.y -= 50 * dt; n.x += n.vx * dt + Math.sin(time * 4 + i) * .4; if (n.life <= 0) notes.splice(i, 1); }
 
     if (phase === 'result') {
       if (phaseT > 1.1 && lives <= 0) return gameOver();
-      if (nextTarget && phaseT > 1.0 && target.leaving == null) target.leaving = 0;
+      if (nextTarget && phaseT > resultDur - .6 && target.leaving == null) { target.leaving = 0; spotOn = false; }
       if (target.leaving != null) {
         target.leaving += dt * 1.8; target.bx += 900 * dt;
       }
-      if (phaseT > 1.6) {
+      if (phaseT > resultDur) {
         if (nextTarget) { target = nextTarget; nextTarget = null; }
         newDog();
       }
@@ -501,13 +549,42 @@ canvas { display: block; width: 100%; height: 100%; }
     for (const [x, y] of pts) { ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill(); }
   }
 
+  function drawSpotlight() {
+    const tp = tpos(target, time), hw = target.hw;
+    const x0 = -OX / S - 40, x1 = (W - OX) / S + 40, y0 = -OY / S - 40, y1 = (H - OY) / S + 40;
+    ctx.fillStyle = `rgba(0,0,0,${.62 * spot})`; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const sx = tp.x - 60, wide = hw + 70;
+    const g = ctx.createLinearGradient(0, y0, 0, COUNTER);
+    g.addColorStop(0, `rgba(255,244,210,${.05 * spot})`); g.addColorStop(1, `rgba(255,236,190,${.28 * spot})`);
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.moveTo(sx - 22, y0); ctx.lineTo(sx + 22, y0); ctx.lineTo(tp.x + wide, COUNTER); ctx.lineTo(tp.x - wide, COUNTER); ctx.closePath(); ctx.fill();
+    const pool = ctx.createRadialGradient(tp.x, COUNTER, 4, tp.x, COUNTER, wide * 1.2);
+    pool.addColorStop(0, `rgba(255,240,200,${.35 * spot})`); pool.addColorStop(1, 'rgba(255,240,200,0)');
+    ctx.fillStyle = pool; ctx.beginPath(); ctx.ellipse(tp.x, COUNTER + 2, wide * 1.2, 16, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
   function draw(t) {
     drawBackground(t);
     if (phase !== 'flight') drawArc(lastArc, 'rgba(233,225,214,.22)');
+    drawPan();
+    if (spot > 0) drawSpotlight();
     drawTarget(target);
     if (nextTarget && nextTarget.enter > 0) drawTarget(nextTarget);
-    drawPan();
     drawDog(dog);
+    ctx.textAlign = 'center'; ctx.font = '22px serif';
+    for (const n of notes) { ctx.globalAlpha = Math.min(1, n.life) * spot; ctx.fillStyle = '#f2c230'; ctx.fillText(n.g, n.x, n.y); }
+    ctx.globalAlpha = 1;
+    if (spot > 0) {
+      ctx.globalAlpha = spot;
+      ctx.font = '40px "Rammetto One", "Arial Black", sans-serif'; ctx.lineWidth = 8; ctx.lineJoin = 'round'; ctx.strokeStyle = '#000';
+      ctx.strokeText('ROUND WON', 500, 90); ctx.fillStyle = '#f2c230'; ctx.fillText('ROUND WON', 500, 90);
+      ctx.font = '700 13px "Chivo Mono", monospace'; ctx.fillStyle = '#e9e1d6';
+      ctx.fillText('NOW PLAYING: BEETHOVEN, ODE TO JOY', 500, 118);
+      ctx.globalAlpha = 1;
+    }
     for (const c of crumbs) { ctx.fillStyle = c.c; ctx.fillRect(c.x, c.y, 4, 4); }
     ctx.textAlign = 'center';
     for (const p of popups) {
