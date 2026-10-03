@@ -55,7 +55,7 @@
         { gesture: 'tap', text: 'Tap to toss, then swipe up to serve' },
       ],
       tips: [
-        'Swipe toward where you want the ball to go.',
+        'Angle a well-timed swipe at the open court for a winner.',
         'Swipe faster for a harder shot. Only perfect timing keeps a big hit in.',
         'Your Pal runs to the ball for you — just focus on timing.',
         'Swipe up for topspin, down for a slice. A long, slow push up lobs.',
@@ -64,8 +64,8 @@
     medals: [
       { id: 'bronze', name: 'Bronze', desc: 'Win a Quick Match or a Match' },
       { id: 'silver', name: 'Silver', desc: 'Win a Match against a Pro' },
-      { id: 'gold', name: 'Gold', desc: 'Reach a 30-hit rally in Rally Challenge' },
-      { id: 'platinum', name: 'Platinum', desc: 'Win a Match against Odessa without losing a game' },
+      { id: 'gold', name: 'Gold', desc: 'Win a Match against a Legend' },
+      { id: 'platinum', name: 'Platinum', desc: 'Reach a 30-hit rally in Rally Challenge' },
     ],
     create,
   };
@@ -95,27 +95,45 @@
    * Reach shrinks against pace (launch speed, m/s) — but mostly when the ball is also wide (the run to
    * it is long): a hard ball hit straight at someone comes back; a hard, well-placed drive gets past.
    */
-  const reachVs = plan => REACH - 0.022 * Math.max(0, (plan.launch || 0) - 24) * (0.25 + 0.75 * smooth(1.2, 3.2, plan.run || 0));
+  const reachVs = plan => REACH - 0.022 * Math.max(0, (plan.launch || 0) - 24) * (0.25 + 0.75 * smooth(1.2, 3.2, plan.run || 0)) - WIDE_PEN * (plan.wideAway || 0);
+  /**
+   * Placement pays: the CPU loses reach on a ball that lands wide (|x| past WIDE_X) on the side away
+   * from where it stood when you hit, or either side when it stood in the middle — it had to guess.
+   */
+  const WIDE_X = 2.3, WIDE_PEN = 0.35;
+  // A cleanly timed, clearly angled swipe (|aimX| past ~0.35, i.e. ~20°+ off vertical) goes for the open
+  // court: up to ANGLE_X[0] + ANGLE_X[1]·q m wider than the plain aim, ANGLE_SHORT m shorter so it stays
+  // in, and ANGLE_SX less sideways spray (a 45° swipe met perfectly lands ~2.9 m out from the centre).
+  const ANGLE_X = [0.2, 0.3], ANGLE_SHORT = 1.5, ANGLE_SX = 0.4;
   const LAUNCH_SLACK = 0.5;             // a ball met early/late leaves from at most this far off the sweet spot
   const RACKET_LEN = 0.47;              // grip → sweet spot
 
   // Swipe pace: peak finger speed in short sides per second (short side capped so desktop mice
-  // aren't penalised) → 0..1. ~1 px/ms on a phone is a relaxed swing, ~3 px/ms a hard flick.
-  const PACE_SIDE_MAX = 500, PACE_NS0 = 1.0, PACE_NS1 = 6.5;
+  // aren't penalised) → 0..1. On a phone ~1 px/ms is a relaxed swing, an everyday 2–2.5 px/ms flick
+  // reads ~0.5 (the safe zone), and only a deliberate ~3+ px/ms snap crosses into power (> 0.78).
+  const PACE_SIDE_MAX = 500, PACE_NS0 = 1.0, PACE_NS1 = 10;
+  const POWER_PACE = 0.78;              // a swipe above this pace is a power shot (big pace, big risk)
+  const HEAT_ANGLE_FROM = 8;            // shots: from here on the CPU widens its angles a little more each shot
   const HEAT_VH_MAX = 33;               // m/s: rally heat never pushes a shot past this pace
   const LOB_VY_MAX = 13;                // m/s: a lob peaks at most ~9 m up
-  const LOB_PACE = 0.08, LOB_LEN = 0.15;   // lob: a push up slower than this pace that travels at least this far (short sides)
+  // lob: a push up slower than this pace, travelling at least this far (short sides) for at least this
+  // long (s) — a frame hitch that bunches a brisk swipe's samples can't pass for one
+  const LOB_PACE = 0.08, LOB_LEN = 0.15, LOB_DUR = 0.2;
   // A swipe still in progress when the racket meets the ball keeps being read for this long (real ms)
   // after contact; the shot is then finalised from the whole gesture (see finalizeStroke).
   const FINAL_MS = 110;
 
   // Serve
   const TOSS_FROM = 1.3, TOSS_APEX = 2.45, TOSS_HIGH = 2.9;
-  const RING_LEAD = 0.35;               // s: the serve timing ring closes onto the ball over this long
+  const RING_LEAD = 0.35;               // s: the timing ring closes onto the ball over this long
+  const STROKE_RING_SWINGS = 15;        // groundstrokes get the ring for this many swings a session (all along while learning)
   const SERVE_PERFECT = 0.05, SERVE_GOOD = 0.14, SERVE_EDGE = 0.26;
+  const SERVE_IGNORE = 0.3;             // s: a serve swipe further than this before the apex doesn't count
 
+  const PRO_SKILL = 0.5, LEGEND_SKILL = 0.92;   // the roster's 'Pro' and 'Legend' titles (silver / gold medals)
   const NAMES = ['LOVE', '15', '30', '40'];
-  const LONG_RALLY = 12;                 // shots: a point this long earns the NICE RALLY call
+  const LONG_RALLY = 16;                 // shots: a point this long earns the NICE RALLY call (~1 point in 8)
+  const EPIC_RALLY = 22;                 // shots: ...and a win this long gets the close-up even off an error
   const BOARD_PTS = ['0', '15', '30', '40'];
 
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -377,8 +395,8 @@
     const smash = info.kind === 'oh';
     // A lob is a deliberate gesture: a slow, unhurried push straight up that keeps going (a short,
     // careful upward nudge stays a soft topspin rally ball).
-    const lob = !smash && uy > 0.8 && p < LOB_PACE && (input.len == null || input.len >= LOB_LEN);
-    let spin, vh, depth, tx;
+    const lob = !smash && uy > 0.8 && p < LOB_PACE && (input.len == null || input.len >= LOB_LEN) && (input.dur == null || input.dur >= LOB_DUR);
+    let spin, vh, depth, tx, ang = 0;
     if (smash) {
       spin = 0.1; vh = 25 + 9 * p; depth = 8.4 + 1.2 * q;
       tx = sgn * tn * 1.4 + aimX * 2.4;
@@ -396,7 +414,11 @@
       // the slice is a low, short set-up ball, not a safe deep one
       // only a perfectly timed ball goes for the deep corners; a merely good one stays safer
       depth = Math.min(lerp(6.0, 9.9, q) + 0.6 * p, tier === 'perfect' ? 10.6 : 9.3) - (spin < 0 ? 1.5 : 0);
-      tx = sgn * tn * 1.8 + aimX * (1.5 + 1.5 * q);
+      // a cleanly timed, clearly angled swipe goes for the open court: sharper and a touch shorter
+      // so it stays in (a scrappy one just sprays)
+      ang = tier === 'perfect' || tier === 'good' ? smooth(0.35, 0.75, Math.abs(aimX)) : 0;
+      tx = sgn * tn * 1.8 + aimX * (1.8 + 1.6 * q) + Math.sign(aimX) * ang * (ANGLE_X[0] + ANGLE_X[1] * q);
+      depth -= ANGLE_SHORT * ang * Math.abs(aimX);
     }
     // Power is a gamble: the harder the swipe, the more it sprays — a little even when perfect, a lot
     // when merely good, and fast balls are harder to keep from sailing long.
@@ -406,8 +428,9 @@
     let sz = (0.45 + 1.5 * (1 - q)) * (1 + 2.4 * risk) + 0.03 * Math.max(0, vh - 28);
     let svy = 0.12 + 0.55 * (1 - q) + 1.0 * risk + (spin < 0 ? 0.3 : 0);   // a slice skims the tape
     if (frame) { vh *= 0.72; sx += 1.0; svy += 0.9; }
+    sx *= 1 - ANGLE_SX * ang;
     sx *= 1 + 0.6 * info.stretch; sz *= 1 + 0.5 * info.stretch;
-    const txCap = tier === 'perfect' ? 3.7 : 2.9 + 0.3 * q;
+    const txCap = tier === 'perfect' ? 3.7 + 0.2 * ang : 2.9 + 0.3 * q + 0.6 * ang;
     return {
       tier, q, tx: clamp(tx, -txCap, txCap), depth, vh, spin, sx, sz, svy, frame, lob, smash, pace: p,
       minClear: lob ? 1.5 : spin < 0 ? 0.15 : 0.28 + 0.45 * (1 - p),
@@ -422,7 +445,7 @@
       const spread = Math.min(3.3, 0.6 + 0.09 * info.streak);
       return {
         tier, q: 1, tx: clamp(info.playerX * 0.35 + rng.range(-spread, spread), -3.5, 3.5),
-        depth: 8.0 + rng.range(-0.6, 0.8), vh: Math.min(27, 14.5 + 0.42 * info.streak), spin: 0.55,
+        depth: 8.0 + rng.range(-0.6, 0.8), vh: Math.min(27.5, 16.5 + 0.45 * info.streak), spin: 0.55,
         minClear: 0.45, sx: 0.12, sz: 0.25, svy: 0.05, frame: false, lob: false, smash: false, tactic: 'feed', pace: 0.4,
       };
     }
@@ -434,6 +457,8 @@
     const defensive = info.stretch > 0.45 || (info.contactY < 0.45 && !sliceSitter);
     const playerNet = info.playerZabs < 8;
     const shortBall = info.contactZabs < 9.5 || sliceSitter;
+    // a slow ball down the middle invites an attack: pushing it back safely gets punished
+    const pushed = (info.inSpeed || 99) < 20 && Math.abs(info.cpuX || 0) < 1.4 && !defensive;
     // pulled in by a short ball while you're still scrambling back: a lob over your head
     const lobChance = (defensive ? 0.3 + 0.2 * skill : 0) + (info.contactZabs < 10 && info.playerRecovering ? 0.12 + 0.12 * skill : 0);
     const px = info.playerX, openSide = Math.abs(px) > 0.8 ? -Math.sign(px) : (rng.chance(0.5) ? 1 : -1);
@@ -454,7 +479,7 @@
       tactic = 'lob'; tx = rng.range(-2.2, 2.2); depth = 9.7; vh = 10.5 + 2 * skill; spin = 0.4;
     } else if (skill > 0.4 && rng.chance(info.playerZabs > 12.9 ? 0.2 : info.contactZabs < 10 ? 0.1 : 0.03)) {
       tactic = 'drop'; tx = rng.range(-2.6, 2.6); depth = 4.3; vh = 11.5; spin = -0.6;
-    } else if (rng.chance(clamp(0.1 + 0.42 * skill + (shortBall ? 0.25 : 0) - (defensive ? 0.3 : 0) - (rushed ? 0.25 : 0) - (deep ? 0.2 : 0) + Math.min(0.4, 0.05 * Math.max(0, (info.shots || 0) - 3)), 0, 0.9))) {
+    } else if (rng.chance(clamp(0.1 + 0.42 * skill + (shortBall ? 0.25 : 0) + (pushed ? 0.15 + 0.1 * skill : 0) - (defensive ? 0.3 : 0) - (rushed ? 0.25 : 0) - (deep ? 0.2 : 0) + Math.min(0.4, 0.05 * Math.max(0, (info.shots || 0) - 3)), 0, 0.9))) {
       tactic = 'attack'; depth = 8.8 + 0.9 * skill; vh = 20 + 9 * skill + (sitter ? 3 : 0); spin = 0.6;
       tx = openSide * (sitter ? rng.range(2.6, 3.0 + 0.4 * skill) : rng.range(2.2, 2.7 + 0.5 * skill));
     } else {
@@ -467,7 +492,8 @@
     const frame = tier === 'edge';
     // pace you can barely handle sprays a reply (a top player absorbs most of it)
     const rush = 1 + 2 * (1 - 0.6 * skill) * clamp(((info.inLaunch || 0) - 27) / 12, 0, 1.3);
-    let sx = (0.3 + 1.3 * (1 - q)) * em * (attack ? 1.25 : block ? 0.7 : 1) * rush;
+    // (a ball that sat up — slow, or pushed down the middle — is attacked cleanly)
+    let sx = (0.3 + 1.3 * (1 - q)) * em * (attack ? (sitter || pushed ? 1.0 : 1.25) : block ? 0.7 : 1) * rush;
     let sz = (0.45 + 1.5 * (1 - q)) * em * rush;
     let svy = ((0.1 + 0.5 * (1 - q)) * em + (attack ? 0.15 : 0)) * rush;
     if (frame) { vh *= 0.72; sx += 1.0; svy += 0.9; }
@@ -499,12 +525,16 @@
   const playerPressureSd = (sd, plan) => sd * (1 + 0.04 * pressure(plan)) + (plan.deficit > -0.4 ? 0.015 : 0);
 
   /**
-   * Rally heat: from the 3rd shot the CPU hits a little harder each time, so long rallies build to a
+   * Rally heat: from its 2nd shot the CPU hits a little harder each time, so long rallies build to a
    * finish (your own pace is always yours: it comes from your swipe).
    */
   function applyHeat(it, shots) {
     if (it.lob || it.tactic === 'drop' || it.tactic === 'feed') return it;
-    it.vh = Math.min(it.vh * (1 + Math.min(0.5, Math.max(0, shots - 2) * 0.08)), Math.max(it.vh, HEAT_VH_MAX));
+    it.vh = Math.min(it.vh * (1 + Math.min(0.5, Math.max(0, shots - 1) * 0.075)), Math.max(it.vh, HEAT_VH_MAX));
+    // ...and past HEAT_ANGLE_FROM shots it starts going for the lines, so a long rally builds to a finish
+    // (a winner or an error) instead of grinding on
+    const late = Math.max(0, shots - HEAT_ANGLE_FROM);
+    if (late && it.tactic !== 'smash') it.tx = clamp(it.tx * (1 + Math.min(0.5, 0.1 * late)), -3.9, 3.9);
     return it;
   }
 
@@ -513,7 +543,7 @@
    * become scrappy frame shots rather than air swings.
    */
   function cpuStrokeErr(skill, plan, rng, feeder, shots) {
-    let err = gauss(rng) * (feeder ? 0.012 : cpuPressureSd(skill, plan) + Math.min(0.04, 0.003 * Math.max(0, (shots || 0) - 7)));
+    let err = gauss(rng) * (feeder ? 0.012 : cpuPressureSd(skill, plan) + Math.min(0.03, 0.001 * Math.max(0, (shots || 0) - 7)));
     if (timingTier(err) === 'whiff' && Math.abs(err) < 2 * T_EARLY_MAX && rng.chance(0.7)) {
       err = Math.sign(err) * rng.range(T_GOOD + 0.005, (err < 0 ? T_EARLY_MAX : T_LATE_MAX) - 0.005);
     }
@@ -584,6 +614,7 @@
     if (blocked || !first || sideOfZ(first.z) !== st.idx) return { ok: false, leave: true };
     const margin = opts && opts.serve ? boxMargin(first.x, first.z, opts.serve.boxSign, st.idx) : courtMargin(first.x, first.z);
     const bounce = { x: first.x, z: first.z, t: t0 + first.t, margin };
+    const wideAway = st.idx === 1 && !(opts && opts.serve) && (first.x * st.x <= 0.3 || Math.abs(st.x) < 0.6) ? Math.max(0, Math.abs(first.x) - WIDE_X) : 0;
     if (margin < -0.25) return { ok: false, leave: true, bounce };
 
     let best = null, bestScore = -Infinity, fallback = null, fallbackDef = Infinity;
@@ -620,7 +651,7 @@
     const launch = P.length >= 8 ? Math.hypot(P[5] - P[1], P[6] - P[2], P[7] - P[3]) / (P[4] - P[0]) : speed;
     return {
       ok: true, leave: false, t: t0 + c.t, kind: c.kind, cx: c.x, cy: c.y, cz: c.z, sx: c.sx, sz: c.sz,
-      deficit: best ? c.dist - c.reach : fallbackDef, reachable: !!best, run: c.dist, bounce, speed, launch, serve: !!(opts && opts.serve), used: false,
+      deficit: best ? c.dist - c.reach : fallbackDef, reachable: !!best, run: c.dist, bounce, speed, launch, serve: !!(opts && opts.serve), used: false, wideAway,
     };
   }
 
@@ -817,12 +848,12 @@
       const far = world.stands(scene, { x: 0, z: -WALL_Z - 0.5, width: 24, rows: 5, rise: 0.45, depth: 0.85, facing: 0, color: 0x8E5BE0 });
       standRows.push(...far.userData.rows);
       for (const s of [-1, 1]) {
-        const st = world.stands(scene, { x: s * (WALL_X + 0.5), z: -1.5, width: 30, rows: 4, rise: 0.45, depth: 0.85, facing: -s * Math.PI / 2, color: 0x1FA2FF });
+        const st = world.stands(scene, { x: s * (WALL_X + 0.5), z: -1.5, width: 30, rows: 4, rise: 0.45, depth: 0.85, facing: -s * Math.PI / 2, color: 0x2C6FB8 });
         standRows.push(...st.userData.rows);
       }
     }
     // (a thinner crowd below 'high': it is most of the frame's triangles)
-    const crowd = world.crowd(scene, { rows: standRows, density: engine.quality === 'high' ? 0.42 : 0.3, spacing: 0.8, seed: ctx.seed });
+    const crowd = world.crowd(scene, { rows: standRows, density: engine.quality === 'high' ? 0.42 : engine.quality === 'medium' ? 0.26 : 0.2, spacing: 0.8, seed: ctx.seed });
 
     // Bounce marks (pool) + landing hint ring
     const marks = [];
@@ -933,6 +964,7 @@
         axis: new V3(IDLE_AXIS[0] * hand, IDLE_AXIS[1], IDLE_AXIS[2]).normalize(), poseOn: false,
       };
       a.place = (x, z, yaw) => {
+        endDive(a);
         a.pos.set(x, 0, z); a.vx = a.vz = 0; a.tx = x; a.tz = z; a.faceYaw = null; a.hero = false;
         a.yaw = yaw == null ? netYaw : yaw; pal.setFacing(a.yaw);
       };
@@ -969,6 +1001,7 @@
     umpire.root.position.set(-(POST_X + 1.15), 1.52, 0);
     umpire.setFacing(Math.PI / 2 - 0.44);
     scene.add(umpire.root);
+    let umpCap = null;            // ours, not the Pal's: disposed with the rackets
     {
       const crown = new THREE.SphereGeometry(0.255, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
       crown.scale(1, 0.72, 1);
@@ -978,6 +1011,7 @@
       const cap = new THREE.Mesh(world.mergeGeometries([world.paint(crown, 0xFFFFFF), world.paint(peak, 0x8E5BE0)]),
         world.mat(0xffffff, { vertexColors: true, kind: 'phong', shininess: 40 }));
       umpire.parts.head.add(cap);
+      umpCap = cap;
     }
 
     // Pose evaluation ------------------------------------------------------------------------------
@@ -1030,6 +1064,20 @@
         P = keyPose(KEYS[a.prep.kind].prep, null, _pc);
         lambda = 10;
       }
+      const dv = a.dive;
+      if (dv && !P) {
+        // diving without a swing: both hands reach out toward the ball
+        P = keyPose(KEYS.fh.hit, null, _pc);
+        P.r[0] = dv.sl * 0.72 * a.hand; P.r[1] = 1.0; P.r[2] = 0.3;
+        P.l[0] = dv.sl * 0.36 * a.hand; P.l[1] = 0.95; P.l[2] = 0.38;
+        P.ax[0] = dv.sl * 0.9 * a.hand; P.ax[1] = 0.35; P.ax[2] = 0.25;
+        P.tw = dv.sl * 0.35 * a.hand; lambda = 24;
+      }
+      if (P && dv) {
+        const k = dv.w;                              // stretched out: low, long and leaning in
+        P.cr = lerp(P.cr, dv.kind === 'dive' ? 0.4 : 0.85, k);
+        P.lean = lerp(P.lean, dv.kind === 'dive' ? 0.55 : 0.4, k);
+      }
       if (P) {
         applyPose(a, P, lambda);
         a.poseOn = true;
@@ -1062,7 +1110,76 @@
       a.pos.x += a.vx * dt; a.pos.z += a.vz * dt;
     }
 
+    // Lunges & dives ---------------------------------------------------------------------------------
+    // A ball just within reach is met with a low lunge; one just out of reach gets a full dive: the
+    // Pal rolls onto its side toward the ball (root roll about its own forward axis), slides, sprawls,
+    // and gets back up. Both are visual: reach is still judged by the planner's rule.
+    const DIVE_MAX = 1.8;                  // m: further out of reach than this, the Pal just watches it go
+    const LUNGE_DIST = 0.42;               // m: a racket stretched further than this from the stand spot lunges
+    function startDive(a, plan, kind) {
+      if (a.dive || a.hero) return;
+      const dx = plan.cx - a.pos.x, dz = plan.cz - a.pos.z, d = Math.hypot(dx, dz) || 1;
+      // which side of the Pal the ball is on (Pal-local +x is its left)
+      const lx = Math.cos(a.yaw), lz = -Math.sin(a.yaw);
+      const sl = (dx * lx + dz * lz) >= 0 ? 1 : -1;
+      a.dive = { kind, t: 0, w: 0, sl, ux: dx / d, uz: dz / d, slid: 0, after: null, landed: false,
+        dur: kind === 'dive' ? 1.35 : 0.7, slide: kind === 'dive' ? clamp(0.35 + 0.3 * (plan.reachGap || 0), 0.4, 0.8) : 0 };
+      if (kind === 'dive') {
+        a.frozen = true;
+        a.busy = true; a.loop = null; a.pal.play('idle_ready');
+        a.pal.setExpression('surprised', 1.0);
+        audio.sfx('whoosh', { intensity: 0.6, pan: clamp(a.pos.x / 8, -0.8, 0.8), vol: a.idx === 0 ? 0.9 : 0.6 });
+        audio.sfx('voice_hup', { vol: a.idx === 0 ? 0.7 : 0.45, rate: 1.15 });
+      } else {
+        a.pal.setExpression('focus', 0.8);
+      }
+    }
+    function endDive(a) {
+      if (!a.dive) return;
+      a.dive = null;
+      a.pal.root.rotation.z = 0;
+      a.pal.root.position.y = 0;
+    }
+    function updateDive(a, dt) {
+      const dv = a.dive;
+      if (!dv) return;
+      dv.t += dt;
+      const t = dv.t;
+      let roll, lift = 0;
+      if (dv.kind === 'dive') {
+        // take-off 0–0.3 s · sprawl to 0.9 s · up by 1.35 s
+        roll = t < 0.3 ? U.ease.outQuad(t / 0.3) : t < 0.9 ? 1 : 1 - U.ease.inOutQuad(clamp((t - 0.9) / 0.45, 0, 1));
+        lift = t < 0.3 ? Math.sin(Math.PI * t / 0.3) * 0.16 : 0;
+        const want = dv.slide * U.ease.inOutQuad(clamp(t / 0.45, 0, 1)), step = want - dv.slid;
+        dv.slid = want;
+        a.pos.x = clamp(a.pos.x + dv.ux * step, -WALL_X + 0.4, WALL_X - 0.4);
+        a.pos.z += dv.uz * step;
+        if (!dv.landed && t >= 0.3) {
+          dv.landed = true;
+          world.burst(scene, new V3(a.pos.x + dv.ux * 0.4, 0.05, a.pos.z + dv.uz * 0.4), { count: 14, colors: [0xD8E8F8, 0xFFFFFF, 0xB9D3EE], speed: 1.6, size: 0.07, gravity: -3, life: 0.6 });
+          audio.sfx('thud', { vol: a.idx === 0 ? 0.6 : 0.4 });
+          a.pal.setExpression('wince', 1.2);
+        }
+        dv.w = roll;
+        a.pal.root.rotation.z = -dv.sl * 1.12 * roll;
+      } else {
+        roll = t < 0.14 ? U.ease.outQuad(t / 0.14) : t < 0.42 ? 1 : 1 - U.ease.inOutQuad(clamp((t - 0.42) / 0.28, 0, 1));
+        dv.w = roll;
+        a.pal.root.rotation.z = -dv.sl * 0.3 * roll;
+      }
+      a.pal.root.position.y = 0.035 * dv.w + lift;
+      if (t >= dv.dur) {
+        const after = dv.after, wasDive = dv.kind === 'dive';
+        endDive(a);
+        // back on its feet: free to run again unless the point is already over (a diver that got the
+        // ball back plays on)
+        if (wasDive) { a.busy = false; a.loop = null; a.frozen = pt.decided || phase !== 'play'; }
+        if (after) a.oneShot(after, 'sad');
+      }
+    }
+
     function updateAthlete(a, dt) {
+      updateDive(a, dt);
       const sp = Math.hypot(a.vx, a.vz);
       // Facing: the net, leaning into lateral runs.
       let yawT = a.faceYaw != null ? a.faceYaw : a.netYaw;
@@ -1086,8 +1203,9 @@
     // Camera rig: solved framing per aspect + gentle lateral follow + short hero shots
     // =============================================================================================
 
+    const LEAN_IN = 2.2, LEAN_IN_TALL = 0.8;   // m the camera leans toward your Pal for an incoming ball (portrait: the far court is tight)
     const camRig = {
-      aspect: -1, dirty: true, pos: new V3(), pitch: 0, follow: 0, zf: 0, push: 0,
+      aspect: -1, dirty: true, pos: new V3(), pitch: 0, follow: 0, zf: 0, push: 0, lean: 0,
       shot: null, w: 0, lastReal: -1, memo: new Map(), baseFov: 40,
     };
     const _cp = new V3(), _ce = new THREE.Euler(), _cq = new THREE.Quaternion(), _cf = new V3(), _cl = new V3(), _cr = new V3();
@@ -1104,8 +1222,8 @@
         // (the camera eases back when it plays from deeper), so the far half reads bigger
         P.push([-4.4, 0, HALF_L - 2.5], [4.4, 0, HALF_L - 2.5], [-1.6, 0, HALF_L + 0.9], [1.6, 0, HALF_L + 0.9], [-1.6, 1.5, HALF_L + 0.9], [1.6, 1.5, HALF_L + 0.9]);
       } else {
-        // landscape: the near Pal may crop at the knees, so the far half can be framed bigger
-        P.push([-4.7, 0, HALF_L], [4.7, 0, HALF_L], [-1.6, 0.5, HALF_L + 1.6], [1.6, 0.5, HALF_L + 1.6]);
+        // landscape: the near alleys may crop; your Pal stays in head to toe
+        P.push([-4.4, 0, HALF_L - 1.5], [4.4, 0, HALF_L - 1.5], [-1.6, 0, HALF_L + 1.2], [1.6, 0, HALF_L + 1.2], [-1.6, 1.5, HALF_L + 1.2], [1.6, 1.5, HALF_L + 1.2]);
       }
       return P;
     }
@@ -1124,7 +1242,6 @@
       hudTop.className = wide ? 'ss-hud-tr' : 'ss-hud-top';
       hudBottom.className = (wide ? 'ss-hud-bl' : 'ss-hud-bottom') + ' tn-bottom';   // wide: chips out of your Pal's way
       skipChip.classList.toggle('low', wide);
-      tbar.classList.toggle('dock', engine.size.h <= 520);
       const t = clamp((aspect - 0.5) / (1.6 - 0.5), 0, 1);
       // A longish lens: flatter perspective keeps the far half (where the CPU plays) and both Pals readable.
       const vFov = aspect > 1.6 ? 25 : lerp(44, 32, t);
@@ -1161,15 +1278,25 @@
         }
         return true;
       };
+      // ...and rewards a bigger near Pal (your swing is the payoff of the gesture): its on-screen
+      // height, as a fraction of the viewport, counts up to a target. In landscape that pulls the
+      // camera lower and closer (a Wii-style view: big you, the far court foreshortened but wider).
+      const palTarget = wide ? 0.2 : 0.11;
+      const palFrac = (h, z, sp, cp) => {
+        const dz = HALF_L + 0.7 - z;
+        const yAt = y => { const dy = y - h, depth = -dy * sp - dz * cp; return (dy * cp - dz * sp) / (depth * tv); };
+        return (yAt(1.45) - yAt(0)) / 2;
+      };
       let best = null, bestScore = Infinity;
-      const pitchLo = prefPitch - 6, pitchHi = prefPitch + (aspect < 0.8 ? 14 : aspect > 1.6 ? 20 : 9);
+      const pitchLo = prefPitch - (wide ? 9 : 6), pitchHi = prefPitch + (aspect < 0.8 ? 14 : aspect > 1.6 ? 20 : 9);
       const search = (p0, p1, pStep, h0, h1, hStep, zStep) => {
         for (let pd = p0; pd <= p1 + 1e-6; pd += pStep) {
           const pitch = pd * Math.PI / 180, sp = Math.sin(pitch), cp = Math.cos(pitch);
           for (let h = Math.max(2, h0); h <= h1 + 1e-6; h += hStep) {
             for (let z = HALF_L; z <= HALF_L + 40; z += zStep) {
               if (!fits(h, z, sp, cp)) continue;
-              const score = -area(h, z, sp, cp) * (1 - (aspect > 1.6 ? 0.008 : 0.025) * Math.abs(pd - prefPitch));
+              const score = -area(h, z, sp, cp) * (1 - (aspect > 1.6 ? 0.008 : 0.025) * Math.abs(pd - prefPitch)) *
+                (1 + Math.min(1, palFrac(h, z, sp, cp) / palTarget));
               if (score < bestScore) { bestScore = score; best = [h, z, pitch, pd]; }
               break;
             }
@@ -1261,10 +1388,19 @@
       camRig.follow = U.damp(camRig.follow, clamp(player.pos.x, -6, 6) * 0.38, 2.5, rdt);
       camRig.zf = U.damp(camRig.zf, Math.max(0, player.pos.z - (camRig.aspect > 1.6 ? 12.6 : 13.2)) * (camRig.aspect > 1.6 ? 1 : 0.7), 2.5, rdt);
       camRig.push = U.damp(camRig.push, 0, 1.5, rdt);
+      // lean-in: while a ball is on its way to you the camera eases toward your Pal along its line of
+      // sight (so the Pal stays put on screen and grows), and eases back once you've swung
+      const p = player.plan;
+      const incoming = phase === 'play' && pt.hitter === 1 && !pt.decided && ball.live && ball.z > 0 && p && p.ok && !p.leave && !p.used;
+      camRig.lean = U.damp(camRig.lean, incoming ? 1 : 0, incoming ? 2.6 : 2, rdt);
       _ce.set(-camRig.pitch, 0, 0);
       _cq.setFromEuler(_ce);
       _cf.set(0, 0, -1).applyQuaternion(_cq);
       _cp.copy(camRig.pos); _cp.x += camRig.follow; _cp.z += camRig.zf;
+      if (camRig.lean > 1e-3) {
+        _cl.set(player.pos.x, 0.8, player.pos.z).sub(_cp);
+        _cp.addScaledVector(_cl, camRig.lean * (camRig.aspect > 1.15 ? LEAN_IN : LEAN_IN_TALL) / _cl.length());
+      }
       _cp.addScaledVector(_cf, camRig.push * 2.2);              // big-moment push-in
       const sh = camRig.shot;
       if (sh) {
@@ -1328,11 +1464,14 @@
       '.tn-skip.low{bottom:calc(var(--sab) + 14px)}',
       '.tn-tbar{position:absolute;left:0;top:0;width:132px;margin-left:-66px;pointer-events:none;opacity:0;transition:opacity .2s}',
       '.tn-tbar.on{opacity:1}',
-      '.tn-tbar.dock{left:auto;top:auto;right:calc(var(--sar) + 16px);bottom:calc(var(--sab) + 14px);margin-left:0;transform:none!important}',
       '.tn-tbar .tr{position:relative;height:8px;border-radius:4px;box-shadow:0 1px 3px rgba(10,30,60,.35);background:linear-gradient(90deg,#FF8A3D 0 20.6%,#fff 20.6% 36.8%,#FFC93C 36.8% 63.2%,#fff 63.2% 79.4%,#FF8A3D 79.4%)}',
       '.tn-tbar .mk{position:absolute;top:-5px;width:5px;height:18px;margin-left:-2.5px;border-radius:3px;background:#2F3B52;box-shadow:0 0 0 1.5px #fff}',
       '.tn-tbar .lb{display:flex;justify-content:space-between;margin-top:3px;font:800 10px/1 var(--font-ui);letter-spacing:.06em;color:#fff;text-shadow:0 1px 2px rgba(10,30,60,.6)}',
-      '.ss-hint.tn-hint .ss-hint-text{max-width:180px;font-size:15px}',
+      // (max-content: the pill's width never depends on where it was provisionally placed)
+      '.ss-hint.tn-hint .ss-hint-text{width:max-content;max-width:180px;font-size:15px}',
+      '.ss-score-pop.tn-perfect{font-size:36px;animation:tn-perfect 1.1s ease-out forwards}',
+      '.ss-score-pop.tn-power{font-size:20px}',
+      '@keyframes tn-perfect{0%{transform:translate(-50%,-50%) scale(.4);opacity:0}14%{transform:translate(-50%,-60%) scale(1.25);opacity:1}30%{transform:translate(-50%,-70%) scale(1);opacity:1}62%{opacity:1}100%{transform:translate(-50%,-170%) scale(1);opacity:0}}',
       '.tn-chip-hot{background:var(--accent)!important;color:#fff!important}',
       '@media (max-width: 359px){.tn-board:not(.rally) .pic,.tn-board .hp{display:none}.tn-board:not(.rally){grid-template-columns:auto minmax(0,1fr) auto auto}.tn-board.quick{grid-template-columns:auto minmax(0,1fr) auto}}',
       '.tn-pulse{animation:tn-bump .5s cubic-bezier(.3,1.6,.5,1)}',
@@ -1406,7 +1545,7 @@
         r.gm.textContent = String(score.games[i]);
         let t;
         if (gw === i) t = 'GAME';
-        else if (gw >= 0) t = '';
+        else if (gw >= 0) t = BOARD_PTS[Math.min(3, score.pts[i])];   // the loser keeps their last score
         else if (a >= 3 && b >= 3) t = score.pts[i] > score.pts[1 - i] ? 'AD' : '40';
         else t = BOARD_PTS[Math.min(3, score.pts[i])];
         r.pt.textContent = t;
@@ -1448,15 +1587,21 @@
 
     const _pp = new V3();
     /** Pop-up text clear above a Pal's head (never on the Pal or the ball at contact); `lift` stacks extra ones. */
-    function popupAt(a, text, color, lift) {
+    function popupAt(a, text, color, lift, cls) {
       _pp.set(a.pos.x, a.pal.height + 0.05, a.pos.z);
       const s = engine.project(_pp, camera), { w } = engine.size;
       if (!s.visible) return;
-      ui.scorePopup(text, clamp(s.x, 70, w - 70), Math.max(70, s.y - 44 - (lift || 0)), { color });
+      ui.scorePopup(text, s.x, Math.max(70, s.y - 44 - (lift || 0)), { color });
+      // keep the whole word on screen (it pops to 115 %), whatever its length
+      const el = ui.fx.lastElementChild;
+      if (!el || !el.classList.contains('ss-score-pop')) return;
+      if (cls) el.classList.add(cls);
+      const half = el.offsetWidth * 0.65 + 8;
+      el.style.left = Math.round(half * 2 >= w ? w / 2 : clamp(s.x, half, w - half)) + 'px';
     }
 
     /** Mini timing bar under the Pal (±170 ms, perfect band in the middle) while timing aids are on. */
-    let tbarT = 0;
+    let tbarT = 0, serveIdle = 0;
     const timingAids = () => hintsAllowed() && !autoplay && (MODE === 'rally' ? stats.swings < 30 : score.games[0] + score.games[1] < 3);
     function showTimingBar(a, err) {
       if (!timingAids()) return;
@@ -1465,13 +1610,18 @@
       tbarT = 1.2;
       placeTimingBar();
     }
-    /** Keeps the bar under your Pal's feet (on screen even while the camera is pushed in). */
+    /**
+     * Keeps the bar under your Pal's feet (on screen even while the camera is pushed in); in a short
+     * landscape window, where the feet sit on the bottom HUD, just above its head instead (under the
+     * EARLY / LATE pop-up).
+     */
     function placeTimingBar() {
-      if (tbar.classList.contains('dock')) return;           // short landscape: docked in the corner
-      _pp.set(player.pos.x, 0, player.pos.z);
-      const s = engine.project(_pp, camera), { w, h } = engine.size;
+      const { w, h } = engine.size, short = h <= 520;
+      _pp.set(player.pos.x, short ? player.pal.height + 0.05 : 0, player.pos.z);
+      const s = engine.project(_pp, camera);
       if (s.behind) return;
-      tbar.style.transform = 'translate(' + Math.round(clamp(s.x, 80, w - 80)) + 'px,' + Math.round(clamp(s.y + 12, h * 0.3, h - 96)) + 'px)';
+      const y = short ? clamp(s.y - 24, 64, h - 96) : clamp(s.y + 12, h * 0.3, h - 96);
+      tbar.style.transform = 'translate(' + Math.round(clamp(s.x, 80, w - 80)) + 'px,' + Math.round(y) + 'px)';
     }
     function updateTimingBar(dt) {
       if (tbarT <= 0) return;
@@ -1501,7 +1651,9 @@
       _pp.set(player.pos.x, 0.9, player.pos.z);
       const s = engine.project(_pp, camera);
       const serving = phase === 'serveReady' || phase === 'toss';
-      const side = awayX != null ? (awayX > player.pos.x ? -1 : 1) : (s.x < w / 2 ? 1 : -1);
+      // The serve shot always puts your Pal on its racket-hand side of the screen (see serveShot), so
+      // the hint goes in the other corner — known up front, even while the camera is still blending.
+      const side = serving ? -player.hand : awayX != null ? (awayX > player.pos.x ? -1 : 1) : (s.x < w / 2 ? 1 : -1);
       const hd = ui.hint({ gesture, text, x: s.x + side * w * 0.3, y: clamp(s.y - 30, h * 0.45, h - 150) });
       hd.el.classList.add('tn-hint');
       hints.active = hd;
@@ -1532,10 +1684,10 @@
     let phase = 'intro';                 // intro · serveReady · cpuServeWait · toss · feed · feedSwing · play · fault · pointOver · done
     let flow = 0, skipFn = null;
     const pending = [];                  // scheduled contacts / swings, processed on the physics clock
-    const score = { pts: [0, 0], games: [0, 0], server: 0, serveNo: 1 };
+    const score = { pts: [0, 0], games: [0, 0], server: 0, serveNo: 1, first: 0 };
     const pt = {
       phase: 'idle', hitter: -1, bounces: 0, shots: 0, netTouch: false,
-      decided: false, decidedAt: -1, lastHitAt: 0, boxSign: 1, tossHit: 0, serveSwung: false, lastKind: '',
+      decided: false, decidedAt: -1, lastHitAt: 0, boxSign: 1, tossHit: 0, serveSwung: false, lastKind: '', serveKmh: 0,
     };
     const stats = {
       won: [0, 0], aces: [0, 0], winners: [0, 0], errors: [0, 0], doubles: [0, 0],
@@ -1639,8 +1791,8 @@
 
     function setupPoint() {
       score.serveNo = 1;
-      // Quick Match is one game, so the serve rotates tiebreak-style: you, then two each.
-      if (MODE === 'quick') score.server = Math.floor((score.pts[0] + score.pts[1] + 1) / 2) % 2;
+      // Quick Match is one game, so the serve rotates tiebreak-style: the first server, then two each.
+      if (MODE === 'quick') score.server = (Math.floor((score.pts[0] + score.pts[1] + 1) / 2) + score.first) % 2;
       setupServe();
     }
 
@@ -1676,7 +1828,7 @@
         if (hints.serve < 2) showHint('tap', 'Tap to toss, then swipe up as the ring closes!');
       } else {
         phase = 'cpuServeWait';
-        later(id, 0.9 + rng.range(0, 0.5)).then(ok => { if (ok) doToss(1); });
+        later(id, 0.6 + rng.range(0, 0.3)).then(ok => { if (ok) doToss(1); });
       }
     }
 
@@ -1728,6 +1880,12 @@
 
     function serveSwipe(g) {
       if (phase !== 'toss' || pt.serveSwung || score.server !== 0) return;
+      // A swipe straight after the toss tap (a nervous double gesture) is ignored, not a sure fault.
+      if (judgeTime(g) + SWIPE_LEAD < pt.tossHit - SERVE_IGNORE) {
+        popupAt(player, timingAids() ? 'Wait for the ring!' : 'Wait for it…', '#FFFFFF');
+        audio.sfx('whoosh', { intensity: 0.2, vol: 0.5 });
+        return;
+      }
       pt.serveSwung = true;
       hideHint();
       const tDet = detSim(g), at = tDet + SWIPE_LEAD;
@@ -1759,17 +1917,17 @@
       if (c.who === 0 && c.gesture && !c.gesture.fixed && c.gesture.upT == null) {
         const g = c.gesture, lag = clamp((simTime - detSim(g)) / Math.max(0.05, frameRatio), 0, 0.4) * 1000;
         finalShot = { serve: true, g, from, H: a.H, info: sInfo, err: dtApex, draws, it, at: simTime, until: g.detT + lag + FINAL_MS,
-          fastest: stats.fastest, power: it.pace > 0.7 };
+          power: it.pace > 0.7 };
       }
       phase = 'play';
       Object.assign(pt, { phase: 'serve', hitter: c.who, bounces: 0, netTouch: false, lastHitAt: simTime, lastKind: 'serve', lastSpin: sol.spin });
       pt.shots = 1;
       const kmh = Math.round(Math.hypot(sol.vx, sol.vy, sol.vz) * 3.6);
       lastShot = { who: c.who, type: 'serve', tier: it.tier, kmh, dtApex: +dtApex.toFixed(3), pace: +it.pace.toFixed(2) };
+      pt.serveKmh = c.who === 0 ? kmh : 0;          // counts toward Fastest Serve only once it lands in
       if (c.who === 0) {
-        stats.fastest = Math.max(stats.fastest, kmh);
         if (score.serveNo === 1) stats.firstTotal++;
-        popupAt(a, timingLabel(it.tier, dtApex), TIER_COLOR[it.tier]);
+        timingPopup(a, timingLabel(it.tier, dtApex), it.tier, false);
         if (it.tier === 'perfect') stats.perfect++;
         if (it.tier === 'perfect' || it.tier === 'good') learned('serve');
         ui.haptic(it.tier === 'perfect' ? 25 : 12);
@@ -1777,7 +1935,8 @@
         showTimingBar(a, dtApex * (T_EARLY_MAX / SERVE_EDGE));
       }
       flashInfo(kmh + ' km/h', 1.8);
-      audio.sfx(it.frame ? 'racket_frame' : 'racket_hit', { intensity: clamp(kmh / 190, 0.3, 1), pan: clamp(ball.x / 8, -0.8, 0.8), vol: c.who === 0 ? 1 : 0.75 });
+      if (c.who === 0) hitSound(it.tier, it.frame, clamp(kmh / 190, 0.3, 1), clamp(ball.x / 8, -0.8, 0.8));
+      else audio.sfx(it.frame ? 'racket_frame' : 'racket_hit', { intensity: clamp(kmh / 190, 0.3, 1), pan: clamp(ball.x / 8, -0.8, 0.8), vol: 0.75 });
       if (it.pace > 0.7) audio.sfx('voice_hup', { vol: c.who === 0 ? 0.9 : 0.6, rate: c.who === 0 ? 1 : 1.1 });
       if (kmh > 170) engine.shake(0.04, 0.2);
       setTrail(kmh > 120, kmh > 165);
@@ -1853,6 +2012,8 @@
         : ra.reactTime + (MODE === 'rally' ? 0 : paceRead(Math.hypot(ball.vx, ball.vy, ball.vz), recv, SKILL))) - (elapsed || 0));
       const plan = planIntercept({ idx: recv, x: ra.pos.x, z: ra.pos.z, vmax: ra.vmax, accel: ra.accel, react, hand: ra.hand }, pred, simTime, opts);
       plan.perfectIn = !!(opts && opts.perfect);     // a perfectly struck ball hurries the reply
+      // how far out of reach the ball will be at contact (− = to spare): drives lunges, dives, timing aids
+      if (plan.ok) { plan.reachDist = predictReach(ra, plan, react); plan.reachGap = plan.reachDist - reachFor(recv, plan); }
       ra.plan = plan;
       ra.react = react;
       auto.swingAt = -1;
@@ -1863,12 +2024,12 @@
           landing.visible = true;
           landingT = 0;
         } else landing.visible = false;
-        hints.swingPending = plan.ok && hints.swing < 2 && MODE !== 'match';
+        hints.swingPending = plan.ok && hints.swing < 2;
       }
       // a ball that's clearly going out, or that the receiver truly can't reach, decides a big point
       const serveFault = opts && opts.serve && score.serveNo === 1;
       if (!serveFault && plan.bounce && bigPoint() && (plan.bounce.margin < -0.05 ||
-        (plan.bounce.margin >= 0 && (!plan.ok || plan.deficit > REACH + 0.05 || predictReach(ra, plan, react) > reachFor(recv, plan) + 0.05)))) dramatic();
+        (plan.bounce.margin >= 0 && (!plan.ok || plan.deficit > REACH + 0.05 || plan.reachGap > 0.05)))) dramatic();
     }
 
     function scheduleCpuStroke(plan) {
@@ -1902,15 +2063,30 @@
       return 'MISHIT';
     }
 
+    /**
+     * Your racket sound: the sweet spot always sounds full and is topped with a chime that climbs
+     * with each perfect hit in a row, so the ear learns the timing before the eye reads the popup.
+     */
+    let perfectRun = 0;
+    function hitSound(tier, frame, intensity, pan) {
+      if (frame) { perfectRun = 0; audio.sfx('racket_frame', { intensity, pan }); return; }
+      if (tier !== 'perfect') { perfectRun = 0; audio.sfx('racket_hit', { intensity, pan }); return; }
+      perfectRun++;
+      audio.sfx('racket_hit', { intensity: Math.max(0.85, intensity), pan });
+      audio.sfx('star', { vol: 0.35, rate: 1 + 0.06 * Math.min(6, perfectRun - 1), pan });
+    }
+    /** The timing word above your Pal (a perfect one pops bigger and lingers), plus POWER on a big swipe. */
+    function timingPopup(a, text, tier, power) {
+      popupAt(a, text, TIER_COLOR[tier], 0, tier === 'perfect' ? 'tn-perfect' : null);
+      if (power) popupAt(a, 'POWER', '#FF8A3D', 34, 'tn-power');
+    }
+
     function strokeSwipe(g) {
       if (player.swing && !player.swing.shadow) return;
       const plan = player.plan;
       const incoming = plan && plan.ok && !plan.leave && pt.hitter === 1 && !pt.decided;
       if (!incoming || plan.used) {
-        if (!pt.decided && pt.hitter !== 1) {        // shadow swing between balls: feedback only
-          player.startSwing('fh', 0.08, 0.95, true);
-          audio.sfx('swing_light', { vol: 0.5 });
-        }
+        if (!pt.decided && pt.hitter !== 1) shadowSwing();   // between balls: feedback only
         return;
       }
       const err = judgeTime(g) + SWIPE_LEAD - plan.t;
@@ -1931,6 +2107,7 @@
         popupAt(player, err < 0 ? 'TOO EARLY' : 'TOO LATE', '#FF8A3D');
         showTimingBar(player, err);
         plan.whiffed = true;
+        perfectRun = 0;
         lastShot = { who: 0, type: 'whiff', err: +err.toFixed(3) };
         return;
       }
@@ -1992,11 +2169,12 @@
       const kmh = Math.round(Math.hypot(sol.vx, sol.vy, sol.vz) * 3.6);
       lastShot = { who: c.who, type: kind, tier: it.tier, err: +c.err.toFixed(3), kmh, pace: +(it.pace || 0).toFixed(2), spin: +it.spin.toFixed(2), tactic: it.tactic || (it.lob ? 'lob' : null) };
       const pan = clamp(ball.x / 8, -0.8, 0.8), vol = c.who === 0 ? 1 : 0.75;
-      audio.sfx(it.frame ? 'racket_frame' : 'racket_hit', { intensity: clamp(kmh / 120, 0.25, 1), pan, vol });
-      const power = it.pace > 0.78 && !it.frame;
+      const power = it.pace > POWER_PACE && !it.frame;
+      if (c.who === 0) hitSound(it.tier, it.frame, clamp(kmh / 120, 0.25, 1), pan);
+      else audio.sfx(it.frame ? 'racket_frame' : 'racket_hit', { intensity: clamp(kmh / 120, 0.25, 1), pan, vol });
       if (finalShot) finalShot.power = power;
       if (c.who === 0) {
-        popupAt(a, it.smash ? 'SMASH!' : timingLabel(it.tier, c.err), TIER_COLOR[it.tier]);
+        timingPopup(a, it.smash ? 'SMASH!' : timingLabel(it.tier, c.err), it.tier, power);
         showTimingBar(a, c.err);
         ui.haptic(it.tier === 'perfect' ? 25 : 12);
         if (it.tier === 'perfect' || it.tier === 'good') learned('swing');
@@ -2045,7 +2223,7 @@
       for (let i = pending.length - 1; i >= 0; i--) if (pending[i].who === 1 && (pending[i].type === 'stroke' || pending[i].type === 'swing')) pending.splice(i, 1);
       if (f.serve) {
         lastShot = Object.assign({}, lastShot, { kmh, pace: +it.pace.toFixed(2), finalized: true });
-        stats.fastest = Math.max(f.fastest, kmh);
+        pt.serveKmh = kmh;
         flashInfo(kmh + ' km/h', 1.8);
         if (it.pace > 0.7 && !f.power) audio.sfx('voice_hup', { vol: 0.9 });
         if (kmh > 170) engine.shake(0.04, 0.2);
@@ -2054,14 +2232,15 @@
         return;
       }
       lastShot = Object.assign({}, lastShot, { kmh, pace: +it.pace.toFixed(2), spin: +it.spin.toFixed(2), tactic: it.lob ? 'lob' : null, finalized: true });
-      const power = it.pace > 0.78 && !it.frame;
-      if (power && !f.power) { audio.sfx('voice_hup', { vol: 0.9 }); engine.shake(0.035, 0.18); }
+      const power = it.pace > POWER_PACE && !it.frame;
+      if (power && !f.power) { audio.sfx('voice_hup', { vol: 0.9 }); engine.shake(0.035, 0.18); popupAt(player, 'POWER', '#FF8A3D', 34, 'tn-power'); }
       if (it.lob && !old.lob) audio.sfx('whoosh', { intensity: 0.3 });
       setTrail(kmh > 85 || it.tier === 'perfect', power || it.tier === 'perfect' || kmh > 125, true);
       afterLaunch(0, it.tier === 'perfect' ? { perfect: true } : null, simTime - f.at);
     }
 
     function missed(a, label) {
+      if (a.dive) { if (label) popupAt(a, label, '#FF8A3D'); return; }
       if (a.busy) return;
       a.oneShot('stumble', 'wince');
       if (label) popupAt(a, label, '#FF8A3D');
@@ -2139,6 +2318,7 @@
         if (side !== recv) { fault('NET'); return; }
         const m = boxMargin(b.bx, b.bz, pt.boxSign, recv);
         if (m >= 0) {
+          if (pt.hitter === 0 && pt.serveKmh) stats.fastest = Math.max(stats.fastest, pt.serveKmh);
           if (pt.netTouch) { letServe(); return; }
           pt.phase = 'rally'; pt.bounces = 1;
           if (pt.hitter === 0 && score.serveNo === 1) stats.firstIn++;
@@ -2184,6 +2364,7 @@
         pt.phase === 'serve' ? { serve: { boxSign: pt.boxSign } } : null);
       // drop any scheduled CPU contact for the old trajectory
       for (let i = pending.length - 1; i >= 0; i--) if (pending[i].who === recv && (pending[i].type === 'stroke' || pending[i].type === 'swing')) pending.splice(i, 1);
+      if (plan.ok) { plan.reachDist = predictReach(ra, plan, 0); plan.reachGap = plan.reachDist - reachFor(recv, plan); }
       ra.plan = plan;
       if (recv === 1 && plan.ok) scheduleCpuStroke(plan);
       if (recv === 0) auto.swingAt = -1;
@@ -2202,7 +2383,7 @@
       const st = rows[0] && rows[0].streak;
       if (st) { st.classList.remove('tn-pulse'); void st.offsetWidth; st.classList.add('tn-pulse'); }
       if (!big) { audio.sfx('crowd_applause', { intensity: 0.3 }); return; }
-      if (n === 30) { audio.sfx('fanfare_big'); crowd.cheer(1, 2.2); ctx.awardMedal('gold'); }
+      if (n === 30) { audio.sfx('fanfare_big'); crowd.cheer(1, 2.2); ctx.awardMedal('platinum'); }
       else if (n >= 20) { audio.sfx('fanfare_small'); crowd.cheer(0.8, 1.6); }
       else { audio.sfx('crowd_applause', { intensity: 0.6 }); crowd.cheer(0.5, 1.2); }
     }
@@ -2275,7 +2456,8 @@
       const wa = ath[winner], la = ath[loser];
       const big = reason === 'ace' || reason === 'smash' || shots >= LONG_RALLY || matchWon;
       wa.oneShot(big ? 'cheer' : winner === 0 ? 'hop' : 'clap', 'joy');
-      if (lunged) la.oneShot('stumble', 'wince').then(() => { if (la.frozen) la.oneShot('shrug'); });
+      if (la.dive) la.dive.after = la.dive.kind === 'dive' || reason === 'winner' || reason === 'ace' ? 'shrug' : 'sad';
+      else if (lunged) la.oneShot('stumble', 'wince').then(() => { if (la.frozen) la.oneShot('shrug'); });
       else la.oneShot(reason === 'out' || reason === 'net' || reason === 'double' || reason === 'whiff' ? 'sad' : 'shrug', 'sad');
       if (winner === 0) {
         audio.sfx(big ? 'crowd_cheer' : 'crowd_applause', { intensity: big ? 0.9 : clamp(0.35 + shots * 0.05, 0.35, 0.9) });
@@ -2290,7 +2472,8 @@
         audio.duck(0.4, 2.5);
       } else if (reason === 'ace' && winner === 0 && !slowRunning) engine.slowmo(0.45, 0.6);
       if (matchWon) heroShot(wa, 3.2);
-      else if (winner === 0 && (reason === 'smash' || shots >= LONG_RALLY || (reason === 'ace' && lastShot && lastShot.kmh >= 150))) heroShot(player, 1.8);
+      else if (winner === 0 && (reason === 'smash' || (shots >= LONG_RALLY && (reason === 'winner' || shots >= EPIC_RALLY)) ||
+        (reason === 'ace' && lastShot && lastShot.kmh >= 150))) heroShot(player, 1.8);
 
       // Banners: what happened → the umpire's call
       const yours = winner === 0;
@@ -2300,7 +2483,7 @@
       if (reason === 'ace') { kind = yours ? 'huge' : 'info'; sub = lastShot && lastShot.kmh ? lastShot.kmh + ' km/h' : null; if (yours) audio.sfx('fanfare_small'); }
       else if (reason === 'smash') { kind = yours ? 'huge' : 'info'; }
       else if (reason === 'winner') { kind = yours ? 'great' : 'info'; if (!yours) sub = CPU_NAME + ' scores'; }
-      else if (reason === 'out' || reason === 'net') { kind = yours ? 'good' : 'bad'; }
+      else if (reason === 'out' || reason === 'net') { kind = yours ? 'good' : 'bad'; if (!yours) sub = errorWhy(); }
       else if (reason === 'double') { kind = yours ? 'good' : 'bad'; }
       else if (reason === 'whiff') { text = yours ? 'NICE SHOT!' : 'MISSED!'; kind = yours ? 'great' : 'bad'; if (yours) sub = CPU_NAME + ' missed it'; }
       if (shots >= LONG_RALLY && (reason === 'out' || reason === 'net' || (reason === 'winner' && !yours))) {
@@ -2337,6 +2520,15 @@
       })();
     }
 
+    /** Why your own shot missed, so a GOOD swing that sails long still teaches something. */
+    function errorWhy() {
+      const s = lastShot;
+      if (!s || s.who !== 0 || s.type === 'serve' || s.type === 'whiff') return null;
+      if (s.pace > POWER_PACE && s.tier !== 'perfect') return 'Too much power!';
+      if (s.tier === 'edge') return s.err < 0 ? 'Swung too early' : 'Swung too late';
+      return null;
+    }
+
     let callT = 0;
     function showCall(text) {
       callChip.textContent = text;
@@ -2363,7 +2555,8 @@
         return 'ADVANTAGE ' + (a > b ? 'YOU' : CPU_NAME.toUpperCase());
       }
       if (a === b) return NAMES[a] + ' ALL';
-      const s = score.server;
+      // Quick Match swaps server every two points, so its calls are read from your side like the board.
+      const s = MODE === 'quick' ? 0 : score.server;
       return NAMES[score.pts[s]] + '–' + NAMES[score.pts[1 - s]];
     }
 
@@ -2392,7 +2585,8 @@
       cpu.oneShot('shrug');
       audio.sfx('crowd_aww', { intensity: 0.5, vol: 0.7 });
       const what = reason === 'out' ? 'OUT!' : reason === 'net' ? 'NET!' : 'MISSED!', title = rallyTitle(streak);
-      ui.banner(title || what, { kind: title ? 'great' : 'bad', sub: (title ? what.replace('!', '') + ' · ' : '') + 'Streak: ' + streak + (rallyState.lives > 0 ? ' · ' + rallyState.lives + ' ball' + (rallyState.lives > 1 ? 's' : '') + ' left' : ''), duration: 1.3 });
+      const why = reason === 'out' || reason === 'net' ? errorWhy() : null;
+      ui.banner(title || what, { kind: title ? 'great' : 'bad', sub: (title ? what.replace('!', '') + ' · ' : '') + (why && !title ? why : 'Streak: ' + streak) + (rallyState.lives > 0 ? ' · ' + rallyState.lives + ' ball' + (rallyState.lives > 1 ? 's' : '') + ' left' : ''), duration: 1.3 });
       if (title) audio.sfx('crowd_applause', { intensity: 0.7 });
       hold(id, 1.7).then(ok => {
         if (!ok) return;
@@ -2409,8 +2603,9 @@
       info.timer = 0;
       setInfo('');
       const won = w === 0;
+      const shown = GAMES_TO_WIN > 1 ? score.games : stats.won;   // a one-game Quick Match is told in points
       if (won) {
-        ui.banner(GAMES_TO_WIN > 1 ? 'MATCH!' : 'GAME & MATCH!', { kind: 'huge', sub: 'You win ' + score.games[0] + '–' + score.games[1], duration: 2.2 });
+        ui.banner(GAMES_TO_WIN > 1 ? 'MATCH!' : 'GAME & MATCH!', { kind: 'huge', sub: 'You win ' + shown[0] + '–' + shown[1], duration: 2.2 });
         audio.sfx('fanfare_big');
         audio.sfx('crowd_cheer', { intensity: 1 });
         crowd.cheer(1, 3);
@@ -2418,7 +2613,7 @@
         player.oneShot('dance', 'joy');
         cpu.oneShot('clap', 'happy');
       } else {
-        ui.banner('GOOD GAME!', { kind: 'info', sub: CPU_NAME + ' wins ' + score.games[1] + '–' + score.games[0], duration: 2.2 });
+        ui.banner('GOOD GAME!', { kind: 'info', sub: CPU_NAME + ' wins ' + shown[1] + '–' + shown[0], duration: 2.2 });
         audio.sfx('crowd_applause', { intensity: 0.7 });
         cpu.oneShot('cheer', 'joy');
         player.oneShot('shrug', 'sad');
@@ -2427,12 +2622,18 @@
       hold(id, 2.8).then(ok => { if (ok) finishMatch(w); });
     }
 
+    /**
+     * Skill change from the expected outcome: E is your chance of beating this opponent at your
+     * level, so an upset pays big, beating a far weaker CPU pays almost nothing, and losing to one
+     * costs a lot. The margin (quality −5…5, from the points won) scales it by up to a quarter.
+     */
     function skillDelta(won, quality) {
       const myNorm = clamp(ctx.skillFor(me) / 2300, 0, 1);
-      const gap = SKILL - myNorm;
-      const scale = MODE === 'quick' ? 0.7 : 1;
-      if (won) return Math.round(clamp(clamp(30 + 60 * gap, 12, 80) * scale + quality * 4, 8, 80));
-      return -Math.round(clamp(clamp(25 - 40 * gap, 6, 40) * scale - quality * 3, 4, 40));
+      const E = 1 / (1 + Math.exp(-6 * (myNorm - SKILL)));
+      const K = MODE === 'quick' ? 56 : 80;
+      const m = 0.25 * clamp(Math.abs(quality) / 5, 0, 1);
+      if (won) return clamp(Math.round(K * (1 - E) * (1 + m)), 2, 80);
+      return -clamp(Math.round(K * E * (1 + m)), 1, 45);
     }
 
     function finishMatch(w) {
@@ -2452,8 +2653,8 @@
       const medals = [];
       if (won) {
         if (ctx.awardMedal('bronze')) medals.push('bronze');
-        if (MODE === 'match' && SKILL >= 0.5 && ctx.awardMedal('silver')) medals.push('silver');
-        if (MODE === 'match' && (opp.profile.id === 'cpu-odessa' || SKILL >= 0.98) && score.games[1] === 0 && ctx.awardMedal('platinum')) medals.push('platinum');
+        if (MODE === 'match' && SKILL >= PRO_SKILL && ctx.awardMedal('silver')) medals.push('silver');
+        if (MODE === 'match' && SKILL >= LEGEND_SKILL && ctx.awardMedal('gold')) medals.push('gold');
       }
       const pts = stats.won[0] + stats.won[1];
       // a one-game Quick Match is told in points, a Match in games
@@ -2563,7 +2764,7 @@
     }
 
     ctx.input.on('down', p => {
-      gest.active = true; gest.onsetT = -1; gest.live = null; gest.tossed = false;
+      gest.active = true; gest.onsetT = -1; gest.live = null; gest.tossed = false; gest.downPhase = phase;
       gest.samples = [{ t: p.t, x: p.x, y: p.y }];
     });
     ctx.input.on('move', p => {
@@ -2589,12 +2790,13 @@
       const S = gest.samples;
       if (!p.cancelled) S.push({ t: p.t, x: p.x, y: p.y });
       if (gest.live) gest.live.upT = p.t;
-      // Waiting to serve: any short press tosses (a thumb's tap often drifts into a little swipe);
-      // only a long, deliberate swipe gets the reminder.
+      // Waiting to serve: any press that doesn't travel far tosses, however slow (a thumb's tap often
+      // drifts into a little swipe; kids press and hold); only a long, deliberate swipe gets the
+      // reminder. A press still held over from before serveReady counts only if it was a quick one.
       gest.tossed = false;
       if (phase === 'serveReady' && score.server === 0 && !p.cancelled) {
         const travel = Math.hypot(p.x - S[0].x, p.y - S[0].y) / shortSide();
-        if (travel < 0.1 && p.t - S[0].t < 350) { gest.tossed = true; hideHint(); doToss(0); }
+        if (travel < 0.1 && (gest.downPhase === 'serveReady' || p.t - S[0].t < 350)) { gest.tossed = true; hideHint(); doToss(0); }
         else if (travel >= 0.1) popupAt(player, 'Tap to toss first!', '#FFFFFF');
       }
     });
@@ -2621,10 +2823,19 @@
       }
     });
 
+    function shadowSwing() {
+      if (player.dive) return;
+      player.startSwing('fh', 0.08, 0.95, true);
+      audio.sfx('swing_light', { vol: 0.5 });
+    }
+
     function onGesture(g) {
       if (phase === 'toss' && score.server === 0) { serveSwipe(g); return; }
       if (phase === 'serveReady') return;               // decided on release (see 'up')
       if (phase === 'play') strokeSwipe(g);
+      // eager before the ball is even struck (the CPU's serve or feed): a practice swing, so the Pal
+      // never ignores you
+      else if (phase === 'cpuServeWait' || phase === 'toss' || phase === 'feed' || phase === 'feedSwing') shadowSwing();
     }
 
     // =============================================================================================
@@ -2682,6 +2893,10 @@
         else if (simTime - pt.decidedAt > 3) setupPoint();
       } else pt.decidedAt = -1;
       if (pt.decided && ball.live && (phase === 'pointOver' || phase === 'done' || phase === 'fault') && Math.abs(ball.z) > WALL_Z + 6) hideBall();
+      // a player who stops at the serve gets a gentle nudge every ~10 s (first-timers have the hint)
+      if (phase === 'serveReady' && score.server === 0 && !autoplay && !gest.active && !hints.active && hintsAllowed()) {
+        if ((serveIdle += dt) >= 4) { serveIdle = -6; flashInfo('Tap to serve', 2.5); }
+      } else serveIdle = 0;
       updateInfo(dt);
       updateTimingBar(dt);
       updateCall(dt);
@@ -2697,6 +2912,12 @@
           const toGo = plan.t - simTime;
           if (toGo < 0.55 && toGo > -0.2 && !a.swing) a.prepare(plan.kind, plan.cy);
           if (toGo < -0.25 && a.prep) a.prep = null;
+          // lunge for a ball only just in reach; dive for one just out of it
+          const gap = plan.reachGap;
+          if (gap != null && !a.dive && pt.hitter !== a.idx && !(a.idx === 1 && plan.cpuWhiff)) {
+            if (gap > 0 && gap < DIVE_MAX && toGo < 0.16 && toGo > -0.1) startDive(a, plan, 'dive');
+            else if (gap <= 0 && plan.reachDist > LUNGE_DIST && toGo < 0.12 && toGo > -0.05) startDive(a, plan, 'lunge');
+          }
           if (toGo < -0.15 && !a.swing && !plan.missedShown && pt.hitter !== a.idx && plan.deficit > 0.4) {
             plan.missedShown = true;
             missed(a, null);
@@ -2753,9 +2974,14 @@
         const myToss = phase === 'toss' && score.server === 0;
         tossRim.visible = myToss;
         if (myToss) tossRim.quaternion.copy(camera.quaternion);
-        // the ring closes onto the ball when it's time to swipe, then lingers a moment and fades
-        const toClose = pt.tossHit - SWIPE_LEAD - simTime;
-        const ring = myToss && !pt.serveSwung && timingAids() && toClose < RING_LEAD && toClose > -0.12;
+        // the ring closes onto the ball when it's time to swipe, then lingers a moment and fades: on
+        // your toss, and (while you're learning) on balls coming to you that you can reach
+        const plan = player.plan;
+        let toClose = null;
+        if (myToss) { if (!pt.serveSwung && timingAids()) toClose = pt.tossHit - SWIPE_LEAD - simTime; }
+        else if (phase === 'play' && pt.hitter === 1 && !pt.decided && plan && plan.ok && !plan.leave && !plan.used &&
+          plan.reachGap != null && plan.reachGap <= 0 && timingAids() && (coaching() || stats.swings < STROKE_RING_SWINGS)) toClose = plan.t - SWIPE_LEAD - simTime;
+        const ring = toClose != null && toClose < RING_LEAD && toClose > -0.12;
         apexRing.visible = ring;
         if (ring) {
           const k = clamp(toClose / RING_LEAD, 0, 1);
@@ -2877,7 +3103,7 @@
       const mk = (idx, m) => ({ idx, H: sideSign(idx), hand: 1, pos: { x: 0, z: 0 }, vx: 0, vz: 0, tx: 0, tz: 0, vmax: m.vmax, accel: m.accel, react: m.react, frozen: false });
       const A = [mk(0, { vmax: PLAYER_VMAX, accel: PLAYER_ACCEL, react: PLAYER_REACT }), mk(1, cpuMotion(skill))];
       const place = (a, x, z) => { a.pos.x = a.tx = x; a.pos.z = a.tz = z; a.vx = a.vz = 0; };
-      const res = { points: 0, won: [0, 0], rallies: [], reasons: {}, kmh: 0, serves: 0, reachMiss: [0, 0], tiers: {}, tactics: {}, unreturned: 0, smashes: 0, cpuWinners: {} };
+      const res = { points: 0, won: [0, 0], rallies: [], reasons: {}, kmh: 0, serves: 0, reachMiss: [0, 0], tiers: {}, tactics: {}, unreturned: 0, smashes: 0, cpuWinners: {}, cpuErrors: {} };
       const DT = 1 / 120;
       for (let k = 0; k < (n || 50); k++) {
         let who, it, from, serveNo = 0, boxSign = 0, shots = 0, reason = null, winner = -1;
@@ -2936,6 +3162,7 @@
           const reach = Math.hypot(cx - plan.cx, cz - plan.cz);
           if (reach > reachVs(plan)) { res.reachMiss[recv]++; reason = isServe ? 'ace' : 'unreached'; winner = who; break; }
           from = { x: plan.cx, y: plan.cy, z: plan.cz };
+          if (plan.kind === 'oh') res.smashes++;              // overheads met (both sides)
           const stretch = clamp((reach - 0.35) / 0.55, 0, 1);
           if (recv === 0) it = strokeIntent(botInput(r, o, A[1].pos.x), err, { H: 1, side: plan.kind === 'bh' ? -1 : 1, kind: plan.kind, contactY: plan.cy, stretch });
           else {
@@ -2956,10 +3183,11 @@
         const key = (winner === 0 ? 'you:' : 'cpu:') + reason;
         res.reasons[key] = (res.reasons[key] || 0) + 1;
         if (winner === 1 && reason === 'unreached' && it) res.cpuWinners[it.tactic] = (res.cpuWinners[it.tactic] || 0) + 1;
+        if (winner === 0 && (reason === 'out' || reason === 'net') && it) res.cpuErrors[it.tactic + ':' + shots] = (res.cpuErrors[it.tactic + ':' + shots] || 0) + 1;
       }
       const avg = res.rallies.reduce((sum, v) => sum + v, 0) / Math.max(1, res.rallies.length);
       return { points: res.points, youWon: res.won[0], cpuWon: res.won[1], winPct: Math.round(res.won[0] / Math.max(1, res.points) * 100),
-        avgRally: +avg.toFixed(1), maxRally: Math.max(0, ...res.rallies), ge10: res.rallies.filter(v => v >= 10).length, ge15: res.rallies.filter(v => v >= 15).length, smashes: res.smashes, reasons: res.reasons, reachMiss: res.reachMiss, tiers: res.tiers, tactics: res.tactics, cpuWinners: res.cpuWinners,
+        avgRally: +avg.toFixed(1), maxRally: Math.max(0, ...res.rallies), ge10: res.rallies.filter(v => v >= 10).length, ge15: res.rallies.filter(v => v >= 15).length, smashes: res.smashes, reasons: res.reasons, reachMiss: res.reachMiss, tiers: res.tiers, tactics: res.tactics, cpuWinners: res.cpuWinners, cpuErrors: res.cpuErrors,
         serveKmh: res.serves ? Math.round(res.kmh / res.serves) : null, unreturnedPct: Math.round(res.unreturned / Math.max(1, res.points) * 100) };
     }
 
@@ -2973,8 +3201,10 @@
         streak: rallyState.streak, best: rallyState.best, lives: rallyState.lives,
         ball: { live: !!ball.live, x: +ball.x.toFixed(2), y: +ball.y.toFixed(2), z: +ball.z.toFixed(2),
           speed: +Math.hypot(ball.vx, ball.vy, ball.vz).toFixed(1), spin: +ball.spin.toFixed(2) },
-        plan: p ? { ok: p.ok, leave: p.leave, kind: p.kind || null, in: p.t != null ? +(p.t - simTime).toFixed(2) : null, deficit: p.deficit != null ? +p.deficit.toFixed(2) : null } : null,
+        plan: p ? { ok: p.ok, leave: p.leave, kind: p.kind || null, in: p.t != null ? +(p.t - simTime).toFixed(2) : null, deficit: p.deficit != null ? +p.deficit.toFixed(2) : null, gap: p.reachGap != null ? +p.reachGap.toFixed(2) : null, dist: p.reachDist != null ? +p.reachDist.toFixed(2) : null } : null,
+        cpuGap: cpu.plan && cpu.plan.reachGap != null ? +cpu.plan.reachGap.toFixed(2) : null,
         players: { you: [+player.pos.x.toFixed(2), +player.pos.z.toFixed(2)], cpu: [+cpu.pos.x.toFixed(2), +cpu.pos.z.toFixed(2)] },
+        dive: { you: player.dive ? player.dive.kind : null, cpu: cpu.dive ? cpu.dive.kind : null }, frozen: [player.frozen, cpu.frozen],
         swing: player.swing ? { kind: player.swing.kind, t: +player.swing.t.toFixed(2), tc: +player.swing.tc.toFixed(2) } : null,
         lastShot, autoplay,
         camera: { shot: camRig.shot ? camRig.shot.kind : null, blend: +camRig.w.toFixed(2), pitch: +(camRig.pitch * 180 / Math.PI).toFixed(1), h: +camRig.pos.y.toFixed(2), z: +camRig.pos.z.toFixed(2), vFov: +camera.fov.toFixed(1) },
@@ -3000,6 +3230,8 @@
     return {
       start() {
         ambience = audio.loop('stadium_ambience', { vol: 0.5 });
+        // A newcomer's first touch is the simple one: returning the CPU's serve, not their own toss + swipe.
+        if (MODE !== 'rally' && coaching() && hints.swing < 2) score.first = score.server = 1;
         setupPoint();
         flashInfo(MODE === 'match' ? 'First to 3 games' : MODE === 'quick' ? 'One game · win by two' : '3 balls · keep it going!', 2.4);
       },
@@ -3027,6 +3259,7 @@
         trail.dispose();
         crowd.dispose();
         for (const a of ath) { engine.disposeObject(a.racket); a.pal.dispose(); }
+        engine.disposeObject(umpCap);
         umpire.dispose();
       },
       debugState,
@@ -3044,6 +3277,13 @@
         simulate,
         simulateRally,
         skip() { if (skipFn) skipFn(); },
+        /** dive('dive'|'lunge', who 0|1, side ±1 world x): plays the move on the spot (pose checks). */
+        dive(kind, who, side) {
+          const a = ath[who ? 1 : 0];
+          endDive(a);
+          startDive(a, { cx: a.pos.x + (side || 1) * 2, cz: a.pos.z, reachGap: 0.6 }, kind === 'lunge' ? 'lunge' : 'dive');
+          return !!a.dive;
+        },
         state: debugState,
       },
     };
