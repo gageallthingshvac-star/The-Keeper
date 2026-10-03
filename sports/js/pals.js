@@ -1212,7 +1212,14 @@
     dispose() {
       if (this._cur && this._cur.resolve) this._cur.resolve();
       if (this.root.parent) this.root.parent.remove(this.root);
-      for (const obj of this._attached) if (obj.parent) obj.parent.remove(obj);
+      // Equipment still attached goes with the pal: it left the scene with the root, so scene disposal
+      // would never reach it. Objects marked userData.shared are only detached (their owner keeps them);
+      // inside an attached object, shared geometry/materials/textures are skipped by disposeObject().
+      // Disposing is idempotent, so a sport that already disposed its equipment is fine.
+      for (const obj of this._attached) {
+        if (obj.parent) obj.parent.remove(obj);
+        if (!(obj.userData && obj.userData.shared === true) && SS.engine && SS.engine.disposeObject) SS.engine.disposeObject(obj);
+      }
       this._attached.clear();
       this._torsoGeo.dispose();
       this._legGeo.dispose();

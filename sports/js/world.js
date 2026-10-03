@@ -1067,20 +1067,31 @@
   const CROWD_SKINS = [0xFFE0C7, 0xF6C9A3, 0xE5A97E, 0xC98A5E, 0x9C6644, 0x6E4630];
   const CROWD_HAIR = [0x2B211C, 0x5A3A22, 0x8B5A2B, 0xC98B3E, 0xE8C26A, 0xB5532A, 0x9AA0A8, 0x2B211C];
 
+  // Two geometry sets share one face texture and materials: 'high' (~740 triangles a fan) and 'low'
+  // (~150: fewer lathe/sphere segments, octahedron hands) for medium/low quality and distant stands.
   let crowdKit = null;
-  function crowdAssets() {
-    if (crowdKit) return crowdKit;
-    const pts = [];
-    for (let i = 0; i <= 8; i++) {
-      const t = i / 8, a = t * Math.PI;
+  const crowdGeos = {};
+  function crowdGeometry(detail) {
+    if (crowdGeos[detail]) return crowdGeos[detail];
+    const low = detail === 'low';
+    const steps = low ? 4 : 8, pts = [];
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps, a = t * Math.PI;
       pts.push(new THREE.Vector2(Math.max(0.001, Math.sin(a) * 0.2 * (1 - 0.15 * t)), (1 - Math.cos(a)) / 2 * 0.56));
     }
-    const body = markShared(new THREE.LatheGeometry(pts, 10));
-    const head = markShared(new THREE.SphereGeometry(0.19, 14, 10));
-    const hair = new THREE.SphereGeometry(0.205, 14, 6, 0, TAU, 0, 1.35);
+    const body = markShared(new THREE.LatheGeometry(pts, low ? 7 : 10));
+    const head = markShared(new THREE.SphereGeometry(0.19, low ? 8 : 14, low ? 6 : 10));
+    const hair = new THREE.SphereGeometry(0.205, low ? 8 : 14, low ? 3 : 6, 0, TAU, 0, 1.35);
     hair.rotateX(-0.35);
     markShared(hair);
-    const hand = markShared(new THREE.IcosahedronGeometry(0.062, 1));
+    const hand = markShared(low ? new THREE.OctahedronGeometry(0.062, 0) : new THREE.IcosahedronGeometry(0.062, 1));
+    crowdGeos[detail] = { body, head, hair, hand };
+    return crowdGeos[detail];
+  }
+
+  function crowdAssets() {
+    if (crowdKit) return crowdKit;
+    const { body, head, hair, hand } = crowdGeometry('high');
 
     const fc = makeCanvas(128, 64);
     const c = fc.getContext('2d');
@@ -1104,6 +1115,11 @@
 
   function crowd(scene, o = {}) {
     const kit = crowdAssets();
+    // detail: 'high' | 'low'; by default low below the 'high' quality tier
+    const autoDetail = o.detail !== 'high' && o.detail !== 'low';
+    const detailFor = () => (SS.engine && SS.engine.quality && SS.engine.quality !== 'high' ? 'low' : 'high');
+    let detail = autoDetail ? detailFor() : o.detail;
+    const geo = crowdGeometry(detail);
     const rng = makeRng(o.rng, o.seed == null ? 5 : o.seed);
     const spacing = o.spacing || 0.75, density = o.density == null ? 0.85 : o.density, scale = o.scale || 1;
     const seats = [];
@@ -1120,15 +1136,30 @@
     const N = seats.length;
     const group = new THREE.Group();
     group.name = 'crowd';
-    const bodies = new THREE.InstancedMesh(kit.body, kit.bodyMat, Math.max(1, N));
-    const heads = new THREE.InstancedMesh(kit.head, kit.headMat, Math.max(1, N));
-    const hairs = new THREE.InstancedMesh(kit.hair, kit.hairMat, Math.max(1, N));
-    const hands = new THREE.InstancedMesh(kit.hand, kit.bodyMat, Math.max(1, N * 2));
+    // Child order is part of the contract (sports may swap geometries): body, head, hair, hands, marker.
+    const bodies = new THREE.InstancedMesh(geo.body, kit.bodyMat, Math.max(1, N));
+    const heads = new THREE.InstancedMesh(geo.head, kit.headMat, Math.max(1, N));
+    const hairs = new THREE.InstancedMesh(geo.hair, kit.hairMat, Math.max(1, N));
+    const hands = new THREE.InstancedMesh(geo.hand, kit.bodyMat, Math.max(1, N * 2));
     // Unique geometry per crowd so the engine's disposal tells us when the crowd is gone.
     const marker = new THREE.BufferGeometry();
     const markerMesh = new THREE.Mesh(marker, kit.bodyMat);
     markerMesh.visible = false;
-    for (const m of [bodies, heads, hairs, hands]) { m.frustumCulled = false; group.add(m); }
+    // One bounding sphere (group-local) around every seat plus the tallest pose (jump + raised hands),
+    // so the instanced meshes can be frustum culled as a whole.
+    const bounds = new THREE.Box3();
+    for (const st of seats) bounds.expandByPoint(new THREE.Vector3(st.x, st.y, st.z));
+    const sphere = new THREE.Sphere();
+    if (N) {
+      bounds.getBoundingSphere(sphere);
+      sphere.center.y += 0.8 * scale;
+      sphere.radius += 1.3 * scale;
+    }
+    for (const m of [bodies, heads, hairs, hands]) {
+      m.frustumCulled = N > 0;
+      m.boundingSphere = sphere.clone();
+      group.add(m);
+    }
     group.add(markerMesh);
     bodies.count = heads.count = hairs.count = N; hands.count = N * 2;
 
@@ -1158,8 +1189,20 @@
     const p = new THREE.Vector3(), sc = new THREE.Vector3(), off = new THREE.Vector3(), zero = new THREE.Quaternion();
     const hidden = new THREE.Matrix4().makeScale(0, 0, 0);
 
+    /** Auto detail follows the quality tier; geometries a sport swapped in itself are left alone. */
+    function followQuality() {
+      const want = detailFor();
+      if (want === detail) return;
+      const from = crowdGeometry(detail), to = crowdGeometry(want);
+      const parts = ['body', 'head', 'hair', 'hand'];
+      [bodies, heads, hairs, hands].forEach((m, i) => { if (m.geometry === from[parts[i]]) m.geometry = to[parts[i]]; });
+      detail = want;
+      handle.detail = want;
+    }
+
     function tick(dt) {
       time += dt;
+      if (autoDetail) followQuality();
       const kT = 1 - Math.exp(-4 * dt), kC = 1 - Math.exp(-9 * dt);
       tense += ((mood === 'tense' ? 1 : 0) - tense) * kT;
       for (let i = 0; i < N; i++) {
@@ -1206,6 +1249,7 @@
     const handle = {
       group,
       count: N,
+      detail,
       cheer(intensity = 1, seconds = 2) {
         const p01 = clamp(intensity, 0, 1);
         for (let i = 0; i < N; i++) {
@@ -1592,7 +1636,13 @@
       const cam = currentCamera();
       for (let i = 0; i < length; i++) {
         const k = i * 6;
-        if (i >= filled) { alpha[i * 2] = alpha[i * 2 + 1] = 0; continue; }
+        if (i >= filled) {
+          // Unused tail: collapse onto the last live vertex pair so the final segment never stretches
+          // toward a stale position from before a clear()/reset (it would draw a fading ghost streak).
+          if (i > 0) { for (let j = 0; j < 6; j++) pos[k + j] = pos[k - 6 + j]; }
+          alpha[i * 2] = alpha[i * 2 + 1] = 0;
+          continue;
+        }
         const p = hist[i];
         const a = hist[Math.max(0, i - 1)], b = hist[Math.min(filled - 1, i + 1)];
         tan.subVectors(a, b);

@@ -684,7 +684,12 @@
   const MOVE_THRESHOLD = 12;
   const RELEASE_WINDOW_MS = 90;
   const PEAK_WINDOW_MS = 40;
-  const RELEASE_GAP_MS = 50;
+  // Lift-off gap (last movement → release). Up to HITCH_GAP_MS the gap is treated as a frame hitch or a
+  // dropped final move event and the motion's velocity is kept; from HOLD_GAP_MS on it is a deliberate
+  // hold-then-release and reads as slow; in between the two blend.
+  const HITCH_GAP_MS = 115;
+  const HOLD_GAP_MS = 150;
+  const MOVE_VEL_WINDOW_MS = 60;   // smoothing window of the velocity on 'move' payloads
 
   const inputEvents = U.emitter();
   let inputEnabled = true;
@@ -737,25 +742,35 @@
   function localXY(e) { return [e.clientX - canvasRect.left, e.clientY - canvasRect.top]; }
   function eventTime(e) { return e && e.timeStamp > 0 ? e.timeStamp : performance.now(); }
 
+  /** Velocity (px/s) of the path over the window ending at sample index `hi`, at least one step long. */
+  function windowVelocity(path, hi, windowMs) {
+    const head = path[hi];
+    let ref = path[Math.max(0, hi - 1)];
+    for (let i = hi - 1; i >= 0; i--) {
+      ref = path[i];
+      if (head.t - path[i].t >= windowMs) break;
+    }
+    const span = (head.t - ref.t) / 1000;
+    return span > 0.001 ? [(head.x - ref.x) / span, (head.y - ref.y) / span] : [0, 0];
+  }
+
   function buildSwipe(startP, endP) {
     const path = press.path, s = shortSide();
     const end = path[path.length - 1];
     const dx = end.x - press.sx, dy = end.y - press.sy;
     const dist = Math.hypot(dx, dy);
 
-    // Release velocity over the last ~90 ms of travel. A lift-off shortly after the last movement
-    // keeps the motion's velocity; a pause before lifting (hold still, then release) reads as slow.
+    // Release velocity over the last ~90 ms of travel, ending at the last movement. The gap between that
+    // movement and the lift-off decides how much of it survives: a short gap is a frame hitch or a missing
+    // last move event (full velocity), a real hold before lifting reads as slow (see HITCH_GAP_MS).
     let last = 0;
     for (let i = 1; i < path.length; i++) if (path[i].x !== path[i - 1].x || path[i].y !== path[i - 1].y) last = i;
-    const head = end.t - path[last].t <= RELEASE_GAP_MS ? path[last] : end;
-    let ref = path[0];
-    for (let i = last; i >= 0; i--) {
-      ref = path[i];
-      if (head.t - path[i].t >= RELEASE_WINDOW_MS) break;
+    const gap = end.t - path[last].t;
+    let [vx, vy] = last > 0 ? windowVelocity(path, last, RELEASE_WINDOW_MS) : [0, 0];
+    if (gap > HITCH_GAP_MS) {
+      const keep = 1 - U.clamp((gap - HITCH_GAP_MS) / (HOLD_GAP_MS - HITCH_GAP_MS), 0, 1);
+      vx *= keep; vy *= keep;
     }
-    const span = (head.t - ref.t) / 1000;
-    const vx = span > 0.001 ? (head.x - ref.x) / span : 0;
-    const vy = span > 0.001 ? (head.y - ref.y) / span : 0;
     const speed = Math.hypot(vx, vy);
 
     // Peak speed: fastest travel over any window of at least PEAK_WINDOW_MS (smooths sample jitter).
@@ -815,10 +830,16 @@
   function onPointerMove(e) {
     if (!press || e.pointerId !== press.id) return;
     const list = typeof e.getCoalescedEvents === 'function' ? e.getCoalescedEvents() : null;
-    const samples = list && list.length ? list : [e];
-    for (const c of samples) { const [x, y] = localXY(c); addSample(x, y, eventTime(c)); }
-    const last = press.path[press.path.length - 1];
+    const events = list && list.length ? list : [e];
+    const path = press.path, from = path.length;
+    for (const c of events) { const [x, y] = localXY(c); addSample(x, y, eventTime(c)); }
+    const last = path[path.length - 1];
     const p = pointerPayload(last.x, last.y, last.t);
+    // Coalesced samples since the previous move event, and a velocity smoothed over the last ~60 ms.
+    p.samples = path.slice(from).map(q => ({ x: q.x, y: q.y, t: q.t }));
+    const [vx, vy] = windowVelocity(path, path.length - 1, MOVE_VEL_WINDOW_MS);
+    const s = shortSide();
+    p.vx = vx; p.vy = vy; p.nvx = vx / s; p.nvy = vy / s; p.nspeed = Math.hypot(vx, vy) / s;
     SS.input.pointer = p;
     inputEvents.emit('move', p);
   }
