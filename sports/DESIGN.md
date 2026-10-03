@@ -59,7 +59,7 @@ Boot/Loading → Title ("Tap to start") → [first run: Pal Creator] → Main Me
 
 | id | Sport | Gesture | Modes | Players |
 |----|-------|---------|-------|---------|
-| `bowling` | Bowling (indoor alley) | drag sideways to position, aim buttons, **swipe up** to roll; swipe curve = hook | 10 Frames · Spare Challenge · 100-Pin | 1–4 hot-seat |
+| `bowling` | Bowling (indoor alley) | drag sideways to position, aim buttons, **swipe up** to roll; swipe curve = hook | 10 Frames · Spare Challenge · Power Pins | 1–4 hot-seat |
 | `tennis` | Tennis (sunny stadium) | auto-run; **swipe** to swing, timing aims, speed = power; tap+swipe to serve | Quick Match · Match · Rally Challenge | 1 vs CPU |
 | `baseball` | Home Run Derby | **swipe across** to swing; timing pulls/pushes, swipe angle = launch | Derby (10 pitches) · Sudden Death | 1 vs CPU pitcher |
 | `golf` | Golf (9-hole parkland) | aim, **pull down then flick up**; pull = power, flick straightness = accuracy | Beginner 3 · Expert 3 · Full 9 | 1–4 hot-seat |
@@ -187,6 +187,8 @@ SS.input = {   // unified pointer (mouse/touch/pen) + keyboard; listens on the c
 //   { id, x, y /*css px*/, nx, ny /* -1..1, ny UP-positive */, t /*ms*/,
 //     sx, sy /*start x,y of this press*/, dx, dy /*px from start, screen y DOWN-positive*/,
 //     ndx, ndy /* dx,dy divided by min(w,h) */, duration /*s since down*/ }
+// 'move' payloads add: samples [{x, y, t}] (coalesced samples since the previous move event, ≥ 0 entries),
+//     vx, vy (px/s, screen axes, smoothed over the last ~60 ms), nvx, nvy, nspeed (same / min(w,h))
 // Swipe payload s (emitted on release when travel ≥ 12 px, after 'up'):
 //   { start:p, end:p, dx, dy, dist, duration,
 //     vx, vy, speed            // px/s, measured over the last ~90 ms of travel (release velocity)
@@ -363,9 +365,11 @@ SS.ui = {
   icon(name) -> svg string   // 'pause' 'play' 'home' 'retry' 'gear' 'trophy' 'medal' 'user' 'users' 'back' 'close'
                              // 'check' 'star' 'left' 'right' 'up' 'down' 'rotate-left' 'rotate-right' 'map' 'sound' 'mute' 'info' 'flag' 'wind'
   button(label, onClick, { kind='primary'|'secondary'|'ghost'|'round', icon, sfx='ui_select' }) -> HTMLButtonElement
-  banner(text, { sub, kind='great'|'good'|'info'|'bad'|'huge', duration=1.6, color }) -> Promise
+  banner(text, { sub, kind='great'|'good'|'info'|'bad'|'huge', duration=1.6, color, caseSensitive=false }) -> Promise
         // big center pop with bounce + shine; 'huge' for STRIKE/HOME RUN/ACE (plays no sound — sports pick sounds)
-  toast(text, { duration=2, icon }) -> void       // small pill top-center
+        // uppercase unless caseSensitive; the promise (resolves when gone) has .dismiss(fast) and .el;
+        // SS.ui.dismissBanner(fast) ends whichever banner is showing
+  toast(text, { duration=2, icon }) -> void       // small pill top-center (during play: below the .ss-hud-top row)
   hint({ gesture, text, x, y }) -> { hide(), el }  // animated hand glyph demonstrating the gesture
         // gestures: 'swipe-up' 'swipe-up-curve' 'swipe-left' 'swipe-right' 'swipe-across' 'drag-down-up'
         //           'drag-h' 'tap' 'hold' ; x,y css px anchor (default bottom center)
@@ -498,14 +502,12 @@ Everything in §6 works as written. The items below are what the implementation 
 sport modules may rely on all of them.
 
 ### 10.1 Sport files today
-`js/sports/*.js` currently hold **placeholder modules**: the `SS.registerSport` metadata (name, tagline,
-accent/tint, icon, music, players/opponent, modes, howTo, medals) is final and tuned for the menu; `create()`
-is a three-shot practice scene. A sport owner keeps the metadata (adjusting medal wording to the real
-rules if needed) and replaces `create()` and everything below it.
+`js/sports/*.js` hold the four complete sports. Mode ids are stable save keys (records, last setup), so a
+renamed mode keeps its id: bowling's `hundred` is shown as **Power Pins**.
 
 | id | accent / tint | modes | players / opponent |
 |----|---------------|-------|--------------------|
-| bowling | `#FF5A5F` / `#FFE8E6` | `game` 10 Frames · `spare` Spare Challenge · `hundred` 100-Pin | 1–4 / – |
+| bowling | `#FF5A5F` / `#FFE8E6` | `game` 10 Frames · `spare` Spare Challenge · `hundred` Power Pins (10 rolls; the rack grows from 10 to 91 pins) | 1–4 / – |
 | tennis | `#8E5BE0` / `#F1EAFF` | `quick` Quick Match · `match` Match · `rally` Rally Challenge | 1 / CPU |
 | baseball | `#2E86F0` / `#E4F0FF` | `derby` Home Run Derby · `sudden` Sudden Death | 1 / CPU |
 | golf | `#2FAE55` / `#E5F7E8` | `beginner` Beginner 3 · `expert` Expert 3 · `full9` Full 9 | 1–4 / – |
@@ -530,10 +532,23 @@ Keep taglines ≤ 23 characters (they are single-line on landscape menu cards).
 
 ### 10.3 Shell behaviour (main.js, ui.js)
 - The core pause button is `#ss-pause`, a sibling of `#ss-hud` (a sport emptying the HUD can't remove it).
-- While a game is loaded `#ss-root` has class `is-playing`; toasts then sit below the top-center HUD row.
+- While a game is loaded `#ss-root` has class `is-playing`; toasts then sit 8 px below the measured bottom of the
+  sport's `#ss-hud .ss-hud-top` row(s) (64 px fallback when none is showing).
 - Banners, hints and pop-ups are hidden while the pause menu or a modal is open; don't rely on banners during
   your own `ui.choose()`.
-- In short landscape (height ≤ 520 px) a default-positioned `ui.hint()` tucks into the bottom-right corner.
+- In short landscape (height ≤ 520 px) a default-positioned `ui.hint()` is compact (glyph beside the text) on the
+  right edge, lifted ~96 px above the bottom so it clears round HUD buttons in the bottom corners and the
+  bottom-center chips. A hint at `x, y` sizes to its content and its center is clamped so it stays fully on screen
+  inside the safe area.
+- How to Play closes with its button, a tap anywhere on the card, or Enter / Space (the key never reaches the game).
+  When steps + tips overflow (short landscape) the body fades at the cut edge and shows a bouncing chevron.
+- `ui.hint({ ..., textMaxWidth })` narrows the text box before an anchored hint is measured and clamped (setting
+  the width afterwards leaves the hint centered for the wider box).
+- The transition curtain waits for the iris close to land (240 ms grace on a slow frame), then `.is-closed` snaps it
+  shut (`transition: none`) before the double rAF and `fn()`: the swap underneath is never visible.
+- Escape while the transition curtain runs never navigates: it opens the pause menu if a started, pausable game is
+  live and not being left (quit/restart/launch mark the game as leaving); otherwise it is dropped.
+- `ui.haptic()` is silent until the page has had a user gesture (no browser console error).
 - `.ss-hud-top` is capped to the width between the side buttons (pause at top-left) and wraps its children
   onto a second row on narrow phones; keep top-center HUD rows to two or three short chips.
 - On every exit (quit, restart, finish → menu, launch) main.js also clears `#ss-fx` (banners, hints, toasts,
@@ -541,7 +556,7 @@ Keep taglines ≤ 23 characters (they are single-line on landscape menu cards).
 - `SS.ui` extensions: `events` ('pause' when the pause button is pressed, 'back' for Escape with no modal open),
   `esc`, `sfx`, `haptic(ms)`, `letters(text)`, `gestureSVG(name)`, `modal({className, dismissValue, backdrop})`
   → `{el, panel, close(v), result}`, `closeTop()`, `modalOpen()`, `confetti({count, colors})` (DOM, over panels),
-  `clearFx()`, `pauseButton`, `GESTURES`, `ICONS`. Extra icons: edit plus trash dice lock sparkle chart bulb crown.
+  `clearFx()`, `dismissBanner(fast)`, `safeInsets()` → `{top, right, bottom, left}` px, `pauseButton`, `GESTURES`, `ICONS`. Extra icons: edit plus trash dice lock sparkle chart bulb crown.
   `button()` also takes `className`, `haptic`, `sfx: null` (silent); `confirm()` takes `{ danger: true }`.
 - `SS.app` (tests): `showScreen(id, opts)`, `launch(cfg, {intro})`, `openSetup(sport)`, `openPause()`,
   `sampleResults()`, `plaza`, getters `game`, `screen`.
@@ -555,8 +570,10 @@ Keep taglines ≤ 23 characters (they are single-line on landscape menu cards).
 - While paused or `input.enabled === false`, pointer events are dropped and only the Escape key is delivered;
   a press in progress gets an `up` with `cancelled: true` (no tap/swipe).
 - Pointer `move` fires only while pressed. Swipe `vx/vy` use screen axes (vy > 0 = moving down), like dx/dy.
-  Extra fields: `pointerType`, `cancelled`. Release velocity ignores a lift-off gap < 50 ms; a longer stop
-  before lifting reads as slow (nspeed → 0). A 400 ms press without moving is neither tap nor swipe.
+  Extra fields: `pointerType`, `cancelled`. Release velocity is measured over the last ~90 ms of movement and is
+  hitch-tolerant: a lift-off gap up to 115 ms (a frame hitch or a dropped last move event) keeps the full velocity,
+  a hold of ≥ 150 ms before lifting reads as slow (nspeed → 0), and 115–150 ms blends between the two.
+  A 400 ms press without moving is neither tap nor swipe.
 - Extras: `engine.tier` (`{shadows, shadowMapSize, dpr, maxPixels}`), `QUALITY_TIERS`, `qualitySetting`
   ('auto' or a tier), `hidden`, event `'contextrestored'`, `project()` also returns `behind` and `z`,
   `slowmo()` returns a Promise, `init()` returns false (with a friendly card) without WebGL.
@@ -594,8 +611,14 @@ Keep taglines ≤ 23 characters (they are single-line on landscape menu cards).
 - `texture(name, { repeat:[x,y] })` returns a cached repeating copy (never mutate returned textures);
   ground textures take `color`; `checker` takes `colors`, `cells`; `banner` takes `width`, `height`.
 - `mat()` also takes `vertexColors`, `flatShading`, `fog`, `depthWrite`.
-- `stands()` group has `userData.rows` ready for `crowd({ rows })`; crowd handle has `count`.
-- `burst({colors})`, `confetti({floor})` (pieces settle at y = floor), `trail({maxJump})` + `handle.mesh`,
+- `stands()` group has `userData.rows` ready for `crowd({ rows })`; crowd handle has `count` and `detail`.
+- `crowd({ detail: 'high' | 'low' })`: 'low' (~190 triangles a fan instead of ~730: fewer lathe/sphere segments,
+  octahedron hands). Without `detail` it follows the quality tier — 'low' below `'high'` — and switches live when
+  the tier changes. Every crowd mesh has a bounding sphere covering all seats plus the tallest pose (jump, raised
+  hands), so crowds are frustum culled. `group.children` order is fixed: body, head, hair, hands (InstancedMeshes),
+  then a hidden marker Mesh; a sport may swap those geometries itself (auto detail then leaves them alone).
+- `burst({colors})`, `confetti({floor})` (pieces settle at y = floor), `trail({maxJump})` + `handle.mesh`
+  (after `clear()`, `visible = false` or a `maxJump` reset the trail restarts cleanly from the object — no streak),
   `label3d()` sprite has `userData.setText(text)`; `bg: null` draws outlined text without a pill.
 - Exports `mergeGeometries(list)`, `paint(geo, hex)` (vertex colors), `gradient`, `SKIES`.
 
@@ -609,6 +632,10 @@ Keep taglines ≤ 23 characters (they are single-line on landscape menu cards).
 - Extras: `SS.pals.ANIMATIONS`, `EXPRESSIONS`, `OPTIONS.shirtNames`, roster entries have `tag` (flavour line),
   `pal.parts.neck`. A pal costs ~15 draw calls (+ the same again in the shadow pass) — budget accordingly.
 - Portraits use one dedicated alpha renderer (one extra WebGL context), are synchronous and cached.
+- `pal.dispose()` also disposes equipment still attached with `pal.attach()` (geometry, materials, textures via
+  `engine.disposeObject`, so anything marked `userData.shared` inside it survives); an attached object that is
+  itself `userData.shared` is only detached. `pal.detach(obj)` first to keep equipment. Disposing twice is harmless,
+  so sports that dispose their equipment before `pal.dispose()` need no change.
 
 ### 10.9 Performance reference (menu plaza, 390×844)
 low: ~62 draw calls / 98k triangles · medium (shadows): ~103 calls / 161k triangles. Title view (whole plaza):

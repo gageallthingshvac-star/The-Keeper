@@ -637,6 +637,14 @@
       old.el.style.pointerEvents = 'none';
       setTimeout(() => old.el.remove(), 260);
     }
+    // DOM confetti belongs to the plaza screens; it must not rain over the text of a panel screen
+    if (id !== 'menu' && id !== 'title') {
+      for (const c of ui.fx.querySelectorAll('.ss-confetti')) {
+        c.style.transition = 'opacity .25s';
+        c.style.opacity = '0';
+        setTimeout(() => c.remove(), 260);
+      }
+    }
     const s = make(opts);
     s.id = id;
     current = s;
@@ -940,7 +948,11 @@
         if (sel && sel.tag) os.appendChild(ui.el('p', 'opp-tag', '“' + esc(sel.tag) + '” — ' + esc(sel.profile.name)));
         requestAnimationFrame(() => {
           const on = row.querySelector('.on');
-          if (on && !row.dataset.scrolled) { row.scrollLeft = on.offsetLeft - row.clientWidth / 2 + on.clientWidth / 2; row.dataset.scrolled = '1'; }
+          if (on && !row.dataset.scrolled) {
+            const rr = row.getBoundingClientRect(), orr = on.getBoundingClientRect();
+            row.scrollLeft += orr.left - rr.left - (rr.width - orr.width) / 2;
+            row.dataset.scrolled = '1';
+          }
         });
       }
       body.scrollTop = scroll;
@@ -1073,6 +1085,8 @@
       for (const img of body.querySelectorAll('img[data-key]')) {
         const v = JSON.parse(img.dataset.value);
         const variant = Object.assign({}, profile, { [img.dataset.key]: v });
+        // Eye and brow thumbnails show the bare face: shades would hide every choice.
+        if (img.dataset.key === 'eyes' || img.dataset.key === 'brows') variant.glasses = 0;
         const sig = profileKeyOf(variant);
         if (img.dataset.sig === sig) continue;
         previewQueue.push({ img, variant, sig });
@@ -1207,9 +1221,20 @@
     renderBody();
     plaza.setHero(profile, 'hop');
     let removeBubble = null;
-    const bubbleTimer = setTimeout(() => {
-      if (current && current.el === el) removeBubble = speechBubble(mode === 'edit' ? 'New look?' : 'Make me yours!', 2.8);
-    }, 800);
+    // The bubble waits for the camera to settle on the pal inside the stage (it flies in from the last screen;
+    // on a slow device that takes a while) and is skipped if the pal never gets there.
+    let bubbleTries = 0, bubbleTimer = 0, lastHead = null;
+    const tryBubble = () => {
+      if (!current || current.el !== el) return;
+      const p = plaza.heroHeadScreen();
+      const r = stage.getBoundingClientRect();
+      const inside = p && !p.behind && p.x > r.left + 10 && p.x < r.right - 10 && p.y > r.top - 10 && p.y < r.bottom - 30;
+      const settled = inside && lastHead && Math.abs(p.x - lastHead.x) < 8 && Math.abs(p.y - lastHead.y) < 8;
+      lastHead = p;
+      if (settled) { removeBubble = speechBubble(mode === 'edit' ? 'New look?' : 'Make me yours!', 2.8); return; }
+      if (++bubbleTries < 40) bubbleTimer = setTimeout(tryBubble, 120);
+    };
+    bubbleTimer = setTimeout(tryBubble, 800);
     return {
       el, music: 'editor', camera: Object.assign(CAMERAS.hero('.ed-stage'), { fill: 0.84, keepSpin: true }),
       back() { if (mode !== 'first') leave(); },
@@ -1324,6 +1349,7 @@
         b.innerHTML = '<span class="ti">' + sportIcon(s) + '</span><span>' + esc(s.name) + '</span>';
         b.addEventListener('click', () => { if (sel !== s) { sel = s; sfx('ui_tick'); renderTabs(); renderContent(); } });
         tabs.appendChild(b);
+        if (s === sel) requestAnimationFrame(() => { if (b.isConnected) b.scrollIntoView({ block: 'nearest', inline: 'nearest' }); });
       }
     }
 
@@ -1438,6 +1464,8 @@
         if (key === 'haptics' && st[key]) ui.haptic(25);
       });
       row.appendChild(b);
+      // the whole row is the hit target, as phones lead people to expect
+      row.addEventListener('click', e => { if (e.target !== b && !b.contains(e.target)) b.click(); });
       parent.appendChild(row);
     }
 
@@ -1616,6 +1644,7 @@
   async function launch(cfg, opts = {}) {
     const intro = opts.intro !== false;
     while (ui.modalOpen()) ui.closeTop();
+    markLeaving();
     const g = await ui.transition(async () => {
       if (game) teardown(game);
       closeResults();
@@ -1667,8 +1696,16 @@
   }
 
   /** Leaves the sport and lands on the menu (optionally reopening the setup sheet). */
+  /** Marks the live game as being left: from now on nothing may pause it (the curtain is closing). */
+  function markLeaving() {
+    if (!game) return;
+    game.leaving = true;
+    refreshPauseButton();
+  }
+
   async function exitToMenu(reopenSetup) {
     const sport = game && game.sport;
+    markLeaving();
     await ui.transition(() => {
       if (game) teardown(game);
       closeResults();
@@ -1680,8 +1717,11 @@
   async function quitGame(ask) {
     if (!game) return;
     if (ask) {
+      // the confirm takes the pause card's place rather than stacking on top of it
+      const covered = pauseEl;
+      if (covered) covered.classList.add('is-covered');
       const ok = await ui.confirm('Quit this game?', "This game won't count.", { yes: 'Quit', no: 'Keep playing' });
-      if (!ok) return;
+      if (!ok) { if (covered) covered.classList.remove('is-covered'); return; }
     }
     exitToMenu(false);
   }
@@ -1689,6 +1729,7 @@
   async function restartGame() {
     if (!game) return;
     const cfg = Object.assign({}, game.cfg, { seed: params.seed != null ? game.cfg.seed : null });
+    markLeaving();
     const g = await ui.transition(async () => {
       teardown(game);
       closeResults();
@@ -1705,12 +1746,12 @@
   let pauseEl = null;
 
   function refreshPauseButton() {
-    ui.setPauseVisible(!!(game && game.started && !game.finished && game.pausable && !pauseEl));
+    ui.setPauseVisible(!!(game && game.started && !game.finished && !game.leaving && game.pausable && !pauseEl));
   }
 
   function openPause() {
     const g = game;
-    if (!g || !g.started || g.finished || !g.pausable || pauseEl) return;
+    if (!g || !g.started || g.finished || g.leaving || !g.pausable || pauseEl) return;
     SS.engine.pause();
     const mode = modeOf(g.sport, g.cfg.mode);
     pauseEl = ui.el('div', 'ss-pause');
@@ -1900,7 +1941,8 @@
       sec.innerHTML = '<h3>' + ui.icon('chart') + 'Stats</h3>';
       const grid = ui.el('div', 'stat-grid');
       result.stats.forEach((s, i) => {
-        const cell = ui.el('div', 'stat', '<b>' + esc(s.value) + '</b><small>' + esc(s.label) + '</small>');
+        const len = String(s.value).length;
+        const cell = ui.el('div', 'stat' + (len > 8 ? ' longer' : len > 5 ? ' long' : ''), '<b>' + esc(s.value) + '</b><small>' + esc(s.label) + '</small>');
         cell.style.setProperty('--i', i);
         grid.appendChild(cell);
       });

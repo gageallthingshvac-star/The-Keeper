@@ -2482,7 +2482,7 @@
       let sub = null;
       if (reason === 'ace') { kind = yours ? 'huge' : 'info'; sub = lastShot && lastShot.kmh ? lastShot.kmh + ' km/h' : null; if (yours) audio.sfx('fanfare_small'); }
       else if (reason === 'smash') { kind = yours ? 'huge' : 'info'; }
-      else if (reason === 'winner') { kind = yours ? 'great' : 'info'; if (!yours) sub = CPU_NAME + ' scores'; }
+      else if (reason === 'winner') { kind = yours ? 'great' : 'info'; if (!yours) { text = 'POINT'; sub = CPU_NAME + ' hits a winner'; } }
       else if (reason === 'out' || reason === 'net') { kind = yours ? 'good' : 'bad'; if (!yours) sub = errorWhy(); }
       else if (reason === 'double') { kind = yours ? 'good' : 'bad'; }
       else if (reason === 'whiff') { text = yours ? 'NICE SHOT!' : 'MISSED!'; kind = yours ? 'great' : 'bad'; if (yours) sub = CPU_NAME + ' missed it'; }
@@ -2963,7 +2963,8 @@
         if (ballOffset.lengthSq() < 1e-6 || !ball.live) ballOffset.set(0, 0, 0);
         ballMesh.position.set(ball.x + ballOffset.x, Math.max(BALL_R, ball.y + ballOffset.y), ball.z + ballOffset.z);
         const dist = camera.position.distanceTo(ballMesh.position);
-        const s = clamp(dist * 0.16, 1, 6);
+        // portrait views the court through a wider vertical field of view: draw the ball a little bigger there
+        const s = clamp(dist * 0.16, 1, 6) * (engine.size.w < engine.size.h ? 1.3 : 1);
         ballMesh.scale.setScalar(s);
         ballShadow.visible = ball.y < 12;
         ballShadow.position.set(ball.x, 0.011, ball.z);

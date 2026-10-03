@@ -1775,9 +1775,8 @@
       // narrow phones: lower and tucked to the edge, clear of the pitch's path to the plate
       const narrow = w < 360;
       const x = narrow ? (H > 0 ? w - 66 : 66) : H > 0 ? clamp(w * 0.76, 100, w - 100) : clamp(w * 0.2, 90, w - 100);
-      hint = ui.hint({ gesture: 'swipe-across', text: HINT_TEXT, x, y: h * (narrow ? 0.6 : H > 0 ? 0.4 : 0.47) });
-      const tx = hint.el.querySelector('.ss-hint-text');
-      if (tx) tx.style.maxWidth = narrow ? '120px' : H > 0 ? '190px' : '160px';
+      hint = ui.hint({ gesture: 'swipe-across', text: HINT_TEXT, x, y: h * (narrow ? 0.6 : H > 0 ? 0.4 : 0.47),
+        textMaxWidth: narrow ? 120 : H > 0 ? 190 : 160 });
     }
     function hideHint() { if (hint) { hint.hide(); hint = null; } }
 
@@ -2683,11 +2682,11 @@
         title: won ? (state.hr >= GOAL + 3 ? 'Slugger!' : 'Goal Reached!') : state.hr > 0 ? 'Nice Swings!' : 'Keep Swinging!',
         headline: String(state.hr), headlineLabel: state.hr === 1 ? 'Home Run' : 'Home Runs',
         players: [
-          { profileId: me.id, name: me.name, profile: me, score: state.hr + ' HR', place: won ? 1 : 2, isCpu: false, skillDelta: delta },
-          { profileId: opp.profile.id, name: opp.profile.name, profile: opp.profile, score: 'Target ' + GOAL + ' HR', place: won ? 2 : 1, isCpu: true },
+          // the pitcher never bats, so it isn't ranked: the goal is reported as a stat instead
+          { profileId: me.id, name: me.name, profile: me, score: state.hr + ' HR', place: 1, isCpu: false, skillDelta: delta },
         ],
         stats: [
-          { label: won ? 'Goal reached' : 'Goal missed', value: (won ? '✓ ' : '✗ ') + GOAL + ' HR' },
+          { label: 'Goal · ' + GOAL + ' HR', value: won ? '✓ Reached' : '✗ Missed' },
           { label: 'Longest Homer', value: state.longest ? state.longest + ' m' : '—' },
           { label: 'Total HR Distance', value: state.totalHrDist ? U.fmt.int(state.totalHrDist) + ' m' : '—' },
           { label: 'Best Streak', value: String(state.bestStreak) },

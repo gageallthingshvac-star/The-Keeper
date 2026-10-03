@@ -4732,11 +4732,13 @@
       const best = order[0];
       const records = [];
       const pid = prof => (prof.isGuest ? null : prof.id);
-      const rec = (key, value, label, fmt, prof, higher, shown) => {
+      // hot-seat: the results line names whose record it is (the stored label stays plain)
+      const rec = (key, value, label, fmt, prof, higher, shown, who) => {
         const r = debugTouched ? null : save.record(DEF.id, key, value, { higherIsBetter: higher, profileId: pid(prof), label, fmt });
-        records.push({ label, value: shown, isNew: !!(r && r.isNew) });
+        records.push({ label: players.length > 1 ? label + ' · ' + (who || prof.name) : label, value: shown, isNew: !!(r && r.isNew) });
       };
-      rec('best_' + mode, totals[best], 'Best ' + modeName, '{v} strokes', players[best].profile, false, totals[best] + ' (' + toParText(tps[best]) + ')');
+      const bestNames = players.filter((p, i) => totals[i] === totals[best]).map(p => p.profile.name).join(' & ');
+      rec('best_' + mode, totals[best], 'Best ' + modeName, '{v} strokes', players[best].profile, false, totals[best] + ' (' + toParText(tps[best]) + ')', bestNames);
       const driveI = stats.reduce((b, s, i) => (s.drive > stats[b].drive ? i : b), 0);
       if (stats[driveI].drive > 0) rec('drive', Math.round(stats[driveI].drive), 'Longest Drive', 'meters', players[driveI].profile, true, Math.round(stats[driveI].drive) + ' m');
       const puttI = stats.reduce((b, s, i) => (s.longPutt > stats[b].longPutt ? i : b), 0);

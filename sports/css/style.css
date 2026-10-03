@@ -269,6 +269,7 @@
 .ss-banner.huge { --f1: #FFFDE2; --f2: #FFB020; --stroke: #E2333B; top: 38%; }
 .ss-banner.huge .ss-banner-text { font-size: clamp(48px, min(16.5vw, 23vh), 136px); }
 .ss-banner.good .ss-banner-text, .ss-banner.info .ss-banner-text { font-size: clamp(32px, min(10vw, 14vh), 76px); }
+.ss-banner.keep-case .ss-banner-text { text-transform: none; letter-spacing: .01em; }
 .ss-banner-sub {
   margin-top: 12px; padding: 7px 16px; border-radius: 999px; max-width: min(92vw, 520px);
   background: rgba(20, 32, 56, .62); color: #fff; font: 800 clamp(15px, 4.2vw, 21px)/1.2 var(--font-ui);
@@ -286,7 +287,8 @@
   position: absolute; left: 50%; top: calc(var(--sat) + 14px); transform: translateX(-50%);
   display: flex; flex-direction: column; align-items: center; gap: 8px; width: max-content; max-width: calc(100vw - 132px);
 }
-/* During play the sport owns the top-center HUD row: toasts drop below it. */
+/* During play the sport owns the top-center HUD row: toasts drop below it (ui.js measures the row's
+   real bottom and sets top inline; this is only the fallback when no .ss-hud-top is showing). */
 #ss-root.is-playing .ss-toasts { top: calc(var(--sat) + 64px); }
 .ss-toast {
   display: flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 999px; max-width: 100%;
@@ -300,13 +302,18 @@
   position: absolute; left: 50%; bottom: calc(var(--sab) + 60px); transform: translateX(-50%);
   display: flex; flex-direction: column; align-items: center; animation: ss-fade-in .35s both;
 }
-.ss-hint.at { bottom: auto; transform: translate(-50%, -50%); }
+/* Anchored hints size to their content (not to the room right of the anchor); ui.js clamps the center. */
+.ss-hint.at { bottom: auto; transform: translate(-50%, -50%); width: max-content; max-width: calc(100% - 16px); }
 .ss-hint.is-out { animation: ss-fade-out .25s forwards; }
 @media (max-height: 520px) {
-  /* Short landscape: tuck the default hint into the bottom-right corner, clear of the action. */
-  .ss-hint:not(.at) { left: auto; right: calc(var(--sar) + 18px); bottom: calc(var(--sab) + 12px); transform: none; }
-  .ss-hint:not(.at) .ss-gesture { width: 100px; height: 126px; }
-  .ss-hint:not(.at) .ss-hint-text { font-size: 14px; max-width: 220px; }
+  /* Short landscape: a compact side-by-side hint on the right edge, lifted above the bottom corner where
+     sports put round HUD buttons, and clear of the bottom-center chips and the middle of the action. */
+  .ss-hint:not(.at) {
+    left: auto; right: calc(var(--sar) + 14px); bottom: calc(var(--sab) + 96px); transform: none;
+    flex-direction: row; gap: 2px; max-width: min(300px, 44vw);
+  }
+  .ss-hint:not(.at) .ss-gesture { width: 62px; height: 78px; flex: none; }
+  .ss-hint:not(.at) .ss-hint-text { margin: 0; padding: 7px 13px; font-size: 13.5px; max-width: 200px; text-align: left; border-radius: 18px; }
 }
 .ss-gesture { width: 136px; height: 172px; overflow: visible; filter: drop-shadow(0 4px 6px rgba(10, 30, 60, .3)); }
 .ss-hint-text {
@@ -429,6 +436,21 @@
 .ss-howto-head small { display: block; font: 800 12px/1 var(--font-ui); letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
 .ss-howto-head h2 { margin: 3px 0 0; font-size: 30px; line-height: 1; }
 .ss-howto-body { padding: 4px 18px 6px; min-height: 0; }
+/* Overflowing body: fade the cut edge and keep a visible scrollbar so the tips below read as scrollable. */
+.ss-howto-body.is-more { -webkit-mask-image: linear-gradient(#000 calc(100% - 34px), rgba(0, 0, 0, .12)); mask-image: linear-gradient(#000 calc(100% - 34px), rgba(0, 0, 0, .12)); }
+.ss-howto-body.is-scrollable { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--accent) 55%, #fff) transparent; }
+.ss-howto-body.is-scrollable::-webkit-scrollbar { width: 6px; }
+.ss-howto-body.is-scrollable::-webkit-scrollbar-thumb { border-radius: 99px; background: color-mix(in srgb, var(--accent) 55%, #fff); }
+.ss-howto .ss-modal-panel { cursor: pointer; }
+.ss-howto-more { position: relative; height: 0; flex: none; pointer-events: none; }
+.ss-howto-more i {
+  position: absolute; right: 16px; bottom: 4px; width: 30px; height: 22px; border-radius: 999px;
+  display: grid; place-items: center; background: var(--accent); color: #fff; box-shadow: 0 2px 6px rgba(22, 58, 108, .25);
+  opacity: 0; transform: translateY(6px); transition: opacity .2s, transform .2s;
+}
+.ss-howto-more .ss-icon { width: 18px; height: 18px; stroke-width: 3; }
+.ss-howto .has-more .ss-howto-more i { opacity: 1; transform: none; animation: ss-nudge 1.4s ease-in-out infinite; }
+@keyframes ss-nudge { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(3px); } }
 .ss-howto-steps { display: grid; gap: 10px; }
 .ss-howto-step {
   display: flex; align-items: center; gap: 14px; padding: 8px 14px 8px 8px; border-radius: 20px;
@@ -447,6 +469,7 @@
 }
 .ss-howto-text span { font: 800 16px/1.3 var(--font-ui); color: var(--ink); }
 .ss-howto-tips { margin-top: 12px !important; display: grid; gap: 6px; }
+#ss-root .ss-howto-tips { padding-right: 30px; }   /* a gutter for the "more" chevron */
 .ss-howto-tips li { display: flex; gap: 8px; align-items: flex-start; font: 700 14px/1.35 var(--font-ui); color: var(--ink-soft); }
 .ss-howto-tips .ss-icon { width: 20px; height: 20px; color: var(--yellow-d); margin-top: -1px; }
 .ss-howto .ss-modal-foot { margin: 0; padding: 12px 18px 16px; }
@@ -463,6 +486,7 @@
 #ss-fade.is-closing .ss-iris, #ss-fade.is-closed .ss-iris {
   visibility: visible; width: 0; height: 0; transition: width .38s cubic-bezier(.55, 0, .8, .45), height .38s cubic-bezier(.55, 0, .8, .45);
 }
+#ss-fade.is-closed .ss-iris { transition: none; }
 #ss-fade.is-opening .ss-iris { visibility: visible; transition: width .42s cubic-bezier(.2, .55, .35, 1), height .42s cubic-bezier(.2, .55, .35, 1); }
 .ss-iris-sun {
   position: absolute; left: 50%; top: 50%; width: 92px; height: 92px; margin: -46px 0 0 -46px; border-radius: 50%;
@@ -489,7 +513,10 @@
 .scr-heading {
   flex: 1; min-width: 0; margin: 0; font-size: clamp(24px, 6.6vw, 34px); line-height: 1.1; color: #fff;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  text-shadow: 0 2px 0 rgba(22, 103, 184, .6), 0 4px 16px rgba(22, 103, 184, .4);
+  /* a solid outline (like the logo's stroke) so white headings hold up on a pale sky */
+  text-shadow: 1.5px 0 0 #1667B8, -1.5px 0 0 #1667B8, 0 1.5px 0 #1667B8, 0 -1.5px 0 #1667B8,
+    1px 1px 0 #1667B8, -1px 1px 0 #1667B8, 1px -1px 0 #1667B8, -1px -1px 0 #1667B8,
+    0 3px 0 #1667B8, 0 5px 14px rgba(22, 103, 184, .45);
 }
 .count-chip {
   flex: none; padding: 7px 13px; border-radius: 999px; background: rgba(255, 255, 255, .94);
@@ -738,6 +765,12 @@
   content: ''; position: absolute; left: 15px; top: 11px; width: 12px; height: 18px; border: solid #fff; border-width: 0 4px 4px 0;
   transform: rotate(40deg); filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .35));
 }
+@media (max-width: 359px) {
+  /* six skin tones stay on one row instead of leaving one swatch alone */
+  .swatches { gap: 6px; }
+  .swatch { width: 37px; height: 37px; }
+  .swatch.on::after { left: 12px; top: 8px; width: 10px; height: 16px; }
+}
 .previews { display: grid; grid-template-columns: repeat(auto-fill, minmax(74px, 1fr)); gap: 8px; }
 .preview {
   appearance: none; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; padding: 4px 4px 5px; cursor: pointer;
@@ -823,6 +856,13 @@
 .rec-tab.on { background: #fff; color: var(--ink); box-shadow: inset 0 -4px 0 var(--accent), 0 2px 8px rgba(22, 58, 108, .12); }
 .rec-tab .ti { width: 34px; height: 34px; flex: none; }
 .rec-tab .ti svg { width: 100%; height: 100%; display: block; }
+@media (max-width: 560px) {
+  /* Four equal tabs, icon over a short label, so every sport fits on a phone. */
+  .rec-tabs { gap: 4px; padding: 8px; }
+  .rec-tab { flex: 1 1 0; min-width: 0; flex-direction: column; gap: 2px; padding: 6px 2px; font-size: 13px; }
+  .rec-tab > span:last-child { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rec-tab .ti { width: 26px; height: 26px; }
+}
 .rec-content { flex: 1; min-height: 0; padding: 2px 16px 18px; }
 .rec-sec h3, .set-group h3, .res-sec h3 {
   display: flex; align-items: center; gap: 8px; margin: 16px 0 8px; font-size: 19px; line-height: 1.1; color: var(--ink);
@@ -867,6 +907,7 @@
 .set-row { display: flex; align-items: center; gap: 12px; min-height: 58px; padding: 8px 0; border-bottom: 2px solid var(--panel-2); }
 .set-label { flex: 1; min-width: 0; font: 800 16px/1.2 var(--font-ui); }
 .set-label small { display: block; margin-top: 2px; font: 700 13px/1.3 var(--font-ui); color: var(--ink-soft); }
+.set-row.toggle { cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none; }
 .set-row.slider .set-label { flex: 0 0 auto; width: 74px; }
 .set-row.slider input { flex: 1; min-width: 0; }
 .set-val { width: 34px; flex: none; text-align: right; font: 700 17px/1 var(--font-display); color: var(--blue-d); }
@@ -907,6 +948,8 @@
   animation: ss-fade-in .2s both;
 }
 .ss-pause.is-out { animation: ss-fade-out .2s forwards; }
+.ss-pause.is-covered { background: transparent; }
+.ss-pause.is-covered .pause-panel { visibility: hidden; }
 .pause-panel { width: min(380px, 100%); max-height: 100%; overflow-y: auto; padding: 20px; animation: ss-panel-in .32s cubic-bezier(.3, 1.4, .5, 1) both; }
 .pause-head { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
 .pause-icon { width: 58px; height: 58px; flex: none; }
@@ -974,6 +1017,9 @@
   animation: ss-pop .45s cubic-bezier(.3, 1.6, .5, 1) both; animation-delay: calc(var(--i) * 70ms + .5s);
 }
 .stat b { display: block; font: 700 25px/1.05 var(--font-display); color: color-mix(in srgb, var(--accent) 82%, #000); }
+/* longer values ("32 km/h", "1,234 m") step down so they stay on one line in a narrow cell */
+.stat.long b { font-size: 21px; line-height: 1.2; }
+.stat.longer b { font-size: 18px; line-height: 1.35; }
 .stat small { display: block; margin-top: 2px; font: 900 10.5px/1.2 var(--font-ui); letter-spacing: .07em; text-transform: uppercase; color: var(--ink-soft); }
 .skill-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px 8px 8px; border-radius: 16px; background: var(--panel-2); margin-bottom: 6px; }
 .skill-row .ss-portrait { width: 36px; height: 36px; }
@@ -995,11 +1041,12 @@
 .res-records { display: grid; gap: 6px; }
 .res-records li { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 8px 12px; border-radius: 14px; background: var(--panel-2); }
 .res-records li span { flex: 1; min-width: 0; font: 800 14px/1.25 var(--font-ui); }
-.res-records li b { font: 700 21px/1 var(--font-display); }
+.res-records li b { flex: none; max-width: 60%; font: 700 21px/1.05 var(--font-display); text-align: right; overflow-wrap: anywhere; }
 .res-records li.is-new { background: linear-gradient(90deg, #FFE9EA, #FFF8F8); }
+/* The badge gets its own slot after the value (margin covers its tilt), so it never sits on the number. */
 .new-badge {
-  flex: none; padding: 4px 9px; border-radius: 999px; background: var(--coral); color: #fff; font: 900 11px/1 var(--font-ui);
-  font-style: normal; letter-spacing: .06em; transform: scale(0) rotate(-14deg);
+  flex: none; margin-left: 4px; padding: 4px 9px; border-radius: 999px; background: var(--coral); color: #fff; font: 900 11px/1 var(--font-ui);
+  font-style: normal; letter-spacing: .06em; white-space: nowrap; transform: scale(0) rotate(-14deg); transform-origin: 50% 50%;
 }
 .res-records li.stamp .new-badge { animation: ss-stamp .5s cubic-bezier(.3, 1.8, .5, 1) forwards; }
 .res-medals { display: grid; gap: 8px; }
@@ -1091,6 +1138,15 @@
   .sheet-foot .ss-btn.big { min-height: 50px; }
   .opp-card { width: 104px; padding-top: 10px; }
   .opp-card .ss-portrait { width: 60px; height: 60px; }
+  /* two columns: Mode on the left, Players / Opponent on the right, so nothing hides under Start */
+  .ss-sheet.setup .sheet-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 16px; align-items: start; }
+  .ss-sheet.setup .sheet-sec h3 { margin: 8px 2px 6px; }
+  .ss-sheet.setup .mode-list.n2, .ss-sheet.setup .mode-list.n3 { grid-template-columns: 1fr; gap: 6px; }
+  .ss-sheet.setup .mode-list .mode-opt { align-items: center; min-height: 0; padding: 6px 12px; }
+  .ss-sheet.setup .mode-list .mode-opt .radio { margin-top: 0; }
+  .ss-sheet.setup .mode-text b { font-size: 18px; }
+  .ss-sheet.setup .mode-text small { font-size: 12px; line-height: 1.25; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+  .ss-sheet.setup .opp-row { margin-left: 0; padding-left: 4px; }
 
   .ss-howto .ss-modal-panel { width: min(760px, 100%); }
   .ss-howto-head { padding: 10px 18px 8px; }
@@ -1104,6 +1160,17 @@
   .ss-howto-steps.n3 .ss-howto-text span, .ss-howto-steps.n4 .ss-howto-text span { font-size: 14px; }
   .ss-howto-glyph { width: 76px; height: 80px; }
   .ss-howto .ss-modal-foot { padding: 8px 18px 12px; }
+  .ss-howto-tips { margin-top: 8px !important; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 4px 14px; }
+  .ss-howto-tips li { font-size: 13px; }
+  /* compact steps: the number rides on the glyph's corner, the glyph shrinks a little */
+  .ss-howto-step { position: relative; }
+  .ss-howto-steps.n3 .ss-howto-step, .ss-howto-steps.n4 .ss-howto-step { padding: 7px 8px 9px; gap: 6px; }
+  .ss-howto-steps.n3 .ss-howto-glyph, .ss-howto-steps.n4 .ss-howto-glyph { width: 68px; height: 68px; }
+  .ss-howto-steps.n3 .ss-howto-glyph .ss-gesture, .ss-howto-steps.n4 .ss-howto-glyph .ss-gesture { width: 66px; height: 80px; }
+  .ss-howto-steps.n3 .ss-howto-text b, .ss-howto-steps.n4 .ss-howto-text b {
+    position: absolute; top: 5px; left: 5px; width: 24px; height: 24px; font-size: 14px; box-shadow: 0 0 0 2px #fff;
+  }
+  .ss-howto-steps.n3 .ss-howto-text span, .ss-howto-steps.n4 .ss-howto-text span { font-size: 13.5px; line-height: 1.25; }
 
   .pause-panel { width: min(600px, 100%); padding: 16px; }
   .pause-head { margin-bottom: 12px; }
@@ -1173,7 +1240,7 @@
 @keyframes ss-bubble-in { from { transform: scale(.3); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes ss-logo-out { to { transform: translateY(-30px) scale(.9); opacity: 0; } }
 @keyframes ss-shake { 0%, 100% { transform: none; } 20% { transform: translateX(-8px); } 40% { transform: translateX(7px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(3px); } }
-@keyframes ss-stamp { 0% { transform: scale(2.4) rotate(-14deg); opacity: 0; } 100% { transform: scale(1) rotate(-6deg); opacity: 1; } }
+@keyframes ss-stamp { 0% { transform: scale(1.9) rotate(-14deg); opacity: 0; } 100% { transform: scale(1) rotate(-6deg); opacity: 1; } }
 @keyframes ss-medal-pop { 0% { transform: scale(.5) rotate(-30deg); } 100% { transform: none; } }
 @keyframes ss-medal-shine { from { transform: translateX(-130%); } to { transform: translateX(130%); } }
 @keyframes ss-glow-row { 0% { box-shadow: 0 0 0 0 rgba(255, 201, 60, 0); } 30% { box-shadow: 0 0 0 5px rgba(255, 201, 60, .75); } 100% { box-shadow: 0 0 0 0 rgba(255, 201, 60, 0); } }
@@ -1183,6 +1250,6 @@
    ============================================================================================ */
 
 @media (prefers-reduced-motion: reduce) {
-  .logo-word .ss-ch, .title-tap, .ss-pulse, .logo-sun::before, .logo-sun i, .res-rays, .ss-banner-rays { animation-iteration-count: 1 !important; }
+  .logo-word .ss-ch, .title-tap, .ss-pulse, .logo-sun::before, .logo-sun i, .res-rays, .ss-banner-rays, .ss-howto-more i { animation-iteration-count: 1 !important; }
   .ss-screen, .sport-card, .pal-card, .rp, .stat { animation-duration: .01s !important; animation-delay: 0s !important; }
 }

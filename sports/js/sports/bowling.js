@@ -911,7 +911,8 @@
   // one past DRIFT_KNEE for a deliberate angled swipe, at most DRIFT_MAX
   // (measured from the bowler's own habitual tilt, see tiltBias)
   const DRIFT_GAIN = 0.015, DRIFT_KNEE = 15, DRIFT_GAIN2 = 0.025, DRIFT_MAX = 1.0;
-  const DRIFT_SHOWN = 0.08 * DEG;          // a pull this big is pointed out to the player
+  const DRIFT_SHOWN = 0.08 * DEG;          // a pull this big is pointed out to the player (pull marker)
+  const DRIFT_TOLD = 0.3 * DEG;            // ...and this big is also named in the shot readout
 
   /** Release speed (short sides / s; real flicks are about 2–10) → ball speed over the whole range. */
   function swipeSpeed(nspeed) {
@@ -924,7 +925,7 @@
   function readSwipe(s, shortSide, bias = 0) {
     const up = -s.dy / shortSide;
     const dirDeg = Math.atan2(s.dx, -s.dy) / DEG;
-    if (up < 0.07 || Math.abs(dirDeg) > 55) return null;
+    if (up < 0.14 || Math.abs(dirDeg) > 55) return null;
     // a tilted swipe pulls the line a little (0.1° moves the ball ~3 cm at the pins): a straight ball
     // needs a straight swipe
     const ad = Math.abs(dirDeg - bias);
@@ -1556,10 +1557,14 @@
   .bw-aim { bottom: calc(var(--sab) + 14px); }
 }
 @media (max-width: 340px) { .bw-f .m span { font-size: 10px; } .bw-f .t { font-size: 11px; } }
+@media (orientation: portrait) {
+  /* the readouts sit between the Frame / pin column and the players column: wrap rather than run under them */
+  .bw-speed { max-width: calc(100% - 2 * (var(--sal) + 108px)); white-space: normal; text-align: center; line-height: 1.25; font-size: 12.5px; }
+}
 @media (max-width: 380px) and (orientation: portrait) {
   .bw-mini span { display: none; }
   .bw-mini { padding-right: 8px; }
-  .bw-speed { top: calc(var(--sat) + 176px); }
+  .bw-speed { top: calc(var(--sat) + 176px); max-width: calc(100% - 2 * (var(--sal) + 82px)); }
 }
 `;
 
@@ -1961,7 +1966,7 @@
     function showSpeed(mps, spin, drift) {
       const a = Math.abs(spin);
       const curve = a < 0.12 ? 'straight' : (a > 0.65 ? 'big hook ' : 'hook ') + (spin > 0 ? 'left' : 'right');
-      const pulled = Math.abs(drift) > DRIFT_SHOWN ? ' · pulled ' + (drift < 0 ? 'left ' : 'right ') + (Math.abs(drift) / DEG).toFixed(1) + '°' : '';
+      const pulled = Math.abs(drift) > DRIFT_TOLD ? ' · pulled ' + (drift < 0 ? 'left ' : 'right ') + (Math.abs(drift) / DEG).toFixed(1) + '°' : '';
       hud.speed.textContent = Math.round(mps * 3.6) + ' km/h · ' + curve + pulled;
       hud.speed.classList.remove('bw-off');
       ctx.wait(2.6).then(() => hud.speed.classList.add('bw-off'));
@@ -3367,7 +3372,9 @@
       const pid = bestProf.isGuest ? null : bestProf.id;
       const rec = (key, value, label, fmt, who) => {
         const r = save.record(DEF.id, key, value, { profileId: who ? (who.isGuest ? null : who.id) : pid, label, fmt });
-        records.push({ label, value: fmt === 'int' ? String(value) : fmt.replace('{v}', value), isNew: !!(r && r.isNew) });
+        // hot-seat: the results line names whose record it is (the stored label stays plain)
+        const shownLabel = players.length > 1 ? label + ' · ' + (who || bestProf).name : label;
+        records.push({ label: shownLabel, value: fmt === 'int' ? String(value) : fmt.replace('{v}', value), isNew: !!(r && r.isNew) });
       };
       if (mode === 'game') {
         rec('high', best.s, 'High Score', 'int');

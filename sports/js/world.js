@@ -1067,8 +1067,8 @@
   const CROWD_SKINS = [0xFFE0C7, 0xF6C9A3, 0xE5A97E, 0xC98A5E, 0x9C6644, 0x6E4630];
   const CROWD_HAIR = [0x2B211C, 0x5A3A22, 0x8B5A2B, 0xC98B3E, 0xE8C26A, 0xB5532A, 0x9AA0A8, 0x2B211C];
 
-  // Two geometry sets share one face texture and materials: 'high' (~740 triangles a fan) and 'low'
-  // (~150: fewer lathe/sphere segments, octahedron hands) for medium/low quality and distant stands.
+  // Two geometry sets share one face texture and materials: 'high' (~730 triangles a fan) and 'low'
+  // (~190: fewer lathe/sphere segments, octahedron hands) for medium/low quality and distant stands.
   let crowdKit = null;
   const crowdGeos = {};
   function crowdGeometry(detail) {

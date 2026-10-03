@@ -32,7 +32,11 @@
   function haptic(ms = 10) {
     const s = SS.save && SS.save.settings;
     if (s && !s.haptics) return;
-    if (navigator.vibrate) { try { navigator.vibrate(ms); } catch (err) { /* not allowed right now */ } }
+    if (!navigator.vibrate) return;
+    // Chrome logs an error for vibrate() before the first user gesture; skip it until then.
+    const ua = navigator.userActivation;
+    if (ua && !ua.hasBeenActive) return;
+    try { navigator.vibrate(ms); } catch (err) { /* not allowed right now */ }
   }
 
   const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -167,7 +171,7 @@
 
   let activeBanner = null;
 
-  function dismissBanner(b, fast) {
+  function dismissBannerEntry(b, fast) {
     if (!b || b.done) return;
     b.done = true;
     clearTimeout(b.timer);
@@ -176,12 +180,19 @@
     setTimeout(() => { b.el.remove(); b.resolve(); }, fast ? 120 : 320);
   }
 
-  /** Big center pop. kind: 'great' | 'good' | 'info' | 'bad' | 'huge'. Plays no sound. */
+  /** Dismisses the banner on screen (if any). fast: a quick 0.12 s exit instead of the normal one. */
+  function dismissBanner(fast) { if (activeBanner) dismissBannerEntry(activeBanner, !!fast); }
+
+  /**
+   * Big center pop. kind: 'great' | 'good' | 'info' | 'bad' | 'huge'. Plays no sound.
+   * opts.caseSensitive keeps the text's own case (banners are uppercase by default).
+   * Returns a promise (resolves when the banner is gone) with .dismiss(fast) to end it early.
+   */
   function banner(text, opts = {}) {
     const kind = opts.kind || 'great';
     const duration = opts.duration == null ? 1.6 : Math.max(0.3, Number(opts.duration));
-    if (activeBanner) dismissBanner(activeBanner, true);
-    const wrap = el('div', 'ss-banner ' + kind);
+    if (activeBanner) dismissBannerEntry(activeBanner, true);
+    const wrap = el('div', 'ss-banner ' + kind + (opts.caseSensitive ? ' keep-case' : ''));
     wrap.setAttribute('role', 'status');
     if (opts.color) wrap.style.setProperty('--stroke', opts.color);
     let html = '';
@@ -190,11 +201,15 @@
     if (opts.sub) html += '<div class="ss-banner-sub">' + esc(opts.sub) + '</div>';
     wrap.innerHTML = html;
     fx.appendChild(wrap);
-    return new Promise(resolve => {
-      const b = { el: wrap, resolve, done: false, timer: 0 };
-      b.timer = setTimeout(() => dismissBanner(b), duration * 1000);
-      activeBanner = b;
+    let entry = null;
+    const promise = new Promise(resolve => {
+      entry = { el: wrap, resolve, done: false, timer: 0 };
+      entry.timer = setTimeout(() => dismissBannerEntry(entry), duration * 1000);
+      activeBanner = entry;
     });
+    promise.dismiss = fast => dismissBannerEntry(entry, !!fast);
+    promise.el = wrap;
+    return promise;
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -203,8 +218,21 @@
 
   let toastBox = null;
 
+  /** During play, toasts sit just below the sport's top-center HUD row (measured, not assumed). */
+  function placeToasts() {
+    if (!root.classList.contains('is-playing')) { toastBox.style.top = ''; return; }
+    let bottom = 0;
+    for (const n of hud.querySelectorAll('.ss-hud-top')) {
+      const r = n.getBoundingClientRect();
+      if (r.height > 0 && r.width > 0 && !n.classList.contains('ss-hidden')) bottom = Math.max(bottom, r.bottom);
+    }
+    const rootTop = root.getBoundingClientRect().top;
+    toastBox.style.top = bottom > 0 ? Math.round(bottom - rootTop + 8) + 'px' : '';
+  }
+
   function toast(text, opts = {}) {
     if (!toastBox || !toastBox.isConnected) { toastBox = el('div', 'ss-toasts'); fx.appendChild(toastBox); }
+    placeToasts();
     const t = el('div', 'ss-toast', (opts.icon ? icon(opts.icon) : '') + '<span>' + esc(text) + '</span>');
     toastBox.appendChild(t);
     while (toastBox.children.length > 3) toastBox.firstElementChild.remove();
@@ -301,6 +329,8 @@
     const s = SS.save && SS.save.settings;
     const node = el('div', 'ss-hint');
     node.innerHTML = gestureSVG(opts.gesture) + (opts.text ? '<div class="ss-hint-text">' + esc(opts.text) + '</div>' : '');
+    // a narrower text box must be set before an anchored hint is measured and clamped
+    if (opts.textMaxWidth && node.lastElementChild) node.lastElementChild.style.maxWidth = opts.textMaxWidth + 'px';
     let hidden = false;
     const handle = {
       el: node,
@@ -312,13 +342,44 @@
       },
     };
     if (s && s.hints === false) { hidden = true; return handle; }
-    if (opts.x != null || opts.y != null) {
+    const at = opts.x != null || opts.y != null;
+    if (at) {
       node.classList.add('at');
-      node.style.left = (opts.x == null ? (SS.engine ? SS.engine.size.w / 2 : window.innerWidth / 2) : opts.x) + 'px';
-      node.style.top = (opts.y == null ? (SS.engine ? SS.engine.size.h * 0.7 : window.innerHeight * 0.7) : opts.y) + 'px';
+      node.style.left = (opts.x == null ? fx.clientWidth / 2 : opts.x) + 'px';
+      node.style.top = (opts.y == null ? fx.clientHeight * 0.7 : opts.y) + 'px';
     }
     fx.appendChild(node);
+    if (at) clampHint(node, opts.x, opts.y);
     return handle;
+  }
+
+  let insetProbe = null;
+  /** Safe-area insets in px (resolved from the --sat/--sar/--sab/--sal variables). */
+  function safeInsets() {
+    if (!insetProbe || !insetProbe.isConnected) {
+      insetProbe = el('div');
+      insetProbe.style.cssText = 'position:absolute;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;' +
+        'padding:var(--sat) var(--sar) var(--sab) var(--sal)';
+      root.appendChild(insetProbe);
+    }
+    const cs = getComputedStyle(insetProbe);
+    return { top: parseFloat(cs.paddingTop) || 0, right: parseFloat(cs.paddingRight) || 0,
+      bottom: parseFloat(cs.paddingBottom) || 0, left: parseFloat(cs.paddingLeft) || 0 };
+  }
+
+  /**
+   * Keeps an anchored hint on screen: the box is sized to its content (not to the room right of the
+   * anchor), then its center is clamped so the whole glyph + text stay inside the safe area.
+   */
+  function clampHint(node, x, y) {
+    const W = fx.clientWidth, H = fx.clientHeight;
+    if (!W || !H) return;
+    const si = safeInsets(), m = 8;
+    const left = si.left + m, right = W - si.right - m, top = si.top + m, bottom = H - si.bottom - m;
+    const w = Math.min(node.offsetWidth, right - left), h = Math.min(node.offsetHeight, bottom - top);
+    const cx = x == null ? W / 2 : x, cy = y == null ? H * 0.7 : y;
+    node.style.left = Math.round(U.clamp(cx, left + w / 2, Math.max(left + w / 2, right - w / 2))) + 'px';
+    node.style.top = Math.round(U.clamp(cy, top + h / 2, Math.max(top + h / 2, bottom - h / 2))) + 'px';
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -536,12 +597,49 @@
     if (tips.length) {
       html += '<ul class="ss-howto-tips">' + tips.map(t => '<li>' + icon('bulb') + '<span>' + esc(t) + '</span></li>').join('') + '</ul>';
     }
-    html += '</div>';
+    html += '</div><div class="ss-howto-more" aria-hidden="true"><i>' + icon('down') + '</i></div>';
     m.panel.innerHTML = html;
     const foot = el('div', 'ss-modal-foot');
-    foot.appendChild(button("Let's go!", () => m.close(true), { kind: 'primary', icon: 'check', className: 'accent' }));
+    const go = button("Let's go!", () => m.close(true), { kind: 'primary', icon: 'check', className: 'accent' });
+    foot.appendChild(go);
     m.panel.appendChild(foot);
-    return m.result.then(() => undefined);
+    // A tap anywhere on the card closes it too (a scroll of the body is not a click). Enter / Space close
+    // it while it is the top modal; the key never reaches the game underneath.
+    m.panel.addEventListener('click', e => {
+      if (m.closed || (e.target instanceof Element && e.target.closest('button'))) return;
+      sfx('ui_select');
+      m.close(true);
+    });
+    const onKey = e => {
+      if (m.closed || modals[modals.length - 1] !== m || e.repeat) return;
+      if (e.key !== 'Enter' && e.key !== ' ' && e.code !== 'Space') return;
+      e.preventDefault();
+      e.stopPropagation();
+      sfx('ui_select');
+      m.close(true);
+    };
+    window.addEventListener('keydown', onKey, true);
+    // Short screens: when the steps + tips overflow, show it (fade at the cut edge + a visible scrollbar).
+    const body = m.panel.querySelector('.ss-howto-body');
+    const cue = () => { scrollCue(body); m.panel.classList.toggle('has-more', body.classList.contains('is-more')); };
+    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(cue) : null;
+    if (body) {
+      body.addEventListener('scroll', cue, { passive: true });
+      if (ro) ro.observe(body); else requestAnimationFrame(cue);
+    }
+    return m.result.then(() => {
+      window.removeEventListener('keydown', onKey, true);
+      if (ro) ro.disconnect();
+    });
+  }
+
+  /** Marks a scroll box that has more content below (is-more) or above (is-scrolled) for CSS cues. */
+  function scrollCue(box) {
+    if (!box) return;
+    const more = box.scrollHeight - box.clientHeight - box.scrollTop > 4;
+    box.classList.toggle('is-more', more);
+    box.classList.toggle('is-scrollable', box.scrollHeight - box.clientHeight > 4);
+    box.classList.toggle('is-scrolled', box.scrollTop > 4);
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -569,6 +667,16 @@
       fade.classList.add('is-active', 'is-closing');
       sfx('swish', { vol: 0.7 });
       await sleep(close);
+      // On a slow frame the close transition can still be running: give it a moment to land, then
+      // .is-closed snaps the iris shut (transition: none) so the swap underneath is never visible.
+      const iris = fade.firstElementChild;
+      if (iris && iris.getBoundingClientRect().width > 1) {
+        await new Promise(r => {
+          const done = () => { iris.removeEventListener('transitionend', done); clearTimeout(t); r(); };
+          const t = setTimeout(done, 240);
+          iris.addEventListener('transitionend', done);
+        });
+      }
       fade.classList.add('is-closed');
       let result;
       try {
@@ -684,7 +792,7 @@
 
   /** Removes transient fx (banners, hints, toasts, pop-ups, countdowns, title cards, confetti). */
   function clearFx() {
-    if (activeBanner) dismissBanner(activeBanner, true);
+    if (activeBanner) dismissBannerEntry(activeBanner, true);
     for (const n of Array.from(fx.children)) n.remove();
     toastBox = null;
   }
@@ -693,9 +801,12 @@
   // Keyboard: Escape closes the top modal, otherwise emits 'back'
   // ---------------------------------------------------------------------------------------------
 
+  // While the transition curtain runs, screens are being swapped underneath: Escape must not navigate.
+  // It may still open the pause menu ('pause' — main.js only opens it for a live, pausable game that is
+  // not being left); otherwise the press is simply dropped and leaves no pending state behind.
   window.addEventListener('keydown', e => {
     if (e.key !== 'Escape' || e.repeat) return;
-    if (fade.classList.contains('is-active')) return;
+    if (fade.classList.contains('is-active')) { if (!modals.length) events.emit('pause', { source: 'escape' }); return; }
     if (!closeTop()) events.emit('back');
   });
 
@@ -708,7 +819,7 @@
     css, el, icon, button, banner, toast, hint, label, meter, choose, confirm, countdown, titleCard, howTo,
     setPauseVisible, transition, portraitImg, scorePopup,
     // extensions
-    events, esc, sfx, haptic, letters, gestureSVG, modal, closeTop, modalOpen, confetti, clearFx,
+    events, esc, sfx, haptic, letters, gestureSVG, modal, closeTop, modalOpen, confetti, clearFx, dismissBanner, safeInsets,
     pauseButton: pauseBtn, GESTURES: Object.keys(GESTURES), ICONS: Object.keys(ICONS),
   };
 })();
