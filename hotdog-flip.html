@@ -283,7 +283,11 @@ canvas { display: block; width: 100%; height: 100%; }
   ];
   // ---------- photo objects: real cutouts, hit boxes read off their alpha channel ----------
   // w is the width on screen; everything else (height, landing surfaces, collision columns) comes from the image
-  const PHOTOS = [];
+  const PHOTOS = [
+    { id: 'dog', name: 'the dog', src: 'img/dog.png', w: 330 },
+    { id: 'puppet', name: 'the puppet', src: 'img/puppet.png', w: 270 },
+    { id: 'head', name: 'the head', src: 'img/head.png', w: 260 },
+  ];
   function analyzePhoto(k, img) {
     const c = document.createElement('canvas'), iw = img.naturalWidth, ih = img.naturalHeight;
     c.width = iw; c.height = ih;
