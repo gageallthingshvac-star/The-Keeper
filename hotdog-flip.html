@@ -367,9 +367,13 @@ canvas { display: block; width: 100%; height: 100%; }
     const P = panT(t), Pp = panT(tp);
     const tg = target, T = tg && targetT(tg, t), Tp = tg && targetT(tg, tp);
     const ps = sau.p;
+    // damp only the wobble (motion relative to the whole sausage), so flight stays ballistic but the jiggle dies out
+    let mvx = 0, mvy = 0;
+    for (const q of ps) { mvx += q.x - q.px; mvy += q.y - q.py; }
+    mvx /= N; mvy /= N;
     for (const q of ps) {
       q.touch = null;
-      const vx = (q.x - q.px) * .9995, vy = (q.y - q.py) * .9995;
+      const vx = mvx * .9995 + (q.x - q.px - mvx) * .985, vy = mvy * .9995 + (q.y - q.py - mvy) * .985;
       q.px = q.x; q.py = q.y;
       q.x += vx; q.y += vy + G * SUB * SUB;
     }
@@ -387,14 +391,14 @@ canvas { display: block; width: 100%; height: 100%; }
     for (let it = 0; it < 10; it++) {
       for (let i = 0; i < N - 1; i++) link(ps[i], ps[i + 1], SEG, 1);
       for (let i = 0; i < N - 2; i++) straighten(ps[i], ps[i + 1], ps[i + 2], BEND);
-      for (let i = 0; i < N - 4; i++) link(ps[i], ps[i + 4], SEG * 4, .3);
+      for (let i = 0; i < N - 4; i++) link(ps[i], ps[i + 4], SEG * 4, .12);
       pin();
     }
     collide();
     simT += SUB;
   }
   // pulls the middle of three neighbours back toward the line between them: a firm casing that still flexes
-  const BEND = .09;
+  const BEND = .06;
   function straighten(a, b, c, k) {
     const dx = (a.x + c.x) / 2 - b.x, dy = (a.y + c.y) / 2 - b.y;
     b.x += dx * k; b.y += dy * k; a.x -= dx * k / 2; a.y -= dy * k / 2; c.x -= dx * k / 2; c.y -= dy * k / 2;
