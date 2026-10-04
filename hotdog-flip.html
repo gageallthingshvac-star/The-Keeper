@@ -270,8 +270,8 @@ canvas { display: block; width: 100%; height: 100%; }
     { id: 'hedgehog', name: 'the hedgehog', src: 'img/hedgehog.png', w: 240 },
     { id: 'chair', name: 'the chair', src: 'img/chair.png', w: 220 },
     { id: 'hand', name: 'the hand', src: 'img/hand.png', w: 170 },
-    { id: 'toaster', name: 'the toaster', src: 'img/toaster.png', w: 280, cav: [[.2, .43, 0, .4], [.54, .77, 0, .4]] },
-    { id: 'mug', name: 'the mug', src: 'img/mug.png', w: 340, cav: [[.2, .55, 0, .86]] },   // walls kept much thicker than the sausage so it cannot push through
+    { id: 'toaster', name: 'the toaster', src: 'img/toaster.png', w: 280, cav: [[.2, .43, .1], [.54, .77, .1]] },
+    { id: 'mug', name: 'the mug', src: 'img/mug.png', w: 340, cav: [[.2, .55, .1]] },
     { id: 'duck', name: 'the duck', src: 'img/duck.png', w: 200 },
     { id: 'balloon', name: 'the balloon', src: 'img/balloon.png', w: 300 },
     { id: 'bicycle', name: 'the bicycle', src: 'img/bicycle.png', w: 320 },
@@ -279,13 +279,13 @@ canvas { display: block; width: 100%; height: 100%; }
     { id: 'pineapple', name: 'the pineapple', src: 'img/pineapple.png', w: 170 },
     { id: 'trophy', name: 'the trophy', src: 'img/trophy.png', w: 220 },
     // things to fall into (openings as fractions of the image: x from, x to, y from the top, y to)
-    { id: 'basket', name: 'the basket', src: 'img/basket.png', w: 300, cav: [[.08, .92, 0, .9]] },
-    { id: 'basket2', name: 'the basket', src: 'img/basket2.png', w: 300, cav: [[.1, .9, 0, .9]] },
-    { id: 'boot', name: 'the boot', src: 'img/boot.png', w: 250, cav: [[.56, .82, 0, .45]] },
-    { id: 'boots2', name: 'the cowboy boots', src: 'img/boots2.png', w: 300, cav: [[.2, .47, 0, .7], [.5, .8, 0, .7]] },
-    { id: 'glass', name: 'the glass', src: 'img/glass.png', w: 190, cav: [[.27, .76, 0, .8]] },
-    { id: 'teacup', name: 'the teacup', src: 'img/teacup.png', w: 280, cav: [[.17, .76, 0, .55]] },
-    { id: 'tophat', name: 'the top hat', src: 'img/tophat.png', w: 230, cav: [[.14, .86, 0, .8]] },
+    { id: 'basket', name: 'the basket', src: 'img/basket.png', w: 300, cav: [[.08, .92, .42]] },
+    { id: 'basket2', name: 'the basket', src: 'img/basket2.png', w: 300, cav: [[.1, .9, .44]] },
+    { id: 'boot', name: 'the boot', src: 'img/boot.png', w: 250, cav: [[.56, .82, .05]] },
+    { id: 'boots2', name: 'the cowboy boots', src: 'img/boots2.png', w: 300, cav: [[.2, .47, .05], [.5, .8, .05]] },
+    { id: 'glass', name: 'the glass', src: 'img/glass.png', w: 190, cav: [[.27, .76, .3]] },
+    { id: 'teacup', name: 'the teacup', src: 'img/teacup.png', w: 280, cav: [[.17, .76, .12]] },
+    { id: 'tophat', name: 'the top hat', src: 'img/tophat.png', w: 230, cav: [[.14, .86, .06]] },
     // awkward perches
     { id: 'pot', name: 'the pot', src: 'img/pot.png', w: 260 },
     { id: 'teapot', name: 'the teapot', src: 'img/teapot.png', w: 260 },
@@ -323,7 +323,9 @@ canvas { display: block; width: 100%; height: 100%; }
       if (run >= 0) close(maxY + 1);
     }
     // carve the openings (fractions of the image box) out of the hit box, so the sausage can drop inside
-    const cav = (k.cav || []).map(([fx0, fx1, fy0, fy1]) => ({ x0: fx0 * bw - bw / 2, x1: fx1 * bw - bw / 2, y0: fy0 * bh, y1: fy1 * bh }));
+    // an opening runs from the top of the image down to just under its front rim, so a sausage resting in it stays in view
+    const scW = k.w / bw, depth = (R + 4) / scW;   // floor one sausage-radius under the rim: the top half shows in the opening
+    const cav = (k.cav || []).map(([fx0, fx1, rim]) => ({ x0: fx0 * bw - bw / 2, x1: fx1 * bw - bw / 2, y0: 0, y1: rim * bh + depth, rim: rim * bh }));
     let carved = cols;
     for (const cv of cav) {
       const next = [];
@@ -505,14 +507,12 @@ canvas { display: block; width: 100%; height: 100%; }
     const T = targetT(target, simT);
     return sau.p.some(q => { const l = lpt(T, q.x, q.y), lx = l.x / target.sc, ly = l.y / target.sc; return target.k.cavity.some(cv => lx > cv.x0 && lx < cv.x1 && ly > cv.y0 && ly < cv.y1); });
   }
-  // clip to the object's openings (or to everything but them)
-  function cavityClip(T, outside) {
-    ctx.beginPath();
-    ctx.save(); ctx.translate(T.x, T.y); ctx.rotate(T.a); ctx.scale(target.sc, target.sc);
-    for (const cv of target.k.cavity) ctx.rect(cv.x0, cv.y0, cv.x1 - cv.x0, cv.y1 - cv.y0);
+  // the part of the object below its lowest rim line, drawn again on top of a sausage that is in an opening
+  function targetFront(tg, t) {
+    const k = tg.k, rim = Math.min(...k.cavity.map(c => c.rim)), T = targetT(tg, t);
+    ctx.save(); ctx.translate(T.x, T.y); ctx.rotate(T.a); ctx.scale(tg.sc, tg.sc);
+    ctx.drawImage(k.image, k.sx, k.sy + rim, k.bw, k.bh - rim, -k.bw / 2, rim, k.bw, k.bh - rim);
     ctx.restore();
-    if (outside) { const { x0, x1, y0, y1 } = ext(); ctx.rect(x0 - 500, y0 - 500, x1 - x0 + 1000, y1 - y0 + 1000); ctx.clip('evenodd'); }
-    else ctx.clip();
   }
   function centroid() { let x = 0, y = 0; for (const q of sau.p) { x += q.x; y += q.y; } return { x: x / N, y: y / N }; }
 
@@ -705,7 +705,7 @@ canvas { display: block; width: 100%; height: 100%; }
   const panImg = new Image(); let panPhoto = null;
   panImg.onload = () => { panPhoto = panImg; };
   panImg.src = 'img/skillet.png';
-  const PAN_IMG = { cavX0: .38, cavX1: 1, floorY: .6, frontY: .7 };
+  const PAN_IMG = { cavX0: .3, cavX1: 1, floorY: .74, frontY: .63 };
   function panImage(T, front) {
     const iw = panPhoto.naturalWidth, ih = panPhoto.naturalHeight;
     const sc = 256 / ((PAN_IMG.cavX1 - PAN_IMG.cavX0) * iw);
@@ -1149,11 +1149,9 @@ canvas { display: block; width: 100%; height: 100%; }
     const inside = !inPan && sau && inCavity();
     drawTarget(target, simT);
     if (inside) {
-      // in an opening: whatever sticks out is drawn as usual, and the part inside shows through the wall, dimmed,
-      // so it reads as sitting in the object rather than hidden behind it
-      const T = targetT(target, simT);
-      ctx.save(); cavityClip(T, true); drawSausage(sau); ctx.restore();
-      ctx.save(); cavityClip(T, false); ctx.globalAlpha = .5; drawSausage(sau); ctx.restore();
+      // in an opening: the sausage goes behind the object's front wall (its image below the rim line) but in front of the rest
+      drawSausage(sau);
+      targetFront(target, simT);
     }
     let g = null;
     if (chop.mode) { g = chopGeom(); stick(...g.back, 3.4, 9, false); }
