@@ -270,8 +270,8 @@ canvas { display: block; width: 100%; height: 100%; }
     { id: 'hedgehog', name: 'the hedgehog', src: 'img/hedgehog.png', w: 240 },
     { id: 'chair', name: 'the chair', src: 'img/chair.png', w: 220 },
     { id: 'hand', name: 'the hand', src: 'img/hand.png', w: 170 },
-    { id: 'toaster', name: 'the toaster', src: 'img/toaster.png', w: 280, cav: [[.2, .43, .1], [.54, .77, .1]] },
-    { id: 'mug', name: 'the mug', src: 'img/mug.png', w: 340, cav: [[.2, .55, .1]] },
+    { id: 'toaster', name: 'the toaster', src: 'img/toaster.png', w: 280, cav: [[.365, .145, .095, .02], [.64, .145, .09, .02]] },
+    { id: 'mug', name: 'the mug', src: 'img/mug.png', w: 340, cav: [[.355, .07, .325, .05]] },
     { id: 'duck', name: 'the duck', src: 'img/duck.png', w: 200 },
     { id: 'balloon', name: 'the balloon', src: 'img/balloon.png', w: 300 },
     { id: 'bicycle', name: 'the bicycle', src: 'img/bicycle.png', w: 320 },
@@ -279,13 +279,13 @@ canvas { display: block; width: 100%; height: 100%; }
     { id: 'pineapple', name: 'the pineapple', src: 'img/pineapple.png', w: 170 },
     { id: 'trophy', name: 'the trophy', src: 'img/trophy.png', w: 220 },
     // things to fall into (openings as fractions of the image: x from, x to, y from the top, y to)
-    { id: 'basket', name: 'the basket', src: 'img/basket.png', w: 300, cav: [[.08, .92, .42]] },
-    { id: 'basket2', name: 'the basket', src: 'img/basket2.png', w: 300, cav: [[.1, .9, .44]] },
-    { id: 'boot', name: 'the boot', src: 'img/boot.png', w: 250, cav: [[.56, .82, .05]] },
-    { id: 'boots2', name: 'the cowboy boots', src: 'img/boots2.png', w: 300, cav: [[.2, .47, .05], [.5, .8, .05]] },
-    { id: 'glass', name: 'the glass', src: 'img/glass.png', w: 190, cav: [[.27, .76, .3]] },
-    { id: 'teacup', name: 'the teacup', src: 'img/teacup.png', w: 280, cav: [[.17, .76, .12]] },
-    { id: 'tophat', name: 'the top hat', src: 'img/tophat.png', w: 230, cav: [[.14, .86, .06]] },
+    { id: 'basket', name: 'the basket', src: 'img/basket.png', w: 300, cav: [[.5, .375, .46, .065]] },
+    { id: 'basket2', name: 'the basket', src: 'img/basket2.png', w: 300, cav: [[.5, .405, .45, .055]] },
+    { id: 'boot', name: 'the boot', src: 'img/boot.png', w: 250, cav: [[.66, .1, .14, .06]] },
+    { id: 'boots2', name: 'the cowboy boots', src: 'img/boots2.png', w: 300, cav: [[.36, .065, .14, .035], [.64, .04, .14, .035]] },
+    { id: 'glass', name: 'the glass', src: 'img/glass.png', w: 190, cav: [[.49, .29, .29, .04]] },
+    { id: 'teacup', name: 'the teacup', src: 'img/teacup.png', w: 280, cav: [[.48, .28, .3, .16]] },
+    { id: 'tophat', name: 'the top hat', src: 'img/tophat.png', w: 230, cav: [[.5, .22, .4, .08]] },
     // awkward perches
     { id: 'pot', name: 'the pot', src: 'img/pot.png', w: 260 },
     { id: 'teapot', name: 'the teapot', src: 'img/teapot.png', w: 260 },
@@ -323,9 +323,10 @@ canvas { display: block; width: 100%; height: 100%; }
       if (run >= 0) close(maxY + 1);
     }
     // carve the openings (fractions of the image box) out of the hit box, so the sausage can drop inside
-    // an opening runs from the top of the image down to just under its front rim, so a sausage resting in it stays in view
-    const scW = k.w / bw, depth = (R + 4) / scW;   // floor one sausage-radius under the rim: the top half shows in the opening
-    const cav = (k.cav || []).map(([fx0, fx1, rim]) => ({ x0: fx0 * bw - bw / 2, x1: fx1 * bw - bw / 2, y0: 0, y1: rim * bh + depth, rim: rim * bh }));
+    // each opening is its rim ellipse; the hole runs from the top of the image to one sausage-radius under the front of the rim,
+    // so a sausage resting in it shows in the opening with its lower half behind the wall
+    const scW = k.w / bw, depth = (R - 5) / scW;
+    const cav = (k.cav || []).map(([fcx, fcy, frx, fry]) => { const cx = fcx * bw - bw / 2, cy = fcy * bh, rx = frx * bw, ry = fry * bh; return { x0: cx - rx, x1: cx + rx, y0: 0, y1: cy + ry + depth, cx, cy, rx, ry }; });
     let carved = cols;
     for (const cv of cav) {
       const next = [];
@@ -507,11 +508,14 @@ canvas { display: block; width: 100%; height: 100%; }
     const T = targetT(target, simT);
     return sau.p.some(q => { const l = lpt(T, q.x, q.y), lx = l.x / target.sc, ly = l.y / target.sc; return target.k.cavity.some(cv => lx > cv.x0 && lx < cv.x1 && ly > cv.y0 && ly < cv.y1); });
   }
-  // the part of the object below its lowest rim line, drawn again on top of a sausage that is in an opening
+  // the object's front wall: everything below the front arc of each rim ellipse, drawn again over a sausage in an opening
   function targetFront(tg, t) {
-    const k = tg.k, rim = Math.min(...k.cavity.map(c => c.rim)), T = targetT(tg, t);
+    const k = tg.k, T = targetT(tg, t), cvs = [...k.cavity].sort((a, b) => a.cx - b.cx);
     ctx.save(); ctx.translate(T.x, T.y); ctx.rotate(T.a); ctx.scale(tg.sc, tg.sc);
-    ctx.drawImage(k.image, k.sx, k.sy + rim, k.bw, k.bh - rim, -k.bw / 2, rim, k.bw, k.bh - rim);
+    ctx.beginPath(); ctx.moveTo(-k.bw / 2, k.bh); ctx.lineTo(-k.bw / 2, cvs[0].cy);
+    for (const cv of cvs) { ctx.lineTo(cv.cx - cv.rx, cv.cy); ctx.ellipse(cv.cx, cv.cy, cv.rx, cv.ry, 0, Math.PI, 0, true); }
+    ctx.lineTo(k.bw / 2, cvs[cvs.length - 1].cy); ctx.lineTo(k.bw / 2, k.bh); ctx.closePath(); ctx.clip();
+    ctx.drawImage(k.image, k.sx, k.sy, k.bw, k.bh, -k.bw / 2, 0, k.bw, k.bh);
     ctx.restore();
   }
   function centroid() { let x = 0, y = 0; for (const q of sau.p) { x += q.x; y += q.y; } return { x: x / N, y: y / N }; }
