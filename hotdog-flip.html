@@ -283,21 +283,29 @@ canvas { display: block; width: 100%; height: 100%; }
   }
   const panCollides = t => !((t - lift.t0) >= 0 && (t - lift.t0) < .24);
 
+  // sc scales the whole object; tops lists its landable surfaces in local units (default: the top edge, y = 0)
   const KINDS = [
-    { id: 'plate', name: 'the bun', hw: 52, h: 30 },
-    { id: 'toaster', name: 'the toaster', hw: 44, h: 96 },
-    { id: 'books', name: 'the cookbooks', hw: 38, h: 0 },
-    { id: 'mug', name: 'the coffee mug', hw: 22, h: 66 },
-    { id: 'cat', name: 'the sleeping cat', hw: 32, h: 72 },
-    { id: 'skate', name: 'the skateboard', hw: 44, h: 26, drift: 60 },
-    { id: 'duck', name: 'the rubber duck', hw: 15, h: 60 },
-    { id: 'cone', name: 'the traffic cone', hw: 11, h: 116 },
-    { id: 'balloon', name: 'the balloon', hw: 20, h: 80, bob: 14, sway: .06 },
-    { id: 'fork', name: 'the fork', hw: 9, h: 124 },
+    { id: 'deer', name: 'the deer', hw: 70, h: 178, tops: [{ x0: -78, x1: 56, y: 0 }] },
+    { id: 'dog', name: 'the dog', hw: 68, h: 124, tops: [{ x0: -66, x1: 64, y: 0 }] },
+    { id: 'chair', name: 'the chair', hw: 60, h: 170, sc: 1.3, tops: [{ x0: -72, x1: 34, y: 72 }] },
+    { id: 'hand', name: 'the hand', hw: 72, h: 140, tops: [{ x0: -96, x1: 44, y: 0 }] },
+    { id: 'toaster', name: 'the toaster', hw: 44, h: 96, sc: 1.6 },
+    { id: 'mug', name: 'the coffee mug', hw: 22, h: 66, sc: 1.7 },
+    { id: 'cat', name: 'the sleeping cat', hw: 32, h: 72, sc: 1.7 },
+    { id: 'skate', name: 'the skateboard', hw: 44, h: 26, drift: 60, sc: 1.6 },
+    { id: 'duck', name: 'the rubber duck', hw: 15, h: 60, sc: 1.9 },
+    { id: 'balloon', name: 'the balloon', hw: 20, h: 80, bob: 14, sway: .06, sc: 1.7 },
   ];
   function polysFor(tg) {
-    const hw = tg.hw, h = tg.h;
+    const hw = tg.hw, h = tg.h, sc = tg.sc, P = pts => poly(pts.map(([x, y]) => [x * sc, y * sc]));
     switch (tg.k.id) {
+      case 'deer': return [P(ngon(-10, 40, 40).map(([x, y]) => [-10 + (x + 10) * 2, y])), P([[-70, 20], [-45, 30], [-95, -55], [-115, -50]]), P(ngon(-122, -58, 21)),
+        P([[-112, -74], [-106, -74], [-96, -128], [-102, -130]]), P([[-114, -74], [-120, -74], [-132, -126], [-126, -128]]),
+        P([[-56, 60], [-44, 60], [-46, 178], [-58, 178]]), P([[-40, 62], [-28, 62], [-30, 178], [-42, 178]]), P([[28, 62], [40, 62], [44, 178], [32, 178]]), P([[42, 58], [54, 58], [60, 178], [48, 178]])];
+      case 'dog': return [P(ngon(0, 36, 36).map(([x, y]) => [x * 1.9, y])), P(ngon(-95, -4, 28)), P([[-120, -12], [-142, -4], [-142, 10], [-118, 14]]), P([[-80, 10], [-50, 10], [-55, 40], [-85, 36]]),
+        P([[64, 20], [74, 22], [98, -28], [90, -32]]), P([[-52, 60], [-40, 60], [-42, 124], [-54, 124]]), P([[-36, 62], [-24, 62], [-26, 124], [-38, 124]]), P([[24, 62], [36, 62], [38, 124], [26, 124]]), P([[40, 58], [52, 58], [56, 124], [44, 124]])];
+      case 'chair': return [P([[34, 0], [48, 0], [48, 72], [34, 72]]), P([[-72, 72], [48, 72], [48, 82], [-72, 82]]), P([[-68, 82], [-58, 82], [-58, 170], [-68, 170]]), P([[36, 82], [46, 82], [46, 170], [36, 170]])];
+      case 'hand': return [P([[-20, 0], [60, 0], [60, 26], [-20, 26]]), P([[-20, 0], [-20, 24], [-95, 10], [-96, -14]]), P([[44, 0], [60, 0], [76, -36], [62, -44]]), P([[36, 26], [76, 26], [92, 140], [52, 140]])];
       case 'plate': return [poly([[-hw, 8], [-hw + 12, 0], [hw - 12, 0], [hw, 8], [hw, h - 8], [-hw, h - 8]]), poly([[-hw - 26, h - 8], [hw + 26, h - 8], [hw + 20, h], [-hw - 20, h]])];
       case 'toaster': return [poly([[-hw, 12], [-hw + 12, 0], [hw - 12, 0], [hw, 12], [hw, h - 4], [-hw, h - 4]])];
       case 'books': return tg.books.map(b => poly([[b.x0, b.y], [b.x0 + b.w, b.y], [b.x0 + b.w, b.y + b.h], [b.x0, b.y + b.h]]));
@@ -314,7 +322,7 @@ canvas { display: block; width: 100%; height: 100%; }
     const pool = KINDS.filter(k => k !== prev);
     const k = pool[Math.floor(Math.random() * pool.length)];
     const seed = Math.floor(Math.random() * 1000);
-    const tg = { k, hw: k.hw, h: k.h, seed, phase: Math.random() * 6.28, enter: 0, drift: k.drift || 0, bob: k.bob || 7, sway: k.sway || .03 };
+    const tg = { k, hw: k.hw, h: k.h, sc: k.sc || 1, seed, phase: Math.random() * 6.28, enter: 0, drift: k.drift || 0, bob: k.bob || 7, sway: k.sway || .03 };
     if (k.id === 'books') {
       const n = 2 + Math.floor(Math.random() * 5), bh = 26;
       tg.h = n * bh;
@@ -323,8 +331,8 @@ canvas { display: block; width: 100%; height: 100%; }
         return { x0: -w + sx, w: w * 2, y: tg.h - (i + 1) * bh, h: bh - 1, ci: (i + seed) % 6 };
       });
     }
-    tg.bx = 540 + Math.random() * (300 - tg.drift * 2);
-    const yMin = 200, yMax = Math.min(400, 555 - tg.h);
+    tg.bx = 560 + Math.random() * (280 - tg.drift * 2);
+    const yMin = 190, yMax = Math.min(400, 555 - tg.h * tg.sc);
     tg.by = yMin + Math.random() * Math.max(0, yMax - yMin);
     tg.polys = polysFor(tg);
     return tg;
@@ -436,8 +444,9 @@ canvas { display: block; width: 100%; height: 100%; }
   // how many of the sausage's points sit over the object's top surface (in its own frame)
   function overTop() {
     if (!target) return 0;
-    const T = targetT(target, simT), lim = target.k.id === 'cat' ? target.hw + 20 : target.k.id === 'skate' ? target.hw + 16 : target.hw;
-    return sau.p.filter(q => { const l = lpt(T, q.x, q.y); return Math.abs(l.x) <= lim && l.y < 4; }).length;
+    const T = targetT(target, simT), k = target.k, sc = target.sc;
+    const tops = k.tops || [{ x0: -(k.id === 'cat' ? target.hw + 20 : k.id === 'skate' ? target.hw + 16 : target.hw), x1: k.id === 'cat' ? target.hw + 20 : k.id === 'skate' ? target.hw + 16 : target.hw, y: 0 }];
+    return sau.p.filter(q => { const l = lpt(T, q.x, q.y), lx = l.x / sc, ly = l.y / sc; return tops.some(tp => lx >= tp.x0 && lx <= tp.x1 && ly < tp.y + 4 && ly > tp.y - 40); }).length;
   }
   function centroid() { let x = 0, y = 0; for (const q of sau.p) { x += q.x; y += q.y; } return { x: x / N, y: y / N }; }
 
@@ -755,12 +764,138 @@ canvas { display: block; width: 100%; height: 100%; }
     };
   }
 
+
+  // --- the crazier objects: side-on, landing surface at y = 0, drawn with the light from the upper left ---
+  function limb(x0, y0, x1, y1, w, c1, c2) {
+    const dx = x1 - x0, dy = y1 - y0, l = Math.hypot(dx, dy), nx = -dy / l * w / 2, ny = dx / l * w / 2;
+    ctx.fillStyle = lin(ctx, x0 + nx, y0 + ny, x0 - nx, y0 - ny, [[0, c1], [1, c2]]);
+    ctx.beginPath(); ctx.moveTo(x0 + nx, y0 + ny); ctx.lineTo(x1 + nx, y1 + ny); ctx.lineTo(x1 - nx, y1 - ny); ctx.lineTo(x0 - nx, y0 - ny); ctx.closePath(); ctx.fill();
+  }
+  function hoof(x, y, w) { ctx.fillStyle = lin(ctx, 0, y - 8, 0, y, [[0, '#4a3324'], [1, '#1e130c']]); rr(ctx, x - w / 2, y - 9, w, 9, [2, 2, 4, 4]); ctx.fill(); }
+  function eye(x, y, r) { ctx.fillStyle = '#1a1210'; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.beginPath(); ctx.arc(x - r * .3, y - r * .35, r * .32, 0, 7); ctx.fill(); }
+
+  function drawDeer(t) {
+    const hide = ['#d2a06a', '#b07a45', '#7d4f26'], br = t * 1.1;
+    ctx.lineJoin = 'round';
+    // far legs
+    limb(-34, 64, -36, 174, 11, '#8f5e32', '#6b4320'); limb(34, 64, 38, 174, 11, '#8f5e32', '#6b4320');
+    hoof(-36, 178, 13); hoof(38, 178, 13);
+    // body
+    ctx.fillStyle = rad(ctx, -30, 20, 6, 120, [[0, hide[0]], [.55, hide[1]], [1, hide[2]]]);
+    ctx.beginPath(); ctx.ellipse(-10, 40 + Math.sin(br) * 1.2, 80, 40, 0, 0, 7); ctx.fill();
+    // white belly and rump patch
+    ctx.fillStyle = 'rgba(248,240,226,.85)'; ctx.beginPath(); ctx.ellipse(-6, 66, 56, 13, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(248,240,226,.9)'; ctx.beginPath(); ctx.ellipse(62, 30, 12, 20, .3, 0, 7); ctx.fill();
+    ctx.fillStyle = '#f3ebdd'; ctx.beginPath(); ctx.ellipse(66, 22, 6, 10, .4, 0, 7); ctx.fill();
+    // near legs
+    limb(-50, 60, -52, 174, 13, hide[0], hide[1]); limb(48, 58, 54, 174, 13, hide[0], hide[1]);
+    hoof(-52, 178, 15); hoof(54, 178, 15);
+    // neck and head
+    limb(-58, 26, -108, -56, 30, hide[0], hide[1]);
+    ctx.fillStyle = lin(ctx, -140, -60, -100, -40, [[0, hide[0]], [1, hide[1]]]);
+    ctx.beginPath(); ctx.ellipse(-122, -58, 24, 17, -.25, 0, 7); ctx.fill();
+    ctx.fillStyle = '#3a2418'; ctx.beginPath(); ctx.ellipse(-146, -64, 6, 4.5, -.2, 0, 7); ctx.fill();
+    ctx.fillStyle = hide[0]; ctx.beginPath(); ctx.moveTo(-104, -70); ctx.quadraticCurveTo(-96, -96, -84, -88); ctx.quadraticCurveTo(-90, -74, -100, -66); ctx.fill();
+    ctx.fillStyle = '#e9c3a4'; ctx.beginPath(); ctx.moveTo(-100, -72); ctx.quadraticCurveTo(-95, -88, -88, -84); ctx.quadraticCurveTo(-92, -76, -98, -70); ctx.fill();
+    eye(-128, -66, 3.2);
+    // antlers
+    ctx.strokeStyle = lin(ctx, -140, -130, -90, -70, [[0, '#e8dcc6'], [1, '#a8936f']]); ctx.lineWidth = 5; ctx.lineCap = 'round';
+    for (const [sx, ex, ey, tx, ty] of [[-110, -99, -128, -84, -118], [-116, -129, -126, -142, -112]]) {
+      ctx.beginPath(); ctx.moveTo(sx, -74); ctx.quadraticCurveTo((sx + ex) / 2 - 4, -104, ex, ey); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo((sx + ex) / 2 - 2, -100); ctx.lineTo(tx, ty); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo((sx + ex) / 2 - 3, -86); ctx.lineTo(tx + (sx < ex ? 4 : -4), ty + 22); ctx.stroke();
+    }
+    ctx.lineWidth = 1;
+  }
+
+  function drawDog(t) {
+    const fur = ['#d9a25a', '#b47a3a', '#7f5222'], wag = Math.sin(t * 9) * 7;
+    ctx.lineJoin = 'round';
+    limb(-30, 62, -32, 120, 12, '#9a6a30', '#7a5020'); limb(30, 62, 32, 120, 12, '#9a6a30', '#7a5020');
+    ctx.fillStyle = '#5a3a1a'; rr(ctx, -40, 112, 16, 10, 4); ctx.fill(); rr(ctx, 24, 112, 16, 10, 4); ctx.fill();
+    // tail
+    ctx.strokeStyle = fur[1]; ctx.lineWidth = 11; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(62, 22); ctx.quadraticCurveTo(84, 10, 94 + wag, -28); ctx.stroke();
+    // body
+    ctx.fillStyle = rad(ctx, -20, 20, 6, 110, [[0, fur[0]], [.55, fur[1]], [1, fur[2]]]);
+    ctx.beginPath(); ctx.ellipse(0, 36, 70, 36, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(245,228,200,.7)'; ctx.beginPath(); ctx.ellipse(-4, 60, 46, 11, 0, 0, 7); ctx.fill();
+    limb(-46, 60, -48, 120, 14, fur[0], fur[1]); limb(44, 58, 48, 120, 14, fur[0], fur[1]);
+    ctx.fillStyle = '#4a2e12'; rr(ctx, -56, 114, 18, 10, 4); ctx.fill(); rr(ctx, 40, 114, 18, 10, 4); ctx.fill();
+    // neck, head, snout
+    limb(-56, 24, -90, 4, 34, fur[0], fur[1]);
+    ctx.fillStyle = rad(ctx, -104, -14, 4, 40, [[0, fur[0]], [1, fur[1]]]); ctx.beginPath(); ctx.arc(-95, -4, 28, 0, 7); ctx.fill();
+    ctx.fillStyle = lin(ctx, -142, 0, -118, 0, [[0, '#e7c89a'], [1, '#d2a86e']]); rr(ctx, -142, -10, 30, 22, [10, 8, 8, 10]); ctx.fill();
+    ctx.fillStyle = '#1c1411'; ctx.beginPath(); ctx.ellipse(-141, -4, 6, 5, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#e2607a'; rr(ctx, -128, 10, 10, 14 + Math.sin(t * 6) * 1.5, [2, 2, 6, 6]); ctx.fill();
+    // collar
+    ctx.fillStyle = '#c8322a'; ctx.beginPath(); ctx.ellipse(-70, 14, 9, 20, -.5, 0, 7); ctx.fill();
+    ctx.fillStyle = '#f2c230'; ctx.beginPath(); ctx.arc(-62, 28, 4.5, 0, 7); ctx.fill();
+    // floppy ear
+    ctx.fillStyle = lin(ctx, -90, -30, -70, 20, [[0, fur[1]], [1, fur[2]]]);
+    ctx.beginPath(); ctx.moveTo(-84, -26); ctx.quadraticCurveTo(-60, -20, -66, 22); ctx.quadraticCurveTo(-80, 20, -86, -4); ctx.fill();
+    eye(-104, -12, 3.4);
+    ctx.lineWidth = 1;
+  }
+
+  function drawChair() {
+    const wood = (x0, y0, x1, y1) => lin(ctx, x0, y0, x1, y1, [[0, '#c48d52'], [.5, '#9a6534'], [1, '#6b4320']]);
+    ctx.lineJoin = 'round';
+    // rear leg and backrest post, one piece
+    ctx.fillStyle = wood(34, 0, 48, 0); rr(ctx, 34, 0, 14, 170, [5, 5, 2, 2]); ctx.fill();
+    ctx.fillStyle = wood(-68, 0, -58, 0); rr(ctx, -68, 82, 11, 88, [0, 0, 2, 2]); ctx.fill();
+    // rung
+    ctx.fillStyle = wood(0, 128, 0, 136); rr(ctx, -58, 128, 94, 7, 3); ctx.fill();
+    // seat
+    ctx.fillStyle = lin(ctx, 0, 72, 0, 84, [[0, '#d7a263'], [.3, '#b57b42'], [1, '#7d4f26']]); rr(ctx, -72, 72, 120, 11, [4, 2, 2, 4]); ctx.fill();
+    ctx.strokeStyle = 'rgba(70,40,15,.3)'; ctx.lineWidth = 1;
+    for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(-68, 75 + i * 2); ctx.lineTo(44, 75 + i * 2 + Math.sin(i) * .6); ctx.stroke(); }
+    // back slats
+    ctx.fillStyle = wood(34, 0, 48, 0);
+    rr(ctx, 30, 0, 22, 9, 4); ctx.fill(); rr(ctx, 32, 30, 18, 6, 3); ctx.fill(); rr(ctx, 32, 50, 18, 6, 3); ctx.fill();
+    ctx.fillStyle = 'rgba(255,240,210,.35)'; ctx.fillRect(36, 2, 2, 166); ctx.fillRect(-66, 84, 2, 84);
+  }
+
+  function drawHand() {
+    const skin = ['#f4d2b2', '#e2b48c', '#b98562'];
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    // sleeve and forearm
+    ctx.fillStyle = lin(ctx, 40, 0, 100, 0, [[0, '#3f6fb2'], [.5, '#2d5390'], [1, '#1d3a68']]);
+    ctx.beginPath(); ctx.moveTo(40, 92); ctx.lineTo(90, 92); ctx.lineTo(96, 142); ctx.lineTo(50, 142); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.fillRect(42, 96, 50, 3);
+    limb(56, 26, 66, 96, 42, skin[0], skin[2]);
+    // palm
+    ctx.fillStyle = rad(ctx, 10, 6, 4, 90, [[0, skin[0]], [.6, skin[1]], [1, skin[2]]]);
+    ctx.beginPath(); ctx.moveTo(-22, 0); ctx.lineTo(56, 0); ctx.quadraticCurveTo(70, 10, 62, 28); ctx.lineTo(-18, 26); ctx.quadraticCurveTo(-28, 14, -22, 0); ctx.fill();
+    // four fingers, slightly fanned upward toward the tips
+    for (let i = 0; i < 4; i++) {
+      const y0 = 3 + i * 5.6, tipY = -14 + i * 7, len = 74 - Math.abs(i - 1.2) * 6;
+      limb(-18, y0 + 3, -18 - len, tipY + 2, 11, skin[0], skin[1]);
+      ctx.fillStyle = skin[0]; ctx.beginPath(); ctx.arc(-18 - len, tipY + 2, 5.5, 0, 7); ctx.fill();
+      ctx.fillStyle = 'rgba(255,245,235,.75)'; ctx.beginPath(); ctx.ellipse(-18 - len + 1, tipY, 3.2, 2.2, 0, 0, 7); ctx.fill();
+      ctx.strokeStyle = 'rgba(150,100,70,.35)'; ctx.lineWidth = 1.2;
+      for (const f of [.36, .68]) { const kx = -18 - len * f, ky = y0 + 3 + (tipY + 2 - y0 - 3) * f; ctx.beginPath(); ctx.moveTo(kx, ky - 4); ctx.lineTo(kx, ky + 4); ctx.stroke(); }
+    }
+    // thumb
+    limb(50, 4, 68, -38, 15, skin[0], skin[1]);
+    ctx.fillStyle = skin[0]; ctx.beginPath(); ctx.arc(68, -38, 7.5, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(255,245,235,.75)'; ctx.beginPath(); ctx.ellipse(70, -40, 3.5, 2.6, -.8, 0, 7); ctx.fill();
+    // palm creases
+    ctx.strokeStyle = 'rgba(150,100,70,.3)'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(-10, 8); ctx.quadraticCurveTo(20, 14, 48, 10); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-6, 18); ctx.quadraticCurveTo(24, 22, 50, 20); ctx.stroke();
+  }
+
   // --- floating objects (local space: landing surface at y = 0) ---
   const BOOK_COLS = [['#8e3442', '#5a1c26'], ['#2f5f84', '#173650'], ['#cfa84e', '#8a6a24'], ['#43734b', '#22412a'], ['#634587', '#36234f'], ['#b05a30', '#6a3010']];
   function drawTarget(tg, t) {
     if (!tg) return;
     const T = targetT(tg, t), hw = tg.hw, k = tg.k.id, x = 0, top = 0, base = tg.h;
-    ctx.save(); ctx.translate(T.x, T.y); ctx.rotate(T.a);
+    ctx.save(); ctx.translate(T.x, T.y); ctx.rotate(T.a); ctx.scale(tg.sc, tg.sc);
+    if (k === 'deer') { drawDeer(t); ctx.restore(); return; }
+    if (k === 'dog') { drawDog(t); ctx.restore(); return; }
+    if (k === 'chair') { drawChair(); ctx.restore(); return; }
+    if (k === 'hand') { drawHand(); ctx.restore(); return; }
     ctx.lineJoin = 'round';
     if (k === 'plate') {
       ctx.fillStyle = lin(ctx, 0, base - 10, 0, base, [[0, '#ffffff'], [1, '#b9b4ab']]);
@@ -864,7 +999,7 @@ canvas { display: block; width: 100%; height: 100%; }
   }
 
   function drawSpotlight(t) {
-    const T = targetT(target, t), { x0, x1, y0, y1 } = ext(), wide = target.hw + 90, bottom = T.y + target.h + 30;
+    const T = targetT(target, t), { x0, x1, y0, y1 } = ext(), wide = target.hw * target.sc + 90, bottom = T.y + target.h * target.sc + 30;
     const sx = T.x - 70;
     const far = Math.max(bottom + 160, y1 + 60), wf = wide * (far - y0) / (bottom - y0);
     const bx = sx + (T.x - sx) * (far - y0) / (bottom - y0);
@@ -879,7 +1014,7 @@ canvas { display: block; width: 100%; height: 100%; }
       const yy = y0 + (bottom - y0) * u, half = 20 + (wide - 20) * u, xx = sx + (T.x - sx) * u + (v - .5) * 2 * half * .8;
       ctx.fillStyle = `rgba(255,250,230,${.25 * spot * (1 - Math.abs(v - .5))})`; ctx.beginPath(); ctx.arc(xx, yy, .9 + (i % 3) * .4, 0, 7); ctx.fill();
     }
-    ctx.fillStyle = rad(ctx, T.x, T.y + target.h / 2, 10, wide * 1.4, [[0, `rgba(255,236,200,${.08 * spot})`], [1, 'rgba(255,236,200,0)']]);
+    ctx.fillStyle = rad(ctx, T.x, T.y + target.h * target.sc / 2, 10, wide * 1.4, [[0, `rgba(255,236,200,${.08 * spot})`], [1, 'rgba(255,236,200,0)']]);
     ctx.fillRect(T.x - wide * 1.5, T.y - wide * 1.4, wide * 3, wide * 3);
     ctx.restore();
   }
@@ -1020,7 +1155,7 @@ canvas { display: block; width: 100%; height: 100%; }
 
   // backdrop behind the start card: a sausage dangling from chopsticks over the pan
   resize();
-  target = makeTarget(null); target.k = KINDS[1]; target.hw = 44; target.h = 96; target.bx = 700; target.by = 300; target.enter = 1; target.polys = polysFor(target);
+  target = makeTarget(null); target.k = KINDS[0]; target.hw = 70; target.h = 178; target.sc = 1; target.bx = 700; target.by = 240; target.enter = 1; target.polys = polysFor(target);
   newSausage(); chop.mode = 'hold';
   requestAnimationFrame(frame);
 })();
