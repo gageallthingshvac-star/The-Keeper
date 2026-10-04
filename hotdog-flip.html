@@ -709,21 +709,21 @@ canvas { display: block; width: 100%; height: 100%; }
   const panImg = new Image(); let panPhoto = null;
   panImg.onload = () => { panPhoto = panImg; };
   panImg.src = 'img/skillet.png';
-  // the skillet's rim traced as an ellipse on the photo; the sausage rests just inside its front edge, and the
-  // part of the pan below that edge is drawn again over the sausage, so it lies in the pan rather than on top of it
-  const PAN_IMG = { cx: .63, cy: .485, rx: .34, ry: .345 };
+  // the skillet traced on the photo: its outer rim and the inner edge of its cooking floor, both ellipses.
+  // The sausage lies across the floor's centre line; only the pan outside the floor (rim band, walls, handles)
+  // is drawn again over it, so it sits on the floor with its ends tucked under the rim
+  const PAN_IMG = { outer: { cx: .63, cy: .485, rx: .34, ry: .345 }, inner: { cx: .625, cy: .68, rx: .295, ry: .18 } };
   function panImage(T, front) {
-    const iw = panPhoto.naturalWidth, ih = panPhoto.naturalHeight, I = PAN_IMG;
-    // the sausage lies a little in front of the rim's widest line, where the ellipse is still almost full width,
-    // so its ends tuck under the rim instead of poking through it
-    const cx = I.cx * iw, cy = I.cy * ih, rx = I.rx * iw, ry = I.ry * ih, lie = .35;
-    const sc = 256 / (2 * rx * Math.sqrt(1 - lie * lie));
-    const ox = -cx, oy = -(cy + lie * ry) - R / sc;
+    const iw = panPhoto.naturalWidth, ih = panPhoto.naturalHeight, O = PAN_IMG.outer, I = PAN_IMG.inner;
+    const cxI = I.cx * iw, cyI = I.cy * ih, rxI = I.rx * iw, ryI = I.ry * ih;
+    const halfAtLine = O.rx * iw * Math.sqrt(Math.max(.1, 1 - Math.pow((I.cy - O.cy) / O.ry, 2)));
+    const sc = 256 / (2 * halfAtLine);
+    const ox = -O.cx * iw, oy = -cyI - R / sc;
     ctx.save(); ctx.translate(T.x, T.y); ctx.rotate(T.a); ctx.scale(sc, sc);
     if (front) {
-      ctx.beginPath(); ctx.moveTo(ox, oy + ih); ctx.lineTo(ox, oy + cy); ctx.lineTo(ox + cx - rx, oy + cy);
-      ctx.ellipse(ox + cx, oy + cy, rx, ry, 0, Math.PI, 0, true);
-      ctx.lineTo(ox + iw, oy + cy); ctx.lineTo(ox + iw, oy + ih); ctx.closePath(); ctx.clip();
+      ctx.beginPath(); ctx.moveTo(ox, oy + ih); ctx.lineTo(ox, oy + cyI); ctx.lineTo(ox + cxI - rxI, oy + cyI);
+      ctx.ellipse(ox + cxI, oy + cyI, rxI, ryI, 0, Math.PI, 0, true);
+      ctx.lineTo(ox + iw, oy + cyI); ctx.lineTo(ox + iw, oy + ih); ctx.closePath(); ctx.clip();
     }
     ctx.drawImage(panPhoto, ox, oy, iw, ih);
     ctx.restore();
