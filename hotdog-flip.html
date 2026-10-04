@@ -278,6 +278,26 @@ canvas { display: block; width: 100%; height: 100%; }
     { id: 'skateboard', name: 'the skateboard', src: 'img/skateboard.png', w: 230 },
     { id: 'pineapple', name: 'the pineapple', src: 'img/pineapple.png', w: 170 },
     { id: 'trophy', name: 'the trophy', src: 'img/trophy.png', w: 220 },
+    // things to fall into (openings as fractions of the image: x from, x to, y from the top, y to)
+    { id: 'basket', name: 'the basket', src: 'img/basket.png', w: 300, cav: [[.08, .92, 0, .9]] },
+    { id: 'basket2', name: 'the basket', src: 'img/basket2.png', w: 300, cav: [[.1, .9, 0, .9]] },
+    { id: 'boot', name: 'the boot', src: 'img/boot.png', w: 250, cav: [[.56, .82, 0, .45]] },
+    { id: 'boots2', name: 'the cowboy boots', src: 'img/boots2.png', w: 300, cav: [[.2, .47, 0, .7], [.5, .8, 0, .7]] },
+    { id: 'glass', name: 'the glass', src: 'img/glass.png', w: 190, cav: [[.27, .76, 0, .8]] },
+    { id: 'teacup', name: 'the teacup', src: 'img/teacup.png', w: 280, cav: [[.17, .76, 0, .55]] },
+    { id: 'tophat', name: 'the top hat', src: 'img/tophat.png', w: 230, cav: [[.14, .86, 0, .8]] },
+    // awkward perches
+    { id: 'pot', name: 'the pot', src: 'img/pot.png', w: 260 },
+    { id: 'teapot', name: 'the teapot', src: 'img/teapot.png', w: 260 },
+    { id: 'vase', name: 'the vase', src: 'img/vase.png', w: 140 },
+    { id: 'umbrella', name: 'the umbrella', src: 'img/umbrella.png', w: 340 },
+    { id: 'books', name: 'the books', src: 'img/books.png', w: 260 },
+    { id: 'books2', name: 'the textbooks', src: 'img/books2.png', w: 260 },
+    { id: 'ladder', name: 'the ladder', src: 'img/ladder.png', w: 230 },
+    { id: 'lamp', name: 'the lamp', src: 'img/lamp.png', w: 170 },
+    { id: 'lamp2', name: 'the desk lamp', src: 'img/lamp2.png', w: 120 },
+    { id: 'lantern', name: 'the lantern', src: 'img/lantern.png', w: 150 },
+    { id: 'microphone', name: 'the microphone', src: 'img/microphone.png', w: 220 },
   ];
   function analyzePhoto(k, img) {
     const c = document.createElement('canvas'), iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
@@ -479,11 +499,20 @@ canvas { display: block; width: 100%; height: 100%; }
     // a point counts when it sits on a landing surface: within a sausage radius above it, measured in screen units
     return sau.p.filter(q => { const l = lpt(T, q.x, q.y), lx = l.x / sc, ly = l.y / sc; return tops.some(tp => { const dy = (ly - tp.y) * sc; return lx >= tp.x0 && lx <= tp.x1 && dy < 4 && dy > -(R + 10); }); }).length;
   }
-  // is the middle of the sausage within one of the object's openings?
+  // is any part of the sausage within one of the object's openings?
   function inCavity() {
     if (!target || !target.k.cavity || !target.k.cavity.length) return false;
-    const T = targetT(target, simT), c = centroid(), l = lpt(T, c.x, c.y), lx = l.x / target.sc, ly = l.y / target.sc;
-    return target.k.cavity.some(cv => lx > cv.x0 && lx < cv.x1 && ly > cv.y0 && ly < cv.y1);
+    const T = targetT(target, simT);
+    return sau.p.some(q => { const l = lpt(T, q.x, q.y), lx = l.x / target.sc, ly = l.y / target.sc; return target.k.cavity.some(cv => lx > cv.x0 && lx < cv.x1 && ly > cv.y0 && ly < cv.y1); });
+  }
+  // clip to the object's openings (or to everything but them)
+  function cavityClip(T, outside) {
+    ctx.beginPath();
+    ctx.save(); ctx.translate(T.x, T.y); ctx.rotate(T.a); ctx.scale(target.sc, target.sc);
+    for (const cv of target.k.cavity) ctx.rect(cv.x0, cv.y0, cv.x1 - cv.x0, cv.y1 - cv.y0);
+    ctx.restore();
+    if (outside) { const { x0, x1, y0, y1 } = ext(); ctx.rect(x0 - 500, y0 - 500, x1 - x0 + 1000, y1 - y0 + 1000); ctx.clip('evenodd'); }
+    else ctx.clip();
   }
   function centroid() { let x = 0, y = 0; for (const q of sau.p) { x += q.x; y += q.y; } return { x: x / N, y: y / N }; }
 
@@ -672,6 +701,20 @@ canvas { display: block; width: 100%; height: 100%; }
   }
 
   // --- pan: seasoned cast-iron skillet, seen slightly from above ---
+  // the real skillet photo: its rim-to-rim opening is stretched over the hit box, handle to the left
+  const panImg = new Image(); let panPhoto = null;
+  panImg.onload = () => { panPhoto = panImg; };
+  panImg.src = 'img/skillet.png';
+  const PAN_IMG = { cavX0: .38, cavX1: 1, floorY: .6, frontY: .7 };
+  function panImage(T, front) {
+    const iw = panPhoto.naturalWidth, ih = panPhoto.naturalHeight;
+    const sc = 256 / ((PAN_IMG.cavX1 - PAN_IMG.cavX0) * iw);
+    const ox = -(PAN_IMG.cavX0 + PAN_IMG.cavX1) / 2 * iw, oy = -PAN_IMG.floorY * ih;
+    ctx.save(); ctx.translate(T.x, T.y); ctx.rotate(T.a); ctx.scale(sc, sc);
+    if (front) { const y0 = PAN_IMG.frontY * ih; ctx.drawImage(panPhoto, 0, y0, iw, ih - y0, ox, oy + y0, iw, ih - y0); }
+    else ctx.drawImage(panPhoto, ox, oy, iw, ih);
+    ctx.restore();
+  }
   function panBack(T) {
     ctx.save(); ctx.translate(T.x, T.y); ctx.rotate(T.a); ctx.scale(1.32, 1);
     // handle
@@ -1098,14 +1141,20 @@ canvas { display: block; width: 100%; height: 100%; }
     lctx.setTransform(1, 0, 0, 1, 0, 0); lctx.clearRect(0, 0, layer.width, layer.height);
     camT(lctx);
     const P = panT(simT);
-    panBack(P);
+    if (panPhoto) panImage(P, false); else panBack(P);
     // sausage sits inside the pan when touching it, otherwise in front of everything
     const inPan = sau && sau.p.some(q => q.touch === 'pan');
     if (inPan) drawSausage(sau);
-    panFront(P);
+    if (panPhoto) panImage(P, true); else panFront(P);
     const inside = !inPan && sau && inCavity();
-    if (inside) drawSausage(sau);
     drawTarget(target, simT);
+    if (inside) {
+      // in an opening: whatever sticks out is drawn as usual, and the part inside shows through the wall, dimmed,
+      // so it reads as sitting in the object rather than hidden behind it
+      const T = targetT(target, simT);
+      ctx.save(); cavityClip(T, true); drawSausage(sau); ctx.restore();
+      ctx.save(); cavityClip(T, false); ctx.globalAlpha = .5; drawSausage(sau); ctx.restore();
+    }
     let g = null;
     if (chop.mode) { g = chopGeom(); stick(...g.back, 3.4, 9, false); }
     if (!inPan && !inside) drawSausage(sau);
