@@ -297,13 +297,19 @@ canvas { display: block; width: 100%; height: 100%; }
     let minX = iw, maxX = -1, minY = ih, maxY = -1;
     for (let y = 0; y < ih; y++) for (let x = 0; x < iw; x++) if (solid(x, y)) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y; }
     if (maxX < 0) return false;
-    const bw = maxX - minX + 1, bh = maxY - minY + 1, cw = Math.max(4, Math.round(bw / 56)), cols = [];
+    // thin columns, each split into its solid runs, so every notch, gap and overhang of the outline is part of the hit box
+    const bw = maxX - minX + 1, bh = maxY - minY + 1, cw = Math.max(3, Math.round(bw / 80)), cols = [];
     for (let x0 = minX; x0 <= maxX; x0 += cw) {
       const x1 = Math.min(maxX + 1, x0 + cw);
-      let top = -1, bot = -1;
-      for (let y = minY; y <= maxY && top < 0; y++) for (let x = x0; x < x1; x++) if (solid(x, y)) { top = y; break; }
-      for (let y = maxY; y >= minY && bot < 0; y--) for (let x = x0; x < x1; x++) if (solid(x, y)) { bot = y; break; }
-      if (top >= 0) cols.push({ x0: x0 - minX - bw / 2, x1: x1 - minX - bw / 2, top: top - minY, bot: bot - minY + 1 });
+      let run = -1, gap = 0;
+      const close = y => { if (y - run >= 3) cols.push({ x0: x0 - minX - bw / 2, x1: x1 - minX - bw / 2, top: run - minY, bot: y - minY }); run = -1; };
+      for (let y = minY; y <= maxY + 1; y++) {
+        let hit = false;
+        if (y <= maxY) for (let x = x0; x < x1; x++) if (solid(x, y)) { hit = true; break; }
+        if (hit) { if (run < 0) run = y; gap = 0; }
+        else if (run >= 0 && ++gap > 2) close(y - gap + 1);
+      }
+      if (run >= 0) close(maxY + 1);
     }
     Object.assign(k, { image: img, sx: minX, sy: minY, bw, bh, cols, tops: cols.map(c => ({ x0: c.x0, x1: c.x1, y: c.top })), ready: true });
     return true;
