@@ -38,24 +38,18 @@ canvas { display: block; width: 100%; height: 100%; }
 .btn:focus-visible { outline: 3px solid var(--mustard); outline-offset: 4px; }
 #actBtn {
   position: absolute; right: 18px; bottom: calc(22px + env(safe-area-inset-bottom, 0px));
-  width: 128px; height: 128px; border-radius: 50%; overflow: hidden; font-size: 15px; line-height: 1.05;
-  touch-action: none; display: grid; place-items: center; padding: 0 10px;
+  width: 128px; height: 128px; border-radius: 50%; overflow: hidden;
+  touch-action: none; display: grid; place-items: center; padding: 0;
 }
+.btn svg { width: 54px; height: 54px; display: block; fill: none; stroke: #fff; stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 2px 0 rgba(0,0,0,.45)); }
+#actBtn svg { position: relative; }
+#actBtn .ico { display: none; }
+#actBtn[data-ico="drop"] .ico-drop, #actBtn[data-ico="flip"] .ico-flip { display: block; }
 #actBtn .fill { position: absolute; left: 0; right: 0; bottom: 0; height: 0%; background: linear-gradient(180deg, #ffd85a, #e9a915); transition: height .05s linear; }
-#actBtn .lbl { position: relative; pointer-events: none; text-shadow: 0 2px 0 rgba(0,0,0,.45); }
 #actBtn:disabled { filter: saturate(.35) brightness(.8); cursor: default; }
-#firm {
-  position: absolute; left: 16px; top: calc(14px + env(safe-area-inset-top, 0px)); z-index: 1;
-  background: rgba(255,250,240,.78); border: 2px solid #5a3d1e; border-radius: 12px; padding: 8px 12px 10px;
-  color: #3b2a14; font-size: 11px; letter-spacing: .08em; width: 190px; box-shadow: 0 3px 0 #5a3d1e;
-}
-#firm b { display: block; font-weight: 700; margin-bottom: 4px; }
-#firm output { font-family: var(--display); font-size: 15px; color: #a8352c; letter-spacing: 0; display: block; margin-bottom: 4px; }
-#firm input { width: 100%; margin: 0; accent-color: #d8342b; }
-#firm .ticks { display: flex; justify-content: space-between; font-size: 9px; color: #7a5a34; margin-top: 2px; }
 #againBtn {
   position: absolute; left: 50%; bottom: calc(30px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
-  font-size: 18px; padding: 13px 24px; border-radius: 14px; z-index: 1;
+  padding: 12px 26px; border-radius: 18px; z-index: 1;
 }
 #againBtn.down, #againBtn:active { transform: translateX(-50%) translateY(5px); }
 #againBtn.up { animation: none; }
@@ -72,28 +66,19 @@ canvas { display: block; width: 100%; height: 100%; }
   font-family: var(--display); font-size: clamp(30px, 8vw, 44px); line-height: .95; margin: 0;
   color: var(--mustard); text-shadow: 3px 3px 0 var(--ketchup);
 }
-.card .small { font-size: 11px; color: #b9ad9c; }
 .card p { margin: 0; line-height: 1.55; font-size: 13px; }
 .card .btn { font-size: 18px; padding: 13px 18px; border-radius: 14px; }
 </style>
 
 <div id="stage">
   <canvas id="c"></canvas>
-  <div id="firm">
-    <b>SAUSAGE FIRMNESS</b>
-    <output id="firmOut" for="firmRange">5 &middot; Medium</output>
-    <input type="range" id="firmRange" min="1" max="9" step="1" value="5" aria-label="Sausage firmness, 1 soft to 9 stiff">
-    <div class="ticks"><span>1</span><span>3</span><span>5</span><span>7</span><span>9</span></div>
-  </div>
-  <button class="btn" id="actBtn" aria-label="Drop or flip the sausage" disabled><span class="fill"></span><span class="lbl" id="actLbl">HOLD TO<br>WIND UP</span></button>
-  <button class="btn" id="againBtn" hidden>Flip another</button>
+  <button class="btn" id="actBtn" aria-label="Drop or flip the sausage" data-ico="drop" disabled><span class="fill"></span>
+    <svg class="ico ico-drop" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 10v40M14 34l18 18 18-18"/></svg>
+    <svg class="ico ico-flip" viewBox="0 0 64 64" aria-hidden="true"><path d="M12 44c0-16 10-26 24-26 10 0 16 5 20 12"/><path d="M44 18l12 12-16 2"/><path d="M8 52h48"/></svg>
+  </button>
+  <button class="btn" id="againBtn" aria-label="Flip another" hidden><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M50 26A20 20 0 1 0 54 38"/><path d="M50 12v14H36"/></svg></button>
   <div class="overlay" id="startScreen">
-    <div class="card">
-      <h1>Hotdog Flip</h1>
-      <p>Chopsticks bring in a sausage. Tap to drop it in the pan. Hold to pull the pan back, let go to flip it onto whatever is floating nearby. Flip as many times as it takes.</p>
-      <p>A solid landing wins on the spot. If it lands on an edge, it has to hang on for 5 seconds.</p>
-      <button class="btn" id="startBtn">Start</button>
-    </div>
+    <button class="btn" id="startBtn" aria-label="Start" style="width:130px;height:130px;border-radius:50%;display:grid;place-items:center"><svg viewBox="0 0 64 64" aria-hidden="true" style="width:60px;height:60px"><path d="M22 14v36l30-18z" fill="#fff" stroke="none"/></svg></button>
   </div>
 </div>
 
@@ -104,7 +89,7 @@ canvas { display: block; width: 100%; height: 100%; }
   const layer = document.createElement('canvas'), lctx = layer.getContext('2d');
   const shad = document.createElement('canvas'), sctx = shad.getContext('2d');
   const stage = document.getElementById('stage');
-  const actBtn = document.getElementById('actBtn'), actLbl = document.getElementById('actLbl'), fill = actBtn.querySelector('.fill');
+  const actBtn = document.getElementById('actBtn'), fill = actBtn.querySelector('.fill');
   const againBtn = document.getElementById('againBtn');
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (!CanvasRenderingContext2D.prototype.roundRect) CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h) { this.rect(x, y, w, h); };
@@ -112,7 +97,7 @@ canvas { display: block; width: 100%; height: 100%; }
   // ---------- world ----------
   const WW = 1000, WH = 600, G = 1900;
   const PX = 270, PY = 440;               // pan cooking-surface centre
-  const N = 9, SEG = 15, R = 14;          // sausage: 9 particles, 120px long, 28px thick
+  const N = 9, SEG = 17, R = 16;          // sausage: 9 particles, 136px long, 32px thick
   const SUB = 1 / 240, REST = .02, MU = 1.1, MU_PAN = .02, SQUISH = .93, PAN_TILT = .11;
   let W = 0, H = 0, DPR = 1, S = 1, OX = 0, OY = 0, bgCache = null;
 
@@ -285,19 +270,51 @@ canvas { display: block; width: 100%; height: 100%; }
 
   // sc scales the whole object; tops lists its landable surfaces in local units (default: the top edge, y = 0)
   const KINDS = [
-    { id: 'deer', name: 'the deer', hw: 70, h: 178, tops: [{ x0: -78, x1: 56, y: 0 }] },
-    { id: 'dog', name: 'the dog', hw: 68, h: 124, tops: [{ x0: -66, x1: 64, y: 0 }] },
-    { id: 'chair', name: 'the chair', hw: 60, h: 170, sc: 1.3, tops: [{ x0: -72, x1: 34, y: 72 }] },
-    { id: 'hand', name: 'the hand', hw: 72, h: 140, tops: [{ x0: -96, x1: 44, y: 0 }] },
-    { id: 'toaster', name: 'the toaster', hw: 44, h: 96, sc: 1.6 },
-    { id: 'mug', name: 'the coffee mug', hw: 22, h: 66, sc: 1.7 },
-    { id: 'cat', name: 'the sleeping cat', hw: 32, h: 72, sc: 1.7 },
-    { id: 'skate', name: 'the skateboard', hw: 44, h: 26, drift: 60, sc: 1.6 },
-    { id: 'duck', name: 'the rubber duck', hw: 15, h: 60, sc: 1.9 },
-    { id: 'balloon', name: 'the balloon', hw: 20, h: 80, bob: 14, sway: .06, sc: 1.7 },
+    { id: 'deer', name: 'the deer', hw: 70, h: 178, sc: 1.25, tops: [{ x0: -78, x1: 56, y: 0 }] },
+    { id: 'dog', name: 'the dog', hw: 68, h: 124, sc: 1.3, tops: [{ x0: -66, x1: 64, y: 0 }] },
+    { id: 'chair', name: 'the chair', hw: 60, h: 170, sc: 1.6, tops: [{ x0: -72, x1: 34, y: 72 }] },
+    { id: 'hand', name: 'the hand', hw: 72, h: 140, sc: 1.3, tops: [{ x0: -96, x1: 44, y: 0 }] },
+    { id: 'toaster', name: 'the toaster', hw: 44, h: 96, sc: 2 },
+    { id: 'mug', name: 'the coffee mug', hw: 22, h: 66, sc: 2.1 },
+    { id: 'cat', name: 'the sleeping cat', hw: 32, h: 72, sc: 2.1 },
+    { id: 'skate', name: 'the skateboard', hw: 44, h: 26, drift: 60, sc: 2 },
+    { id: 'duck', name: 'the rubber duck', hw: 15, h: 60, sc: 2.3 },
+    { id: 'balloon', name: 'the balloon', hw: 20, h: 80, bob: 14, sway: .06, sc: 2.1 },
   ];
+  // ---------- photo objects: real cutouts, hit boxes read off their alpha channel ----------
+  // w is the width on screen; everything else (height, landing surfaces, collision columns) comes from the image
+  const PHOTOS = [];
+  function analyzePhoto(k, img) {
+    const c = document.createElement('canvas'), iw = img.naturalWidth, ih = img.naturalHeight;
+    c.width = iw; c.height = ih;
+    const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+    let d; try { d = g.getImageData(0, 0, iw, ih).data; } catch { return false; }
+    const solid = (x, y) => d[(y * iw + x) * 4 + 3] > 60;
+    let minX = iw, maxX = -1, minY = ih, maxY = -1;
+    for (let y = 0; y < ih; y++) for (let x = 0; x < iw; x++) if (solid(x, y)) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y; }
+    if (maxX < 0) return false;
+    const bw = maxX - minX + 1, bh = maxY - minY + 1, cw = Math.max(4, Math.round(bw / 56)), cols = [];
+    for (let x0 = minX; x0 <= maxX; x0 += cw) {
+      const x1 = Math.min(maxX + 1, x0 + cw);
+      let top = -1, bot = -1;
+      for (let y = minY; y <= maxY && top < 0; y++) for (let x = x0; x < x1; x++) if (solid(x, y)) { top = y; break; }
+      for (let y = maxY; y >= minY && bot < 0; y--) for (let x = x0; x < x1; x++) if (solid(x, y)) { bot = y; break; }
+      if (top >= 0) cols.push({ x0: x0 - minX - bw / 2, x1: x1 - minX - bw / 2, top: top - minY, bot: bot - minY + 1 });
+    }
+    Object.assign(k, { image: img, sx: minX, sy: minY, bw, bh, cols, tops: cols.map(c => ({ x0: c.x0, x1: c.x1, y: c.top })), ready: true });
+    return true;
+  }
+  function loadPhotos() {
+    for (const k of PHOTOS) {
+      const img = new Image();
+      img.onload = () => analyzePhoto(k, img);
+      img.src = k.src;
+    }
+  }
+
   function polysFor(tg) {
     const hw = tg.hw, h = tg.h, sc = tg.sc, P = pts => poly(pts.map(([x, y]) => [x * sc, y * sc]));
+    if (tg.k.cols) return tg.k.cols.map(c => P([[c.x0, c.top], [c.x1, c.top], [c.x1, c.bot], [c.x0, c.bot]]));
     switch (tg.k.id) {
       case 'deer': return [P(ngon(-10, 40, 40).map(([x, y]) => [-10 + (x + 10) * 2, y])), P([[-70, 20], [-45, 30], [-95, -55], [-115, -50]]), P(ngon(-122, -58, 21)),
         P([[-112, -74], [-106, -74], [-96, -128], [-102, -130]]), P([[-114, -74], [-120, -74], [-132, -126], [-126, -128]]),
@@ -319,10 +336,12 @@ canvas { display: block; width: 100%; height: 100%; }
     }
   }
   function makeTarget(prev) {
-    const pool = KINDS.filter(k => k !== prev);
+    const ready = PHOTOS.filter(k => k.ready);
+    const pool = (ready.length ? ready : KINDS).filter(k => k !== prev);
     const k = pool[Math.floor(Math.random() * pool.length)];
     const seed = Math.floor(Math.random() * 1000);
-    const tg = { k, hw: k.hw, h: k.h, sc: k.sc || 1, seed, phase: Math.random() * 6.28, enter: 0, drift: k.drift || 0, bob: k.bob || 7, sway: k.sway || .03 };
+    const tg = k.cols ? { k, hw: k.bw / 2, h: k.bh, sc: k.w / k.bw, seed } : { k, hw: k.hw, h: k.h, sc: k.sc || 1, seed };
+    Object.assign(tg, { phase: Math.random() * 6.28, enter: 0, drift: k.drift || 0, bob: k.bob || 7, sway: k.sway || .03 });
     if (k.id === 'books') {
       const n = 2 + Math.floor(Math.random() * 5), bh = 26;
       tg.h = n * bh;
@@ -331,8 +350,8 @@ canvas { display: block; width: 100%; height: 100%; }
         return { x0: -w + sx, w: w * 2, y: tg.h - (i + 1) * bh, h: bh - 1, ci: (i + seed) % 6 };
       });
     }
-    tg.bx = 560 + Math.random() * (280 - tg.drift * 2);
-    const yMin = 190, yMax = Math.min(400, 555 - tg.h * tg.sc);
+    tg.bx = 600 + Math.random() * (240 - tg.drift * 2);
+    const yMin = 170, yMax = Math.min(400, 560 - tg.h * tg.sc);
     tg.by = yMin + Math.random() * Math.max(0, yMax - yMin);
     tg.polys = polysFor(tg);
     return tg;
@@ -423,16 +442,8 @@ canvas { display: block; width: 100%; height: 100%; }
     simT += SUB;
   }
   // pulls the middle of three neighbours back toward the line between them: a firm casing that still flexes
-  // firmness slider: 5 is the tuned middle; each step up multiplies the bend stiffness by ~1.5
-  let BEND = .06, K4 = .12;
-  const FIRM_NAMES = { 1: 'Overcooked noodle', 2: 'Very soft', 3: 'Soft', 4: 'Medium-soft', 5: 'Medium', 6: 'Medium-firm', 7: 'Firm', 8: 'Very firm', 9: 'Breadstick' };
-  function setFirmness(v) {
-    v = Math.max(1, Math.min(9, Math.round(+v || 5)));
-    BEND = .06 * Math.pow(5, (v - 5) / 4); K4 = .12 * Math.pow(4, (v - 5) / 4);
-    document.getElementById('firmRange').value = v;
-    document.getElementById('firmOut').textContent = v + ' \u00B7 ' + FIRM_NAMES[v];
-    try { localStorage.setItem('hotdogflip-firmness', String(v)); } catch {}
-  }
+  // bend stiffness: the softest setting of the old firmness slider (level 1)
+  const BEND = .012, K4 = .03;
   function straighten(a, b, c, k) {
     const dx = (a.x + c.x) / 2 - b.x, dy = (a.y + c.y) / 2 - b.y;
     b.x += dx * k; b.y += dy * k; a.x -= dx * k / 2; a.y -= dy * k / 2; c.x -= dx * k / 2; c.y -= dy * k / 2;
@@ -492,25 +503,12 @@ canvas { display: block; width: 100%; height: 100%; }
     againBtn.hidden = true; newSausage();
   }
   const tri = u => { u %= 2; return u < 1 ? u : 2 - u; };
-  // what the big button says: tells you exactly what to do, with some sass
-  const LABELS = {
-    hang: 'TAP TO<br>FREE THE<br>WIENER',
-    drop: 'IT\u2019S<br>FALLING',
-    ready: 'HOLD TO<br>WIND UP',
-    charge: 'LET GO<br>TO FLIP',
-    max: 'LET GO!<br>FULL<br>SEND',
-    flight: 'HANDS<br>OFF',
-    hold: 'DON\u2019T<br>BREATHE',
-    miss: 'OOPS.<br>NEXT<br>WIENER',
-    won: 'LEGEND',
-  };
-
   function press() {
     if (state !== 'play') return;
     initAudio();
     if (phase === 'hang') {
       if (chop.mode === 'hold') dropIt(); else chop.queued = true;
-    } else if (phase === 'ready') {
+    } else if (phase === 'ready' || phase === 'drop' || phase === 'flight') {
       phase = 'charge'; charge = 0;
     }
   }
@@ -519,9 +517,13 @@ canvas { display: block; width: 100%; height: 100%; }
     sfx('chopstick', .7);
   }
   function release() {
-    if (state === 'play' && phase === 'charge') { launch(power); dip = 0; phase = 'flight'; phaseT = 0; settle = { pan: 0, target: 0 }; }
+    if (state === 'play' && phase === 'charge') {
+      // the jerk only throws the sausage if it is actually in the pan; otherwise the pan just swings
+      if (sau.p.some(q => q.touch === 'pan')) launch(power); else { lift = { t0: simT, p: power, d0: dip }; sfx('whoosh', .3, 1.2); }
+      dip = 0; phase = 'flight'; phaseT = 0; settle = { pan: 0, target: 0 };
+    }
   }
-  function popup(text) { const c = centroid(); popups.push({ x: c.x, y: c.y - 40, text, life: 1.3 }); }
+  function popup() {}
   function celebrate(huge) {
     phase = 'won'; phaseT = 0; spotOn = true; big = !!huge; playOde();
     if (huge) {
@@ -556,10 +558,10 @@ canvas { display: block; width: 100%; height: 100%; }
 
     if (state === 'play' && phase === 'charge') { charge += dt; power = tri(charge / 1.15); dip = power; }
     fill.style.height = (phase === 'charge' ? power * 100 : 0) + '%';
-    const canAct = state === 'play' && (phase === 'hang' || phase === 'ready' || phase === 'charge');
+    const canAct = state === 'play' && (phase === 'hang' || phase === 'ready' || phase === 'charge' || phase === 'drop' || phase === 'flight');
     actBtn.disabled = !canAct;
-    const lbl = LABELS[phase === 'charge' && power > .85 ? 'max' : phase] || LABELS.flight;
-    if (actLbl.innerHTML !== lbl) actLbl.innerHTML = lbl;
+    const ico = phase === 'hang' ? 'drop' : 'flip';
+    if (actBtn.dataset.ico !== ico) actBtn.dataset.ico = ico;
     zoom += ((phase === 'hold' ? 1.16 : 1) - zoom) * Math.min(1, dt * 3);
     shake = Math.max(0, shake - dt * 1.6);
     for (let i = confetti.length - 1; i >= 0; i--) { const f = confetti[i]; f.life -= dt; f.vy += 900 * dt; f.vx *= .985; f.vy *= .985; f.x += f.vx * dt; f.y += f.vy * dt; f.r += f.vr * dt; if (f.life <= 0) confetti.splice(i, 1); }
@@ -596,7 +598,7 @@ canvas { display: block; width: 100%; height: 100%; }
       if (sfxBuf.heartbeat) beatLoop(1 + hold.t * .12);
       else { hold.beat -= dt; if (hold.beat <= 0) { sfx('heartbeat', .9, 1 + hold.t * .08); hold.beat = Math.max(.42, .85 - hold.t * .09); } }
       const sec = Math.ceil(5 - hold.t);
-      if (sec !== hold.sec && sec > 0) { hold.sec = sec; buzz(12); }
+      if (sec !== hold.sec && sec > 0) { hold.sec = sec; buzz(12); blip(1000, .07, 'sine', .12); }
       if (hold.lost > .3) { stopBeat(); phase = 'flight'; phaseT = 0; settle.target = 0; popup('NOOOO'); buzz([20, 60, 20]); }
       else if (hold.t >= 5) { stopBeat(); celebrate(true); }
     }
@@ -892,6 +894,7 @@ canvas { display: block; width: 100%; height: 100%; }
     if (!tg) return;
     const T = targetT(tg, t), hw = tg.hw, k = tg.k.id, x = 0, top = 0, base = tg.h;
     ctx.save(); ctx.translate(T.x, T.y); ctx.rotate(T.a); ctx.scale(tg.sc, tg.sc);
+    if (tg.k.image) { ctx.drawImage(tg.k.image, tg.k.sx, tg.k.sy, tg.k.bw, tg.k.bh, -tg.k.bw / 2, 0, tg.k.bw, tg.k.bh); ctx.restore(); return; }
     if (k === 'deer') { drawDeer(t); ctx.restore(); return; }
     if (k === 'dog') { drawDog(t); ctx.restore(); return; }
     if (k === 'chair') { drawChair(); ctx.restore(); return; }
@@ -1019,24 +1022,34 @@ canvas { display: block; width: 100%; height: 100%; }
     ctx.restore();
   }
 
+  // the hold test: a vintage film-leader countdown, big numeral in a crosshair circle with a sweeping wipe
   function drawHold(t) {
     const { x0, x1, y0, y1 } = ext(), k = Math.min(1, phaseT * 2), c = centroid();
-    // tunnel vision toward the sausage
-    ctx.fillStyle = rad(ctx, c.x, c.y, 90, 620, [[0, 'rgba(20,10,4,0)'], [1, `rgba(20,10,4,${.55 * k})`]]);
+    ctx.fillStyle = rad(ctx, c.x, c.y, 90, 620, [[0, 'rgba(20,10,4,0)'], [1, `rgba(20,10,4,${.6 * k})`]]);
     ctx.fillRect(x0 - 200, y0 - 200, x1 - x0 + 400, y1 - y0 + 400);
-    // countdown ring around the sausage
-    const left = Math.max(0, 5 - hold.t), frac = left / 5;
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = 'rgba(40,20,6,.35)'; ctx.lineWidth = 7; ctx.beginPath(); ctx.arc(c.x, c.y, 92, 0, 7); ctx.stroke();
-    ctx.strokeStyle = frac < .25 ? '#3aa260' : '#f2c230'; ctx.lineWidth = 7;
-    ctx.beginPath(); ctx.arc(c.x, c.y, 92, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - frac)); ctx.stroke();
-    const num = Math.ceil(left), sub = left - Math.floor(left), pop = 1 + Math.max(0, sub - .75) * 1.6;
-    ctx.save(); ctx.translate(c.x, c.y - 130); ctx.scale(pop, pop);
-    ctx.textAlign = 'center'; ctx.lineJoin = 'round'; ctx.font = '64px "Rammetto One", "Arial Black", sans-serif';
-    ctx.lineWidth = 10; ctx.strokeStyle = '#000'; ctx.strokeText(String(num), 0, 0); ctx.fillStyle = '#f2c230'; ctx.fillText(String(num), 0, 0);
+    const left = Math.max(0, 5 - hold.t), num = Math.ceil(left), sub = 1 - (left - Math.floor(left));
+    const cx = c.x > 500 ? 250 : 750, cy = 235, Rr = 115;
+    const jit = reduce ? 0 : 1.2;
+    ctx.save(); ctx.translate(cx + Math.sin(t * 97) * jit, cy + Math.cos(t * 83) * jit); ctx.globalAlpha = k;
+    // leader card
+    ctx.fillStyle = '#d9cbb0'; ctx.beginPath(); ctx.arc(0, 0, Rr + 26, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#2a1d10'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, Rr + 26, 0, 7); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, Rr + 6, 0, 7); ctx.stroke();
+    // sweeping wipe
+    ctx.fillStyle = 'rgba(70,50,30,.55)'; ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, Rr + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * sub); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#2a1d10'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(-Math.PI / 2 + Math.PI * 2 * sub) * (Rr + 26), Math.sin(-Math.PI / 2 + Math.PI * 2 * sub) * (Rr + 26)); ctx.stroke();
+    // crosshair
+    ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-Rr - 26, 0); ctx.lineTo(Rr + 26, 0); ctx.moveTo(0, -Rr - 26); ctx.lineTo(0, Rr + 26); ctx.stroke();
+    // numeral
+    ctx.fillStyle = '#1e1409'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = '700 150px Georgia, "Times New Roman", serif'; ctx.fillText(String(num), 0, 8);
+    ctx.textBaseline = 'alphabetic';
+    // grain, scratches and flicker
+    ctx.globalAlpha = k * (.06 + .04 * Math.sin(t * 50));
+    ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(0, 0, Rr + 26, 0, 7); ctx.fill();
+    ctx.globalAlpha = k * .5; ctx.strokeStyle = 'rgba(40,25,10,.5)'; ctx.lineWidth = 1;
+    for (let i = 0; i < 3; i++) { const sx = ((t * 400 * (i + 1)) % (Rr * 2 + 52)) - Rr - 26; ctx.beginPath(); ctx.moveTo(sx, -Rr - 26); ctx.lineTo(sx + 2, Rr + 26); ctx.stroke(); }
     ctx.restore();
-    ctx.textAlign = 'center'; ctx.font = '700 14px "Chivo Mono", monospace'; ctx.fillStyle = '#fff3dc';
-    ctx.fillText('HANG ON... ' + num + (num === 1 ? ' SECOND' : ' SECONDS'), c.x, c.y + 122);
   }
 
   function draw(t) {
@@ -1087,25 +1100,6 @@ canvas { display: block; width: 100%; height: 100%; }
       ctx.fillStyle = '#ff7a5c'; ctx.fillText(p.text, p.x, p.y);
       ctx.globalAlpha = 1;
     }
-    if (spot > 0) {
-      ctx.globalAlpha = spot;
-      const head = big ? 'IT HELD!' : 'IT LANDED', pop = big ? 1 + Math.max(0, .35 - phaseT) * 1.4 : 1;
-      ctx.save(); ctx.translate(500, 84); ctx.scale(pop, pop);
-      ctx.font = (big ? '58px' : '42px') + ' "Rammetto One", "Arial Black", sans-serif'; ctx.lineWidth = 9; ctx.strokeStyle = '#000';
-      ctx.strokeText(head, 0, 0); ctx.fillStyle = '#f2c230'; ctx.fillText(head, 0, 0); ctx.restore();
-      ctx.font = '700 13px "Chivo Mono", monospace'; ctx.fillStyle = '#f3ead9';
-      ctx.fillText((big ? '5 seconds on ' + target.k.name + '. Unreal.  \u00B7  Beethoven, Ode to Joy' : 'On ' + target.k.name + '  \u00B7  Beethoven, Ode to Joy').toUpperCase(), 500, big ? 124 : 112);
-      ctx.globalAlpha = 1;
-    }
-    if (state === 'play') {
-      const hint = phase === 'hang' ? 'Tap anywhere to drop it in the pan' : phase === 'ready' ? 'Hold to pull back. Further back = bigger flip' : phase === 'charge' ? 'Let go to flip' : '';
-      if (hint) {
-        ctx.fillStyle = 'rgba(74,48,22,' + (.6 + .3 * Math.sin(t * 5)) + ')';
-        ctx.font = '700 13px "Chivo Mono", monospace';
-        if (phase === 'hang') ctx.fillText(hint, PX, HANG.y - 62);
-        else ctx.fillText(hint, PX, PY + 70);
-      }
-    }
   }
 
   // ---------- loop ----------
@@ -1118,7 +1112,7 @@ canvas { display: block; width: 100%; height: 100%; }
 
   // ---------- input ----------
   stage.addEventListener('pointerdown', e => {
-    if (e.target.closest('.overlay') || e.target.closest('#firm') || e.target === againBtn) return;
+    if (e.target.closest('.overlay') || e.target === againBtn) return;
     e.preventDefault(); press();
   });
   window.addEventListener('pointerup', release);
@@ -1132,9 +1126,6 @@ canvas { display: block; width: 100%; height: 100%; }
   });
   window.addEventListener('keyup', e => { if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'Enter') release(); });
   againBtn.onclick = () => newRound();
-  document.getElementById('firmRange').addEventListener('input', e => setFirmness(e.target.value));
-  let savedFirm = 5; try { savedFirm = localStorage.getItem('hotdogflip-firmness') || 5; } catch {}
-  setFirmness(savedFirm);
   // tactile buttons: they sink on press with a click, spring back with a softer click and a tiny buzz
   function btnDown(b) { if (b.disabled || b.classList.contains('down')) return; initAudio(); b.classList.remove('up'); b.classList.add('down'); sfx('click_down', .8); buzz(8); }
   function btnUp() {
@@ -1153,6 +1144,7 @@ canvas { display: block; width: 100%; height: 100%; }
     state = 'play'; document.getElementById('startScreen').hidden = true; newRound();
   };
 
+  loadPhotos();
   // backdrop behind the start card: a sausage dangling from chopsticks over the pan
   resize();
   target = makeTarget(null); target.k = KINDS[0]; target.hw = 70; target.h = 178; target.sc = 1; target.bx = 700; target.by = 240; target.enter = 1; target.polys = polysFor(target);
