@@ -80,7 +80,7 @@ canvas { display: block; width: 100%; height: 100%; }
   // ---------- world ----------
   const WW = 1000, WH = 600, G = 1500;
   const PX = 270, PY = 440;               // pan cooking-surface centre
-  const N = 9, SEG = 12.5, R = 11;        // sausage: 9 particles, 100px long, 22px thick
+  const N = 9, SEG = 15, R = 14;          // sausage: 9 particles, 120px long, 28px thick
   const SUB = 1 / 240, REST = .12, FRIC = .3;
   let W = 0, H = 0, DPR = 1, S = 1, OX = 0, OY = 0, bgCache = null;
 
@@ -166,12 +166,14 @@ canvas { display: block; width: 100%; height: 100%; }
     poly([[-98, -20], [-89, -22], [-66, 2], [-74, 7]]),
     poly([[89, -22], [98, -20], [74, 7], [66, 2]]),
   ];
-  let lift = { t0: -10, p: 0 }, dip = 0;
+  let lift = { t0: -10, p: 0, d0: 0 }, dip = 0;
   function panT(t) {
     const u = (t - lift.t0) / .38;
-    let y = PY + Math.sin(t * 1.1) * 3 + dip * 9, a = Math.sin(t * .8) * .012;
+    // pulling back: the pan slides toward its handle, sinks and rocks its front lip down with the charge
+    const back = dip + (u >= 0 && u < 1 ? lift.d0 * Math.max(0, 1 - u * 3) : 0);
+    let x = PX - back * 30, y = PY + Math.sin(t * 1.1) * 3 + back * 14, a = Math.sin(t * .8) * .012 + back * .17;
     if (u >= 0 && u < 1) { const k = Math.sin(Math.PI * u) * (.6 + lift.p * .4); y -= 40 * k; a -= .38 * k; }
-    return { x: PX, y, a };
+    return { x, y, a };
   }
   const panCollides = t => !((t - lift.t0) >= 0 && (t - lift.t0) < .24);
 
@@ -301,14 +303,14 @@ canvas { display: block; width: 100%; height: 100%; }
   function centroid() { let x = 0, y = 0; for (const q of sau.p) { x += q.x; y += q.y; } return { x: x / N, y: y / N }; }
 
   function launch(p) {
-    const vx = 170 + p * 370, vy = 500 + p * 600, T = 2 * vy / G, w = Math.PI / T;
+    const vx = 170 + p * 440, vy = 500 + p * 660, T = 2 * vy / G, w = Math.PI / T;
     const c = centroid();
     for (const q of sau.p) {
       const rx = q.x - c.x, ry = q.y - c.y;
       const ux = vx - w * ry, uy = -vy + w * rx;
       q.px = q.x - ux * SUB; q.py = q.y - uy * SUB;
     }
-    lift = { t0: simT, p };
+    lift = { t0: simT, p, d0: dip };
     blip(200, .1, 'triangle', .06, 400);
     setTimeout(() => blip(520, .06, 'sine', .04), 40);
   }
@@ -358,7 +360,7 @@ canvas { display: block; width: 100%; height: 100%; }
   }
   function release() {
     actBtn.classList.remove('held');
-    if (state === 'play' && phase === 'charge') { dip = 0; launch(power); phase = 'flight'; phaseT = 0; settle = { pan: 0, target: 0 }; }
+    if (state === 'play' && phase === 'charge') { launch(power); dip = 0; phase = 'flight'; phaseT = 0; settle = { pan: 0, target: 0 }; }
   }
   function popup(text) { const c = centroid(); popups.push({ x: c.x, y: c.y - 40, text, life: 1.3 }); }
   function celebrate() { phase = 'won'; phaseT = 0; spotOn = true; playOde(); }
@@ -401,8 +403,9 @@ canvas { display: block; width: 100%; height: 100%; }
       sp += Math.hypot(q.x - q.px - (q.touch ? q.tvx : 0), q.y - q.py - (q.touch ? q.tvy : 0)) / SUB;
     }
     sp /= N;
-    settle.pan = onPan >= 3 && sp < 40 ? settle.pan + dt : 0;
-    settle.target = onTg >= 3 && sp < 40 ? settle.target + dt : 0;
+    // at rest while touching something counts, even when only one or two points of the casing hold it
+    settle.pan = onPan >= 1 && onTg === 0 && sp < 40 ? settle.pan + dt : 0;
+    settle.target = onTg >= 1 && sp < 40 ? settle.target + dt : 0;
 
     if (state !== 'play') return;
     const c = centroid(), { y1 } = ext();
