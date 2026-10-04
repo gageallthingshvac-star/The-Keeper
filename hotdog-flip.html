@@ -44,6 +44,15 @@ canvas { display: block; width: 100%; height: 100%; }
 #actBtn .fill { position: absolute; left: 0; right: 0; bottom: 0; height: 0%; background: linear-gradient(180deg, #ffd85a, #e9a915); transition: height .05s linear; }
 #actBtn .lbl { position: relative; pointer-events: none; text-shadow: 0 2px 0 rgba(0,0,0,.45); }
 #actBtn:disabled { filter: saturate(.35) brightness(.8); cursor: default; }
+#firm {
+  position: absolute; left: 16px; top: calc(14px + env(safe-area-inset-top, 0px)); z-index: 1;
+  background: rgba(255,250,240,.78); border: 2px solid #5a3d1e; border-radius: 12px; padding: 8px 12px 10px;
+  color: #3b2a14; font-size: 11px; letter-spacing: .08em; width: 190px; box-shadow: 0 3px 0 #5a3d1e;
+}
+#firm b { display: block; font-weight: 700; margin-bottom: 4px; }
+#firm output { font-family: var(--display); font-size: 15px; color: #a8352c; letter-spacing: 0; display: block; margin-bottom: 4px; }
+#firm input { width: 100%; margin: 0; accent-color: #d8342b; }
+#firm .ticks { display: flex; justify-content: space-between; font-size: 9px; color: #7a5a34; margin-top: 2px; }
 #againBtn {
   position: absolute; left: 50%; bottom: calc(30px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
   font-size: 18px; padding: 13px 24px; border-radius: 14px; z-index: 1;
@@ -70,6 +79,12 @@ canvas { display: block; width: 100%; height: 100%; }
 
 <div id="stage">
   <canvas id="c"></canvas>
+  <div id="firm">
+    <b>SAUSAGE FIRMNESS</b>
+    <output id="firmOut" for="firmRange">5 &middot; Medium</output>
+    <input type="range" id="firmRange" min="1" max="9" step="1" value="5" aria-label="Sausage firmness, 1 soft to 9 stiff">
+    <div class="ticks"><span>1</span><span>3</span><span>5</span><span>7</span><span>9</span></div>
+  </div>
   <button class="btn" id="actBtn" aria-label="Drop or flip the sausage" disabled><span class="fill"></span><span class="lbl" id="actLbl">HOLD TO<br>WIND UP</span></button>
   <button class="btn" id="againBtn" hidden>Flip another</button>
   <div class="overlay" id="startScreen">
@@ -98,7 +113,7 @@ canvas { display: block; width: 100%; height: 100%; }
   const WW = 1000, WH = 600, G = 1900;
   const PX = 270, PY = 440;               // pan cooking-surface centre
   const N = 9, SEG = 15, R = 14;          // sausage: 9 particles, 120px long, 28px thick
-  const SUB = 1 / 240, REST = .02, MU = 1.1, SQUISH = .93;
+  const SUB = 1 / 240, REST = .02, MU = 1.1, MU_PAN = .02, SQUISH = .93, PAN_TILT = .11;
   let W = 0, H = 0, DPR = 1, S = 1, OX = 0, OY = 0, bgCache = null;
 
   function resize() {
@@ -250,17 +265,19 @@ canvas { display: block; width: 100%; height: 100%; }
   const ngon = (cx, cy, r, n = 10) => Array.from({ length: n }, (_, i) => [cx + Math.cos(i / n * Math.PI * 2) * r, cy + Math.sin(i / n * Math.PI * 2) * r]);
 
   // ---------- bodies ----------
+  // wide enough that the sausage (148 px with its rounded ends) has room to slide to the front lip
   const PAN_POLYS = [
-    poly([[-72, 0], [72, 0], [66, 12], [-66, 12]]),
-    poly([[-98, -20], [-89, -22], [-66, 2], [-74, 7]]),
-    poly([[89, -22], [98, -20], [74, 7], [66, 2]]),
+    poly([[-100, 0], [100, 0], [94, 12], [-94, 12]]),
+    poly([[-128, -20], [-118, -22], [-94, 2], [-102, 7]]),
+    poly([[118, -22], [128, -20], [102, 7], [94, 2]]),
   ];
   let lift = { t0: -10, p: 0, d0: 0 }, dip = 0;
   function panT(t) {
     const u = (t - lift.t0) / .38;
     // pulling back: the pan slides toward its handle, sinks and rocks its front lip down with the charge
     const back = dip + (u >= 0 && u < 1 ? lift.d0 * Math.max(0, 1 - u * 3) : 0);
-    let x = PX - back * 30, y = PY + Math.sin(t * 1.1) * 3 + back * 14, a = Math.sin(t * .8) * .012 + back * .17;
+    // the pan sits nose-down a little, so a greasy sausage slides to the front lip and waits there
+    let x = PX - back * 30, y = PY + Math.sin(t * 1.1) * 3 + back * 14, a = PAN_TILT + Math.sin(t * .8) * .012 + back * .17;
     if (u >= 0 && u < 1) { const k = Math.sin(Math.PI * u) * (.6 + lift.p * .4); y -= 40 * k; a -= .38 * k; }
     return { x, y, a };
   }
@@ -352,10 +369,10 @@ canvas { display: block; width: 100%; height: 100%; }
       let jn = pen;
       if (vn < 0) { rx -= nx * vn * (1 + REST); ry -= ny * vn * (1 + REST); jn += -vn * (1 + REST); hits[tag] = Math.max(hits[tag], -vn / SUB / 300); }
       // Coulomb friction: grip scales with how hard it is pressed, so it rests on tops but slides down sides
-      const tx = -ny, ty = nx, vt = rx * tx + ry * ty, cut = Math.min(Math.abs(vt), MU * jn) * Math.sign(vt);
+      const tx = -ny, ty = nx, vt = rx * tx + ry * ty, cut = Math.min(Math.abs(vt), (tag === 'pan' ? MU_PAN : MU) * jn) * Math.sign(vt);
       rx -= tx * cut; ry -= ty * cut;
-      // meat is dead weight: every contact soaks up a bit of motion instead of skidding or rolling on
-      rx *= SQUISH; ry *= SQUISH;
+      // meat is dead weight on the objects: contact soaks up motion instead of skidding on. The greasy pan lets it slide.
+      if (tag !== 'pan') { rx *= SQUISH; ry *= SQUISH; }
       q.px = q.x - (vpx + rx); q.py = q.y - (vpy + ry);
       q.touch = tag; q.tvx = vpx; q.tvy = vpy;
     }
@@ -391,14 +408,23 @@ canvas { display: block; width: 100%; height: 100%; }
     for (let it = 0; it < 10; it++) {
       for (let i = 0; i < N - 1; i++) link(ps[i], ps[i + 1], SEG, 1);
       for (let i = 0; i < N - 2; i++) straighten(ps[i], ps[i + 1], ps[i + 2], BEND);
-      for (let i = 0; i < N - 4; i++) link(ps[i], ps[i + 4], SEG * 4, .12);
+      for (let i = 0; i < N - 4; i++) link(ps[i], ps[i + 4], SEG * 4, K4);
       pin();
     }
     collide();
     simT += SUB;
   }
   // pulls the middle of three neighbours back toward the line between them: a firm casing that still flexes
-  const BEND = .06;
+  // firmness slider: 5 is the tuned middle; each step up multiplies the bend stiffness by ~1.5
+  let BEND = .06, K4 = .12;
+  const FIRM_NAMES = { 1: 'Overcooked noodle', 2: 'Very soft', 3: 'Soft', 4: 'Medium-soft', 5: 'Medium', 6: 'Medium-firm', 7: 'Firm', 8: 'Very firm', 9: 'Breadstick' };
+  function setFirmness(v) {
+    v = Math.max(1, Math.min(9, Math.round(+v || 5)));
+    BEND = .06 * Math.pow(5, (v - 5) / 4); K4 = .12 * Math.pow(4, (v - 5) / 4);
+    document.getElementById('firmRange').value = v;
+    document.getElementById('firmOut').textContent = v + ' \u00B7 ' + FIRM_NAMES[v];
+    try { localStorage.setItem('hotdogflip-firmness', String(v)); } catch {}
+  }
   function straighten(a, b, c, k) {
     const dx = (a.x + c.x) / 2 - b.x, dy = (a.y + c.y) / 2 - b.y;
     b.x += dx * k; b.y += dy * k; a.x -= dx * k / 2; a.y -= dy * k / 2; c.x -= dx * k / 2; c.y -= dy * k / 2;
@@ -612,13 +638,13 @@ canvas { display: block; width: 100%; height: 100%; }
 
   // --- pan: seasoned cast-iron skillet, seen slightly from above ---
   function panBack(T) {
-    ctx.save(); ctx.translate(T.x, T.y); ctx.rotate(T.a);
+    ctx.save(); ctx.translate(T.x, T.y); ctx.rotate(T.a); ctx.scale(1.32, 1);
     // handle
-    ctx.beginPath(); ctx.moveTo(-92, -24); ctx.lineTo(-238, -44); ctx.quadraticCurveTo(-262, -46, -262, -34); ctx.quadraticCurveTo(-262, -22, -240, -24); ctx.lineTo(-92, -6); ctx.closePath();
+    ctx.beginPath(); ctx.moveTo(-92, -24); ctx.lineTo(-178, -44); ctx.quadraticCurveTo(-196, -46, -196, -34); ctx.quadraticCurveTo(-196, -22, -180, -24); ctx.lineTo(-92, -6); ctx.closePath();
     ctx.fillStyle = lin(ctx, 0, -46, 0, -6, [[0, '#55575c'], [.3, '#2c2d31'], [1, '#0d0d0f']]); ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,.14)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(-96, -22); ctx.lineTo(-236, -41); ctx.stroke();
-    ctx.fillStyle = '#05060a'; ctx.beginPath(); ctx.ellipse(-244, -34, 7, 4.5, -.1, 0, 7); ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,.12)'; ctx.beginPath(); ctx.ellipse(-244, -34, 7, 4.5, -.1, .2, 2.4); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.14)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(-96, -22); ctx.lineTo(-176, -41); ctx.stroke();
+    ctx.fillStyle = '#05060a'; ctx.beginPath(); ctx.ellipse(-184, -34, 7, 4.5, -.1, 0, 7); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.12)'; ctx.beginPath(); ctx.ellipse(-184, -34, 7, 4.5, -.1, .2, 2.4); ctx.stroke();
     // inner bowl
     ctx.beginPath(); ctx.ellipse(0, -20, 98, 24, 0, 0, 7);
     ctx.fillStyle = lin(ctx, 0, -44, 0, 4, [[0, '#3a3b40'], [.35, '#202125'], [1, '#141417']]); ctx.fill();
@@ -632,7 +658,7 @@ canvas { display: block; width: 100%; height: 100%; }
     ctx.restore();
   }
   function panFront(T) {
-    ctx.save(); ctx.translate(T.x, T.y); ctx.rotate(T.a);
+    ctx.save(); ctx.translate(T.x, T.y); ctx.rotate(T.a); ctx.scale(1.32, 1);
     ctx.beginPath();
     ctx.ellipse(0, -20, 98, 24, 0, Math.PI, 0, true);
     ctx.lineTo(80, 14); ctx.ellipse(0, 14, 80, 18, 0, 0, Math.PI); ctx.closePath();
@@ -957,7 +983,7 @@ canvas { display: block; width: 100%; height: 100%; }
 
   // ---------- input ----------
   stage.addEventListener('pointerdown', e => {
-    if (e.target.closest('.overlay') || e.target === againBtn) return;
+    if (e.target.closest('.overlay') || e.target.closest('#firm') || e.target === againBtn) return;
     e.preventDefault(); press();
   });
   window.addEventListener('pointerup', release);
@@ -971,6 +997,9 @@ canvas { display: block; width: 100%; height: 100%; }
   });
   window.addEventListener('keyup', e => { if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'Enter') release(); });
   againBtn.onclick = () => newRound();
+  document.getElementById('firmRange').addEventListener('input', e => setFirmness(e.target.value));
+  let savedFirm = 5; try { savedFirm = localStorage.getItem('hotdogflip-firmness') || 5; } catch {}
+  setFirmness(savedFirm);
   // tactile buttons: they sink on press with a click, spring back with a softer click and a tiny buzz
   function btnDown(b) { if (b.disabled || b.classList.contains('down')) return; initAudio(); b.classList.remove('up'); b.classList.add('down'); sfx('click_down', .8); buzz(8); }
   function btnUp() {
