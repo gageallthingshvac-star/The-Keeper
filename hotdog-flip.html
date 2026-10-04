@@ -717,7 +717,7 @@ canvas { display: block; width: 100%; height: 100%; }
     // the sausage lies a little in front of the rim's widest line, where the ellipse is still almost full width,
     // so its ends tuck under the rim instead of poking through it
     const cx = I.cx * iw, cy = I.cy * ih, rx = I.rx * iw, ry = I.ry * ih, lie = .35;
-    const sc = 256 / (2 * rx * Math.sqrt(1 - lie * lie) * iw);
+    const sc = 256 / (2 * rx * Math.sqrt(1 - lie * lie));
     const ox = -cx, oy = -(cy + lie * ry) - R / sc;
     ctx.save(); ctx.translate(T.x, T.y); ctx.rotate(T.a); ctx.scale(sc, sc);
     if (front) {
