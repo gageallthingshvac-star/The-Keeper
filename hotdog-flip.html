@@ -286,6 +286,24 @@ canvas { display: block; width: 100%; height: 100%; }
     { id: 'dog', name: 'the dog', src: 'img/dog.png', w: 330 },
     { id: 'puppet', name: 'the puppet', src: 'img/puppet.png', w: 270 },
     { id: 'head', name: 'the head', src: 'img/head.png', w: 260 },
+    { id: 'deer', name: 'the deer', src: 'img/deer.png', w: 320 },
+    { id: 'stag', name: 'the stag', src: 'img/stag.png', w: 300 },
+    { id: 'shepherd', name: 'the shepherd', src: 'img/shepherd.png', w: 330 },
+    { id: 'cat', name: 'the cat', src: 'img/cat.png', w: 240 },
+    { id: 'tiger', name: 'the tiger', src: 'img/tiger.png', w: 340 },
+    { id: 'giraffe', name: 'the giraffe', src: 'img/giraffe.png', w: 320 },
+    { id: 'flamingo', name: 'the flamingo', src: 'img/flamingo.png', w: 260 },
+    { id: 'hedgehog', name: 'the hedgehog', src: 'img/hedgehog.png', w: 240 },
+    { id: 'chair', name: 'the chair', src: 'img/chair.png', w: 220 },
+    { id: 'hand', name: 'the hand', src: 'img/hand.png', w: 170 },
+    { id: 'toaster', name: 'the toaster', src: 'img/toaster.png', w: 260 },
+    { id: 'mug', name: 'the mug', src: 'img/mug.png', w: 220 },
+    { id: 'duck', name: 'the duck', src: 'img/duck.png', w: 200 },
+    { id: 'balloon', name: 'the balloon', src: 'img/balloon.png', w: 300 },
+    { id: 'bicycle', name: 'the bicycle', src: 'img/bicycle.png', w: 320 },
+    { id: 'skateboard', name: 'the skateboard', src: 'img/skateboard.png', w: 230 },
+    { id: 'pineapple', name: 'the pineapple', src: 'img/pineapple.png', w: 170 },
+    { id: 'trophy', name: 'the trophy', src: 'img/trophy.png', w: 200 },
   ];
   function analyzePhoto(k, img) {
     const c = document.createElement('canvas'), iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
@@ -348,7 +366,8 @@ canvas { display: block; width: 100%; height: 100%; }
   let queue = [];
   function makeTarget(prev) {
     // every object comes up once, in a shuffled order, before any repeats
-    if (!queue.length) { queue = [...PHOTOS.filter(k => k.ready), ...KINDS]; for (let i = queue.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [queue[i], queue[j]] = [queue[j], queue[i]]; } }
+    // photos only once they have loaded; the drawn objects are the fallback
+    if (!queue.length) { const ready = PHOTOS.filter(k => k.ready); queue = ready.length ? ready : [...KINDS]; for (let i = queue.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [queue[i], queue[j]] = [queue[j], queue[i]]; } }
     const k = queue.pop();
     const seed = Math.floor(Math.random() * 1000);
     const tg = k.cols ? { k, hw: k.bw / 2, h: k.bh, sc: k.w / k.bw, seed } : { k, hw: k.hw, h: k.h, sc: k.sc || 1, seed };

@@ -1,0 +1,51 @@
+# Stock photo sources
+
+These cutouts were found on GitHub mirrors of Unsplash / Pexels / Pixabay photos and had their backgrounds removed. `dog.png`, `puppet.png` and `head.png` are the player's own uploads.
+
+# Image sources
+
+All files: transparent-background PNG cutouts (8-bit RGBA) of real photographs, trimmed to the
+object and downscaled to max 900 px on the long side (720 px where needed to stay under 600 KB).
+Every download came from raw.githubusercontent.com; the originating stock-photo page is given as
+the license evidence recorded by the mirroring repo. None of the licenses (Unsplash, Pexels,
+Pixabay Content License) *require* attribution, but photographer credits are listed anyway.
+
+Processing legend:
+- **BG-REMOVED**: background removed locally with `@imgly/background-removal-node` 1.4.5 (ISNet
+  model, npm registry download), then the alpha mask was re-applied to the untouched original pixels
+  (`convert orig \( cut -alpha extract \) -alpha off -compose CopyOpacity -composite`), then
+  `convert -trim +repage -resize 900x900\>`.
+- **PRE-CUT**: the mirroring repo already shipped the image as an alpha PNG sticker
+  (dyaskur/belajar_membaca_toddler `assets/stickers-cut/`); only `-trim` and `-resize` applied.
+
+| File | Px size | Raw URL (downloaded) | Repo / original file | Photo source + license | Credit | Processing |
+|---|---|---|---|---|---|---|
+| deer.png | 817x900 | https://raw.githubusercontent.com/MichLLLLL/betemystere/main/public/images/animals/mule-deer.jpg | MichLLLLL/betemystere – `public/images/animals/mule-deer.jpg` | Unsplash License – https://unsplash.com/photos/gray-and-white-deer-on-snow-field-jRFE0TtLgq8 ; evidence: https://raw.githubusercontent.com/MichLLLLL/betemystere/main/public/images/animals/credits.txt | Photo by Steve Adams on Unsplash | BG-REMOVED |
+| shepherd.png | 900x581 | https://raw.githubusercontent.com/MichLLLLL/betemystere/main/public/images/animals/german-shepherd.jpg | MichLLLLL/betemystere – `public/images/animals/german-shepherd.jpg` | Pixabay Content License – https://pixabay.com/photos/german-shepherd-shepherd-almind-405503/ ; evidence: same credits.txt | Photo by Hans_Kemperman on Pixabay | BG-REMOVED |
+| chair.png | 600x900 | https://raw.githubusercontent.com/dyaskur/belajar_membaca_toddler/main/assets/stickers-cut/kursi.png | dyaskur/belajar_membaca_toddler – `assets/stickers-cut/kursi.png` (repo MIT) | Unsplash License – https://unsplash.com/photos/a-wooden-chair-sitting-on-top-of-a-wooden-floor-RCWIK0fsETc ; evidence: https://raw.githubusercontent.com/dyaskur/belajar_membaca_toddler/main/assets/stickers-src/credits.json (key `kursi`) | Unsplash (photographer not named in repo) | PRE-CUT |
+| hand.png | 217x414 | https://raw.githubusercontent.com/dyaskur/belajar_membaca_toddler/main/static/kata/jari.webp | dyaskur/belajar_membaca_toddler – `static/kata/jari.webp` (512x512 app crop of the photo) | Pexels License – https://www.pexels.com/photo/close-up-shot-of-a-boy-showing-his-palms-8657190/ ; evidence: https://raw.githubusercontent.com/dyaskur/belajar_membaca_toddler/main/assets/kata-src/sources.tsv (row `jari`) and `assets/kata-src/credits.json` | Photo by Ron Lach on Pexels | webp->png (sharp), BG-REMOVED, cropped to the left-hand half (248 px) because the other hand had a ghosted face behind it; fingers up, palm to camera, forearm/sleeve cut at the bottom |
+| cat.png | 567x781 | https://raw.githubusercontent.com/dyaskur/belajar_membaca_toddler/main/assets/stickers-cut/kucing.png | dyaskur/belajar_membaca_toddler – `assets/stickers-cut/kucing.png` | Pexels License – https://www.pexels.com/photo/-18538744/ (Pexels photo id 18538744) ; evidence: stickers-src/credits.json key `kucing` | Pexels (photographer not named in repo) | PRE-CUT. Note: standing/walking tabby kitten, not lying |
+| toaster.png | 900x600 | https://raw.githubusercontent.com/NoumanMalikk/Crownstone-LLC-/main/public/products/two-slice-digital-toaster-matte-black/main.jpg | NoumanMalikk/Crownstone-LLC- – `public/products/two-slice-digital-toaster-matte-black/main.jpg` | Unsplash License – Unsplash photo id `photo-1509440159596-0249088772ff` (https://unsplash.com/photos/1509440159596-0249088772ff) ; evidence: https://raw.githubusercontent.com/NoumanMalikk/Crownstone-LLC-/main/data/image-credits-downloaded.json | Unsplash (photographer not named in repo) | BG-REMOVED |
+| mug.png | 850x556 | https://raw.githubusercontent.com/fusedio/fused-render/main/fused_render/static/samples/mug.jpg | fusedio/fused-render – `fused_render/static/samples/mug.jpg` | Unsplash License – https://unsplash.com/photos/aeVA-j1y2BY ; evidence: https://raw.githubusercontent.com/fusedio/fused-render/main/fused_render/static/samples/CREDITS.md | Photo by Shyamanta Baruah on Unsplash | BG-REMOVED |
+| skateboard.png | 833x900 | https://raw.githubusercontent.com/pafuluofu-dev/japans-goods-e-store/master/public/skateboard.jpg | pafuluofu-dev/japans-goods-e-store – `public/skateboard.jpg` | Unsplash License – https://unsplash.com/photos/9N3rS-xLfkI ; evidence: https://raw.githubusercontent.com/pafuluofu-dev/japans-goods-e-store/master/public/photo-credits.txt | Photo by Niket Nigde on Unsplash | BG-REMOVED. Note: deck standing upright (leaning), graphic side to camera – rotate 90° in-game for a flat side view |
+| duck.png | 900x600 | https://raw.githubusercontent.com/nanxstats/nanx.me/master/static/image/timothy-dykes-LhqLdDPcSV8-unsplash.jpg | nanxstats/nanx.me – `static/image/timothy-dykes-LhqLdDPcSV8-unsplash.jpg` | Unsplash License – https://unsplash.com/photos/LhqLdDPcSV8 ; evidence: https://raw.githubusercontent.com/nanxstats/nanx.me/master/content/blog/post/2023-06-06-knitr-chunk-option-error/index.Rmd | Photo by Timothy Dykes on Unsplash | BG-REMOVED (yellow rubber duck, side view) |
+| balloon.png | 720x712 | https://raw.githubusercontent.com/dyaskur/belajar_membaca_toddler/main/assets/stickers-cut/balon.png | dyaskur/belajar_membaca_toddler – `assets/stickers-cut/balon.png` | Unsplash License – https://unsplash.com/photos/yellow-blue-and-red-hot-air-balloon-jqdpdtPrKwc ; evidence: stickers-src/credits.json key `balon` | Unsplash | PRE-CUT. Note: hot-air balloon (one large + two small in the distance), not a party balloon |
+| bicycle.png | 720x617 | https://raw.githubusercontent.com/pafuluofu-dev/japans-goods-e-store/master/public/bicycle.jpg | pafuluofu-dev/japans-goods-e-store – `public/bicycle.jpg` | Unsplash License – https://unsplash.com/photos/jcEm3fAXhFw ; evidence: public/photo-credits.txt | Photo by Frederik Rosar on Unsplash | BG-REMOVED (red mountain bike, side view) |
+| pineapple.png | 380x900 | https://raw.githubusercontent.com/dyaskur/belajar_membaca_toddler/main/assets/stickers-cut/nanas.png | dyaskur/belajar_membaca_toddler – `assets/stickers-cut/nanas.png` | Unsplash License – https://unsplash.com/photos/pineapple-on-white-surface-Cr9hZrpC1Oc ; evidence: credits.json key `nanas` | Unsplash | PRE-CUT |
+| tiger.png | 900x514 | https://raw.githubusercontent.com/dyaskur/belajar_membaca_toddler/main/assets/stickers-cut/harimau.png | dyaskur/belajar_membaca_toddler – `assets/stickers-cut/harimau.png` | Pexels License – https://www.pexels.com/photo/-36530920/ ; evidence: credits.json key `harimau` | Pexels | PRE-CUT (walking tiger, side view) |
+| flamingo.png | 838x900 | https://raw.githubusercontent.com/dyaskur/belajar_membaca_toddler/main/assets/stickers-cut/flamingo.png | dyaskur/belajar_membaca_toddler – `assets/stickers-cut/flamingo.png` | Pexels License – https://www.pexels.com/photo/-30597910/ ; evidence: credits.json key `flamingo` | Pexels | PRE-CUT |
+| trophy.png | 455x900 | https://raw.githubusercontent.com/dyaskur/belajar_membaca_toddler/main/assets/stickers-cut/trofi-4.png | dyaskur/belajar_membaca_toddler – `assets/stickers-cut/trofi-4.png` | Unsplash License – https://images.unsplash.com/photo-1620756634852-2190ad694c8f ; evidence: credits.json key `trofi-4` | Unsplash | PRE-CUT. Note: trophy held up by two hands (hands included) |
+| hedgehog.png | 900x450 | https://raw.githubusercontent.com/MichLLLLL/betemystere/main/public/images/animals/hedgehog.jpg | MichLLLLL/betemystere – `public/images/animals/hedgehog.jpg` | Pixabay Content License – https://pixabay.com/photos/animal-hedgehog-mammal-9248795/ ; evidence: credits.txt | Photo by katerinavulcova on Pixabay | BG-REMOVED (slight soft fringe on the right side) |
+| giraffe.png | 900x711 | https://raw.githubusercontent.com/dyaskur/belajar_membaca_toddler/main/assets/stickers-cut/jerapah.png | dyaskur/belajar_membaca_toddler – `assets/stickers-cut/jerapah.png` | Pexels License – https://www.pexels.com/photo/-26582999/ ; evidence: credits.json key `jerapah` | Pexels | PRE-CUT (giraffe bending its neck down, side view) |
+| stag.png | 733x900 | https://raw.githubusercontent.com/dyaskur/belajar_membaca_toddler/main/assets/stickers-cut/rusa.png | dyaskur/belajar_membaca_toddler – `assets/stickers-cut/rusa.png` | Pexels License – https://www.pexels.com/photo/-19378300/ ; evidence: credits.json key `rusa` | Pexels | PRE-CUT (red-deer stag, standing, side view – alternative deer) |
+
+## Repo licenses
+- dyaskur/belajar_membaca_toddler: MIT (https://raw.githubusercontent.com/dyaskur/belajar_membaca_toddler/main/LICENSE); its credits.json states per image "Unsplash License (free commercial use, no attribution required)" / "Pexels License".
+- fusedio/fused-render: LICENSE file present at https://raw.githubusercontent.com/fusedio/fused-render/main/LICENSE; CREDITS.md says attribution not required by the Unsplash licence.
+- MichLLLLL/betemystere, pafuluofu-dev/japans-goods-e-store, nanxstats/nanx.me, NoumanMalikk/Crownstone-LLC-: no LICENSE file in the repo; the photos are relied upon under their original Unsplash/Pixabay licenses as recorded in the repos' credit files.
+
+## Not used / rejected
+- GFM / AIM / rembg sample cutouts (bear, horse, lion, elephant, tiger...): photo provenance not stated, so skipped.
+- Online Boutique (GoogleCloudPlatform/microservices-demo) product photos (mug, hairdryer...): no photo credit in repo, skipped.
+- japans-goods-e-store lamp.jpg: background removal failed (kept wall rack + plant), skipped.
+- dyaskur `teko` (red teapot, Unsplash): usable but the 512 px app crop cuts off the teapot bottom; not included.
