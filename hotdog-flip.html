@@ -21,64 +21,40 @@ body {
 }
 #stage { position: relative; height: 100%; }
 canvas { display: block; width: 100%; height: 100%; }
-.btn {
-  font-family: var(--display); color: #fff; cursor: pointer; border: 3px solid #2a0d08;
-  background: linear-gradient(180deg, #ef5a44 0%, #d8342b 55%, #b32419 100%);
-  box-shadow: inset 0 2px 0 rgba(255,255,255,.35), inset 0 -3px 0 rgba(0,0,0,.18), 0 6px 0 #6e140c, 0 10px 18px rgba(60,20,10,.35);
-  transition: transform .07s ease-out, box-shadow .07s ease-out, filter .2s;
-  -webkit-tap-highlight-color: transparent;
+/* old-time controls: the same sepia leader card as the countdown, ink rules, serif */
+.leader {
+  background: #d9cbb0; color: #1e1409; border: 3px solid #2a1d10; font-family: Georgia, "Times New Roman", serif;
+  box-shadow: inset 0 0 0 5px #d9cbb0, inset 0 0 0 7px #2a1d10, 0 8px 18px rgba(40,25,10,.35);
 }
-.btn:hover { filter: brightness(1.06); }
-.btn.down, .btn:active {
-  transform: translateY(5px);
-  box-shadow: inset 0 2px 0 rgba(255,255,255,.25), inset 0 -1px 0 rgba(0,0,0,.18), 0 1px 0 #6e140c, 0 3px 6px rgba(60,20,10,.35);
+.ring {
+  width: 110px; height: 110px; border-radius: 50%; display: grid; place-items: center; position: relative; cursor: pointer;
+  background: #d9cbb0; border: 3px solid #2a1d10; box-shadow: inset 0 0 0 5px #d9cbb0, inset 0 0 0 7px #2a1d10;
+  -webkit-tap-highlight-color: transparent; transition: transform .08s ease-out; padding: 0; overflow: hidden;
 }
-.btn.up { animation: springUp .32s cubic-bezier(.3,1.8,.5,1); }
-@keyframes springUp { 0% { transform: translateY(5px) scale(1); } 45% { transform: translateY(-3px) scale(1.04); } 100% { transform: translateY(0) scale(1); } }
-.btn:focus-visible { outline: 3px solid var(--mustard); outline-offset: 4px; }
-#actBtn {
-  position: absolute; right: 18px; bottom: calc(22px + env(safe-area-inset-bottom, 0px));
-  width: 128px; height: 128px; border-radius: 50%; overflow: hidden;
-  touch-action: none; display: grid; place-items: center; padding: 0;
+.ring::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 2px; margin-top: -1px; background: #2a1d10; opacity: .5; }
+.ring::after { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; margin-left: -1px; background: #2a1d10; opacity: .5; }
+.ring:active, .ring.down { transform: scale(.93); }
+.ring svg { width: 54px; height: 54px; position: relative; z-index: 1; display: block; }
+.ring:focus-visible { outline: 3px solid #2a1d10; outline-offset: 4px; }
+#corner { position: absolute; top: 0; right: 0; width: 76px; height: 76px; z-index: 3; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+#corner::after { content: ""; position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); right: 12px; width: 12px; height: 12px; border-top: 2px solid rgba(74,48,22,.35); border-right: 2px solid rgba(74,48,22,.35); }
+#settings {
+  position: absolute; top: calc(16px + env(safe-area-inset-top, 0px)); right: 16px; z-index: 2; padding: 16px 18px; border-radius: 6px;
+  transform: translateX(125%) rotate(8deg); transform-origin: right top; transition: transform .38s cubic-bezier(.2, 1.25, .4, 1);
 }
-.btn svg { width: 54px; height: 54px; display: block; fill: none; stroke: #fff; stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 2px 0 rgba(0,0,0,.45)); }
-#actBtn svg { position: relative; }
-#actBtn .ico { display: none; }
-#actBtn[data-ico="drop"] .ico-drop, #actBtn[data-ico="flip"] .ico-flip { display: block; }
-#actBtn .fill { position: absolute; left: 0; right: 0; bottom: 0; height: 0%; background: linear-gradient(180deg, #ffd85a, #e9a915); transition: height .05s linear; }
-#actBtn:disabled { filter: saturate(.35) brightness(.8); cursor: default; }
-#againBtn {
-  position: absolute; left: 50%; bottom: calc(30px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
-  padding: 12px 26px; border-radius: 18px; z-index: 1;
-}
-#againBtn.down, #againBtn:active { transform: translateX(-50%) translateY(5px); }
-#againBtn.up { animation: none; }
-@media (prefers-reduced-motion: reduce) { .btn.up { animation: none; } }
-.overlay {
-  position: absolute; inset: 0; display: grid; place-items: center;
-  background: rgba(5, 7, 10, .7); padding: 16px; z-index: 2;
-}
-.card {
-  max-width: 400px; width: 100%; background: var(--iron); border: 3px solid #000;
-  box-shadow: 6px 6px 0 #000; padding: 24px 22px; display: flex; flex-direction: column; gap: 14px;
-}
-.card h1 {
-  font-family: var(--display); font-size: clamp(30px, 8vw, 44px); line-height: .95; margin: 0;
-  color: var(--mustard); text-shadow: 3px 3px 0 var(--ketchup);
-}
-.card p { margin: 0; line-height: 1.55; font-size: 13px; }
-.card .btn { font-size: 18px; padding: 13px 18px; border-radius: 14px; }
+#settings.open { transform: none; }
+@media (prefers-reduced-motion: reduce) { #settings { transition: none; } .ring { transition: none; } }
+.overlay { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(30, 20, 10, .5); z-index: 2; cursor: pointer; }
 </style>
 
 <div id="stage">
   <canvas id="c"></canvas>
-  <button class="btn" id="actBtn" aria-label="Drop or flip the sausage" data-ico="drop" disabled><span class="fill"></span>
-    <svg class="ico ico-drop" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 10v40M14 34l18 18 18-18"/></svg>
-    <svg class="ico ico-flip" viewBox="0 0 64 64" aria-hidden="true"><path d="M12 44c0-16 10-26 24-26 10 0 16 5 20 12"/><path d="M44 18l12 12-16 2"/><path d="M8 52h48"/></svg>
-  </button>
-  <button class="btn" id="againBtn" aria-label="Flip another" hidden><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M50 26A20 20 0 1 0 54 38"/><path d="M50 12v14H36"/></svg></button>
+  <div id="corner" role="button" aria-label="Settings" tabindex="0"></div>
+  <div id="settings" class="leader" aria-hidden="true">
+    <button class="ring" id="unstuckBtn" aria-label="Reset this round"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M50 26A20 20 0 1 0 54 38" fill="none" stroke="#1e1409" stroke-width="6" stroke-linecap="round"/><path d="M50 12v14H36" fill="none" stroke="#1e1409" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+  </div>
   <div class="overlay" id="startScreen">
-    <button class="btn" id="startBtn" aria-label="Start" style="width:130px;height:130px;border-radius:50%;display:grid;place-items:center"><svg viewBox="0 0 64 64" aria-hidden="true" style="width:60px;height:60px"><path d="M22 14v36l30-18z" fill="#fff" stroke="none"/></svg></button>
+    <div class="ring" style="width:150px;height:150px" aria-label="Start"><svg viewBox="0 0 64 64" aria-hidden="true" style="width:64px;height:64px"><path d="M22 14v36l30-18z" fill="#1e1409"/></svg></div>
   </div>
 </div>
 
@@ -89,15 +65,13 @@ canvas { display: block; width: 100%; height: 100%; }
   const layer = document.createElement('canvas'), lctx = layer.getContext('2d');
   const shad = document.createElement('canvas'), sctx = shad.getContext('2d');
   const stage = document.getElementById('stage');
-  const actBtn = document.getElementById('actBtn'), fill = actBtn.querySelector('.fill');
-  const againBtn = document.getElementById('againBtn');
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (!CanvasRenderingContext2D.prototype.roundRect) CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h) { this.rect(x, y, w, h); };
 
   // ---------- world ----------
   const WW = 1000, WH = 600, G = 2400;
   const PX = 270, PY = 440;               // pan cooking-surface centre
-  const N = 9, SEG = 17, R = 16;          // sausage: 9 particles, 136px long, 32px thick
+  const N = 9, SEG = 17, R = 19;          // sausage: 9 particles, 136px long, 38px thick
   const SUB = 1 / 240, REST = .01, MU = 1.1, MU_PAN = .02, SQUISH = .93, PAN_TILT = .11;
   let W = 0, H = 0, DPR = 1, S = 1, OX = 0, OY = 0, bgCache = null;
 
@@ -471,7 +445,7 @@ canvas { display: block; width: 100%; height: 100%; }
     pin();
     const collide = () => {
       for (const q of ps) {
-        if (panCollides(t)) collideBody(q, PAN_POLYS, P, Pp, 'pan');
+        collideBody(q, PAN_POLYS, P, Pp, 'pan');
         if (tg) collideBody(q, tg.polys, T, Tp, 'target');
       }
     };
@@ -538,7 +512,7 @@ canvas { display: block; width: 100%; height: 100%; }
 
   // ---------- state ----------
   let state = 'menu', phase = 'idle', phaseT = 0, time = 0;
-  let charge = 0, power = 0, target = null, spot = 0, spotOn = false, settle = { pan: 0, target: 0 };
+  let charge = 0, power = 0, target = null, spot = 0, spotOn = false, settle = { pan: 0, target: 0 }, stableT = 0;
   let big = false, hold = { t: 0, lost: 0, beat: 0 }, zoom = 1, zc = { x: 500, y: 300 }, shake = 0;
   const notes = [], popups = [], confetti = [];
   const motes = Array.from({ length: 70 }, () => ({ x: Math.random() * 1200 - 100, y: Math.random() * 700 - 50, z: .3 + Math.random() * .7, ph: Math.random() * 6.28 }));
@@ -547,12 +521,12 @@ canvas { display: block; width: 100%; height: 100%; }
     chop.mode = 'in'; chop.t = 0; chop.open = 0; chop.out = 0; chop.queued = false;
     const pose = chopPose(simT); chop.tip = { x: pose.x, y: pose.y }; chop.a = pose.a;
     sau = makeSausage(pose.x + (N - 1) / 2 * SEG, pose.y); sau.pinned = true;
-    phase = 'hang'; phaseT = 0; settle = { pan: 0, target: 0 };
+    phase = 'hang'; phaseT = 0; settle = { pan: 0, target: 0 }; stableT = 0;
   }
   function newRound() {
     target = makeTarget(target && target.k);
     spotOn = false; big = false; stopOde(); stopCheer(); stopBeat(); notes.length = 0; popups.length = 0; confetti.length = 0;
-    againBtn.hidden = true; newSausage();
+    newSausage();
   }
   const tri = u => { u %= 2; return u < 1 ? u : 2 - u; };
   function press() {
@@ -570,8 +544,10 @@ canvas { display: block; width: 100%; height: 100%; }
   }
   function release() {
     if (state === 'play' && phase === 'charge') {
-      // the jerk only throws the sausage if it is actually in the pan; otherwise the pan just swings
-      if (sau.p.some(q => q.touch === 'pan')) launch(power); else { lift = { t0: simT, p: power, d0: dip }; sfx('whoosh', .3, 1.2); }
+      // the jerk throws the sausage if it is in the pan or falling into it; otherwise the pan just swings
+      const P = panT(simT), c = centroid(), l = lpt(P, c.x, c.y);
+      const nearPan = Math.abs(l.x) < 110 && l.y > -110 && l.y < 4;
+      if (sau.p.some(q => q.touch === 'pan') || nearPan) launch(power); else { lift = { t0: simT, p: power, d0: dip }; sfx('whoosh', .3, 1.2); }
       dip = 0; phase = 'flight'; phaseT = 0; settle = { pan: 0, target: 0 };
     }
   }
@@ -609,11 +585,6 @@ canvas { display: block; width: 100%; height: 100%; }
     }
 
     if (state === 'play' && phase === 'charge') { charge += dt; power = tri(charge / 1.15); dip = power; }
-    fill.style.height = (phase === 'charge' ? power * 100 : 0) + '%';
-    const canAct = state === 'play' && (phase === 'hang' || phase === 'ready' || phase === 'charge' || phase === 'drop' || phase === 'flight');
-    actBtn.disabled = !canAct;
-    const ico = phase === 'hang' ? 'drop' : 'flip';
-    if (actBtn.dataset.ico !== ico) actBtn.dataset.ico = ico;
     zoom += ((phase === 'hold' ? 1.16 : 1) - zoom) * Math.min(1, dt * 3);
     shake = Math.max(0, shake - dt * 1.6);
     for (let i = confetti.length - 1; i >= 0; i--) { const f = confetti[i]; f.life -= dt; f.vy += 900 * dt; f.vx *= .985; f.vy *= .985; f.x += f.vx * dt; f.y += f.vy * dt; f.r += f.vr * dt; if (f.life <= 0) confetti.splice(i, 1); }
@@ -632,18 +603,19 @@ canvas { display: block; width: 100%; height: 100%; }
       sp += Math.hypot(q.x - q.px - (q.touch ? q.tvx : 0), q.y - q.py - (q.touch ? q.tvy : 0)) / SUB;
     }
     sp /= N;
-    const SOLID = 6;
-    // at rest while touching something counts, even when only one or two points of the casing hold it
     settle.pan = onPan >= 1 && onTg === 0 && sp < 40 ? settle.pan + dt : 0;
     settle.target = onTg >= 1 && sp < 40 ? settle.target + dt : 0;
+    // stable: at rest and held by at least three points of the casing. Balanced on one or two: unstable.
+    stableT = onTg >= 3 && sp < 25 ? stableT + dt : 0;
 
     if (state !== 'play') return;
     const c = centroid(), { y1 } = ext();
     setSizzle(onPan > 0 ? .25 + onPan / N * .75 : 0);
     zc.x += (c.x - zc.x) * Math.min(1, dt * 4); zc.y += (c.y - zc.y) * Math.min(1, dt * 4);
     if ((phase === 'drop' || phase === 'flight') && settle.pan > .3) { phase = 'ready'; phaseT = 0; }
-    // resting on the object: a solid landing wins now, a shaky one has to survive 5 seconds
-    if (phase === 'flight' && settle.target > .35) { if (onTg >= 4 && overTop() >= SOLID) celebrate(false); else startHold(); }
+    // stable on the object: the round is won. Balanced on an edge: the 5-second countdown, won early if it steadies
+    if (phase === 'flight' && stableT > .4) celebrate(false);
+    else if (phase === 'flight' && settle.target > .5 && onTg <= 2) startHold();
     if (phase === 'hold') {
       hold.t += dt;
       hold.lost = onTg === 0 ? hold.lost + dt : 0;
@@ -652,13 +624,13 @@ canvas { display: block; width: 100%; height: 100%; }
       const sec = Math.ceil(5 - hold.t);
       if (sec !== hold.sec && sec > 0) { hold.sec = sec; buzz(12); blip(1000, .07, 'sine', .12); }
       if (hold.lost > .3) { stopBeat(); phase = 'flight'; phaseT = 0; settle.target = 0; popup('NOOOO'); buzz([20, 60, 20]); }
+      else if (stableT > .4) { stopBeat(); celebrate(false); }
       else if (hold.t >= 5) { stopBeat(); celebrate(true); }
     }
     if ((phase === 'drop' || phase === 'flight' || phase === 'ready' || phase === 'hold') && c.y > y1 + 80) { phase = 'miss'; phaseT = 0; popup('MISSED'); }
     if (phase === 'miss' && phaseT > .45) { stopBeat(); newSausage(); }
     if (phase === 'won') {
       if (spot > .5 && Math.random() < dt * 6) notes.push({ x: c.x + (Math.random() - .5) * 90, y: c.y - 20, vx: (Math.random() - .5) * 30, life: 1.8, g: Math.random() < .5 ? '\u266A' : '\u266B' });
-      if (phaseT > 2 && againBtn.hidden) againBtn.hidden = false;
     }
   }
 
@@ -1178,39 +1150,51 @@ canvas { display: block; width: 100%; height: 100%; }
     requestAnimationFrame(frame);
   }
 
-  // ---------- input ----------
+  // ---------- input: tap or hold anywhere ----------
+  const settings = document.getElementById('settings'), corner = document.getElementById('corner');
+  function start() {
+    initAudio(); if (ac && ac.state === 'suspended') ac.resume();
+    state = 'play'; document.getElementById('startScreen').hidden = true; newRound();
+  }
+  function act() {
+    if (settings.classList.contains('open')) { toggleSettings(false); return; }
+    if (state === 'menu') { start(); return; }
+    if (phase === 'won') { if (phaseT > 1) newRound(); return; }
+    press();
+  }
+  function toggleSettings(open) {
+    const o = open == null ? !settings.classList.contains('open') : open;
+    settings.classList.toggle('open', o); settings.setAttribute('aria-hidden', String(!o));
+    initAudio(); sfx(o ? 'click_down' : 'click_up', .6); buzz(6);
+  }
+  // unstuck: same object, fresh sausage
+  function resetRound() {
+    stopOde(); stopCheer(); stopBeat(); spotOn = false; big = false; notes.length = 0; confetti.length = 0;
+    if (state === 'play') newSausage();
+    toggleSettings(false);
+  }
   stage.addEventListener('pointerdown', e => {
-    if (e.target.closest('.overlay') || e.target === againBtn) return;
-    e.preventDefault(); press();
+    if (e.target.closest('#settings') || e.target.closest('#corner')) return;
+    e.preventDefault(); act();
   });
   window.addEventListener('pointerup', release);
   window.addEventListener('pointercancel', release);
   window.addEventListener('keydown', e => {
+    if (e.code === 'Escape') { toggleSettings(false); return; }
     if (e.code !== 'Space' && e.code !== 'ArrowUp' && e.code !== 'Enter') return;
     e.preventDefault();
     if (e.repeat) return;
-    if (!againBtn.hidden) { newRound(); return; }
-    press();
+    act();
   });
   window.addEventListener('keyup', e => { if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'Enter') release(); });
-  againBtn.onclick = () => newRound();
-  // tactile buttons: they sink on press with a click, spring back with a softer click and a tiny buzz
-  function btnDown(b) { if (b.disabled || b.classList.contains('down')) return; initAudio(); b.classList.remove('up'); b.classList.add('down'); sfx('click_down', .8); buzz(8); }
-  function btnUp() {
-    document.querySelectorAll('.btn.down').forEach(b => { b.classList.remove('down'); b.classList.add('up'); sfx('click_up', .6); buzz(4); });
-  }
-  document.querySelectorAll('.btn').forEach(b => {
-    b.addEventListener('pointerdown', () => btnDown(b));
-    b.addEventListener('animationend', () => b.classList.remove('up'));
+  corner.addEventListener('pointerdown', e => { e.preventDefault(); toggleSettings(); });
+  corner.addEventListener('keydown', e => { if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); toggleSettings(); } });
+  document.getElementById('unstuckBtn').addEventListener('click', resetRound);
+  // the ring buttons click like old switches
+  document.querySelectorAll('.ring').forEach(b => {
+    b.addEventListener('pointerdown', () => { initAudio(); b.classList.add('down'); sfx('click_down', .8); buzz(8); });
   });
-  window.addEventListener('pointerup', btnUp);
-  window.addEventListener('pointercancel', btnUp);
-  window.addEventListener('keydown', e => { if ((e.code === 'Space' || e.code === 'Enter' || e.code === 'ArrowUp') && !e.repeat) btnDown(againBtn.hidden ? actBtn : againBtn); });
-  window.addEventListener('keyup', e => { if (e.code === 'Space' || e.code === 'Enter' || e.code === 'ArrowUp') btnUp(); });
-  document.getElementById('startBtn').onclick = () => {
-    initAudio(); if (ac && ac.state === 'suspended') ac.resume();
-    state = 'play'; document.getElementById('startScreen').hidden = true; newRound();
-  };
+  window.addEventListener('pointerup', () => document.querySelectorAll('.ring.down').forEach(b => { b.classList.remove('down'); sfx('click_up', .6); }));
 
   loadPhotos(); rasterKinds();
   // backdrop behind the start card: a sausage dangling from chopsticks over the pan
