@@ -22,23 +22,35 @@ body {
 #stage { position: relative; height: 100%; }
 canvas { display: block; width: 100%; height: 100%; }
 .btn {
-  font-family: var(--display); color: #fff; background: var(--ketchup);
-  border: 4px solid #000; box-shadow: 5px 5px 0 #000; cursor: pointer;
+  font-family: var(--display); color: #fff; cursor: pointer; border: 3px solid #2a0d08;
+  background: linear-gradient(180deg, #ef5a44 0%, #d8342b 55%, #b32419 100%);
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.35), inset 0 -3px 0 rgba(0,0,0,.18), 0 6px 0 #6e140c, 0 10px 18px rgba(60,20,10,.35);
+  transition: transform .07s ease-out, box-shadow .07s ease-out, filter .2s;
+  -webkit-tap-highlight-color: transparent;
 }
-.btn:focus-visible { outline: 3px solid var(--mustard); outline-offset: 3px; }
+.btn:hover { filter: brightness(1.06); }
+.btn.down, .btn:active {
+  transform: translateY(5px);
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.25), inset 0 -1px 0 rgba(0,0,0,.18), 0 1px 0 #6e140c, 0 3px 6px rgba(60,20,10,.35);
+}
+.btn.up { animation: springUp .32s cubic-bezier(.3,1.8,.5,1); }
+@keyframes springUp { 0% { transform: translateY(5px) scale(1); } 45% { transform: translateY(-3px) scale(1.04); } 100% { transform: translateY(0) scale(1); } }
+.btn:focus-visible { outline: 3px solid var(--mustard); outline-offset: 4px; }
 #actBtn {
-  position: absolute; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-  width: 112px; height: 112px; border-radius: 50%; overflow: hidden; font-size: 14px; line-height: 1.1;
-  touch-action: none;
+  position: absolute; right: 18px; bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+  width: 128px; height: 128px; border-radius: 50%; overflow: hidden; font-size: 15px; line-height: 1.05;
+  touch-action: none; display: grid; place-items: center; padding: 0 10px;
 }
-#actBtn .fill { position: absolute; left: 0; right: 0; bottom: 0; height: 0%; background: var(--mustard); }
-#actBtn .lbl { position: relative; pointer-events: none; text-shadow: 2px 2px 0 #000; }
-#actBtn.held { transform: translate(3px, 3px); box-shadow: 2px 2px 0 #000; }
-#actBtn:disabled { filter: grayscale(.7) brightness(.55); cursor: default; }
+#actBtn .fill { position: absolute; left: 0; right: 0; bottom: 0; height: 0%; background: linear-gradient(180deg, #ffd85a, #e9a915); transition: height .05s linear; }
+#actBtn .lbl { position: relative; pointer-events: none; text-shadow: 0 2px 0 rgba(0,0,0,.45); }
+#actBtn:disabled { filter: saturate(.35) brightness(.8); cursor: default; }
 #againBtn {
-  position: absolute; left: 50%; bottom: calc(28px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
-  font-size: 18px; padding: 12px 22px; z-index: 1;
+  position: absolute; left: 50%; bottom: calc(30px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+  font-size: 18px; padding: 13px 24px; border-radius: 14px; z-index: 1;
 }
+#againBtn.down, #againBtn:active { transform: translateX(-50%) translateY(5px); }
+#againBtn.up { animation: none; }
+@media (prefers-reduced-motion: reduce) { .btn.up { animation: none; } }
 .overlay {
   position: absolute; inset: 0; display: grid; place-items: center;
   background: rgba(5, 7, 10, .7); padding: 16px; z-index: 2;
@@ -51,18 +63,20 @@ canvas { display: block; width: 100%; height: 100%; }
   font-family: var(--display); font-size: clamp(30px, 8vw, 44px); line-height: .95; margin: 0;
   color: var(--mustard); text-shadow: 3px 3px 0 var(--ketchup);
 }
+.card .small { font-size: 11px; color: #b9ad9c; }
 .card p { margin: 0; line-height: 1.55; font-size: 13px; }
-.card .btn { font-size: 18px; padding: 12px 18px; box-shadow: 4px 4px 0 #000; border-width: 3px; }
+.card .btn { font-size: 18px; padding: 13px 18px; border-radius: 14px; }
 </style>
 
 <div id="stage">
   <canvas id="c"></canvas>
-  <button class="btn" id="actBtn" aria-label="Drop or flip the sausage" disabled><span class="fill"></span><span class="lbl" id="actLbl">HOLD<br>TO FLIP</span></button>
+  <button class="btn" id="actBtn" aria-label="Drop or flip the sausage" disabled><span class="fill"></span><span class="lbl" id="actLbl">HOLD TO<br>WIND UP</span></button>
   <button class="btn" id="againBtn" hidden>Flip another</button>
   <div class="overlay" id="startScreen">
     <div class="card">
       <h1>Hotdog Flip</h1>
-      <p>Chopsticks bring in a sausage. Tap to drop it in the pan. Hold to charge, release to flip it onto whatever is floating nearby. Flip as many times as it takes.</p>
+      <p>Chopsticks bring in a sausage. Tap to drop it in the pan. Hold to pull the pan back, let go to flip it onto whatever is floating nearby. Flip as many times as it takes.</p>
+      <p>A solid landing wins on the spot. If it lands on an edge, it has to hang on for 5 seconds.</p>
       <button class="btn" id="startBtn">Start</button>
     </div>
   </div>
@@ -70,7 +84,10 @@ canvas { display: block; width: 100%; height: 100%; }
 
 <script>
 (() => {
-  const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+  const cv = document.getElementById('c'), mainCtx = cv.getContext('2d');
+  let ctx = mainCtx;
+  const layer = document.createElement('canvas'), lctx = layer.getContext('2d');
+  const shad = document.createElement('canvas'), sctx = shad.getContext('2d');
   const stage = document.getElementById('stage');
   const actBtn = document.getElementById('actBtn'), actLbl = document.getElementById('actLbl'), fill = actBtn.querySelector('.fill');
   const againBtn = document.getElementById('againBtn');
@@ -78,40 +95,112 @@ canvas { display: block; width: 100%; height: 100%; }
   if (!CanvasRenderingContext2D.prototype.roundRect) CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h) { this.rect(x, y, w, h); };
 
   // ---------- world ----------
-  const WW = 1000, WH = 600, G = 1500;
+  const WW = 1000, WH = 600, G = 1900;
   const PX = 270, PY = 440;               // pan cooking-surface centre
   const N = 9, SEG = 15, R = 14;          // sausage: 9 particles, 120px long, 28px thick
-  const SUB = 1 / 240, REST = .12, FRIC = .3;
+  const SUB = 1 / 240, REST = .02, MU = 1.1, SQUISH = .93;
   let W = 0, H = 0, DPR = 1, S = 1, OX = 0, OY = 0, bgCache = null;
 
   function resize() {
     const r = stage.getBoundingClientRect();
     DPR = Math.min(window.devicePixelRatio || 1, 3); W = r.width; H = r.height;
     cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    layer.width = cv.width; layer.height = cv.height;
+    shad.width = Math.max(1, Math.round(cv.width / 5)); shad.height = Math.max(1, Math.round(cv.height / 5));
     S = Math.min(W / WW, H / WH); OX = (W - WW * S) / 2; OY = (H - WH * S) / 2;
     buildBackground();
   }
   new ResizeObserver(resize).observe(stage);
   const worldT = c => c.setTransform(DPR * S, 0, 0, DPR * S, DPR * OX, DPR * OY);
+  // camera: leans in during the hold test, shakes on the big win
+  function camT(c) {
+    worldT(c);
+    if (shake > 0 && !reduce) c.translate(Math.sin(time * 61) * 9 * shake, Math.cos(time * 47) * 7 * shake);
+    if (zoom > 1.001) { c.translate(zc.x, zc.y); c.scale(zoom, zoom); c.translate(-zc.x, -zc.y); }
+  }
   const ext = () => ({ x0: -OX / S - 40, x1: (W - OX) / S + 40, y0: -OY / S - 40, y1: (H - OY) / S + 40 });
 
   // ---------- audio ----------
   let ac = null;
-  function initAudio() { if (ac) return; try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch { ac = null; } }
+  function initAudio() {
+    if (ac) return;
+    try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch { ac = null; return; }
+    master = ac.createGain(); master.gain.value = .9; master.connect(ac.destination);
+    sizzleGain = ac.createGain(); sizzleGain.gain.value = 0; sizzleGain.connect(master);
+    startSizzle(); loadSfx();
+  }
   function blip(freq, dur, type = 'sine', vol = .08, slide = 0) {
     if (!ac) return;
     const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime;
     o.type = type; o.frequency.setValueAtTime(freq, t);
     if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), t + dur);
     g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
-    o.connect(g).connect(ac.destination); o.start(t); o.stop(t + dur);
+    o.connect(g).connect(master || ac.destination); o.start(t); o.stop(t + dur);
   }
-  let lastThud = 0;
-  function thud(strength) {
+  // ---- sound effects: recorded files shipped next to the page, with synthesized stand-ins until they load ----
+  // CC0 recordings (Kenney, BenjaminNelan, artisticdude, bart, craigsmith); provenance in sfx/SOURCES.md
+  const SFX_FILES = { sizzle: 'sfx/sizzle.mp3', land_soft: 'sfx/land_soft.mp3', land_hard: 'sfx/land_hard.mp3', pan_hit: 'sfx/pan_hit.mp3', whoosh: 'sfx/whoosh.mp3', click_down: 'sfx/click_down.mp3', click_up: 'sfx/click_up.mp3', chopstick: 'sfx/chopstick.mp3', heartbeat: 'sfx/heartbeat.mp3', cheer: 'sfx/cheer.mp3' };
+  const sfxBuf = {}, lastPlay = {};
+  let master = null, sizzleGain = null, sizzleSrc = null, cheerSrc = null;
+  function noiseBuffer(sec) {
+    const len = Math.floor(ac.sampleRate * sec), b = ac.createBuffer(1, len, ac.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (Math.random() < .002 ? 3 : .35);
+    return b;
+  }
+  function startSizzle() {
+    if (!ac) return;
+    if (sizzleSrc) { try { sizzleSrc.stop(); } catch {} }
+    const src = ac.createBufferSource(); src.loop = true;
+    if (sfxBuf.sizzle) { src.buffer = sfxBuf.sizzle; src.connect(sizzleGain); }
+    else { src.buffer = noiseBuffer(2); const f = ac.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 2500; src.connect(f).connect(sizzleGain); }
+    src.start(); sizzleSrc = src;
+  }
+  function setSizzle(level) { if (sizzleGain) sizzleGain.gain.setTargetAtTime(level * (sfxBuf.sizzle ? .55 : .05), ac.currentTime, .12); }
+  function loadSfx() {
+    for (const [name, url] of Object.entries(SFX_FILES)) {
+      fetch(url).then(r => r.ok ? r.arrayBuffer() : Promise.reject(r.status))
+        .then(b => new Promise((ok, no) => ac.decodeAudioData(b, ok, no)))
+        .then(buf => { sfxBuf[name] = buf; if (name === 'sizzle') startSizzle(); })
+        .catch(() => {});
+    }
+  }
+  const FALLBACK = {
+    whoosh: (v, r) => { const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain(), t = ac.currentTime; s.buffer = noiseBuffer(.35); f.type = 'bandpass'; f.frequency.setValueAtTime(400 * r, t); f.frequency.exponentialRampToValueAtTime(2400 * r, t + .3); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.5 * v, t + .08); g.gain.exponentialRampToValueAtTime(.001, t + .33); s.connect(f).connect(g).connect(master); s.start(); },
+    land_soft: v => blip(95, .14, 'sine', .25 * v, -45),
+    land_hard: v => blip(140, .1, 'triangle', .22 * v, -70),
+    pan_hit: v => { blip(620, .25, 'triangle', .06 * v, -40); blip(1240, .18, 'sine', .03 * v); },
+    chopstick: v => blip(1700, .04, 'triangle', .06 * v),
+    click_down: v => blip(420, .035, 'square', .05 * v, -200),
+    click_up: v => blip(760, .03, 'triangle', .04 * v),
+    heartbeat: (v, r) => { blip(62, .12, 'sine', .35 * v, -20); setTimeout(() => blip(55, .14, 'sine', .25 * v, -20), 150 / r); },
+    cheer: () => {},
+  };
+  function sfx(name, vol = 1, rate = 1) {
+    if (!ac) return;
     const now = performance.now();
-    if (now - lastThud < 90) return; lastThud = now;
-    blip(90 + Math.random() * 30, .12, 'sine', Math.min(.22, .04 + strength * .05), -40);
+    if (now - (lastPlay[name] || 0) < 70) return; lastPlay[name] = now;
+    const b = sfxBuf[name];
+    if (!b) { FALLBACK[name] && FALLBACK[name](vol, rate); return; }
+    const src = ac.createBufferSource(), g = ac.createGain();
+    src.buffer = b; src.playbackRate.value = rate * (.96 + Math.random() * .08); g.gain.value = vol;
+    src.connect(g).connect(master); src.start();
+    if (name === 'cheer') cheerSrc = { src, g };
   }
+  let beatSrc = null;
+  function beatLoop(rate) {
+    if (!ac || !sfxBuf.heartbeat) return;
+    if (!beatSrc) { const src = ac.createBufferSource(), g = ac.createGain(); src.buffer = sfxBuf.heartbeat; src.loop = true; g.gain.value = 1; src.connect(g).connect(master); src.start(); beatSrc = { src, g }; }
+    beatSrc.src.playbackRate.value = rate;
+  }
+  function stopBeat() { if (!beatSrc) return; const b = beatSrc; beatSrc = null; b.g.gain.setTargetAtTime(0, ac.currentTime, .05); setTimeout(() => { try { b.src.stop(); } catch {} }, 400); }
+  function stopCheer() { if (cheerSrc && ac) { cheerSrc.g.gain.setTargetAtTime(0, ac.currentTime, .2); const s0 = cheerSrc.src; setTimeout(() => { try { s0.stop(); } catch {} }, 900); cheerSrc = null; } }
+  function impacts() {
+    if (hits.pan > 1) { const v = Math.min(1, hits.pan / 5); sfx('pan_hit', .25 + v * .75, 1.1 - v * .2); sfx('land_soft', .3 + v * .5); buzz(Math.round(6 + v * 14)); }
+    if (hits.target > 1) { const v = Math.min(1, hits.target / 5); sfx(v > .45 ? 'land_hard' : 'land_soft', .35 + v * .65); buzz(Math.round(8 + v * 16)); }
+  }
+  // haptics where the device and browser allow it (Android Chrome); silently nothing elsewhere
+  function buzz(pattern) { try { navigator.vibrate && navigator.vibrate(pattern); } catch {} }
+
   // Beethoven, Symphony No. 9, "Ode to Joy" (public domain)
   const NOTE = { G2: 98, C3: 130.81, C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, G4: 392 };
   const ODE = [['E4', 1], ['E4', 1], ['F4', 1], ['G4', 1], ['G4', 1], ['F4', 1], ['E4', 1], ['D4', 1],
@@ -135,7 +224,7 @@ canvas { display: block; width: 100%; height: 100%; }
   function playOde() {
     if (!ac) return;
     stopOde();
-    const bus = ac.createGain(); bus.gain.value = .9; bus.connect(ac.destination); odeBus = bus;
+    const bus = ac.createGain(); bus.gain.value = .9; bus.connect(master); odeBus = bus;
     const t0 = ac.currentTime + .05;
     let t = t0;
     for (const [n, b] of ODE) { tone(bus, NOTE[n], t, b * BEAT, 'triangle', .16); tone(bus, NOTE[n] * 2, t, b * BEAT, 'sine', .035); t += b * BEAT; }
@@ -240,7 +329,7 @@ canvas { display: block; width: 100%; height: 100%; }
     const marks = Array.from({ length: 30 }, () => [Math.random(), Math.random() * 2 - 1, Math.random()]);
     return { p, pinned: false, marks };
   }
-  const PIN = [3, 4, 5];
+  const PIN = [0, 1];
 
   function collideBody(q, polys, T, Tp, tag) {
     for (const ed of polys) {
@@ -249,24 +338,30 @@ canvas { display: block; width: 100%; height: 100%; }
         const a = wpt(T, e.ax, e.ay), nx = e.nx * Math.cos(T.a) - e.ny * Math.sin(T.a), ny = e.nx * Math.sin(T.a) + e.ny * Math.cos(T.a);
         const d = (q.x - a.x) * nx + (q.y - a.y) * ny;
         if (d > best) { best = d; bn = [nx, ny]; }
-        if (best >= R) break;
+        if (best >= R + 2) break;
       }
-      if (best >= R) continue;
-      const [nx, ny] = bn;
-      q.x += nx * (R - best); q.y += ny * (R - best);
+      if (best >= R + 2) continue;
+      // resting just on the surface still counts as touching it
+      if (best >= R) { if (!q.touch) { q.touch = tag; const l0 = lpt(T, q.x, q.y), n0 = wpt(T, l0.x, l0.y), w0 = wpt(Tp, l0.x, l0.y); q.tvx = n0.x - w0.x; q.tvy = n0.y - w0.y; } continue; }
+      const [nx, ny] = bn, pen = R - best;
+      q.x += nx * pen; q.y += ny * pen;
       const l = lpt(T, q.x, q.y), now = wpt(T, l.x, l.y), was = wpt(Tp, l.x, l.y);
       const vpx = now.x - was.x, vpy = now.y - was.y;
       let rx = q.x - q.px - vpx, ry = q.y - q.py - vpy;
       const vn = rx * nx + ry * ny;
-      if (vn < 0) { rx -= nx * vn * (1 + REST); ry -= ny * vn * (1 + REST); impact = Math.max(impact, -vn / SUB / 300); }
-      const tx = -ny, ty = nx, vt = rx * tx + ry * ty;
-      rx -= tx * vt * FRIC; ry -= ty * vt * FRIC;
+      let jn = pen;
+      if (vn < 0) { rx -= nx * vn * (1 + REST); ry -= ny * vn * (1 + REST); jn += -vn * (1 + REST); hits[tag] = Math.max(hits[tag], -vn / SUB / 300); }
+      // Coulomb friction: grip scales with how hard it is pressed, so it rests on tops but slides down sides
+      const tx = -ny, ty = nx, vt = rx * tx + ry * ty, cut = Math.min(Math.abs(vt), MU * jn) * Math.sign(vt);
+      rx -= tx * cut; ry -= ty * cut;
+      // meat is dead weight: every contact soaks up a bit of motion instead of skidding or rolling on
+      rx *= SQUISH; ry *= SQUISH;
       q.px = q.x - (vpx + rx); q.py = q.y - (vpy + ry);
       q.touch = tag; q.tvx = vpx; q.tvy = vpy;
     }
   }
 
-  let simT = 0, impact = 0;
+  let simT = 0; const hits = { pan: 0, target: 0 };
   function step() {
     const t = simT, tp = simT - SUB;
     const P = panT(t), Pp = panT(tp);
@@ -278,7 +373,8 @@ canvas { display: block; width: 100%; height: 100%; }
       q.px = q.x; q.py = q.y;
       q.x += vx; q.y += vy + G * SUB * SUB;
     }
-    const pin = () => { if (!sau.pinned) return; PIN.forEach((i, k) => { const q = ps[i]; const nx = chop.tip.x + (k - 1) * SEG, ny = chop.tip.y; q.px = q.x - (nx - q.x) * 0 + (q.px - q.x); q.x = nx; q.y = ny; q.px = nx - chop.vx * SUB; q.py = ny - chop.vy * SUB; }); };
+    // chopsticks grip the left end: the first two points follow the tips, the rest hangs off them
+    const pin = () => { if (!sau.pinned) return; PIN.forEach((i, k) => { const q = ps[i]; const nx = chop.tip.x + Math.cos(chop.a) * SEG * k, ny = chop.tip.y + Math.sin(chop.a) * SEG * k; q.x = nx; q.y = ny; q.px = nx - chop.vx * SUB; q.py = ny - chop.vy * SUB; }); };
     pin();
     const collide = () => {
       for (const q of ps) {
@@ -287,23 +383,36 @@ canvas { display: block; width: 100%; height: 100%; }
       }
     };
     collide();
-    for (let it = 0; it < 6; it++) {
+    // firm casing: stretch is stiff, bending resists but still gives a little
+    for (let it = 0; it < 10; it++) {
       for (let i = 0; i < N - 1; i++) link(ps[i], ps[i + 1], SEG, 1);
-      for (let i = 0; i < N - 2; i++) link(ps[i], ps[i + 2], SEG * 2, .32);
-      for (let i = 0; i < N - 4; i++) link(ps[i], ps[i + 4], SEG * 4, .06);
+      for (let i = 0; i < N - 2; i++) straighten(ps[i], ps[i + 1], ps[i + 2], BEND);
+      for (let i = 0; i < N - 4; i++) link(ps[i], ps[i + 4], SEG * 4, .3);
       pin();
     }
     collide();
     simT += SUB;
   }
+  // pulls the middle of three neighbours back toward the line between them: a firm casing that still flexes
+  const BEND = .09;
+  function straighten(a, b, c, k) {
+    const dx = (a.x + c.x) / 2 - b.x, dy = (a.y + c.y) / 2 - b.y;
+    b.x += dx * k; b.y += dy * k; a.x -= dx * k / 2; a.y -= dy * k / 2; c.x -= dx * k / 2; c.y -= dy * k / 2;
+  }
   function link(a, b, rest, k) {
     const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 1e-6, diff = (d - rest) / d * .5 * k;
     a.x += dx * diff; a.y += dy * diff; b.x -= dx * diff; b.y -= dy * diff;
   }
+  // how many of the sausage's points sit over the object's top surface (in its own frame)
+  function overTop() {
+    if (!target) return 0;
+    const T = targetT(target, simT), lim = target.k.id === 'cat' ? target.hw + 20 : target.k.id === 'skate' ? target.hw + 16 : target.hw;
+    return sau.p.filter(q => { const l = lpt(T, q.x, q.y); return Math.abs(l.x) <= lim && l.y < 4; }).length;
+  }
   function centroid() { let x = 0, y = 0; for (const q of sau.p) { x += q.x; y += q.y; } return { x: x / N, y: y / N }; }
 
   function launch(p) {
-    const vx = 170 + p * 440, vy = 500 + p * 660, T = 2 * vy / G, w = Math.PI / T;
+    const vx = 190 + p * 495, vy = 562 + p * 742, T = 2 * vy / G, w = Math.PI / T;
     const c = centroid();
     for (const q of sau.p) {
       const rx = q.x - c.x, ry = q.y - c.y;
@@ -311,59 +420,81 @@ canvas { display: block; width: 100%; height: 100%; }
       q.px = q.x - ux * SUB; q.py = q.y - uy * SUB;
     }
     lift = { t0: simT, p, d0: dip };
-    blip(200, .1, 'triangle', .06, 400);
-    setTimeout(() => blip(520, .06, 'sine', .04), 40);
+    sfx('whoosh', .5 + p * .5, .9 + p * .3);
   }
 
   // ---------- chopsticks ----------
-  const HANG = { x: PX, y: PY - 175 };
-  const chop = { mode: null, t: 0, tip: { x: 0, y: 0 }, vx: 0, vy: 0, open: 0, out: 0 };
-  const CH_DIR = (() => { const dx = -160, dy = -340, l = Math.hypot(dx, dy); return { x: dx / l, y: dy / l }; })();
-  function chopTip(t) {
-    const swing = (reduce ? .02 : .075) * Math.sin(t * 1.7) + .02 * Math.sin(t * 3.1);
-    const piv = { x: HANG.x + CH_DIR.x * 360, y: HANG.y + CH_DIR.y * 360 };
-    const dx = HANG.x - piv.x, dy = HANG.y - piv.y, c = Math.cos(swing), s = Math.sin(swing);
-    let x = piv.x + dx * c - dy * s, y = piv.y + dx * s + dy * c;
-    const away = (1 - easeOut(chop.mode === 'in' ? chop.t / .9 : 1)) + easeOut(chop.out) * 1.2;
-    x += CH_DIR.x * 520 * away; y += CH_DIR.y * 520 * away;
-    return { x, y };
+  const HANG = { x: PX - 62, y: PY - 150 };   // where the gripped end hangs, so the sausage spans the pan
+  const chop = { mode: null, t: 0, tip: { x: 0, y: 0 }, a: 0, vx: 0, vy: 0, open: 0, out: 0, queued: false };
+  const CH_IN = .45;
+  function chopPose(t) {
+    const a = (reduce ? .015 : .05) * Math.sin(t * 1.6) + .015 * Math.sin(t * 2.9);
+    let x = HANG.x, y = HANG.y + Math.sin(t * 2.2) * (reduce ? 1 : 4);
+    x -= (1 - easeOut(chop.mode === 'in' ? chop.t / CH_IN : 1)) * 520 + easeOut(chop.out) * 640;
+    return { x, y, a };
   }
 
   // ---------- state ----------
   let state = 'menu', phase = 'idle', phaseT = 0, time = 0;
   let charge = 0, power = 0, target = null, spot = 0, spotOn = false, settle = { pan: 0, target: 0 };
-  const notes = [], popups = [];
+  let big = false, hold = { t: 0, lost: 0, beat: 0 }, zoom = 1, zc = { x: 500, y: 300 }, shake = 0;
+  const notes = [], popups = [], confetti = [];
   const motes = Array.from({ length: 70 }, () => ({ x: Math.random() * 1200 - 100, y: Math.random() * 700 - 50, z: .3 + Math.random() * .7, ph: Math.random() * 6.28 }));
 
   function newSausage() {
-    chop.mode = 'in'; chop.t = 0; chop.open = 0; chop.out = 0;
-    const tip = chopTip(simT); chop.tip = tip;
-    sau = makeSausage(tip.x, tip.y); sau.pinned = true;
+    chop.mode = 'in'; chop.t = 0; chop.open = 0; chop.out = 0; chop.queued = false;
+    const pose = chopPose(simT); chop.tip = { x: pose.x, y: pose.y }; chop.a = pose.a;
+    sau = makeSausage(pose.x + (N - 1) / 2 * SEG, pose.y); sau.pinned = true;
     phase = 'hang'; phaseT = 0; settle = { pan: 0, target: 0 };
   }
   function newRound() {
     target = makeTarget(target && target.k);
-    spotOn = false; stopOde(); notes.length = 0; popups.length = 0;
+    spotOn = false; big = false; stopOde(); stopCheer(); stopBeat(); notes.length = 0; popups.length = 0; confetti.length = 0;
     againBtn.hidden = true; newSausage();
   }
   const tri = u => { u %= 2; return u < 1 ? u : 2 - u; };
+  // what the big button says: tells you exactly what to do, with some sass
+  const LABELS = {
+    hang: 'TAP TO<br>FREE THE<br>WIENER',
+    drop: 'IT\u2019S<br>FALLING',
+    ready: 'HOLD TO<br>WIND UP',
+    charge: 'LET GO<br>TO FLIP',
+    max: 'LET GO!<br>FULL<br>SEND',
+    flight: 'HANDS<br>OFF',
+    hold: 'DON\u2019T<br>BREATHE',
+    miss: 'OOPS.<br>NEXT<br>WIENER',
+    won: 'LEGEND',
+  };
 
   function press() {
     if (state !== 'play') return;
     initAudio();
-    if (phase === 'hang' && chop.mode === 'hold') {
-      sau.pinned = false; chop.mode = 'open'; chop.t = 0; phase = 'drop'; phaseT = 0;
-      blip(900, .05, 'triangle', .04);
+    if (phase === 'hang') {
+      if (chop.mode === 'hold') dropIt(); else chop.queued = true;
     } else if (phase === 'ready') {
-      phase = 'charge'; charge = 0; actBtn.classList.add('held');
+      phase = 'charge'; charge = 0;
     }
   }
+  function dropIt() {
+    sau.pinned = false; chop.mode = 'open'; chop.t = 0; phase = 'drop'; phaseT = 0;
+    sfx('chopstick', .7);
+  }
   function release() {
-    actBtn.classList.remove('held');
     if (state === 'play' && phase === 'charge') { launch(power); dip = 0; phase = 'flight'; phaseT = 0; settle = { pan: 0, target: 0 }; }
   }
   function popup(text) { const c = centroid(); popups.push({ x: c.x, y: c.y - 40, text, life: 1.3 }); }
-  function celebrate() { phase = 'won'; phaseT = 0; spotOn = true; playOde(); }
+  function celebrate(huge) {
+    phase = 'won'; phaseT = 0; spotOn = true; big = !!huge; playOde();
+    if (huge) {
+      sfx('cheer', .8); shake = 1; buzz([30, 40, 30, 40, 80]);
+      const c = centroid();
+      for (let i = 0; i < 220; i++) {
+        const a = -Math.PI / 2 + (Math.random() - .5) * 2.4, v = 400 + Math.random() * 700;
+        confetti.push({ x: c.x, y: c.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: Math.random() * 6, vr: (Math.random() - .5) * 14, w: 5 + Math.random() * 6, h: 3 + Math.random() * 4, c: ['#d8342b', '#f2c230', '#2f7fd8', '#3aa260', '#ffffff', '#ff8a3a'][i % 6], life: 3 + Math.random() * 2 });
+      }
+    } else buzz(25);
+  }
+  function startHold() { phase = 'hold'; phaseT = 0; hold = { t: 0, lost: 0, beat: 0, sec: 5 }; popup('ON THE EDGE!'); buzz(15); }
 
   let acc = 0;
   function update(dt) {
@@ -376,24 +507,29 @@ canvas { display: block; width: 100%; height: 100%; }
     // chopsticks
     if (chop.mode) {
       chop.t += dt;
-      if (chop.mode === 'in' && chop.t >= .9) chop.mode = 'hold';
-      if (chop.mode === 'open') { chop.open = Math.min(1, chop.t / .12); if (chop.t > .15) chop.out = Math.min(1, (chop.t - .15) / .7); if (chop.out >= 1) chop.mode = null; }
-      const tip = chopTip(simT);
-      chop.vx = (tip.x - chop.tip.x) / Math.max(dt, 1e-3); chop.vy = (tip.y - chop.tip.y) / Math.max(dt, 1e-3);
-      if (chop.mode !== 'open') chop.tip = tip; else chop.tip = { x: tip.x, y: tip.y };
+      if (chop.mode === 'in' && chop.t >= CH_IN) { chop.mode = 'hold'; if (chop.queued) dropIt(); }
+      if (chop.mode === 'open') { chop.open = Math.min(1, chop.t / .08); if (chop.t > .1) chop.out = Math.min(1, (chop.t - .1) / .35); if (chop.out >= 1) chop.mode = null; }
+      const pose = chopPose(simT);
+      chop.vx = (pose.x - chop.tip.x) / Math.max(dt, 1e-3); chop.vy = (pose.y - chop.tip.y) / Math.max(dt, 1e-3);
+      if (chop.mode === 'open') { chop.vx = 0; chop.vy = 0; }
+      chop.tip = { x: pose.x, y: pose.y }; chop.a = pose.a;
     }
 
-    if (state === 'play' && phase === 'charge') { charge += dt; power = tri(charge / .8); dip = power; }
+    if (state === 'play' && phase === 'charge') { charge += dt; power = tri(charge / 1.15); dip = power; }
     fill.style.height = (phase === 'charge' ? power * 100 : 0) + '%';
-    const canAct = state === 'play' && ((phase === 'hang' && chop.mode === 'hold') || phase === 'ready' || phase === 'charge');
+    const canAct = state === 'play' && (phase === 'hang' || phase === 'ready' || phase === 'charge');
     actBtn.disabled = !canAct;
-    actLbl.innerHTML = phase === 'hang' ? 'TAP TO<br>DROP' : 'HOLD TO<br>FLIP';
+    const lbl = LABELS[phase === 'charge' && power > .85 ? 'max' : phase] || LABELS.flight;
+    if (actLbl.innerHTML !== lbl) actLbl.innerHTML = lbl;
+    zoom += ((phase === 'hold' ? 1.16 : 1) - zoom) * Math.min(1, dt * 3);
+    shake = Math.max(0, shake - dt * 1.6);
+    for (let i = confetti.length - 1; i >= 0; i--) { const f = confetti[i]; f.life -= dt; f.vy += 900 * dt; f.vx *= .985; f.vy *= .985; f.x += f.vx * dt; f.y += f.vy * dt; f.r += f.vr * dt; if (f.life <= 0) confetti.splice(i, 1); }
 
     if (!sau) return;
     acc += Math.min(dt, .05);
-    impact = 0;
+    hits.pan = 0; hits.target = 0;
     while (acc >= SUB) { step(); acc -= SUB; }
-    if (impact > 1.2 && !sau.pinned) thud(impact);
+    if (!sau.pinned) impacts();
 
     // contact + settle bookkeeping
     let onPan = 0, onTg = 0, sp = 0;
@@ -403,18 +539,32 @@ canvas { display: block; width: 100%; height: 100%; }
       sp += Math.hypot(q.x - q.px - (q.touch ? q.tvx : 0), q.y - q.py - (q.touch ? q.tvy : 0)) / SUB;
     }
     sp /= N;
+    const SOLID = 6;
     // at rest while touching something counts, even when only one or two points of the casing hold it
     settle.pan = onPan >= 1 && onTg === 0 && sp < 40 ? settle.pan + dt : 0;
     settle.target = onTg >= 1 && sp < 40 ? settle.target + dt : 0;
 
     if (state !== 'play') return;
     const c = centroid(), { y1 } = ext();
+    setSizzle(onPan > 0 ? .25 + onPan / N * .75 : 0);
+    zc.x += (c.x - zc.x) * Math.min(1, dt * 4); zc.y += (c.y - zc.y) * Math.min(1, dt * 4);
     if ((phase === 'drop' || phase === 'flight') && settle.pan > .3) { phase = 'ready'; phaseT = 0; }
-    if (phase === 'flight' && settle.target > .6) celebrate();
-    if ((phase === 'drop' || phase === 'flight' || phase === 'ready') && c.y > y1 + 80) { phase = 'miss'; phaseT = 0; popup('MISSED'); blip(150, .3, 'sawtooth', .06, -70); }
-    if (phase === 'miss' && phaseT > .9) newSausage();
+    // resting on the object: a solid landing wins now, a shaky one has to survive 5 seconds
+    if (phase === 'flight' && settle.target > .35) { if (onTg >= 4 && overTop() >= SOLID) celebrate(false); else startHold(); }
+    if (phase === 'hold') {
+      hold.t += dt;
+      hold.lost = onTg === 0 ? hold.lost + dt : 0;
+      if (sfxBuf.heartbeat) beatLoop(1 + hold.t * .12);
+      else { hold.beat -= dt; if (hold.beat <= 0) { sfx('heartbeat', .9, 1 + hold.t * .08); hold.beat = Math.max(.42, .85 - hold.t * .09); } }
+      const sec = Math.ceil(5 - hold.t);
+      if (sec !== hold.sec && sec > 0) { hold.sec = sec; buzz(12); }
+      if (hold.lost > .3) { stopBeat(); phase = 'flight'; phaseT = 0; settle.target = 0; popup('NOOOO'); buzz([20, 60, 20]); }
+      else if (hold.t >= 5) { stopBeat(); celebrate(true); }
+    }
+    if ((phase === 'drop' || phase === 'flight' || phase === 'ready' || phase === 'hold') && c.y > y1 + 80) { phase = 'miss'; phaseT = 0; popup('MISSED'); }
+    if (phase === 'miss' && phaseT > .45) { stopBeat(); newSausage(); }
     if (phase === 'won') {
-      if (spot > .5 && Math.random() < dt * 6) notes.push({ x: c.x + (Math.random() - .5) * 90, y: c.y - 20, vx: (Math.random() - .5) * 30, life: 1.8, g: Math.random() < .5 ? '♪' : '♫' });
+      if (spot > .5 && Math.random() < dt * 6) notes.push({ x: c.x + (Math.random() - .5) * 90, y: c.y - 20, vx: (Math.random() - .5) * 30, life: 1.8, g: Math.random() < .5 ? '\u266A' : '\u266B' });
       if (phaseT > 2 && againBtn.hidden) againBtn.hidden = false;
     }
   }
@@ -565,13 +715,13 @@ canvas { display: block; width: 100%; height: 100%; }
     ctx.strokeStyle = 'rgba(255,230,210,.35)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(gx + nx * wg * .25, gy + ny * wg * .25); ctx.lineTo(bx + nx * w1 * .25, by + ny * w1 * .25); ctx.stroke();
   }
   function chopGeom() {
-    const tip = chop.tip, gap = R + 1 + chop.open * 9;
-    const px = -CH_DIR.y, py = CH_DIR.x;  // perpendicular
-    const up = { x: tip.x + px * gap, y: tip.y + py * gap }, lo = { x: tip.x - px * gap, y: tip.y - py * gap };
-    const L = 330;
+    const tip = chop.tip, gap = R + 1 + chop.open * 10, c = Math.cos(chop.a), sn = Math.sin(chop.a);
+    const px = -sn, py = c;               // perpendicular (down)
+    const up = { x: tip.x - px * gap, y: tip.y - py * gap }, lo = { x: tip.x + px * gap, y: tip.y + py * gap };
+    const L = 380;
     return {
-      back: [up.x, up.y, up.x + CH_DIR.x * L + px * 14, up.y + CH_DIR.y * L + py * 14],
-      front: [lo.x, lo.y, lo.x + CH_DIR.x * L - px * 14, lo.y + CH_DIR.y * L - py * 14],
+      back: [up.x, up.y, up.x - c * L - px * 12, up.y - sn * L - py * 12],
+      front: [lo.x, lo.y, lo.x - c * L + px * 12, lo.y - sn * L + py * 12],
     };
   }
 
@@ -581,10 +731,6 @@ canvas { display: block; width: 100%; height: 100%; }
     if (!tg) return;
     const T = targetT(tg, t), hw = tg.hw, k = tg.k.id, x = 0, top = 0, base = tg.h;
     ctx.save(); ctx.translate(T.x, T.y); ctx.rotate(T.a);
-    // soft glow underneath so it reads as hovering
-    ctx.save(); ctx.translate(0, base + 26); ctx.scale(1, .18);
-    ctx.fillStyle = rad(ctx, 0, 0, 2, hw + 46, [[0, 'rgba(70,45,20,.28)'], [1, 'rgba(70,45,20,0)']]);
-    ctx.beginPath(); ctx.arc(0, 0, hw + 46, 0, 7); ctx.fill(); ctx.restore();
     ctx.lineJoin = 'round';
     if (k === 'plate') {
       ctx.fillStyle = lin(ctx, 0, base - 10, 0, base, [[0, '#ffffff'], [1, '#b9b4ab']]);
@@ -689,42 +835,82 @@ canvas { display: block; width: 100%; height: 100%; }
 
   function drawSpotlight(t) {
     const T = targetT(target, t), { x0, x1, y0, y1 } = ext(), wide = target.hw + 90, bottom = T.y + target.h + 30;
-    ctx.fillStyle = `rgba(0,0,0,${.66 * spot})`; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
-    ctx.save(); ctx.globalCompositeOperation = 'lighter';
     const sx = T.x - 70;
-    const far = bottom + 160, wf = wide * (far - y0) / (bottom - y0);
-    ctx.fillStyle = lin(ctx, 0, y0, 0, far, [[0, `rgba(255,246,215,${.04 * spot})`], [(bottom - y0) / (far - y0), `rgba(255,236,190,${.26 * spot})`], [1, 'rgba(255,236,190,0)']]);
+    const far = Math.max(bottom + 160, y1 + 60), wf = wide * (far - y0) / (bottom - y0);
+    const bx = sx + (T.x - sx) * (far - y0) / (bottom - y0);
+    ctx.beginPath(); ctx.rect(x0, y0, x1 - x0, y1 - y0);
+    ctx.moveTo(sx - 20, y0); ctx.lineTo(bx - wf, far); ctx.lineTo(bx + wf, far); ctx.lineTo(sx + 20, y0); ctx.closePath();
+    ctx.fillStyle = `rgba(20,12,4,${.62 * spot})`; ctx.fill('evenodd');
+    ctx.save();
+    ctx.fillStyle = lin(ctx, 0, y0, 0, far, [[0, `rgba(255,250,235,${.02 * spot})`], [(bottom - y0) / (far - y0), `rgba(255,244,220,${.12 * spot})`], [1, 'rgba(255,244,220,0)']]);
     ctx.beginPath(); ctx.moveTo(sx - 20, y0); ctx.lineTo(sx + 20, y0); ctx.lineTo(sx + (T.x - sx) * (far - y0) / (bottom - y0) + wf, far); ctx.lineTo(sx + (T.x - sx) * (far - y0) / (bottom - y0) - wf, far); ctx.closePath(); ctx.fill();
     for (let i = 0; i < 26; i++) {
       const u = (i * .618 + t * .03) % 1, v = Math.sin(i * 91.3) * .5 + .5;
       const yy = y0 + (bottom - y0) * u, half = 20 + (wide - 20) * u, xx = sx + (T.x - sx) * u + (v - .5) * 2 * half * .8;
       ctx.fillStyle = `rgba(255,250,230,${.25 * spot * (1 - Math.abs(v - .5))})`; ctx.beginPath(); ctx.arc(xx, yy, .9 + (i % 3) * .4, 0, 7); ctx.fill();
     }
-    ctx.fillStyle = rad(ctx, T.x, T.y + target.h / 2, 10, wide * 1.4, [[0, `rgba(255,236,200,${.16 * spot})`], [1, 'rgba(255,236,200,0)']]);
+    ctx.fillStyle = rad(ctx, T.x, T.y + target.h / 2, 10, wide * 1.4, [[0, `rgba(255,236,200,${.08 * spot})`], [1, 'rgba(255,236,200,0)']]);
     ctx.fillRect(T.x - wide * 1.5, T.y - wide * 1.4, wide * 3, wide * 3);
     ctx.restore();
   }
 
+  function drawHold(t) {
+    const { x0, x1, y0, y1 } = ext(), k = Math.min(1, phaseT * 2), c = centroid();
+    // tunnel vision toward the sausage
+    ctx.fillStyle = rad(ctx, c.x, c.y, 90, 620, [[0, 'rgba(20,10,4,0)'], [1, `rgba(20,10,4,${.55 * k})`]]);
+    ctx.fillRect(x0 - 200, y0 - 200, x1 - x0 + 400, y1 - y0 + 400);
+    // countdown ring around the sausage
+    const left = Math.max(0, 5 - hold.t), frac = left / 5;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(40,20,6,.35)'; ctx.lineWidth = 7; ctx.beginPath(); ctx.arc(c.x, c.y, 92, 0, 7); ctx.stroke();
+    ctx.strokeStyle = frac < .25 ? '#3aa260' : '#f2c230'; ctx.lineWidth = 7;
+    ctx.beginPath(); ctx.arc(c.x, c.y, 92, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - frac)); ctx.stroke();
+    const num = Math.ceil(left), sub = left - Math.floor(left), pop = 1 + Math.max(0, sub - .75) * 1.6;
+    ctx.save(); ctx.translate(c.x, c.y - 130); ctx.scale(pop, pop);
+    ctx.textAlign = 'center'; ctx.lineJoin = 'round'; ctx.font = '64px "Rammetto One", "Arial Black", sans-serif';
+    ctx.lineWidth = 10; ctx.strokeStyle = '#000'; ctx.strokeText(String(num), 0, 0); ctx.fillStyle = '#f2c230'; ctx.fillText(String(num), 0, 0);
+    ctx.restore();
+    ctx.textAlign = 'center'; ctx.font = '700 14px "Chivo Mono", monospace'; ctx.fillStyle = '#fff3dc';
+    ctx.fillText('HANG ON... ' + num + (num === 1 ? ' SECOND' : ' SECONDS'), c.x, c.y + 122);
+  }
+
   function draw(t) {
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    if (bgCache) ctx.drawImage(bgCache, 0, 0); else { ctx.fillStyle = '#07090c'; ctx.fillRect(0, 0, cv.width, cv.height); }
-    worldT(ctx);
-    drawMotes(t);
+    mainCtx.setTransform(1, 0, 0, 1, 0, 0);
+    if (bgCache) mainCtx.drawImage(bgCache, 0, 0); else { mainCtx.fillStyle = '#d6c09a'; mainCtx.fillRect(0, 0, cv.width, cv.height); }
+    // 1. everything solid goes on its own layer
+    ctx = lctx;
+    lctx.setTransform(1, 0, 0, 1, 0, 0); lctx.clearRect(0, 0, layer.width, layer.height);
+    camT(lctx);
     const P = panT(simT);
-    ctx.save(); ctx.translate(P.x - 20, P.y + 50); ctx.scale(1, .16);
-    ctx.fillStyle = rad(ctx, 0, 0, 4, 150, [[0, 'rgba(70,45,20,.3)'], [1, 'rgba(70,45,20,0)']]);
-    ctx.beginPath(); ctx.arc(0, 0, 150, 0, 7); ctx.fill(); ctx.restore();
     panBack(P);
     // sausage sits inside the pan when touching it, otherwise in front of everything
     const inPan = sau && sau.p.some(q => q.touch === 'pan');
-    if (inPan) { drawSausage(sau); panFront(P); } else panFront(P);
-    if (spot > 0) drawSpotlight(simT);
+    if (inPan) drawSausage(sau);
+    panFront(P);
     drawTarget(target, simT);
     let g = null;
     if (chop.mode) { g = chopGeom(); stick(...g.back, 3.4, 9, false); }
     if (!inPan) drawSausage(sau);
     if (g) stick(...g.front, 3.6, 9.5, true);
-
+    ctx = mainCtx;
+    // 2. its silhouette, shrunk (which softens it) and dropped onto the cardboard behind, light from the upper left
+    sctx.globalCompositeOperation = 'source-over'; sctx.clearRect(0, 0, shad.width, shad.height);
+    sctx.drawImage(layer, 0, 0, shad.width, shad.height);
+    sctx.globalCompositeOperation = 'source-in'; sctx.fillStyle = 'rgba(74,46,18,.34)'; sctx.fillRect(0, 0, shad.width, shad.height);
+    mainCtx.imageSmoothingEnabled = true; mainCtx.imageSmoothingQuality = 'high';
+    const so = 18 * S * DPR;
+    mainCtx.drawImage(shad, so * .8, so * 1.1, cv.width, cv.height);
+    mainCtx.drawImage(layer, 0, 0);
+    camT(mainCtx);
+    drawMotes(t);
+    if (spot > 0) drawSpotlight(simT);
+    if (phase === 'hold') drawHold(t);
+    for (const f of confetti) {
+      mainCtx.save(); mainCtx.translate(f.x, f.y); mainCtx.rotate(f.r); mainCtx.scale(1, Math.cos(f.r * 1.7));
+      mainCtx.globalAlpha = Math.min(1, f.life); mainCtx.fillStyle = f.c; mainCtx.fillRect(-f.w / 2, -f.h / 2, f.w, f.h); mainCtx.restore();
+    }
+    mainCtx.globalAlpha = 1;
+    worldT(mainCtx);
     ctx.textAlign = 'center'; ctx.lineJoin = 'round';
     ctx.font = '24px serif';
     for (const n of notes) { ctx.globalAlpha = Math.min(1, n.life) * spot; ctx.fillStyle = '#f2c230'; ctx.fillText(n.g, n.x, n.y); }
@@ -738,19 +924,21 @@ canvas { display: block; width: 100%; height: 100%; }
     }
     if (spot > 0) {
       ctx.globalAlpha = spot;
-      ctx.font = '42px "Rammetto One", "Arial Black", sans-serif'; ctx.lineWidth = 8; ctx.strokeStyle = '#000';
-      ctx.strokeText('IT LANDED', 500, 84); ctx.fillStyle = '#f2c230'; ctx.fillText('IT LANDED', 500, 84);
-      ctx.font = '700 13px "Chivo Mono", monospace'; ctx.fillStyle = '#e9e1d6';
-      ctx.fillText(('On ' + target.k.name + '  ·  Beethoven, Ode to Joy').toUpperCase(), 500, 112);
+      const head = big ? 'IT HELD!' : 'IT LANDED', pop = big ? 1 + Math.max(0, .35 - phaseT) * 1.4 : 1;
+      ctx.save(); ctx.translate(500, 84); ctx.scale(pop, pop);
+      ctx.font = (big ? '58px' : '42px') + ' "Rammetto One", "Arial Black", sans-serif'; ctx.lineWidth = 9; ctx.strokeStyle = '#000';
+      ctx.strokeText(head, 0, 0); ctx.fillStyle = '#f2c230'; ctx.fillText(head, 0, 0); ctx.restore();
+      ctx.font = '700 13px "Chivo Mono", monospace'; ctx.fillStyle = '#f3ead9';
+      ctx.fillText((big ? '5 seconds on ' + target.k.name + '. Unreal.  \u00B7  Beethoven, Ode to Joy' : 'On ' + target.k.name + '  \u00B7  Beethoven, Ode to Joy').toUpperCase(), 500, big ? 124 : 112);
       ctx.globalAlpha = 1;
     }
     if (state === 'play') {
-      const hint = phase === 'hang' && chop.mode === 'hold' ? 'TAP TO DROP' : phase === 'ready' ? 'HOLD TO CHARGE, RELEASE TO FLIP' : '';
+      const hint = phase === 'hang' ? 'Tap anywhere to drop it in the pan' : phase === 'ready' ? 'Hold to pull back. Further back = bigger flip' : phase === 'charge' ? 'Let go to flip' : '';
       if (hint) {
         ctx.fillStyle = 'rgba(74,48,22,' + (.6 + .3 * Math.sin(t * 5)) + ')';
         ctx.font = '700 13px "Chivo Mono", monospace';
-        if (phase === 'hang') { ctx.textAlign = 'left'; ctx.fillText(hint, chop.tip.x + 70, chop.tip.y + 5); ctx.textAlign = 'center'; }
-        else ctx.fillText(hint, PX, PY + 62);
+        if (phase === 'hang') ctx.fillText(hint, PX, HANG.y - 62);
+        else ctx.fillText(hint, PX, PY + 70);
       }
     }
   }
@@ -779,6 +967,19 @@ canvas { display: block; width: 100%; height: 100%; }
   });
   window.addEventListener('keyup', e => { if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'Enter') release(); });
   againBtn.onclick = () => newRound();
+  // tactile buttons: they sink on press with a click, spring back with a softer click and a tiny buzz
+  function btnDown(b) { if (b.disabled || b.classList.contains('down')) return; initAudio(); b.classList.remove('up'); b.classList.add('down'); sfx('click_down', .8); buzz(8); }
+  function btnUp() {
+    document.querySelectorAll('.btn.down').forEach(b => { b.classList.remove('down'); b.classList.add('up'); sfx('click_up', .6); buzz(4); });
+  }
+  document.querySelectorAll('.btn').forEach(b => {
+    b.addEventListener('pointerdown', () => btnDown(b));
+    b.addEventListener('animationend', () => b.classList.remove('up'));
+  });
+  window.addEventListener('pointerup', btnUp);
+  window.addEventListener('pointercancel', btnUp);
+  window.addEventListener('keydown', e => { if ((e.code === 'Space' || e.code === 'Enter' || e.code === 'ArrowUp') && !e.repeat) btnDown(againBtn.hidden ? actBtn : againBtn); });
+  window.addEventListener('keyup', e => { if (e.code === 'Space' || e.code === 'Enter' || e.code === 'ArrowUp') btnUp(); });
   document.getElementById('startBtn').onclick = () => {
     initAudio(); if (ac && ac.state === 'suspended') ac.resume();
     state = 'play'; document.getElementById('startScreen').hidden = true; newRound();
