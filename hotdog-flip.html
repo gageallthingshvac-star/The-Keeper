@@ -4,7 +4,7 @@
 <style>
 /* Layout: one full-bleed canvas of a floating scene, a round action button bottom right, start card and "flip another" button as overlays. Single dark look, by choice. */
 :root {
-  --void: #0a0d12;
+  --void: #d6c09a;
   --iron: #1d232b;
   --mustard: #f2c230;
   --ketchup: #d8342b;
@@ -425,21 +425,30 @@ canvas { display: block; width: 100%; height: 100%; }
     if (!W) return;
     bgCache = document.createElement('canvas'); bgCache.width = cv.width; bgCache.height = cv.height;
     const c = bgCache.getContext('2d');
-    c.fillStyle = '#07090c'; c.fillRect(0, 0, cv.width, cv.height);
+    c.fillStyle = '#d6c09a'; c.fillRect(0, 0, cv.width, cv.height);
     worldT(c);
     const { x0, x1, y0, y1 } = ext();
-    c.fillStyle = rad(c, 520, 300, 30, 760, [[0, '#26303b'], [.45, '#141a22'], [1, '#06080b']]);
+    // kraft cardboard: warm base, faint corrugation lines, paper fibres, soft vignette
+    c.fillStyle = rad(c, 500, 280, 40, 820, [[0, '#e6d3b0'], [.6, '#d8c19b'], [1, '#c2a77c']]);
     c.fillRect(x0, y0, x1 - x0, y1 - y0);
-    // soft out-of-focus lights far behind
-    const bok = [[120, 110, 70, '255,190,120', .07], [880, 90, 90, '120,180,255', .06], [700, 520, 110, '255,150,90', .05], [330, 560, 60, '180,220,255', .05], [960, 400, 50, '255,220,160', .07], [40, 380, 80, '140,170,255', .05], [560, 60, 40, '255,240,200', .06]];
-    for (const [x, y, r, col, a] of bok) { c.fillStyle = rad(c, x, y, 0, r, [[0, `rgba(${col},${a})`], [.7, `rgba(${col},${a * .6})`], [1, `rgba(${col},0)`]]); c.beginPath(); c.arc(x, y, r, 0, 7); c.fill(); }
-    c.fillStyle = rad(c, 500, 300, 300, 820, [[0, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,.55)']]); c.fillRect(x0, y0, x1 - x0, y1 - y0);
+    for (let y = Math.floor(y0 / 9) * 9; y < y1; y += 9) {
+      c.fillStyle = 'rgba(120,88,48,.05)'; c.fillRect(x0, y, x1 - x0, 3);
+      c.fillStyle = 'rgba(255,248,232,.05)'; c.fillRect(x0, y + 4, x1 - x0, 2);
+    }
+    let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let i = 0; i < 1400; i++) {
+      const x = x0 + rnd() * (x1 - x0), y = y0 + rnd() * (y1 - y0), l = 2 + rnd() * 9, a = rnd() * Math.PI;
+      c.strokeStyle = rnd() < .5 ? `rgba(110,78,40,${.06 + rnd() * .08})` : `rgba(255,246,226,${.08 + rnd() * .1})`;
+      c.lineWidth = .5 + rnd() * .6; c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); c.stroke();
+    }
+    for (let i = 0; i < 260; i++) { c.fillStyle = `rgba(90,60,30,${.08 + rnd() * .12})`; c.beginPath(); c.arc(x0 + rnd() * (x1 - x0), y0 + rnd() * (y1 - y0), .4 + rnd() * 1.1, 0, 7); c.fill(); }
+    c.fillStyle = rad(c, 500, 300, 320, 860, [[0, 'rgba(70,45,20,0)'], [1, 'rgba(70,45,20,.28)']]); c.fillRect(x0, y0, x1 - x0, y1 - y0);
   }
 
   function drawMotes(t) {
     for (const m of motes) {
       const x = ((m.x + t * 6 * m.z) % 1200 + 1200) % 1200 - 100, y = m.y + Math.sin(t * .4 + m.ph) * 10 * m.z;
-      ctx.fillStyle = `rgba(230,220,200,${.05 + m.z * .12})`;
+      ctx.fillStyle = `rgba(120,90,55,${.04 + m.z * .08})`;
       ctx.beginPath(); ctx.arc(x, y, .6 + m.z * 1.2, 0, 7); ctx.fill();
     }
   }
@@ -533,19 +542,6 @@ canvas { display: block; width: 100%; height: 100%; }
     ctx.restore();
     layer(R * .32, 'rgba(255,226,200,.55)', -R * .58, 1, N - 2);
     layer(R * .12, 'rgba(255,255,255,.75)', -R * .62, 2, N - 3);
-    // mustard ribbon following the bend
-    const ribbon = (w, col, oy) => {
-      ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath();
-      const steps = 48;
-      for (let j = 0; j <= steps; j++) {
-        const f = .08 + j / steps * .84, fi = f * (N - 1), i = Math.min(N - 2, Math.floor(fi)), w2 = fi - i, a = ps[i], b = ps[i + 1], n = nm[i];
-        const off = Math.sin(f * Math.PI * 10) * R * .38;
-        const x = a.x + (b.x - a.x) * w2 + n.nx * off, y = a.y + (b.y - a.y) * w2 + n.ny * off + oy - R * .12;
-        j ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
-      }
-      ctx.stroke();
-    };
-    ribbon(5.4, 'rgba(110,70,0,.5)', 1); ribbon(4.2, '#efb81c', 0); ribbon(1.4, 'rgba(255,250,210,.85)', -1.1);
     ctx.restore();
   }
 
@@ -583,8 +579,9 @@ canvas { display: block; width: 100%; height: 100%; }
     const T = targetT(tg, t), hw = tg.hw, k = tg.k.id, x = 0, top = 0, base = tg.h;
     ctx.save(); ctx.translate(T.x, T.y); ctx.rotate(T.a);
     // soft glow underneath so it reads as hovering
-    ctx.fillStyle = rad(ctx, 0, base + 18, 2, hw + 40, [[0, 'rgba(255,214,160,.10)'], [1, 'rgba(255,214,160,0)']]);
-    ctx.beginPath(); ctx.ellipse(0, base + 18, hw + 40, 10, 0, 0, 7); ctx.fill();
+    ctx.save(); ctx.translate(0, base + 26); ctx.scale(1, .18);
+    ctx.fillStyle = rad(ctx, 0, 0, 2, hw + 46, [[0, 'rgba(70,45,20,.28)'], [1, 'rgba(70,45,20,0)']]);
+    ctx.beginPath(); ctx.arc(0, 0, hw + 46, 0, 7); ctx.fill(); ctx.restore();
     ctx.lineJoin = 'round';
     if (k === 'plate') {
       ctx.fillStyle = lin(ctx, 0, base - 10, 0, base, [[0, '#ffffff'], [1, '#b9b4ab']]);
@@ -711,6 +708,9 @@ canvas { display: block; width: 100%; height: 100%; }
     worldT(ctx);
     drawMotes(t);
     const P = panT(simT);
+    ctx.save(); ctx.translate(P.x - 20, P.y + 50); ctx.scale(1, .16);
+    ctx.fillStyle = rad(ctx, 0, 0, 4, 150, [[0, 'rgba(70,45,20,.3)'], [1, 'rgba(70,45,20,0)']]);
+    ctx.beginPath(); ctx.arc(0, 0, 150, 0, 7); ctx.fill(); ctx.restore();
     panBack(P);
     // sausage sits inside the pan when touching it, otherwise in front of everything
     const inPan = sau && sau.p.some(q => q.touch === 'pan');
@@ -744,7 +744,7 @@ canvas { display: block; width: 100%; height: 100%; }
     if (state === 'play') {
       const hint = phase === 'hang' && chop.mode === 'hold' ? 'TAP TO DROP' : phase === 'ready' ? 'HOLD TO CHARGE, RELEASE TO FLIP' : '';
       if (hint) {
-        ctx.fillStyle = 'rgba(242,194,48,' + (.55 + .35 * Math.sin(t * 5)) + ')';
+        ctx.fillStyle = 'rgba(74,48,22,' + (.6 + .3 * Math.sin(t * 5)) + ')';
         ctx.font = '700 13px "Chivo Mono", monospace';
         if (phase === 'hang') { ctx.textAlign = 'left'; ctx.fillText(hint, chop.tip.x + 70, chop.tip.y + 5); ctx.textAlign = 'center'; }
         else ctx.fillText(hint, PX, PY + 62);
