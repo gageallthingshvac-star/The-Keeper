@@ -40,7 +40,7 @@ canvas { display: block; width: 100%; height: 100%; }
 #corner::after { content: ""; position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); right: 12px; width: 12px; height: 12px; border-top: 2px solid rgba(74,48,22,.35); border-right: 2px solid rgba(74,48,22,.35); }
 #settings {
   position: absolute; top: calc(16px + env(safe-area-inset-top, 0px)); right: 16px; z-index: 2; padding: 16px 18px; border-radius: 6px;
-  transform: translateX(125%) rotate(8deg); transform-origin: right top; transition: transform .38s cubic-bezier(.2, 1.25, .4, 1);
+  transform: translateX(150%) rotate(8deg); transform-origin: right top; transition: transform .38s cubic-bezier(.2, 1.25, .4, 1);
 }
 #settings.open { transform: none; }
 @media (prefers-reduced-motion: reduce) { #settings { transition: none; } .ring { transition: none; } }
