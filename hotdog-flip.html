@@ -709,14 +709,23 @@ canvas { display: block; width: 100%; height: 100%; }
   const panImg = new Image(); let panPhoto = null;
   panImg.onload = () => { panPhoto = panImg; };
   panImg.src = 'img/skillet.png';
-  const PAN_IMG = { cavX0: .3, cavX1: 1, floorY: .74, frontY: .63 };
+  // the skillet's rim traced as an ellipse on the photo; the sausage rests just inside its front edge, and the
+  // part of the pan below that edge is drawn again over the sausage, so it lies in the pan rather than on top of it
+  const PAN_IMG = { cx: .63, cy: .485, rx: .34, ry: .345 };
   function panImage(T, front) {
-    const iw = panPhoto.naturalWidth, ih = panPhoto.naturalHeight;
-    const sc = 256 / ((PAN_IMG.cavX1 - PAN_IMG.cavX0) * iw);
-    const ox = -(PAN_IMG.cavX0 + PAN_IMG.cavX1) / 2 * iw, oy = -PAN_IMG.floorY * ih;
+    const iw = panPhoto.naturalWidth, ih = panPhoto.naturalHeight, I = PAN_IMG;
+    // the sausage lies a little in front of the rim's widest line, where the ellipse is still almost full width,
+    // so its ends tuck under the rim instead of poking through it
+    const cx = I.cx * iw, cy = I.cy * ih, rx = I.rx * iw, ry = I.ry * ih, lie = .35;
+    const sc = 256 / (2 * rx * Math.sqrt(1 - lie * lie) * iw);
+    const ox = -cx, oy = -(cy + lie * ry) - R / sc;
     ctx.save(); ctx.translate(T.x, T.y); ctx.rotate(T.a); ctx.scale(sc, sc);
-    if (front) { const y0 = PAN_IMG.frontY * ih; ctx.drawImage(panPhoto, 0, y0, iw, ih - y0, ox, oy + y0, iw, ih - y0); }
-    else ctx.drawImage(panPhoto, ox, oy, iw, ih);
+    if (front) {
+      ctx.beginPath(); ctx.moveTo(ox, oy + ih); ctx.lineTo(ox, oy + cy); ctx.lineTo(ox + cx - rx, oy + cy);
+      ctx.ellipse(ox + cx, oy + cy, rx, ry, 0, Math.PI, 0, true);
+      ctx.lineTo(ox + iw, oy + cy); ctx.lineTo(ox + iw, oy + ih); ctx.closePath(); ctx.clip();
+    }
+    ctx.drawImage(panPhoto, ox, oy, iw, ih);
     ctx.restore();
   }
   function panBack(T) {
