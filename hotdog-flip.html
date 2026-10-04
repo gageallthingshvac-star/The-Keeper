@@ -95,10 +95,10 @@ canvas { display: block; width: 100%; height: 100%; }
   if (!CanvasRenderingContext2D.prototype.roundRect) CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h) { this.rect(x, y, w, h); };
 
   // ---------- world ----------
-  const WW = 1000, WH = 600, G = 1900;
+  const WW = 1000, WH = 600, G = 2400;
   const PX = 270, PY = 440;               // pan cooking-surface centre
   const N = 9, SEG = 17, R = 16;          // sausage: 9 particles, 136px long, 32px thick
-  const SUB = 1 / 240, REST = .02, MU = 1.1, MU_PAN = .02, SQUISH = .93, PAN_TILT = .11;
+  const SUB = 1 / 240, REST = .01, MU = 1.1, MU_PAN = .02, SQUISH = .93, PAN_TILT = .11;
   let W = 0, H = 0, DPR = 1, S = 1, OX = 0, OY = 0, bgCache = null;
 
   function resize() {
@@ -296,14 +296,14 @@ canvas { display: block; width: 100%; height: 100%; }
     { id: 'hedgehog', name: 'the hedgehog', src: 'img/hedgehog.png', w: 240 },
     { id: 'chair', name: 'the chair', src: 'img/chair.png', w: 220 },
     { id: 'hand', name: 'the hand', src: 'img/hand.png', w: 170 },
-    { id: 'toaster', name: 'the toaster', src: 'img/toaster.png', w: 260 },
-    { id: 'mug', name: 'the mug', src: 'img/mug.png', w: 220 },
+    { id: 'toaster', name: 'the toaster', src: 'img/toaster.png', w: 280, cav: [[.2, .43, 0, .4], [.54, .77, 0, .4]] },
+    { id: 'mug', name: 'the mug', src: 'img/mug.png', w: 340, cav: [[.2, .55, 0, .86]] },   // walls kept much thicker than the sausage so it cannot push through
     { id: 'duck', name: 'the duck', src: 'img/duck.png', w: 200 },
     { id: 'balloon', name: 'the balloon', src: 'img/balloon.png', w: 300 },
     { id: 'bicycle', name: 'the bicycle', src: 'img/bicycle.png', w: 320 },
     { id: 'skateboard', name: 'the skateboard', src: 'img/skateboard.png', w: 230 },
     { id: 'pineapple', name: 'the pineapple', src: 'img/pineapple.png', w: 170 },
-    { id: 'trophy', name: 'the trophy', src: 'img/trophy.png', w: 200 },
+    { id: 'trophy', name: 'the trophy', src: 'img/trophy.png', w: 220 },
   ];
   function analyzePhoto(k, img) {
     const c = document.createElement('canvas'), iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
@@ -328,7 +328,20 @@ canvas { display: block; width: 100%; height: 100%; }
       }
       if (run >= 0) close(maxY + 1);
     }
-    Object.assign(k, { image: img, sx: minX, sy: minY, bw, bh, cols, tops: cols.map(c => ({ x0: c.x0, x1: c.x1, y: c.top })), ready: true });
+    // carve the openings (fractions of the image box) out of the hit box, so the sausage can drop inside
+    const cav = (k.cav || []).map(([fx0, fx1, fy0, fy1]) => ({ x0: fx0 * bw - bw / 2, x1: fx1 * bw - bw / 2, y0: fy0 * bh, y1: fy1 * bh }));
+    let carved = cols;
+    for (const cv of cav) {
+      const next = [];
+      for (const c of carved) {
+        const mid = (c.x0 + c.x1) / 2;
+        if (mid < cv.x0 || mid > cv.x1 || c.bot <= cv.y0 || c.top >= cv.y1) { next.push(c); continue; }
+        if (c.top < cv.y0 - 2) next.push({ ...c, bot: cv.y0 });
+        if (c.bot > cv.y1 + 2) next.push({ ...c, top: cv.y1 });
+      }
+      carved = next;
+    }
+    Object.assign(k, { image: img, sx: minX, sy: minY, bw, bh, cols: carved, cavity: cav, tops: carved.map(c => ({ x0: c.x0, x1: c.x1, y: c.top })), ready: true });
     if (PHOTOS.includes(k) && queue.length) queue.splice(Math.floor(Math.random() * (queue.length + 1)), 0, k);
     return true;
   }
@@ -417,11 +430,13 @@ canvas { display: block; width: 100%; height: 100%; }
       if (best >= R + 2) continue;
       // resting just on the surface still counts as touching it
       if (best >= R) { if (!q.touch) { q.touch = tag; const l0 = lpt(T, q.x, q.y), n0 = wpt(T, l0.x, l0.y), w0 = wpt(Tp, l0.x, l0.y); q.tvx = n0.x - w0.x; q.tvy = n0.y - w0.y; } continue; }
-      const [nx, ny] = bn, pen = R - best;
-      q.x += nx * pen; q.y += ny * pen;
+      // ease a deeply wedged point out over a few steps instead of teleporting it (that was flinging the sausage out of cups)
+      const [nx, ny] = bn, pen = Math.min(R - best, 3);
+      // velocity relative to the surface is measured before the position fix, so pushing a point out of a wall adds no energy
       const l = lpt(T, q.x, q.y), now = wpt(T, l.x, l.y), was = wpt(Tp, l.x, l.y);
       const vpx = now.x - was.x, vpy = now.y - was.y;
       let rx = q.x - q.px - vpx, ry = q.y - q.py - vpy;
+      q.x += nx * pen; q.y += ny * pen;
       const vn = rx * nx + ry * ny;
       let jn = pen;
       if (vn < 0) { rx -= nx * vn * (1 + REST); ry -= ny * vn * (1 + REST); jn += -vn * (1 + REST); hits[tag] = Math.max(hits[tag], -vn / SUB / 300); }
@@ -447,7 +462,7 @@ canvas { display: block; width: 100%; height: 100%; }
     mvx /= N; mvy /= N;
     for (const q of ps) {
       q.touch = null;
-      const vx = mvx * .9995 + (q.x - q.px - mvx) * .985, vy = mvy * .9995 + (q.y - q.py - mvy) * .985;
+      const vx = mvx * .9995 + (q.x - q.px - mvx) * .965, vy = mvy * .9995 + (q.y - q.py - mvy) * .965;
       q.px = q.x; q.py = q.y;
       q.x += vx; q.y += vy + G * SUB * SUB;
     }
@@ -487,12 +502,19 @@ canvas { display: block; width: 100%; height: 100%; }
     if (!target) return 0;
     const T = targetT(target, simT), k = target.k, sc = target.sc;
     const tops = k.tops || [{ x0: -(k.id === 'cat' ? target.hw + 20 : k.id === 'skate' ? target.hw + 16 : target.hw), x1: k.id === 'cat' ? target.hw + 20 : k.id === 'skate' ? target.hw + 16 : target.hw, y: 0 }];
-    return sau.p.filter(q => { const l = lpt(T, q.x, q.y), lx = l.x / sc, ly = l.y / sc; return tops.some(tp => lx >= tp.x0 && lx <= tp.x1 && ly < tp.y + 4 && ly > tp.y - 40); }).length;
+    // a point counts when it sits on a landing surface: within a sausage radius above it, measured in screen units
+    return sau.p.filter(q => { const l = lpt(T, q.x, q.y), lx = l.x / sc, ly = l.y / sc; return tops.some(tp => { const dy = (ly - tp.y) * sc; return lx >= tp.x0 && lx <= tp.x1 && dy < 4 && dy > -(R + 10); }); }).length;
+  }
+  // is the middle of the sausage within one of the object's openings?
+  function inCavity() {
+    if (!target || !target.k.cavity || !target.k.cavity.length) return false;
+    const T = targetT(target, simT), c = centroid(), l = lpt(T, c.x, c.y), lx = l.x / target.sc, ly = l.y / target.sc;
+    return target.k.cavity.some(cv => lx > cv.x0 && lx < cv.x1 && ly > cv.y0 && ly < cv.y1);
   }
   function centroid() { let x = 0, y = 0; for (const q of sau.p) { x += q.x; y += q.y; } return { x: x / N, y: y / N }; }
 
   function launch(p) {
-    const vx = 190 + p * 495, vy = 562 + p * 742, T = 2 * vy / G, w = Math.PI / T;
+    const vx = 214 + p * 556, vy = 632 + p * 834, T = 2 * vy / G, w = Math.PI / T;
     const c = centroid();
     for (const q of sau.p) {
       const rx = q.x - c.x, ry = q.y - c.y;
@@ -1109,10 +1131,12 @@ canvas { display: block; width: 100%; height: 100%; }
     const inPan = sau && sau.p.some(q => q.touch === 'pan');
     if (inPan) drawSausage(sau);
     panFront(P);
+    const inside = !inPan && sau && inCavity();
+    if (inside) drawSausage(sau);
     drawTarget(target, simT);
     let g = null;
     if (chop.mode) { g = chopGeom(); stick(...g.back, 3.4, 9, false); }
-    if (!inPan) drawSausage(sau);
+    if (!inPan && !inside) drawSausage(sau);
     if (g) stick(...g.front, 3.6, 9.5, true);
     ctx = mainCtx;
     // 2. its silhouette, shrunk (which softens it) and dropped onto the cardboard behind, light from the upper left
