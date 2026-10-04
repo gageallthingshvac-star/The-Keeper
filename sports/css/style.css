@@ -929,6 +929,20 @@
 }
 .seg.on { background: #fff; color: var(--blue-d); box-shadow: 0 2px 6px rgba(22, 58, 108, .14); }
 .set-note { margin: 6px 2px 4px; font: 700 13px/1.4 var(--font-ui); color: var(--ink-soft); }
+.ss-credits .ss-modal-panel { width: min(560px, 100%); }
+.credits-list { margin-top: 12px; min-height: 0; padding: 0 2px; }
+.credits-list h3 { margin: 16px 0 4px; font: 600 18px/1.2 var(--font-display); color: var(--ink); }
+.credits-list h3:first-child { margin-top: 0; }
+.credits-list ul { list-style: none; margin: 0; padding: 0; }
+.credits-list li { padding: 7px 0; border-bottom: 2px solid var(--panel-2); font: 700 13px/1.35 var(--font-ui); color: var(--ink-soft); overflow-wrap: anywhere; }
+.credits-list li b { display: block; color: var(--ink); font-weight: 800; }
+.credits-list a { color: var(--blue); }
+/* landscape phones: give the list the height (the subtitle goes, the title tightens) */
+@media (max-height: 500px) {
+  .ss-credits .ss-modal-sub { display: none; }
+  .ss-credits .ss-modal-head h2 { margin: 0; font-size: 22px; }
+  .ss-credits .credits-list { margin-top: 6px; }
+}
 .set-about { margin-top: 24px; padding: 18px; border-radius: 20px; text-align: center; background: linear-gradient(180deg, #E5F4FF, #fff); }
 .about-logo {
   font: 700 28px/1 var(--font-display); color: var(--yellow);

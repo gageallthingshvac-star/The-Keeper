@@ -1472,6 +1472,10 @@
     const sound = group('Sound', 'sound');
     slider(sound, 'Music', 'music', null);
     slider(sound, 'Effects', 'sfx', 'ui_tick');
+    const creditsRow = ui.el('div', 'set-row');
+    creditsRow.innerHTML = '<span class="set-label">Sound credits<small>Real recordings, free for everyone (CC0).</small></span>';
+    creditsRow.appendChild(ui.button('View', showSoundCredits, { kind: 'secondary', icon: 'info', className: 'small', sfx: null }));
+    sound.appendChild(creditsRow);
 
     const play = group('Play', 'star');
     toggle(play, 'Vibration', 'Little buzzes on taps and big moments', 'haptics');
@@ -1522,7 +1526,7 @@
     const about = ui.el('div', 'set-about');
     about.innerHTML = '<div class="about-logo">Sunny Sports</div><div class="about-ver">Version ' + esc(SS.VERSION || '1.0.0') +
       (save.persistent ? '' : ' · progress saved for this visit only') + '</div>' +
-      '<p>Made with three.js. Fonts: Fredoka and Nunito (SIL Open Font License). Every sound and song is synthesized live in your browser.</p>' +
+      '<p>Made with three.js. Fonts: Fredoka and Nunito (SIL Open Font License). Sounds and instruments are real public-domain recordings (see Sound credits).</p>' +
       '<p class="thanks">Thanks for playing!</p>';
     body.appendChild(about);
 
@@ -1532,6 +1536,23 @@
       leave() { offQuality(); },
     };
   };
+
+  /** Settings → Sound credits: every source recording (audio/CREDITS.md, via SS.audio.credits) in a scrollable modal. */
+  function showSoundCredits() {
+    const m = ui.modal({ className: 'ss-credits' });
+    m.panel.innerHTML = '<div class="ss-modal-head"><h2>Sound credits</h2><p class="ss-modal-sub">The game\'s sound effects, crowds and instruments are real recordings ' +
+      'released to the public domain (CC0&nbsp;1.0). Thank you to everyone who shared them!</p></div>';
+    const list = ui.el('div', 'credits-list ss-scroll');
+    for (const g of (SS.audio && SS.audio.credits) || []) {
+      list.insertAdjacentHTML('beforeend', '<h3>' + esc(g.title) + '</h3><ul>' + g.rows.map(([work, author, link]) =>
+        '<li><b>' + esc(work) + '</b>' + esc(author) + (link ? ' · <a href="' + esc(link) + '" target="_blank" rel="noopener">' +
+          esc(link.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')) + '</a>' : '') + '</li>').join('') + '</ul>');
+    }
+    m.panel.appendChild(list);
+    const foot = ui.el('div', 'ss-modal-foot');
+    foot.appendChild(ui.button('Close', () => m.close(null), { kind: 'primary', sfx: 'ui_back' }));
+    m.panel.appendChild(foot);
+  }
 
   // ---------------------------------------------------------------------------------------------
   // Playing a sport: ctx (§6.8), lifecycle, pause

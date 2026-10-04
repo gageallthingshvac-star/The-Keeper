@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Bundles Sunny Sports into ONE self-contained HTML file: every stylesheet, script and font inlined.
+// Bundles Sunny Sports into ONE self-contained HTML file: every stylesheet, script, font and audio bank
+// (core + every per-sport js/audio-bank-*.js) inlined.
 //
 //   node tools/build.mjs --out dist/sunny-sports.html            full standalone document
 //   node tools/build.mjs --out page.html --fragment              no doctype/html/head/body wrapper
@@ -31,7 +32,13 @@ let headOut = head
   .replace(/<link rel="stylesheet" href="css\/style\.css">/, () => `<style>\n${safeStyle(css)}\n</style>`);
 if (fragment) headOut = headOut.replace(/<meta charset[^>]*>\s*/i, '');
 
-const bodyOut = body.replace(/<script src="([^"]+)"><\/script>/g, (_, src) => `<script>\n${safeScript(read(src))}\n</script>`);
+// The per-sport sample banks are loaded on demand by js/audio.js in the multi-file build; a single
+// file cannot load anything, so every bank is inlined right after the core bank.
+const sportBanks = fs.readdirSync(path.join(root, 'js')).filter(f => /^audio-bank-[a-z]+\.js$/.test(f)).sort().map(f => 'js/' + f);
+const inline = (src) => `<script>\n${safeScript(read(src))}\n</script>`;
+const bodyOut = body.replace(/<script src="([^"]+)"><\/script>/g, (_, src) =>
+  src === 'js/audio-bank.js' ? [src, ...sportBanks].map(inline).join('\n') : inline(src));
+if (!body.includes('<script src="js/audio-bank.js"></script>')) { console.error('index.html does not load js/audio-bank.js'); process.exit(1); }
 
 const doc = fragment
   ? `${headOut.trim()}\n${bodyOut.trim()}\n`

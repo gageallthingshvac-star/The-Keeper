@@ -40,6 +40,13 @@
   .group-title { color: var(--ink-soft); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; margin: 12px 0 6px; }
   .group-title:first-of-type { margin-top: 0; }
   #status { color: var(--ink-soft); }
+  button .tag { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 8px; font-size: 11px; letter-spacing: .04em; vertical-align: 1px; }
+  .tag.real { background: var(--green); color: #fff; }
+  .tag.wait { background: var(--yellow); color: var(--ink); }
+  .tag.synth { background: var(--line); color: var(--ink-soft); }
+  button.on .tag { box-shadow: 0 0 0 1.5px #fff; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; color: var(--ink-soft); margin: 0 0 10px; }
+  label.chk { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-soft); min-height: 44px; }
   table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
   th, td { padding: 5px 6px; border-bottom: 1px solid var(--line); text-align: right; }
   th:first-child, td:first-child { text-align: left; }
@@ -49,7 +56,8 @@
 </head>
 <body>
 <h1>Soundboard</h1>
-<p class="sub">Every Sunny Sports sound, synthesized live. Tap anything to hear it. <span id="status">Audio locked until the first tap.</span></p>
+<p class="sub">Every Sunny Sports sound. Tap anything to hear it. <span id="status">Audio locked until the first tap.</span></p>
+<p class="legend"><span><span class="tag real">REAL</span> plays real recordings</span><span><span class="tag wait">LOADING</span> recorded, decoded on first use (synthesis plays meanwhile)</span><span><span class="tag synth">SYNTH</span> synthesized only</span></p>
 
 <section class="panel">
   <h2>Controls</h2>
@@ -86,15 +94,20 @@
 
 <section class="panel">
   <h2>Offline analysis</h2>
-  <div class="row"><button class="accent" id="analyze">Analyze everything</button><span id="analyzeStatus" class="sub" style="margin:0"></span></div>
+  <div class="row"><button class="accent" id="analyze">Analyze everything</button>
+    <label class="chk"><input type="checkbox" id="synthOnly"> Synthesis fallback</label>
+    <label class="chk"><input type="checkbox" id="fullTracks"> Whole tracks</label>
+    <label class="chk"><input type="checkbox" id="rawSamples"> Every raw recording</label>
+    <span id="analyzeStatus" class="sub" style="margin:0"></span></div>
   <div class="table-wrap"><table id="results" hidden>
-    <thead><tr><th>Sound</th><th>Peak</th><th>RMS</th><th>Length s</th><th>Build ms</th></tr></thead>
+    <thead><tr><th>Sound</th><th>Peak</th><th>LUFS</th><th>Max LUFS</th><th>Length s</th><th>Build ms</th><th>Played as</th></tr></thead>
     <tbody></tbody>
   </table></div>
 </section>
 
 <script src="../js/util.js"></script>
 <script src="../js/audio.js"></script>
+<script src="../js/audio-bank.js"></script>
 <script>
 (function () {
   'use strict';
@@ -116,6 +129,24 @@
   if (extra.length) GROUPS.push(['Other', extra]);
 
   const num = id => Number($(id).value);
+  ['bowling', 'tennis', 'baseball', 'golf'].forEach(s => A.prepare(s));
+
+  // REAL / LOADING / SYNTH badge on every button, refreshed as recordings decode.
+  const badges = [];
+  function badge(b, kind, name) {
+    const tag = document.createElement('span');
+    tag.className = 'tag';
+    b.appendChild(tag);
+    badges.push({ tag, kind, name });
+  }
+  function refreshBadges() {
+    for (const { tag, kind, name } of badges) {
+      const i = A.info(kind, name);
+      const cls = !i.recorded ? 'synth' : i.ready ? 'real' : 'wait';
+      tag.className = 'tag ' + cls;
+      tag.textContent = cls === 'real' ? 'REAL' : cls === 'wait' ? 'LOADING' : 'SYNTH';
+    }
+  }
   const opts = () => ({ intensity: num('intensity'), vol: num('vol'), rate: num('rate'), pan: num('pan') });
 
   function button(label, onClick, cls) {
@@ -143,7 +174,7 @@
     t.textContent = title;
     const grid = document.createElement('div');
     grid.className = 'grid';
-    for (const n of names) grid.appendChild(button(n, () => A.sfx(n, opts())));
+    for (const n of names) { const b = button(n, () => A.sfx(n, opts())); badge(b, 'sfx', n); grid.appendChild(b); }
     $('sfx').append(t, grid);
   }
 
@@ -151,6 +182,7 @@
   const musicButtons = new Map();
   for (const id of A.names.music) {
     const b = button(id, () => { A.music(id); refreshMusic(); });
+    badge(b, 'music', id);
     musicButtons.set(id, b);
     $('music').appendChild(b);
   }
@@ -173,31 +205,39 @@
       else activeLoops.set(name, A.loop(name, { vol: num('vol'), rate: num('rate') }));
       b.classList.toggle('on', activeLoops.has(name));
     });
+    badge(b, 'loop', name);
     $('loops').appendChild(b);
   }
 
   // Status
   function refreshStatus() {
-    const ctx = A.ctx;
-    $('status').textContent = ctx ? `Audio ${ctx.state} · ${ctx.sampleRate} Hz` : 'Audio locked until the first tap.';
+    const ctx = A.ctx, st = A._stats();
+    $('status').textContent = ctx ? `Audio ${ctx.state} · ${ctx.sampleRate} Hz · ${st.decoded} / ${st.total} recordings decoded` +
+      (st.failed ? ` · ${st.failed} failed` : '') : 'Audio locked until the first tap.';
+    refreshBadges();
   }
+  refreshStatus();
   setInterval(refreshStatus, 500);
 
   // Offline analysis of everything
   $('analyze').addEventListener('click', async () => {
+    const synth = $('synthOnly').checked, full = $('fullTracks').checked;
     const names = [...A.names.sfx, ...A.names.loops.map(n => 'loop:' + n), ...A.names.music.map(n => 'music:' + n)];
+    if ($('rawSamples').checked && !synth) names.push(...Object.keys((window.SS.audioBank && window.SS.audioBank.samples) || {}).map(id => 'sample:' + id));
     const body = $('results').querySelector('tbody');
     body.textContent = '';
     $('results').hidden = false;
     for (let i = 0; i < names.length; i++) {
       $('analyzeStatus').textContent = `Rendering ${i + 1} / ${names.length}…`;
-      const r = await A._analyze(names[i], { intensity: num('intensity') });
+      const r = await A._analyze(names[i], { intensity: num('intensity'), synth, full });
       const tr = document.createElement('tr');
-      const cells = [names[i], r.peak.toFixed(3), r.rms.toFixed(3), r.duration.toFixed(2), r.scheduleMs.toFixed(1)];
+      const how = r.real.length && r.synth.length ? 'mixed' : names[i].startsWith('music:') && r.real.length ? 'sampled + synth backing'
+        : r.real.length || names[i].startsWith('sample:') ? 'recordings' : 'synthesis';
+      const cells = [names[i], r.peak.toFixed(3), r.lufs.toFixed(1), r.lufsMax.toFixed(1), r.duration.toFixed(2), r.scheduleMs.toFixed(1), how];
       cells.forEach((c, k) => {
         const td = document.createElement('td');
         td.textContent = c;
-        if ((k === 1 && (r.peak > 0.98 || r.peak < 0.01))) td.className = 'bad';
+        if (k === 1 && (r.peak > 0.98 || (r.peak < 0.01 && names[i] !== 'voice_hup'))) td.className = 'bad';   // voice_hup is silent by design
         tr.appendChild(td);
       });
       body.appendChild(tr);
