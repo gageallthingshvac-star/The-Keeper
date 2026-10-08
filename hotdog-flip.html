@@ -113,7 +113,7 @@ canvas { display: block; width: 100%; height: 100%; }
   }
   // ---- sound effects: recorded files shipped next to the page, with synthesized stand-ins until they load ----
   // CC0 recordings (Kenney, BenjaminNelan, artisticdude, bart, craigsmith); provenance in sfx/SOURCES.md
-  const SFX_FILES = { sizzle: 'sfx/sizzle.mp3', land_soft: 'sfx/land_soft.mp3', land_hard: 'sfx/land_hard.mp3', pan_hit: 'sfx/pan_hit.mp3', whoosh: 'sfx/whoosh.mp3', click_down: 'sfx/click_down.mp3', click_up: 'sfx/click_up.mp3', chopstick: 'sfx/chopstick.mp3', heartbeat: 'sfx/heartbeat.mp3', cheer: 'sfx/cheer.mp3' };
+  const SFX_FILES = { sizzle: 'sfx/sizzle.mp3', land_soft: 'sfx/land_soft.mp3', land_hard: 'sfx/land_hard.mp3', pan_hit: 'sfx/pan_hit.mp3', whoosh: 'sfx/whoosh.mp3', click_down: 'sfx/click_down.mp3', click_up: 'sfx/click_up.mp3', chopstick: 'sfx/chopstick.mp3', heartbeat: 'sfx/heartbeat.mp3', cheer: 'sfx/cheer.mp3', meat: 'sfx/meat.mp3' };
   const sfxBuf = {}, lastPlay = {};
   let master = null, sizzleGain = null, sizzleSrc = null, cheerSrc = null;
   function noiseBuffer(sec) {
@@ -141,6 +141,7 @@ canvas { display: block; width: 100%; height: 100%; }
   const FALLBACK = {
     whoosh: (v, r) => { const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain(), t = ac.currentTime; s.buffer = noiseBuffer(.35); f.type = 'bandpass'; f.frequency.setValueAtTime(400 * r, t); f.frequency.exponentialRampToValueAtTime(2400 * r, t + .3); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.5 * v, t + .08); g.gain.exponentialRampToValueAtTime(.001, t + .33); s.connect(f).connect(g).connect(master); s.start(); },
     land_soft: v => blip(95, .14, 'sine', .25 * v, -45),
+    meat: v => blip(80, .16, 'sine', .3 * v, -40),
     land_hard: v => blip(140, .1, 'triangle', .22 * v, -70),
     pan_hit: v => { blip(620, .25, 'triangle', .06 * v, -40); blip(1240, .18, 'sine', .03 * v); },
     chopstick: v => blip(1700, .04, 'triangle', .06 * v),
@@ -169,7 +170,8 @@ canvas { display: block; width: 100%; height: 100%; }
   function stopBeat() { if (!beatSrc) return; const b = beatSrc; beatSrc = null; b.g.gain.setTargetAtTime(0, ac.currentTime, .05); setTimeout(() => { try { b.src.stop(); } catch {} }, 400); }
   function stopCheer() { if (cheerSrc && ac) { cheerSrc.g.gain.setTargetAtTime(0, ac.currentTime, .2); const s0 = cheerSrc.src; setTimeout(() => { try { s0.stop(); } catch {} }, 900); cheerSrc = null; } }
   function impacts() {
-    if (hits.pan > 1) { const v = Math.min(1, hits.pan / 5); sfx('pan_hit', .25 + v * .75, 1.1 - v * .2); sfx('land_soft', .3 + v * .5); buzz(Math.round(6 + v * 14)); }
+    // meat slapping onto iron: the wet slap carries it, with a touch of pan ring underneath
+    if (hits.pan > 1) { const v = Math.min(1, hits.pan / 5); sfx('meat', .5 + v * .5, .95 + (1 - v) * .15); sfx('pan_hit', .12 + v * .3, 1.1 - v * .2); buzz(Math.round(6 + v * 14)); }
     if (hits.target > 1) { const v = Math.min(1, hits.target / 5); sfx(v > .45 ? 'land_hard' : 'land_soft', .35 + v * .65); buzz(Math.round(8 + v * 16)); }
   }
   // haptics where the device and browser allow it (Android Chrome); silently nothing elsewhere
