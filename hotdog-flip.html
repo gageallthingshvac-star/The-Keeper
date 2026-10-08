@@ -260,17 +260,17 @@ canvas { display: block; width: 100%; height: 100%; }
   // w is the width on screen; everything else (height, landing surfaces, collision columns) comes from the image
   const PHOTOS = [
     { id: 'dog', name: 'the dog', src: 'img/dog.png', w: 330 },
-    { id: 'puppet', name: 'the puppet', src: 'img/puppet.png', w: 270 },
+    { id: 'puppet', name: 'the puppet', src: 'img/puppet.png', w: 200 },
     { id: 'head', name: 'the head', src: 'img/head.png', w: 260 },
     { id: 'deer', name: 'the deer', src: 'img/deer.png', w: 320 },
     { id: 'stag', name: 'the stag', src: 'img/stag.png', w: 300 },
     { id: 'shepherd', name: 'the shepherd', src: 'img/shepherd.png', w: 330 },
-    { id: 'cat', name: 'the cat', src: 'img/cat.png', w: 240 },
+    { id: 'cat', name: 'the cat', src: 'img/cat.png', w: 290 },
     { id: 'tiger', name: 'the tiger', src: 'img/tiger.png', w: 340 },
     { id: 'giraffe', name: 'the giraffe', src: 'img/giraffe.png', w: 320 },
-    { id: 'flamingo', name: 'the flamingo', src: 'img/flamingo.png', w: 260 },
+    { id: 'flamingo', name: 'the flamingo', src: 'img/flamingo.png', w: 310 },
     { id: 'hedgehog', name: 'the hedgehog', src: 'img/hedgehog.png', w: 240 },
-    { id: 'chair', name: 'the chair', src: 'img/chair.png', w: 220 },
+    { id: 'chair', name: 'the chair', src: 'img/chair.png', w: 250 },
     { id: 'myhand', name: 'the hand', src: 'img/myhand.png', w: 340 },
     { id: 'kid', name: 'the kid', src: 'img/kid.png', w: 290 },
     { id: 'toaster', name: 'the toaster', src: 'img/toaster.png', w: 280, cav: [[.365, .145, .095, .02], [.64, .145, .09, .02]] },
@@ -278,9 +278,9 @@ canvas { display: block; width: 100%; height: 100%; }
     { id: 'duck', name: 'the duck', src: 'img/duck.png', w: 200 },
     { id: 'balloon', name: 'the balloon', src: 'img/balloon.png', w: 300 },
     { id: 'bicycle', name: 'the bicycle', src: 'img/bicycle.png', w: 320 },
-    { id: 'skateboard', name: 'the skateboard', src: 'img/skateboard.png', w: 230 },
-    { id: 'pineapple', name: 'the pineapple', src: 'img/pineapple.png', w: 170 },
-    { id: 'trophy', name: 'the trophy', src: 'img/trophy.png', w: 220 },
+    { id: 'skateboard', name: 'the skateboard', src: 'img/skateboard.png', w: 110 },
+    { id: 'pineapple', name: 'the pineapple', src: 'img/pineapple.png', w: 125 },
+    { id: 'trophy', name: 'the trophy', src: 'img/trophy.png', w: 150 },
     // things to fall into (openings as fractions of the image: x from, x to, y from the top, y to)
     { id: 'basket', name: 'the basket', src: 'img/basket.png', w: 300, cav: [[.5, .375, .46, .065]] },
     { id: 'basket2', name: 'the basket', src: 'img/basket2.png', w: 300, cav: [[.5, .405, .45, .055]] },
@@ -291,14 +291,14 @@ canvas { display: block; width: 100%; height: 100%; }
     { id: 'tophat', name: 'the top hat', src: 'img/tophat.png', w: 230, cav: [[.5, .22, .4, .08]] },
     // awkward perches
     { id: 'pot', name: 'the pot', src: 'img/pot.png', w: 260 },
-    { id: 'vase', name: 'the vase', src: 'img/vase.png', w: 140 },
+    { id: 'vase', name: 'the vase', src: 'img/vase.png', w: 100 },
     { id: 'umbrella', name: 'the umbrella', src: 'img/umbrella.png', w: 340 },
     { id: 'books', name: 'the books', src: 'img/books.png', w: 260 },
     { id: 'books2', name: 'the textbooks', src: 'img/books2.png', w: 260 },
-    { id: 'ladder', name: 'the ladder', src: 'img/ladder.png', w: 230 },
+    // { id: 'ladder', name: 'the ladder', src: 'img/ladder.png', w: 150 },   // dropped: its top is too thin to ever land on (simulated clearance ~1%)
     { id: 'lamp', name: 'the lamp', src: 'img/lamp.png', w: 170 },
-    { id: 'lamp2', name: 'the desk lamp', src: 'img/lamp2.png', w: 120 },
-    { id: 'lantern', name: 'the lantern', src: 'img/lantern.png', w: 150 },
+    // { id: 'lamp2', name: 'the desk lamp', src: 'img/lamp2.png', w: 90 },   // dropped: its top is too thin to ever land on (simulated clearance ~1%)
+    { id: 'lantern', name: 'the lantern', src: 'img/lantern.png', w: 110 },
   ];
   function analyzePhoto(k, img) {
     const c = document.createElement('canvas'), iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
@@ -395,6 +395,8 @@ canvas { display: block; width: 100%; height: 100%; }
     tg.bx = Math.min(600 + Math.random() * (240 - tg.drift * 2), 985 - w2 - tg.drift);
     const yMin = 120, yMax = Math.min(400, 585 - hh);
     tg.by = yMax > yMin ? yMin + Math.random() * (yMax - yMin) : Math.max(40, yMax);
+    // tall things sit low: their tops must stay inside the arc the pan can throw (clearance checked by simulation)
+    if (hh > 250 && yMax > yMin) tg.by = Math.max(yMin, yMax - 50) + Math.random() * Math.min(50, yMax - yMin);
     tg.polys = polysFor(tg);
     return tg;
   }
@@ -533,7 +535,8 @@ canvas { display: block; width: 100%; height: 100%; }
   function centroid() { let x = 0, y = 0; for (const q of sau.p) { x += q.x; y += q.y; } return { x: x / N, y: y / N }; }
 
   function launch(p) {
-    const vx = 214 + p * 556, vy = 632 + p * 834, T = 2 * vy / G, w = Math.PI / T;
+    // steeper arc than it used to be: full power still lands on screen, and the sausage comes down onto a perch instead of skidding across it
+    const vx = 214 + p * 300, vy = 632 + p * 834, T = 2 * vy / G, w = Math.PI / T;
     const c = centroid();
     for (const q of sau.p) {
       const rx = q.x - c.x, ry = q.y - c.y;
