@@ -536,7 +536,8 @@ canvas { display: block; width: 100%; height: 100%; }
 
   function launch(p) {
     // steeper arc than it used to be: full power still lands on screen, and the sausage comes down onto a perch instead of skidding across it
-    const vx = 214 + p * 300, vy = 632 + p * 834, T = 2 * vy / G, w = Math.PI / T;
+    // the cubic term is extra range at the top of the band: full power clears the far edge of the screen, mid power stays steep
+    const vx = 214 + p * 300 + p * p * p * 200, vy = 632 + p * 834, T = 2 * vy / G, w = Math.PI / T;
     const c = centroid();
     for (const q of sau.p) {
       const rx = q.x - c.x, ry = q.y - c.y;
