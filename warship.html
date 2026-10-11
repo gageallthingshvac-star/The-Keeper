@@ -92,11 +92,6 @@
   .tools button{padding:7px 10px;font-size:12px}
   .tools button.on{border-color:var(--brass);color:var(--brass)}
 
-  @media (max-width:760px){
-    #builder .main{flex-direction:column}
-    #side{width:auto;flex:0 0 auto;max-height:46%}
-    #palette{grid-template-columns:repeat(6,1fr)}
-  }
 
   /* battle */
   #game{position:fixed;inset:0;width:100%;height:100%;display:none;touch-action:none}
@@ -123,6 +118,102 @@
   .dialog h2{font-family:var(--display);font-size:30px;letter-spacing:.08em;margin-bottom:10px}
   .dialog .stats{text-align:left;margin:12px 0 16px}
   .dialog .btns{display:flex;flex-direction:column;gap:8px}
+  /* ================= iPhone layout ================= */
+  html,body{-webkit-text-size-adjust:100%;-webkit-touch-callout:none}
+  #hint{transition:opacity .8s}
+  .dialog{max-height:calc(100% - 8px);overflow-y:auto;touch-action:pan-y}
+  @media (pointer:coarse){
+    #hud .tr button{min-width:44px;min-height:44px;padding:8px 10px}
+    #builder .top button{min-height:44px}
+    .tools button{min-height:36px}
+  }
+  /* stacked shipyard on portrait phones: big ship view, compact controls underneath */
+  @media (orientation:portrait) and (max-width:760px){
+    #builder{gap:8px}
+    #builder .top{flex-wrap:nowrap;gap:6px}
+    #builder .top .title{min-width:0}
+    #builder .top .title b{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #builder .top .title span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px}
+    #builder .top button{padding:8px 12px}
+    #builder .main{flex-direction:column;gap:8px}
+    #side{width:auto;flex:0 0 auto;max-height:none;overflow:visible;gap:6px}
+    #side .card{padding:7px 8px}
+    #side .card h3{display:none}
+    #palette{display:flex;gap:6px;overflow-x:auto;touch-action:pan-x;scrollbar-width:none;padding-bottom:2px}
+    #palette::-webkit-scrollbar{display:none}
+    #palette .part{flex:0 0 60px}
+    #partInfo{font-size:11px;min-height:0;margin-top:5px!important;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    #side .card:nth-child(2){display:flex;gap:6px;overflow-x:auto;touch-action:pan-x;scrollbar-width:none}
+    #side .card:nth-child(2)::-webkit-scrollbar{display:none}
+    #side .card:nth-child(2) .tools{flex-wrap:nowrap;margin:0!important}
+    #side .card:nth-child(2) .tools button{white-space:nowrap;flex:0 0 auto}
+    #side .card:nth-child(3){display:grid;grid-template-columns:repeat(3,1fr);gap:2px 8px}
+    #side .card:nth-child(3) .bar{display:none}
+    #side .card:nth-child(3) .stat{flex-direction:column;border:none;padding:1px 0;font-size:10px;color:var(--mute)}
+    #side .card:nth-child(3) .stat span:last-child{font-size:12px;color:var(--ink)}
+    #side .card:nth-child(3) .stat:nth-of-type(9){display:none}
+    #warn{grid-column:1/-1;margin-top:4px!important;font-size:11px;line-height:1.35;height:2.7em;overflow:hidden}
+  }
+  @media (orientation:portrait) and (max-height:700px){
+    #palette .part{flex-basis:54px}
+    .part canvas{width:28px;height:28px}
+    #partInfo{display:none}
+  }
+  /* landscape phones: ship view left, scrolling controls right */
+  @media (orientation:landscape) and (max-height:500px){
+    .screen{padding-top:calc(6px + var(--safeT));padding-bottom:calc(6px + var(--safeB))}
+    #menu h1{margin-top:4px;font-size:44px}
+    #menu .sub{margin-bottom:12px}
+    #builder{gap:6px}
+    #builder .top{flex-wrap:nowrap}
+    #builder .top .title{min-width:0}
+    #builder .top .title b{font-size:15px;display:inline}
+    #builder .top .title span{margin-left:8px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #builder .top .title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #builder .top button{padding:7px 12px;min-height:36px}
+    #builder .main{flex-direction:row;gap:8px}
+    #side{width:250px;max-height:none;gap:6px}
+    #side .card{padding:7px 8px}
+    #side .card h3{margin-bottom:5px}
+    #palette{grid-template-columns:repeat(5,1fr);gap:4px}
+    .part{padding:3px 1px 4px}
+    .part canvas{width:26px;height:26px}
+    #partInfo{font-size:11px;min-height:0}
+    .stat{font-size:12px;padding:2px 0}
+    /* battle HUD */
+    #hud .tl{width:160px}
+    #hud .panel{padding:5px 8px}
+    #hud .lbl{font-size:10px;letter-spacing:.04em}
+    #hud .bar{margin:1px 0 4px}
+    #throttle{height:110px;top:calc(56px + var(--safeT));transform:none}
+    #minimap{width:96px;height:96px}
+    #msg{top:16%;font-size:22px}
+    #side .card:nth-child(1){order:1} #side .card:nth-child(3){order:2} #side .card:nth-child(2){order:3}
+    #partInfo{display:none}
+    #msg{top:30%}
+    /* result dialog: stats left, buttons right */
+    .dialog{padding:12px 16px}
+    #resultOv .dialog{max-width:620px;display:grid;grid-template-columns:1fr 1fr;column-gap:18px;align-items:center;
+      grid-template-areas:"t b" "s b" "st b";text-align:left}
+    #resultOv .dialog h2{grid-area:t;font-size:24px;margin:0}
+    #resultOv #rSub{grid-area:s;font-size:12px}
+    #resultOv .stats{grid-area:st;margin:6px 0 0}
+    #resultOv .btns{grid-area:b}
+    .dialog .btns button{padding:9px 12px}
+  }
+  @media (orientation:portrait) and (max-width:400px){
+    #hud .tl{width:140px}
+    #minimap{width:104px;height:104px}
+    #msg{font-size:24px}
+  }
+  @media (orientation:portrait) and (max-height:700px){
+    #throttle{height:140px}
+    #hud .lbl{font-size:10px}
+    .dialog{padding:14px 16px}
+    .dialog h2{font-size:26px;margin-bottom:4px}
+    .dialog .stats{margin:8px 0 10px}
+    .dialog .btns button{padding:9px 12px}
+  }
 </style>
 </head>
 <body>
@@ -679,7 +770,13 @@ function openBuilder(){
   show('builder'); buildPalette(); buildSlots();
   requestAnimationFrame(sizeGrid);
 }
-window.addEventListener('resize', ()=>{ if($('builder').classList.contains('on')) sizeGrid(); if(game) resizeGame(); });
+function onResize(){ if($('builder').classList.contains('on')) sizeGrid(); if(game) resizeGame(); }
+window.addEventListener('resize', onResize);
+window.addEventListener('orientationchange', ()=>setTimeout(onResize, 250));
+if (window.visualViewport) visualViewport.addEventListener('resize', onResize);
+if (window.ResizeObserver) new ResizeObserver(()=>{ if($('builder').classList.contains('on')) sizeGrid(); }).observe($('gridWrap'));
+let hintTimer=0;
+function showHint(){ const h=$('hint'); h.style.opacity=1; clearTimeout(hintTimer); hintTimer=setTimeout(()=>h.style.opacity=0, 7000); }
 
 // ============================================================ battle: ships
 let game = null;
@@ -689,7 +786,7 @@ function resizeGame(){
   DPR = Math.min(window.devicePixelRatio||1, 2);
   VW = window.innerWidth; VH = window.innerHeight;
   cv.width = VW*DPR; cv.height = VH*DPR;
-  const mm = $('minimap'); mm.width = 130*DPR; mm.height = 130*DPR;
+  const mm = $('minimap'); const ms = mm.clientWidth||130; mm.width = ms*DPR; mm.height = ms*DPR;
 }
 
 function makeShip(g, team, x, y, a, name){
@@ -796,9 +893,10 @@ function startBattle(){
   });
   player.accuracy = 1;
   cam.x = player.x; cam.y = player.y - 200;
-  resizeGame(); show('battle');
+  show('battle'); resizeGame();
   $('pauseOv').classList.remove('on'); $('resultOv').classList.remove('on');
   flash(L.name.toUpperCase());
+  showHint();
   input.throttle = 0.6; input.rudder = 0;
   last = performance.now();
   if (!loopOn){ loopOn=true; requestAnimationFrame(loop); }
@@ -1243,7 +1341,7 @@ function drawShip(s, k){
 }
 
 function drawMinimap(){
-  const mm=$('minimap'), c=mm.getContext('2d'), sz=130;
+  const mm=$('minimap'), c=mm.getContext('2d'), sz=mm.clientWidth||130;
   c.setTransform(DPR,0,0,DPR,0,0); c.clearRect(0,0,sz,sz);
   const sc = sz/(FIELD*2);
   c.strokeStyle='rgba(255,90,74,.3)'; c.strokeRect(4,4,sz-8,sz-8);
