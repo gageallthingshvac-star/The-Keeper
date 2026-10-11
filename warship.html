@@ -745,7 +745,11 @@ gridCv.addEventListener('contextmenu', e=>e.preventDefault());
 
 $('tMirror').onclick = ()=>{ mirror=!mirror; $('tMirror').classList.toggle('on',mirror); drawGrid(); };
 $('tErase').onclick = ()=>{ erasing=!erasing; $('tErase').classList.toggle('on',erasing); buildPalette(); };
-$('tClear').onclick = ()=>{ if(confirm('Scrap the whole design?')){ design=emptyGrid(); store.set('design',design); drawGrid(); } };
+let clearArm=0;
+$('tClear').onclick = ()=>{ const b=$('tClear');
+  if (!clearArm){ b.textContent='Tap again'; b.classList.add('on'); clearArm=setTimeout(()=>{ clearArm=0; b.textContent='Clear'; b.classList.remove('on'); }, 2500); return; }
+  clearTimeout(clearArm); clearArm=0; b.textContent='Clear'; b.classList.remove('on');
+  design=emptyGrid(); store.set('design',design); drawGrid(); };
 $('tStarter').onclick = ()=>{ design=gridFromRows(STARTER); store.set('design',design); drawGrid(); };
 function buildSlots(){
   const el = $('slots'); el.innerHTML='';
