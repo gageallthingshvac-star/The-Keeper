@@ -9,8 +9,11 @@ const Gfx = (() => {
     low:    {pr: 1,   shadows: false, oceanSeg: 110, particles: 2500, lights: 0, aa: false},
     medium: {pr: 1.5, shadows: false, oceanSeg: 170, particles: 4000, lights: 2, aa: true},
     high:   {pr: 2,   shadows: true,  oceanSeg: 230, particles: 6000, lights: 3, aa: true},
+    // iPhone 14 and newer (A15+): shadows on with a lighter map; the governor trims resolution if it runs hot.
+    phone:  {pr: 2,   shadows: true,  shadowMap: 1024, oceanSeg: 170, particles: 4500, lights: 2, aa: true},
   };
-  const resolveQuality = q => QUALITY[q] ? q : (IS_TOUCH ? 'medium' : 'high');
+  const modernPhone = () => IS_TOUCH && Math.min(screen.width, screen.height) >= 390 && (window.devicePixelRatio || 1) >= 3;
+  const resolveQuality = q => QUALITY[q] ? q : (IS_TOUCH ? (modernPhone() ? 'phone' : 'medium') : 'high');
 
   // ---------------------------------------------------------------- waves
   // Same function on the CPU (ships bob on it) and GPU (ocean surface). `amp` follows the weather.
@@ -139,6 +142,9 @@ const Gfx = (() => {
     MAT.funnel = std({color: '#c2a36d', roughness: 0.6});
     MAT.red = std({color: '#c2473a', roughness: 0.5});
     MAT.yellow = std({color: '#d9a92e', roughness: 0.5});
+    MAT.flight = std({color: '#6b5e4c', roughness: 0.85, metalness: 0.05});
+    MAT.plane = std({color: '#c9d1d8', roughness: 0.55, metalness: 0.3});
+    MAT.planeFly = MAT.plane; MAT.darkFly = MAT.dark; // same look, separate instance pools
     MAT.coil = std({color: '#4f8fb8', roughness: 0.3, metalness: 0.7, emissive: '#16405a', emissiveIntensity: 0.6});
     MAT.shell = new THREE.MeshBasicMaterial({color: '#ffd27a'});
     MAT.missile = std({color: '#e8e8e8', roughness: 0.4});
@@ -200,6 +206,21 @@ const Gfx = (() => {
     GEO.rocketBase = cyl(2.6, 3, 1.4, 12).translate(0, 0.7, 0);
     GEO.rocketBox = box(6.4, 3.6, 6).translate(0, 0, -0.5);
     GEO.rocketFace = box(5.6, 2.8, 0.3).translate(0, 0, -3.6);
+    GEO.superHouse = box(9.8, 4.6, 10.4).translate(0, 2.3, 0.8);
+    GEO.superRoof = box(8.6, 0.9, 7.4).translate(0, 5.0, 1.6);
+    GEO.superBarrel = cyl(0.7, 0.95, 17, 8).rotateX(Math.PI / 2).translate(0, 0, -8.5);
+    GEO.aaBase = cyl(1.6, 2, 1.2, 10).translate(0, 0.6, 0);
+    GEO.aaMount = box(2.6, 1.6, 2.2).translate(0, 1.6, 0);
+    GEO.aaBarrel = cyl(0.2, 0.25, 4.2, 6).rotateX(Math.PI / 2).translate(0, 0, -2.1);
+    GEO.flightDeck = box(S, 0.5, S).translate(0, DECK + 0.25, 0);
+    GEO.deckStripe = box(0.8, 0.52, S).translate(0, DECK + 0.26, 0);
+    // aircraft, built nose toward -z
+    GEO.planeBody = cyl(0.55, 0.75, 7.2, 8).rotateX(Math.PI / 2);
+    GEO.planeWing = box(11, 0.3, 2.1).translate(0, 0, -0.4);
+    GEO.planeTail = box(4, 0.25, 1.2).translate(0, 0.2, 3.1);
+    GEO.planeFin = box(0.25, 1.6, 1.3).translate(0, 0.9, 3.1);
+    GEO.planeProp = box(3, 0.15, 0.2).translate(0, 0, -3.75);
+    GEO.bomb = new THREE.SphereGeometry(0.9, 6, 4).scale(0.8, 0.8, 1.6);
     GEO.radarMast = cyl(0.5, 0.8, 7, 8).translate(0, DECK + 3.5, 0);
     GEO.radarDish = box(7.5, 2.4, 0.5);
     GEO.craneBase = box(3, 4, 3).translate(1.5, DECK + 2, 1.5);
@@ -346,7 +367,7 @@ const Gfx = (() => {
       this.sun = new THREE.DirectionalLight('#fff1dc', 2.6);
       this.sun.castShadow = Q.shadows;
       if (Q.shadows) {
-        this.sun.shadow.mapSize.set(2048, 2048);
+        this.sun.shadow.mapSize.set(Q.shadowMap || 2048, Q.shadowMap || 2048);
         const c = this.sun.shadow.camera; c.left = c.bottom = -opts.shadowSize || -260; c.right = c.top = opts.shadowSize || 260; c.near = 10; c.far = 2400;
         this.sun.shadow.bias = -0.0006; this.sun.shadow.normalBias = 0.6;
       }

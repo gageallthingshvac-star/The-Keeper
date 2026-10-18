@@ -45,8 +45,7 @@ const Yard = (() => {
       g.add(this.center);
       const arrow = new THREE.Mesh(new THREE.ConeGeometry(4, 9, 3).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({color: '#e0b45a'}));
       arrow.position.set(0, DECK + 0.5, -h * S / 2 - 10); g.add(arrow);
-      this.fitDist = Math.max(w * S * 2.1, h * S * 1.15) + 60;
-      if (!this.userZoom) this.dist = this.fitDist;
+      this.dockFit = Math.max(w * S * 2.1, h * S * 1.15) + 60;
     }
     showGrid(on, mirror) { if (this.grid) this.grid.visible = on; if (this.center) this.center.visible = on && mirror; }
 
@@ -59,6 +58,10 @@ const Yard = (() => {
       this.viz.clear();
       this.ship = null;
       while (this.looseGroup.children.length) this.looseGroup.remove(this.looseGroup.children[0]);
+      // Frame the ship itself (not the whole dock), so small designs in a big dock stay readable.
+      const bnd = Design.bounds(d);
+      const bw = bnd ? Math.max(5, bnd.c1 - bnd.c0 + 3) : d.w, bh = bnd ? Math.max(9, bnd.r1 - bnd.r0 + 3) : d.h;
+      if (!this.userZoom) this.dist = Math.min(this.dockFit, Math.max(bw * S * 2.1, bh * S * 1.15) + 60);
       if (!d.cells.some(Boolean)) return;
       const w = new Sim.World({rng: Util.rng(1)});
       const s = w.addShip(d, {team: 0, x: 0, y: 0, a: 0});

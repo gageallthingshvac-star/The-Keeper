@@ -68,10 +68,11 @@ const Sim = (() => {
       radars = Math.min(radars, PARTS.radar.util.max);
       this.rangeMul = 1 + radars * PARTS.radar.util.range;
       this.spreadMul = (1 - radars * PARTS.radar.util.spread) * this.mods.spread;
-      for (const b of this.weapons) { const W = PARTS[b.t].weapon; if (W.dmg) range = Math.max(range, W.range * this.rangeMul); }
+      for (const b of this.weapons) { const W = PARTS[b.t].weapon; if (W.dmg && W.type !== 'air') range = Math.max(range, W.range * this.rangeMul); }
       this.mass = m; this.buoy = bu; this.thrust = th; this.rudders = ru; this.count = n; this.range = range;
       this.maxSpeed = Design.calcSpeed(m, th); this.turnRate = Design.calcTurn(m, ru);
       this.armed = this.weapons.some(b => PARTS[b.t].weapon.dmg);
+      this.hasAir = this.weapons.some(b => b.t === 'hangar');
       this.hasSmoke = this.utils.some(b => b.t === 'smoke');
       this.hasRepair = this.utils.some(b => b.t === 'repair');
       if (!first && bu > 0) {
@@ -115,9 +116,9 @@ const Sim = (() => {
       this.rng = o.rng || Util.rng();
       this.weather = Data.WEATHER[o.weather || 'clear'];
       this.t = 0; this.nextId = 1;
-      this.ships = []; this.shells = []; this.missiles = []; this.rockets = []; this.torps = [];
+      this.ships = []; this.shells = []; this.missiles = []; this.rockets = []; this.torps = []; this.planes = []; this.bombs = [];
       this.smokes = []; this.booms = []; this.events = [];
-      this.stats = {shots: 0, hits: 0, dmg: 0, taken: 0, sunk: 0, sunkCost: 0};
+      this.stats = {shots: 0, hits: 0, dmg: 0, taken: 0, sunk: 0, sunkCost: 0, planesDown: 0};
       this.player = null;
     }
     emit(type, d) { d.type = type; this.events.push(d); }
@@ -159,7 +160,7 @@ const Sim = (() => {
         if (s.sinking) { s.sinkT += dt / 5; if (s.sinkT >= 1) s.dead = true; }
       }
       this.collisions();
-      this.stepShells(dt); this.stepRockets(dt); this.stepMissiles(dt); this.stepTorps(dt);
+      this.stepShells(dt); this.stepRockets(dt); this.stepMissiles(dt); this.stepTorps(dt); this.stepPlanes(dt); this.stepBombs(dt);
       for (let i = this.booms.length - 1; i >= 0; i--) {
         const b = this.booms[i]; b.delay -= dt;
         if (b.delay > 0) continue;
@@ -209,7 +210,8 @@ const Sim = (() => {
         w.cd -= dt;
         const [wx, wy] = s.pos(w);
 
-        if (W.type === 'ciws') { this.ciws(s, w, W, wx, wy, dt); continue; }
+        if (W.type === 'ciws' || W.type === 'aa') { this.pointDefense(s, w, W, wx, wy, dt); continue; }
+        if (W.type === 'air') { this.hangar(s, w, W, wx, wy); continue; }
         // a rocket salvo in progress keeps firing at its locked point
         if (w.salvo > 0) {
           w.salvoT -= dt;
@@ -225,7 +227,7 @@ const Sim = (() => {
         const d0 = Math.hypot(tx - wx, ty - wy);
         if (W.speed && W.type !== 'missile') { const lead = d0 / W.speed * s.prof.lead; tx += t.vx * lead; ty += t.vy * lead; }
         const desired = headingTo(tx - wx, ty - wy);
-        if (W.type !== 'missile') w.ang = turnToward(w.ang, desired, (w.t === 'heavy' || w.t === 'rail' ? 1.4 : 3.5) * dt);
+        if (W.type !== 'missile') w.ang = turnToward(w.ang, desired, (w.t === 'superheavy' ? 1.0 : w.t === 'heavy' || w.t === 'rail' ? 1.4 : 3.5) * dt);
         const d = Math.hypot(tx - wx, ty - wy);
         if (W.type === 'shell' || W.type === 'rockets') {
           const T = d / W.speed, apex = SHELL_ARC * T * T + 2;
@@ -243,7 +245,7 @@ const Sim = (() => {
             const [fx, fy] = fwd(w.ang);
             const mx = wx + fx * 8, my = wy + fy * 8, T = d / W.speed;
             this.shells.push({x0: mx, y0: my, tx: tx + ex, ty: ty + ey, t: 0, T, apex: SHELL_ARC * T * T + 2,
-              dmg: W.dmg, splash: W.splash, team: s.team, owner: s, heavy: w.t === 'heavy'});
+              dmg: W.dmg, splash: W.splash, team: s.team, owner: s, heavy: w.t === 'heavy' || w.t === 'superheavy'});
             this.emit('fire', {kind: w.t, ship: s, block: w, x: mx, y: my, ang: w.ang});
             break;
           }
@@ -304,23 +306,136 @@ const Sim = (() => {
       if (!pierced) this.emit('splash', {x: tx, y: ty, size: 1.2});
       this.emit('rail', {ship: s, block: w, x0: wx + fx * 10, y0: wy + fy * 10, x1: ex, y1: ey});
     }
-    ciws(s, w, W, wx, wy, dt) {
-      let best = null, bd = W.range;
-      for (const list of [this.missiles, this.rockets]) for (const m of list) {
-        if (m.team === s.team || m.hp <= 0) continue;
+    // CIWS prefers missiles and rockets; AA guns prefer aircraft. Both will take what they can get.
+    pointDefense(s, w, W, wx, wy, dt) {
+      const aa = W.type === 'aa';
+      let best = null, bd = W.range, bestPlane = false;
+      const consider = (m, plane) => {
+        if (m.team === s.team || m.hp <= 0) return;
         const d = Math.hypot(m.x - wx, m.y - wy);
-        if (d < bd) { bd = d; best = m; }
-      }
+        if (d >= W.range) return;
+        // a preferred target type wins over a closer non-preferred one
+        const pref = aa ? plane : !plane;
+        const bestPref = best ? (aa ? bestPlane : !bestPlane) : false;
+        if (!best || (pref && !bestPref) || (pref === bestPref && d < bd)) { best = m; bd = d; bestPlane = plane; }
+      };
+      for (const m of this.missiles) consider(m, false);
+      for (const m of this.rockets) consider(m, false);
+      for (const m of this.planes) consider(m, true);
       if (!best) { w.ang = turnToward(w.ang, s.a, 2 * dt); w.elev *= 0.95; return; }
-      w.ang = turnToward(w.ang, headingTo(best.x - wx, best.y - wy), 10 * dt);
+      w.ang = turnToward(w.ang, headingTo(best.x - wx, best.y - wy), (aa ? 6 : 10) * dt);
       w.elev = Math.atan2(best.h - DECK - 2.6, Math.max(bd, 1));
       if (w.cd > 0) return;
-      w.cd = W.reload;
-      this.emit('ciws', {ship: s, block: w, x: wx, y: wy, tx: best.x, ty: best.y, th: best.h});
-      if (this.rng() < 0.4) {
-        best.hp--;
-        if (best.hp <= 0) this.emit('intercept', {x: best.x, y: best.y, h: best.h});
+      w.cd = W.reload * this.rng.range(0.85, 1.15);
+      const chance = aa ? (bestPlane ? 0.45 : 0.15) : (bestPlane ? 0.3 : 0.4);
+      const hit = this.rng() < chance;
+      if (aa) this.emit('flak', {ship: s, block: w, x: best.x + this.rng.gauss() * 8, y: best.y + this.rng.gauss() * 8, h: best.h + this.rng.gauss() * 5, hit});
+      else this.emit('ciws', {ship: s, block: w, x: wx, y: wy, tx: best.x, ty: best.y, th: best.h});
+      if (!hit) return;
+      best.hp--;
+      if (best.hp > 0) return;
+      if (bestPlane) this.planeDown(best, s);
+      else this.emit('intercept', {x: best.x, y: best.y, h: best.h});
+    }
+
+    // ---------------------------------------------------------- aircraft
+    // A hangar keeps W.maxAir planes in the air; each flies out, dive-bombs and comes home to rearm.
+    hangar(s, w, W, wx, wy) {
+      w.air = w.air || 0;
+      if (w.cd > 0 || w.air >= W.maxAir) return;
+      const t = this.pickTarget(s, wx, wy, W.range * s.rangeMul);
+      if (!t) return;
+      w.air++;
+      w.sorties = (w.sorties || 0) + 1;
+      w.cd = W.reload * this.rng.range(0.9, 1.1) * s.prof.reload / s.mods.reload;
+      const p = {x: wx, y: wy, h: DECK + 3, a: s.a, speed: 40, hp: 3, team: s.team, owner: s, hangar: w, W,
+                 tgt: t, b: s.prof.smartAim ? t.valuableBlock() : t.randomBlock(), state: 'out', fuel: 45, age: 0,
+                 kind: (w.sorties + w.i) % 2 ? 'torpedo' : 'bomb'};
+      this.planes.push(p);
+      if (s === this.player) this.stats.shots++;
+      this.emit('launch', {ship: s, block: w, x: wx, y: wy, plane: p});
+    }
+    stepPlanes(dt) {
+      for (let i = this.planes.length - 1; i >= 0; i--) {
+        const p = this.planes[i];
+        p.age += dt; p.fuel -= dt;
+        p.px = p.x; p.py = p.y; p.ph = p.h;
+        if (p.hp <= 0) { this.planes.splice(i, 1); continue; }
+        const homeOk = p.owner && !p.owner.sinking && !p.owner.dead && p.hangar.alive;
+        if (p.fuel <= 0) { this.planeDown(p, null); this.planes.splice(i, 1); continue; }
+        let tx, ty, th, spd = 150;
+        if (p.state === 'out' || p.state === 'dive') {
+          if (!p.tgt || p.tgt.sinking || p.tgt.dead) { p.tgt = this.nearestFoe(p.team, p.x, p.y, 1200); p.b = null; if (!p.tgt) { p.state = 'home'; continue; } }
+          if (!p.b || !p.b.alive) p.b = p.tgt.randomBlock();
+          if (!p.b) { p.state = 'home'; continue; }
+          [tx, ty] = p.tgt.pos(p.b);
+          const d = Math.hypot(tx - p.x, ty - p.y);
+          if (p.kind === 'torpedo') {
+            // torpedo bombers come in low and release well short of the target
+            th = d < 420 ? 9 : 50; spd = d < 420 ? 165 : 150;
+            if (d < 200 && Math.abs(wrapA(headingTo(tx - p.x, ty - p.y) - p.a)) < 0.35) { this.dropTorpedo(p); p.state = 'home'; }
+            else if (d < 90) p.state = 'out';
+          } else if (p.state === 'out') { th = 55; if (d < 170) { p.state = 'dive'; this.emit('dive', {x: p.x, y: p.y, plane: p}); } }
+          if (p.state === 'dive') {
+            th = 14; spd = 175;
+            if (d < 30) { this.dropBomb(p, tx, ty); p.state = 'home'; }
+          }
+        } else {
+          if (!homeOk) { // carrier gone: keep fighting until the tanks run dry
+            p.tgt = this.nearestFoe(p.team, p.x, p.y, 1200);
+            if (p.tgt && p.fuel > 8 && !p.dropped) { p.state = 'out'; continue; }
+            tx = p.x + Math.sin(p.a) * 100; ty = p.y - Math.cos(p.a) * 100; th = 30;
+          } else {
+            [tx, ty] = p.owner.pos(p.hangar); th = 40;
+            const d = Math.hypot(tx - p.x, ty - p.y);
+            if (d < 120) th = DECK + 4 + d * 0.3;
+            if (d < 18) { // landed: rearm for the next sortie
+              p.hangar.air = Math.max(0, (p.hangar.air || 1) - 1);
+              this.planes.splice(i, 1);
+              this.emit('land', {ship: p.owner, x: tx, y: ty});
+              continue;
+            }
+          }
+        }
+        p.speed = Math.min(spd, p.speed + 120 * dt);
+        p.a = turnToward(p.a, headingTo(tx - p.x, ty - p.y), (p.state === 'dive' ? 2.2 : 1.6) * dt);
+        p.h += clamp(th - p.h, -45 * dt, 25 * dt);
+        const [fx, fy] = fwd(p.a);
+        p.x += fx * p.speed * dt; p.y += fy * p.speed * dt;
+        p.x = clamp(p.x, -FIELD * 1.2, FIELD * 1.2); p.y = clamp(p.y, -FIELD * 1.2, FIELD * 1.2);
       }
+    }
+    dropBomb(p, tx, ty) {
+      const sp = p.W.spread * p.owner.prof.acc * this.weather.spread * (this.inSmoke(tx, ty) ? 2.2 : 1);
+      this.bombs.push({x: p.x, y: p.y, h: p.h, x1: tx + this.rng.gauss() * sp, y1: ty + this.rng.gauss() * sp, t: 0, T: 0.7,
+                       dmg: p.W.dmg, splash: p.W.splash, team: p.team, owner: p.owner});
+      p.dropped = true;
+      this.emit('bombDrop', {x: p.x, y: p.y, h: p.h});
+    }
+    dropTorpedo(p) {
+      const t = p.tgt, [tx, ty] = t.pos(p.b), spd = Data.PARTS.torp.weapon.speed;
+      const lead = Math.hypot(tx - p.x, ty - p.y) / spd;
+      const a = headingTo(tx + t.vx * lead * p.owner.prof.lead - p.x, ty + t.vy * lead * p.owner.prof.lead - p.y) + this.rng.gauss() * 0.06 * p.owner.prof.acc;
+      const [fx, fy] = fwd(a);
+      this.torps.push({x: p.x, y: p.y, vx: fx * spd, vy: fy * spd, a, life: 420 / spd, dmg: p.W.torpDmg, splash: 10, team: p.team, owner: p.owner});
+      p.dropped = true;
+      this.emit('torpDrop', {x: p.x, y: p.y, h: p.h});
+    }
+    stepBombs(dt) {
+      for (let i = this.bombs.length - 1; i >= 0; i--) {
+        const b = this.bombs[i]; b.t += dt;
+        const f = Math.min(1, b.t / b.T);
+        b.cx = b.x + (b.x1 - b.x) * f; b.cy = b.y + (b.y1 - b.y) * f; b.ch = b.h * (1 - f * f);
+        if (f < 1) continue;
+        this.bombs.splice(i, 1);
+        this.impact(b.x1, b.y1, b.dmg, b.splash, b.team, b.owner, 'bomb');
+      }
+    }
+    planeDown(p, by) {
+      p.hp = 0;
+      if (p.hangar && p.hangar.air) p.hangar.air--;
+      if (by === this.player || (by && by.team === 0 && p.team !== 0)) this.stats.planesDown++;
+      this.emit('planeDown', {x: p.x, y: p.y, h: p.h, vx: Math.sin(p.a) * p.speed, vy: -Math.cos(p.a) * p.speed, team: p.team});
     }
 
     // ---------------------------------------------------------- utilities
@@ -454,13 +569,13 @@ const Sim = (() => {
         if (s.team === team || s.dead || s.sinking) continue;
         if (Math.hypot(s.x - x, s.y - y) > s.rad + (splash || 0) + S) continue;
         const b = s.blockAt(x, y);
-        if (b) { this.damageBlock(s, b, dmg, owner, true); hit = s; if (kind !== 'shell') this.ignite(s, b, kind === 'heavy' ? 0.22 : 0.12); }
+        if (b) { this.damageBlock(s, b, dmg, owner, true); hit = s; if (kind !== 'shell') this.ignite(s, b, kind === 'heavy' || kind === 'bomb' ? 0.25 : 0.12); }
         if (splash && this.damageRadius(s, x, y, splash, dmg * 0.3, owner, kind !== 'shell')) hit = hit || s;
       }
       if (hit) {
         if (owner === this.player) this.stats.hits++;
-        this.emit('hit', {x, y, size: kind === 'heavy' ? 1.2 : kind === 'rocket' ? 0.8 : 0.55, ship: hit, kind});
-      } else this.emit('splash', {x, y, size: kind === 'heavy' ? 2.2 : kind === 'rocket' ? 1.2 : 1});
+        this.emit('hit', {x, y, size: kind === 'heavy' || kind === 'bomb' ? 1.2 : kind === 'rocket' ? 0.8 : 0.55, ship: hit, kind});
+      } else this.emit('splash', {x, y, size: kind === 'heavy' || kind === 'bomb' ? 2.2 : kind === 'rocket' ? 1.2 : 1});
     }
     damageRadius(s, x, y, r, dmg, attacker, incendiary) {
       const [lx, ly] = s.w2l(x, y); let hit = false;

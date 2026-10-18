@@ -103,7 +103,7 @@ const Design = (() => {
       if (W && W.dmg) {
         const shots = W.salvo || 1;
         dps += W.dmg * shots / (W.reload / (mods.reload || 1));
-        range = Math.max(range, W.range * rangeMul);
+        range = Math.max(range, W.type === 'air' ? 0 : W.range * rangeMul);
       }
     }
     const conn = connected(d);

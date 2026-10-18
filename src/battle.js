@@ -7,7 +7,7 @@ const Battle = (() => {
   const STEP = 1 / 60;
 
   const WEAPON_ICON = {gun: 'G', heavy: 'X', torp: 'T', missile: 'M', rockets: 'K', rail: 'L', ciws: 'C'};
-  const WEAPON_ORDER = ['heavy', 'gun', 'rail', 'rockets', 'missile', 'torp', 'ciws'];
+  const WEAPON_ORDER = ['superheavy', 'heavy', 'gun', 'rail', 'rockets', 'missile', 'torp', 'hangar', 'aa', 'ciws'];
 
   class Battle {
     constructor(app, cfg) {
@@ -241,14 +241,20 @@ const Battle = (() => {
       const p = this.player, near = (x, y) => clamp(1 - Math.hypot(x - p.x, y - p.y) / 300, 0, 1);
       switch (e.type) {
         case 'fire': {
-          const snd = {gun: 'gun', heavy: 'heavy', torp: 'torp', missile: 'missile', rockets: 'rocket', ciws: null}[e.kind];
+          const snd = {gun: 'gun', heavy: 'heavy', superheavy: 'heavy', torp: 'torp', missile: 'missile', rockets: 'rocket', ciws: null}[e.kind];
           if (snd) Sound.play(snd, {x: e.x, y: e.y, vol: e.ship === p ? 0.8 : 0.6});
-          if (e.ship === p && e.kind === 'heavy') this.shake(0.25);
+          if (e.ship === p && (e.kind === 'heavy' || e.kind === 'superheavy')) this.shake(e.kind === 'superheavy' ? 0.45 : 0.25);
           break;
         }
         case 'rocket': Sound.play('rocket', {x: e.x, y: e.y, vol: 0.5}); break;
         case 'rail': Sound.play('rail', {x: e.x0, y: e.y0}); if (e.ship === p) this.shake(0.35); break;
         case 'ciws': Sound.play('ciws', {x: e.x, y: e.y, vol: 0.5}); break;
+        case 'flak': Sound.play('flak', {x: e.x, y: e.y, vol: 0.5}); break;
+        case 'launch': Sound.play('plane', {x: e.x, y: e.y}); break;
+        case 'dive': Sound.play('dive', {x: e.x, y: e.y}); break;
+        case 'bombDrop': Sound.play('whistle', {x: e.x, y: e.y}); break;
+        case 'torpDrop': Sound.play('splash', {x: e.x, y: e.y, vol: 0.6}); break;
+        case 'planeDown': Sound.play('explode', {x: e.x, y: e.y, vol: 0.4}); if (e.team !== 0 && near(e.x, e.y) > 0) this.app.haptic('light'); break;
         case 'hit':
           Sound.play(e.size > 1 ? 'heavy' : 'hit', {x: e.x, y: e.y, vol: e.size > 1 ? 0.8 : 0.6});
           if (e.ship === p) { this.shake(0.15 + e.size * 0.25); this.app.haptic(e.size > 1 ? 'heavy' : 'light'); }

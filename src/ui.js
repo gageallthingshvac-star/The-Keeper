@@ -31,6 +31,12 @@ const UI = (() => {
         for (let r = 0; r < 2; r++) for (let c = 0; c < 4; c++) { circ(ctx, x - k * .21 + c * k * .14, y - k * .14 + r * k * .2, k * .05); ctx.fill(); } break;
       case 'rail': ctx.fillStyle = '#2b3138'; ctx.fillRect(x - k * .15, y - k * .5, k * .1, k * .7); ctx.fillRect(x + k * .05, y - k * .5, k * .1, k * .7);
         ctx.fillStyle = '#4f8fb8'; for (let i = 0; i < 3; i++) ctx.fillRect(x - k * .22, y - k * .42 + i * k * .2, k * .44, k * .06); ctx.fillStyle = '#9aa4ae'; ctx.fillRect(x - k * .26, y + k * .12, k * .52, k * .24); break;
+      case 'superheavy': ctx.fillStyle = '#1e2329'; for (const dx of [-0.26, 0, 0.26]) ctx.fillRect(x + dx * k - k * .05, y - k * .52, k * .1, k * .5);
+        ctx.fillStyle = '#c8d0d8'; ctx.fillRect(x - k * .4, y - k * .1, k * .8, k * .46); break;
+      case 'aa': ctx.fillStyle = '#1b2026'; ctx.fillRect(x - k * .14, y - k * .46, k * .08, k * .42); ctx.fillRect(x + k * .06, y - k * .46, k * .08, k * .42);
+        ctx.fillStyle = '#aab4be'; roundRect(ctx, x - k * .22, y - k * .06, k * .44, k * .32, k * .06); ctx.fill(); break;
+      case 'hangar': ctx.fillStyle = '#6b5e4c'; ctx.fillRect(x - k * .42, y - k * .42, k * .84, k * .84); ctx.fillStyle = '#d9a92e'; ctx.fillRect(x - k * .03, y - k * .42, k * .06, k * .84);
+        ctx.fillStyle = '#dfe5ea'; ctx.fillRect(x - k * .32, y - k * .06, k * .64, k * .1); ctx.fillRect(x - k * .05, y - k * .24, k * .1, k * .46); ctx.fillRect(x - k * .14, y + k * .16, k * .28, k * .07); break;
       case 'radar': ctx.fillStyle = '#2b3138'; circ(ctx, x, y, k * .1); ctx.fill(); ctx.fillStyle = '#dfe5ea'; ctx.fillRect(x - k * .34, y - k * .08, k * .68, k * .16); break;
       case 'repair': ctx.fillStyle = '#d9a92e'; ctx.fillRect(x - k * .3, y - k * .3, k * .6, k * .6); ctx.fillStyle = '#2a3036'; ctx.fillRect(x - k * .06, y - k * .22, k * .12, k * .44); ctx.fillRect(x - k * .22, y - k * .06, k * .44, k * .12); break;
       case 'smoke': ctx.fillStyle = '#2a3036'; circ(ctx, x - k * .16, y, k * .14); ctx.fill(); circ(ctx, x + k * .16, y, k * .14); ctx.fill();
@@ -77,11 +83,13 @@ const UI = (() => {
     $('cCredits').textContent = cr(p.credits);
     el.innerHTML = '';
     OPS.forEach((op, i) => {
+      if (op.legend && !OPS[i - 1].legend) el.insertAdjacentHTML('beforeend', '<div class="legendHead"><b>Legends</b><span>Famous battles, famous ships. Unlocked after the campaign.</span></div>');
       const open = Progress.opUnlocked(p, i);
       const b = document.createElement('button');
       b.className = 'op' + (open ? '' : ' locked'); b.disabled = !open;
       const foes = {}; op.enemies.forEach(e => foes[ENEMIES[e].name] = (foes[ENEMIES[e].name] || 0) + 1);
-      b.innerHTML = `<span class="num">OPERATION ${i + 1} · ${WEATHER[op.weather].name.toUpperCase()}</span><b>${op.name}</b>
+      b.className += op.legend ? ' legend' : '';
+      b.innerHTML = `<span class="num">${op.legend ? 'LEGEND · ' + op.year : 'OPERATION ' + (i + 1)} · ${WEATHER[op.weather].name.toUpperCase()}</span><b>${op.name}</b>
         <div class="meta">${Object.entries(foes).map(([n, c]) => `${c}× ${n}`).join(', ')}<br>Budget ${Util.fmtNum(Progress.budget(p, i))}${open ? '' : ' · Locked'}</div>
         <div class="stars">${starsHtml(p.stars[i])}</div>${p.hardClears[i] ? '<span class="badge">HARD</span>' : ''}`;
       b.onclick = () => { Sound.play('click'); openBrief(i); };
@@ -93,7 +101,7 @@ const UI = (() => {
     const foes = {}; op.enemies.forEach(e => foes[ENEMIES[e].name] = (foes[ENEMIES[e].name] || 0) + 1);
     const probs = app.launchProblems({mode: 'op', op: i});
     $('sheetBody').innerHTML = `
-      <div class="mute small">OPERATION ${i + 1}</div><h2>${op.name}</h2>
+      <div class="mute small">${op.legend ? 'LEGEND · ' + op.year : 'OPERATION ' + (i + 1)}</div><h2>${op.name}</h2>
       <div class="stars">${starsHtml(p.stars[i])}</div>
       <p class="brief">${op.brief}</p>
       <div class="facts">
@@ -276,6 +284,29 @@ const UI = (() => {
     next();
   }
 
+  // Load a famous ship as your own design (if it fits your dock and you own its parts).
+  function openBlueprints() {
+    const p = app.profile, dock = Progress.dock(p), unl = Progress.unlocked(p);
+    const rows = Data.BLUEPRINTS.map(id => {
+      const F = Data.FAMOUS[id], d = Design.fromRows(F.rows), a = Design.analyze(d);
+      const missing = Object.keys(a.cnt).filter(t => !unl.has(t)).map(t => PARTS[t].name);
+      const needDock = Data.DOCKS.findIndex(k => k.w >= d.w && k.h >= d.h);
+      const why = needDock > p.dock ? `Needs ${Data.DOCKS[needDock].name}` : missing.length ? 'Needs ' + missing.join(', ') : '';
+      return `<div class="bp"><div><b>${F.name}</b> <span class="mute small">${F.cls} · ${F.nation} · ${F.year}</span>
+        <p>${F.blurb}</p><span class="mono small">${d.w}×${d.h} · cost ${a.cost} · ${(a.speed * Design.KN).toFixed(0)} kn</span></div>
+        <button data-bp="${id}" class="${why ? '' : 'primary'}" ${why ? 'disabled' : ''}>${why || 'Load'}</button></div>`;
+    }).join('');
+    $('sheetBody').innerHTML = `<h2>Blueprints</h2><p class="mute small" style="margin:4px 0 10px">Famous warships, ready to refit. Loading replaces your current design (undo brings it back).</p>
+      <div class="bps">${rows}</div><div class="btns"><button id="bpClose">Close</button></div>`;
+    $('sheet').classList.add('on');
+    $('bpClose').onclick = () => $('sheet').classList.remove('on');
+    for (const b of $$('[data-bp]')) b.onclick = () => {
+      const F = Data.FAMOUS[b.dataset.bp];
+      edit(() => { p.design = Design.fromRows(F.rows, dock.w, dock.h); });
+      $('sheet').classList.remove('on'); toast(`${F.name} loaded`); Sound.play('buy');
+    };
+  }
+
   // ---------------------------------------------------------------- armory
   let armoryTab = 'parts';
   function renderArmory(tab) {
@@ -331,7 +362,7 @@ const UI = (() => {
     };
     seg('setDiff', Object.entries(DIFFICULTY).map(([k, d]) => [k, d.name]), s.difficulty, k => { s.difficulty = k; app.save(); renderSettings(); });
     $('setDiffDesc').textContent = DIFFICULTY[s.difficulty].desc + ` Rewards ×${DIFFICULTY[s.difficulty].reward}.`;
-    seg('setQual', [['auto', 'Auto'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High']], s.quality, k => { if (k === s.quality) return; s.quality = k; app.save(); location.reload(); });
+    seg('setQual', [['auto', 'Auto'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High']], s.quality === 'phone' ? 'auto' : s.quality, k => { if (k === s.quality) return; s.quality = k; app.save(); location.reload(); });
     $('setVol').value = s.volume; $('setVol').oninput = e => { s.volume = +e.target.value; Sound.setVolume(s.volume); app.save(); };
     $('setMusic').checked = s.music; $('setMusic').onchange = e => { s.music = e.target.checked; Sound.setMusic(s.music); app.save(); };
     $('setShake').checked = s.shake; $('setShake').onchange = e => { s.shake = e.target.checked; app.save(); };
@@ -366,7 +397,8 @@ const UI = (() => {
     $('rStars').innerHTML = endless ? '' : [0, 1, 2].map(() => '<span>★</span>').join('');
     const st = r.stats;
     $('rStats').innerHTML = [['Time', Util.fmtTime(r.time)], ['Ships sunk', r.sunk], ['Accuracy', st.shots ? Math.round(Math.min(1, st.hits / st.shots) * 100) + '%' : '—'],
-      ['Damage dealt', Util.fmtNum(st.dmg)], ['Damage taken', Util.fmtNum(st.taken)], ['Hull remaining', Math.round(r.integrity * 100) + '%']]
+      ['Damage dealt', Util.fmtNum(st.dmg)], ['Damage taken', Util.fmtNum(st.taken)], ['Hull remaining', Math.round(r.integrity * 100) + '%'],
+      ...(st.planesDown ? [['Aircraft downed', st.planesDown]] : [])]
       .map(([a, b]) => `<div class="row"><span>${a}</span><span>${b}</span></div>`).join('');
     const lines = endless ? [[`Waves × ${r.wave}`, r.wave * 45], ['Ships sunk', Math.round((r.sunkCost || 0) * 0.1)]] : rw.lines;
     const mult = endless ? DIFFICULTY[r.difficulty].reward : rw.mult;
@@ -426,6 +458,7 @@ const UI = (() => {
       clearTimeout(clearArm); clearArm = 0; b.textContent = 'Clear'; b.classList.remove('on');
       edit(() => { const d = app.profile.design; app.profile.design = Design.create(d.w, d.h); });
     };
+    $('tBlue').onclick = () => { Sound.play('click'); openBlueprints(); };
     $('tStarter').onclick = () => { const d = Progress.dock(app.profile); edit(() => { app.profile.design = Design.fromRows(Data.STARTER, d.w, d.h); }); };
     $('vLeft').onclick = () => { app.yard.yaw += Math.PI / 4; };
     $('vRight').onclick = () => { app.yard.yaw -= Math.PI / 4; };

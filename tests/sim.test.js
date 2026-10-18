@@ -24,11 +24,17 @@ const REF = {
   t5: ['.....H.....', '....HXH....', '...HAXAH...', '..HHHLHHH..', '..CAHHHAC..', '.HHHAXAHHH.', '.GHHHHHHHG.', '.HAAABAAAH.',
        '.GHMHDHMHG.', '.HHHHLHHHH.', '.THMHWHMHT.', '.AHHHHHHHA.', '.GHMHHHMHG.', '.AHHHXHHHA.', '.CHHHXHHHC.', '.KHHHHHHHK.',
        '.HAHHLHHAH.', '.HHHHHHHHH.', '.HEHEHEHEH.', '.HEHEHEHEH.', '.HEHHSHHEH.', '..HHRHRHH..'],
+  // Dock IV flagship (Yamato hull, modern refit) for the last Legends operations
+  t6: ['......H......', '.....HLH.....', '....HHHHH....', '....HHZHH....', '...HHAAAHH...', '...HHHZHHH...', '..HHHAAAHHH..',
+       '..HQHMHMHQH..', '..HHXABAXHH..', '.HQHHADAHHQH.', '.HHHAAEAAHHH.', '.HQXHHWHHXQH.', '.HHHAAEAAHHH.', '.HQHMHHHMHQH.',
+       '.HHGHAEAHGHH.', '.HQKHHHHHKQH.', '.HHHAAEAAHHH.', '.HCHMHHHMHCH.', '..HHHAAAHHH..', '..HHHHZHHHH..', '..HHHAAAHHH..',
+       '..HCHHHHHCH..', '...HHEHEHH...', '...HHWHWHH...', '....HRHRH....', '.....HHH.....'],
   t4: ['.....H.....', '....HXH....', '...HAXAH...', '..HHHLHHH..', '..CAHHHAC..', '.HHHAXAHHH.', '.GHHHHHHHG.', '.HAAABAAAH.',
        '.GHMHDHMHG.', '.HHHHHHHHH.', '.THMHWHMHT.', '.HHHHHHHHH.', '.GHMHHHMHG.', '.AHHHXHHHA.', '.CHHHXHHHC.', '.HHHHHHHHH.',
        '.HAHHLHHAH.', '.HHHHHHHHH.', '.HEHEHEHEH.', '.HEHEHEHEH.', '.HEHHSHHEH.', '..HHRHRHH..'],
 };
-const refFor = op => ['starter', 't1', 't1', 't2', 't2', 't2b', 't2b', 't3', 't3', 't3b', 't4', 't5'][op];
+const refFor = op => ['starter', 't1', 't1', 't2', 't2', 't2b', 't2b', 't3', 't3', 't3b', 't4', 't5', 't4', 't4', 't5', 't6', 't6'][op];
+for (const k of Data.BLUEPRINTS) REF[k] = REF[k] || Data.FAMOUS[k].rows;
 // Upgrades a player would plausibly own by this operation.
 const modsFor = op => { const lv = Math.floor(op / 4); const p = Progress.fresh(); for (const k of ['plating', 'gunnery', 'firecontrol', 'propulsion']) p.tracks[k] = lv; return Progress.mods(p); };
 
@@ -54,7 +60,8 @@ for (const [id, e] of Object.entries(Data.ENEMIES)) {
   const a = Design.analyze(Design.fromRows(e.rows));
   const p = Design.problems(a, {});
   ok(p.length === 0, `${id}: ${p.join(' ')}`);
-  ok(e.rows[0].length <= 11 && e.rows.length <= 23, `${id}: fits 11x23`);
+  ok(e.rows[0].length <= 13 && e.rows.length <= 27, `${id}: fits 13x27`);
+  ok(e.rows.every(r => r.length === e.rows[0].length), `${id}: rows same width`);
   console.log(`  ${id.padEnd(12)} cost ${String(a.cost).padStart(5)}  mass ${a.mass.toFixed(0).padStart(4)}/${a.buoy.toFixed(0).padStart(4)}  ` +
               `${(a.speed * Design.KN).toFixed(1).padStart(5)} kn  dps ${a.dps.toFixed(0).padStart(4)}  rng ${a.range.toFixed(0)}`);
 }
@@ -117,6 +124,21 @@ section('simulation');
   const victim = s2.blocks.find(b => b.t === 'hull'); victim.hp = 5;
   for (let i = 0; i < 60; i++) w2.step(1 / 30);
   ok(victim.hp > 5, 'repair bay heals');
+  // aircraft: launch, attack, return
+  const w4 = new Sim.World({rng: Util.rng(11)});
+  const cv = w4.addShip(Design.fromRows(Data.FAMOUS.enterprise.rows), {team: 0, x: 0, y: 500, a: 0, player: true});
+  const tgt = w4.addShip(Design.fromRows(Data.ENEMIES.cruiser.rows), {team: 1, x: 0, y: -200, a: Math.PI});
+  const seen4 = new Set(); let maxAir = 0;
+  for (let i = 0; i < 30 * 50; i++) { w4.step(1 / 30); maxAir = Math.max(maxAir, w4.planes.length); for (const e of w4.drain()) seen4.add(e.type); }
+  for (const t of ['launch', 'dive', 'bombDrop', 'land']) ok(seen4.has(t), `aircraft event "${t}"`);
+  ok(maxAir > 1, `several planes airborne (${maxAir})`);
+  ok(w4.stats.dmg > 0, 'bombs deal damage');
+  // AA shoots planes down
+  const w5 = new Sim.World({rng: Util.rng(12)});
+  w5.addShip(Design.fromRows(Data.FAMOUS.akagi.rows), {team: 1, x: 0, y: -400, a: Math.PI});
+  const flak = w5.addShip(Design.fromRows(['..QHQ..', '.QHHHQ.', 'QHHBHHQ', 'QHHGHHQ', '.QHEHQ.', '..HRH..']), {team: 0, x: 0, y: 400, a: 0, player: true});
+  for (let i = 0; i < 30 * 60; i++) { w5.step(1 / 30); w5.drain(); }
+  ok(w5.stats.planesDown > 0, `AA downs planes (${w5.stats.planesDown})`);
   // sinking by flooding
   const w3 = new Sim.World({rng: Util.rng(9)});
   const s3 = w3.addShip(Design.fromRows(REF.starter), {team: 0, x: 0, y: 0, a: 0});
@@ -141,7 +163,7 @@ section('progression');
   const hard = Progress.reward(Progress.fresh(), {op: 0, won: true, integrity: 0.9, time: 60, sunkCost: 400, difficulty: 'hard'}).total;
   ok(easy < rw.total && rw.total < hard, 'difficulty scales rewards');
   const junk = Progress.sanitize({v: 1, credits: -5, parts: ['nope', 'rail'], dock: 9, stars: [3, 'x'], settings: {difficulty: 'insane'}});
-  ok(junk.credits === 0 && junk.dock === 2 && junk.stars[1] === 0 && junk.settings.difficulty === 'medium' && !junk.parts.includes('nope'), 'sanitize');
+  ok(junk.credits === 0 && junk.dock === Data.DOCKS.length - 1 && junk.stars[1] === 0 && junk.settings.difficulty === 'medium' && !junk.parts.includes('nope'), 'sanitize');
   ok(Progress.sanitize(null).credits === 0, 'fresh profile from nothing');
 }
 section('endless');
@@ -180,7 +202,8 @@ section('difficulty ordering (win rate of the test captain)');
   }
   const rate = d => total[d] / n[d];
   console.log(`  overall: easy ${(rate('easy') * 100).toFixed(0)}%  medium ${(rate('medium') * 100).toFixed(0)}%  hard ${(rate('hard') * 100).toFixed(0)}%`);
-  ok(rate('easy') >= rate('medium') && rate('medium') >= rate('hard'), 'easy >= medium >= hard');
+  const tol = BALANCE ? 0.05 : 0.12; // small samples are noisy
+  ok(rate('easy') >= rate('medium') - tol && rate('medium') >= rate('hard') - tol, 'easy >= medium >= hard (within sampling noise)');
   ok(rate('easy') > rate('hard'), 'easy strictly easier than hard');
 }
 

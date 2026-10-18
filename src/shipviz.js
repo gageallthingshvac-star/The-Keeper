@@ -14,8 +14,9 @@ const Viz = (() => {
 
   // Visual pieces per part. node: base | pivot (turret yaw) | barrel (yaw + elevation) | spin (radar)
   // tint: 'paint' takes the team turret colour.
-  const BARREL = {gun: [0, 1.7, -1.4], heavy: [0, 2.2, -3.2], ciws: [0, 2.6, -1.2], rail: [0, 1.9, -0.6], rockets: [0, 2.6, 0.4]};
-  const MUZZLE = {gun: 9.6, heavy: 16, ciws: 5, rail: 17, rockets: 4, torp: 6, missile: 0};
+  const BARREL = {gun: [0, 1.7, -1.4], heavy: [0, 2.2, -3.2], superheavy: [0, 2.7, -3.4], ciws: [0, 2.6, -1.2], aa: [0, 1.9, -0.6], rail: [0, 1.9, -0.6], rockets: [0, 2.6, 0.4]};
+  const MUZZLE = {gun: 9.6, heavy: 16, superheavy: 20, ciws: 5, aa: 4.6, rail: 17, rockets: 4, torp: 6, missile: 0, hangar: 0};
+  const PLANE = [['planeBody', 'plane'], ['planeWing', 'plane'], ['planeTail', 'plane'], ['planeFin', 'plane'], ['planeProp', 'dark']];
   const p = (geo, mat, node = 'base', o = {}) => Object.assign({geo, mat, node}, o);
   const PIECES = {
     bridge: [p('tower', 'light'), p('tower2', 'light'), p('window', 'glass'), p('wing', 'light'), p('mast', 'dark'),
@@ -31,6 +32,12 @@ const Viz = (() => {
     rail: [p('railBase', 'paint', 'pivot', {tint: true}), p('railRail', 'dark', 'barrel', {pos: [-1.3, 0, 0]}), p('railRail', 'dark', 'barrel', {pos: [1.3, 0, 0]}),
            p('railCoil', 'coil', 'barrel', {pos: [0, 0, -3]}), p('railCoil', 'coil', 'barrel', {pos: [0, 0, -8]}), p('railCoil', 'coil', 'barrel', {pos: [0, 0, -13]})],
     rockets: [p('rocketBase', 'dark', 'pivot'), p('rocketBox', 'paint', 'barrel', {tint: true}), p('rocketFace', 'black', 'barrel')],
+    superheavy: [p('superHouse', 'paint', 'pivot', {tint: true}), p('superRoof', 'paint', 'pivot', {tint: true}),
+                 ...[-2.6, 0, 2.6].map(x => p('superBarrel', 'dark', 'barrel', {pos: [x, 0, 0]}))],
+    aa: [p('aaBase', 'dark', 'pivot'), p('aaMount', 'paint', 'pivot', {tint: true}),
+         p('aaBarrel', 'dark', 'barrel', {pos: [-0.6, 0, 0]}), p('aaBarrel', 'dark', 'barrel', {pos: [0.6, 0, 0]})],
+    hangar: [p('flightDeck', 'flight'), p('deckStripe', 'yellow'),
+             ...PLANE.map(([g, m]) => p(g, m, 'parked', {pos: [0, DECK + 1.5, 0], tint: m === 'plane'}))],
     radar: [p('radarMast', 'dark'), p('radarDish', 'light', 'spin', {y: DECK + 7.5, rate: 2.4})],
     repair: [p('repairPad', 'yellow'), p('craneBase', 'yellow'), p('craneArm', 'yellow')],
     smoke: [p('canister', 'dark', 'base', {pos: [-1.8, DECK + 1.6, 0.6]}), p('canister', 'dark', 'base', {pos: [1.8, DECK + 1.6, 0.6]})],
@@ -173,6 +180,9 @@ const Viz = (() => {
               m.node.multiply(m.r.makeRotationX(b.elev || 0));
             }
             node = m.node;
+          } else if (e.node === 'parked') {
+            if (b.air > 0) { e.pool.set(e.i, Gfx_zero); continue; }
+            node = m.base;
           } else if (e.node === 'spin') {
             m.node.multiplyMatrices(m.base, m.tmp.makeTranslation(0, e.pc.y, 0));
             m.node.multiply(m.r.makeRotationY(t * e.pc.rate + s.id));
@@ -268,6 +278,25 @@ const Viz = (() => {
         out.makeRotationY(-tp.a).setPosition(tp.x, waveH(tp.x, tp.y, t) - 1.6, tp.y);
         if (Math.random() < 0.7) this.P({x: tp.x, y: tp.y, h: 0, vx: 0, vy: 0, vh: 0, life: 3, size: 3.5, c: C.foam, a: 0.55, surf: true, grow: 1.5});
       });
+      // aircraft: every piece shares the plane's matrix; bank into turns, pitch with climb
+      const planeM = new M4(), team0 = TEAM[0].paint, team1 = TEAM[1].paint;
+      for (const [g, mt0] of PLANE) {
+        // separate pools from the parked planes on carrier decks (those are ship pieces)
+        const mt = mt0 === 'plane' ? 'planeFly' : 'darkFly';
+        const pool = this.pools.get(g, mt, true);
+        stream(pool, world.planes, (pl, out) => {
+          const dyaw = Util.wrapA(pl.a - (pl.va ?? pl.a)), climb = (pl.h - (pl.ph ?? pl.h));
+          pl.bank = (pl.bank || 0) + (Util.clamp(-dyaw * 40, -0.9, 0.9) - (pl.bank || 0)) * 0.15;
+          m.e.set(Util.clamp(climb * 0.4, -0.6, 0.5), -pl.a, pl.bank); m.q.setFromEuler(m.e);
+          out.compose(m.v.set(pl.x, pl.h, pl.y), m.q, m.one);
+        });
+        if (mt === 'planeFly') { let i = 0; for (const pl of world.planes) pool.color(i++, pl.team === 0 ? team0 : team1); }
+      }
+      for (const pl of world.planes) {
+        pl.va = pl.a;
+        if (Math.random() < 0.25) this.P({x: pl.x, y: pl.y, h: pl.h, vx: 0, vy: 0, vh: 0, life: 0.8, size: 1.6, c: C.fsmoke, a: 0.35, grow: 1.5});
+      }
+      stream(this.pools.get('bomb', 'black', false), world.bombs, (bm, out) => out.makeScale(1, 1, 1).setPosition(bm.cx ?? bm.x, bm.ch ?? bm.h, bm.cy ?? bm.y));
       // smoke screens keep billowing while they last
       for (const c of world.smokes) {
         const left = 1 - c.t / c.life;
@@ -356,8 +385,8 @@ const Viz = (() => {
             for (let i = 0; i < 6; i++) this.P({x, y, h, vx: (Math.random() - .5) * 30, vy: (Math.random() - .5) * 30, vh: Math.random() * 6, life: 1.5 + Math.random(), size: 5 + Math.random() * 3, c: C.fsmoke, a: 0.6, grow: 1.5});
           } else if (e.kind === 'torp') this.splash(x, y, 0.8);
           else if (e.kind !== 'rockets') {
-            const big = e.kind === 'heavy';
-            this.muzzleFlash(x, y, h, e.ang, big ? 2 : 1, [s.vx, s.vy]);
+            const big = e.kind === 'heavy' || e.kind === 'superheavy';
+            this.muzzleFlash(x, y, h, e.ang, e.kind === 'superheavy' ? 2.8 : big ? 2 : 1, [s.vx, s.vy]);
             if (big) this.env.flashLight(x, h, y, 0.8);
           }
           break;
@@ -395,6 +424,16 @@ const Viz = (() => {
           break;
         }
         case 'intercept': this.explosion(e.x, e.y, e.h, 0.5); break;
+        case 'flak':
+          this.P({x: e.x, y: e.y, h: e.h, vx: 0, vy: 0, vh: 1, life: 1.6, size: 5, c: C.dsmoke, a: 0.7, grow: 1.2});
+          this.G({x: e.x, y: e.y, h: e.h, vx: 0, vy: 0, vh: 0, life: 0.1, size: 6, c: C.flash, a: 1});
+          break;
+        case 'planeDown':
+          this.explosion(e.x, e.y, e.h, 0.6);
+          this.spawnDebris(e.x, e.y, e.h, e.vx * 0.5, e.vy * 0.5, {vh: 4, k: 0.3, scale: 0.9, life: 8});
+          for (let i = 0; i < 8; i++) this.P({x: e.x + e.vx * 0.05 * i, y: e.y + e.vy * 0.05 * i, h: e.h - i * 2, vx: 0, vy: 0, vh: 2, life: 2.5, size: 4, c: C.dsmoke, a: 0.6, grow: 1.8});
+          break;
+        case 'launch': { if (s && s.viz) { const [x, y] = s.pos(e.block); this.P({x, y, h: this.deckH(s, e.block.lx, e.block.ly) + 2, vx: -s.vx * 0.3, vy: -s.vy * 0.3, vh: 2, life: 1, size: 5, c: C.foam, a: 0.4, grow: 1.5}); } break; }
         case 'smoke': for (let i = 0; i < 20; i++) { const a = Math.random() * Util.TAU, r = Math.random() * e.r * 0.5; this.P({x: e.x + Math.cos(a) * r, y: e.y + Math.sin(a) * r, h: 3 + Math.random() * 8, vx: Math.cos(a) * 12, vy: Math.sin(a) * 12, vh: 2, life: 4 + Math.random() * 2, size: 18 + Math.random() * 14, c: C.screen, a: 0.6, grow: 0.8, fadeIn: true}); } break;
       }
     }

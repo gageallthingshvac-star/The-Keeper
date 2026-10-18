@@ -65,6 +65,10 @@ const Sound = (() => {
     ciws:    t => [noiseSrc(t, 0.05, 'highpass', 3500, 0, 0.12)],
     sink:    t => [tone(t, 3, 'sawtooth', 55, 30, 0.12, 0.3), noiseSrc(t, 3, 'lowpass', 300, 0, 0.25, 80)],
     smoke:   t => [noiseSrc(t, 1.2, 'bandpass', 900, 0.8, 0.18, 300)],
+    plane:   t => [tone(t, 1.6, 'sawtooth', 88, 120, 0.07, 0.3), noiseSrc(t, 1.6, 'bandpass', 500, 1.2, 0.06)],
+    dive:    t => [tone(t, 1.3, 'sine', 1400, 520, 0.09, 0.2), tone(t, 1.3, 'sawtooth', 120, 180, 0.05, 0.2)],
+    whistle: t => [tone(t, 0.7, 'sine', 1800, 700, 0.06, 0.05)],
+    flak:    t => [noiseSrc(t, 0.25, 'lowpass', 900, 0, 0.3, 200), tone(t, 0.12, 'sine', 140, 60, 0.18)],
     // UI and stingers are not positional
     click:   t => [tone(t, 0.05, 'sine', 900, 700, 0.12)],
     place:   t => [tone(t, 0.06, 'triangle', 420, 300, 0.14), noiseSrc(t, 0.05, 'bandpass', 1800, 2, 0.08)],
@@ -77,8 +81,8 @@ const Sound = (() => {
     defeat:  t => [392, 349, 311, 233].flatMap((f, i) => [tone(t + i * 0.22, 1.2, 'triangle', f, 0, 0.14, 0.03)]),
     alarm:   t => [tone(t, 0.18, 'square', 700, 0, 0.05), tone(t + 0.22, 0.18, 'square', 700, 0, 0.05)],
   };
-  const POSITIONAL = new Set(['gun', 'heavy', 'explode', 'hit', 'splash', 'bigsplash', 'missile', 'rocket', 'torp', 'rail', 'ciws', 'sink', 'smoke']);
-  const MIN_GAP = {ciws: 0.06, gun: 0.03, splash: 0.04, hit: 0.03, coin: 0.04};
+  const POSITIONAL = new Set(['gun', 'heavy', 'explode', 'hit', 'splash', 'bigsplash', 'missile', 'rocket', 'torp', 'rail', 'ciws', 'sink', 'smoke', 'plane', 'dive', 'whistle', 'flak']);
+  const MIN_GAP = {ciws: 0.06, gun: 0.03, splash: 0.04, hit: 0.03, coin: 0.04, flak: 0.07, plane: 0.4, dive: 0.3};
 
   // play('gun', {x, y, vol})
   function play(name, o = {}) {

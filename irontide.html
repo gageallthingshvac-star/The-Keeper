@@ -67,6 +67,14 @@ h3{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute
 .op.locked{opacity:.45}
 .stars{color:#4c5c68;letter-spacing:2px;font-size:15px} .stars .on{color:var(--brass);text-shadow:0 0 10px rgba(224,180,90,.5)}
 
+.legendHead{grid-column:1/-1;margin-top:10px;padding:4px 2px;display:flex;flex-direction:column;gap:2px}
+.legendHead b{font-family:var(--display);font-size:20px;color:var(--brass);letter-spacing:.04em}
+.legendHead span{font-size:12px;color:var(--mute)}
+.op.legend{border-color:rgba(224,180,90,.32);background:linear-gradient(160deg,rgba(60,44,16,.55),var(--panel) 60%)}
+.bps{display:flex;flex-direction:column;gap:8px;text-align:left}
+.bp{display:flex;gap:10px;align-items:center;justify-content:space-between;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:12px;padding:10px}
+.bp p{font-size:12px;color:#b7c7d2;line-height:1.4;margin:3px 0}
+.bp button{flex:0 0 auto;max-width:130px;font-size:12px}
 /* ---------- shipyard */
 .yard{padding-bottom:calc(8px + var(--sB))}
 .yardTop{margin-bottom:8px;flex-wrap:nowrap}
@@ -233,8 +241,8 @@ h3{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute
   .yardTop{margin-bottom:4px}
   #yardPanel{width:270px;gap:6px}
   #yardPanel .card{padding:8px}
-  #palette{grid-template-columns:repeat(5,1fr);gap:4px}
-  .part{padding:2px 1px 3px} .part canvas{width:24px;height:24px}
+  #palette{grid-template-columns:repeat(6,1fr);gap:3px}
+  .part{padding:2px 0 3px;font-size:9px} .part canvas{width:22px;height:22px} .part .c{font-size:9px}
   #partInfo{display:none}
   .tools button{padding:5px 8px;min-height:32px}
   .hstats{width:124px} #hShip{width:36px;height:84px}
@@ -249,6 +257,8 @@ h3{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute
     grid-template-areas:"h b" "s b" "r b"}
   .result .rHead{grid-area:h} .result .rBody{grid-area:s / s / r / r} .result .btns{grid-area:b;align-self:center;margin:0}
   .result .stars{font-size:26px;margin:4px 0 0}
+  .result .row{font-size:12px;padding:1px 0} .result .rstats,.result .reward{margin-top:6px}
+  .result .reward .row.total{padding-top:3px}
   .dialog .btns button{padding:8px 12px;min-height:38px}
 }
 </style>
@@ -306,7 +316,7 @@ h3{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute
       </div>
       <div class="card tools">
         <button id="tMirror" class="on">Mirror</button><button id="tErase">Erase</button>
-        <button id="tClear">Clear</button><button id="tStarter">Starter</button>
+        <button id="tClear">Clear</button><button id="tStarter">Starter</button><button id="tBlue">Blueprints</button>
         <span class="sep"></span>
         <span id="slots"></span>
       </div>
@@ -328,7 +338,7 @@ h3{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute
   <div class="topbar"><button class="back" data-act="title">‹ Back</button><b>Settings</b><span></span></div>
   <div class="wrap narrow">
     <div class="card"><h3>Difficulty</h3><div class="seg" id="setDiff"></div><p class="mute small" id="setDiffDesc"></p></div>
-    <div class="card"><h3>Graphics</h3><div class="seg" id="setQual"></div><p class="mute small">Auto picks Medium on phones and High on computers. Changing it reloads the game.</p></div>
+    <div class="card"><h3>Graphics</h3><div class="seg" id="setQual"></div><p class="mute small">Auto turns on shadows for iPhone 14 and newer, Medium on older phones, High on computers. Changing it reloads the game.</p></div>
     <div class="card"><h3>Sound</h3>
       <label class="rowline"><span>Volume</span><input type="range" id="setVol" min="0" max="1" step="0.05"></label>
       <label class="rowline"><span>Music</span><input type="checkbox" id="setMusic"></label>
@@ -489,6 +499,15 @@ const Data = (() => {
     rail:    {name: 'Railgun',   key: 'L', cost: 240, mass: 5,   buoy: 0.5, hp: 60,  boom: 25,
               weapon: {type: 'rail', range: 720, reload: 5.5, dmg: 95, pierce: 4, falloff: 0.75, spread: 0.012},
               desc: 'Hypersonic slug. Longest range, punches through a line of blocks.'},
+    superheavy: {name: '46cm Turret', key: 'Z', cost: 220, mass: 10, buoy: 0.5, hp: 120, boom: 45,
+              weapon: {type: 'shell', range: 560, reload: 3.6, dmg: 95, splash: 16, speed: 470, spread: 0.028},
+              desc: "Yamato's triple 46 cm turret. The heaviest guns ever put to sea. Enormously heavy."},
+    aa:      {name: 'AA Gun',    key: 'Q', cost: 30,  mass: 1,   buoy: 0.5, hp: 25,
+              weapon: {type: 'aa', range: 280, reload: 0.3},
+              desc: 'Twin flak mount. Shoots down aircraft, and sometimes missiles.'},
+    hangar:  {name: 'Hangar',    key: 'F', cost: 160, mass: 3,   buoy: 1.5, hp: 45,  boom: 30,
+              weapon: {type: 'air', range: 950, reload: 10, dmg: 65, splash: 12, speed: 150, maxAir: 1, spread: 9, torpDmg: 100},
+              desc: 'Flight deck with a strike plane — dive bombers and torpedo bombers alternate. Each strikes, returns and rearms. Lose the hangar and its plane has nowhere to land.'},
     radar:   {name: 'Radar',     key: 'D', cost: 60,  mass: 1,   buoy: 0.8, hp: 25,
               util: {type: 'radar', range: 0.15, spread: 0.2, max: 2},
               desc: '+15% weapon range and tighter spread. Up to two stack.'},
@@ -499,11 +518,11 @@ const Data = (() => {
               util: {type: 'smoke', radius: 75, duration: 10, cooldown: 30},
               desc: 'Lays a smoke screen under heavy fire. Enemy aim suffers inside it.'},
   };
-  const PART_ORDER = ['hull', 'armor', 'bridge', 'engine', 'rudder', 'gun', 'heavy', 'torp',
-                      'rockets', 'ciws', 'missile', 'rail', 'radar', 'repair', 'smoke'];
+  const PART_ORDER = ['hull', 'armor', 'bridge', 'engine', 'rudder', 'gun', 'heavy', 'superheavy', 'torp',
+                      'rockets', 'missile', 'rail', 'hangar', 'aa', 'ciws', 'radar', 'repair', 'smoke'];
   const KEY2PART = {};
   for (const k in PARTS) { PARTS[k].id = k; KEY2PART[PARTS[k].key] = k; }
-  const TURRETS = new Set(['gun', 'heavy', 'torp', 'ciws', 'rail', 'rockets']);
+  const TURRETS = new Set(['gun', 'heavy', 'superheavy', 'torp', 'ciws', 'aa', 'rail', 'rockets']);
   // Unlocked from the start; everything else is bought in the Armory.
   const FREE_PARTS = ['hull', 'armor', 'bridge', 'engine', 'rudder', 'gun'];
   // price in credits, op = operation index (0-based) that must be reached first
@@ -511,6 +530,7 @@ const Data = (() => {
     heavy: {price: 250, op: 1}, radar: {price: 250, op: 2}, torp: {price: 400, op: 2},
     smoke: {price: 300, op: 3}, ciws: {price: 450, op: 3}, rockets: {price: 600, op: 3},
     repair: {price: 550, op: 4}, missile: {price: 800, op: 5}, rail: {price: 1400, op: 8},
+    aa: {price: 200, op: 2}, hangar: {price: 1600, op: 9}, superheavy: {price: 2600, op: 13},
   };
 
   // ---- enemy designs (row 0 = bow) ---------------------------------------
@@ -646,6 +666,227 @@ const Data = (() => {
       '..HHRHRHH..']},
   };
 
+  // ---- famous ships ------------------------------------------------------
+  const FAMOUS = {
+    fletcher: {name: 'Fletcher', cls: 'Destroyer', nation: 'USA', year: 1942,
+      blurb: 'The workhorse destroyer of the Pacific: five 5-inch guns, ten torpedo tubes, bristling AA.', rows: [
+      '...H...',
+      '..HGH..',
+      '..HGH..',
+      '.HHBHH.',
+      '.HHHHH.',
+      '.QHEHQ.',
+      '.THEHT.',
+      '.HHEHH.',
+      '.THEHT.',
+      '.HHGHH.',
+      '.HHGHH.',
+      '.HHHHH.',
+      '..HRH..']},
+    grafspee: {name: 'Admiral Graf Spee', cls: 'Pocket battleship', nation: 'Germany', year: 1936,
+      blurb: 'Cruiser-sized hull, battleship guns. Scuttled off Montevideo after the Battle of the River Plate.', rows: [
+      '....H....',
+      '...HHH...',
+      '...HXH...',
+      '..HHHHH..',
+      '..HHBHH..',
+      '.HGHDHGH.',
+      '.HHHEHHH.',
+      '.QGHHHGQ.',
+      '.HHHEHHH.',
+      '.THHHHHT.',
+      '.HHHHHHH.',
+      '..HHXHH..',
+      '..HHHHH..',
+      '...HRH...']},
+    prinzeugen: {name: 'Prinz Eugen', cls: 'Heavy cruiser', nation: 'Germany', year: 1940,
+      blurb: "Bismarck's escort at Denmark Strait — and the only one of the pair to come home.", rows: [
+      '....H....',
+      '...HXH...',
+      '..HHHHH..',
+      '..HHBHH..',
+      '.HGHDHGH.',
+      '.HHHEHHH.',
+      '.QHHHHHQ.',
+      '.THHEHHT.',
+      '.HHHHHHH.',
+      '..HHXHH..',
+      '...HRH...']},
+    hood: {name: 'HMS Hood', cls: 'Battlecruiser', nation: 'UK', year: 1920,
+      blurb: 'The pride of the Royal Navy: fast and beautiful, but thinly armored overhead.', rows: [
+      '.....H.....',
+      '....HHH....',
+      '....HXH....',
+      '...HHHHH...',
+      '...HHXHH...',
+      '..HHHHHHH..',
+      '..HGHBHGH..',
+      '.HQHHDHHQH.',
+      '.HGHEHEHGH.',
+      '.HHHHHHHHH.',
+      '.HQHEHEHQH.',
+      '.HGHHHHHGH.',
+      '.HHHEHEHHH.',
+      '.HQHHHHHQH.',
+      '..HHHXHHH..',
+      '..HHHHHHH..',
+      '..HHHXHHH..',
+      '...HEHEH...',
+      '...HHRHH...']},
+    bismarck: {name: 'Bismarck', cls: 'Battleship', nation: 'Germany', year: 1940,
+      blurb: 'Sank Hood in eight minutes, then was hunted down by the Home Fleet.', rows: [
+      '.....H.....',
+      '....HHH....',
+      '....HXH....',
+      '...HHHHH...',
+      '...HHXHH...',
+      '..HHAAAHH..',
+      '..HGABAGH..',
+      '.HQHHDHHQH.',
+      '.HGHAEAHGH.',
+      '.HHHHHHHHH.',
+      '.HQHAEAHQH.',
+      '.HGHHWHHGH.',
+      '.HHHAEAHHH.',
+      '.HQHHHHHQH.',
+      '..HHAXAHH..',
+      '..HHHHHHH..',
+      '..HHHXHHH..',
+      '...HEHEH...',
+      '...HHRHH...']},
+    iowa: {name: 'USS Iowa', cls: 'Fast battleship', nation: 'USA', year: 1943,
+      blurb: 'Nine 16-inch guns at 33 knots, ringed with anti-aircraft batteries.', rows: [
+      '.....H.....',
+      '....HHH....',
+      '....HXH....',
+      '...HHHHH...',
+      '...HHXHH...',
+      '..HHAAAHH..',
+      '..HQABAQH..',
+      '.HHGHDHGHH.',
+      '.HQHEAEHQH.',
+      '.HHGHHHGHH.',
+      '.HQHEAEHQH.',
+      '.HHHHWHHHH.',
+      '.HQHEAEHQH.',
+      '.HHGHHHGHH.',
+      '.HQHEAEHQH.',
+      '.HHHHHHHHH.',
+      '..HHAXAHH..',
+      '..HHHHHHH..',
+      '..HCHHHCH..',
+      '...HEHEH...',
+      '...HHRHH...']},
+    akagi: {name: 'Akagi', cls: 'Aircraft carrier', nation: 'Japan', year: 1927,
+      blurb: 'Flagship of the Pearl Harbor strike force, lost at Midway.', rows: [
+      '.....H.....',
+      '....HHH....',
+      '...HHHHH...',
+      '...HHFHH...',
+      '..HHHFHHH..',
+      '..QHHHHHQ..',
+      '..HHFHFHH..',
+      '.HHHHHHHBH.',
+      '.HQHFHFHQH.',
+      '.HHHHHHHHH.',
+      '.HHHEHEHHH.',
+      '.HQHFHFHQH.',
+      '.HHHHHHHHH.',
+      '.HHHEHEHHH.',
+      '.HCHHWHHCH.',
+      '..HHHHHHH..',
+      '..HQHHHQH..',
+      '...HEHEH...',
+      '...HHRHH...']},
+    kaga: {name: 'Kaga', cls: 'Aircraft carrier', nation: 'Japan', year: 1929,
+      blurb: 'Converted from a battleship hull; the largest carrier at Midway.', rows: [
+      '.....H.....',
+      '....HHH....',
+      '...HHHHH...',
+      '...HHFHH...',
+      '..QHHHHHQ..',
+      '..HHFHFHH..',
+      '.HHHHHHHBH.',
+      '.HQHHHHHQH.',
+      '.HHHFHFHHH.',
+      '.HHHEHEHHH.',
+      '.HQHHHHHQH.',
+      '.HHHFHFHHH.',
+      '.HHHEHEHHH.',
+      '.HCHHWHHCH.',
+      '..HQHHHQH..',
+      '...HEHEH...',
+      '...HHRHH...']},
+    zuikaku: {name: 'Zuikaku', cls: 'Aircraft carrier', nation: 'Japan', year: 1941,
+      blurb: 'Veteran of Pearl Harbor, Coral Sea and the Philippine Sea; the last Pearl Harbor carrier to fall.', rows: [
+      '.....H.....',
+      '....HHH....',
+      '...HHFHH...',
+      '..QHHHHHQ..',
+      '..HHFHFHH..',
+      '.HHHHHHHBH.',
+      '.HQHFHFHQH.',
+      '.HHHEHEHHH.',
+      '.HQHFHFHQH.',
+      '.HHHEHEHHH.',
+      '.HCHHDHHCH.',
+      '..HHFHFHH..',
+      '..HQHHHQH..',
+      '...HEHEH...',
+      '...HHRHH...']},
+    enterprise: {name: 'USS Enterprise', cls: 'Aircraft carrier', nation: 'USA', year: 1938,
+      blurb: '"The Big E" — the most decorated US warship of the Second World War.', rows: [
+      '.....H.....',
+      '....HHH....',
+      '...HHFHH...',
+      '..QHHHHHQ..',
+      '..HHFHFHH..',
+      '.HQHHHHHBH.',
+      '.HHHFHFHHH.',
+      '.HQHEHEHQH.',
+      '.HHHFHFHHH.',
+      '.HQHEHEHQH.',
+      '.HHHFHFHHH.',
+      '.HCHHDHHCH.',
+      '..HQHWHQH..',
+      '...HEHEH...',
+      '...HHRHH...']},
+    yamato: {name: 'Yamato', cls: 'Super-battleship', nation: 'Japan', year: 1941,
+      blurb: 'The largest battleship ever built: nine 46 cm guns behind 65 cm of armor. Sunk by aircraft on Operation Ten-Go.', boss: true, rows: [
+      '......H......',
+      '.....HHH.....',
+      '....HHHHH....',
+      '....HHZHH....',
+      '...HHAAAHH...',
+      '...HHHZHHH...',
+      '..HHHAAAHHH..',
+      '..HQHHHHHQH..',
+      '..HHGABAGHH..',
+      '.HQHHADAHHQH.',
+      '.HHHAAEAAHHH.',
+      '.HQGHHWHHGQH.',
+      '.HHHAAEAAHHH.',
+      '.HQHHHHHHHQH.',
+      '.HHGHAEAHGHH.',
+      '.HQHHHHHHHQH.',
+      '.HHHAAEAAHHH.',
+      '.HCHHHHHHHCH.',
+      '..HHHAAAHHH..',
+      '..HHHHZHHHH..',
+      '..HHHAAAHHH..',
+      '..HQHHHHHQH..',
+      '...HHEHEHH...',
+      '...HHHHHHH...',
+      '....HRHRH....',
+      '.....HHH.....']},
+  };
+  FAMOUS.musashi = Object.assign({}, FAMOUS.yamato, {name: 'Musashi', year: 1942,
+    blurb: "Yamato's sister. Took some twenty torpedoes and seventeen bombs at Leyte Gulf before she went down."});
+  for (const k in FAMOUS) FAMOUS[k].famous = true;
+  Object.assign(ENEMIES, FAMOUS);
+  // Player blueprints, in rough order of size.
+  const BLUEPRINTS = ['fletcher', 'prinzeugen', 'grafspee', 'hood', 'bismarck', 'iowa', 'enterprise', 'yamato'];
+
   // ---- player starter ----------------------------------------------------
   const STARTER = [
     '...H...',
@@ -708,6 +949,17 @@ const Data = (() => {
      brief: 'The enemy main body, in foul weather.'},
     {name: 'Iron Tide',       budget: 4800, weather: 'dusk',     par: 240, enemies: ['frigate', 'battleship', 'dreadnought', 'frigate'],
      brief: 'Their flagship. Break it and the war is over.'},
+    // ---- Legends: famous engagements, unlocked after the main campaign
+    {name: 'River Plate',     budget: 4200, weather: 'clear',    par: 180, legend: true, year: 1939, enemies: ['destroyer', 'grafspee', 'cruiser', 'frigate'],
+     brief: 'December 1939. The raider Admiral Graf Spee is loose in the South Atlantic. Bring her to battle.'},
+    {name: 'Denmark Strait',  budget: 4600, weather: 'overcast', par: 210, legend: true, year: 1941, enemies: ['destroyer', 'prinzeugen', 'bismarck', 'frigate'],
+     brief: 'May 1941. Bismarck and Prinz Eugen are breaking out into the Atlantic. Hood could not stop them. You must.'},
+    {name: 'Midway',          budget: 5200, weather: 'clear',    par: 220, legend: true, year: 1942, enemies: ['destroyer', 'akagi', 'cruiser', 'kaga', 'destroyer'],
+     brief: 'June 1942. Four carriers are coming for the atoll. Their dive bombers will find you first — bring anti-aircraft guns.'},
+    {name: 'Leyte Gulf',      budget: 5800, weather: 'dawn',     par: 240, legend: true, year: 1944, enemies: ['cruiser', 'musashi', 'zuikaku'],
+     brief: 'October 1944. The largest naval battle in history. Musashi leads the centre force; Zuikaku covers it from the air.'},
+    {name: 'Ten-Go',          budget: 6200, weather: 'overcast', par: 270, legend: true, year: 1945, enemies: ['destroyer', 'destroyer', 'yamato', 'cruiser', 'destroyer'],
+     brief: 'April 1945. Yamato sails on her last mission. Nine 46 cm guns, armor nothing else can pierce. Sink her.'},
   ];
 
   // ---- endless mode --------------------------------------------------------
@@ -716,7 +968,9 @@ const Data = (() => {
     {id: 'patrol', minWave: 1}, {id: 'torpboat', minWave: 2}, {id: 'gunboat', minWave: 2},
     {id: 'corvette', minWave: 4}, {id: 'destroyer', minWave: 4}, {id: 'frigate', minWave: 6},
     {id: 'cruiser', minWave: 6}, {id: 'monitor', minWave: 8}, {id: 'railcruiser', minWave: 10},
-    {id: 'battleship', minWave: 10}, {id: 'dreadnought', minWave: 15},
+    {id: 'battleship', minWave: 10}, {id: 'fletcher', minWave: 5}, {id: 'grafspee', minWave: 9}, {id: 'hood', minWave: 12},
+    {id: 'bismarck', minWave: 13}, {id: 'akagi', minWave: 12}, {id: 'enterprise', minWave: 14}, {id: 'iowa', minWave: 16},
+    {id: 'dreadnought', minWave: 15}, {id: 'yamato', minWave: 20},
   ];
   const endlessBudget = wave => 260 + wave * 230;
 
@@ -725,6 +979,7 @@ const Data = (() => {
     {name: 'Dock I',   w: 7,  h: 15, price: 0},
     {name: 'Dock II',  w: 9,  h: 19, price: 600},
     {name: 'Dock III', w: 11, h: 23, price: 1800},
+    {name: 'Dock IV',  w: 13, h: 27, price: 4000},
   ];
   const TRACK_PRICES = [200, 400, 700, 1100, 1600];
   const TRACKS = {
@@ -751,7 +1006,7 @@ const Data = (() => {
              desc: 'Enemies aim for your bridge and engines, comb torpedoes, and fall back to repair.'},
   };
 
-  return {PARTS, PART_ORDER, KEY2PART, TURRETS, FREE_PARTS, PART_SHOP, ENEMIES, STARTER, WEATHER, OPS,
+  return {PARTS, PART_ORDER, KEY2PART, TURRETS, FREE_PARTS, PART_SHOP, ENEMIES, FAMOUS, BLUEPRINTS, STARTER, WEATHER, OPS,
           ENDLESS_POOL, endlessBudget, DOCKS, TRACKS, TRACK_PRICES, DIFFICULTY};
 })();
 
@@ -861,7 +1116,7 @@ const Design = (() => {
       if (W && W.dmg) {
         const shots = W.salvo || 1;
         dps += W.dmg * shots / (W.reload / (mods.reload || 1));
-        range = Math.max(range, W.range * rangeMul);
+        range = Math.max(range, W.type === 'air' ? 0 : W.range * rangeMul);
       }
     }
     const conn = connected(d);
@@ -968,10 +1223,11 @@ const Sim = (() => {
       radars = Math.min(radars, PARTS.radar.util.max);
       this.rangeMul = 1 + radars * PARTS.radar.util.range;
       this.spreadMul = (1 - radars * PARTS.radar.util.spread) * this.mods.spread;
-      for (const b of this.weapons) { const W = PARTS[b.t].weapon; if (W.dmg) range = Math.max(range, W.range * this.rangeMul); }
+      for (const b of this.weapons) { const W = PARTS[b.t].weapon; if (W.dmg && W.type !== 'air') range = Math.max(range, W.range * this.rangeMul); }
       this.mass = m; this.buoy = bu; this.thrust = th; this.rudders = ru; this.count = n; this.range = range;
       this.maxSpeed = Design.calcSpeed(m, th); this.turnRate = Design.calcTurn(m, ru);
       this.armed = this.weapons.some(b => PARTS[b.t].weapon.dmg);
+      this.hasAir = this.weapons.some(b => b.t === 'hangar');
       this.hasSmoke = this.utils.some(b => b.t === 'smoke');
       this.hasRepair = this.utils.some(b => b.t === 'repair');
       if (!first && bu > 0) {
@@ -1015,9 +1271,9 @@ const Sim = (() => {
       this.rng = o.rng || Util.rng();
       this.weather = Data.WEATHER[o.weather || 'clear'];
       this.t = 0; this.nextId = 1;
-      this.ships = []; this.shells = []; this.missiles = []; this.rockets = []; this.torps = [];
+      this.ships = []; this.shells = []; this.missiles = []; this.rockets = []; this.torps = []; this.planes = []; this.bombs = [];
       this.smokes = []; this.booms = []; this.events = [];
-      this.stats = {shots: 0, hits: 0, dmg: 0, taken: 0, sunk: 0, sunkCost: 0};
+      this.stats = {shots: 0, hits: 0, dmg: 0, taken: 0, sunk: 0, sunkCost: 0, planesDown: 0};
       this.player = null;
     }
     emit(type, d) { d.type = type; this.events.push(d); }
@@ -1059,7 +1315,7 @@ const Sim = (() => {
         if (s.sinking) { s.sinkT += dt / 5; if (s.sinkT >= 1) s.dead = true; }
       }
       this.collisions();
-      this.stepShells(dt); this.stepRockets(dt); this.stepMissiles(dt); this.stepTorps(dt);
+      this.stepShells(dt); this.stepRockets(dt); this.stepMissiles(dt); this.stepTorps(dt); this.stepPlanes(dt); this.stepBombs(dt);
       for (let i = this.booms.length - 1; i >= 0; i--) {
         const b = this.booms[i]; b.delay -= dt;
         if (b.delay > 0) continue;
@@ -1109,7 +1365,8 @@ const Sim = (() => {
         w.cd -= dt;
         const [wx, wy] = s.pos(w);
 
-        if (W.type === 'ciws') { this.ciws(s, w, W, wx, wy, dt); continue; }
+        if (W.type === 'ciws' || W.type === 'aa') { this.pointDefense(s, w, W, wx, wy, dt); continue; }
+        if (W.type === 'air') { this.hangar(s, w, W, wx, wy); continue; }
         // a rocket salvo in progress keeps firing at its locked point
         if (w.salvo > 0) {
           w.salvoT -= dt;
@@ -1125,7 +1382,7 @@ const Sim = (() => {
         const d0 = Math.hypot(tx - wx, ty - wy);
         if (W.speed && W.type !== 'missile') { const lead = d0 / W.speed * s.prof.lead; tx += t.vx * lead; ty += t.vy * lead; }
         const desired = headingTo(tx - wx, ty - wy);
-        if (W.type !== 'missile') w.ang = turnToward(w.ang, desired, (w.t === 'heavy' || w.t === 'rail' ? 1.4 : 3.5) * dt);
+        if (W.type !== 'missile') w.ang = turnToward(w.ang, desired, (w.t === 'superheavy' ? 1.0 : w.t === 'heavy' || w.t === 'rail' ? 1.4 : 3.5) * dt);
         const d = Math.hypot(tx - wx, ty - wy);
         if (W.type === 'shell' || W.type === 'rockets') {
           const T = d / W.speed, apex = SHELL_ARC * T * T + 2;
@@ -1143,7 +1400,7 @@ const Sim = (() => {
             const [fx, fy] = fwd(w.ang);
             const mx = wx + fx * 8, my = wy + fy * 8, T = d / W.speed;
             this.shells.push({x0: mx, y0: my, tx: tx + ex, ty: ty + ey, t: 0, T, apex: SHELL_ARC * T * T + 2,
-              dmg: W.dmg, splash: W.splash, team: s.team, owner: s, heavy: w.t === 'heavy'});
+              dmg: W.dmg, splash: W.splash, team: s.team, owner: s, heavy: w.t === 'heavy' || w.t === 'superheavy'});
             this.emit('fire', {kind: w.t, ship: s, block: w, x: mx, y: my, ang: w.ang});
             break;
           }
@@ -1204,23 +1461,136 @@ const Sim = (() => {
       if (!pierced) this.emit('splash', {x: tx, y: ty, size: 1.2});
       this.emit('rail', {ship: s, block: w, x0: wx + fx * 10, y0: wy + fy * 10, x1: ex, y1: ey});
     }
-    ciws(s, w, W, wx, wy, dt) {
-      let best = null, bd = W.range;
-      for (const list of [this.missiles, this.rockets]) for (const m of list) {
-        if (m.team === s.team || m.hp <= 0) continue;
+    // CIWS prefers missiles and rockets; AA guns prefer aircraft. Both will take what they can get.
+    pointDefense(s, w, W, wx, wy, dt) {
+      const aa = W.type === 'aa';
+      let best = null, bd = W.range, bestPlane = false;
+      const consider = (m, plane) => {
+        if (m.team === s.team || m.hp <= 0) return;
         const d = Math.hypot(m.x - wx, m.y - wy);
-        if (d < bd) { bd = d; best = m; }
-      }
+        if (d >= W.range) return;
+        // a preferred target type wins over a closer non-preferred one
+        const pref = aa ? plane : !plane;
+        const bestPref = best ? (aa ? bestPlane : !bestPlane) : false;
+        if (!best || (pref && !bestPref) || (pref === bestPref && d < bd)) { best = m; bd = d; bestPlane = plane; }
+      };
+      for (const m of this.missiles) consider(m, false);
+      for (const m of this.rockets) consider(m, false);
+      for (const m of this.planes) consider(m, true);
       if (!best) { w.ang = turnToward(w.ang, s.a, 2 * dt); w.elev *= 0.95; return; }
-      w.ang = turnToward(w.ang, headingTo(best.x - wx, best.y - wy), 10 * dt);
+      w.ang = turnToward(w.ang, headingTo(best.x - wx, best.y - wy), (aa ? 6 : 10) * dt);
       w.elev = Math.atan2(best.h - DECK - 2.6, Math.max(bd, 1));
       if (w.cd > 0) return;
-      w.cd = W.reload;
-      this.emit('ciws', {ship: s, block: w, x: wx, y: wy, tx: best.x, ty: best.y, th: best.h});
-      if (this.rng() < 0.4) {
-        best.hp--;
-        if (best.hp <= 0) this.emit('intercept', {x: best.x, y: best.y, h: best.h});
+      w.cd = W.reload * this.rng.range(0.85, 1.15);
+      const chance = aa ? (bestPlane ? 0.45 : 0.15) : (bestPlane ? 0.3 : 0.4);
+      const hit = this.rng() < chance;
+      if (aa) this.emit('flak', {ship: s, block: w, x: best.x + this.rng.gauss() * 8, y: best.y + this.rng.gauss() * 8, h: best.h + this.rng.gauss() * 5, hit});
+      else this.emit('ciws', {ship: s, block: w, x: wx, y: wy, tx: best.x, ty: best.y, th: best.h});
+      if (!hit) return;
+      best.hp--;
+      if (best.hp > 0) return;
+      if (bestPlane) this.planeDown(best, s);
+      else this.emit('intercept', {x: best.x, y: best.y, h: best.h});
+    }
+
+    // ---------------------------------------------------------- aircraft
+    // A hangar keeps W.maxAir planes in the air; each flies out, dive-bombs and comes home to rearm.
+    hangar(s, w, W, wx, wy) {
+      w.air = w.air || 0;
+      if (w.cd > 0 || w.air >= W.maxAir) return;
+      const t = this.pickTarget(s, wx, wy, W.range * s.rangeMul);
+      if (!t) return;
+      w.air++;
+      w.sorties = (w.sorties || 0) + 1;
+      w.cd = W.reload * this.rng.range(0.9, 1.1) * s.prof.reload / s.mods.reload;
+      const p = {x: wx, y: wy, h: DECK + 3, a: s.a, speed: 40, hp: 3, team: s.team, owner: s, hangar: w, W,
+                 tgt: t, b: s.prof.smartAim ? t.valuableBlock() : t.randomBlock(), state: 'out', fuel: 45, age: 0,
+                 kind: (w.sorties + w.i) % 2 ? 'torpedo' : 'bomb'};
+      this.planes.push(p);
+      if (s === this.player) this.stats.shots++;
+      this.emit('launch', {ship: s, block: w, x: wx, y: wy, plane: p});
+    }
+    stepPlanes(dt) {
+      for (let i = this.planes.length - 1; i >= 0; i--) {
+        const p = this.planes[i];
+        p.age += dt; p.fuel -= dt;
+        p.px = p.x; p.py = p.y; p.ph = p.h;
+        if (p.hp <= 0) { this.planes.splice(i, 1); continue; }
+        const homeOk = p.owner && !p.owner.sinking && !p.owner.dead && p.hangar.alive;
+        if (p.fuel <= 0) { this.planeDown(p, null); this.planes.splice(i, 1); continue; }
+        let tx, ty, th, spd = 150;
+        if (p.state === 'out' || p.state === 'dive') {
+          if (!p.tgt || p.tgt.sinking || p.tgt.dead) { p.tgt = this.nearestFoe(p.team, p.x, p.y, 1200); p.b = null; if (!p.tgt) { p.state = 'home'; continue; } }
+          if (!p.b || !p.b.alive) p.b = p.tgt.randomBlock();
+          if (!p.b) { p.state = 'home'; continue; }
+          [tx, ty] = p.tgt.pos(p.b);
+          const d = Math.hypot(tx - p.x, ty - p.y);
+          if (p.kind === 'torpedo') {
+            // torpedo bombers come in low and release well short of the target
+            th = d < 420 ? 9 : 50; spd = d < 420 ? 165 : 150;
+            if (d < 200 && Math.abs(wrapA(headingTo(tx - p.x, ty - p.y) - p.a)) < 0.35) { this.dropTorpedo(p); p.state = 'home'; }
+            else if (d < 90) p.state = 'out';
+          } else if (p.state === 'out') { th = 55; if (d < 170) { p.state = 'dive'; this.emit('dive', {x: p.x, y: p.y, plane: p}); } }
+          if (p.state === 'dive') {
+            th = 14; spd = 175;
+            if (d < 30) { this.dropBomb(p, tx, ty); p.state = 'home'; }
+          }
+        } else {
+          if (!homeOk) { // carrier gone: keep fighting until the tanks run dry
+            p.tgt = this.nearestFoe(p.team, p.x, p.y, 1200);
+            if (p.tgt && p.fuel > 8 && !p.dropped) { p.state = 'out'; continue; }
+            tx = p.x + Math.sin(p.a) * 100; ty = p.y - Math.cos(p.a) * 100; th = 30;
+          } else {
+            [tx, ty] = p.owner.pos(p.hangar); th = 40;
+            const d = Math.hypot(tx - p.x, ty - p.y);
+            if (d < 120) th = DECK + 4 + d * 0.3;
+            if (d < 18) { // landed: rearm for the next sortie
+              p.hangar.air = Math.max(0, (p.hangar.air || 1) - 1);
+              this.planes.splice(i, 1);
+              this.emit('land', {ship: p.owner, x: tx, y: ty});
+              continue;
+            }
+          }
+        }
+        p.speed = Math.min(spd, p.speed + 120 * dt);
+        p.a = turnToward(p.a, headingTo(tx - p.x, ty - p.y), (p.state === 'dive' ? 2.2 : 1.6) * dt);
+        p.h += clamp(th - p.h, -45 * dt, 25 * dt);
+        const [fx, fy] = fwd(p.a);
+        p.x += fx * p.speed * dt; p.y += fy * p.speed * dt;
+        p.x = clamp(p.x, -FIELD * 1.2, FIELD * 1.2); p.y = clamp(p.y, -FIELD * 1.2, FIELD * 1.2);
       }
+    }
+    dropBomb(p, tx, ty) {
+      const sp = p.W.spread * p.owner.prof.acc * this.weather.spread * (this.inSmoke(tx, ty) ? 2.2 : 1);
+      this.bombs.push({x: p.x, y: p.y, h: p.h, x1: tx + this.rng.gauss() * sp, y1: ty + this.rng.gauss() * sp, t: 0, T: 0.7,
+                       dmg: p.W.dmg, splash: p.W.splash, team: p.team, owner: p.owner});
+      p.dropped = true;
+      this.emit('bombDrop', {x: p.x, y: p.y, h: p.h});
+    }
+    dropTorpedo(p) {
+      const t = p.tgt, [tx, ty] = t.pos(p.b), spd = Data.PARTS.torp.weapon.speed;
+      const lead = Math.hypot(tx - p.x, ty - p.y) / spd;
+      const a = headingTo(tx + t.vx * lead * p.owner.prof.lead - p.x, ty + t.vy * lead * p.owner.prof.lead - p.y) + this.rng.gauss() * 0.06 * p.owner.prof.acc;
+      const [fx, fy] = fwd(a);
+      this.torps.push({x: p.x, y: p.y, vx: fx * spd, vy: fy * spd, a, life: 420 / spd, dmg: p.W.torpDmg, splash: 10, team: p.team, owner: p.owner});
+      p.dropped = true;
+      this.emit('torpDrop', {x: p.x, y: p.y, h: p.h});
+    }
+    stepBombs(dt) {
+      for (let i = this.bombs.length - 1; i >= 0; i--) {
+        const b = this.bombs[i]; b.t += dt;
+        const f = Math.min(1, b.t / b.T);
+        b.cx = b.x + (b.x1 - b.x) * f; b.cy = b.y + (b.y1 - b.y) * f; b.ch = b.h * (1 - f * f);
+        if (f < 1) continue;
+        this.bombs.splice(i, 1);
+        this.impact(b.x1, b.y1, b.dmg, b.splash, b.team, b.owner, 'bomb');
+      }
+    }
+    planeDown(p, by) {
+      p.hp = 0;
+      if (p.hangar && p.hangar.air) p.hangar.air--;
+      if (by === this.player || (by && by.team === 0 && p.team !== 0)) this.stats.planesDown++;
+      this.emit('planeDown', {x: p.x, y: p.y, h: p.h, vx: Math.sin(p.a) * p.speed, vy: -Math.cos(p.a) * p.speed, team: p.team});
     }
 
     // ---------------------------------------------------------- utilities
@@ -1354,13 +1724,13 @@ const Sim = (() => {
         if (s.team === team || s.dead || s.sinking) continue;
         if (Math.hypot(s.x - x, s.y - y) > s.rad + (splash || 0) + S) continue;
         const b = s.blockAt(x, y);
-        if (b) { this.damageBlock(s, b, dmg, owner, true); hit = s; if (kind !== 'shell') this.ignite(s, b, kind === 'heavy' ? 0.22 : 0.12); }
+        if (b) { this.damageBlock(s, b, dmg, owner, true); hit = s; if (kind !== 'shell') this.ignite(s, b, kind === 'heavy' || kind === 'bomb' ? 0.25 : 0.12); }
         if (splash && this.damageRadius(s, x, y, splash, dmg * 0.3, owner, kind !== 'shell')) hit = hit || s;
       }
       if (hit) {
         if (owner === this.player) this.stats.hits++;
-        this.emit('hit', {x, y, size: kind === 'heavy' ? 1.2 : kind === 'rocket' ? 0.8 : 0.55, ship: hit, kind});
-      } else this.emit('splash', {x, y, size: kind === 'heavy' ? 2.2 : kind === 'rocket' ? 1.2 : 1});
+        this.emit('hit', {x, y, size: kind === 'heavy' || kind === 'bomb' ? 1.2 : kind === 'rocket' ? 0.8 : 0.55, ship: hit, kind});
+      } else this.emit('splash', {x, y, size: kind === 'heavy' || kind === 'bomb' ? 2.2 : kind === 'rocket' ? 1.2 : 1});
     }
     damageRadius(s, x, y, r, dmg, attacker, incendiary) {
       const [lx, ly] = s.w2l(x, y); let hit = false;
@@ -1512,7 +1882,7 @@ const AI = (() => {
 
   class Brain {
     constructor(p, fleet) {
-      this.p = p; this.fleet = fleet; this.t = 0; this.orbit = Math.random() < 0.5 ? 1 : -1; this.orbitT = 0;
+      this.p = p; this.fleet = fleet; this.t = 0; this.orbit = 0; this.orbitT = 0;
       this.mode = 'engage'; this.modeT = 0; this.dodgeT = 0; this.dodgeHeading = 0; this.goal = null;
     }
     update(world, s, dt) {
@@ -1524,6 +1894,7 @@ const AI = (() => {
 
     think(world, s) {
       const p = this.p, rng = world.rng;
+      if (!this.orbit) this.orbit = rng() < 0.5 ? 1 : -1;
       const foes = world.foes(s.team);
       if (!foes.length) { s.target = null; this.goal = null; return; }
 
@@ -1567,7 +1938,7 @@ const AI = (() => {
 
       // --- positioning
       const hasTorp = s.weapons.some(w => w.t === 'torp');
-      let want = (hasTorp ? 380 : s.range * 0.78) || 250;
+      let want = s.hasAir ? 650 : (hasTorp ? 380 : s.range * 0.78) || 250;
       if (this.mode === 'ram') want = 160;
       if (this.orbitT <= 0) { this.orbitT = rng.range(5, 10); if (rng() < 0.35) this.orbit *= -1; }
       if (p.flank) {
@@ -1587,6 +1958,7 @@ const AI = (() => {
       if (!t) { s.throttle = 0.3; s.rudder = 0; return; }
       const dx = t.x - s.x, dy = t.y - s.y, d = Math.hypot(dx, dy), toT = headingTo(dx, dy);
       const want = this.want || 250;
+      if (s.hasAir && d < want * 0.8) throttle = 1;
       if (this.mode === 'retreat') {
         const [cx, cy] = this.fleet.centroid();
         desired = headingTo(s.x - t.x + (cx - s.x) * 0.3, s.y - t.y + (cy - s.y) * 0.3); throttle = 1;
@@ -1627,9 +1999,12 @@ const AI = (() => {
       const off = i - (n - 1) / 2;
       const x = (opts.x || 0) + off * spread + world.rng.range(-30, 30);
       const y = y0 + Math.abs(off) * 60;
-      const s = world.addShip(enemyDesign(id), {team: 1, x, y, a: Math.PI, name: Data.ENEMIES[id].name, kind: id, profile});
+      const E = Data.ENEMIES[id];
+      // Famous ships sail with veteran crews: tougher, faster-loading, better gunnery. Bosses more so.
+      const mods = E.famous ? (E.boss ? {hp: 1.5, reload: 1.15, spread: 0.85} : {hp: 1.3, reload: 1.1, spread: 0.9}) : undefined;
+      const s = world.addShip(enemyDesign(id), {team: 1, x, y, a: Math.PI, name: E.name, kind: id, profile, mods});
       s.cost = enemyCost(id);
-      s.boss = !!Data.ENEMIES[id].boss;
+      s.boss = !!E.boss; s.famous = !!E.famous;
       s.brain = fleet.brain(s);
       return s;
     });
@@ -1863,6 +2238,10 @@ const Sound = (() => {
     ciws:    t => [noiseSrc(t, 0.05, 'highpass', 3500, 0, 0.12)],
     sink:    t => [tone(t, 3, 'sawtooth', 55, 30, 0.12, 0.3), noiseSrc(t, 3, 'lowpass', 300, 0, 0.25, 80)],
     smoke:   t => [noiseSrc(t, 1.2, 'bandpass', 900, 0.8, 0.18, 300)],
+    plane:   t => [tone(t, 1.6, 'sawtooth', 88, 120, 0.07, 0.3), noiseSrc(t, 1.6, 'bandpass', 500, 1.2, 0.06)],
+    dive:    t => [tone(t, 1.3, 'sine', 1400, 520, 0.09, 0.2), tone(t, 1.3, 'sawtooth', 120, 180, 0.05, 0.2)],
+    whistle: t => [tone(t, 0.7, 'sine', 1800, 700, 0.06, 0.05)],
+    flak:    t => [noiseSrc(t, 0.25, 'lowpass', 900, 0, 0.3, 200), tone(t, 0.12, 'sine', 140, 60, 0.18)],
     // UI and stingers are not positional
     click:   t => [tone(t, 0.05, 'sine', 900, 700, 0.12)],
     place:   t => [tone(t, 0.06, 'triangle', 420, 300, 0.14), noiseSrc(t, 0.05, 'bandpass', 1800, 2, 0.08)],
@@ -1875,8 +2254,8 @@ const Sound = (() => {
     defeat:  t => [392, 349, 311, 233].flatMap((f, i) => [tone(t + i * 0.22, 1.2, 'triangle', f, 0, 0.14, 0.03)]),
     alarm:   t => [tone(t, 0.18, 'square', 700, 0, 0.05), tone(t + 0.22, 0.18, 'square', 700, 0, 0.05)],
   };
-  const POSITIONAL = new Set(['gun', 'heavy', 'explode', 'hit', 'splash', 'bigsplash', 'missile', 'rocket', 'torp', 'rail', 'ciws', 'sink', 'smoke']);
-  const MIN_GAP = {ciws: 0.06, gun: 0.03, splash: 0.04, hit: 0.03, coin: 0.04};
+  const POSITIONAL = new Set(['gun', 'heavy', 'explode', 'hit', 'splash', 'bigsplash', 'missile', 'rocket', 'torp', 'rail', 'ciws', 'sink', 'smoke', 'plane', 'dive', 'whistle', 'flak']);
+  const MIN_GAP = {ciws: 0.06, gun: 0.03, splash: 0.04, hit: 0.03, coin: 0.04, flak: 0.07, plane: 0.4, dive: 0.3};
 
   // play('gun', {x, y, vol})
   function play(name, o = {}) {
@@ -1985,8 +2364,11 @@ const Gfx = (() => {
     low:    {pr: 1,   shadows: false, oceanSeg: 110, particles: 2500, lights: 0, aa: false},
     medium: {pr: 1.5, shadows: false, oceanSeg: 170, particles: 4000, lights: 2, aa: true},
     high:   {pr: 2,   shadows: true,  oceanSeg: 230, particles: 6000, lights: 3, aa: true},
+    // iPhone 14 and newer (A15+): shadows on with a lighter map; the governor trims resolution if it runs hot.
+    phone:  {pr: 2,   shadows: true,  shadowMap: 1024, oceanSeg: 170, particles: 4500, lights: 2, aa: true},
   };
-  const resolveQuality = q => QUALITY[q] ? q : (IS_TOUCH ? 'medium' : 'high');
+  const modernPhone = () => IS_TOUCH && Math.min(screen.width, screen.height) >= 390 && (window.devicePixelRatio || 1) >= 3;
+  const resolveQuality = q => QUALITY[q] ? q : (IS_TOUCH ? (modernPhone() ? 'phone' : 'medium') : 'high');
 
   // ---------------------------------------------------------------- waves
   // Same function on the CPU (ships bob on it) and GPU (ocean surface). `amp` follows the weather.
@@ -2115,6 +2497,9 @@ const Gfx = (() => {
     MAT.funnel = std({color: '#c2a36d', roughness: 0.6});
     MAT.red = std({color: '#c2473a', roughness: 0.5});
     MAT.yellow = std({color: '#d9a92e', roughness: 0.5});
+    MAT.flight = std({color: '#6b5e4c', roughness: 0.85, metalness: 0.05});
+    MAT.plane = std({color: '#c9d1d8', roughness: 0.55, metalness: 0.3});
+    MAT.planeFly = MAT.plane; MAT.darkFly = MAT.dark; // same look, separate instance pools
     MAT.coil = std({color: '#4f8fb8', roughness: 0.3, metalness: 0.7, emissive: '#16405a', emissiveIntensity: 0.6});
     MAT.shell = new THREE.MeshBasicMaterial({color: '#ffd27a'});
     MAT.missile = std({color: '#e8e8e8', roughness: 0.4});
@@ -2176,6 +2561,21 @@ const Gfx = (() => {
     GEO.rocketBase = cyl(2.6, 3, 1.4, 12).translate(0, 0.7, 0);
     GEO.rocketBox = box(6.4, 3.6, 6).translate(0, 0, -0.5);
     GEO.rocketFace = box(5.6, 2.8, 0.3).translate(0, 0, -3.6);
+    GEO.superHouse = box(9.8, 4.6, 10.4).translate(0, 2.3, 0.8);
+    GEO.superRoof = box(8.6, 0.9, 7.4).translate(0, 5.0, 1.6);
+    GEO.superBarrel = cyl(0.7, 0.95, 17, 8).rotateX(Math.PI / 2).translate(0, 0, -8.5);
+    GEO.aaBase = cyl(1.6, 2, 1.2, 10).translate(0, 0.6, 0);
+    GEO.aaMount = box(2.6, 1.6, 2.2).translate(0, 1.6, 0);
+    GEO.aaBarrel = cyl(0.2, 0.25, 4.2, 6).rotateX(Math.PI / 2).translate(0, 0, -2.1);
+    GEO.flightDeck = box(S, 0.5, S).translate(0, DECK + 0.25, 0);
+    GEO.deckStripe = box(0.8, 0.52, S).translate(0, DECK + 0.26, 0);
+    // aircraft, built nose toward -z
+    GEO.planeBody = cyl(0.55, 0.75, 7.2, 8).rotateX(Math.PI / 2);
+    GEO.planeWing = box(11, 0.3, 2.1).translate(0, 0, -0.4);
+    GEO.planeTail = box(4, 0.25, 1.2).translate(0, 0.2, 3.1);
+    GEO.planeFin = box(0.25, 1.6, 1.3).translate(0, 0.9, 3.1);
+    GEO.planeProp = box(3, 0.15, 0.2).translate(0, 0, -3.75);
+    GEO.bomb = new THREE.SphereGeometry(0.9, 6, 4).scale(0.8, 0.8, 1.6);
     GEO.radarMast = cyl(0.5, 0.8, 7, 8).translate(0, DECK + 3.5, 0);
     GEO.radarDish = box(7.5, 2.4, 0.5);
     GEO.craneBase = box(3, 4, 3).translate(1.5, DECK + 2, 1.5);
@@ -2322,7 +2722,7 @@ const Gfx = (() => {
       this.sun = new THREE.DirectionalLight('#fff1dc', 2.6);
       this.sun.castShadow = Q.shadows;
       if (Q.shadows) {
-        this.sun.shadow.mapSize.set(2048, 2048);
+        this.sun.shadow.mapSize.set(Q.shadowMap || 2048, Q.shadowMap || 2048);
         const c = this.sun.shadow.camera; c.left = c.bottom = -opts.shadowSize || -260; c.right = c.top = opts.shadowSize || 260; c.near = 10; c.far = 2400;
         this.sun.shadow.bias = -0.0006; this.sun.shadow.normalBias = 0.6;
       }
@@ -2493,8 +2893,9 @@ const Viz = (() => {
 
   // Visual pieces per part. node: base | pivot (turret yaw) | barrel (yaw + elevation) | spin (radar)
   // tint: 'paint' takes the team turret colour.
-  const BARREL = {gun: [0, 1.7, -1.4], heavy: [0, 2.2, -3.2], ciws: [0, 2.6, -1.2], rail: [0, 1.9, -0.6], rockets: [0, 2.6, 0.4]};
-  const MUZZLE = {gun: 9.6, heavy: 16, ciws: 5, rail: 17, rockets: 4, torp: 6, missile: 0};
+  const BARREL = {gun: [0, 1.7, -1.4], heavy: [0, 2.2, -3.2], superheavy: [0, 2.7, -3.4], ciws: [0, 2.6, -1.2], aa: [0, 1.9, -0.6], rail: [0, 1.9, -0.6], rockets: [0, 2.6, 0.4]};
+  const MUZZLE = {gun: 9.6, heavy: 16, superheavy: 20, ciws: 5, aa: 4.6, rail: 17, rockets: 4, torp: 6, missile: 0, hangar: 0};
+  const PLANE = [['planeBody', 'plane'], ['planeWing', 'plane'], ['planeTail', 'plane'], ['planeFin', 'plane'], ['planeProp', 'dark']];
   const p = (geo, mat, node = 'base', o = {}) => Object.assign({geo, mat, node}, o);
   const PIECES = {
     bridge: [p('tower', 'light'), p('tower2', 'light'), p('window', 'glass'), p('wing', 'light'), p('mast', 'dark'),
@@ -2510,6 +2911,12 @@ const Viz = (() => {
     rail: [p('railBase', 'paint', 'pivot', {tint: true}), p('railRail', 'dark', 'barrel', {pos: [-1.3, 0, 0]}), p('railRail', 'dark', 'barrel', {pos: [1.3, 0, 0]}),
            p('railCoil', 'coil', 'barrel', {pos: [0, 0, -3]}), p('railCoil', 'coil', 'barrel', {pos: [0, 0, -8]}), p('railCoil', 'coil', 'barrel', {pos: [0, 0, -13]})],
     rockets: [p('rocketBase', 'dark', 'pivot'), p('rocketBox', 'paint', 'barrel', {tint: true}), p('rocketFace', 'black', 'barrel')],
+    superheavy: [p('superHouse', 'paint', 'pivot', {tint: true}), p('superRoof', 'paint', 'pivot', {tint: true}),
+                 ...[-2.6, 0, 2.6].map(x => p('superBarrel', 'dark', 'barrel', {pos: [x, 0, 0]}))],
+    aa: [p('aaBase', 'dark', 'pivot'), p('aaMount', 'paint', 'pivot', {tint: true}),
+         p('aaBarrel', 'dark', 'barrel', {pos: [-0.6, 0, 0]}), p('aaBarrel', 'dark', 'barrel', {pos: [0.6, 0, 0]})],
+    hangar: [p('flightDeck', 'flight'), p('deckStripe', 'yellow'),
+             ...PLANE.map(([g, m]) => p(g, m, 'parked', {pos: [0, DECK + 1.5, 0], tint: m === 'plane'}))],
     radar: [p('radarMast', 'dark'), p('radarDish', 'light', 'spin', {y: DECK + 7.5, rate: 2.4})],
     repair: [p('repairPad', 'yellow'), p('craneBase', 'yellow'), p('craneArm', 'yellow')],
     smoke: [p('canister', 'dark', 'base', {pos: [-1.8, DECK + 1.6, 0.6]}), p('canister', 'dark', 'base', {pos: [1.8, DECK + 1.6, 0.6]})],
@@ -2652,6 +3059,9 @@ const Viz = (() => {
               m.node.multiply(m.r.makeRotationX(b.elev || 0));
             }
             node = m.node;
+          } else if (e.node === 'parked') {
+            if (b.air > 0) { e.pool.set(e.i, Gfx_zero); continue; }
+            node = m.base;
           } else if (e.node === 'spin') {
             m.node.multiplyMatrices(m.base, m.tmp.makeTranslation(0, e.pc.y, 0));
             m.node.multiply(m.r.makeRotationY(t * e.pc.rate + s.id));
@@ -2747,6 +3157,25 @@ const Viz = (() => {
         out.makeRotationY(-tp.a).setPosition(tp.x, waveH(tp.x, tp.y, t) - 1.6, tp.y);
         if (Math.random() < 0.7) this.P({x: tp.x, y: tp.y, h: 0, vx: 0, vy: 0, vh: 0, life: 3, size: 3.5, c: C.foam, a: 0.55, surf: true, grow: 1.5});
       });
+      // aircraft: every piece shares the plane's matrix; bank into turns, pitch with climb
+      const planeM = new M4(), team0 = TEAM[0].paint, team1 = TEAM[1].paint;
+      for (const [g, mt0] of PLANE) {
+        // separate pools from the parked planes on carrier decks (those are ship pieces)
+        const mt = mt0 === 'plane' ? 'planeFly' : 'darkFly';
+        const pool = this.pools.get(g, mt, true);
+        stream(pool, world.planes, (pl, out) => {
+          const dyaw = Util.wrapA(pl.a - (pl.va ?? pl.a)), climb = (pl.h - (pl.ph ?? pl.h));
+          pl.bank = (pl.bank || 0) + (Util.clamp(-dyaw * 40, -0.9, 0.9) - (pl.bank || 0)) * 0.15;
+          m.e.set(Util.clamp(climb * 0.4, -0.6, 0.5), -pl.a, pl.bank); m.q.setFromEuler(m.e);
+          out.compose(m.v.set(pl.x, pl.h, pl.y), m.q, m.one);
+        });
+        if (mt === 'planeFly') { let i = 0; for (const pl of world.planes) pool.color(i++, pl.team === 0 ? team0 : team1); }
+      }
+      for (const pl of world.planes) {
+        pl.va = pl.a;
+        if (Math.random() < 0.25) this.P({x: pl.x, y: pl.y, h: pl.h, vx: 0, vy: 0, vh: 0, life: 0.8, size: 1.6, c: C.fsmoke, a: 0.35, grow: 1.5});
+      }
+      stream(this.pools.get('bomb', 'black', false), world.bombs, (bm, out) => out.makeScale(1, 1, 1).setPosition(bm.cx ?? bm.x, bm.ch ?? bm.h, bm.cy ?? bm.y));
       // smoke screens keep billowing while they last
       for (const c of world.smokes) {
         const left = 1 - c.t / c.life;
@@ -2835,8 +3264,8 @@ const Viz = (() => {
             for (let i = 0; i < 6; i++) this.P({x, y, h, vx: (Math.random() - .5) * 30, vy: (Math.random() - .5) * 30, vh: Math.random() * 6, life: 1.5 + Math.random(), size: 5 + Math.random() * 3, c: C.fsmoke, a: 0.6, grow: 1.5});
           } else if (e.kind === 'torp') this.splash(x, y, 0.8);
           else if (e.kind !== 'rockets') {
-            const big = e.kind === 'heavy';
-            this.muzzleFlash(x, y, h, e.ang, big ? 2 : 1, [s.vx, s.vy]);
+            const big = e.kind === 'heavy' || e.kind === 'superheavy';
+            this.muzzleFlash(x, y, h, e.ang, e.kind === 'superheavy' ? 2.8 : big ? 2 : 1, [s.vx, s.vy]);
             if (big) this.env.flashLight(x, h, y, 0.8);
           }
           break;
@@ -2874,6 +3303,16 @@ const Viz = (() => {
           break;
         }
         case 'intercept': this.explosion(e.x, e.y, e.h, 0.5); break;
+        case 'flak':
+          this.P({x: e.x, y: e.y, h: e.h, vx: 0, vy: 0, vh: 1, life: 1.6, size: 5, c: C.dsmoke, a: 0.7, grow: 1.2});
+          this.G({x: e.x, y: e.y, h: e.h, vx: 0, vy: 0, vh: 0, life: 0.1, size: 6, c: C.flash, a: 1});
+          break;
+        case 'planeDown':
+          this.explosion(e.x, e.y, e.h, 0.6);
+          this.spawnDebris(e.x, e.y, e.h, e.vx * 0.5, e.vy * 0.5, {vh: 4, k: 0.3, scale: 0.9, life: 8});
+          for (let i = 0; i < 8; i++) this.P({x: e.x + e.vx * 0.05 * i, y: e.y + e.vy * 0.05 * i, h: e.h - i * 2, vx: 0, vy: 0, vh: 2, life: 2.5, size: 4, c: C.dsmoke, a: 0.6, grow: 1.8});
+          break;
+        case 'launch': { if (s && s.viz) { const [x, y] = s.pos(e.block); this.P({x, y, h: this.deckH(s, e.block.lx, e.block.ly) + 2, vx: -s.vx * 0.3, vy: -s.vy * 0.3, vh: 2, life: 1, size: 5, c: C.foam, a: 0.4, grow: 1.5}); } break; }
         case 'smoke': for (let i = 0; i < 20; i++) { const a = Math.random() * Util.TAU, r = Math.random() * e.r * 0.5; this.P({x: e.x + Math.cos(a) * r, y: e.y + Math.sin(a) * r, h: 3 + Math.random() * 8, vx: Math.cos(a) * 12, vy: Math.sin(a) * 12, vh: 2, life: 4 + Math.random() * 2, size: 18 + Math.random() * 14, c: C.screen, a: 0.6, grow: 0.8, fadeIn: true}); } break;
       }
     }
@@ -2948,8 +3387,7 @@ const Yard = (() => {
       g.add(this.center);
       const arrow = new THREE.Mesh(new THREE.ConeGeometry(4, 9, 3).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({color: '#e0b45a'}));
       arrow.position.set(0, DECK + 0.5, -h * S / 2 - 10); g.add(arrow);
-      this.fitDist = Math.max(w * S * 2.1, h * S * 1.15) + 60;
-      if (!this.userZoom) this.dist = this.fitDist;
+      this.dockFit = Math.max(w * S * 2.1, h * S * 1.15) + 60;
     }
     showGrid(on, mirror) { if (this.grid) this.grid.visible = on; if (this.center) this.center.visible = on && mirror; }
 
@@ -2962,6 +3400,10 @@ const Yard = (() => {
       this.viz.clear();
       this.ship = null;
       while (this.looseGroup.children.length) this.looseGroup.remove(this.looseGroup.children[0]);
+      // Frame the ship itself (not the whole dock), so small designs in a big dock stay readable.
+      const bnd = Design.bounds(d);
+      const bw = bnd ? Math.max(5, bnd.c1 - bnd.c0 + 3) : d.w, bh = bnd ? Math.max(9, bnd.r1 - bnd.r0 + 3) : d.h;
+      if (!this.userZoom) this.dist = Math.min(this.dockFit, Math.max(bw * S * 2.1, bh * S * 1.15) + 60);
       if (!d.cells.some(Boolean)) return;
       const w = new Sim.World({rng: Util.rng(1)});
       const s = w.addShip(d, {team: 0, x: 0, y: 0, a: 0});
@@ -3038,7 +3480,7 @@ const Battle = (() => {
   const STEP = 1 / 60;
 
   const WEAPON_ICON = {gun: 'G', heavy: 'X', torp: 'T', missile: 'M', rockets: 'K', rail: 'L', ciws: 'C'};
-  const WEAPON_ORDER = ['heavy', 'gun', 'rail', 'rockets', 'missile', 'torp', 'ciws'];
+  const WEAPON_ORDER = ['superheavy', 'heavy', 'gun', 'rail', 'rockets', 'missile', 'torp', 'hangar', 'aa', 'ciws'];
 
   class Battle {
     constructor(app, cfg) {
@@ -3272,14 +3714,20 @@ const Battle = (() => {
       const p = this.player, near = (x, y) => clamp(1 - Math.hypot(x - p.x, y - p.y) / 300, 0, 1);
       switch (e.type) {
         case 'fire': {
-          const snd = {gun: 'gun', heavy: 'heavy', torp: 'torp', missile: 'missile', rockets: 'rocket', ciws: null}[e.kind];
+          const snd = {gun: 'gun', heavy: 'heavy', superheavy: 'heavy', torp: 'torp', missile: 'missile', rockets: 'rocket', ciws: null}[e.kind];
           if (snd) Sound.play(snd, {x: e.x, y: e.y, vol: e.ship === p ? 0.8 : 0.6});
-          if (e.ship === p && e.kind === 'heavy') this.shake(0.25);
+          if (e.ship === p && (e.kind === 'heavy' || e.kind === 'superheavy')) this.shake(e.kind === 'superheavy' ? 0.45 : 0.25);
           break;
         }
         case 'rocket': Sound.play('rocket', {x: e.x, y: e.y, vol: 0.5}); break;
         case 'rail': Sound.play('rail', {x: e.x0, y: e.y0}); if (e.ship === p) this.shake(0.35); break;
         case 'ciws': Sound.play('ciws', {x: e.x, y: e.y, vol: 0.5}); break;
+        case 'flak': Sound.play('flak', {x: e.x, y: e.y, vol: 0.5}); break;
+        case 'launch': Sound.play('plane', {x: e.x, y: e.y}); break;
+        case 'dive': Sound.play('dive', {x: e.x, y: e.y}); break;
+        case 'bombDrop': Sound.play('whistle', {x: e.x, y: e.y}); break;
+        case 'torpDrop': Sound.play('splash', {x: e.x, y: e.y, vol: 0.6}); break;
+        case 'planeDown': Sound.play('explode', {x: e.x, y: e.y, vol: 0.4}); if (e.team !== 0 && near(e.x, e.y) > 0) this.app.haptic('light'); break;
         case 'hit':
           Sound.play(e.size > 1 ? 'heavy' : 'hit', {x: e.x, y: e.y, vol: e.size > 1 ? 0.8 : 0.6});
           if (e.ship === p) { this.shake(0.15 + e.size * 0.25); this.app.haptic(e.size > 1 ? 'heavy' : 'light'); }
@@ -3548,6 +3996,12 @@ const UI = (() => {
         for (let r = 0; r < 2; r++) for (let c = 0; c < 4; c++) { circ(ctx, x - k * .21 + c * k * .14, y - k * .14 + r * k * .2, k * .05); ctx.fill(); } break;
       case 'rail': ctx.fillStyle = '#2b3138'; ctx.fillRect(x - k * .15, y - k * .5, k * .1, k * .7); ctx.fillRect(x + k * .05, y - k * .5, k * .1, k * .7);
         ctx.fillStyle = '#4f8fb8'; for (let i = 0; i < 3; i++) ctx.fillRect(x - k * .22, y - k * .42 + i * k * .2, k * .44, k * .06); ctx.fillStyle = '#9aa4ae'; ctx.fillRect(x - k * .26, y + k * .12, k * .52, k * .24); break;
+      case 'superheavy': ctx.fillStyle = '#1e2329'; for (const dx of [-0.26, 0, 0.26]) ctx.fillRect(x + dx * k - k * .05, y - k * .52, k * .1, k * .5);
+        ctx.fillStyle = '#c8d0d8'; ctx.fillRect(x - k * .4, y - k * .1, k * .8, k * .46); break;
+      case 'aa': ctx.fillStyle = '#1b2026'; ctx.fillRect(x - k * .14, y - k * .46, k * .08, k * .42); ctx.fillRect(x + k * .06, y - k * .46, k * .08, k * .42);
+        ctx.fillStyle = '#aab4be'; roundRect(ctx, x - k * .22, y - k * .06, k * .44, k * .32, k * .06); ctx.fill(); break;
+      case 'hangar': ctx.fillStyle = '#6b5e4c'; ctx.fillRect(x - k * .42, y - k * .42, k * .84, k * .84); ctx.fillStyle = '#d9a92e'; ctx.fillRect(x - k * .03, y - k * .42, k * .06, k * .84);
+        ctx.fillStyle = '#dfe5ea'; ctx.fillRect(x - k * .32, y - k * .06, k * .64, k * .1); ctx.fillRect(x - k * .05, y - k * .24, k * .1, k * .46); ctx.fillRect(x - k * .14, y + k * .16, k * .28, k * .07); break;
       case 'radar': ctx.fillStyle = '#2b3138'; circ(ctx, x, y, k * .1); ctx.fill(); ctx.fillStyle = '#dfe5ea'; ctx.fillRect(x - k * .34, y - k * .08, k * .68, k * .16); break;
       case 'repair': ctx.fillStyle = '#d9a92e'; ctx.fillRect(x - k * .3, y - k * .3, k * .6, k * .6); ctx.fillStyle = '#2a3036'; ctx.fillRect(x - k * .06, y - k * .22, k * .12, k * .44); ctx.fillRect(x - k * .22, y - k * .06, k * .44, k * .12); break;
       case 'smoke': ctx.fillStyle = '#2a3036'; circ(ctx, x - k * .16, y, k * .14); ctx.fill(); circ(ctx, x + k * .16, y, k * .14); ctx.fill();
@@ -3594,11 +4048,13 @@ const UI = (() => {
     $('cCredits').textContent = cr(p.credits);
     el.innerHTML = '';
     OPS.forEach((op, i) => {
+      if (op.legend && !OPS[i - 1].legend) el.insertAdjacentHTML('beforeend', '<div class="legendHead"><b>Legends</b><span>Famous battles, famous ships. Unlocked after the campaign.</span></div>');
       const open = Progress.opUnlocked(p, i);
       const b = document.createElement('button');
       b.className = 'op' + (open ? '' : ' locked'); b.disabled = !open;
       const foes = {}; op.enemies.forEach(e => foes[ENEMIES[e].name] = (foes[ENEMIES[e].name] || 0) + 1);
-      b.innerHTML = `<span class="num">OPERATION ${i + 1} · ${WEATHER[op.weather].name.toUpperCase()}</span><b>${op.name}</b>
+      b.className += op.legend ? ' legend' : '';
+      b.innerHTML = `<span class="num">${op.legend ? 'LEGEND · ' + op.year : 'OPERATION ' + (i + 1)} · ${WEATHER[op.weather].name.toUpperCase()}</span><b>${op.name}</b>
         <div class="meta">${Object.entries(foes).map(([n, c]) => `${c}× ${n}`).join(', ')}<br>Budget ${Util.fmtNum(Progress.budget(p, i))}${open ? '' : ' · Locked'}</div>
         <div class="stars">${starsHtml(p.stars[i])}</div>${p.hardClears[i] ? '<span class="badge">HARD</span>' : ''}`;
       b.onclick = () => { Sound.play('click'); openBrief(i); };
@@ -3610,7 +4066,7 @@ const UI = (() => {
     const foes = {}; op.enemies.forEach(e => foes[ENEMIES[e].name] = (foes[ENEMIES[e].name] || 0) + 1);
     const probs = app.launchProblems({mode: 'op', op: i});
     $('sheetBody').innerHTML = `
-      <div class="mute small">OPERATION ${i + 1}</div><h2>${op.name}</h2>
+      <div class="mute small">${op.legend ? 'LEGEND · ' + op.year : 'OPERATION ' + (i + 1)}</div><h2>${op.name}</h2>
       <div class="stars">${starsHtml(p.stars[i])}</div>
       <p class="brief">${op.brief}</p>
       <div class="facts">
@@ -3793,6 +4249,29 @@ const UI = (() => {
     next();
   }
 
+  // Load a famous ship as your own design (if it fits your dock and you own its parts).
+  function openBlueprints() {
+    const p = app.profile, dock = Progress.dock(p), unl = Progress.unlocked(p);
+    const rows = Data.BLUEPRINTS.map(id => {
+      const F = Data.FAMOUS[id], d = Design.fromRows(F.rows), a = Design.analyze(d);
+      const missing = Object.keys(a.cnt).filter(t => !unl.has(t)).map(t => PARTS[t].name);
+      const needDock = Data.DOCKS.findIndex(k => k.w >= d.w && k.h >= d.h);
+      const why = needDock > p.dock ? `Needs ${Data.DOCKS[needDock].name}` : missing.length ? 'Needs ' + missing.join(', ') : '';
+      return `<div class="bp"><div><b>${F.name}</b> <span class="mute small">${F.cls} · ${F.nation} · ${F.year}</span>
+        <p>${F.blurb}</p><span class="mono small">${d.w}×${d.h} · cost ${a.cost} · ${(a.speed * Design.KN).toFixed(0)} kn</span></div>
+        <button data-bp="${id}" class="${why ? '' : 'primary'}" ${why ? 'disabled' : ''}>${why || 'Load'}</button></div>`;
+    }).join('');
+    $('sheetBody').innerHTML = `<h2>Blueprints</h2><p class="mute small" style="margin:4px 0 10px">Famous warships, ready to refit. Loading replaces your current design (undo brings it back).</p>
+      <div class="bps">${rows}</div><div class="btns"><button id="bpClose">Close</button></div>`;
+    $('sheet').classList.add('on');
+    $('bpClose').onclick = () => $('sheet').classList.remove('on');
+    for (const b of $$('[data-bp]')) b.onclick = () => {
+      const F = Data.FAMOUS[b.dataset.bp];
+      edit(() => { p.design = Design.fromRows(F.rows, dock.w, dock.h); });
+      $('sheet').classList.remove('on'); toast(`${F.name} loaded`); Sound.play('buy');
+    };
+  }
+
   // ---------------------------------------------------------------- armory
   let armoryTab = 'parts';
   function renderArmory(tab) {
@@ -3848,7 +4327,7 @@ const UI = (() => {
     };
     seg('setDiff', Object.entries(DIFFICULTY).map(([k, d]) => [k, d.name]), s.difficulty, k => { s.difficulty = k; app.save(); renderSettings(); });
     $('setDiffDesc').textContent = DIFFICULTY[s.difficulty].desc + ` Rewards ×${DIFFICULTY[s.difficulty].reward}.`;
-    seg('setQual', [['auto', 'Auto'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High']], s.quality, k => { if (k === s.quality) return; s.quality = k; app.save(); location.reload(); });
+    seg('setQual', [['auto', 'Auto'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High']], s.quality === 'phone' ? 'auto' : s.quality, k => { if (k === s.quality) return; s.quality = k; app.save(); location.reload(); });
     $('setVol').value = s.volume; $('setVol').oninput = e => { s.volume = +e.target.value; Sound.setVolume(s.volume); app.save(); };
     $('setMusic').checked = s.music; $('setMusic').onchange = e => { s.music = e.target.checked; Sound.setMusic(s.music); app.save(); };
     $('setShake').checked = s.shake; $('setShake').onchange = e => { s.shake = e.target.checked; app.save(); };
@@ -3883,7 +4362,8 @@ const UI = (() => {
     $('rStars').innerHTML = endless ? '' : [0, 1, 2].map(() => '<span>★</span>').join('');
     const st = r.stats;
     $('rStats').innerHTML = [['Time', Util.fmtTime(r.time)], ['Ships sunk', r.sunk], ['Accuracy', st.shots ? Math.round(Math.min(1, st.hits / st.shots) * 100) + '%' : '—'],
-      ['Damage dealt', Util.fmtNum(st.dmg)], ['Damage taken', Util.fmtNum(st.taken)], ['Hull remaining', Math.round(r.integrity * 100) + '%']]
+      ['Damage dealt', Util.fmtNum(st.dmg)], ['Damage taken', Util.fmtNum(st.taken)], ['Hull remaining', Math.round(r.integrity * 100) + '%'],
+      ...(st.planesDown ? [['Aircraft downed', st.planesDown]] : [])]
       .map(([a, b]) => `<div class="row"><span>${a}</span><span>${b}</span></div>`).join('');
     const lines = endless ? [[`Waves × ${r.wave}`, r.wave * 45], ['Ships sunk', Math.round((r.sunkCost || 0) * 0.1)]] : rw.lines;
     const mult = endless ? DIFFICULTY[r.difficulty].reward : rw.mult;
@@ -3943,6 +4423,7 @@ const UI = (() => {
       clearTimeout(clearArm); clearArm = 0; b.textContent = 'Clear'; b.classList.remove('on');
       edit(() => { const d = app.profile.design; app.profile.design = Design.create(d.w, d.h); });
     };
+    $('tBlue').onclick = () => { Sound.play('click'); openBlueprints(); };
     $('tStarter').onclick = () => { const d = Progress.dock(app.profile); edit(() => { app.profile.design = Design.fromRows(Data.STARTER, d.w, d.h); }); };
     $('vLeft').onclick = () => { app.yard.yaw += Math.PI / 4; };
     $('vRight').onclick = () => { app.yard.yaw -= Math.PI / 4; };

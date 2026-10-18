@@ -29,7 +29,7 @@ const AI = (() => {
 
   class Brain {
     constructor(p, fleet) {
-      this.p = p; this.fleet = fleet; this.t = 0; this.orbit = Math.random() < 0.5 ? 1 : -1; this.orbitT = 0;
+      this.p = p; this.fleet = fleet; this.t = 0; this.orbit = 0; this.orbitT = 0;
       this.mode = 'engage'; this.modeT = 0; this.dodgeT = 0; this.dodgeHeading = 0; this.goal = null;
     }
     update(world, s, dt) {
@@ -41,6 +41,7 @@ const AI = (() => {
 
     think(world, s) {
       const p = this.p, rng = world.rng;
+      if (!this.orbit) this.orbit = rng() < 0.5 ? 1 : -1;
       const foes = world.foes(s.team);
       if (!foes.length) { s.target = null; this.goal = null; return; }
 
@@ -84,7 +85,7 @@ const AI = (() => {
 
       // --- positioning
       const hasTorp = s.weapons.some(w => w.t === 'torp');
-      let want = (hasTorp ? 380 : s.range * 0.78) || 250;
+      let want = s.hasAir ? 650 : (hasTorp ? 380 : s.range * 0.78) || 250;
       if (this.mode === 'ram') want = 160;
       if (this.orbitT <= 0) { this.orbitT = rng.range(5, 10); if (rng() < 0.35) this.orbit *= -1; }
       if (p.flank) {
@@ -104,6 +105,7 @@ const AI = (() => {
       if (!t) { s.throttle = 0.3; s.rudder = 0; return; }
       const dx = t.x - s.x, dy = t.y - s.y, d = Math.hypot(dx, dy), toT = headingTo(dx, dy);
       const want = this.want || 250;
+      if (s.hasAir && d < want * 0.8) throttle = 1;
       if (this.mode === 'retreat') {
         const [cx, cy] = this.fleet.centroid();
         desired = headingTo(s.x - t.x + (cx - s.x) * 0.3, s.y - t.y + (cy - s.y) * 0.3); throttle = 1;
@@ -144,9 +146,12 @@ const AI = (() => {
       const off = i - (n - 1) / 2;
       const x = (opts.x || 0) + off * spread + world.rng.range(-30, 30);
       const y = y0 + Math.abs(off) * 60;
-      const s = world.addShip(enemyDesign(id), {team: 1, x, y, a: Math.PI, name: Data.ENEMIES[id].name, kind: id, profile});
+      const E = Data.ENEMIES[id];
+      // Famous ships sail with veteran crews: tougher, faster-loading, better gunnery. Bosses more so.
+      const mods = E.famous ? (E.boss ? {hp: 1.5, reload: 1.15, spread: 0.85} : {hp: 1.3, reload: 1.1, spread: 0.9}) : undefined;
+      const s = world.addShip(enemyDesign(id), {team: 1, x, y, a: Math.PI, name: E.name, kind: id, profile, mods});
       s.cost = enemyCost(id);
-      s.boss = !!Data.ENEMIES[id].boss;
+      s.boss = !!E.boss; s.famous = !!E.famous;
       s.brain = fleet.brain(s);
       return s;
     });

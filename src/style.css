@@ -55,6 +55,14 @@ h3{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute
 .op.locked{opacity:.45}
 .stars{color:#4c5c68;letter-spacing:2px;font-size:15px} .stars .on{color:var(--brass);text-shadow:0 0 10px rgba(224,180,90,.5)}
 
+.legendHead{grid-column:1/-1;margin-top:10px;padding:4px 2px;display:flex;flex-direction:column;gap:2px}
+.legendHead b{font-family:var(--display);font-size:20px;color:var(--brass);letter-spacing:.04em}
+.legendHead span{font-size:12px;color:var(--mute)}
+.op.legend{border-color:rgba(224,180,90,.32);background:linear-gradient(160deg,rgba(60,44,16,.55),var(--panel) 60%)}
+.bps{display:flex;flex-direction:column;gap:8px;text-align:left}
+.bp{display:flex;gap:10px;align-items:center;justify-content:space-between;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:12px;padding:10px}
+.bp p{font-size:12px;color:#b7c7d2;line-height:1.4;margin:3px 0}
+.bp button{flex:0 0 auto;max-width:130px;font-size:12px}
 /* ---------- shipyard */
 .yard{padding-bottom:calc(8px + var(--sB))}
 .yardTop{margin-bottom:8px;flex-wrap:nowrap}
@@ -221,8 +229,8 @@ h3{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute
   .yardTop{margin-bottom:4px}
   #yardPanel{width:270px;gap:6px}
   #yardPanel .card{padding:8px}
-  #palette{grid-template-columns:repeat(5,1fr);gap:4px}
-  .part{padding:2px 1px 3px} .part canvas{width:24px;height:24px}
+  #palette{grid-template-columns:repeat(6,1fr);gap:3px}
+  .part{padding:2px 0 3px;font-size:9px} .part canvas{width:22px;height:22px} .part .c{font-size:9px}
   #partInfo{display:none}
   .tools button{padding:5px 8px;min-height:32px}
   .hstats{width:124px} #hShip{width:36px;height:84px}
@@ -237,5 +245,7 @@ h3{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute
     grid-template-areas:"h b" "s b" "r b"}
   .result .rHead{grid-area:h} .result .rBody{grid-area:s / s / r / r} .result .btns{grid-area:b;align-self:center;margin:0}
   .result .stars{font-size:26px;margin:4px 0 0}
+  .result .row{font-size:12px;padding:1px 0} .result .rstats,.result .reward{margin-top:6px}
+  .result .reward .row.total{padding-top:3px}
   .dialog .btns button{padding:8px 12px;min-height:38px}
 }
