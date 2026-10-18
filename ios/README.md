@@ -1,8 +1,9 @@
 # Iron Tide — iPhone / iPad app
 
-A native SwiftUI shell that runs `../warship3d.html` full screen in a WKWebView.
+A native SwiftUI shell that runs `../irontide.html` full screen in a WKWebView, with Taptic Engine haptics bridged from the game.
 The game file is referenced from the repo root, so every rebuild picks up the
-latest version of the game. Nothing to copy by hand.
+latest version of the game. If you change anything in `src/`, run
+`python3 tools/build.py` first to regenerate `irontide.html`.
 
 ## Requirements
 - A Mac with **Xcode 16 or newer** (free from the Mac App Store)

@@ -262,6 +262,7 @@ const Sim = (() => {
             break;
           }
           case 'rockets': {
+            if (s === this.player) this.stats.shots--; // each rocket counts as its own shot
             w.salvo = W.salvo; w.salvoT = 0; w.lockX = tx; w.lockY = ty; w.lockD = d; w.lockT = t;
             this.emit('fire', {kind: 'rockets', ship: s, block: w, x: wx, y: wy, ang: w.ang});
             break;
@@ -276,6 +277,7 @@ const Sim = (() => {
       const sp = d * W.spread * this.spreadFor(s, w.lockT || s, wx, wy);
       const tx = w.lockX + rng.gauss() * sp, ty = w.lockY + rng.gauss() * sp;
       const T = Math.hypot(tx - wx, ty - wy) / W.speed;
+      if (s === this.player) this.stats.shots++;
       this.rockets.push({x0: wx, y0: wy, tx, ty, t: 0, T, apex: 14 + d * 0.06, x: wx, y: wy, h: DECK + 2,
         dmg: W.dmg, splash: W.splash, team: s.team, owner: s, hp: 1});
       this.emit('rocket', {ship: s, block: w, x: wx, y: wy});

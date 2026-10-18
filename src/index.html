@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+<title>Iron Tide</title>
+<meta name="description" content="Design a warship block by block, then fight it through a twelve-operation naval campaign." />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Iron Tide" />
+<meta name="theme-color" content="#07121c" />
+<style>/*@STYLE@*/</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<canvas id="overlay"></canvas>
+<div id="shade"></div>
+
+<!-- ============================== title -->
+<section id="sTitle" class="screen">
+  <div class="topbar"><span></span><span class="pill" id="tCredits">0 cr</span></div>
+  <div class="titleWrap">
+    <h1 class="logo">IRON TIDE</h1>
+    <p class="tag">Build it. Sail it. Sink them.</p>
+    <div class="menu">
+      <button class="big primary" data-act="campaign"><span>Campaign</span><small id="tStars"></small></button>
+      <button class="big" data-act="endless"><span>Endless Patrol</span><small id="tBest"></small></button>
+      <button class="big" data-act="yardFree"><span>Shipyard</span><small>Design your ship</small></button>
+      <button class="big" data-act="armory"><span>Armory</span><small>Parts &amp; upgrades</small></button>
+      <div class="row2"><button data-act="settings">Settings</button><button data-act="help">How to play</button></div>
+    </div>
+    <button class="diffChip" data-act="settings" id="tDiff">Medium</button>
+  </div>
+</section>
+
+<!-- ============================== campaign -->
+<section id="sCampaign" class="screen scroll">
+  <div class="topbar"><button class="back" data-act="title">‹ Back</button><b>Campaign</b><span class="pill" id="cCredits">0 cr</span></div>
+  <div class="wrap"><div class="ops" id="ops"></div></div>
+</section>
+
+<!-- ============================== shipyard -->
+<section id="sYard" class="screen yard">
+  <div class="topbar yardTop">
+    <button class="back" id="yBack">‹</button>
+    <div class="ytitle"><b id="yTitle">Shipyard</b><span id="yBrief"></span></div>
+    <button class="icon" id="yUndo" title="Undo">↶</button>
+    <button class="icon" id="yRedo" title="Redo">↷</button>
+    <button class="primary" id="yLaunch">Launch</button>
+  </div>
+  <div class="yardBody">
+    <div id="yardFree"><div id="yardBtns"><button id="vLeft">⟲</button><button id="vRight">⟳</button><button id="vTop">Top</button></div></div>
+    <div id="yardPanel">
+      <div class="card"><div id="palette"></div><div id="partInfo"></div></div>
+      <div class="card stats" id="yStats">
+        <div class="stat"><span>Cost</span><b id="sCost">0</b></div>
+        <div class="stat"><span>Mass / Float</span><b id="sMass">0</b></div>
+        <div class="stat"><span>Speed</span><b id="sSpeed">0</b></div>
+        <div class="stat"><span>Turn</span><b id="sTurn">0</b></div>
+        <div class="stat"><span>Firepower</span><b id="sDps">0</b></div>
+        <div class="stat"><span>Range</span><b id="sRange">0</b></div>
+        <div class="bars"><i id="sCostBar"></i><i id="sBuoyBar"></i></div>
+        <div id="warn"></div>
+      </div>
+      <div class="card tools">
+        <button id="tMirror" class="on">Mirror</button><button id="tErase">Erase</button>
+        <button id="tClear">Clear</button><button id="tStarter">Starter</button>
+        <span class="sep"></span>
+        <span id="slots"></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== armory -->
+<section id="sArmory" class="screen scroll">
+  <div class="topbar"><button class="back" data-act="title">‹ Back</button><b>Armory</b><span class="pill" id="aCredits">0 cr</span></div>
+  <div class="wrap">
+    <div class="tabs" id="aTabs"><button data-tab="parts" class="on">Parts</button><button data-tab="eng">Engineering</button><button data-tab="dock">Dock</button></div>
+    <div id="aList"></div>
+  </div>
+</section>
+
+<!-- ============================== settings -->
+<section id="sSettings" class="screen scroll">
+  <div class="topbar"><button class="back" data-act="title">‹ Back</button><b>Settings</b><span></span></div>
+  <div class="wrap narrow">
+    <div class="card"><h3>Difficulty</h3><div class="seg" id="setDiff"></div><p class="mute small" id="setDiffDesc"></p></div>
+    <div class="card"><h3>Graphics</h3><div class="seg" id="setQual"></div><p class="mute small">Auto picks Medium on phones and High on computers. Changing it reloads the game.</p></div>
+    <div class="card"><h3>Sound</h3>
+      <label class="rowline"><span>Volume</span><input type="range" id="setVol" min="0" max="1" step="0.05"></label>
+      <label class="rowline"><span>Music</span><input type="checkbox" id="setMusic"></label>
+    </div>
+    <div class="card"><h3>Camera</h3><label class="rowline"><span>Screen shake</span><input type="checkbox" id="setShake"></label></div>
+    <div class="card"><h3>Progress</h3><button id="setReset" class="danger">Reset all progress</button></div>
+  </div>
+</section>
+
+<!-- ============================== help -->
+<section id="sHelp" class="screen scroll">
+  <div class="topbar"><button class="back" data-act="title">‹ Back</button><b>How to play</b><span></span></div>
+  <div class="wrap narrow help">
+    <div class="card"><h3>1 · Build</h3><p>Pick a part, then tap the deck to place it. Every block has <b>mass</b> and <b>buoyancy</b>: if the ship weighs more than it floats, it won't launch. Every block must connect to the single <b>Bridge</b>. Speed comes from engines against weight; turning from rudders.</p></div>
+    <div class="card"><h3>2 · Fight</h3><p>Turrets aim and fire by themselves — you steer. <b>Keyboard:</b> W/S throttle, A/D rudder, Tab or click to focus fire, F smoke, C camera, drag to look. <b>Touch:</b> drag the left half to steer and set throttle, drag the right half to look, tap an enemy to focus fire.</p></div>
+    <div class="card"><h3>3 · Survive</h3><p>Shells hit the block they land on. Lost blocks cost buoyancy and the ship lists toward the damage. Lose the bridge, or too much buoyancy, and you sink. Fires spread until they burn out — Repair Bays put them out.</p></div>
+    <div class="card"><h3>4 · Progress</h3><p>Battles pay <b>credits</b>. Spend them in the Armory on new parts, engineering upgrades and a bigger dock. Each operation has three stars: win, finish with 60% of your hull, and beat the par time. Harder difficulty pays more.</p></div>
+    <div class="card"><h3>Parts</h3><div id="helpParts"></div></div>
+  </div>
+</section>
+
+<!-- ============================== battle HUD -->
+<section id="sHud" class="screen hud">
+  <div class="hudTL panel">
+    <canvas id="hShip"></canvas>
+    <div class="hstats">
+      <div class="lbl"><span>Hull</span><b id="hInteg">100%</b></div><div class="bar"><i id="hIntegBar"></i></div>
+      <div class="lbl"><span>Reserve</span><b id="hBuoy">100%</b></div><div class="bar"><i id="hBuoyBar"></i></div>
+      <div class="lbl"><span>List</span><b id="hList">level</b></div>
+      <div class="lbl"><span>Speed</span><b id="hSpeed">0 kn</b></div>
+      <div class="lbl"><span>Hostiles</span><b id="hFoes">0</b></div>
+      <div class="lbl"><span>Target</span><b id="hTarget">auto</b></div>
+      <div class="lbl" id="hWaveRow"><span>Wave</span><b id="hWave">1</b></div>
+      <div class="lbl"><span>Time</span><b id="hTime">0:00</b></div>
+    </div>
+  </div>
+  <div class="hudTR"><button id="bZoomOut">−</button><button id="bZoomIn">+</button><button id="bCam">Cam</button><button id="bPause">❚❚</button></div>
+  <div id="throttle"><i id="thrBar"></i><div class="zero" id="thrZero"></div></div>
+  <div class="hudBR"><button id="bSmoke">Smoke</button><button id="bTarget">Target</button><canvas id="minimap"></canvas></div>
+  <div id="weapons"></div>
+  <div id="hint"></div>
+</section>
+<div id="msg"><b></b><span></span></div>
+
+<!-- ============================== overlays -->
+<div class="overlay" id="sheet"><div class="dialog sheet" id="sheetBody"></div></div>
+<div class="overlay" id="pauseOv"><div class="dialog">
+  <h2>Paused</h2>
+  <div class="btns">
+    <button class="primary" id="pResume">Resume</button>
+    <button id="pRestart">Restart</button>
+    <button id="pRetreat">Retreat to shipyard</button>
+    <button id="pQuit">Quit to menu</button>
+  </div>
+</div></div>
+<div class="overlay" id="resultOv"><div class="dialog result">
+  <div class="rHead"><h2 id="rTitle">Victory</h2><div class="mute" id="rSub"></div><div class="stars" id="rStars"></div></div>
+  <div class="rBody"><div class="rstats" id="rStats"></div><div class="reward" id="rReward"></div></div>
+  <div class="btns" id="rBtns"></div>
+</div></div>
+<div id="toast"></div>
+<div id="coach"><div class="coachBox"><p id="coachText"></p><button id="coachNext" class="primary">Got it</button></div></div>
+<div id="nogl"><div><h1 class="logo">IRON TIDE</h1><p>This browser has WebGL turned off, so the game can't start. Try Safari or Chrome with hardware acceleration enabled.</p></div></div>
+
+<script>/*@THREE@*/</script>
+<script>/*@GAME@*/</script>
+</body>
+</html>
