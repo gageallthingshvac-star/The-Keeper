@@ -2,7 +2,7 @@
 // AI, design rules and progression can be exercised headlessly.
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const SRC = path.join(__dirname, '..', 'src');
-const PURE = ['util', 'data', 'design', 'sim', 'ai', 'progress'];
+const PURE = ['util', 'data', 'ships', 'design', 'sim', 'ai', 'progress'];
 
 function load() {
   const ctx = { console, Math, Date, JSON, performance: { now: () => Date.now() } };

@@ -24,6 +24,7 @@ const Sim = (() => {
       this.brain = o.brain || null;
       this.target = null;
       this.w = design.w; this.h = design.h;
+      this.livery = design.livery || o.livery || null;
       this.blocks = []; this.map = new Array(design.w * design.h).fill(null);
       let sc = 0, sr = 0;
       design.cells.forEach((t, i) => {
@@ -62,7 +63,7 @@ const Sim = (() => {
         m += P.mass; bu += P.buoy; th += (P.thrust || 0) * this.mods.thrust; ru += P.turn || 0; n++;
         if (P.weapon) this.weapons.push(b);
         if (P.util) { this.utils.push(b); if (P.util.type === 'radar') radars++; }
-        if (b.t === 'engine') this.engines.push(b);
+        if (b.t === 'engine' || b.t === 'funnel') this.engines.push(b);
         if (b.t === 'bridge') this.bridge = b;
       }
       radars = Math.min(radars, PARTS.radar.util.max);
@@ -212,6 +213,7 @@ const Sim = (() => {
 
         if (W.type === 'ciws' || W.type === 'aa') { this.pointDefense(s, w, W, wx, wy, dt); continue; }
         if (W.type === 'air') { this.hangar(s, w, W, wx, wy); continue; }
+        if (W.type === 'broadside') { this.broadside(s, w, W, wx, wy, W.range * s.rangeMul, dt); continue; }
         // a rocket salvo in progress keeps firing at its locked point
         if (w.salvo > 0) {
           w.salvoT -= dt;
@@ -273,6 +275,30 @@ const Sim = (() => {
         }
         w.aimB = null; // next shot picks a fresh block
       }
+    }
+    // Gun decks fire a ripple of shots at the best target within 40° of either beam.
+    broadside(s, w, W, wx, wy, range, dt) {
+      const onBeam = o => { const rel = Math.abs(wrapA(headingTo(o.x - wx, o.y - wy) - s.a)); return Math.abs(rel - Math.PI / 2) < 0.7; };
+      let t = s.target && !s.target.sinking && !s.target.dead && Math.hypot(s.target.x - wx, s.target.y - wy) - s.target.rad * 0.5 < range && onBeam(s.target) ? s.target : null;
+      if (!t) { let bd = range; for (const o of this.ships) { if (o.team === s.team || o.sinking || o.dead || !onBeam(o)) continue; const d = Math.hypot(o.x - wx, o.y - wy) - o.rad * 0.5; if (d < bd) { bd = d; t = o; } } }
+      if (w.salvo > 0) {
+        w.salvoT -= dt;
+        if (w.salvoT > 0 || !w.lockT || w.lockT.sinking) { if (!w.lockT || w.lockT.sinking) w.salvo = 0; return; }
+        w.salvo--; w.salvoT = 0.18;
+        const b = w.lockT.randomBlock(); if (!b) return;
+        let [tx, ty] = w.lockT.pos(b);
+        const d = Math.hypot(tx - wx, ty - wy), sp = d * W.spread * this.spreadFor(s, w.lockT, wx, wy);
+        tx += w.lockT.vx * d / W.speed + this.rng.gauss() * sp; ty += w.lockT.vy * d / W.speed + this.rng.gauss() * sp;
+        const a = headingTo(tx - wx, ty - wy), [fx, fy] = fwd(a), T = d / W.speed;
+        w.ang = a; w.elev = 0.05;
+        if (s === this.player) this.stats.shots++;
+        this.shells.push({x0: wx + fx * 5, y0: wy + fy * 5, tx, ty, t: 0, T, apex: 4 + T * 6, dmg: W.dmg, splash: 0, team: s.team, owner: s});
+        this.emit('fire', {kind: 'battery', ship: s, block: w, x: wx + fx * 5, y: wy + fy * 5, ang: a});
+        return;
+      }
+      if (!t || w.cd > 0) return;
+      w.cd = W.reload * this.rng.range(0.9, 1.15) * s.prof.reload / s.mods.reload;
+      w.salvo = W.salvo; w.salvoT = 0; w.lockT = t;
     }
     launchRocket(s, w, W, wx, wy) {
       const rng = this.rng, d = w.lockD;

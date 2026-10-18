@@ -8,6 +8,7 @@ const Progress = (() => {
     return {
       v: VERSION, credits: 0, parts: FREE_PARTS.slice(), dock: 0,
       tracks: Object.fromEntries(Object.keys(TRACKS).map(k => [k, 0])),
+      blueprints: [],
       stars: OPS.map(() => 0), hardClears: OPS.map(() => false),
       endlessBest: 0, totalSunk: 0, battles: 0,
       settings: {difficulty: 'medium', quality: 'auto', volume: 0.8, music: true, shake: true},
@@ -31,6 +32,7 @@ const Progress = (() => {
     out.dock = Util.clamp(p.dock | 0, 0, DOCKS.length - 1);
     if (!Design.valid(out.design)) out.design = f.design;
     out.slots = [0, 1, 2].map(i => (p.slots && Design.valid(p.slots[i])) ? p.slots[i] : null);
+    out.blueprints = Array.from(new Set((p.blueprints || []).filter(id => Data.FAMOUS[id])));
     out.credits = Math.max(0, +p.credits || 0);
     return out;
   }
@@ -77,6 +79,24 @@ const Progress = (() => {
     p.credits -= price; p.tracks[k]++; return true;
   }
   function dockPrice(p) { const n = DOCKS[p.dock + 1]; return n ? n.price : null; }
+  // ---- historical blueprints
+  // Price scales with the ship's build cost; owning one lets you load it in the shipyard any time.
+  function blueprintPrice(id) {
+    const a = Design.analyze(Design.fromRows(Data.FAMOUS[id].rows));
+    return Math.max(150, Math.round(a.cost * 0.55 / 50) * 50);
+  }
+  // What stops an owned blueprint from being built right now: dock size and missing parts.
+  function blueprintNeeds(p, id) {
+    const d = Design.fromRows(Data.FAMOUS[id].rows), a = Design.analyze(d), unl = unlocked(p);
+    const dockIdx = DOCKS.findIndex(k => k.w >= d.w && k.h >= d.h);
+    return {dock: dockIdx > p.dock ? DOCKS[dockIdx] : null, parts: Object.keys(a.cnt).filter(t => !unl.has(t)), design: d, a};
+  }
+  function buyBlueprint(p, id) {
+    if (p.blueprints.includes(id)) return false;
+    const price = blueprintPrice(id);
+    if (p.credits < price) return false;
+    p.credits -= price; p.blueprints.push(id); return true;
+  }
   function buyDock(p) {
     const price = dockPrice(p);
     if (price == null || p.credits < price) return false;
@@ -130,7 +150,8 @@ const Progress = (() => {
     return rw;
   }
 
-  return {fresh, sanitize, load, save, unlocked, dock, opUnlocked, reachedOp, budget, endlessBudgetCap, totalStars,
+  return {blueprintPrice, blueprintNeeds, buyBlueprint,
+          fresh, sanitize, load, save, unlocked, dock, opUnlocked, reachedOp, budget, endlessBudgetCap, totalStars,
           mods, partStatus, buyPart, trackPrice, buyTrack, dockPrice, buyDock, starsFor, reward, applyResult,
           endlessReward, applyEndless};
 })();

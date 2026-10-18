@@ -37,6 +37,17 @@ const UI = (() => {
         ctx.fillStyle = '#aab4be'; roundRect(ctx, x - k * .22, y - k * .06, k * .44, k * .32, k * .06); ctx.fill(); break;
       case 'hangar': ctx.fillStyle = '#6b5e4c'; ctx.fillRect(x - k * .42, y - k * .42, k * .84, k * .84); ctx.fillStyle = '#d9a92e'; ctx.fillRect(x - k * .03, y - k * .42, k * .06, k * .84);
         ctx.fillStyle = '#dfe5ea'; ctx.fillRect(x - k * .32, y - k * .06, k * .64, k * .1); ctx.fillRect(x - k * .05, y - k * .24, k * .1, k * .46); ctx.fillRect(x - k * .14, y + k * .16, k * .28, k * .07); break;
+      case 'machinery': ctx.fillStyle = '#2b3138'; for (let i = 0; i < 4; i++) ctx.fillRect(x - k * .3, y - k * .3 + i * k * .16, k * .6, k * .08);
+        ctx.fillStyle = '#c08050'; circ(ctx, x + k * .22, y + k * .24, k * .08); ctx.fill(); break;
+      case 'funnel': ctx.fillStyle = '#c2a36d'; circ(ctx, x, y, k * .28); ctx.fill(); ctx.fillStyle = '#141618'; circ(ctx, x, y, k * .17); ctx.fill(); break;
+      case 'mast': ctx.fillStyle = '#efe8d8'; ctx.fillRect(x - k * .38, y - k * .1, k * .76, k * .2); ctx.fillStyle = '#5a4630'; circ(ctx, x, y, k * .09); ctx.fill(); break;
+      case 'paddle': ctx.fillStyle = '#d6dbe0'; circ(ctx, x, y, k * .34); ctx.fill(); ctx.strokeStyle = '#2a3036'; ctx.lineWidth = k * .05;
+        for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(i * .785) * k * .34, y + Math.sin(i * .785) * k * .34); ctx.moveTo(x, y); ctx.lineTo(x - Math.cos(i * .785) * k * .34, y - Math.sin(i * .785) * k * .34); ctx.stroke(); } break;
+      case 'battery': ctx.fillStyle = '#6b5a44'; ctx.fillRect(x - k * .4, y - k * .4, k * .8, k * .8); ctx.fillStyle = '#15191d';
+        for (let i = -1; i <= 1; i++) { ctx.fillRect(x - k * .5, y + i * k * .24 - k * .05, k * .22, k * .1); ctx.fillRect(x + k * .28, y + i * k * .24 - k * .05, k * .22, k * .1); } break;
+      case 'cabin': ctx.fillStyle = '#eef1f3'; ctx.fillRect(x - k * .36, y - k * .36, k * .72, k * .72); ctx.fillStyle = '#2d4152';
+        for (let i = 0; i < 3; i++) ctx.fillRect(x - k * .28 + i * k * .2, y - k * .1, k * .12, k * .12); break;
+      case 'deck': ctx.fillStyle = '#6b5e4c'; ctx.fillRect(x - k * .45, y - k * .45, k * .9, k * .9); ctx.fillStyle = '#d9a92e'; ctx.fillRect(x - k * .03, y - k * .45, k * .06, k * .9); break;
       case 'radar': ctx.fillStyle = '#2b3138'; circ(ctx, x, y, k * .1); ctx.fill(); ctx.fillStyle = '#dfe5ea'; ctx.fillRect(x - k * .34, y - k * .08, k * .68, k * .16); break;
       case 'repair': ctx.fillStyle = '#d9a92e'; ctx.fillRect(x - k * .3, y - k * .3, k * .6, k * .6); ctx.fillStyle = '#2a3036'; ctx.fillRect(x - k * .06, y - k * .22, k * .12, k * .44); ctx.fillRect(x - k * .22, y - k * .06, k * .44, k * .12); break;
       case 'smoke': ctx.fillStyle = '#2a3036'; circ(ctx, x - k * .16, y, k * .14); ctx.fill(); circ(ctx, x + k * .16, y, k * .14); ctx.fill();
@@ -284,27 +295,55 @@ const UI = (() => {
     next();
   }
 
-  // Load a famous ship as your own design (if it fits your dock and you own its parts).
+  // Top-down profile of a design, drawn with the part icons. Long ships are drawn bow-left.
+  function profileCanvas(d, maxW = 280, maxH = 64) {
+    const horiz = d.h >= d.w;
+    const cols = horiz ? d.h : d.w, rows = horiz ? d.w : d.h;
+    const cell = Math.max(3, Math.min(Math.floor(maxW / cols), Math.floor(maxH / rows)));
+    const cv = document.createElement('canvas'), dpr = 2;
+    cv.width = cols * cell * dpr; cv.height = rows * cell * dpr;
+    cv.style.width = cols * cell + 'px'; cv.style.height = rows * cell + 'px';
+    const g = cv.getContext('2d'); g.scale(dpr, dpr);
+    d.cells.forEach((t, i) => {
+      if (!t) return;
+      const c = i % d.w, r = (i / d.w) | 0;
+      const x = horiz ? r : c, y = horiz ? (d.w - 1 - c) : r;
+      drawPartIcon(g, t, x * cell + cell / 2, y * cell + cell / 2, cell);
+    });
+    return cv;
+  }
+  function specsHtml(F) {
+    const s = F.specs;
+    return `<div class="specs"><span>Length</span><b>${s.length}</b><span>Displacement</span><b>${s.disp}</b>
+      <span>Speed</span><b>${s.speed}</b><span>Armament</span><b>${s.arm}</b><span>Crew</span><b>${s.crew}</b></div>`;
+  }
+
+  // Shipyard: load an owned historical blueprint as your design.
   function openBlueprints() {
-    const p = app.profile, dock = Progress.dock(p), unl = Progress.unlocked(p);
-    const rows = Data.BLUEPRINTS.map(id => {
-      const F = Data.FAMOUS[id], d = Design.fromRows(F.rows), a = Design.analyze(d);
-      const missing = Object.keys(a.cnt).filter(t => !unl.has(t)).map(t => PARTS[t].name);
-      const needDock = Data.DOCKS.findIndex(k => k.w >= d.w && k.h >= d.h);
-      const why = needDock > p.dock ? `Needs ${Data.DOCKS[needDock].name}` : missing.length ? 'Needs ' + missing.join(', ') : '';
-      return `<div class="bp"><div><b>${F.name}</b> <span class="mute small">${F.cls} · ${F.nation} · ${F.year}</span>
-        <p>${F.blurb}</p><span class="mono small">${d.w}×${d.h} · cost ${a.cost} · ${(a.speed * Design.KN).toFixed(0)} kn</span></div>
-        <button data-bp="${id}" class="${why ? '' : 'primary'}" ${why ? 'disabled' : ''}>${why || 'Load'}</button></div>`;
-    }).join('');
-    $('sheetBody').innerHTML = `<h2>Blueprints</h2><p class="mute small" style="margin:4px 0 10px">Famous warships, ready to refit. Loading replaces your current design (undo brings it back).</p>
-      <div class="bps">${rows}</div><div class="btns"><button id="bpClose">Close</button></div>`;
+    const p = app.profile, dock = Progress.dock(p);
+    const owned = Data.SHIPWRIGHT.filter(id => p.blueprints.includes(id));
+    $('sheetBody').innerHTML = `<h2>Blueprints</h2><p class="mute small" style="margin:4px 0 10px">${owned.length
+        ? 'Historical ships you own. Loading replaces your current design (undo brings it back).'
+        : 'You don\'t own any blueprints yet. Buy them in the Armory under Shipwright.'}</p>
+      <div class="bps" id="bpList"></div><div class="btns" style="flex-direction:row"><button id="bpShop">Shipwright</button><button id="bpClose">Close</button></div>`;
+    const list = $('bpList');
+    for (const id of owned) {
+      const F = Data.FAMOUS[id], need = Progress.blueprintNeeds(p, id);
+      const why = need.dock ? `Needs ${need.dock.name}` : need.parts.length ? 'Needs ' + need.parts.map(t => PARTS[t].name).join(', ') : '';
+      const el = document.createElement('div'); el.className = 'bp';
+      el.innerHTML = `<div class="bpTxt"><b>${F.name}</b> <span class="mute small">${F.cls} · ${F.nation} · ${F.year}</span><div class="pf"></div>
+        <span class="mono small">${need.design.w}×${need.design.h} · cost ${need.a.cost} · ${(need.a.speed * Design.KN).toFixed(0)} kn</span></div>
+        <button class="${why ? '' : 'primary'}" ${why ? 'disabled' : ''}>${why || 'Load'}</button>`;
+      el.querySelector('.pf').appendChild(profileCanvas(need.design, 220, 40));
+      el.querySelector('button').onclick = () => {
+        edit(() => { p.design = Design.fromRows(F.rows, dock.w, dock.h); if (F.livery) p.design.livery = Object.assign({}, F.livery); });
+        $('sheet').classList.remove('on'); toast(`${F.name} loaded`); Sound.play('buy');
+      };
+      list.appendChild(el);
+    }
     $('sheet').classList.add('on');
     $('bpClose').onclick = () => $('sheet').classList.remove('on');
-    for (const b of $$('[data-bp]')) b.onclick = () => {
-      const F = Data.FAMOUS[b.dataset.bp];
-      edit(() => { p.design = Design.fromRows(F.rows, dock.w, dock.h); });
-      $('sheet').classList.remove('on'); toast(`${F.name} loaded`); Sound.play('buy');
-    };
+    $('bpShop').onclick = () => { $('sheet').classList.remove('on'); show('sArmory'); renderArmory('ships'); };
   }
 
   // ---------------------------------------------------------------- armory
@@ -314,6 +353,7 @@ const UI = (() => {
     const p = app.profile, el = $('aList');
     $('aCredits').textContent = cr(p.credits);
     for (const b of $$('#aTabs button')) b.classList.toggle('on', b.dataset.tab === armoryTab);
+    el.classList.toggle('wide', armoryTab === 'ships');
     el.innerHTML = '';
     const item = (iconEl, title, desc, extra, actHtml, onBuy) => {
       const c = document.createElement('div'); c.className = 'card item';
@@ -331,6 +371,25 @@ const UI = (() => {
           : st.state === 'locked' ? `<span class="mute small">Reach op ${st.op + 1}</span>`
           : `<button class="${st.state === 'buy' ? 'primary' : ''}" ${st.state === 'buy' ? '' : 'disabled'}>${cr(st.price)}</button>`;
         item(iconCanvas(t, 96), P.name, P.desc, stats, act, () => Progress.buyPart(p, t));
+      }
+    } else if (armoryTab === 'ships') {
+      const ERA = {sail: 'Age of sail', steam: 'Steel and steam', ww2: 'Second World War', modern: 'Modern'};
+      let lastEra = '';
+      el.insertAdjacentHTML('beforeend', `<p class="mute small shipNote">Historical ships as buildable blueprints. Real proportions at 10 m per block (ships under 60 m at double scale), real armament layouts, and speeds tuned to history up to the game's 31-knot cap. Buy once, then load from Shipyard → Blueprints.</p>`);
+      for (const id of Data.SHIPWRIGHT) {
+        const F = Data.FAMOUS[id];
+        if (F.era !== lastEra) { lastEra = F.era; el.insertAdjacentHTML('beforeend', `<div class="eraHead">${ERA[F.era]}</div>`); }
+        const owned = p.blueprints.includes(id), price = Progress.blueprintPrice(id), need = Progress.blueprintNeeds(p, id);
+        const c = document.createElement('div'); c.className = 'card ship';
+        const needs = [need.dock ? need.dock.name : '', ...need.parts.map(t => PARTS[t].name)].filter(Boolean);
+        c.innerHTML = `<div class="shipHead"><div><b>${F.name}</b><span class="mute small">${F.cls} · ${F.nation} · ${F.year}</span></div>
+            <div class="act">${owned ? '<span class="owned">Owned</span>' : `<button class="${p.credits >= price ? 'primary' : ''}" ${p.credits >= price ? '' : 'disabled'}>${cr(price)}</button>`}</div></div>
+          <div class="pf"></div>${specsHtml(F)}<p class="fate">${F.fate}</p>
+          <span class="mono small">Game: ${need.design.w}×${need.design.h} blocks · build cost ${need.a.cost} · ${(need.a.speed * Design.KN).toFixed(1)} kn${needs.length ? ` · <span style="color:var(--bad)">to build: ${needs.join(', ')}</span>` : ''}</span>`;
+        c.querySelector('.pf').appendChild(profileCanvas(need.design));
+        const btn = c.querySelector('.act button');
+        if (btn) btn.onclick = () => { if (Progress.buyBlueprint(p, id)) { Sound.play('buy'); app.haptic('success'); app.save(); toast(`${F.name} blueprint bought`); renderArmory(); } else Sound.play('deny'); };
+        el.appendChild(c);
       }
     } else if (armoryTab === 'eng') {
       for (const k in TRACKS) {

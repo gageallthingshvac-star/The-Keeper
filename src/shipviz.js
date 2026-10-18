@@ -15,13 +15,21 @@ const Viz = (() => {
   // Visual pieces per part. node: base | pivot (turret yaw) | barrel (yaw + elevation) | spin (radar)
   // tint: 'paint' takes the team turret colour.
   const BARREL = {gun: [0, 1.7, -1.4], heavy: [0, 2.2, -3.2], superheavy: [0, 2.7, -3.4], ciws: [0, 2.6, -1.2], aa: [0, 1.9, -0.6], rail: [0, 1.9, -0.6], rockets: [0, 2.6, 0.4]};
-  const MUZZLE = {gun: 9.6, heavy: 16, superheavy: 20, ciws: 5, aa: 4.6, rail: 17, rockets: 4, torp: 6, missile: 0, hangar: 0};
+  const MUZZLE = {battery: 5.5, gun: 9.6, heavy: 16, superheavy: 20, ciws: 5, aa: 4.6, rail: 17, rockets: 4, torp: 6, missile: 0, hangar: 0};
   const PLANE = [['planeBody', 'plane'], ['planeWing', 'plane'], ['planeTail', 'plane'], ['planeFin', 'plane'], ['planeProp', 'dark']];
   const p = (geo, mat, node = 'base', o = {}) => Object.assign({geo, mat, node}, o);
   const PIECES = {
     bridge: [p('tower', 'light'), p('tower2', 'light'), p('window', 'glass'), p('wing', 'light'), p('mast', 'dark'),
              p('radarBar', 'dark', 'spin', {y: DECK + 17.5, rate: 1.8})],
-    engine: [p('funnel', 'funnel'), p('funnelTop', 'black')],
+    engine: [p('funnel', 'funnel', 'base', {livery: true}), p('funnelTop', 'black')],
+    funnel: [p('funnel', 'funnel', 'base', {livery: true}), p('funnelTop', 'black')],
+    machinery: [p('vent', 'dark'), ...[-2, 0, 2].map(z => p('ventGrille', 'black', 'base', {pos: [0, DECK + 1, z]}))],
+    mast: [p('sailMast', 'wood'), ...[11, 17.5, 23.5].flatMap((y, i) => [p('yard', 'wood', 'base', {pos: [0, DECK + y + 2.6, 0]}),
+           p('sail', 'sail', 'base', {pos: [0, DECK + y, 0], scl: [1 - i * 0.18, 1 - i * 0.12, 1], rotY: 0.55})])],
+    paddle: [p('paddleBox', 'light')],
+    battery: [...[-2.8, 0, 2.8].flatMap(z => [p('gunport', 'black', 'base', {pos: [-5.1, DECK - 1.4, z]}), p('gunport', 'black', 'base', {pos: [5.1, DECK - 1.4, z]})])],
+    cabin: [p('cabinLow', 'cabin'), p('cabinTop', 'cabin'), p('windows', 'glass'), p('windows2', 'glass')],
+    deck: [p('flightDeck', 'flight')],
     rudder: [p('rudderCap', 'dark')],
     gun: [p('gunBase', 'paint', 'pivot', {tint: true}), p('gunBarrel', 'dark', 'barrel')],
     heavy: [p('heavyHouse', 'paint', 'pivot', {tint: true}), p('heavyRoof', 'paint', 'pivot', {tint: true}),
@@ -42,7 +50,12 @@ const Viz = (() => {
     repair: [p('repairPad', 'yellow'), p('craneBase', 'yellow'), p('craneArm', 'yellow')],
     smoke: [p('canister', 'dark', 'base', {pos: [-1.8, DECK + 1.6, 0.6]}), p('canister', 'dark', 'base', {pos: [1.8, DECK + 1.6, 0.6]})],
   };
-  for (const k in PIECES) for (const pc of PIECES[k]) pc.local = new M4().makeTranslation(...(pc.pos || [0, 0, 0]));
+  for (const k in PIECES) for (const pc of PIECES[k]) {
+    pc.local = new M4().makeTranslation(...(pc.pos || [0, 0, 0]));
+    if (pc.rotY) pc.local.multiply(new M4().makeRotationY(pc.rotY));
+    if (pc.scl) pc.local.multiply(new M4().makeScale(...pc.scl));
+  }
+  const FUNNEL_DEFAULT = new THREE.Color('#c2a36d');
 
   function variant(s, b) {
     if (b.t === 'bridge') return 'full';
@@ -95,11 +108,18 @@ const Viz = (() => {
       const armor = b.t === 'armor';
       const body = this.pools.get((armor ? 'armor_' : 'hull_') + v.variants.get(b), armor ? 'armorMats' : 'hullMats');
       const list = [{pool: body, i: body.alloc(), node: 'base', local: null, hull: true}];
-      for (const pc of PIECES[b.t] || []) {
+      // Machinery is below decks: on a carrier it shows as more flight deck, not as vents.
+      let pieces = PIECES[b.t] || [];
+      if (b.t === 'machinery') {
+        const nb = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dc, dr]) => { const c = b.c + dc, r = b.r + dr; return c >= 0 && r >= 0 && c < s.w && r < s.h ? s.map[c + r * s.w] : null; });
+        if (nb.some(n => n && (n.t === 'deck' || n.t === 'hangar'))) pieces = PIECES.deck;
+      }
+      for (const pc of pieces) {
         const pool = this.pools.get(pc.geo, pc.mat, true);
         const e = {pool, i: pool.alloc(), node: pc.node, local: pc.local, pc};
         list.push(e);
         if (pc.tint) pool.color(e.i, team.paint);
+        if (pc.livery) pool.color(e.i, s.livery && s.livery.funnel ? new THREE.Color(s.livery.funnel) : FUNNEL_DEFAULT);
       }
       body.color(list[0].i, team.hull);
       b.vizLevel = 0;

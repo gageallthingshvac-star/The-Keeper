@@ -60,6 +60,18 @@ h3{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute
 .legendHead span{font-size:12px;color:var(--mute)}
 .op.legend{border-color:rgba(224,180,90,.32);background:linear-gradient(160deg,rgba(60,44,16,.55),var(--panel) 60%)}
 .bps{display:flex;flex-direction:column;gap:8px;text-align:left}
+.bpTxt{min-width:0} .bpTxt .pf{margin:6px 0 2px;overflow:hidden}
+.shipNote{grid-column:1/-1;margin:-2px 2px 2px;line-height:1.45}
+.eraHead{grid-column:1/-1;font-family:var(--display);font-size:17px;color:var(--brass);margin:8px 2px 0;letter-spacing:.03em}
+.card.ship{display:flex;flex-direction:column;gap:8px}
+.card.ship + .card.ship{margin-top:0}
+.shipHead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.shipHead b{display:block;font-size:16px} .shipHead .act button{min-width:96px}
+.card.ship .pf{background:rgba(120,170,200,.07);border-radius:8px;padding:6px;display:flex;justify-content:center;overflow:hidden}
+.specs{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:12px}
+.specs span{color:var(--mute);text-transform:uppercase;letter-spacing:.05em;font-size:10px;padding-top:2px}
+.specs b{font-weight:500;color:#d8e4ec;line-height:1.35}
+.fate{font-size:12px;color:#b7c7d2;line-height:1.45;font-style:italic}
 .bp{display:flex;gap:10px;align-items:center;justify-content:space-between;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:12px;padding:10px}
 .bp p{font-size:12px;color:#b7c7d2;line-height:1.4;margin:3px 0}
 .bp button{flex:0 0 auto;max-width:130px;font-size:12px}
@@ -104,6 +116,7 @@ h3{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute
 .tabs{display:flex;gap:6px;margin-bottom:12px}
 .tabs button{flex:1} .tabs button.on{border-color:var(--brass);color:var(--brass);background:rgba(224,180,90,.1)}
 #aList{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px;padding-bottom:20px}
+#aList.wide{grid-template-columns:repeat(auto-fill,minmax(340px,1fr))}
 .item{display:flex;gap:12px;align-items:flex-start}
 .item canvas{width:48px;height:48px;flex:0 0 48px;border-radius:10px;background:rgba(255,255,255,.04)}
 .item .txt{flex:1;min-width:0}

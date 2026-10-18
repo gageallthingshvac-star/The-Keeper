@@ -139,10 +139,13 @@ const Gfx = (() => {
     MAT.glass = std({color: '#18252f', roughness: 0.15, metalness: 0.7});
     MAT.dark = std({color: '#2a3036', roughness: 0.5, metalness: 0.55});
     MAT.black = std({color: '#121416', roughness: 0.9});
-    MAT.funnel = std({color: '#c2a36d', roughness: 0.6});
+    MAT.funnel = std({color: '#ffffff', roughness: 0.6});   // coloured per ship through instance colour (livery)
+    MAT.sail = std({color: '#efe8d8', roughness: 0.9, metalness: 0, side: THREE.DoubleSide});
+    MAT.wood = std({color: '#6b5440', roughness: 0.85, metalness: 0.05});
+    MAT.cabin = std({color: '#eef1f3', roughness: 0.55, metalness: 0.1});
     MAT.red = std({color: '#c2473a', roughness: 0.5});
     MAT.yellow = std({color: '#d9a92e', roughness: 0.5});
-    MAT.flight = std({color: '#6b5e4c', roughness: 0.85, metalness: 0.05});
+    MAT.flight = std({color: '#4b5056', roughness: 0.9, metalness: 0.1});
     MAT.plane = std({color: '#c9d1d8', roughness: 0.55, metalness: 0.3});
     MAT.planeFly = MAT.plane; MAT.darkFly = MAT.dark; // same look, separate instance pools
     MAT.coil = std({color: '#4f8fb8', roughness: 0.3, metalness: 0.7, emissive: '#16405a', emissiveIntensity: 0.6});
@@ -221,6 +224,17 @@ const Gfx = (() => {
     GEO.planeFin = box(0.25, 1.6, 1.3).translate(0, 0.9, 3.1);
     GEO.planeProp = box(3, 0.15, 0.2).translate(0, 0, -3.75);
     GEO.bomb = new THREE.SphereGeometry(0.9, 6, 4).scale(0.8, 0.8, 1.6);
+    GEO.vent = box(7, 0.9, 7).translate(0, DECK + 0.45, 0);
+    GEO.ventGrille = box(5.6, 0.25, 0.7);
+    GEO.sailMast = cyl(0.35, 0.55, 28, 8).translate(0, DECK + 14, 0);
+    GEO.yard = cyl(0.18, 0.18, 9.5, 6).rotateZ(Math.PI / 2);
+    GEO.sail = box(8.4, 5.2, 0.2);
+    GEO.paddleBox = cyl(4.4, 4.4, 3.4, 18, 1, false, 0, Math.PI).rotateZ(Math.PI / 2).rotateY(Math.PI / 2).translate(0, DECK - 0.5, 0);
+    GEO.gunport = cyl(0.35, 0.45, 2.6, 6).rotateZ(Math.PI / 2);
+    GEO.cabinLow = box(8.8, 3.4, 9.6).translate(0, DECK + 1.7, 0);
+    GEO.cabinTop = box(7.4, 2.8, 9.6).translate(0, DECK + 4.8, 0);
+    GEO.windows = box(9, 0.7, 9.7).translate(0, DECK + 2.3, 0);
+    GEO.windows2 = box(7.6, 0.6, 9.7).translate(0, DECK + 5.2, 0);
     GEO.radarMast = cyl(0.5, 0.8, 7, 8).translate(0, DECK + 3.5, 0);
     GEO.radarDish = box(7.5, 2.4, 0.5);
     GEO.craneBase = box(3, 4, 3).translate(1.5, DECK + 2, 1.5);

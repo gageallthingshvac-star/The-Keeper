@@ -72,6 +72,18 @@ h3{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute
 .legendHead span{font-size:12px;color:var(--mute)}
 .op.legend{border-color:rgba(224,180,90,.32);background:linear-gradient(160deg,rgba(60,44,16,.55),var(--panel) 60%)}
 .bps{display:flex;flex-direction:column;gap:8px;text-align:left}
+.bpTxt{min-width:0} .bpTxt .pf{margin:6px 0 2px;overflow:hidden}
+.shipNote{grid-column:1/-1;margin:-2px 2px 2px;line-height:1.45}
+.eraHead{grid-column:1/-1;font-family:var(--display);font-size:17px;color:var(--brass);margin:8px 2px 0;letter-spacing:.03em}
+.card.ship{display:flex;flex-direction:column;gap:8px}
+.card.ship + .card.ship{margin-top:0}
+.shipHead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.shipHead b{display:block;font-size:16px} .shipHead .act button{min-width:96px}
+.card.ship .pf{background:rgba(120,170,200,.07);border-radius:8px;padding:6px;display:flex;justify-content:center;overflow:hidden}
+.specs{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:12px}
+.specs span{color:var(--mute);text-transform:uppercase;letter-spacing:.05em;font-size:10px;padding-top:2px}
+.specs b{font-weight:500;color:#d8e4ec;line-height:1.35}
+.fate{font-size:12px;color:#b7c7d2;line-height:1.45;font-style:italic}
 .bp{display:flex;gap:10px;align-items:center;justify-content:space-between;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:12px;padding:10px}
 .bp p{font-size:12px;color:#b7c7d2;line-height:1.4;margin:3px 0}
 .bp button{flex:0 0 auto;max-width:130px;font-size:12px}
@@ -116,6 +128,7 @@ h3{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute
 .tabs{display:flex;gap:6px;margin-bottom:12px}
 .tabs button{flex:1} .tabs button.on{border-color:var(--brass);color:var(--brass);background:rgba(224,180,90,.1)}
 #aList{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px;padding-bottom:20px}
+#aList.wide{grid-template-columns:repeat(auto-fill,minmax(340px,1fr))}
 .item{display:flex;gap:12px;align-items:flex-start}
 .item canvas{width:48px;height:48px;flex:0 0 48px;border-radius:10px;background:rgba(255,255,255,.04)}
 .item .txt{flex:1;min-width:0}
@@ -328,7 +341,7 @@ h3{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute
 <section id="sArmory" class="screen scroll">
   <div class="topbar"><button class="back" data-act="title">‹ Back</button><b>Armory</b><span class="pill" id="aCredits">0 cr</span></div>
   <div class="wrap">
-    <div class="tabs" id="aTabs"><button data-tab="parts" class="on">Parts</button><button data-tab="eng">Engineering</button><button data-tab="dock">Dock</button></div>
+    <div class="tabs" id="aTabs"><button data-tab="parts" class="on">Parts</button><button data-tab="ships">Shipwright</button><button data-tab="eng">Engineering</button><button data-tab="dock">Dock</button></div>
     <div id="aList"></div>
   </div>
 </section>
@@ -508,6 +521,21 @@ const Data = (() => {
     hangar:  {name: 'Hangar',    key: 'F', cost: 160, mass: 3,   buoy: 1.5, hp: 45,  boom: 30,
               weapon: {type: 'air', range: 950, reload: 10, dmg: 65, splash: 12, speed: 150, maxAir: 1, spread: 9, torpDmg: 100},
               desc: 'Flight deck with a strike plane — dive bombers and torpedo bombers alternate. Each strikes, returns and rearms. Lose the hangar and its plane has nowhere to land.'},
+    machinery:{name: 'Machinery', key: 'V', cost: 40, mass: 3,   buoy: 1,   hp: 35,  thrust: 10, boom: 18,
+              desc: 'Below-deck boilers, turbines or reactor. Same push as an Engine, no funnel on deck.'},
+    funnel:  {name: 'Funnel',    key: 'O', cost: 6,   mass: 1,   buoy: 1,   hp: 25,
+              desc: 'A smokestack and nothing else. Pair with Machinery for an authentic profile.'},
+    mast:    {name: 'Sail Mast', key: 'N', cost: 18,  mass: 1,   buoy: 1,   hp: 20,  thrust: 0.8,
+              desc: 'Square-rigged mast. A gentle push — sailing ships were slow — but no fuel and no smoke.'},
+    paddle:  {name: 'Paddle Wheel', key: 'P', cost: 22, mass: 2, buoy: 1.5, hp: 30,  thrust: 2,
+              desc: 'Steam paddle wheel. Put them on the sides, or across the stern for a sternwheeler.'},
+    battery: {name: 'Gun Deck',  key: 'Y', cost: 28,  mass: 2,   buoy: 0.8, hp: 35,
+              weapon: {type: 'broadside', range: 230, reload: 3, dmg: 9, splash: 0, speed: 380, spread: 0.06, salvo: 3},
+              desc: 'A row of muzzle-loaders behind gunports. Fires only to the sides — turn your beam to the enemy.'},
+    cabin:   {name: 'Deckhouse', key: 'U', cost: 8,   mass: 1.2, buoy: 2.6, hp: 30,
+              desc: 'Passenger decks and cabins. Light and buoyant, but no protection.'},
+    deck:    {name: 'Flight Deck', key: 'J', cost: 6, mass: 1,   buoy: 2.8, hp: 30,
+              desc: 'Open flight deck. Pair with Hangars for a carrier.'},
     radar:   {name: 'Radar',     key: 'D', cost: 60,  mass: 1,   buoy: 0.8, hp: 25,
               util: {type: 'radar', range: 0.15, spread: 0.2, max: 2},
               desc: '+15% weapon range and tighter spread. Up to two stack.'},
@@ -518,13 +546,14 @@ const Data = (() => {
               util: {type: 'smoke', radius: 75, duration: 10, cooldown: 30},
               desc: 'Lays a smoke screen under heavy fire. Enemy aim suffers inside it.'},
   };
-  const PART_ORDER = ['hull', 'armor', 'bridge', 'engine', 'rudder', 'gun', 'heavy', 'superheavy', 'torp',
-                      'rockets', 'missile', 'rail', 'hangar', 'aa', 'ciws', 'radar', 'repair', 'smoke'];
+  const PART_ORDER = ['hull', 'armor', 'bridge', 'engine', 'machinery', 'funnel', 'rudder', 'mast', 'paddle', 'cabin', 'deck',
+                      'gun', 'battery', 'heavy', 'superheavy', 'torp', 'rockets', 'missile', 'rail', 'hangar', 'aa', 'ciws',
+                      'radar', 'repair', 'smoke'];
   const KEY2PART = {};
   for (const k in PARTS) { PARTS[k].id = k; KEY2PART[PARTS[k].key] = k; }
   const TURRETS = new Set(['gun', 'heavy', 'superheavy', 'torp', 'ciws', 'aa', 'rail', 'rockets']);
   // Unlocked from the start; everything else is bought in the Armory.
-  const FREE_PARTS = ['hull', 'armor', 'bridge', 'engine', 'rudder', 'gun'];
+  const FREE_PARTS = ['hull', 'armor', 'bridge', 'engine', 'rudder', 'gun', 'machinery', 'funnel', 'mast', 'paddle', 'battery', 'cabin', 'deck'];
   // price in credits, op = operation index (0-based) that must be reached first
   const PART_SHOP = {
     heavy: {price: 250, op: 1}, radar: {price: 250, op: 2}, torp: {price: 400, op: 2},
@@ -666,226 +695,9 @@ const Data = (() => {
       '..HHRHRHH..']},
   };
 
-  // ---- famous ships ------------------------------------------------------
-  const FAMOUS = {
-    fletcher: {name: 'Fletcher', cls: 'Destroyer', nation: 'USA', year: 1942,
-      blurb: 'The workhorse destroyer of the Pacific: five 5-inch guns, ten torpedo tubes, bristling AA.', rows: [
-      '...H...',
-      '..HGH..',
-      '..HGH..',
-      '.HHBHH.',
-      '.HHHHH.',
-      '.QHEHQ.',
-      '.THEHT.',
-      '.HHEHH.',
-      '.THEHT.',
-      '.HHGHH.',
-      '.HHGHH.',
-      '.HHHHH.',
-      '..HRH..']},
-    grafspee: {name: 'Admiral Graf Spee', cls: 'Pocket battleship', nation: 'Germany', year: 1936,
-      blurb: 'Cruiser-sized hull, battleship guns. Scuttled off Montevideo after the Battle of the River Plate.', rows: [
-      '....H....',
-      '...HHH...',
-      '...HXH...',
-      '..HHHHH..',
-      '..HHBHH..',
-      '.HGHDHGH.',
-      '.HHHEHHH.',
-      '.QGHHHGQ.',
-      '.HHHEHHH.',
-      '.THHHHHT.',
-      '.HHHHHHH.',
-      '..HHXHH..',
-      '..HHHHH..',
-      '...HRH...']},
-    prinzeugen: {name: 'Prinz Eugen', cls: 'Heavy cruiser', nation: 'Germany', year: 1940,
-      blurb: "Bismarck's escort at Denmark Strait — and the only one of the pair to come home.", rows: [
-      '....H....',
-      '...HXH...',
-      '..HHHHH..',
-      '..HHBHH..',
-      '.HGHDHGH.',
-      '.HHHEHHH.',
-      '.QHHHHHQ.',
-      '.THHEHHT.',
-      '.HHHHHHH.',
-      '..HHXHH..',
-      '...HRH...']},
-    hood: {name: 'HMS Hood', cls: 'Battlecruiser', nation: 'UK', year: 1920,
-      blurb: 'The pride of the Royal Navy: fast and beautiful, but thinly armored overhead.', rows: [
-      '.....H.....',
-      '....HHH....',
-      '....HXH....',
-      '...HHHHH...',
-      '...HHXHH...',
-      '..HHHHHHH..',
-      '..HGHBHGH..',
-      '.HQHHDHHQH.',
-      '.HGHEHEHGH.',
-      '.HHHHHHHHH.',
-      '.HQHEHEHQH.',
-      '.HGHHHHHGH.',
-      '.HHHEHEHHH.',
-      '.HQHHHHHQH.',
-      '..HHHXHHH..',
-      '..HHHHHHH..',
-      '..HHHXHHH..',
-      '...HEHEH...',
-      '...HHRHH...']},
-    bismarck: {name: 'Bismarck', cls: 'Battleship', nation: 'Germany', year: 1940,
-      blurb: 'Sank Hood in eight minutes, then was hunted down by the Home Fleet.', rows: [
-      '.....H.....',
-      '....HHH....',
-      '....HXH....',
-      '...HHHHH...',
-      '...HHXHH...',
-      '..HHAAAHH..',
-      '..HGABAGH..',
-      '.HQHHDHHQH.',
-      '.HGHAEAHGH.',
-      '.HHHHHHHHH.',
-      '.HQHAEAHQH.',
-      '.HGHHWHHGH.',
-      '.HHHAEAHHH.',
-      '.HQHHHHHQH.',
-      '..HHAXAHH..',
-      '..HHHHHHH..',
-      '..HHHXHHH..',
-      '...HEHEH...',
-      '...HHRHH...']},
-    iowa: {name: 'USS Iowa', cls: 'Fast battleship', nation: 'USA', year: 1943,
-      blurb: 'Nine 16-inch guns at 33 knots, ringed with anti-aircraft batteries.', rows: [
-      '.....H.....',
-      '....HHH....',
-      '....HXH....',
-      '...HHHHH...',
-      '...HHXHH...',
-      '..HHAAAHH..',
-      '..HQABAQH..',
-      '.HHGHDHGHH.',
-      '.HQHEAEHQH.',
-      '.HHGHHHGHH.',
-      '.HQHEAEHQH.',
-      '.HHHHWHHHH.',
-      '.HQHEAEHQH.',
-      '.HHGHHHGHH.',
-      '.HQHEAEHQH.',
-      '.HHHHHHHHH.',
-      '..HHAXAHH..',
-      '..HHHHHHH..',
-      '..HCHHHCH..',
-      '...HEHEH...',
-      '...HHRHH...']},
-    akagi: {name: 'Akagi', cls: 'Aircraft carrier', nation: 'Japan', year: 1927,
-      blurb: 'Flagship of the Pearl Harbor strike force, lost at Midway.', rows: [
-      '.....H.....',
-      '....HHH....',
-      '...HHHHH...',
-      '...HHFHH...',
-      '..HHHFHHH..',
-      '..QHHHHHQ..',
-      '..HHFHFHH..',
-      '.HHHHHHHBH.',
-      '.HQHFHFHQH.',
-      '.HHHHHHHHH.',
-      '.HHHEHEHHH.',
-      '.HQHFHFHQH.',
-      '.HHHHHHHHH.',
-      '.HHHEHEHHH.',
-      '.HCHHWHHCH.',
-      '..HHHHHHH..',
-      '..HQHHHQH..',
-      '...HEHEH...',
-      '...HHRHH...']},
-    kaga: {name: 'Kaga', cls: 'Aircraft carrier', nation: 'Japan', year: 1929,
-      blurb: 'Converted from a battleship hull; the largest carrier at Midway.', rows: [
-      '.....H.....',
-      '....HHH....',
-      '...HHHHH...',
-      '...HHFHH...',
-      '..QHHHHHQ..',
-      '..HHFHFHH..',
-      '.HHHHHHHBH.',
-      '.HQHHHHHQH.',
-      '.HHHFHFHHH.',
-      '.HHHEHEHHH.',
-      '.HQHHHHHQH.',
-      '.HHHFHFHHH.',
-      '.HHHEHEHHH.',
-      '.HCHHWHHCH.',
-      '..HQHHHQH..',
-      '...HEHEH...',
-      '...HHRHH...']},
-    zuikaku: {name: 'Zuikaku', cls: 'Aircraft carrier', nation: 'Japan', year: 1941,
-      blurb: 'Veteran of Pearl Harbor, Coral Sea and the Philippine Sea; the last Pearl Harbor carrier to fall.', rows: [
-      '.....H.....',
-      '....HHH....',
-      '...HHFHH...',
-      '..QHHHHHQ..',
-      '..HHFHFHH..',
-      '.HHHHHHHBH.',
-      '.HQHFHFHQH.',
-      '.HHHEHEHHH.',
-      '.HQHFHFHQH.',
-      '.HHHEHEHHH.',
-      '.HCHHDHHCH.',
-      '..HHFHFHH..',
-      '..HQHHHQH..',
-      '...HEHEH...',
-      '...HHRHH...']},
-    enterprise: {name: 'USS Enterprise', cls: 'Aircraft carrier', nation: 'USA', year: 1938,
-      blurb: '"The Big E" — the most decorated US warship of the Second World War.', rows: [
-      '.....H.....',
-      '....HHH....',
-      '...HHFHH...',
-      '..QHHHHHQ..',
-      '..HHFHFHH..',
-      '.HQHHHHHBH.',
-      '.HHHFHFHHH.',
-      '.HQHEHEHQH.',
-      '.HHHFHFHHH.',
-      '.HQHEHEHQH.',
-      '.HHHFHFHHH.',
-      '.HCHHDHHCH.',
-      '..HQHWHQH..',
-      '...HEHEH...',
-      '...HHRHH...']},
-    yamato: {name: 'Yamato', cls: 'Super-battleship', nation: 'Japan', year: 1941,
-      blurb: 'The largest battleship ever built: nine 46 cm guns behind 65 cm of armor. Sunk by aircraft on Operation Ten-Go.', boss: true, rows: [
-      '......H......',
-      '.....HHH.....',
-      '....HHHHH....',
-      '....HHZHH....',
-      '...HHAAAHH...',
-      '...HHHZHHH...',
-      '..HHHAAAHHH..',
-      '..HQHHHHHQH..',
-      '..HHGABAGHH..',
-      '.HQHHADAHHQH.',
-      '.HHHAAEAAHHH.',
-      '.HQGHHWHHGQH.',
-      '.HHHAAEAAHHH.',
-      '.HQHHHHHHHQH.',
-      '.HHGHAEAHGHH.',
-      '.HQHHHHHHHQH.',
-      '.HHHAAEAAHHH.',
-      '.HCHHHHHHHCH.',
-      '..HHHAAAHHH..',
-      '..HHHHZHHHH..',
-      '..HHHAAAHHH..',
-      '..HQHHHHHQH..',
-      '...HHEHEHH...',
-      '...HHHHHHH...',
-      '....HRHRH....',
-      '.....HHH.....']},
-  };
-  FAMOUS.musashi = Object.assign({}, FAMOUS.yamato, {name: 'Musashi', year: 1942,
-    blurb: "Yamato's sister. Took some twenty torpedoes and seventeen bombs at Leyte Gulf before she went down."});
-  for (const k in FAMOUS) FAMOUS[k].famous = true;
-  Object.assign(ENEMIES, FAMOUS);
-  // Player blueprints, in rough order of size.
-  const BLUEPRINTS = ['fletcher', 'prinzeugen', 'grafspee', 'hood', 'bismarck', 'iowa', 'enterprise', 'yamato'];
+  // ---- famous ships: filled in by ships.js (historical blueprints) -------
+  const FAMOUS = {};
+  const SHIPWRIGHT = [];
 
   // ---- player starter ----------------------------------------------------
   const STARTER = [
@@ -950,16 +762,16 @@ const Data = (() => {
     {name: 'Iron Tide',       budget: 4800, weather: 'dusk',     par: 240, enemies: ['frigate', 'battleship', 'dreadnought', 'frigate'],
      brief: 'Their flagship. Break it and the war is over.'},
     // ---- Legends: famous engagements, unlocked after the main campaign
-    {name: 'River Plate',     budget: 4200, weather: 'clear',    par: 180, legend: true, year: 1939, enemies: ['destroyer', 'grafspee', 'cruiser', 'frigate'],
-     brief: 'December 1939. The raider Admiral Graf Spee is loose in the South Atlantic. Bring her to battle.'},
-    {name: 'Denmark Strait',  budget: 4600, weather: 'overcast', par: 210, legend: true, year: 1941, enemies: ['destroyer', 'prinzeugen', 'bismarck', 'frigate'],
+    {name: 'River Plate',     budget: 1700, weather: 'clear',    par: 180, legend: true, year: 1939, enemies: ['destroyer', 'grafspee', 'destroyer'],
+     brief: 'December 1939. The raider Admiral Graf Spee is loose in the South Atlantic. Commodore Harwood caught her with three cruisers — your budget is cruiser-sized too.'},
+    {name: 'Denmark Strait',  budget: 4600, weather: 'overcast', par: 210, legend: true, year: 1941, enemies: ['destroyer', 'prinzeugen', 'bismarck', 'destroyer'],
      brief: 'May 1941. Bismarck and Prinz Eugen are breaking out into the Atlantic. Hood could not stop them. You must.'},
-    {name: 'Midway',          budget: 5200, weather: 'clear',    par: 220, legend: true, year: 1942, enemies: ['destroyer', 'akagi', 'cruiser', 'kaga', 'destroyer'],
-     brief: 'June 1942. Four carriers are coming for the atoll. Their dive bombers will find you first — bring anti-aircraft guns.'},
-    {name: 'Leyte Gulf',      budget: 5800, weather: 'dawn',     par: 240, legend: true, year: 1944, enemies: ['cruiser', 'musashi', 'zuikaku'],
-     brief: 'October 1944. The largest naval battle in history. Musashi leads the centre force; Zuikaku covers it from the air.'},
-    {name: 'Ten-Go',          budget: 6200, weather: 'overcast', par: 270, legend: true, year: 1945, enemies: ['destroyer', 'destroyer', 'yamato', 'cruiser', 'destroyer'],
-     brief: 'April 1945. Yamato sails on her last mission. Nine 46 cm guns, armor nothing else can pierce. Sink her.'},
+    {name: 'Midway',          budget: 5200, weather: 'clear',    par: 220, legend: true, year: 1942, enemies: ['akagi', 'destroyer', 'nagato', 'destroyer', 'kaga'],
+     brief: 'June 1942. Akagi and Kaga lead the strike on the atoll, with the battleship Nagato in support. Their bombers will find you first — bring anti-aircraft guns.'},
+    {name: 'Leyte Gulf',      budget: 5800, weather: 'dawn',     par: 240, legend: true, year: 1944, enemies: ['destroyer', 'musashi', 'zuikaku', 'destroyer'],
+     brief: 'October 1944. The largest naval battle in history. Musashi leads the Centre Force through the Sibuyan Sea while Zuikaku comes south as the decoy.'},
+    {name: 'Ten-Go',          budget: 6200, weather: 'overcast', par: 270, legend: true, year: 1945, enemies: ['destroyer', 'destroyer', 'cruiser', 'yamato', 'destroyer', 'destroyer'],
+     brief: 'April 1945. Yamato sails on her last mission with the cruiser Yahagi and a destroyer screen. Nine 46 cm guns, armour nothing else can pierce. Sink her.'},
   ];
 
   // ---- endless mode --------------------------------------------------------
@@ -971,6 +783,8 @@ const Data = (() => {
     {id: 'battleship', minWave: 10}, {id: 'fletcher', minWave: 5}, {id: 'grafspee', minWave: 9}, {id: 'hood', minWave: 12},
     {id: 'bismarck', minWave: 13}, {id: 'akagi', minWave: 12}, {id: 'enterprise', minWave: 14}, {id: 'iowa', minWave: 16},
     {id: 'dreadnought', minWave: 15}, {id: 'yamato', minWave: 20},
+    {id: 'warrior', minWave: 2}, {id: 'mikasa', minWave: 4}, {id: 'hmsdreadnought', minWave: 6}, {id: 'belfast', minWave: 7},
+    {id: 'spruance', minWave: 9}, {id: 'nagato', minWave: 11}, {id: 'arkroyal', minWave: 12}, {id: 'vanguard', minWave: 14}, {id: 'nimitz', minWave: 22},
   ];
   const endlessBudget = wave => 260 + wave * 230;
 
@@ -980,6 +794,7 @@ const Data = (() => {
     {name: 'Dock II',  w: 9,  h: 19, price: 600},
     {name: 'Dock III', w: 11, h: 23, price: 1800},
     {name: 'Dock IV',  w: 13, h: 27, price: 4000},
+    {name: 'Dock V',   w: 15, h: 31, price: 7000},
   ];
   const TRACK_PRICES = [200, 400, 700, 1100, 1600];
   const TRACKS = {
@@ -1006,8 +821,681 @@ const Data = (() => {
              desc: 'Enemies aim for your bridge and engines, comb torpedoes, and fall back to repair.'},
   };
 
-  return {PARTS, PART_ORDER, KEY2PART, TURRETS, FREE_PARTS, PART_SHOP, ENEMIES, FAMOUS, BLUEPRINTS, STARTER, WEATHER, OPS,
+  return {PARTS, PART_ORDER, KEY2PART, TURRETS, FREE_PARTS, PART_SHOP, ENEMIES, FAMOUS, SHIPWRIGHT, STARTER, WEATHER, OPS,
           ENDLESS_POOL, endlessBudget, DOCKS, TRACKS, TRACK_PRICES, DIFFICULTY};
+})();
+
+// ---------------------------------------------------------------- ships.js
+// Historical ships, buildable as blueprints from the Shipwright and used as enemies in Legends.
+//
+// Scale: one block = 10 m of length. Beam is rounded to the nearest odd number of blocks at 8 m per block
+// (minimum 3) so there is a centreline for turrets. Ships shorter than 60 m are drawn at double scale so
+// they are playable. Main guns map to parts by calibre: 18-inch → 46cm Turret, 8–16-inch → Heavy Gun,
+// 4–6-inch → Cannon, light flak → AA Gun. Machinery (V) was tuned so game speed matches history,
+// up to the game's 31-knot cap. Row 0 is the bow; the left column is port.
+const Ships = (() => {
+  const S = {
+    // ------------------------------------------------------------------ age of sail and early steam
+    goldenhind: {name: 'Golden Hind', cls: 'Galleon', nation: 'England', year: 1577, era: 'sail', scale: 2, kn: 8,
+      specs: {length: 'c. 30 m', disp: 'c. 150 tons burthen', speed: 'c. 8 kn (sail)', arm: '22 guns', crew: 'c. 80'},
+      fate: 'Francis Drake circumnavigated the globe in her, 1577–80. Laid up at Deptford as a memorial until she rotted away.',
+      rows: [
+      '.H.',
+      'HNH',
+      'YHY',
+      'YNY',
+      'HNH',
+      'HBH',
+      '.R.']},
+    paddlefrigate: {name: 'Paddle Frigate', cls: 'Steam paddle frigate (type)', nation: 'UK', year: 1845, era: 'sail', kn: 10,
+      specs: {length: 'c. 65 m', disp: 'c. 1,800 tons', speed: '9–11 kn', arm: '16–20 guns', crew: 'c. 300'},
+      fate: 'A transitional type: sail rig plus steam paddles. The wheels took up the broadside and were easily shot away, so the screw propeller replaced them within a decade.',
+      rows: [
+      '.H.',
+      'HNH',
+      'YHY',
+      'PBP',
+      'YOY',
+      'YNY',
+      'HRH']},
+    warrior: {name: 'HMS Warrior', cls: 'Armoured frigate', nation: 'UK', year: 1860, era: 'sail', kn: 14,
+      specs: {length: '127 m', disp: '9,137 t', speed: '14 kn steam, 13 kn sail', arm: '40 guns incl. 68- and 110-pounders', crew: '705'},
+      fate: 'The first iron-hulled armoured warship. She made every wooden battle fleet obsolete without ever firing a shot in anger. Restored and preserved at Portsmouth.',
+      rows: [
+      '.H.',
+      'HHH',
+      'HNH',
+      'YHY',
+      'YOY',
+      'YBY',
+      'YOY',
+      'YNY',
+      'YVY',
+      'HHH',
+      'HNH',
+      'HHH',
+      '.R.']},
+    monitor: {name: 'USS Monitor', cls: 'Turret ironclad', nation: 'USA', year: 1862, era: 'steam', scale: 2, kn: 6,
+      specs: {length: '55 m', disp: '987 t', speed: '6 kn', arm: '2 × 11-inch Dahlgren in one revolving turret', crew: '49'},
+      fate: 'Fought CSS Virginia to a draw at Hampton Roads on 9 March 1862, the first battle between ironclads. Foundered in a gale off Cape Hatteras that December.',
+      rows: [
+      '.A.',
+      'AHA',
+      'ABA',
+      'AHA',
+      'AHA',
+      'AXA',
+      'AVA',
+      'AOA',
+      'AHA',
+      'AHA',
+      '.R.']},
+    timberclad: {name: 'Timberclad Gunboat', cls: 'River gunboat (type)', nation: 'USA', year: 1861, era: 'steam', scale: 2, kn: 10,
+      specs: {length: 'c. 55 m', disp: 'c. 500 tons', speed: 'c. 10 kn', arm: '4–9 heavy guns', crew: 'c. 150'},
+      fate: 'Mississippi river steamers bought by the Union Navy and given five-inch oak bulwarks. They fought at Fort Henry, Shiloh and Vicksburg.',
+      rows: [
+      '.H.',
+      'HHH',
+      'GHG',
+      'UUU',
+      'UBU',
+      'OUO',
+      'UUU',
+      'GUG',
+      'UUU',
+      'HRH',
+      'PPP']},
+    // ------------------------------------------------------------------ steel and steam
+    mikasa: {name: 'Mikasa', cls: 'Pre-dreadnought battleship', nation: 'Japan', year: 1902, era: 'steam', kn: 18,
+      specs: {length: '131.7 m', disp: '15,140 t', speed: '18 kn', arm: '4 × 12-inch, 14 × 6-inch, 20 × 3-inch, 4 torpedo tubes', crew: '830'},
+      fate: "Admiral Tōgō's flagship at Tsushima in 1905, where the Russian Baltic Fleet was annihilated. Preserved as a museum ship at Yokosuka.",
+      rows: [
+      '.H.',
+      'HXH',
+      'HBH',
+      'GHG',
+      'HOH',
+      'GHG',
+      'HOH',
+      'GVG',
+      'HVH',
+      'GHG',
+      'HHH',
+      'HXH',
+      '.R.']},
+    hmsdreadnought: {name: 'HMS Dreadnought', cls: 'Battleship', nation: 'UK', year: 1906, era: 'steam', kn: 21,
+      specs: {length: '160.6 m', disp: '18,110 t', speed: '21 kn (turbines)', arm: '10 × 12-inch, 27 × 12-pounder, 5 torpedo tubes', crew: '700–810'},
+      fate: 'All big guns and steam turbines: she made every battleship before her obsolete and gave the type its name. Rammed and sank U-29 in 1915; scrapped 1923.',
+      rows: [
+      '.H.',
+      'HHH',
+      'HXH',
+      'HBH',
+      'XOX',
+      'QHQ',
+      'HOH',
+      'AVA',
+      'HVH',
+      'HXH',
+      'QVQ',
+      'HVH',
+      'HXH',
+      'QHQ',
+      'HHH',
+      '.R.']},
+    lusitania: {name: 'RMS Lusitania', cls: 'Ocean liner (armed conversion)', nation: 'UK', year: 1907, era: 'steam', kn: 25,
+      livery: {funnel: '#c8452c'},
+      specs: {length: '239.9 m', disp: '44,060 t (31,550 GRT)', speed: '25 kn', arm: 'None in service. Built to Admiralty specification for conversion to an armed merchant cruiser.', crew: '850 crew, 2,198 passengers'},
+      fate: 'Blue Riband holder. Torpedoed by U-20 off Ireland on 7 May 1915; 1,197 died, and the sinking helped turn American opinion against Germany.',
+      rows: [
+      '.H.',
+      'HHH',
+      'HHH',
+      'HHH',
+      'GHG',
+      'UUU',
+      'UBU',
+      'UUU',
+      'UOU',
+      'UHU',
+      'UOU',
+      'UVU',
+      'UOU',
+      'UVU',
+      'UOU',
+      'UVU',
+      'UVU',
+      'UVU',
+      'GUG',
+      'HHH',
+      'HHH',
+      'GHG',
+      'HHH',
+      '.R.']},
+    hood: {name: 'HMS Hood', cls: 'Battlecruiser', nation: 'UK', year: 1920, era: 'steam', kn: 31,
+      specs: {length: '262.3 m', disp: '46,680 t', speed: '31 kn', arm: '8 × 15-inch, 14 × 4-inch AA, 2 torpedo tubes', crew: '1,418 (1941)'},
+      fate: 'For twenty years the largest warship in the world. Blown apart by Bismarck at Denmark Strait on 24 May 1941; three of 1,418 men survived.',
+      rows: [
+      '..H..',
+      '.HHH.',
+      '.HHH.',
+      '.HHH.',
+      'HHXHH',
+      'HHHHH',
+      'HHXHH',
+      'HHBHH',
+      'QHVHQ',
+      'QHOHQ',
+      'HHVHH',
+      'QHOHQ',
+      'QHVHQ',
+      'HHVHH',
+      'HHVHH',
+      'QHVHQ',
+      'HHVHH',
+      'HHXHH',
+      'HHVHH',
+      'HHXHH',
+      'HHVHH',
+      'HHVHH',
+      '.HVH.',
+      '.HVH.',
+      '.HRH.',
+      '..H..']},
+    nagato: {name: 'Nagato', cls: 'Battleship', nation: 'Japan', year: 1920, era: 'steam', kn: 25,
+      specs: {length: '224.9 m (rebuilt)', disp: '39,130 t standard', speed: '25 kn (rebuilt)', arm: '8 × 41 cm, 18 × 14 cm, 8 × 12.7 cm AA', crew: '1,368'},
+      fate: 'The first battleship with 16-inch guns, recognisable by her pagoda mast. Yamamoto planned Pearl Harbor aboard her. Survived the war; sunk in the Bikini atomic tests in 1946.',
+      rows: [
+      '..H..',
+      '.HHH.',
+      '.HHH.',
+      'HHXHH',
+      'HHXHH',
+      'GHBHG',
+      'GAVAG',
+      'QAOAQ',
+      'GAVAG',
+      'QAVAQ',
+      'GAVAG',
+      'HAVAH',
+      'HHVHH',
+      'HHXHH',
+      'HHXHH',
+      'HHVHH',
+      'HHVHH',
+      'QHVHQ',
+      'HHVHH',
+      '.HHH.',
+      '.HRH.',
+      '..H..']},
+    // ------------------------------------------------------------------ Second World War
+    akagi: {name: 'Akagi', cls: 'Aircraft carrier', nation: 'Japan', year: 1927, era: 'ww2', kn: 31,
+      specs: {length: '261.2 m', disp: '41,300 t full load', speed: '31 kn', arm: 'c. 66 aircraft, 6 × 20 cm, 12 × 12 cm AA', crew: '1,630'},
+      fate: 'Flagship of the Pearl Harbor strike force. Her island was on the port side. Wrecked by dive bombers at Midway on 4 June 1942 and scuttled the next morning.',
+      rows: [
+      '.J.',
+      'JJJ',
+      'JJJ',
+      'JFJ',
+      'JJJ',
+      'QFQ',
+      'JJJ',
+      'QFQ',
+      'JJJ',
+      'BJO',
+      'QVQ',
+      'JFJ',
+      'JVJ',
+      'QFQ',
+      'JVJ',
+      'JVJ',
+      'QVQ',
+      'JVJ',
+      'GVG',
+      'JVJ',
+      'GJG',
+      'JJJ',
+      'GJG',
+      'JJJ',
+      'JRJ',
+      '.J.']},
+    kaga: {name: 'Kaga', cls: 'Aircraft carrier', nation: 'Japan', year: 1929, era: 'ww2', kn: 28,
+      specs: {length: '247.6 m', disp: '42,541 t full load', speed: '28 kn', arm: 'c. 72 aircraft, 10 × 20 cm, 16 × 12.7 cm AA', crew: '1,708'},
+      fate: 'Converted from an unfinished battleship hull; the largest carrier at Midway. Sunk by dive bombers from USS Enterprise on 4 June 1942.',
+      rows: [
+      '..J..',
+      '.JJJ.',
+      '.JJJ.',
+      'JJFJJ',
+      'JJJJJ',
+      'QJFJQ',
+      'JJJJJ',
+      'QFJFQ',
+      'JJJJB',
+      'QJVJO',
+      'JFVFJ',
+      'QJVJQ',
+      'JJFJJ',
+      'QJVJQ',
+      'JJVJJ',
+      'GJVJG',
+      'JJVJJ',
+      'GJVJG',
+      'JJVJJ',
+      'GJVJG',
+      'JJJJJ',
+      '.JJJ.',
+      '.JRJ.',
+      '.JJJ.',
+      '..J..']},
+    grafspee: {name: 'Admiral Graf Spee', cls: 'Panzerschiff ("pocket battleship")', nation: 'Germany', year: 1936, era: 'ww2', kn: 28.5,
+      specs: {length: '186 m', disp: '16,020 t full load', speed: '28.5 kn (diesels)', arm: '6 × 28 cm, 8 × 15 cm, 6 × 10.5 cm AA, 8 torpedo tubes', crew: '1,150'},
+      fate: 'Commerce raider with cruiser size and battleship guns. Cornered by three British cruisers at the River Plate and scuttled off Montevideo on 17 December 1939.',
+      rows: [
+      '.H.',
+      'HHH',
+      'HHH',
+      'HXH',
+      'HHH',
+      'HBH',
+      'GHG',
+      'QOQ',
+      'GVG',
+      'QVQ',
+      'GVG',
+      'GVG',
+      'HVH',
+      'HXH',
+      'HVH',
+      'THT',
+      'HHH',
+      'HRH',
+      '.H.']},
+    zuikaku: {name: 'Zuikaku', cls: 'Aircraft carrier', nation: 'Japan', year: 1941, era: 'ww2', kn: 34.5,
+      specs: {length: '257.5 m', disp: '32,105 t full load', speed: '34.5 kn', arm: 'c. 72 aircraft, 16 × 12.7 cm AA, up to 96 × 25 mm', crew: '1,660'},
+      fate: 'Fought at Pearl Harbor, Coral Sea, Santa Cruz and the Philippine Sea. The last Pearl Harbor carrier afloat, she was sunk as a decoy off Cape Engaño on 25 October 1944.',
+      rows: [
+      '.J.',
+      'JJJ',
+      'JFJ',
+      'JJJ',
+      'QFQ',
+      'JJJ',
+      'QFQ',
+      'JJJ',
+      'JJB',
+      'QJO',
+      'JVO',
+      'QFQ',
+      'JVJ',
+      'QFQ',
+      'JVJ',
+      'QVQ',
+      'JVJ',
+      'GVG',
+      'JVJ',
+      'GVG',
+      'JJJ',
+      'QJQ',
+      'JJJ',
+      'JJJ',
+      'JRJ',
+      '.J.']},
+    arkroyal: {name: 'HMS Ark Royal', cls: 'Aircraft carrier', nation: 'UK', year: 1938, era: 'ww2', kn: 31,
+      specs: {length: '240 m', disp: '27,720 t full load', speed: '30.75 kn', arm: 'c. 60 aircraft, 16 × 4.5-inch, 32 × 2-pdr pom-pom', crew: '1,580'},
+      fate: "Her Swordfish torpedo bombers jammed Bismarck's rudder in May 1941. Torpedoed by U-81 off Gibraltar that November, she sank with the loss of one man.",
+      rows: [
+      '.J.',
+      'JJJ',
+      'JFJ',
+      'QJQ',
+      'JFJ',
+      'JJJ',
+      'QFQ',
+      'JJJ',
+      'JJB',
+      'GVO',
+      'JVJ',
+      'QFQ',
+      'JVJ',
+      'GFG',
+      'JVJ',
+      'QVQ',
+      'JVJ',
+      'GVG',
+      'JVJ',
+      'QJQ',
+      'JJJ',
+      'GJG',
+      'JRJ',
+      '.J.']},
+    belfast: {name: 'HMS Belfast', cls: 'Light cruiser', nation: 'UK', year: 1938, era: 'ww2', kn: 32,
+      specs: {length: '187 m', disp: '11,550 t standard', speed: '32 kn', arm: '12 × 6-inch in four triple turrets, 12 × 4-inch AA, 6 torpedo tubes', crew: '750–850'},
+      fate: 'Helped sink the battleship Scharnhorst at North Cape in 1943 and bombarded Normandy on D-Day. Preserved on the Thames in London.',
+      rows: [
+      '.H.',
+      'HHH',
+      'HGH',
+      'HGH',
+      'HBH',
+      'QOQ',
+      'TVT',
+      'QVQ',
+      'QOQ',
+      'HVH',
+      'HVH',
+      'HGH',
+      'HGH',
+      'HVH',
+      'HVH',
+      'HHH',
+      'HHH',
+      'HRH',
+      '.H.']},
+    bismarck: {name: 'Bismarck', cls: 'Battleship', nation: 'Germany', year: 1940, era: 'ww2', kn: 30,
+      specs: {length: '251 m', disp: '50,300 t full load', speed: '30 kn', arm: '8 × 38 cm, 12 × 15 cm, 16 × 10.5 cm AA', crew: '2,200'},
+      fate: 'Sank Hood in eight minutes on her first sortie. Crippled by a Swordfish torpedo to the rudder, she was destroyed by the Home Fleet on 27 May 1941.',
+      rows: [
+      '..H..',
+      '.HHH.',
+      '.HHH.',
+      'HHXHH',
+      'HHHHH',
+      'HHXHH',
+      'HABAH',
+      'GAVAG',
+      'QAOAQ',
+      'GAVAG',
+      'QAVAQ',
+      'GAVAG',
+      'QAVAQ',
+      'HAVAH',
+      'HHVHH',
+      'HHXHH',
+      'HHVHH',
+      'HHXHH',
+      'HHVHH',
+      'HHVHH',
+      'HHVHH',
+      '.HVH.',
+      '.HVH.',
+      '.RVR.',
+      '..H..']},
+    prinzeugen: {name: 'Prinz Eugen', cls: 'Heavy cruiser', nation: 'Germany', year: 1940, era: 'ww2', kn: 32.5,
+      specs: {length: '207.7 m', disp: '18,750 t full load', speed: '32.5 kn', arm: '8 × 20.3 cm, 12 × 10.5 cm AA, 12 torpedo tubes', crew: '1,600'},
+      fate: "Bismarck's consort at Denmark Strait — and the only one of the pair to come home. Surrendered in 1945; sank after the Bikini atomic tests in 1946.",
+      rows: [
+      '.H.',
+      'HHH',
+      'HHH',
+      'HXH',
+      'HXH',
+      'HBH',
+      'QHQ',
+      'QOQ',
+      'TVT',
+      'QVQ',
+      'TVT',
+      'QVQ',
+      'HVH',
+      'HXH',
+      'HXH',
+      'HVH',
+      'HVH',
+      'HVH',
+      'HHH',
+      'HRH',
+      '.H.']},
+    yamato: {name: 'Yamato', cls: 'Battleship', nation: 'Japan', year: 1941, era: 'ww2', kn: 27, boss: true,
+      specs: {length: '263 m', disp: '72,800 t full load', speed: '27 kn', arm: '9 × 46 cm in three triple turrets, 6 × 15.5 cm, 24 × 12.7 cm, 162 × 25 mm (1945)', crew: '2,500 (3,332 in 1945)'},
+      fate: 'The largest battleship ever built, with the heaviest guns ever mounted at sea. Sunk by US carrier aircraft on 7 April 1945 during Operation Ten-Go.',
+      rows: [
+      '..H..',
+      '.HHH.',
+      '.HVH.',
+      'HHVHH',
+      'HHZHH',
+      'HHVHH',
+      'HHZHH',
+      'HHGHH',
+      'QABAQ',
+      'QAVAQ',
+      'GAOAG',
+      'QAVAQ',
+      'QAVAQ',
+      'QAVAQ',
+      'QAVAQ',
+      'QAVAQ',
+      'HAVAH',
+      'HHGHH',
+      'HHZHH',
+      'HHVHH',
+      'HHVHH',
+      'HHVHH',
+      'HHFHH',
+      '.HVH.',
+      '.HRH.',
+      '.HHH.']},
+    fletcher: {name: 'Fletcher class', cls: 'Destroyer', nation: 'USA', year: 1942, era: 'ww2', kn: 36.5,
+      specs: {length: '114.8 m', disp: '2,924 t full load', speed: '36.5 kn', arm: '5 × 5-inch/38, 10 × 21-inch torpedo tubes, 40 mm and 20 mm AA', crew: '329'},
+      fate: '175 were built, the largest destroyer class the US Navy ever ordered. They fought in every Pacific campaign from Guadalcanal to Okinawa.',
+      rows: [
+      '.H.',
+      'HGH',
+      'HGH',
+      'HBH',
+      'HOH',
+      'HTH',
+      'VOV',
+      'VTV',
+      'QGQ',
+      'HGH',
+      'RGR']},
+    iowa: {name: 'USS Iowa', cls: 'Fast battleship', nation: 'USA', year: 1943, era: 'ww2', kn: 33,
+      specs: {length: '270.4 m', disp: '57,540 t full load', speed: '33 kn', arm: '9 × 16-inch/50, 20 × 5-inch/38, 80 × 40 mm, 49 × 20 mm', crew: '2,700'},
+      fate: 'Fast enough to escort carriers. Carried President Roosevelt to Tehran in 1943, served again in Korea and the 1980s. Museum ship at Los Angeles.',
+      rows: [
+      '..H..',
+      '..H..',
+      '.HHH.',
+      '.HVH.',
+      'HHVHH',
+      'HHXHH',
+      'HHVHH',
+      'HHXHH',
+      'GABAG',
+      'QAVAQ',
+      'GAOAG',
+      'QAVAQ',
+      'GAOAG',
+      'QAVAQ',
+      'GAVAG',
+      'QAVAQ',
+      'GAVAG',
+      'HAVAH',
+      'HHXHH',
+      'HHVHH',
+      'HHVHH',
+      'QHVHQ',
+      'HHVHH',
+      '.HVH.',
+      '.HVH.',
+      '.HRH.',
+      '..H..']},
+    enterprise: {name: 'USS Enterprise', cls: 'Aircraft carrier', nation: 'USA', year: 1938, era: 'ww2', kn: 32.5,
+      specs: {length: '246.7 m', disp: '32,060 t full load (1943)', speed: '32.5 kn', arm: 'c. 90 aircraft, 8 × 5-inch/38, 40 mm and 20 mm AA', crew: '2,217'},
+      fate: '"The Big E": twenty battle stars, the most of any US warship in the Second World War. Her dive bombers sank Kaga and Akagi at Midway. Scrapped 1958–60.',
+      rows: [
+      '..J..',
+      '.JJJ.',
+      'JJFJJ',
+      'QJJJQ',
+      'JFJFJ',
+      'JJJJJ',
+      'QJFJQ',
+      'JJJJJ',
+      'GJVJB',
+      'QJVJO',
+      'QJVJD',
+      'JFVFJ',
+      'QJVJQ',
+      'JJFJJ',
+      'QJVJQ',
+      'JJVJJ',
+      'GJVJG',
+      'JJVJJ',
+      'QJVJQ',
+      'JJVJJ',
+      'GJVJG',
+      'JJJJJ',
+      '.JJJ.',
+      '.JRJ.',
+      '..J..']},
+    vanguard: {name: 'HMS Vanguard', cls: 'Battleship', nation: 'UK', year: 1946, era: 'ww2', kn: 30,
+      specs: {length: '248.2 m', disp: '51,420 t deep load', speed: '30 kn', arm: '8 × 15-inch (turrets from the cruisers Courageous and Glorious), 16 × 5.25-inch, 73 × 40 mm', crew: '1,893'},
+      fate: 'Britain\'s last battleship, completed just after the war it was built for. Carried the Royal Family to South Africa in 1947; scrapped in 1960.',
+      rows: [
+      '..H..',
+      '.HHH.',
+      '.HHH.',
+      'HHVHH',
+      'HHXHH',
+      'HHXHH',
+      'GHBHG',
+      'QAVAQ',
+      'GAOAG',
+      'QAVAQ',
+      'QAOAQ',
+      'GAVAG',
+      'QAVAQ',
+      'GAVAG',
+      'HAVAH',
+      'HHXHH',
+      'HHXHH',
+      'HHVHH',
+      'QHVHQ',
+      'HHVHH',
+      'HHVHH',
+      '.HVH.',
+      '.HVH.',
+      '.RVR.',
+      '..H..']},
+    // ------------------------------------------------------------------ modern
+    nimitz: {name: 'USS Nimitz', cls: 'Nuclear supercarrier', nation: 'USA', year: 1975, era: 'modern', kn: 31,
+      specs: {length: '332.8 m (shown 310 m: the largest grid)', disp: 'c. 100,000 t full load', speed: '30+ kn (two nuclear reactors)', arm: '60–90 aircraft, Sea Sparrow, RAM, Phalanx CIWS', crew: 'c. 3,000 ship + 2,000 air wing'},
+      fate: 'Lead ship of the ten-strong Nimitz class, the largest warships of the 20th century. No funnels: the reactors need no exhaust.',
+      rows: [
+      '...JJJ...',
+      '..JJVJJ..',
+      '.JJJVJJJ.',
+      'CJJJFJJJC',
+      'JJJJVJJJJ',
+      'JJFJVJFJJ',
+      'JJJJVJJJJ',
+      'MJJJFJJJJ',
+      'JJJJVJJJJ',
+      'JJFJVJFJJ',
+      'JJJJVJJJJ',
+      'JJJJVJJJJ',
+      'JJJJFJJJJ',
+      'JJJJVJJJJ',
+      'JJJJVJJJJ',
+      'JJJJVJJBJ',
+      'JJJJVJJDJ',
+      'JJJVVJJDJ',
+      'JJFJVJJJJ',
+      'JJJJVJJJJ',
+      'JJJJFJJJJ',
+      'JJJJVJJJJ',
+      'JJFJVJFJJ',
+      'JJJJVJJJJ',
+      'JJJJVJJJM',
+      'CJJJVJJJJ',
+      'JJJJVJJJJ',
+      '.JJJVJJJC',
+      '.JJJVJJJ.',
+      '..JJRJJ..',
+      '...JJJ...']},
+    spruance: {name: 'Spruance class', cls: 'Destroyer', nation: 'USA', year: 1975, era: 'modern', kn: 32.5,
+      specs: {length: '171.7 m', disp: '8,040 t full load', speed: '32.5 kn (gas turbines)', arm: '2 × 5-inch/54, ASROC, Harpoon, Sea Sparrow (later 61-cell VLS), 2 × Phalanx, 6 torpedo tubes, 2 helicopters', crew: '319'},
+      fate: '31 were built as anti-submarine escorts; most later gained vertical launchers for Tomahawk. Note the staggered funnels. All were retired by 2005.',
+      rows: [
+      '.H.',
+      'HGH',
+      'HKH',
+      'HBH',
+      'CDH',
+      'HVO',
+      'TVT',
+      'OVH',
+      'HFH',
+      'HVH',
+      'HMH',
+      'HVC',
+      'HMH',
+      'HGH',
+      'HVH',
+      'HRH',
+      '.H.']},
+    tarawa: {name: 'USS Tarawa', cls: 'Amphibious assault ship', nation: 'USA', year: 1976, era: 'modern', kn: 24,
+      specs: {length: '254 m', disp: '39,300 t full load', speed: '24 kn', arm: 'Up to 35 helicopters or Harrier jets, 2 × 5-inch (as built), Phalanx, RAM; c. 1,700 Marines', crew: '960'},
+      fate: 'A floating air base and landing force in one, with a flooding well deck for landing craft. Decommissioned in 2009.',
+      rows: [
+      '..J..',
+      '.JJJ.',
+      'JJFJJ',
+      'CJJJJ',
+      'JJJJJ',
+      'JFJJJ',
+      'JJJJJ',
+      'JJJBJ',
+      'JJJOJ',
+      'JJJOJ',
+      'JJVDJ',
+      'JJFJJ',
+      'JJVJJ',
+      'JJVJJ',
+      'JJVJJ',
+      'JFVJJ',
+      'JJVJJ',
+      'QJVJQ',
+      'JJVJJ',
+      'JJJJJ',
+      'GJJJG',
+      'JJJJJ',
+      'JJJJC',
+      'JRJRJ',
+      '.JJJ.']},
+    ferry: {name: 'Cruise Ferry', cls: 'Requisitioned ferry (type)', nation: 'UK', year: 1982, era: 'modern', kn: 21,
+      livery: {funnel: '#e0b030'},
+      specs: {length: 'c. 150 m', disp: 'c. 25,000 GT', speed: 'c. 21 kn', arm: 'Bofors and Oerlikon guns fitted for the voyage', crew: 'Merchant crew; carried troops'},
+      fate: 'In 1982 Britain requisitioned ferries and liners, "ships taken up from trade", to carry troops and stores 8,000 miles to the Falklands.',
+      rows: [
+      '.H.',
+      'HHH',
+      'UUU',
+      'UBU',
+      'UUU',
+      'QUQ',
+      'UUU',
+      'UVU',
+      'UVU',
+      'UOU',
+      'UVU',
+      'GUG',
+      'HHH',
+      'HHH',
+      'HRH']},
+  };
+  S.musashi = Object.assign({}, S.yamato, {name: 'Musashi', year: 1942,
+    fate: "Yamato's sister. Took some twenty torpedoes and seventeen bombs in the Sibuyan Sea on 24 October 1944 before she went down."});
+
+  for (const id in S) S[id].famous = true;
+  Object.assign(Data.FAMOUS, S);
+  Object.assign(Data.ENEMIES, S);
+  // Catalog order: by year.
+  Data.SHIPWRIGHT.push(...Object.keys(S).sort((a, b) => S[a].year - S[b].year || S[a].name.localeCompare(S[b].name)));
+  return S;
 })();
 
 // ---------------------------------------------------------------- design.js
@@ -1017,7 +1505,7 @@ const Design = (() => {
   const KN = 0.25; // world units/s -> knots shown to the player
 
   const create = (w, h) => ({w, h, cells: new Array(w * h).fill(null)});
-  const clone = d => ({w: d.w, h: d.h, cells: d.cells.slice()});
+  const clone = d => Object.assign({w: d.w, h: d.h, cells: d.cells.slice()}, d.livery ? {livery: Object.assign({}, d.livery)} : {});
   const idx = (d, c, r) => c + r * d.w;
   const at = (d, c, r) => (c < 0 || r < 0 || c >= d.w || r >= d.h) ? null : d.cells[c + r * d.w];
 
@@ -1040,6 +1528,7 @@ const Design = (() => {
   function resize(d, w, h) {
     const b = bounds(d);
     const out = create(w, h);
+    if (d.livery) out.livery = Object.assign({}, d.livery);
     if (!b) return out;
     const bw = b.c1 - b.c0 + 1, bh = b.r1 - b.r0 + 1;
     const ox = Math.floor((w - bw) / 2) - b.c0, oy = Math.floor((h - bh) / 2) - b.r0;
@@ -1179,6 +1668,7 @@ const Sim = (() => {
       this.brain = o.brain || null;
       this.target = null;
       this.w = design.w; this.h = design.h;
+      this.livery = design.livery || o.livery || null;
       this.blocks = []; this.map = new Array(design.w * design.h).fill(null);
       let sc = 0, sr = 0;
       design.cells.forEach((t, i) => {
@@ -1217,7 +1707,7 @@ const Sim = (() => {
         m += P.mass; bu += P.buoy; th += (P.thrust || 0) * this.mods.thrust; ru += P.turn || 0; n++;
         if (P.weapon) this.weapons.push(b);
         if (P.util) { this.utils.push(b); if (P.util.type === 'radar') radars++; }
-        if (b.t === 'engine') this.engines.push(b);
+        if (b.t === 'engine' || b.t === 'funnel') this.engines.push(b);
         if (b.t === 'bridge') this.bridge = b;
       }
       radars = Math.min(radars, PARTS.radar.util.max);
@@ -1367,6 +1857,7 @@ const Sim = (() => {
 
         if (W.type === 'ciws' || W.type === 'aa') { this.pointDefense(s, w, W, wx, wy, dt); continue; }
         if (W.type === 'air') { this.hangar(s, w, W, wx, wy); continue; }
+        if (W.type === 'broadside') { this.broadside(s, w, W, wx, wy, W.range * s.rangeMul, dt); continue; }
         // a rocket salvo in progress keeps firing at its locked point
         if (w.salvo > 0) {
           w.salvoT -= dt;
@@ -1428,6 +1919,30 @@ const Sim = (() => {
         }
         w.aimB = null; // next shot picks a fresh block
       }
+    }
+    // Gun decks fire a ripple of shots at the best target within 40° of either beam.
+    broadside(s, w, W, wx, wy, range, dt) {
+      const onBeam = o => { const rel = Math.abs(wrapA(headingTo(o.x - wx, o.y - wy) - s.a)); return Math.abs(rel - Math.PI / 2) < 0.7; };
+      let t = s.target && !s.target.sinking && !s.target.dead && Math.hypot(s.target.x - wx, s.target.y - wy) - s.target.rad * 0.5 < range && onBeam(s.target) ? s.target : null;
+      if (!t) { let bd = range; for (const o of this.ships) { if (o.team === s.team || o.sinking || o.dead || !onBeam(o)) continue; const d = Math.hypot(o.x - wx, o.y - wy) - o.rad * 0.5; if (d < bd) { bd = d; t = o; } } }
+      if (w.salvo > 0) {
+        w.salvoT -= dt;
+        if (w.salvoT > 0 || !w.lockT || w.lockT.sinking) { if (!w.lockT || w.lockT.sinking) w.salvo = 0; return; }
+        w.salvo--; w.salvoT = 0.18;
+        const b = w.lockT.randomBlock(); if (!b) return;
+        let [tx, ty] = w.lockT.pos(b);
+        const d = Math.hypot(tx - wx, ty - wy), sp = d * W.spread * this.spreadFor(s, w.lockT, wx, wy);
+        tx += w.lockT.vx * d / W.speed + this.rng.gauss() * sp; ty += w.lockT.vy * d / W.speed + this.rng.gauss() * sp;
+        const a = headingTo(tx - wx, ty - wy), [fx, fy] = fwd(a), T = d / W.speed;
+        w.ang = a; w.elev = 0.05;
+        if (s === this.player) this.stats.shots++;
+        this.shells.push({x0: wx + fx * 5, y0: wy + fy * 5, tx, ty, t: 0, T, apex: 4 + T * 6, dmg: W.dmg, splash: 0, team: s.team, owner: s});
+        this.emit('fire', {kind: 'battery', ship: s, block: w, x: wx + fx * 5, y: wy + fy * 5, ang: a});
+        return;
+      }
+      if (!t || w.cd > 0) return;
+      w.cd = W.reload * this.rng.range(0.9, 1.15) * s.prof.reload / s.mods.reload;
+      w.salvo = W.salvo; w.salvoT = 0; w.lockT = t;
     }
     launchRocket(s, w, W, wx, wy) {
       const rng = this.rng, d = w.lockD;
@@ -2001,8 +2516,8 @@ const AI = (() => {
       const y = y0 + Math.abs(off) * 60;
       const E = Data.ENEMIES[id];
       // Famous ships sail with veteran crews: tougher, faster-loading, better gunnery. Bosses more so.
-      const mods = E.famous ? (E.boss ? {hp: 1.5, reload: 1.15, spread: 0.85} : {hp: 1.3, reload: 1.1, spread: 0.9}) : undefined;
-      const s = world.addShip(enemyDesign(id), {team: 1, x, y, a: Math.PI, name: E.name, kind: id, profile, mods});
+      const mods = E.famous ? (E.boss ? {hp: 2.3, reload: 1.2, spread: 0.8} : {hp: 1.8, reload: 1.15, spread: 0.85}) : undefined;
+      const s = world.addShip(enemyDesign(id), {team: 1, x, y, a: Math.PI, name: E.name, kind: id, profile, mods, livery: E.livery});
       s.cost = enemyCost(id);
       s.boss = !!E.boss; s.famous = !!E.famous;
       s.brain = fleet.brain(s);
@@ -2043,6 +2558,7 @@ const Progress = (() => {
     return {
       v: VERSION, credits: 0, parts: FREE_PARTS.slice(), dock: 0,
       tracks: Object.fromEntries(Object.keys(TRACKS).map(k => [k, 0])),
+      blueprints: [],
       stars: OPS.map(() => 0), hardClears: OPS.map(() => false),
       endlessBest: 0, totalSunk: 0, battles: 0,
       settings: {difficulty: 'medium', quality: 'auto', volume: 0.8, music: true, shake: true},
@@ -2066,6 +2582,7 @@ const Progress = (() => {
     out.dock = Util.clamp(p.dock | 0, 0, DOCKS.length - 1);
     if (!Design.valid(out.design)) out.design = f.design;
     out.slots = [0, 1, 2].map(i => (p.slots && Design.valid(p.slots[i])) ? p.slots[i] : null);
+    out.blueprints = Array.from(new Set((p.blueprints || []).filter(id => Data.FAMOUS[id])));
     out.credits = Math.max(0, +p.credits || 0);
     return out;
   }
@@ -2112,6 +2629,24 @@ const Progress = (() => {
     p.credits -= price; p.tracks[k]++; return true;
   }
   function dockPrice(p) { const n = DOCKS[p.dock + 1]; return n ? n.price : null; }
+  // ---- historical blueprints
+  // Price scales with the ship's build cost; owning one lets you load it in the shipyard any time.
+  function blueprintPrice(id) {
+    const a = Design.analyze(Design.fromRows(Data.FAMOUS[id].rows));
+    return Math.max(150, Math.round(a.cost * 0.55 / 50) * 50);
+  }
+  // What stops an owned blueprint from being built right now: dock size and missing parts.
+  function blueprintNeeds(p, id) {
+    const d = Design.fromRows(Data.FAMOUS[id].rows), a = Design.analyze(d), unl = unlocked(p);
+    const dockIdx = DOCKS.findIndex(k => k.w >= d.w && k.h >= d.h);
+    return {dock: dockIdx > p.dock ? DOCKS[dockIdx] : null, parts: Object.keys(a.cnt).filter(t => !unl.has(t)), design: d, a};
+  }
+  function buyBlueprint(p, id) {
+    if (p.blueprints.includes(id)) return false;
+    const price = blueprintPrice(id);
+    if (p.credits < price) return false;
+    p.credits -= price; p.blueprints.push(id); return true;
+  }
   function buyDock(p) {
     const price = dockPrice(p);
     if (price == null || p.credits < price) return false;
@@ -2165,7 +2700,8 @@ const Progress = (() => {
     return rw;
   }
 
-  return {fresh, sanitize, load, save, unlocked, dock, opUnlocked, reachedOp, budget, endlessBudgetCap, totalStars,
+  return {blueprintPrice, blueprintNeeds, buyBlueprint,
+          fresh, sanitize, load, save, unlocked, dock, opUnlocked, reachedOp, budget, endlessBudgetCap, totalStars,
           mods, partStatus, buyPart, trackPrice, buyTrack, dockPrice, buyDock, starsFor, reward, applyResult,
           endlessReward, applyEndless};
 })();
@@ -2494,10 +3030,13 @@ const Gfx = (() => {
     MAT.glass = std({color: '#18252f', roughness: 0.15, metalness: 0.7});
     MAT.dark = std({color: '#2a3036', roughness: 0.5, metalness: 0.55});
     MAT.black = std({color: '#121416', roughness: 0.9});
-    MAT.funnel = std({color: '#c2a36d', roughness: 0.6});
+    MAT.funnel = std({color: '#ffffff', roughness: 0.6});   // coloured per ship through instance colour (livery)
+    MAT.sail = std({color: '#efe8d8', roughness: 0.9, metalness: 0, side: THREE.DoubleSide});
+    MAT.wood = std({color: '#6b5440', roughness: 0.85, metalness: 0.05});
+    MAT.cabin = std({color: '#eef1f3', roughness: 0.55, metalness: 0.1});
     MAT.red = std({color: '#c2473a', roughness: 0.5});
     MAT.yellow = std({color: '#d9a92e', roughness: 0.5});
-    MAT.flight = std({color: '#6b5e4c', roughness: 0.85, metalness: 0.05});
+    MAT.flight = std({color: '#4b5056', roughness: 0.9, metalness: 0.1});
     MAT.plane = std({color: '#c9d1d8', roughness: 0.55, metalness: 0.3});
     MAT.planeFly = MAT.plane; MAT.darkFly = MAT.dark; // same look, separate instance pools
     MAT.coil = std({color: '#4f8fb8', roughness: 0.3, metalness: 0.7, emissive: '#16405a', emissiveIntensity: 0.6});
@@ -2576,6 +3115,17 @@ const Gfx = (() => {
     GEO.planeFin = box(0.25, 1.6, 1.3).translate(0, 0.9, 3.1);
     GEO.planeProp = box(3, 0.15, 0.2).translate(0, 0, -3.75);
     GEO.bomb = new THREE.SphereGeometry(0.9, 6, 4).scale(0.8, 0.8, 1.6);
+    GEO.vent = box(7, 0.9, 7).translate(0, DECK + 0.45, 0);
+    GEO.ventGrille = box(5.6, 0.25, 0.7);
+    GEO.sailMast = cyl(0.35, 0.55, 28, 8).translate(0, DECK + 14, 0);
+    GEO.yard = cyl(0.18, 0.18, 9.5, 6).rotateZ(Math.PI / 2);
+    GEO.sail = box(8.4, 5.2, 0.2);
+    GEO.paddleBox = cyl(4.4, 4.4, 3.4, 18, 1, false, 0, Math.PI).rotateZ(Math.PI / 2).rotateY(Math.PI / 2).translate(0, DECK - 0.5, 0);
+    GEO.gunport = cyl(0.35, 0.45, 2.6, 6).rotateZ(Math.PI / 2);
+    GEO.cabinLow = box(8.8, 3.4, 9.6).translate(0, DECK + 1.7, 0);
+    GEO.cabinTop = box(7.4, 2.8, 9.6).translate(0, DECK + 4.8, 0);
+    GEO.windows = box(9, 0.7, 9.7).translate(0, DECK + 2.3, 0);
+    GEO.windows2 = box(7.6, 0.6, 9.7).translate(0, DECK + 5.2, 0);
     GEO.radarMast = cyl(0.5, 0.8, 7, 8).translate(0, DECK + 3.5, 0);
     GEO.radarDish = box(7.5, 2.4, 0.5);
     GEO.craneBase = box(3, 4, 3).translate(1.5, DECK + 2, 1.5);
@@ -2894,13 +3444,21 @@ const Viz = (() => {
   // Visual pieces per part. node: base | pivot (turret yaw) | barrel (yaw + elevation) | spin (radar)
   // tint: 'paint' takes the team turret colour.
   const BARREL = {gun: [0, 1.7, -1.4], heavy: [0, 2.2, -3.2], superheavy: [0, 2.7, -3.4], ciws: [0, 2.6, -1.2], aa: [0, 1.9, -0.6], rail: [0, 1.9, -0.6], rockets: [0, 2.6, 0.4]};
-  const MUZZLE = {gun: 9.6, heavy: 16, superheavy: 20, ciws: 5, aa: 4.6, rail: 17, rockets: 4, torp: 6, missile: 0, hangar: 0};
+  const MUZZLE = {battery: 5.5, gun: 9.6, heavy: 16, superheavy: 20, ciws: 5, aa: 4.6, rail: 17, rockets: 4, torp: 6, missile: 0, hangar: 0};
   const PLANE = [['planeBody', 'plane'], ['planeWing', 'plane'], ['planeTail', 'plane'], ['planeFin', 'plane'], ['planeProp', 'dark']];
   const p = (geo, mat, node = 'base', o = {}) => Object.assign({geo, mat, node}, o);
   const PIECES = {
     bridge: [p('tower', 'light'), p('tower2', 'light'), p('window', 'glass'), p('wing', 'light'), p('mast', 'dark'),
              p('radarBar', 'dark', 'spin', {y: DECK + 17.5, rate: 1.8})],
-    engine: [p('funnel', 'funnel'), p('funnelTop', 'black')],
+    engine: [p('funnel', 'funnel', 'base', {livery: true}), p('funnelTop', 'black')],
+    funnel: [p('funnel', 'funnel', 'base', {livery: true}), p('funnelTop', 'black')],
+    machinery: [p('vent', 'dark'), ...[-2, 0, 2].map(z => p('ventGrille', 'black', 'base', {pos: [0, DECK + 1, z]}))],
+    mast: [p('sailMast', 'wood'), ...[11, 17.5, 23.5].flatMap((y, i) => [p('yard', 'wood', 'base', {pos: [0, DECK + y + 2.6, 0]}),
+           p('sail', 'sail', 'base', {pos: [0, DECK + y, 0], scl: [1 - i * 0.18, 1 - i * 0.12, 1], rotY: 0.55})])],
+    paddle: [p('paddleBox', 'light')],
+    battery: [...[-2.8, 0, 2.8].flatMap(z => [p('gunport', 'black', 'base', {pos: [-5.1, DECK - 1.4, z]}), p('gunport', 'black', 'base', {pos: [5.1, DECK - 1.4, z]})])],
+    cabin: [p('cabinLow', 'cabin'), p('cabinTop', 'cabin'), p('windows', 'glass'), p('windows2', 'glass')],
+    deck: [p('flightDeck', 'flight')],
     rudder: [p('rudderCap', 'dark')],
     gun: [p('gunBase', 'paint', 'pivot', {tint: true}), p('gunBarrel', 'dark', 'barrel')],
     heavy: [p('heavyHouse', 'paint', 'pivot', {tint: true}), p('heavyRoof', 'paint', 'pivot', {tint: true}),
@@ -2921,7 +3479,12 @@ const Viz = (() => {
     repair: [p('repairPad', 'yellow'), p('craneBase', 'yellow'), p('craneArm', 'yellow')],
     smoke: [p('canister', 'dark', 'base', {pos: [-1.8, DECK + 1.6, 0.6]}), p('canister', 'dark', 'base', {pos: [1.8, DECK + 1.6, 0.6]})],
   };
-  for (const k in PIECES) for (const pc of PIECES[k]) pc.local = new M4().makeTranslation(...(pc.pos || [0, 0, 0]));
+  for (const k in PIECES) for (const pc of PIECES[k]) {
+    pc.local = new M4().makeTranslation(...(pc.pos || [0, 0, 0]));
+    if (pc.rotY) pc.local.multiply(new M4().makeRotationY(pc.rotY));
+    if (pc.scl) pc.local.multiply(new M4().makeScale(...pc.scl));
+  }
+  const FUNNEL_DEFAULT = new THREE.Color('#c2a36d');
 
   function variant(s, b) {
     if (b.t === 'bridge') return 'full';
@@ -2974,11 +3537,18 @@ const Viz = (() => {
       const armor = b.t === 'armor';
       const body = this.pools.get((armor ? 'armor_' : 'hull_') + v.variants.get(b), armor ? 'armorMats' : 'hullMats');
       const list = [{pool: body, i: body.alloc(), node: 'base', local: null, hull: true}];
-      for (const pc of PIECES[b.t] || []) {
+      // Machinery is below decks: on a carrier it shows as more flight deck, not as vents.
+      let pieces = PIECES[b.t] || [];
+      if (b.t === 'machinery') {
+        const nb = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dc, dr]) => { const c = b.c + dc, r = b.r + dr; return c >= 0 && r >= 0 && c < s.w && r < s.h ? s.map[c + r * s.w] : null; });
+        if (nb.some(n => n && (n.t === 'deck' || n.t === 'hangar'))) pieces = PIECES.deck;
+      }
+      for (const pc of pieces) {
         const pool = this.pools.get(pc.geo, pc.mat, true);
         const e = {pool, i: pool.alloc(), node: pc.node, local: pc.local, pc};
         list.push(e);
         if (pc.tint) pool.color(e.i, team.paint);
+        if (pc.livery) pool.color(e.i, s.livery && s.livery.funnel ? new THREE.Color(s.livery.funnel) : FUNNEL_DEFAULT);
       }
       body.color(list[0].i, team.hull);
       b.vizLevel = 0;
@@ -3480,7 +4050,7 @@ const Battle = (() => {
   const STEP = 1 / 60;
 
   const WEAPON_ICON = {gun: 'G', heavy: 'X', torp: 'T', missile: 'M', rockets: 'K', rail: 'L', ciws: 'C'};
-  const WEAPON_ORDER = ['superheavy', 'heavy', 'gun', 'rail', 'rockets', 'missile', 'torp', 'hangar', 'aa', 'ciws'];
+  const WEAPON_ORDER = ['superheavy', 'heavy', 'gun', 'battery', 'rail', 'rockets', 'missile', 'torp', 'hangar', 'aa', 'ciws'];
 
   class Battle {
     constructor(app, cfg) {
@@ -3714,7 +4284,7 @@ const Battle = (() => {
       const p = this.player, near = (x, y) => clamp(1 - Math.hypot(x - p.x, y - p.y) / 300, 0, 1);
       switch (e.type) {
         case 'fire': {
-          const snd = {gun: 'gun', heavy: 'heavy', superheavy: 'heavy', torp: 'torp', missile: 'missile', rockets: 'rocket', ciws: null}[e.kind];
+          const snd = {battery: 'gun', gun: 'gun', heavy: 'heavy', superheavy: 'heavy', torp: 'torp', missile: 'missile', rockets: 'rocket', ciws: null}[e.kind];
           if (snd) Sound.play(snd, {x: e.x, y: e.y, vol: e.ship === p ? 0.8 : 0.6});
           if (e.ship === p && (e.kind === 'heavy' || e.kind === 'superheavy')) this.shake(e.kind === 'superheavy' ? 0.45 : 0.25);
           break;
@@ -4002,6 +4572,17 @@ const UI = (() => {
         ctx.fillStyle = '#aab4be'; roundRect(ctx, x - k * .22, y - k * .06, k * .44, k * .32, k * .06); ctx.fill(); break;
       case 'hangar': ctx.fillStyle = '#6b5e4c'; ctx.fillRect(x - k * .42, y - k * .42, k * .84, k * .84); ctx.fillStyle = '#d9a92e'; ctx.fillRect(x - k * .03, y - k * .42, k * .06, k * .84);
         ctx.fillStyle = '#dfe5ea'; ctx.fillRect(x - k * .32, y - k * .06, k * .64, k * .1); ctx.fillRect(x - k * .05, y - k * .24, k * .1, k * .46); ctx.fillRect(x - k * .14, y + k * .16, k * .28, k * .07); break;
+      case 'machinery': ctx.fillStyle = '#2b3138'; for (let i = 0; i < 4; i++) ctx.fillRect(x - k * .3, y - k * .3 + i * k * .16, k * .6, k * .08);
+        ctx.fillStyle = '#c08050'; circ(ctx, x + k * .22, y + k * .24, k * .08); ctx.fill(); break;
+      case 'funnel': ctx.fillStyle = '#c2a36d'; circ(ctx, x, y, k * .28); ctx.fill(); ctx.fillStyle = '#141618'; circ(ctx, x, y, k * .17); ctx.fill(); break;
+      case 'mast': ctx.fillStyle = '#efe8d8'; ctx.fillRect(x - k * .38, y - k * .1, k * .76, k * .2); ctx.fillStyle = '#5a4630'; circ(ctx, x, y, k * .09); ctx.fill(); break;
+      case 'paddle': ctx.fillStyle = '#d6dbe0'; circ(ctx, x, y, k * .34); ctx.fill(); ctx.strokeStyle = '#2a3036'; ctx.lineWidth = k * .05;
+        for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(i * .785) * k * .34, y + Math.sin(i * .785) * k * .34); ctx.moveTo(x, y); ctx.lineTo(x - Math.cos(i * .785) * k * .34, y - Math.sin(i * .785) * k * .34); ctx.stroke(); } break;
+      case 'battery': ctx.fillStyle = '#6b5a44'; ctx.fillRect(x - k * .4, y - k * .4, k * .8, k * .8); ctx.fillStyle = '#15191d';
+        for (let i = -1; i <= 1; i++) { ctx.fillRect(x - k * .5, y + i * k * .24 - k * .05, k * .22, k * .1); ctx.fillRect(x + k * .28, y + i * k * .24 - k * .05, k * .22, k * .1); } break;
+      case 'cabin': ctx.fillStyle = '#eef1f3'; ctx.fillRect(x - k * .36, y - k * .36, k * .72, k * .72); ctx.fillStyle = '#2d4152';
+        for (let i = 0; i < 3; i++) ctx.fillRect(x - k * .28 + i * k * .2, y - k * .1, k * .12, k * .12); break;
+      case 'deck': ctx.fillStyle = '#6b5e4c'; ctx.fillRect(x - k * .45, y - k * .45, k * .9, k * .9); ctx.fillStyle = '#d9a92e'; ctx.fillRect(x - k * .03, y - k * .45, k * .06, k * .9); break;
       case 'radar': ctx.fillStyle = '#2b3138'; circ(ctx, x, y, k * .1); ctx.fill(); ctx.fillStyle = '#dfe5ea'; ctx.fillRect(x - k * .34, y - k * .08, k * .68, k * .16); break;
       case 'repair': ctx.fillStyle = '#d9a92e'; ctx.fillRect(x - k * .3, y - k * .3, k * .6, k * .6); ctx.fillStyle = '#2a3036'; ctx.fillRect(x - k * .06, y - k * .22, k * .12, k * .44); ctx.fillRect(x - k * .22, y - k * .06, k * .44, k * .12); break;
       case 'smoke': ctx.fillStyle = '#2a3036'; circ(ctx, x - k * .16, y, k * .14); ctx.fill(); circ(ctx, x + k * .16, y, k * .14); ctx.fill();
@@ -4249,27 +4830,55 @@ const UI = (() => {
     next();
   }
 
-  // Load a famous ship as your own design (if it fits your dock and you own its parts).
+  // Top-down profile of a design, drawn with the part icons. Long ships are drawn bow-left.
+  function profileCanvas(d, maxW = 280, maxH = 64) {
+    const horiz = d.h >= d.w;
+    const cols = horiz ? d.h : d.w, rows = horiz ? d.w : d.h;
+    const cell = Math.max(3, Math.min(Math.floor(maxW / cols), Math.floor(maxH / rows)));
+    const cv = document.createElement('canvas'), dpr = 2;
+    cv.width = cols * cell * dpr; cv.height = rows * cell * dpr;
+    cv.style.width = cols * cell + 'px'; cv.style.height = rows * cell + 'px';
+    const g = cv.getContext('2d'); g.scale(dpr, dpr);
+    d.cells.forEach((t, i) => {
+      if (!t) return;
+      const c = i % d.w, r = (i / d.w) | 0;
+      const x = horiz ? r : c, y = horiz ? (d.w - 1 - c) : r;
+      drawPartIcon(g, t, x * cell + cell / 2, y * cell + cell / 2, cell);
+    });
+    return cv;
+  }
+  function specsHtml(F) {
+    const s = F.specs;
+    return `<div class="specs"><span>Length</span><b>${s.length}</b><span>Displacement</span><b>${s.disp}</b>
+      <span>Speed</span><b>${s.speed}</b><span>Armament</span><b>${s.arm}</b><span>Crew</span><b>${s.crew}</b></div>`;
+  }
+
+  // Shipyard: load an owned historical blueprint as your design.
   function openBlueprints() {
-    const p = app.profile, dock = Progress.dock(p), unl = Progress.unlocked(p);
-    const rows = Data.BLUEPRINTS.map(id => {
-      const F = Data.FAMOUS[id], d = Design.fromRows(F.rows), a = Design.analyze(d);
-      const missing = Object.keys(a.cnt).filter(t => !unl.has(t)).map(t => PARTS[t].name);
-      const needDock = Data.DOCKS.findIndex(k => k.w >= d.w && k.h >= d.h);
-      const why = needDock > p.dock ? `Needs ${Data.DOCKS[needDock].name}` : missing.length ? 'Needs ' + missing.join(', ') : '';
-      return `<div class="bp"><div><b>${F.name}</b> <span class="mute small">${F.cls} · ${F.nation} · ${F.year}</span>
-        <p>${F.blurb}</p><span class="mono small">${d.w}×${d.h} · cost ${a.cost} · ${(a.speed * Design.KN).toFixed(0)} kn</span></div>
-        <button data-bp="${id}" class="${why ? '' : 'primary'}" ${why ? 'disabled' : ''}>${why || 'Load'}</button></div>`;
-    }).join('');
-    $('sheetBody').innerHTML = `<h2>Blueprints</h2><p class="mute small" style="margin:4px 0 10px">Famous warships, ready to refit. Loading replaces your current design (undo brings it back).</p>
-      <div class="bps">${rows}</div><div class="btns"><button id="bpClose">Close</button></div>`;
+    const p = app.profile, dock = Progress.dock(p);
+    const owned = Data.SHIPWRIGHT.filter(id => p.blueprints.includes(id));
+    $('sheetBody').innerHTML = `<h2>Blueprints</h2><p class="mute small" style="margin:4px 0 10px">${owned.length
+        ? 'Historical ships you own. Loading replaces your current design (undo brings it back).'
+        : 'You don\'t own any blueprints yet. Buy them in the Armory under Shipwright.'}</p>
+      <div class="bps" id="bpList"></div><div class="btns" style="flex-direction:row"><button id="bpShop">Shipwright</button><button id="bpClose">Close</button></div>`;
+    const list = $('bpList');
+    for (const id of owned) {
+      const F = Data.FAMOUS[id], need = Progress.blueprintNeeds(p, id);
+      const why = need.dock ? `Needs ${need.dock.name}` : need.parts.length ? 'Needs ' + need.parts.map(t => PARTS[t].name).join(', ') : '';
+      const el = document.createElement('div'); el.className = 'bp';
+      el.innerHTML = `<div class="bpTxt"><b>${F.name}</b> <span class="mute small">${F.cls} · ${F.nation} · ${F.year}</span><div class="pf"></div>
+        <span class="mono small">${need.design.w}×${need.design.h} · cost ${need.a.cost} · ${(need.a.speed * Design.KN).toFixed(0)} kn</span></div>
+        <button class="${why ? '' : 'primary'}" ${why ? 'disabled' : ''}>${why || 'Load'}</button>`;
+      el.querySelector('.pf').appendChild(profileCanvas(need.design, 220, 40));
+      el.querySelector('button').onclick = () => {
+        edit(() => { p.design = Design.fromRows(F.rows, dock.w, dock.h); if (F.livery) p.design.livery = Object.assign({}, F.livery); });
+        $('sheet').classList.remove('on'); toast(`${F.name} loaded`); Sound.play('buy');
+      };
+      list.appendChild(el);
+    }
     $('sheet').classList.add('on');
     $('bpClose').onclick = () => $('sheet').classList.remove('on');
-    for (const b of $$('[data-bp]')) b.onclick = () => {
-      const F = Data.FAMOUS[b.dataset.bp];
-      edit(() => { p.design = Design.fromRows(F.rows, dock.w, dock.h); });
-      $('sheet').classList.remove('on'); toast(`${F.name} loaded`); Sound.play('buy');
-    };
+    $('bpShop').onclick = () => { $('sheet').classList.remove('on'); show('sArmory'); renderArmory('ships'); };
   }
 
   // ---------------------------------------------------------------- armory
@@ -4279,6 +4888,7 @@ const UI = (() => {
     const p = app.profile, el = $('aList');
     $('aCredits').textContent = cr(p.credits);
     for (const b of $$('#aTabs button')) b.classList.toggle('on', b.dataset.tab === armoryTab);
+    el.classList.toggle('wide', armoryTab === 'ships');
     el.innerHTML = '';
     const item = (iconEl, title, desc, extra, actHtml, onBuy) => {
       const c = document.createElement('div'); c.className = 'card item';
@@ -4296,6 +4906,25 @@ const UI = (() => {
           : st.state === 'locked' ? `<span class="mute small">Reach op ${st.op + 1}</span>`
           : `<button class="${st.state === 'buy' ? 'primary' : ''}" ${st.state === 'buy' ? '' : 'disabled'}>${cr(st.price)}</button>`;
         item(iconCanvas(t, 96), P.name, P.desc, stats, act, () => Progress.buyPart(p, t));
+      }
+    } else if (armoryTab === 'ships') {
+      const ERA = {sail: 'Age of sail', steam: 'Steel and steam', ww2: 'Second World War', modern: 'Modern'};
+      let lastEra = '';
+      el.insertAdjacentHTML('beforeend', `<p class="mute small shipNote">Historical ships as buildable blueprints. Real proportions at 10 m per block (ships under 60 m at double scale), real armament layouts, and speeds tuned to history up to the game's 31-knot cap. Buy once, then load from Shipyard → Blueprints.</p>`);
+      for (const id of Data.SHIPWRIGHT) {
+        const F = Data.FAMOUS[id];
+        if (F.era !== lastEra) { lastEra = F.era; el.insertAdjacentHTML('beforeend', `<div class="eraHead">${ERA[F.era]}</div>`); }
+        const owned = p.blueprints.includes(id), price = Progress.blueprintPrice(id), need = Progress.blueprintNeeds(p, id);
+        const c = document.createElement('div'); c.className = 'card ship';
+        const needs = [need.dock ? need.dock.name : '', ...need.parts.map(t => PARTS[t].name)].filter(Boolean);
+        c.innerHTML = `<div class="shipHead"><div><b>${F.name}</b><span class="mute small">${F.cls} · ${F.nation} · ${F.year}</span></div>
+            <div class="act">${owned ? '<span class="owned">Owned</span>' : `<button class="${p.credits >= price ? 'primary' : ''}" ${p.credits >= price ? '' : 'disabled'}>${cr(price)}</button>`}</div></div>
+          <div class="pf"></div>${specsHtml(F)}<p class="fate">${F.fate}</p>
+          <span class="mono small">Game: ${need.design.w}×${need.design.h} blocks · build cost ${need.a.cost} · ${(need.a.speed * Design.KN).toFixed(1)} kn${needs.length ? ` · <span style="color:var(--bad)">to build: ${needs.join(', ')}</span>` : ''}</span>`;
+        c.querySelector('.pf').appendChild(profileCanvas(need.design));
+        const btn = c.querySelector('.act button');
+        if (btn) btn.onclick = () => { if (Progress.buyBlueprint(p, id)) { Sound.play('buy'); app.haptic('success'); app.save(); toast(`${F.name} blueprint bought`); renderArmory(); } else Sound.play('deny'); };
+        el.appendChild(c);
       }
     } else if (armoryTab === 'eng') {
       for (const k in TRACKS) {

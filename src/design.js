@@ -4,7 +4,7 @@ const Design = (() => {
   const KN = 0.25; // world units/s -> knots shown to the player
 
   const create = (w, h) => ({w, h, cells: new Array(w * h).fill(null)});
-  const clone = d => ({w: d.w, h: d.h, cells: d.cells.slice()});
+  const clone = d => Object.assign({w: d.w, h: d.h, cells: d.cells.slice()}, d.livery ? {livery: Object.assign({}, d.livery)} : {});
   const idx = (d, c, r) => c + r * d.w;
   const at = (d, c, r) => (c < 0 || r < 0 || c >= d.w || r >= d.h) ? null : d.cells[c + r * d.w];
 
@@ -27,6 +27,7 @@ const Design = (() => {
   function resize(d, w, h) {
     const b = bounds(d);
     const out = create(w, h);
+    if (d.livery) out.livery = Object.assign({}, d.livery);
     if (!b) return out;
     const bw = b.c1 - b.c0 + 1, bh = b.r1 - b.r0 + 1;
     const ox = Math.floor((w - bw) / 2) - b.c0, oy = Math.floor((h - bh) / 2) - b.r0;

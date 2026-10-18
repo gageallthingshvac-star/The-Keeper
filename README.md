@@ -15,6 +15,7 @@ Play: open `irontide.html` in a browser (it is fully offline — three.js is inl
 src/            game source, one module per concern
   util.js       math, seeded RNG, safe storage
   data.js       parts, enemy designs, operations, upgrades, difficulty, weather
+  ships.js      historical ships (Shipwright blueprints, Legends enemies) with specs
   design.js     ship-design rules, stats, undo history
   sim.js        battle simulation (no DOM/WebGL; emits events)
   ai.js         enemy captains (Easy/Medium/Hard), fleet spawning, endless waves
@@ -29,6 +30,7 @@ src/            game source, one module per concern
   index.html, style.css
 vendor/         three.js r158
 tools/build.py  bundles everything into irontide.html
+tools/tune_ships.js  tunes historical ships' machinery to their real speeds
 tests/          headless Node tests for rules, AI and progression
 ```
 

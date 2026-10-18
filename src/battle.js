@@ -7,7 +7,7 @@ const Battle = (() => {
   const STEP = 1 / 60;
 
   const WEAPON_ICON = {gun: 'G', heavy: 'X', torp: 'T', missile: 'M', rockets: 'K', rail: 'L', ciws: 'C'};
-  const WEAPON_ORDER = ['superheavy', 'heavy', 'gun', 'rail', 'rockets', 'missile', 'torp', 'hangar', 'aa', 'ciws'];
+  const WEAPON_ORDER = ['superheavy', 'heavy', 'gun', 'battery', 'rail', 'rockets', 'missile', 'torp', 'hangar', 'aa', 'ciws'];
 
   class Battle {
     constructor(app, cfg) {
@@ -241,7 +241,7 @@ const Battle = (() => {
       const p = this.player, near = (x, y) => clamp(1 - Math.hypot(x - p.x, y - p.y) / 300, 0, 1);
       switch (e.type) {
         case 'fire': {
-          const snd = {gun: 'gun', heavy: 'heavy', superheavy: 'heavy', torp: 'torp', missile: 'missile', rockets: 'rocket', ciws: null}[e.kind];
+          const snd = {battery: 'gun', gun: 'gun', heavy: 'heavy', superheavy: 'heavy', torp: 'torp', missile: 'missile', rockets: 'rocket', ciws: null}[e.kind];
           if (snd) Sound.play(snd, {x: e.x, y: e.y, vol: e.ship === p ? 0.8 : 0.6});
           if (e.ship === p && (e.kind === 'heavy' || e.kind === 'superheavy')) this.shake(e.kind === 'superheavy' ? 0.45 : 0.25);
           break;

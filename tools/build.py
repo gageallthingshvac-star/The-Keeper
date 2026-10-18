@@ -9,7 +9,7 @@ import pathlib, sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SRC = ROOT / 'src'
-MODULES = ['util', 'data', 'design', 'sim', 'ai', 'progress',
+MODULES = ['util', 'data', 'ships', 'design', 'sim', 'ai', 'progress',
            'audio', 'gfx', 'shipviz', 'yard', 'battle', 'ui', 'main']
 
 def three_lib():

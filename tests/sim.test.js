@@ -33,8 +33,8 @@ const REF = {
        '.GHMHDHMHG.', '.HHHHHHHHH.', '.THMHWHMHT.', '.HHHHHHHHH.', '.GHMHHHMHG.', '.AHHHXHHHA.', '.CHHHXHHHC.', '.HHHHHHHHH.',
        '.HAHHLHHAH.', '.HHHHHHHHH.', '.HEHEHEHEH.', '.HEHEHEHEH.', '.HEHHSHHEH.', '..HHRHRHH..'],
 };
-const refFor = op => ['starter', 't1', 't1', 't2', 't2', 't2b', 't2b', 't3', 't3', 't3b', 't4', 't5', 't4', 't4', 't5', 't6', 't6'][op];
-for (const k of Data.BLUEPRINTS) REF[k] = REF[k] || Data.FAMOUS[k].rows;
+const refFor = op => ['starter', 't1', 't1', 't2', 't2', 't2b', 't2b', 't3', 't3', 't3b', 't4', 't5', 't2b', 't4', 't5', 't6', 't6'][op];
+// (historical ships are tested in their own section below)
 // Upgrades a player would plausibly own by this operation.
 const modsFor = op => { const lv = Math.floor(op / 4); const p = Progress.fresh(); for (const k of ['plating', 'gunnery', 'firecontrol', 'propulsion']) p.tracks[k] = lv; return Progress.mods(p); };
 
@@ -60,7 +60,8 @@ for (const [id, e] of Object.entries(Data.ENEMIES)) {
   const a = Design.analyze(Design.fromRows(e.rows));
   const p = Design.problems(a, {});
   ok(p.length === 0, `${id}: ${p.join(' ')}`);
-  ok(e.rows[0].length <= 13 && e.rows.length <= 27, `${id}: fits 13x27`);
+  const big = Data.DOCKS[Data.DOCKS.length - 1];
+  ok(e.rows[0].length <= big.w && e.rows.length <= big.h, `${id}: fits ${big.w}x${big.h}`);
   ok(e.rows.every(r => r.length === e.rows[0].length), `${id}: rows same width`);
   console.log(`  ${id.padEnd(12)} cost ${String(a.cost).padStart(5)}  mass ${a.mass.toFixed(0).padStart(4)}/${a.buoy.toFixed(0).padStart(4)}  ` +
               `${(a.speed * Design.KN).toFixed(1).padStart(5)} kn  dps ${a.dps.toFixed(0).padStart(4)}  rng ${a.range.toFixed(0)}`);
@@ -86,6 +87,33 @@ for (const [k, rows] of Object.entries(REF)) {
   const r = Design.fromRows(rows);
   const dock = Data.DOCKS.findIndex(d => d.w >= r.w && d.h >= r.h);
   ok(dock >= 0, `${k} fits a dock`);
+}
+
+section('historical blueprints');
+for (const id of Data.SHIPWRIGHT) {
+  const F = Data.FAMOUS[id], a = Design.analyze(Design.fromRows(F.rows));
+  const game = a.speed * Design.KN, target = Math.min(F.kn, 31);
+  ok(Design.problems(a, {}).length === 0, `${id} launchable: ${Design.problems(a, {}).join(' ')}`);
+  ok(Math.abs(game - target) <= 2.6, `${id} speed ${game.toFixed(1)} kn vs historical ${F.kn} kn`);
+  ok(F.specs && F.specs.length && F.specs.arm && F.fate && F.cls && F.nation && F.year, `${id} has specs`);
+  ok(Progress.blueprintPrice(id) >= 150, `${id} has a price`);
+}
+{
+  const p = Progress.fresh(); p.credits = 10000;
+  const id = 'goldenhind', price = Progress.blueprintPrice(id);
+  ok(Progress.buyBlueprint(p, id) && p.credits === 10000 - price && !Progress.buyBlueprint(p, id), 'buy blueprint once');
+  ok(!Progress.blueprintNeeds(p, 'goldenhind').dock && !Progress.blueprintNeeds(p, 'goldenhind').parts.length, 'Golden Hind buildable from the start');
+  ok(Progress.blueprintNeeds(p, 'nimitz').dock && Progress.blueprintNeeds(p, 'nimitz').parts.includes('hangar'), 'Nimitz needs Dock V and hangars');
+  ok(Progress.sanitize({v: 1, blueprints: ['yamato', 'nope']}).blueprints.join() === 'yamato', 'sanitize blueprints');
+  // broadside guns fire only across the beam
+  const w = new Sim.World({rng: Util.rng(4)});
+  const gh = w.addShip(Design.fromRows(Data.FAMOUS.warrior.rows), {team: 0, x: 0, y: 0, a: 0, player: true});
+  w.addShip(Design.fromRows(Data.ENEMIES.patrol.rows), {team: 1, x: 0, y: -150, a: 0});   // dead ahead
+  let fired = 0; for (let i = 0; i < 90; i++) { w.step(1 / 30); for (const e of w.drain()) if (e.type === 'fire' && e.kind === 'battery') fired++; }
+  ok(fired === 0, 'gun deck holds fire at a target dead ahead');
+  gh.a = Math.PI / 2; // now the target is on the port beam
+  for (let i = 0; i < 120; i++) { w.step(1 / 30); for (const e of w.drain()) if (e.type === 'fire' && e.kind === 'battery') fired++; }
+  ok(fired > 0, `gun deck fires on the beam (${fired} shots)`);
 }
 
 // ------------------------------------------------------------------ design rules

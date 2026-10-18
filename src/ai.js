@@ -148,8 +148,8 @@ const AI = (() => {
       const y = y0 + Math.abs(off) * 60;
       const E = Data.ENEMIES[id];
       // Famous ships sail with veteran crews: tougher, faster-loading, better gunnery. Bosses more so.
-      const mods = E.famous ? (E.boss ? {hp: 1.5, reload: 1.15, spread: 0.85} : {hp: 1.3, reload: 1.1, spread: 0.9}) : undefined;
-      const s = world.addShip(enemyDesign(id), {team: 1, x, y, a: Math.PI, name: E.name, kind: id, profile, mods});
+      const mods = E.famous ? (E.boss ? {hp: 2.3, reload: 1.2, spread: 0.8} : {hp: 1.8, reload: 1.15, spread: 0.85}) : undefined;
+      const s = world.addShip(enemyDesign(id), {team: 1, x, y, a: Math.PI, name: E.name, kind: id, profile, mods, livery: E.livery});
       s.cost = enemyCost(id);
       s.boss = !!E.boss; s.famous = !!E.famous;
       s.brain = fleet.brain(s);
