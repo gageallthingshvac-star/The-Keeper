@@ -116,6 +116,51 @@ for (const id of Data.SHIPWRIGHT) {
   ok(fired > 0, `gun deck fires on the beam (${fired} shots)`);
 }
 
+section('transmission efficiency');
+{
+  const sym = Design.fromRows(['.HXH.', 'HHCHH', 'HHHHH', 'HEHEH'], 5, 4), lop = Design.fromRows(['.HXH.', 'HHCHH', 'HHHHH', 'HEHHH'], 5, 4);
+  const centre = Design.fromRows(['.HXH.', 'HHCHH', 'HHHHH', 'HHEHH'], 5, 4);
+  ok(Design.analyze(sym).trans === 1, 'mirrored engines: 100%');
+  ok(Design.analyze(centre).trans === 1, 'centreline engine: 100%');
+  ok(Math.abs(Design.analyze(lop).trans - 0.85) < 1e-9, 'one-sided engine: 85%');
+  const w = new Sim.World({rng: Util.rng(3)}), s = w.addShip(sym, {team: 0, x: 0, y: 0, a: 0});
+  ok(s.trans === 1, 'sim ship starts balanced');
+  const e = s.blocks.find(b => b.t === 'engine'); e.alive = false; s.recompute();
+  ok(Math.abs(s.trans - 0.85) < 1e-9 && s.thrust > 0, 'losing one of a mirrored pair drops to 85%');
+}
+
+section('manual fire control');
+{
+  const w = new Sim.World({rng: Util.rng(21)});
+  const me = w.addShip(Design.fromRows(Data.FAMOUS.iowa.rows), {team: 0, x: 0, y: 0, a: 0, player: true, manual: true});
+  const foe = w.addShip(Design.fromRows(Data.ENEMIES.cruiser.rows), {team: 1, x: 0, y: -320, a: Math.PI / 2});
+  ok(me.mainType === 'heavy', `main battery is the heaviest gun (${me.mainType})`);
+  let fired = 0, salvo = 0;
+  const count = () => { for (const e of w.drain()) { if (e.type === 'fire' && e.ship === me && e.kind === 'heavy') fired++; if (e.type === 'salvo') salvo++; } };
+  for (let i = 0; i < 120; i++) { w.step(1 / 30); count(); }
+  ok(fired === 0, 'manual guns hold fire without a command');
+  me.aim = {x: foe.x, y: foe.y};
+  for (let i = 0; i < 150; i++) { w.step(1 / 30); count(); }
+  ok(me.fc.main === 3 && me.fc.canFire > 0, `turrets come to bear on the aim point (${me.fc.canFire}/${me.fc.main} can fire)`);
+  me.cmd.fire = 1; w.step(1 / 30); count();
+  ok(fired === 1, `one tap fires one mount (${fired})`);
+  me.cmd.salvo = 1; w.step(1 / 30); count();
+  ok(fired >= 2 && salvo === 1, `double tap fires a salvo (${fired} total)`);
+  for (let i = 0; i < 90; i++) { w.step(1 / 30); count(); }
+  ok(w.stats.dmg > 0, 'aimed shells hit the target');
+  me.aim = {x: 0, y: -2000};
+  for (let i = 0; i < 60; i++) { w.step(1 / 30); count(); }
+  ok(!me.fc.inRange && me.fc.canFire === 0, 'out-of-range aim cannot fire');
+  // torpedoes and specials
+  const w2 = new Sim.World({rng: Util.rng(22)});
+  const dd = w2.addShip(Design.fromRows(Data.FAMOUS.fletcher.rows), {team: 0, x: 0, y: 0, a: 0, player: true, manual: true});
+  w2.addShip(Design.fromRows(Data.ENEMIES.patrol.rows), {team: 1, x: 300, y: 0, a: 0});
+  dd.aim = {x: 300, y: 0};
+  for (let i = 0; i < 60; i++) w2.step(1 / 30);
+  w2.drain(); dd.cmd.torp = 1; w2.step(1 / 30);
+  ok(w2.torps.length > 0, `torpedo command launches tubes that bear (${w2.torps.length})`);
+}
+
 // ------------------------------------------------------------------ design rules
 section('design rules');
 {

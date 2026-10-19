@@ -178,6 +178,48 @@ h3{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute
 #msg b{display:block;font-family:var(--display);font-size:clamp(18px,6vw,28px);font-weight:800;letter-spacing:.08em;color:var(--brass);text-shadow:0 2px 20px rgba(0,0,0,.85)}
 #msg span{display:block;font-size:13px;color:#d4e0e8;text-shadow:0 1px 6px rgba(0,0,0,.9);margin-top:2px}
 
+/* ---------- Warship Craft controls */
+#rudder,#tgWrap,#fireCluster{display:none}
+.hud.craft #rudder,.hud.craft #tgWrap,.hud.craft #fireCluster{display:flex}
+.hud.craft #throttle,.hud.craft #bTarget,.hud.craft #bSmoke{display:none}
+.hud.craft .hudBR{top:calc(62px + var(--sT));bottom:auto;right:calc(10px + var(--sR))}
+.hud.craft #minimap{width:104px;height:104px}
+#rudder{left:calc(12px + var(--sL));bottom:calc(12px + var(--sB));width:min(250px,44vw);height:76px;flex-direction:column;justify-content:center;padding:0 22px;touch-action:none;pointer-events:auto}
+.rtrack{position:relative;height:10px;border-radius:5px;background:linear-gradient(90deg,rgba(255,90,74,.35),rgba(255,255,255,.12) 50%,rgba(95,211,138,.35))}
+.rtrack i{position:absolute;top:-5px;width:2px;height:20px;margin-left:-1px;background:rgba(220,232,240,.45)}
+.rtrack i.mid{background:var(--ink);height:24px;top:-7px}
+#rudKnob{position:absolute;top:50%;left:50%;width:38px;height:38px;margin:-19px 0 0 -19px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe2a0,var(--brass) 55%,var(--brass2));box-shadow:0 2px 10px rgba(0,0,0,.5);transition:left .08s linear}
+#rudKnob::after{content:'';position:absolute;inset:9px;border-radius:50%;border:2px solid rgba(26,18,6,.55)}
+#rudLbl{text-align:center;font-size:11px;color:var(--mute);margin-top:14px;text-transform:uppercase;letter-spacing:.08em;font-family:var(--mono)}
+#tgWrap{right:calc(10px + var(--sR));bottom:calc(10px + var(--sB));flex-direction:column;align-items:stretch;gap:4px}
+#tgSpeed{text-align:center;font-family:var(--mono);font-size:12px;color:var(--ink);text-shadow:0 1px 4px rgba(0,0,0,.9)}
+#telegraph{display:flex;flex-direction:column;width:84px;padding:4px;gap:3px;touch-action:none;pointer-events:auto}
+.notch{min-height:0;height:29px;padding:0;font-size:11px;font-weight:700;letter-spacing:.04em;border-radius:7px;background:rgba(255,255,255,.05);color:#b8c8d4}
+.notch.stop{color:var(--ink)} .notch.astern{color:#ffb0a6}
+.notch.on{background:linear-gradient(180deg,var(--brass),var(--brass2));color:#1a1206;border-color:transparent}
+.notch.astern.on{background:linear-gradient(180deg,#ff7b6b,#c9493b);color:#fff}
+#fireCluster{right:calc(106px + var(--sR));bottom:calc(12px + var(--sB));width:170px;height:170px;position:absolute;pointer-events:none}
+#fireCluster button{position:absolute;pointer-events:auto;touch-action:none;border-radius:50%;padding:0;font-weight:800;letter-spacing:.06em;background:var(--panel)}
+#bFire{right:0;bottom:0;width:92px;height:92px;font-size:16px;background:radial-gradient(circle at 40% 35%,#ff8d6b,#c43c2a 70%);color:#fff;border:2px solid rgba(255,255,255,.35);box-shadow:0 4px 18px rgba(0,0,0,.45)}
+#fireCluster .mini{width:52px;height:52px;min-height:0;font-size:10px}
+#bTorp{right:96px;bottom:4px} #bSpecial{right:84px;bottom:62px} #bSmoke2{right:44px;bottom:104px} #bScope{right:-6px;bottom:104px}
+#fireCluster .mini.ready{border-color:var(--good);color:var(--good)} #bScope.on{border-color:var(--brass);color:var(--brass)}
+.hud.craft #weapons{left:50%;transform:translateX(-50%);bottom:calc(10px + var(--sB))}
+.hud.craft #hint{bottom:calc(104px + var(--sB));max-width:min(46%,420px)}
+@media (orientation:portrait) and (max-width:760px){
+  #rudder{width:calc(100vw - 150px - var(--sL) - var(--sR));height:70px;padding:0 20px}
+  #fireCluster{right:calc(100px + var(--sR));bottom:calc(92px + var(--sB))}
+  .hud.craft #weapons{top:calc(150px + var(--sT));bottom:auto;left:calc(10px + var(--sL));transform:none;flex-direction:column;max-width:none}
+  .hud.craft #hint{bottom:calc(270px + var(--sB))}
+}
+@media (orientation:landscape) and (max-height:500px){
+  #telegraph{width:76px} .notch{height:25px;font-size:10px}
+  #rudder{height:66px} #fireCluster{right:calc(96px + var(--sR))}
+  .hud.craft #weapons{bottom:calc(8px + var(--sB))}
+  .hud.craft #hint{bottom:calc(88px + var(--sB));max-width:36%}
+  .hud.craft .hudBR{top:calc(56px + var(--sT))} .hud.craft #minimap{width:84px;height:84px}
+}
+
 /* ---------- overlays */
 .overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(3,10,16,.66);z-index:10;
   padding:calc(12px + var(--sT)) calc(12px + var(--sR)) calc(12px + var(--sB)) calc(12px + var(--sL))}
@@ -321,6 +363,7 @@ h3{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute
         <div class="stat"><span>Cost</span><b id="sCost">0</b></div>
         <div class="stat"><span>Mass / Float</span><b id="sMass">0</b></div>
         <div class="stat"><span>Speed</span><b id="sSpeed">0</b></div>
+        <div class="stat" title="Engines mirrored across the centreline run at full efficiency"><span>Transmission</span><b id="sTrans">—</b></div>
         <div class="stat"><span>Turn</span><b id="sTurn">0</b></div>
         <div class="stat"><span>Firepower</span><b id="sDps">0</b></div>
         <div class="stat"><span>Range</span><b id="sRange">0</b></div>
@@ -328,8 +371,8 @@ h3{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute
         <div id="warn"></div>
       </div>
       <div class="card tools">
-        <button id="tMirror" class="on">Mirror</button><button id="tErase">Erase</button>
-        <button id="tClear">Clear</button><button id="tStarter">Starter</button><button id="tBlue">Blueprints</button>
+        <button id="tMirror" class="on">Mirror</button><button id="tErase">Erase</button><button id="tMove">Move</button>
+        <button id="tClear">Clear</button><button id="tHull">Hulls</button><button id="tStarter">Starter</button><button id="tBlue">Blueprints</button>
         <span class="sep"></span>
         <span id="slots"></span>
       </div>
@@ -356,6 +399,8 @@ h3{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute
       <label class="rowline"><span>Volume</span><input type="range" id="setVol" min="0" max="1" step="0.05"></label>
       <label class="rowline"><span>Music</span><input type="checkbox" id="setMusic"></label>
     </div>
+    <div class="card"><h3>Controls</h3><div class="seg" id="setCtrl"></div><p class="mute small" id="setCtrlDesc"></p>
+      <label class="rowline"><span>Aim assist (lead marker)</span><input type="checkbox" id="setAssist"></label></div>
     <div class="card"><h3>Camera</h3><label class="rowline"><span>Screen shake</span><input type="checkbox" id="setShake"></label></div>
     <div class="card"><h3>Progress</h3><button id="setReset" class="danger">Reset all progress</button></div>
   </div>
@@ -392,6 +437,14 @@ h3{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute
   <div id="throttle"><i id="thrBar"></i><div class="zero" id="thrZero"></div></div>
   <div class="hudBR"><button id="bSmoke">Smoke</button><button id="bTarget">Target</button><canvas id="minimap"></canvas></div>
   <div id="weapons"></div>
+  <!-- Warship Craft controls -->
+  <div id="rudder" class="panel"><div class="rtrack"><i style="left:0"></i><i style="left:25%"></i><i class="mid" style="left:50%"></i><i style="left:75%"></i><i style="left:100%"></i><b id="rudKnob"></b></div><span id="rudLbl">Midships</span></div>
+  <div id="tgWrap"><div id="tgSpeed">0.0 kn</div><div id="telegraph" class="panel"></div></div>
+  <div id="fireCluster">
+    <button id="bScope" class="mini">SCOPE</button><button id="bSmoke2" class="mini">SMK</button>
+    <button id="bSpecial" class="mini">MSL</button><button id="bTorp" class="mini">TORP</button>
+    <button id="bFire">FIRE</button>
+  </div>
   <div id="hint"></div>
 </section>
 <div id="msg"><b></b><span></span></div>
@@ -1588,6 +1641,18 @@ const Design = (() => {
     return set;
   }
 
+  // Transmission efficiency (Warship Craft): engines that are not mirrored across the centreline
+  // lose up to 15% of their output. cells: part ids (or null) on a w-wide grid.
+  function transmission(cells, w) {
+    let all = 0, sym = 0;
+    cells.forEach((t, i) => {
+      const th = t && PARTS[t].thrust; if (!th) return;
+      const c = i % w, m = i - c + (w - 1 - c), mt = cells[m];
+      all += th; if (m === i || (mt && PARTS[mt].thrust === th)) sym += th;
+    });
+    return all ? 0.85 + 0.15 * sym / all : 1;
+  }
+
   // mods: optional upgrade multipliers (see Progress.mods)
   function analyze(d, mods = {}) {
     let cost = 0, mass = 0, buoy = 0, thrust = 0, rud = 0, dps = 0, range = 0, n = 0, bridges = 0, hp = 0;
@@ -1608,8 +1673,9 @@ const Design = (() => {
         range = Math.max(range, W.type === 'air' ? 0 : W.range * rangeMul);
       }
     }
-    const conn = connected(d);
-    return {cost, mass, buoy, thrust, rud, dps, range, n, hp, bridges, cnt, conn, loose: n - conn.size,
+    const conn = connected(d), trans = transmission(d.cells, d.w);
+    thrust *= trans;
+    return {trans, cost, mass, buoy, thrust, rud, dps, range, n, hp, bridges, cnt, conn, loose: n - conn.size,
             speed: calcSpeed(mass, thrust), turn: calcTurn(mass, rud)};
   }
 
@@ -1637,7 +1703,7 @@ const Design = (() => {
     clear() { this.past.length = 0; this.future.length = 0; }
   }
 
-  return {KN, create, clone, at, fromRows, resize, bounds, valid, place, connected, analyze, problems,
+  return {KN, create, clone, at, fromRows, resize, bounds, valid, place, connected, analyze, problems, transmission,
           calcSpeed, calcTurn, History};
 })();
 
@@ -1666,6 +1732,11 @@ const Sim = (() => {
       this.mods = Object.assign({hp: 1, reload: 1, thrust: 1, spread: 1, repair: 1, fire: 1}, o.mods || {});
       this.prof = o.profile || PLAYER_PROFILE;
       this.brain = o.brain || null;
+      // Manual fire control (Warship Craft style): the player aims with the camera and fires on command.
+      this.manual = !!o.manual;
+      this.aim = null;                                    // {x, y} point on the water under the reticle
+      this.cmd = {fire: 0, salvo: 0, torp: 0, special: 0}; // pending commands, consumed by the next step
+      this.fc = {main: 0, ready: 0, bearing: 0, canFire: 0, inRange: false, reload: 0, mounts: []};
       this.target = null;
       this.w = design.w; this.h = design.h;
       this.livery = design.livery || o.livery || null;
@@ -1714,12 +1785,18 @@ const Sim = (() => {
       this.rangeMul = 1 + radars * PARTS.radar.util.range;
       this.spreadMul = (1 - radars * PARTS.radar.util.spread) * this.mods.spread;
       for (const b of this.weapons) { const W = PARTS[b.t].weapon; if (W.dmg && W.type !== 'air') range = Math.max(range, W.range * this.rangeMul); }
+      const cells = new Array(this.w * this.h).fill(null);
+      for (const b of this.blocks) if (b.alive) cells[b.c + b.r * this.w] = b.t;
+      this.trans = Design.transmission(cells, this.w); th *= this.trans;
       this.mass = m; this.buoy = bu; this.thrust = th; this.rudders = ru; this.count = n; this.range = range;
       this.maxSpeed = Design.calcSpeed(m, th); this.turnRate = Design.calcTurn(m, ru);
       this.armed = this.weapons.some(b => PARTS[b.t].weapon.dmg);
       this.hasAir = this.weapons.some(b => b.t === 'hangar');
       this.hasSmoke = this.utils.some(b => b.t === 'smoke');
       this.hasRepair = this.utils.some(b => b.t === 'repair');
+      // Main battery = the heaviest gun type still aboard; everything lighter is secondary and fires itself.
+      const MAIN_ORDER = ['superheavy', 'heavy', 'rail', 'gun', 'battery'];
+      this.mainType = MAIN_ORDER.find(t => this.weapons.some(b => b.t === t)) || null;
       if (!first && bu > 0) {
         const mm = this.moments();
         this.listRoll = clamp(-(mm.mx - this.m0.mx) / bu * 0.05, -0.4, 0.4);
@@ -1794,6 +1871,7 @@ const Sim = (() => {
         if (s.brain && !s.sinking) s.brain.update(this, s, dt);
         this.physics(s, dt);
         if (!s.sinking) { this.weapons(s, dt); this.utilities(s, dt); }
+        if (s.manual) this.manualEnd(s);
         this.fires(s, dt);
         s.recentDmg *= Math.exp(-dt * 0.5);
         // An enemy with nothing left to shoot with is abandoned by its crew.
@@ -1849,12 +1927,14 @@ const Sim = (() => {
     }
     weapons(s, dt) {
       const rng = this.rng;
+      if (s.manual) this.manualBegin(s);
       for (const w of s.weapons) {
         if (!w.alive) continue;
         const W = PARTS[w.t].weapon;
         w.cd -= dt;
         const [wx, wy] = s.pos(w);
 
+        if (s.manual && this.manualWeapon(s, w, W, wx, wy, dt)) continue;
         if (W.type === 'ciws' || W.type === 'aa') { this.pointDefense(s, w, W, wx, wy, dt); continue; }
         if (W.type === 'air') { this.hangar(s, w, W, wx, wy); continue; }
         if (W.type === 'broadside') { this.broadside(s, w, W, wx, wy, W.range * s.rangeMul, dt); continue; }
@@ -1954,6 +2034,115 @@ const Sim = (() => {
         dmg: W.dmg, splash: W.splash, team: s.team, owner: s, hp: 1});
       this.emit('rocket', {ship: s, block: w, x: wx, y: wy});
     }
+    // ---------------------------------------------------------- manual fire control
+    // Each step: turrets of the main battery slew toward the aim point; a mount can fire when it is loaded,
+    // bears on the aim point and the aim point is within range. Commands from the player:
+    //   fire    one tap — the next ready mount fires (rapid taps walk the fire)
+    //   salvo   double tap — every ready mount fires together, with tighter grouping
+    //   torp    every loaded tube that bears launches toward the aim point
+    //   special missiles, aircraft and rockets launch at the enemy nearest the reticle (or the locked target)
+    manualBegin(s) {
+      const fc = s.fc;
+      fc.main = 0; fc.ready = 0; fc.bearing = 0; fc.canFire = 0; fc.inRange = false; fc.reload = 1; fc.mounts.length = 0;
+      fc.torpReady = 0; fc.torps = 0; fc.specialReady = 0; fc.specials = 0;
+      s.fireDone = false;
+    }
+    manualWeapon(s, w, W, wx, wy, dt) {
+      const main = w.t === s.mainType, torp = W.type === 'torp', special = W.type === 'missile' || W.type === 'air' || W.type === 'rockets';
+      if (!main && !torp && !special) return false;          // secondaries, AA and CIWS stay automatic
+      const fc = s.fc, aim = s.aim, range = W.range * s.rangeMul;
+      const R = W.reload * s.prof.reload / s.mods.reload;
+      if (special) {
+        fc.specials++;
+        if (W.type === 'rockets' && w.salvo > 0) return false; // let the salvo finish through the normal path
+        if (w.cd <= 0) fc.specialReady++;
+        if (s.cmd.special && w.cd <= 0) {
+          const t = this.specialTarget(s, range);
+          if (W.type === 'rockets') {
+            if (aim && Math.hypot(aim.x - wx, aim.y - wy) <= range) {
+              w.cd = R; w.salvo = W.salvo; w.salvoT = 0; w.lockX = aim.x; w.lockY = aim.y; w.lockD = Math.hypot(aim.x - wx, aim.y - wy); w.lockT = t;
+              if (s === this.player) this.stats.shots++;
+              this.emit('fire', {kind: 'rockets', ship: s, block: w, x: wx, y: wy, ang: w.ang});
+            }
+          } else if (t) {
+            if (W.type === 'air') { w.cd = 0; s.target = t; this.hangar(s, w, W, wx, wy); }
+            else {
+              w.cd = R; const b = t.randomBlock();
+              this.missiles.push({x: wx, y: wy, h: DECK + 1.6, a: headingTo(t.x - wx, t.y - wy), speed: 25, max: W.speed, age: 0,
+                life: range / W.speed * 1.8, dmg: W.dmg, splash: W.splash, team: s.team, owner: s, tgt: t, b, hp: 3});
+              if (s === this.player) this.stats.shots++;
+              this.emit('fire', {kind: 'missile', ship: s, block: w, x: wx, y: wy, ang: w.ang});
+            }
+          }
+        }
+        return true;
+      }
+      if (!aim) { w.ang = turnToward(w.ang, s.a, 1.5 * dt); return true; }
+      const d = Math.hypot(aim.x - wx, aim.y - wy), desired = headingTo(aim.x - wx, aim.y - wy);
+      const inRange = d <= range;
+      if (torp) {
+        fc.torps++;
+        w.ang = turnToward(w.ang, desired, 2.5 * dt);
+        const bears = Math.abs(wrapA(desired - w.ang)) < 0.35;
+        if (w.cd <= 0 && bears) fc.torpReady++;
+        if (s.cmd.torp && w.cd <= 0 && bears) {
+          w.cd = R * this.rng.range(0.95, 1.05);
+          const a = desired + this.rng.gauss() * 0.03, [fx, fy] = fwd(a);
+          this.torps.push({x: wx + fx * 6, y: wy + fy * 6, vx: fx * W.speed, vy: fy * W.speed, a, life: range / W.speed,
+            dmg: W.dmg, splash: W.splash, team: s.team, owner: s});
+          if (s === this.player) this.stats.shots++;
+          this.emit('fire', {kind: 'torp', ship: s, block: w, x: wx + fx * 8, y: wy + fy * 8, ang: a});
+        }
+        return true;
+      }
+      // main battery
+      let bears;
+      if (W.type === 'broadside') {
+        const rel = Math.abs(wrapA(desired - s.a)); bears = Math.abs(rel - Math.PI / 2) < 0.7; w.ang = desired;
+      } else {
+        w.ang = turnToward(w.ang, desired, (w.t === 'superheavy' ? 1.0 : w.t === 'heavy' || w.t === 'rail' ? 1.4 : 3.5) * dt);
+        bears = Math.abs(wrapA(desired - w.ang)) < 0.06;
+      }
+      if (W.speed) { const T = d / W.speed, apex = SHELL_ARC * T * T + 2; w.elev += (Math.atan2(4 * apex, Math.max(1, d)) - w.elev) * Math.min(1, dt * 4); }
+      const ready = w.cd <= 0, can = ready && bears && inRange;
+      fc.main++; if (ready) fc.ready++; if (bears) fc.bearing++; if (can) fc.canFire++;
+      fc.inRange = fc.inRange || inRange;
+      fc.reload = Math.min(fc.reload, ready ? 0 : Math.max(0, w.cd / R));
+      fc.mounts.push(can ? 2 : ready ? 1 : 0);
+      w.canFire = can;
+      const fireNow = can && (s.cmd.salvo || (s.cmd.fire && !s.fireDone));
+      if (!fireNow) return true;
+      if (!s.cmd.salvo) s.fireDone = true;                     // single tap: one mount per tap
+      w.cd = R * this.rng.range(0.95, 1.08);
+      const grouping = s.cmd.salvo ? 0.7 : 1;
+      const sp = d * (W.spread || 0) * s.prof.acc * s.spreadMul * this.weather.spread * grouping * (this.inSmoke(aim.x, aim.y) ? 2.2 : 1);
+      const tx = aim.x + this.rng.gauss() * sp, ty = aim.y + this.rng.gauss() * sp;
+      if (s === this.player) this.stats.shots++;
+      if (W.type === 'rail') { this.fireRail(s, w, W, wx, wy, tx, ty, range); return true; }
+      const [fx, fy] = fwd(w.ang), mx = wx + fx * 8, my = wy + fy * 8, T = Math.hypot(tx - mx, ty - my) / W.speed;
+      this.shells.push({x0: mx, y0: my, tx, ty, t: 0, T, apex: W.type === 'broadside' ? 4 + T * 6 : SHELL_ARC * T * T + 2,
+        dmg: W.dmg, splash: W.splash, team: s.team, owner: s, heavy: w.t === 'heavy' || w.t === 'superheavy'});
+      this.emit('fire', {kind: w.t, ship: s, block: w, x: mx, y: my, ang: w.ang, salvo: !!s.cmd.salvo});
+      return true;
+    }
+    specialTarget(s, range) {
+      const t = s.target;
+      if (t && !t.sinking && !t.dead && Math.hypot(t.x - s.x, t.y - s.y) < range) return t;
+      if (!s.aim) return this.nearestFoe(s.team, s.x, s.y, range);
+      let best = null, bd = 1e9;
+      for (const o of this.ships) {
+        if (o.team === s.team || o.sinking || o.dead || Math.hypot(o.x - s.x, o.y - s.y) > range) continue;
+        const d = Math.hypot(o.x - s.aim.x, o.y - s.aim.y);
+        if (d < bd) { bd = d; best = o; }
+      }
+      return best;
+    }
+    manualEnd(s) {
+      const c = s.cmd;
+      if (c.salvo && s.fc.canFire) this.emit('salvo', {ship: s, guns: s.fc.canFire});
+      c.fire = 0; c.salvo = 0; c.torp = 0; c.special = 0;
+    }
+
     fireRail(s, w, W, wx, wy, tx, ty, range) {
       const a = headingTo(tx - wx, ty - wy), [fx, fy] = fwd(a);
       let dmg = W.dmg, pierced = 0, ex = wx + fx * range, ey = wy + fy * range;
@@ -2561,7 +2750,7 @@ const Progress = (() => {
       blueprints: [],
       stars: OPS.map(() => 0), hardClears: OPS.map(() => false),
       endlessBest: 0, totalSunk: 0, battles: 0,
-      settings: {difficulty: 'medium', quality: 'auto', volume: 0.8, music: true, shake: true},
+      settings: {difficulty: 'medium', quality: 'auto', volume: 0.8, music: true, shake: true, controls: 'craft', aimAssist: true},
       design: Design.fromRows(STARTER, DOCKS[0].w, DOCKS[0].h),
       slots: [null, null, null],
       seen: {},
@@ -4013,6 +4202,16 @@ const Yard = (() => {
       if (mirror && mc !== c && part !== 'bridge') place(this.ghosts[1], mc);
     }
 
+    // Move tool: outline the picked-up part (and its mirror twin).
+    markSource(i, mirror) {
+      if (!this.marks) this.marks = [0, 1].map(() => { const m = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(S * 1.04, 9, S * 1.04).translate(0, DECK - 3.5, 0)), new THREE.LineBasicMaterial({color: '#7fd6ff'})); m.visible = false; this.env.scene.add(m); return m; });
+      for (const m of this.marks) m.visible = false;
+      const d = this.design; if (!d || i < 0) return;
+      const c = i % d.w, r = (i / d.w) | 0, mc = d.w - 1 - c;
+      this.marks[0].visible = true; this.marks[0].position.set(this.cellX(c), 0.3, this.cellZ(r));
+      if (mirror && mc !== c && d.cells[mc + r * d.w] === d.cells[i]) { this.marks[1].visible = true; this.marks[1].position.set(this.cellX(mc), 0.3, this.cellZ(r)); }
+    }
+
     resize(W, H) {
       this.renderer.setSize(W, H, false);
       this.camera.aspect = W / H; this.camera.updateProjectionMatrix();
@@ -4049,7 +4248,10 @@ const Battle = (() => {
   const $ = id => document.getElementById(id);
   const STEP = 1 / 60;
 
-  const WEAPON_ICON = {gun: 'G', heavy: 'X', torp: 'T', missile: 'M', rockets: 'K', rail: 'L', ciws: 'C'};
+  // Engine telegraph notches (top to bottom) and rudder detents, as on a ship's bridge.
+  const TELEGRAPH = [[1, 'FULL'], [0.75, '¾'], [0.5, '½'], [0.25, '¼'], [0, 'STOP'], [-0.2, '½ AST'], [-0.4, 'FULL AST']];
+  const RUDDER = [[-1, 'Hard port'], [-0.5, 'Port'], [0, 'Midships'], [0.5, 'Starboard'], [1, 'Hard stbd']];
+  const DOUBLE_TAP = 320; // ms
   const WEAPON_ORDER = ['superheavy', 'heavy', 'gun', 'battery', 'rail', 'rockets', 'missile', 'torp', 'hangar', 'aa', 'ciws'];
 
   class Battle {
@@ -4065,18 +4267,22 @@ const Battle = (() => {
       this.camera = new THREE.PerspectiveCamera(50, 1, 1, 12000);
       this.world = new Sim.World({weather: this.weatherKey});
       this.addBuoys();
-      this.player = this.world.addShip(cfg.design, {team: 0, x: 0, y: 560, a: 0, name: 'Your ship', player: true, mods: cfg.mods});
+      this.craft = (cfg.settings.controls || 'craft') === 'craft';
+      this.player = this.world.addShip(cfg.design, {team: 0, x: 0, y: 560, a: 0, name: 'Your ship', player: true, mods: cfg.mods, manual: this.craft});
       this.viz.addShip(this.player);
       this.wave = 0; this.waveT = 0; this.over = false; this.endT = 0; this.paused = false; this.t = 0;
       if (cfg.mode === 'op') this.spawn(Data.OPS[cfg.op].enemies);
       else this.nextWave();
-      this.cam = {x: this.player.x, y: this.player.y, yaw: 0, pitch: 0.32, dist: 260, mode: 0, shake: 0};
-      this.input = {throttle: 0.6, rudder: 0, joy: null, look: null, keys: {}};
+      this.cam = {x: this.player.x, y: this.player.y, yaw: 0, pitch: 0.32, dist: 260, mode: 0, shake: 0,
+                  aimYaw: this.player.a, range: 380, scope: false, fov: 50};
+      this.input = {throttle: this.craft ? 0.5 : 0.6, rudder: 0, joy: null, look: null, keys: {}, lastTap: 0, lastSpace: 0};
       this.acc = 0; this.hudT = 0; this.lightningT = 6 + Math.random() * 8;
       this.overlay = $('overlay'); this.octx = this.overlay.getContext('2d');
       this.mm = $('minimap'); this.mctx = this.mm.getContext('2d');
       this.shipCv = $('hShip'); this.sctx = this.shipCv.getContext('2d');
+      $('sHud').classList.toggle('craft', this.craft); $('sHud').classList.toggle('simple', !this.craft);
       this.bindInput();
+      if (this.craft) this.bindCraftControls();
       this.buildWeaponBar();
       this.resize();
       $('hWaveRow').style.display = cfg.mode === 'endless' ? '' : 'none';
@@ -4132,16 +4338,22 @@ const Battle = (() => {
         key: e => {
           I.keys[e.code] = e.type === 'keydown';
           if (e.type !== 'keydown' || this.over) return;
+          if (this.craft && this.craftKey(e)) return;
           if (e.code === 'Tab') { e.preventDefault(); this.cycleTarget(); }
           else if (e.code === 'KeyC') this.cycleCam();
           else if (e.code === 'KeyF' || e.code === 'KeyX') this.smoke();
           else if (e.code === 'Escape' || e.code === 'KeyP') this.togglePause();
         },
-        wheel: e => { e.preventDefault(); this.cam.dist = clamp(this.cam.dist * (e.deltaY > 0 ? 1.1 : 1 / 1.1), 70, 900); },
+        wheel: e => { e.preventDefault(); if (this.craft && !e.ctrlKey) { this.setRange(this.cam.range * (e.deltaY > 0 ? 1 / 1.08 : 1.08)); return; } this.cam.dist = clamp(this.cam.dist * (e.deltaY > 0 ? 1.1 : 1 / 1.1), 70, 900); },
         down: e => {
           if (this.paused || this.over) return;
           Sound.init();
           el.setPointerCapture(e.pointerId);
+          if (this.craft) {
+            if (I.look && e.pointerType !== 'mouse') { I.pinch = {id: e.pointerId, x: e.clientX, y: e.clientY, d0: Math.hypot(e.clientX - I.look.x, e.clientY - I.look.y), dist0: this.cam.dist}; I.look.moved = true; return; }
+            I.look = {id: e.pointerId, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, t: performance.now(), moved: false, button: e.button};
+            return;
+          }
           if (e.pointerType !== 'mouse' && e.clientX < this.W * 0.5 && !I.joy) { I.joy = {id: e.pointerId, ox: e.clientX, oy: e.clientY, x: e.clientX, y: e.clientY}; return; }
           if (I.look && e.pointerType !== 'mouse') { // second finger on the look side: pinch to zoom
             I.pinch = {id: e.pointerId, x: e.clientX, y: e.clientY, d0: Math.hypot(e.clientX - I.look.x, e.clientY - I.look.y), dist0: this.cam.dist};
@@ -4168,14 +4380,20 @@ const Battle = (() => {
           if (l && l.id === e.pointerId) {
             const dx = e.clientX - l.x, dy = e.clientY - l.y; l.x = e.clientX; l.y = e.clientY;
             if (Math.hypot(e.clientX - l.sx, e.clientY - l.sy) > 6) l.moved = true;
-            if (l.moved) { this.cam.yaw -= dx * 0.006; this.cam.pitch = clamp(this.cam.pitch + dy * 0.004, 0.06, 1.35); }
+            if (l.moved) {
+              if (this.craft) this.swingAim(dx, dy);
+              else { this.cam.yaw -= dx * 0.006; this.cam.pitch = clamp(this.cam.pitch + dy * 0.004, 0.06, 1.35); }
+            }
           }
         },
         up: e => {
           if (I.joy && I.joy.id === e.pointerId) { I.joy = null; I.rudder = 0; }
           if (I.pinch && (I.pinch.id === e.pointerId || (I.look && I.look.id === e.pointerId))) { I.pinch = null; if (I.look && I.look.id === e.pointerId) I.look = null; return; }
           const l = I.look;
-          if (l && l.id === e.pointerId) { if (!l.moved) this.pickTarget(e.clientX, e.clientY); I.look = null; }
+          if (l && l.id === e.pointerId) {
+            if (!l.moved) { if (this.craft) { if (l.button === 2) this.toggleScope(); else this.tapFire(); } else this.pickTarget(e.clientX, e.clientY); }
+            I.look = null;
+          }
         },
         ctx: e => e.preventDefault(),
       };
@@ -4197,6 +4415,102 @@ const Battle = (() => {
       el.removeEventListener('wheel', this.h.wheel); el.removeEventListener('pointerdown', this.h.down);
       el.removeEventListener('pointermove', this.h.move); el.removeEventListener('pointerup', this.h.up);
       el.removeEventListener('pointercancel', this.h.up); el.removeEventListener('contextmenu', this.h.ctx);
+    }
+    // ---------------------------------------------------------- Warship Craft controls
+    // Rudder holds where you leave it; the telegraph has fixed notches; the camera is your aim.
+    bindCraftControls() {
+      const I = this.input;
+      // telegraph
+      const tg = $('telegraph'); tg.innerHTML = '';
+      this.tgBtns = TELEGRAPH.map(([v, label]) => {
+        const b = document.createElement('button'); b.className = 'notch' + (v < 0 ? ' astern' : v === 0 ? ' stop' : '');
+        b.textContent = label; tg.appendChild(b); return [v, b];
+      });
+      // tap a notch, or drag along the lever to sweep through notches
+      let tgDrag = null;
+      const tgPick = e => {
+        const r = tg.getBoundingClientRect(), i = clamp(Math.floor((e.clientY - r.top) / r.height * TELEGRAPH.length), 0, TELEGRAPH.length - 1);
+        if (TELEGRAPH[i][0] !== I.throttle) this.setTelegraph(TELEGRAPH[i][0]);
+      };
+      tg.onpointerdown = e => { e.preventDefault(); Sound.init(); tgDrag = e.pointerId; tg.setPointerCapture(e.pointerId); tgPick(e); };
+      tg.onpointermove = e => { if (tgDrag === e.pointerId) tgPick(e); };
+      tg.onpointerup = tg.onpointercancel = e => { if (tgDrag === e.pointerId) tgDrag = null; };
+      // rudder
+      const rd = $('rudder'), track = rd.querySelector('.rtrack');
+      let drag = null;
+      const fromX = x => { const r = track.getBoundingClientRect(); return clamp(((x - r.left) / r.width) * 2 - 1, -1, 1); };
+      rd.onpointerdown = e => {
+        e.preventDefault(); rd.setPointerCapture(e.pointerId); Sound.init();
+        const now = performance.now();
+        if (now - (this.rudTap || 0) < DOUBLE_TAP) { this.setRudder(0, true); this.rudTap = 0; drag = null; return; }
+        this.rudTap = now; drag = e.pointerId; this.setRudder(fromX(e.clientX));
+      };
+      rd.onpointermove = e => { if (drag === e.pointerId) this.setRudder(fromX(e.clientX)); };
+      rd.onpointerup = rd.onpointercancel = e => {
+        if (drag !== e.pointerId) return; drag = null;
+        const near = RUDDER.reduce((a, d) => Math.abs(d[0] - I.rudder) < Math.abs(a[0] - I.rudder) ? d : a);
+        if (Math.abs(near[0] - I.rudder) < 0.15) this.setRudder(near[0], true);
+      };
+      // weapons
+      const fire = $('bFire');
+      fire.onpointerdown = e => { e.preventDefault(); this.tapFire(); };
+      $('bTorp').onpointerdown = e => { e.preventDefault(); this.command('torp'); };
+      $('bSpecial').onpointerdown = e => { e.preventDefault(); this.command('special'); };
+      $('bScope').onpointerdown = e => { e.preventDefault(); this.toggleScope(); };
+      $('bSmoke2').onpointerdown = e => { e.preventDefault(); this.smoke(); };
+      $('bTorp').style.display = this.player.weapons.some(b => b.t === 'torp') ? '' : 'none';
+      $('bSpecial').style.display = this.player.weapons.some(b => ['missile', 'hangar', 'rockets'].includes(b.t)) ? '' : 'none';
+      $('bSpecial').textContent = this.player.weapons.some(b => b.t === 'hangar') ? 'AIR' : this.player.weapons.some(b => b.t === 'missile') ? 'MSL' : 'RKT';
+      $('bSmoke2').style.display = this.player.hasSmoke ? '' : 'none';
+      this.cam.range = clamp((this.player.range || 300) * 0.7, 120, 900);
+      this.setTelegraph(I.throttle, true); this.setRudder(0, true);
+    }
+    setTelegraph(v, quiet) {
+      this.input.throttle = v;
+      if (this.tgBtns) for (const [n, b] of this.tgBtns) b.classList.toggle('on', n === v);
+      if (!quiet) { Sound.play('click'); this.app.haptic('light'); }
+    }
+    stepTelegraph(dir) {
+      const i = TELEGRAPH.findIndex(([v]) => v === this.input.throttle);
+      const j = clamp((i < 0 ? 4 : i) - dir, 0, TELEGRAPH.length - 1);
+      this.setTelegraph(TELEGRAPH[j][0]);
+    }
+    setRudder(v, snap) {
+      const I = this.input; I.rudder = clamp(v, -1, 1);
+      const knob = $('rudKnob'); if (knob) knob.style.left = ((I.rudder + 1) / 2 * 100) + '%';
+      const near = RUDDER.reduce((a, d) => Math.abs(d[0] - I.rudder) < Math.abs(a[0] - I.rudder) ? d : a);
+      const lbl = $('rudLbl'); if (lbl) lbl.textContent = Math.abs(near[0] - I.rudder) < 0.08 ? near[1] : `${Math.round(Math.abs(I.rudder) * 35)}° ${I.rudder < 0 ? 'port' : 'stbd'}`;
+      if (snap) this.app.haptic('light');
+    }
+    setRange(r) { this.cam.range = clamp(r, 60, Math.max(700, (this.player.range || 300) * 1.25)); }
+    swingAim(dx, dy) {
+      const k = this.cam.scope ? 0.0014 : 0.0048;
+      this.cam.aimYaw = wrapA(this.cam.aimYaw + dx * k);
+      this.setRange(this.cam.range * Math.exp(-dy * (this.cam.scope ? 0.0016 : 0.0045)));
+    }
+    toggleScope() { this.cam.scope = !this.cam.scope; Sound.play('click'); $('bScope').classList.toggle('on', this.cam.scope); }
+    command(kind) { if (this.over || this.paused) return; this.player.cmd[kind] = 1; this.app.haptic('light'); }
+    // Single tap fires the next ready mount; a second tap inside the double-tap window fires a full salvo.
+    tapFire() {
+      if (this.over || this.paused) return;
+      Sound.init();
+      const now = performance.now(), p = this.player;
+      if (now - this.input.lastTap < DOUBLE_TAP) { p.cmd.salvo = 1; this.input.lastTap = 0; }
+      else { p.cmd.fire = 1; this.input.lastTap = now; }
+      if (!p.fc.canFire) Sound.play('deny');
+    }
+    craftKey(e) {
+      const c = e.code;
+      if (c === 'KeyW' || c === 'ArrowUp') { this.stepTelegraph(1); return true; }
+      if (c === 'KeyS' || c === 'ArrowDown') { this.stepTelegraph(-1); return true; }
+      if (c === 'KeyX') { this.setRudder(0, true); return true; }
+      if (c === 'Space') { e.preventDefault(); this.tapFire(); return true; }
+      if (c === 'KeyT') { this.command('torp'); return true; }
+      if (c === 'KeyR') { this.command('special'); return true; }
+      if (c === 'KeyZ' || c === 'KeyV') { this.toggleScope(); return true; }
+      if (c === 'KeyQ') { this.cam.aimYaw = wrapA(this.cam.aimYaw - 0.15); return true; }
+      if (c === 'KeyE') { this.cam.aimYaw = wrapA(this.cam.aimYaw + 0.15); return true; }
+      return false;
     }
     cycleCam() { this.cam.mode = (this.cam.mode + 1) % 3; Sound.play('click'); }
     cycleTarget() {
@@ -4239,9 +4553,15 @@ const Battle = (() => {
       if (!this.paused) {
         if (!this.over && !p.sinking) {
           const k = I.keys;
-          if (k.KeyW || k.ArrowUp) I.throttle = clamp(I.throttle + dt * 0.8, -0.4, 1);
-          if (k.KeyS || k.ArrowDown) I.throttle = clamp(I.throttle - dt * 0.8, -0.4, 1);
-          if (!I.joy) I.rudder = ((k.KeyD || k.ArrowRight) ? 1 : 0) - ((k.KeyA || k.ArrowLeft) ? 1 : 0);
+          if (this.craft) {
+            // A/D move the rudder and it stays where you leave it (X centres)
+            const dr = ((k.KeyD || k.ArrowRight) ? 1 : 0) - ((k.KeyA || k.ArrowLeft) ? 1 : 0);
+            if (dr) this.setRudder(I.rudder + dr * dt * 1.4);
+          } else {
+            if (k.KeyW || k.ArrowUp) I.throttle = clamp(I.throttle + dt * 0.8, -0.4, 1);
+            if (k.KeyS || k.ArrowDown) I.throttle = clamp(I.throttle - dt * 0.8, -0.4, 1);
+            if (!I.joy) I.rudder = ((k.KeyD || k.ArrowRight) ? 1 : 0) - ((k.KeyA || k.ArrowLeft) ? 1 : 0);
+          }
           p.throttle = I.throttle; p.rudder = I.rudder;
           if (p.target && (p.target.sinking || p.target.dead)) p.target = null;
         }
@@ -4289,6 +4609,7 @@ const Battle = (() => {
           if (e.ship === p && (e.kind === 'heavy' || e.kind === 'superheavy')) this.shake(e.kind === 'superheavy' ? 0.45 : 0.25);
           break;
         }
+        case 'salvo': if (e.ship === p) { this.flash('SALVO', `${e.guns} mount${e.guns > 1 ? 's' : ''}`); this.shake(0.6); this.app.haptic('heavy'); } break;
         case 'rocket': Sound.play('rocket', {x: e.x, y: e.y, vol: 0.5}); break;
         case 'rail': Sound.play('rail', {x: e.x0, y: e.y0}); if (e.ship === p) this.shake(0.35); break;
         case 'ciws': Sound.play('ciws', {x: e.x, y: e.y, vol: 0.5}); break;
@@ -4357,7 +4678,35 @@ const Battle = (() => {
     }
 
     // ---------------------------------------------------------- camera
+    // Third-person aiming camera: it sits behind the ship along the aim bearing and looks at the aim point,
+    // so the centre of the screen is always exactly where the main battery will fire.
+    updateCraftCamera(dt) {
+      const p = this.player, c = this.camera, cam = this.cam;
+      if (!p.dead) { cam.x += (p.x - cam.x) * Math.min(1, dt * 6); cam.y += (p.y - cam.y) * Math.min(1, dt * 6); }
+      const [fx, fy] = fwd(cam.aimYaw), R = cam.range;
+      const ax = cam.x + fx * R, ay = cam.y + fy * R;
+      let px, py, ph;
+      if (cam.scope) { px = cam.x - fx * 10; py = cam.y - fy * 10; ph = 34; }
+      else {
+        const back = cam.dist * 0.55 + 40;
+        px = cam.x - fx * back; py = cam.y - fy * back; ph = 26 + back * 0.32 + R * 0.05;
+      }
+      if (cam.mode === 1) { ph = 520; px = cam.x - fx * 60; py = cam.y - fy * 60; }  // tactical view
+      c.position.set(px, ph, py);
+      const wh = Gfx.waveH(px, py, this.t); if (c.position.y < wh + 5) c.position.y = wh + 5;
+      const fov = cam.scope ? 14 : 50;
+      if (Math.abs(c.fov - fov) > 0.05) { c.fov += (fov - c.fov) * Math.min(1, dt * 10); c.updateProjectionMatrix(); this.onPixelRatio(); }
+      c.lookAt(ax, 0, ay);
+      if (!p.sinking && !p.dead) p.aim = {x: ax, y: ay};
+      if (cam.shake > 0) {
+        const k = cam.shake * cam.shake * (cam.scope ? 0.6 : 3);
+        c.position.x += (Math.random() - .5) * k; c.position.y += (Math.random() - .5) * k; c.position.z += (Math.random() - .5) * k;
+        cam.shake = Math.max(0, cam.shake - dt * 2.5);
+      }
+      Sound.setListener(cam.x, cam.y, cam.aimYaw, clamp(cam.dist / 300, 0.8, 2));
+    }
     updateCamera(dt) {
+      if (this.craft) return this.updateCraftCamera(dt);
       const p = this.player, c = this.camera, cam = this.cam;
       if (!p.dead) { cam.x += (p.x - cam.x) * Math.min(1, dt * 4); cam.y += (p.y - cam.y) * Math.min(1, dt * 4); }
       let pitch = cam.pitch, dist = cam.dist * (this.W < this.H ? 1.4 : 1);
@@ -4390,8 +4739,11 @@ const Battle = (() => {
     flash(title, sub) { this.app.ui.flash(title, sub); }
     showHint() {
       const h = $('hint');
-      h.textContent = Gfx.IS_TOUCH ? 'Left side: steer & throttle · Right side: look · tap an enemy to focus fire'
-                                   : 'W/S throttle · A/D rudder · drag to look · Tab or click to target · F smoke · C camera';
+      h.textContent = this.craft
+        ? (Gfx.IS_TOUCH ? 'Swipe to aim (up/down sets range) · tap to fire, double-tap for a full salvo · rudder bottom-left, telegraph bottom-right'
+                        : 'Drag to aim, wheel sets range · click or Space fires, double for a salvo · W/S telegraph · A/D rudder, X centres · T torpedo · R missile/air · Z scope')
+        : (Gfx.IS_TOUCH ? 'Left side: steer & throttle · Right side: look · tap an enemy to focus fire'
+                        : 'W/S throttle · A/D rudder · drag to look · Tab or click to target · F smoke · C camera');
       h.style.opacity = 1; clearTimeout(this.hintTimer); this.hintTimer = setTimeout(() => { h.style.opacity = 0; }, 7000);
     }
     buildWeaponBar() {
@@ -4438,6 +4790,14 @@ const Battle = (() => {
         sl.num.textContent = alive;
         sl.bar.style.width = (alive ? ready * 100 : 0) + '%';
         sl.el.classList.toggle('dead', !alive);
+      }
+      if (this.craft) {
+        const fc = p.fc;
+        $('bTorp').textContent = `TORP ${fc.torpReady || 0}/${fc.torps || 0}`;
+        $('bTorp').classList.toggle('ready', fc.torpReady > 0);
+        $('bSpecial').classList.toggle('ready', fc.specialReady > 0);
+        const s2 = $('bSmoke2'); s2.disabled = p.smokeCd > 0; s2.textContent = p.smokeCd > 0 ? Math.ceil(p.smokeCd) : 'SMK';
+        $('tgSpeed').textContent = (Math.abs(p.speed) * Design.KN).toFixed(1) + ' kn';
       }
       const sb = $('bSmoke');
       if (p.hasSmoke) { sb.style.display = ''; sb.disabled = p.smokeCd > 0; sb.textContent = p.smokeCd > 0 ? `Smoke ${Math.ceil(p.smokeCd)}` : 'Smoke'; }
@@ -4505,12 +4865,59 @@ const Battle = (() => {
           }
         }
       }
+      if (this.craft && !p.dead && !p.sinking && !this.over) this.drawReticle(c, W, H);
       const j = this.input.joy;
       if (j) {
         c.strokeStyle = 'rgba(220,232,240,.4)'; c.lineWidth = 2; c.beginPath(); c.arc(j.ox, j.oy, 60, 0, TAU); c.stroke();
         const dx = clamp(j.x - j.ox, -60, 60), dy = clamp(j.y - j.oy, -60, 60);
         c.fillStyle = 'rgba(224,180,90,.65)'; c.beginPath(); c.arc(j.ox + dx, j.oy + dy, 22, 0, TAU); c.fill();
       }
+    }
+
+    // Centre reticle: green when a main mount can fire, yellow when in range but none bear/are loaded, red out of range.
+    drawReticle(c, W, H) {
+      const p = this.player, fc = p.fc, cx = W / 2, cy = H / 2, cam = this.cam;
+      const col = fc.canFire > 0 ? '#5fd38a' : fc.inRange ? '#e0b45a' : '#ff5a4a';
+      const r = cam.scope ? 34 : 24;
+      c.save();
+      c.lineWidth = 2; c.strokeStyle = col; c.shadowColor = 'rgba(0,0,0,.6)'; c.shadowBlur = 4;
+      c.beginPath(); c.arc(cx, cy, r, 0, TAU); c.stroke();
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { c.beginPath(); c.moveTo(cx + dx * (r + 4), cy + dy * (r + 4)); c.lineTo(cx + dx * (r + 14), cy + dy * (r + 14)); c.stroke(); }
+      c.fillStyle = col; c.beginPath(); c.arc(cx, cy, 2, 0, TAU); c.fill();
+      if (fc.main && fc.reload > 0 && fc.canFire === 0) { // reload arc for the quickest mount
+        c.lineWidth = 3; c.strokeStyle = 'rgba(255,255,255,.7)';
+        c.beginPath(); c.arc(cx, cy, r + 6, -Math.PI / 2, -Math.PI / 2 + TAU * (1 - fc.reload)); c.stroke();
+      }
+      // mount pips: green can fire, yellow loaded but not bearing, grey reloading
+      const n = fc.mounts.length, pw = 9;
+      fc.mounts.forEach((m, i) => { c.fillStyle = m === 2 ? '#5fd38a' : m === 1 ? '#e0b45a' : 'rgba(200,210,220,.35)'; c.fillRect(cx - n * pw / 2 + i * pw + 1, cy + r + 20, pw - 3, 5); });
+      c.shadowBlur = 0;
+      c.font = '600 12px ui-monospace,menlo,monospace'; c.textAlign = 'center'; c.fillStyle = col;
+      c.fillText(`${Util.fmtNum(cam.range)} m${fc.inRange ? '' : ' · OUT OF RANGE'}`, cx, cy + r + 40);
+      // lead pip (aim assist): where the enemy nearest the reticle will be when a shell arrives
+      if (this.cfg.settings.aimAssist !== false && p.mainType) {
+        const W2 = Data.PARTS[p.mainType].weapon;
+        let best = null, bd = 220;
+        for (const s of this.world.ships) {
+          if (s.team === 0 || s.sinking) continue;
+          const pr = this.project(s.x, 4, s.y); if (pr.behind) continue;
+          const d = Math.hypot(pr.x - cx, pr.y - cy); if (d < bd) { bd = d; best = s; }
+        }
+        if (best && W2.speed) {
+          const T = Math.hypot(best.x - p.x, best.y - p.y) / W2.speed;
+          const lp = this.project(best.x + best.vx * T, 4, best.y + best.vy * T);
+          if (!lp.behind) {
+            c.strokeStyle = 'rgba(255,255,255,.85)'; c.lineWidth = 1.5;
+            c.beginPath(); c.moveTo(lp.x, lp.y - 8); c.lineTo(lp.x + 8, lp.y); c.lineTo(lp.x, lp.y + 8); c.lineTo(lp.x - 8, lp.y); c.closePath(); c.stroke();
+          }
+        }
+      }
+      if (cam.scope) { // telescope vignette
+        const g = c.createRadialGradient(cx, cy, Math.min(W, H) * 0.32, cx, cy, Math.max(W, H) * 0.62);
+        g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,.85)');
+        c.fillStyle = g; c.fillRect(0, 0, W, H);
+      }
+      c.restore();
     }
 
     dispose() {
@@ -4669,10 +5076,10 @@ const UI = (() => {
   }
 
   // ---------------------------------------------------------------- shipyard editor
-  const yardState = {ctx: {mode: 'free'}, tool: 'hull', mirror: true, erase: false, hist: new Design.History()};
+  const yardState = {ctx: {mode: 'free'}, tool: 'hull', mirror: true, erase: false, move: false, src: -1, hist: new Design.History()};
   function openYard(ctx) {
     yardState.ctx = ctx;
-    yardState.hist.clear();
+    yardState.hist.clear(); yardState.src = -1;
     const p = app.profile;
     const dock = Progress.dock(p);
     if (p.design.w !== dock.w || p.design.h !== dock.h) p.design = Design.resize(p.design, dock.w, dock.h);
@@ -4699,7 +5106,7 @@ const UI = (() => {
       b.insertAdjacentHTML('beforeend', `<span>${P.name}</span><span class="c">${P.cost}</span>`);
       b.onclick = () => {
         if (!ok) { const st = Progress.partStatus(p, t); toast(st.state === 'locked' ? `${P.name}: reach operation ${st.op + 1}, then buy in the Armory` : `${P.name}: buy it in the Armory (${cr(st.price)})`); Sound.play('deny'); return; }
-        yardState.tool = t; yardState.erase = false; $('tErase').classList.remove('on'); Sound.play('click'); buildPalette();
+        yardState.tool = t; yardState.erase = false; $('tErase').classList.remove('on'); if (yardState.move) setMove(false); Sound.play('click'); buildPalette();
       };
       el.appendChild(b);
     }
@@ -4728,6 +5135,8 @@ const UI = (() => {
     const margin = a.buoy > 0 ? (a.buoy - a.mass) / a.buoy : 0;
     $('sMass').style.color = margin < 0 ? 'var(--bad)' : margin < 0.15 ? 'var(--brass)' : '';
     $('sSpeed').textContent = (a.speed * Design.KN).toFixed(1) + ' kn';
+    $('sTrans').textContent = a.thrust ? Math.round(a.trans * 100) + '%' : '—';
+    $('sTrans').style.color = a.trans < 0.97 ? 'var(--brass)' : '';
     $('sTurn').textContent = (a.turn * 180 / Math.PI).toFixed(0) + '°/s';
     $('sDps').textContent = a.dps.toFixed(0) + ' dps';
     $('sRange').textContent = a.range ? Math.round(a.range) : '—';
@@ -4744,6 +5153,7 @@ const UI = (() => {
   }
   function paint(i, eraseOverride) {
     if (i < 0) return;
+    if (yardState.move) return moveTap(i);
     const p = app.profile, d = p.design, c = i % d.w, r = (i / d.w) | 0;
     const t = (yardState.erase || eraseOverride) ? null : yardState.tool;
     if (t && !Progress.unlocked(p).has(t)) return;
@@ -4754,6 +5164,57 @@ const UI = (() => {
     app.save(); refreshDesign();
     Sound.play(t ? 'place' : 'erase');
     app.haptic('light');
+  }
+
+  // Move tool (Warship Craft): tap a part to pick it up, tap an empty cell to drop it. With Mirror on,
+  // the mirrored twin moves with it.
+  function moveTap(i) {
+    const p = app.profile, d = p.design, Y = app.yard;
+    if (yardState.src < 0 || yardState.src === i) {
+      yardState.src = d.cells[i] && yardState.src !== i ? i : -1;
+      Y.markSource(yardState.src, yardState.mirror); Sound.play('click'); return;
+    }
+    const s = yardState.src, t = d.cells[s];
+    if (d.cells[i]) { yardState.src = i; Y.markSource(i, yardState.mirror); Sound.play('click'); return; }
+    const test = Design.clone(d), w = d.w, mir = j => j - j % w + (w - 1 - j % w);
+    const pairs = [[s, i]];
+    if (yardState.mirror && t !== 'bridge' && mir(s) !== s && d.cells[mir(s)] === t && mir(i) !== i) pairs.push([mir(s), mir(i)]);
+    for (const [a] of pairs) test.cells[a] = null;
+    for (const [, b] of pairs) { if (test.cells[b]) { toast('Destination is occupied'); Sound.play('deny'); return; } test.cells[b] = t; }
+    yardState.hist.push(d); p.design = test; yardState.src = -1; Y.markSource(-1);
+    app.save(); refreshDesign(); Sound.play('place'); app.haptic('light');
+  }
+  function setMove(on) {
+    yardState.move = on; yardState.src = -1; app.yard.markSource(-1);
+    $('tMove').classList.toggle('on', on);
+    if (on && yardState.erase) { yardState.erase = false; $('tErase').classList.remove('on'); buildPalette(); }
+  }
+
+  // Bare hulls: the outline of a real ship in plain Hull blocks, to build on (free, no blueprint needed).
+  const HULLS = [['goldenhind', 'Galleon'], ['fletcher', 'Destroyer'], ['belfast', 'Light cruiser'], ['prinzeugen', 'Heavy cruiser'],
+    ['bismarck', 'Battleship'], ['enterprise', 'Fleet carrier'], ['nimitz', 'Supercarrier']];
+  function openHulls() {
+    const p = app.profile, dock = Progress.dock(p);
+    $('sheetBody').innerHTML = `<h2>Bare hulls</h2><p class="mute small" style="margin:4px 0 10px">A historical hull outline in plain Hull blocks. Add a bridge, engines and guns yourself. Replaces your current design (undo brings it back).</p>
+      <div class="bps" id="bpList"></div><div class="btns" style="flex-direction:row"><button id="bpClose">Close</button></div>`;
+    const list = $('bpList');
+    for (const [id, label] of HULLS) {
+      const F = Data.FAMOUS[id]; if (!F) continue;
+      const rows = F.rows.map(r => r.replace(/[^.]/g, 'H')), d = Design.fromRows(rows, rows[0].length, rows.length);
+      const fits = d.w <= dock.w && d.h <= dock.h, a = Design.analyze(d);
+      const el = document.createElement('div'); el.className = 'bp';
+      el.innerHTML = `<div class="bpTxt"><b>${label}</b> <span class="mute small">after ${F.name}</span><div class="pf"></div>
+        <span class="mono small">${d.w}×${d.h} · ${a.n} blocks · cost ${a.cost} · float ${a.buoy.toFixed(0)}</span></div>
+        <button class="${fits ? 'primary' : ''}" ${fits ? '' : 'disabled'}>${fits ? 'Use' : `Needs ${d.w}×${d.h} dock`}</button>`;
+      el.querySelector('.pf').appendChild(profileCanvas(d, 220, 40));
+      el.querySelector('button').onclick = () => {
+        edit(() => { p.design = Design.fromRows(rows, dock.w, dock.h); });
+        $('sheet').classList.remove('on'); toast(`${label} hull laid down`); Sound.play('place');
+      };
+      list.appendChild(el);
+    }
+    $('sheet').classList.add('on');
+    $('bpClose').onclick = () => $('sheet').classList.remove('on');
   }
 
   // pointer: paint with one finger / left mouse, orbit with right mouse or two fingers, pinch or wheel to zoom
@@ -4783,7 +5244,7 @@ const UI = (() => {
         Y.yaw -= dx * 0.004; Y.pitch = Util.clamp(Y.pitch + dy * 0.003, 0.12, 1.5);
         const d = Math.hypot(a.x - b.x, a.y - b.y); if (yp.pinch0 > 0) { Y.dist = Util.clamp(yp.dist0 * yp.pinch0 / d, 90, 1100); Y.userZoom = true; }
       } else if (yp.mode === 'pending' && Math.hypot(e.clientX - yp.start.x, e.clientY - yp.start.y) > 8) { yp.mode = 'paint'; yp.last = -1; }
-      if (yp.mode === 'paint') { const i = Y.pick(e.clientX, e.clientY); Y.showGhost(i, yardState.mirror, yardState.erase, yardState.tool); if (i !== yp.last) { yp.last = i; paint(i, e.shiftKey); } }
+      if (yp.mode === 'paint' && !yardState.move) { const i = Y.pick(e.clientX, e.clientY); Y.showGhost(i, yardState.mirror, yardState.erase, yardState.tool); if (i !== yp.last) { yp.last = i; paint(i, e.shiftKey); } }
     });
     const up = e => {
       if (!yp.ptrs.has(e.pointerId)) return;
@@ -4801,6 +5262,8 @@ const UI = (() => {
       if ((e.metaKey || e.ctrlKey) && e.code === 'KeyZ') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
       else if (e.code === 'KeyM') $('tMirror').onclick();
       else if (e.code === 'KeyE') $('tErase').onclick();
+      else if (e.code === 'KeyG') $('tMove').onclick();
+      else if (e.code === 'Escape' && yardState.move) setMove(false);
     });
   }
   function undo() { const d = yardState.hist.undo(app.profile.design); if (d) { app.profile.design = d; app.save(); refreshDesign(); Sound.play('click'); } }
@@ -4959,6 +5422,11 @@ const UI = (() => {
     seg('setQual', [['auto', 'Auto'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High']], s.quality === 'phone' ? 'auto' : s.quality, k => { if (k === s.quality) return; s.quality = k; app.save(); location.reload(); });
     $('setVol').value = s.volume; $('setVol').oninput = e => { s.volume = +e.target.value; Sound.setVolume(s.volume); app.save(); };
     $('setMusic').checked = s.music; $('setMusic').onchange = e => { s.music = e.target.checked; Sound.setMusic(s.music); app.save(); };
+    seg('setCtrl', [['craft', 'Warship Craft'], ['simple', 'Simple']], s.controls || 'craft', k => { s.controls = k; app.save(); renderSettings(); });
+    $('setCtrlDesc').textContent = (s.controls || 'craft') === 'craft'
+      ? 'Rudder and engine telegraph hold their setting. Swipe to aim the main battery, tap to fire, double-tap for a full salvo. Secondaries and AA fire on their own.'
+      : 'One-thumb joystick for rudder and throttle. Every weapon aims and fires automatically.';
+    $('setAssist').checked = s.aimAssist !== false; $('setAssist').onchange = e => { s.aimAssist = e.target.checked; app.save(); };
     $('setShake').checked = s.shake; $('setShake').onchange = e => { s.shake = e.target.checked; app.save(); };
     let armed = 0;
     $('setReset').textContent = 'Reset all progress';
@@ -5044,7 +5512,9 @@ const UI = (() => {
     $('yLaunch').onclick = () => { const c = yardState.ctx; if (c.mode === 'free') { show('sTitle'); refreshTitle(); return; } app.startBattle(c); };
     $('yUndo').onclick = undo; $('yRedo').onclick = redo;
     $('tMirror').onclick = () => { yardState.mirror = !yardState.mirror; $('tMirror').classList.toggle('on', yardState.mirror); app.yard.showGrid(true, yardState.mirror); Sound.play('click'); };
-    $('tErase').onclick = () => { yardState.erase = !yardState.erase; $('tErase').classList.toggle('on', yardState.erase); buildPalette(); Sound.play('click'); };
+    $('tErase').onclick = () => { yardState.erase = !yardState.erase; if (yardState.erase && yardState.move) setMove(false); $('tErase').classList.toggle('on', yardState.erase); buildPalette(); Sound.play('click'); };
+    $('tMove').onclick = () => { setMove(!yardState.move); Sound.play('click'); toast(yardState.move ? 'Move: tap a part, then tap where it goes' : 'Move off'); };
+    $('tHull').onclick = () => { Sound.play('click'); openHulls(); };
     let clearArm = 0;
     $('tClear').onclick = () => {
       const b = $('tClear');

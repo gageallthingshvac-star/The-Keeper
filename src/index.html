@@ -57,6 +57,7 @@
         <div class="stat"><span>Cost</span><b id="sCost">0</b></div>
         <div class="stat"><span>Mass / Float</span><b id="sMass">0</b></div>
         <div class="stat"><span>Speed</span><b id="sSpeed">0</b></div>
+        <div class="stat" title="Engines mirrored across the centreline run at full efficiency"><span>Transmission</span><b id="sTrans">—</b></div>
         <div class="stat"><span>Turn</span><b id="sTurn">0</b></div>
         <div class="stat"><span>Firepower</span><b id="sDps">0</b></div>
         <div class="stat"><span>Range</span><b id="sRange">0</b></div>
@@ -64,8 +65,8 @@
         <div id="warn"></div>
       </div>
       <div class="card tools">
-        <button id="tMirror" class="on">Mirror</button><button id="tErase">Erase</button>
-        <button id="tClear">Clear</button><button id="tStarter">Starter</button><button id="tBlue">Blueprints</button>
+        <button id="tMirror" class="on">Mirror</button><button id="tErase">Erase</button><button id="tMove">Move</button>
+        <button id="tClear">Clear</button><button id="tHull">Hulls</button><button id="tStarter">Starter</button><button id="tBlue">Blueprints</button>
         <span class="sep"></span>
         <span id="slots"></span>
       </div>
@@ -92,6 +93,8 @@
       <label class="rowline"><span>Volume</span><input type="range" id="setVol" min="0" max="1" step="0.05"></label>
       <label class="rowline"><span>Music</span><input type="checkbox" id="setMusic"></label>
     </div>
+    <div class="card"><h3>Controls</h3><div class="seg" id="setCtrl"></div><p class="mute small" id="setCtrlDesc"></p>
+      <label class="rowline"><span>Aim assist (lead marker)</span><input type="checkbox" id="setAssist"></label></div>
     <div class="card"><h3>Camera</h3><label class="rowline"><span>Screen shake</span><input type="checkbox" id="setShake"></label></div>
     <div class="card"><h3>Progress</h3><button id="setReset" class="danger">Reset all progress</button></div>
   </div>
@@ -128,6 +131,14 @@
   <div id="throttle"><i id="thrBar"></i><div class="zero" id="thrZero"></div></div>
   <div class="hudBR"><button id="bSmoke">Smoke</button><button id="bTarget">Target</button><canvas id="minimap"></canvas></div>
   <div id="weapons"></div>
+  <!-- Warship Craft controls -->
+  <div id="rudder" class="panel"><div class="rtrack"><i style="left:0"></i><i style="left:25%"></i><i class="mid" style="left:50%"></i><i style="left:75%"></i><i style="left:100%"></i><b id="rudKnob"></b></div><span id="rudLbl">Midships</span></div>
+  <div id="tgWrap"><div id="tgSpeed">0.0 kn</div><div id="telegraph" class="panel"></div></div>
+  <div id="fireCluster">
+    <button id="bScope" class="mini">SCOPE</button><button id="bSmoke2" class="mini">SMK</button>
+    <button id="bSpecial" class="mini">MSL</button><button id="bTorp" class="mini">TORP</button>
+    <button id="bFire">FIRE</button>
+  </div>
   <div id="hint"></div>
 </section>
 <div id="msg"><b></b><span></span></div>

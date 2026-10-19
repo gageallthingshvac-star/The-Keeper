@@ -10,6 +10,17 @@
 
 Play: open `irontide.html` in a browser (it is fully offline — three.js is inlined).
 
+### Controls (Warship Craft style, default; Settings → Controls → Simple for joystick + auto-fire)
+
+- **Engine telegraph** (bottom-right): FULL / ¾ / ½ / ¼ / STOP / ½ AST / FULL AST. Tap or drag; it holds. Keys W/S.
+- **Rudder** (bottom-left): drag; it holds its angle. Double-tap or X centres it. Keys A/D.
+- **Aim**: swipe the sea (desktop: drag) to train the main battery; up/down or the wheel sets range.
+  Reticle is green when a mount can fire, yellow when in range but not loaded or bearing, red when out of range.
+- **Fire**: tap fires one mount; double-tap fires a full salvo. TORP, MSL/RKT/AIR, SMK and SCOPE (telescope zoom) buttons.
+  Keys: Space, T, R, Z. Secondaries, AA and CIWS fire on their own.
+- **Shipyard**: Mirror, Erase, Move (tap a part, tap where it goes), Hulls (bare historical hull outlines).
+  Transmission efficiency: engines not mirrored across the centreline lose up to 15% thrust.
+
 ### Layout
 ```
 src/            game source, one module per concern

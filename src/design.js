@@ -87,6 +87,18 @@ const Design = (() => {
     return set;
   }
 
+  // Transmission efficiency (Warship Craft): engines that are not mirrored across the centreline
+  // lose up to 15% of their output. cells: part ids (or null) on a w-wide grid.
+  function transmission(cells, w) {
+    let all = 0, sym = 0;
+    cells.forEach((t, i) => {
+      const th = t && PARTS[t].thrust; if (!th) return;
+      const c = i % w, m = i - c + (w - 1 - c), mt = cells[m];
+      all += th; if (m === i || (mt && PARTS[mt].thrust === th)) sym += th;
+    });
+    return all ? 0.85 + 0.15 * sym / all : 1;
+  }
+
   // mods: optional upgrade multipliers (see Progress.mods)
   function analyze(d, mods = {}) {
     let cost = 0, mass = 0, buoy = 0, thrust = 0, rud = 0, dps = 0, range = 0, n = 0, bridges = 0, hp = 0;
@@ -107,8 +119,9 @@ const Design = (() => {
         range = Math.max(range, W.type === 'air' ? 0 : W.range * rangeMul);
       }
     }
-    const conn = connected(d);
-    return {cost, mass, buoy, thrust, rud, dps, range, n, hp, bridges, cnt, conn, loose: n - conn.size,
+    const conn = connected(d), trans = transmission(d.cells, d.w);
+    thrust *= trans;
+    return {trans, cost, mass, buoy, thrust, rud, dps, range, n, hp, bridges, cnt, conn, loose: n - conn.size,
             speed: calcSpeed(mass, thrust), turn: calcTurn(mass, rud)};
   }
 
@@ -136,6 +149,6 @@ const Design = (() => {
     clear() { this.past.length = 0; this.future.length = 0; }
   }
 
-  return {KN, create, clone, at, fromRows, resize, bounds, valid, place, connected, analyze, problems,
+  return {KN, create, clone, at, fromRows, resize, bounds, valid, place, connected, analyze, problems, transmission,
           calcSpeed, calcTurn, History};
 })();

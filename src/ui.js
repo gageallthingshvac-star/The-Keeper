@@ -134,10 +134,10 @@ const UI = (() => {
   }
 
   // ---------------------------------------------------------------- shipyard editor
-  const yardState = {ctx: {mode: 'free'}, tool: 'hull', mirror: true, erase: false, hist: new Design.History()};
+  const yardState = {ctx: {mode: 'free'}, tool: 'hull', mirror: true, erase: false, move: false, src: -1, hist: new Design.History()};
   function openYard(ctx) {
     yardState.ctx = ctx;
-    yardState.hist.clear();
+    yardState.hist.clear(); yardState.src = -1;
     const p = app.profile;
     const dock = Progress.dock(p);
     if (p.design.w !== dock.w || p.design.h !== dock.h) p.design = Design.resize(p.design, dock.w, dock.h);
@@ -164,7 +164,7 @@ const UI = (() => {
       b.insertAdjacentHTML('beforeend', `<span>${P.name}</span><span class="c">${P.cost}</span>`);
       b.onclick = () => {
         if (!ok) { const st = Progress.partStatus(p, t); toast(st.state === 'locked' ? `${P.name}: reach operation ${st.op + 1}, then buy in the Armory` : `${P.name}: buy it in the Armory (${cr(st.price)})`); Sound.play('deny'); return; }
-        yardState.tool = t; yardState.erase = false; $('tErase').classList.remove('on'); Sound.play('click'); buildPalette();
+        yardState.tool = t; yardState.erase = false; $('tErase').classList.remove('on'); if (yardState.move) setMove(false); Sound.play('click'); buildPalette();
       };
       el.appendChild(b);
     }
@@ -193,6 +193,8 @@ const UI = (() => {
     const margin = a.buoy > 0 ? (a.buoy - a.mass) / a.buoy : 0;
     $('sMass').style.color = margin < 0 ? 'var(--bad)' : margin < 0.15 ? 'var(--brass)' : '';
     $('sSpeed').textContent = (a.speed * Design.KN).toFixed(1) + ' kn';
+    $('sTrans').textContent = a.thrust ? Math.round(a.trans * 100) + '%' : '—';
+    $('sTrans').style.color = a.trans < 0.97 ? 'var(--brass)' : '';
     $('sTurn').textContent = (a.turn * 180 / Math.PI).toFixed(0) + '°/s';
     $('sDps').textContent = a.dps.toFixed(0) + ' dps';
     $('sRange').textContent = a.range ? Math.round(a.range) : '—';
@@ -209,6 +211,7 @@ const UI = (() => {
   }
   function paint(i, eraseOverride) {
     if (i < 0) return;
+    if (yardState.move) return moveTap(i);
     const p = app.profile, d = p.design, c = i % d.w, r = (i / d.w) | 0;
     const t = (yardState.erase || eraseOverride) ? null : yardState.tool;
     if (t && !Progress.unlocked(p).has(t)) return;
@@ -219,6 +222,57 @@ const UI = (() => {
     app.save(); refreshDesign();
     Sound.play(t ? 'place' : 'erase');
     app.haptic('light');
+  }
+
+  // Move tool (Warship Craft): tap a part to pick it up, tap an empty cell to drop it. With Mirror on,
+  // the mirrored twin moves with it.
+  function moveTap(i) {
+    const p = app.profile, d = p.design, Y = app.yard;
+    if (yardState.src < 0 || yardState.src === i) {
+      yardState.src = d.cells[i] && yardState.src !== i ? i : -1;
+      Y.markSource(yardState.src, yardState.mirror); Sound.play('click'); return;
+    }
+    const s = yardState.src, t = d.cells[s];
+    if (d.cells[i]) { yardState.src = i; Y.markSource(i, yardState.mirror); Sound.play('click'); return; }
+    const test = Design.clone(d), w = d.w, mir = j => j - j % w + (w - 1 - j % w);
+    const pairs = [[s, i]];
+    if (yardState.mirror && t !== 'bridge' && mir(s) !== s && d.cells[mir(s)] === t && mir(i) !== i) pairs.push([mir(s), mir(i)]);
+    for (const [a] of pairs) test.cells[a] = null;
+    for (const [, b] of pairs) { if (test.cells[b]) { toast('Destination is occupied'); Sound.play('deny'); return; } test.cells[b] = t; }
+    yardState.hist.push(d); p.design = test; yardState.src = -1; Y.markSource(-1);
+    app.save(); refreshDesign(); Sound.play('place'); app.haptic('light');
+  }
+  function setMove(on) {
+    yardState.move = on; yardState.src = -1; app.yard.markSource(-1);
+    $('tMove').classList.toggle('on', on);
+    if (on && yardState.erase) { yardState.erase = false; $('tErase').classList.remove('on'); buildPalette(); }
+  }
+
+  // Bare hulls: the outline of a real ship in plain Hull blocks, to build on (free, no blueprint needed).
+  const HULLS = [['goldenhind', 'Galleon'], ['fletcher', 'Destroyer'], ['belfast', 'Light cruiser'], ['prinzeugen', 'Heavy cruiser'],
+    ['bismarck', 'Battleship'], ['enterprise', 'Fleet carrier'], ['nimitz', 'Supercarrier']];
+  function openHulls() {
+    const p = app.profile, dock = Progress.dock(p);
+    $('sheetBody').innerHTML = `<h2>Bare hulls</h2><p class="mute small" style="margin:4px 0 10px">A historical hull outline in plain Hull blocks. Add a bridge, engines and guns yourself. Replaces your current design (undo brings it back).</p>
+      <div class="bps" id="bpList"></div><div class="btns" style="flex-direction:row"><button id="bpClose">Close</button></div>`;
+    const list = $('bpList');
+    for (const [id, label] of HULLS) {
+      const F = Data.FAMOUS[id]; if (!F) continue;
+      const rows = F.rows.map(r => r.replace(/[^.]/g, 'H')), d = Design.fromRows(rows, rows[0].length, rows.length);
+      const fits = d.w <= dock.w && d.h <= dock.h, a = Design.analyze(d);
+      const el = document.createElement('div'); el.className = 'bp';
+      el.innerHTML = `<div class="bpTxt"><b>${label}</b> <span class="mute small">after ${F.name}</span><div class="pf"></div>
+        <span class="mono small">${d.w}×${d.h} · ${a.n} blocks · cost ${a.cost} · float ${a.buoy.toFixed(0)}</span></div>
+        <button class="${fits ? 'primary' : ''}" ${fits ? '' : 'disabled'}>${fits ? 'Use' : `Needs ${d.w}×${d.h} dock`}</button>`;
+      el.querySelector('.pf').appendChild(profileCanvas(d, 220, 40));
+      el.querySelector('button').onclick = () => {
+        edit(() => { p.design = Design.fromRows(rows, dock.w, dock.h); });
+        $('sheet').classList.remove('on'); toast(`${label} hull laid down`); Sound.play('place');
+      };
+      list.appendChild(el);
+    }
+    $('sheet').classList.add('on');
+    $('bpClose').onclick = () => $('sheet').classList.remove('on');
   }
 
   // pointer: paint with one finger / left mouse, orbit with right mouse or two fingers, pinch or wheel to zoom
@@ -248,7 +302,7 @@ const UI = (() => {
         Y.yaw -= dx * 0.004; Y.pitch = Util.clamp(Y.pitch + dy * 0.003, 0.12, 1.5);
         const d = Math.hypot(a.x - b.x, a.y - b.y); if (yp.pinch0 > 0) { Y.dist = Util.clamp(yp.dist0 * yp.pinch0 / d, 90, 1100); Y.userZoom = true; }
       } else if (yp.mode === 'pending' && Math.hypot(e.clientX - yp.start.x, e.clientY - yp.start.y) > 8) { yp.mode = 'paint'; yp.last = -1; }
-      if (yp.mode === 'paint') { const i = Y.pick(e.clientX, e.clientY); Y.showGhost(i, yardState.mirror, yardState.erase, yardState.tool); if (i !== yp.last) { yp.last = i; paint(i, e.shiftKey); } }
+      if (yp.mode === 'paint' && !yardState.move) { const i = Y.pick(e.clientX, e.clientY); Y.showGhost(i, yardState.mirror, yardState.erase, yardState.tool); if (i !== yp.last) { yp.last = i; paint(i, e.shiftKey); } }
     });
     const up = e => {
       if (!yp.ptrs.has(e.pointerId)) return;
@@ -266,6 +320,8 @@ const UI = (() => {
       if ((e.metaKey || e.ctrlKey) && e.code === 'KeyZ') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
       else if (e.code === 'KeyM') $('tMirror').onclick();
       else if (e.code === 'KeyE') $('tErase').onclick();
+      else if (e.code === 'KeyG') $('tMove').onclick();
+      else if (e.code === 'Escape' && yardState.move) setMove(false);
     });
   }
   function undo() { const d = yardState.hist.undo(app.profile.design); if (d) { app.profile.design = d; app.save(); refreshDesign(); Sound.play('click'); } }
@@ -424,6 +480,11 @@ const UI = (() => {
     seg('setQual', [['auto', 'Auto'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High']], s.quality === 'phone' ? 'auto' : s.quality, k => { if (k === s.quality) return; s.quality = k; app.save(); location.reload(); });
     $('setVol').value = s.volume; $('setVol').oninput = e => { s.volume = +e.target.value; Sound.setVolume(s.volume); app.save(); };
     $('setMusic').checked = s.music; $('setMusic').onchange = e => { s.music = e.target.checked; Sound.setMusic(s.music); app.save(); };
+    seg('setCtrl', [['craft', 'Warship Craft'], ['simple', 'Simple']], s.controls || 'craft', k => { s.controls = k; app.save(); renderSettings(); });
+    $('setCtrlDesc').textContent = (s.controls || 'craft') === 'craft'
+      ? 'Rudder and engine telegraph hold their setting. Swipe to aim the main battery, tap to fire, double-tap for a full salvo. Secondaries and AA fire on their own.'
+      : 'One-thumb joystick for rudder and throttle. Every weapon aims and fires automatically.';
+    $('setAssist').checked = s.aimAssist !== false; $('setAssist').onchange = e => { s.aimAssist = e.target.checked; app.save(); };
     $('setShake').checked = s.shake; $('setShake').onchange = e => { s.shake = e.target.checked; app.save(); };
     let armed = 0;
     $('setReset').textContent = 'Reset all progress';
@@ -509,7 +570,9 @@ const UI = (() => {
     $('yLaunch').onclick = () => { const c = yardState.ctx; if (c.mode === 'free') { show('sTitle'); refreshTitle(); return; } app.startBattle(c); };
     $('yUndo').onclick = undo; $('yRedo').onclick = redo;
     $('tMirror').onclick = () => { yardState.mirror = !yardState.mirror; $('tMirror').classList.toggle('on', yardState.mirror); app.yard.showGrid(true, yardState.mirror); Sound.play('click'); };
-    $('tErase').onclick = () => { yardState.erase = !yardState.erase; $('tErase').classList.toggle('on', yardState.erase); buildPalette(); Sound.play('click'); };
+    $('tErase').onclick = () => { yardState.erase = !yardState.erase; if (yardState.erase && yardState.move) setMove(false); $('tErase').classList.toggle('on', yardState.erase); buildPalette(); Sound.play('click'); };
+    $('tMove').onclick = () => { setMove(!yardState.move); Sound.play('click'); toast(yardState.move ? 'Move: tap a part, then tap where it goes' : 'Move off'); };
+    $('tHull').onclick = () => { Sound.play('click'); openHulls(); };
     let clearArm = 0;
     $('tClear').onclick = () => {
       const b = $('tClear');

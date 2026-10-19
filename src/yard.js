@@ -101,6 +101,16 @@ const Yard = (() => {
       if (mirror && mc !== c && part !== 'bridge') place(this.ghosts[1], mc);
     }
 
+    // Move tool: outline the picked-up part (and its mirror twin).
+    markSource(i, mirror) {
+      if (!this.marks) this.marks = [0, 1].map(() => { const m = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(S * 1.04, 9, S * 1.04).translate(0, DECK - 3.5, 0)), new THREE.LineBasicMaterial({color: '#7fd6ff'})); m.visible = false; this.env.scene.add(m); return m; });
+      for (const m of this.marks) m.visible = false;
+      const d = this.design; if (!d || i < 0) return;
+      const c = i % d.w, r = (i / d.w) | 0, mc = d.w - 1 - c;
+      this.marks[0].visible = true; this.marks[0].position.set(this.cellX(c), 0.3, this.cellZ(r));
+      if (mirror && mc !== c && d.cells[mc + r * d.w] === d.cells[i]) { this.marks[1].visible = true; this.marks[1].position.set(this.cellX(mc), 0.3, this.cellZ(r)); }
+    }
+
     resize(W, H) {
       this.renderer.setSize(W, H, false);
       this.camera.aspect = W / H; this.camera.updateProjectionMatrix();

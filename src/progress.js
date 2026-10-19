@@ -11,7 +11,7 @@ const Progress = (() => {
       blueprints: [],
       stars: OPS.map(() => 0), hardClears: OPS.map(() => false),
       endlessBest: 0, totalSunk: 0, battles: 0,
-      settings: {difficulty: 'medium', quality: 'auto', volume: 0.8, music: true, shake: true},
+      settings: {difficulty: 'medium', quality: 'auto', volume: 0.8, music: true, shake: true, controls: 'craft', aimAssist: true},
       design: Design.fromRows(STARTER, DOCKS[0].w, DOCKS[0].h),
       slots: [null, null, null],
       seen: {},

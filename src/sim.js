@@ -22,6 +22,11 @@ const Sim = (() => {
       this.mods = Object.assign({hp: 1, reload: 1, thrust: 1, spread: 1, repair: 1, fire: 1}, o.mods || {});
       this.prof = o.profile || PLAYER_PROFILE;
       this.brain = o.brain || null;
+      // Manual fire control (Warship Craft style): the player aims with the camera and fires on command.
+      this.manual = !!o.manual;
+      this.aim = null;                                    // {x, y} point on the water under the reticle
+      this.cmd = {fire: 0, salvo: 0, torp: 0, special: 0}; // pending commands, consumed by the next step
+      this.fc = {main: 0, ready: 0, bearing: 0, canFire: 0, inRange: false, reload: 0, mounts: []};
       this.target = null;
       this.w = design.w; this.h = design.h;
       this.livery = design.livery || o.livery || null;
@@ -70,12 +75,18 @@ const Sim = (() => {
       this.rangeMul = 1 + radars * PARTS.radar.util.range;
       this.spreadMul = (1 - radars * PARTS.radar.util.spread) * this.mods.spread;
       for (const b of this.weapons) { const W = PARTS[b.t].weapon; if (W.dmg && W.type !== 'air') range = Math.max(range, W.range * this.rangeMul); }
+      const cells = new Array(this.w * this.h).fill(null);
+      for (const b of this.blocks) if (b.alive) cells[b.c + b.r * this.w] = b.t;
+      this.trans = Design.transmission(cells, this.w); th *= this.trans;
       this.mass = m; this.buoy = bu; this.thrust = th; this.rudders = ru; this.count = n; this.range = range;
       this.maxSpeed = Design.calcSpeed(m, th); this.turnRate = Design.calcTurn(m, ru);
       this.armed = this.weapons.some(b => PARTS[b.t].weapon.dmg);
       this.hasAir = this.weapons.some(b => b.t === 'hangar');
       this.hasSmoke = this.utils.some(b => b.t === 'smoke');
       this.hasRepair = this.utils.some(b => b.t === 'repair');
+      // Main battery = the heaviest gun type still aboard; everything lighter is secondary and fires itself.
+      const MAIN_ORDER = ['superheavy', 'heavy', 'rail', 'gun', 'battery'];
+      this.mainType = MAIN_ORDER.find(t => this.weapons.some(b => b.t === t)) || null;
       if (!first && bu > 0) {
         const mm = this.moments();
         this.listRoll = clamp(-(mm.mx - this.m0.mx) / bu * 0.05, -0.4, 0.4);
@@ -150,6 +161,7 @@ const Sim = (() => {
         if (s.brain && !s.sinking) s.brain.update(this, s, dt);
         this.physics(s, dt);
         if (!s.sinking) { this.weapons(s, dt); this.utilities(s, dt); }
+        if (s.manual) this.manualEnd(s);
         this.fires(s, dt);
         s.recentDmg *= Math.exp(-dt * 0.5);
         // An enemy with nothing left to shoot with is abandoned by its crew.
@@ -205,12 +217,14 @@ const Sim = (() => {
     }
     weapons(s, dt) {
       const rng = this.rng;
+      if (s.manual) this.manualBegin(s);
       for (const w of s.weapons) {
         if (!w.alive) continue;
         const W = PARTS[w.t].weapon;
         w.cd -= dt;
         const [wx, wy] = s.pos(w);
 
+        if (s.manual && this.manualWeapon(s, w, W, wx, wy, dt)) continue;
         if (W.type === 'ciws' || W.type === 'aa') { this.pointDefense(s, w, W, wx, wy, dt); continue; }
         if (W.type === 'air') { this.hangar(s, w, W, wx, wy); continue; }
         if (W.type === 'broadside') { this.broadside(s, w, W, wx, wy, W.range * s.rangeMul, dt); continue; }
@@ -310,6 +324,115 @@ const Sim = (() => {
         dmg: W.dmg, splash: W.splash, team: s.team, owner: s, hp: 1});
       this.emit('rocket', {ship: s, block: w, x: wx, y: wy});
     }
+    // ---------------------------------------------------------- manual fire control
+    // Each step: turrets of the main battery slew toward the aim point; a mount can fire when it is loaded,
+    // bears on the aim point and the aim point is within range. Commands from the player:
+    //   fire    one tap — the next ready mount fires (rapid taps walk the fire)
+    //   salvo   double tap — every ready mount fires together, with tighter grouping
+    //   torp    every loaded tube that bears launches toward the aim point
+    //   special missiles, aircraft and rockets launch at the enemy nearest the reticle (or the locked target)
+    manualBegin(s) {
+      const fc = s.fc;
+      fc.main = 0; fc.ready = 0; fc.bearing = 0; fc.canFire = 0; fc.inRange = false; fc.reload = 1; fc.mounts.length = 0;
+      fc.torpReady = 0; fc.torps = 0; fc.specialReady = 0; fc.specials = 0;
+      s.fireDone = false;
+    }
+    manualWeapon(s, w, W, wx, wy, dt) {
+      const main = w.t === s.mainType, torp = W.type === 'torp', special = W.type === 'missile' || W.type === 'air' || W.type === 'rockets';
+      if (!main && !torp && !special) return false;          // secondaries, AA and CIWS stay automatic
+      const fc = s.fc, aim = s.aim, range = W.range * s.rangeMul;
+      const R = W.reload * s.prof.reload / s.mods.reload;
+      if (special) {
+        fc.specials++;
+        if (W.type === 'rockets' && w.salvo > 0) return false; // let the salvo finish through the normal path
+        if (w.cd <= 0) fc.specialReady++;
+        if (s.cmd.special && w.cd <= 0) {
+          const t = this.specialTarget(s, range);
+          if (W.type === 'rockets') {
+            if (aim && Math.hypot(aim.x - wx, aim.y - wy) <= range) {
+              w.cd = R; w.salvo = W.salvo; w.salvoT = 0; w.lockX = aim.x; w.lockY = aim.y; w.lockD = Math.hypot(aim.x - wx, aim.y - wy); w.lockT = t;
+              if (s === this.player) this.stats.shots++;
+              this.emit('fire', {kind: 'rockets', ship: s, block: w, x: wx, y: wy, ang: w.ang});
+            }
+          } else if (t) {
+            if (W.type === 'air') { w.cd = 0; s.target = t; this.hangar(s, w, W, wx, wy); }
+            else {
+              w.cd = R; const b = t.randomBlock();
+              this.missiles.push({x: wx, y: wy, h: DECK + 1.6, a: headingTo(t.x - wx, t.y - wy), speed: 25, max: W.speed, age: 0,
+                life: range / W.speed * 1.8, dmg: W.dmg, splash: W.splash, team: s.team, owner: s, tgt: t, b, hp: 3});
+              if (s === this.player) this.stats.shots++;
+              this.emit('fire', {kind: 'missile', ship: s, block: w, x: wx, y: wy, ang: w.ang});
+            }
+          }
+        }
+        return true;
+      }
+      if (!aim) { w.ang = turnToward(w.ang, s.a, 1.5 * dt); return true; }
+      const d = Math.hypot(aim.x - wx, aim.y - wy), desired = headingTo(aim.x - wx, aim.y - wy);
+      const inRange = d <= range;
+      if (torp) {
+        fc.torps++;
+        w.ang = turnToward(w.ang, desired, 2.5 * dt);
+        const bears = Math.abs(wrapA(desired - w.ang)) < 0.35;
+        if (w.cd <= 0 && bears) fc.torpReady++;
+        if (s.cmd.torp && w.cd <= 0 && bears) {
+          w.cd = R * this.rng.range(0.95, 1.05);
+          const a = desired + this.rng.gauss() * 0.03, [fx, fy] = fwd(a);
+          this.torps.push({x: wx + fx * 6, y: wy + fy * 6, vx: fx * W.speed, vy: fy * W.speed, a, life: range / W.speed,
+            dmg: W.dmg, splash: W.splash, team: s.team, owner: s});
+          if (s === this.player) this.stats.shots++;
+          this.emit('fire', {kind: 'torp', ship: s, block: w, x: wx + fx * 8, y: wy + fy * 8, ang: a});
+        }
+        return true;
+      }
+      // main battery
+      let bears;
+      if (W.type === 'broadside') {
+        const rel = Math.abs(wrapA(desired - s.a)); bears = Math.abs(rel - Math.PI / 2) < 0.7; w.ang = desired;
+      } else {
+        w.ang = turnToward(w.ang, desired, (w.t === 'superheavy' ? 1.0 : w.t === 'heavy' || w.t === 'rail' ? 1.4 : 3.5) * dt);
+        bears = Math.abs(wrapA(desired - w.ang)) < 0.06;
+      }
+      if (W.speed) { const T = d / W.speed, apex = SHELL_ARC * T * T + 2; w.elev += (Math.atan2(4 * apex, Math.max(1, d)) - w.elev) * Math.min(1, dt * 4); }
+      const ready = w.cd <= 0, can = ready && bears && inRange;
+      fc.main++; if (ready) fc.ready++; if (bears) fc.bearing++; if (can) fc.canFire++;
+      fc.inRange = fc.inRange || inRange;
+      fc.reload = Math.min(fc.reload, ready ? 0 : Math.max(0, w.cd / R));
+      fc.mounts.push(can ? 2 : ready ? 1 : 0);
+      w.canFire = can;
+      const fireNow = can && (s.cmd.salvo || (s.cmd.fire && !s.fireDone));
+      if (!fireNow) return true;
+      if (!s.cmd.salvo) s.fireDone = true;                     // single tap: one mount per tap
+      w.cd = R * this.rng.range(0.95, 1.08);
+      const grouping = s.cmd.salvo ? 0.7 : 1;
+      const sp = d * (W.spread || 0) * s.prof.acc * s.spreadMul * this.weather.spread * grouping * (this.inSmoke(aim.x, aim.y) ? 2.2 : 1);
+      const tx = aim.x + this.rng.gauss() * sp, ty = aim.y + this.rng.gauss() * sp;
+      if (s === this.player) this.stats.shots++;
+      if (W.type === 'rail') { this.fireRail(s, w, W, wx, wy, tx, ty, range); return true; }
+      const [fx, fy] = fwd(w.ang), mx = wx + fx * 8, my = wy + fy * 8, T = Math.hypot(tx - mx, ty - my) / W.speed;
+      this.shells.push({x0: mx, y0: my, tx, ty, t: 0, T, apex: W.type === 'broadside' ? 4 + T * 6 : SHELL_ARC * T * T + 2,
+        dmg: W.dmg, splash: W.splash, team: s.team, owner: s, heavy: w.t === 'heavy' || w.t === 'superheavy'});
+      this.emit('fire', {kind: w.t, ship: s, block: w, x: mx, y: my, ang: w.ang, salvo: !!s.cmd.salvo});
+      return true;
+    }
+    specialTarget(s, range) {
+      const t = s.target;
+      if (t && !t.sinking && !t.dead && Math.hypot(t.x - s.x, t.y - s.y) < range) return t;
+      if (!s.aim) return this.nearestFoe(s.team, s.x, s.y, range);
+      let best = null, bd = 1e9;
+      for (const o of this.ships) {
+        if (o.team === s.team || o.sinking || o.dead || Math.hypot(o.x - s.x, o.y - s.y) > range) continue;
+        const d = Math.hypot(o.x - s.aim.x, o.y - s.aim.y);
+        if (d < bd) { bd = d; best = o; }
+      }
+      return best;
+    }
+    manualEnd(s) {
+      const c = s.cmd;
+      if (c.salvo && s.fc.canFire) this.emit('salvo', {ship: s, guns: s.fc.canFire});
+      c.fire = 0; c.salvo = 0; c.torp = 0; c.special = 0;
+    }
+
     fireRail(s, w, W, wx, wy, tx, ty, range) {
       const a = headingTo(tx - wx, ty - wy), [fx, fy] = fwd(a);
       let dmg = W.dmg, pierced = 0, ex = wx + fx * range, ey = wy + fy * range;
