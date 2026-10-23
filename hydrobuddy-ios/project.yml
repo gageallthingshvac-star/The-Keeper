@@ -1,0 +1,43 @@
+# Alternative to the checked-in .xcodeproj, for anyone who would rather
+# generate it: `brew install xcodegen && xcodegen generate`
+name: HydroBuddy
+options:
+  bundleIdPrefix: com.hydrobuddy
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    TARGETED_DEVICE_FAMILY: "1,2"
+targets:
+  HydroBuddy:
+    type: application
+    platform: iOS
+    sources: [HydroBuddy]
+    entitlements:
+      path: HydroBuddy/HydroBuddy.entitlements
+      properties:
+        com.apple.developer.healthkit: true
+        com.apple.developer.healthkit.access: []
+    info:
+      path: HydroBuddy/Info.plist
+      properties:
+        CFBundleDisplayName: HydroBuddy+
+        UILaunchScreen: {}
+        UIUserInterfaceStyle: Dark
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        NSHealthShareUsageDescription: HydroBuddy+ reads nothing from Health unless you turn the Health switch on.
+        NSHealthUpdateUsageDescription: HydroBuddy+ writes the drinks you log as dietary water, so Health and this app agree.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.hydrobuddy.app
+  HydroBuddyTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [HydroBuddyTests]
+    dependencies:
+      - target: HydroBuddy
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.hydrobuddy.app.tests

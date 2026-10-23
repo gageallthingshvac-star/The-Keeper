@@ -1,0 +1,6052 @@
+{
+ "generatedFrom": "hydrobuddy.html",
+ "generatedAt": "2026-09-22T04:51:26.141Z",
+ "estimates": [
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 326,
+    "age": 37,
+    "sex": "male",
+    "activity": 30,
+    "climate": "cool",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 4879.742736,
+    "age": 0,
+    "sex": 195.189709,
+    "activity": 350,
+    "climate": -100,
+    "lifeStage": 700,
+    "food": -1084.48784,
+    "total": 4940
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 79,
+    "age": 72,
+    "sex": "male",
+    "activity": 85,
+    "climate": "temperate",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2607,
+    "age": -156.42,
+    "sex": 104.28,
+    "activity": 600,
+    "climate": 0,
+    "lifeStage": 300,
+    "food": -621.8748,
+    "total": 2830
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 133,
+    "age": 13,
+    "sex": "male",
+    "activity": 65,
+    "climate": "cool",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 1990.815288,
+    "age": 79.632612,
+    "sex": 79.632612,
+    "activity": 600,
+    "climate": -100,
+    "lifeStage": 0,
+    "food": -477.014492,
+    "total": 2170
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 93,
+    "age": 45,
+    "sex": "other",
+    "activity": 175,
+    "climate": "warm",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 3069,
+    "age": 0,
+    "sex": 0,
+    "activity": 600,
+    "climate": 300,
+    "lifeStage": 0,
+    "food": -714.42,
+    "total": 3250
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 247,
+    "age": 19,
+    "sex": "female",
+    "activity": 235,
+    "climate": "temperate",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 3697.228392,
+    "age": 0,
+    "sex": -73.944568,
+    "activity": 600,
+    "climate": 0,
+    "lifeStage": 700,
+    "food": -886.191088,
+    "total": 4040
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 170,
+    "age": 61,
+    "sex": "female",
+    "activity": 155,
+    "climate": "cool",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2544.65112,
+    "age": 0,
+    "sex": -50.893022,
+    "activity": 600,
+    "climate": -100,
+    "lifeStage": 300,
+    "food": -592.876458,
+    "total": 2700
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 319,
+    "age": 29,
+    "sex": "male",
+    "activity": 175,
+    "climate": "hot",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 4774.962984,
+    "age": 0,
+    "sex": 190.998519,
+    "activity": 600,
+    "climate": 550,
+    "lifeStage": 700,
+    "food": -1226.873071,
+    "total": 5000
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 188,
+    "age": 68,
+    "sex": "female",
+    "activity": 170,
+    "climate": "temperate",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2814.084768,
+    "age": -168.845086,
+    "sex": -56.281695,
+    "activity": 600,
+    "climate": 0,
+    "lifeStage": 700,
+    "food": -700.012438,
+    "total": 3190
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 148,
+    "age": 21,
+    "sex": "female",
+    "activity": 185,
+    "climate": "cool",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 4884,
+    "age": 0,
+    "sex": -97.68,
+    "activity": 600,
+    "climate": -100,
+    "lifeStage": 0,
+    "food": -951.5376,
+    "total": 4330
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 229,
+    "age": 75,
+    "sex": "male",
+    "activity": 25,
+    "climate": "temperate",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 3427.794744,
+    "age": -205.667685,
+    "sex": 137.11179,
+    "activity": 291.666667,
+    "climate": 0,
+    "lifeStage": 300,
+    "food": -711.162993,
+    "total": 3240
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 154,
+    "age": 55,
+    "sex": "female",
+    "activity": 60,
+    "climate": "hot",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 5082,
+    "age": 0,
+    "sex": -101.64,
+    "activity": 600,
+    "climate": 550,
+    "lifeStage": 300,
+    "food": -1157.4648,
+    "total": 5000
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 174,
+    "age": 43,
+    "sex": "female",
+    "activity": 5,
+    "climate": "warm",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2604.525264,
+    "age": 0,
+    "sex": -52.090505,
+    "activity": 58.333333,
+    "climate": 300,
+    "lifeStage": 700,
+    "food": -649.938257,
+    "total": 2960
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 137,
+    "age": 92,
+    "sex": "male",
+    "activity": 75,
+    "climate": "warm",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2050.689432,
+    "age": -123.041366,
+    "sex": 82.027577,
+    "activity": 600,
+    "climate": 300,
+    "lifeStage": 700,
+    "food": -649.741616,
+    "total": 2960
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 231,
+    "age": 43,
+    "sex": "female",
+    "activity": 65,
+    "climate": "warm",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 3457.731816,
+    "age": 0,
+    "sex": -69.154636,
+    "activity": 600,
+    "climate": 300,
+    "lifeStage": 300,
+    "food": -825.943892,
+    "total": 3760
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 139,
+    "age": 38,
+    "sex": "female",
+    "activity": 180,
+    "climate": "temperate",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2080.626504,
+    "age": 0,
+    "sex": -41.61253,
+    "activity": 600,
+    "climate": 0,
+    "lifeStage": 0,
+    "food": -475.022515,
+    "total": 2160
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 137,
+    "age": 55,
+    "sex": "other",
+    "activity": 25,
+    "climate": "temperate",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2050.689432,
+    "age": 0,
+    "sex": 0,
+    "activity": 291.666667,
+    "climate": 0,
+    "lifeStage": 300,
+    "food": -475.624098,
+    "total": 2170
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 131,
+    "age": 17,
+    "sex": "male",
+    "activity": 175,
+    "climate": "hot",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 4323,
+    "age": 172.92,
+    "sex": 172.92,
+    "activity": 600,
+    "climate": 550,
+    "lifeStage": 0,
+    "food": -1047.3912,
+    "total": 4770
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 86,
+    "age": 53,
+    "sex": "male",
+    "activity": 150,
+    "climate": "hot",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 1287.294096,
+    "age": 0,
+    "sex": 51.491764,
+    "activity": 600,
+    "climate": 550,
+    "lifeStage": 0,
+    "food": -447.981455,
+    "total": 2040
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 156,
+    "age": 90,
+    "sex": "other",
+    "activity": 85,
+    "climate": "temperate",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2335.091616,
+    "age": -140.105497,
+    "sex": 0,
+    "activity": 600,
+    "climate": 0,
+    "lifeStage": 700,
+    "food": -629.097501,
+    "total": 2870
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 98,
+    "age": 61,
+    "sex": "female",
+    "activity": 200,
+    "climate": "hot",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 3234,
+    "age": 0,
+    "sex": -64.68,
+    "activity": 600,
+    "climate": 550,
+    "lifeStage": 0,
+    "food": -777.4776,
+    "total": 3540
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 114,
+    "age": 72,
+    "sex": "female",
+    "activity": 65,
+    "climate": "cool",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 3762,
+    "age": -225.72,
+    "sex": -75.24,
+    "activity": 600,
+    "climate": -100,
+    "lifeStage": 300,
+    "food": -766.9872,
+    "total": 3490
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 155,
+    "age": 76,
+    "sex": "female",
+    "activity": 35,
+    "climate": "cool",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 5115,
+    "age": -306.9,
+    "sex": -102.3,
+    "activity": 408.333333,
+    "climate": -100,
+    "lifeStage": 300,
+    "food": -956.544,
+    "total": 4360
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 51,
+    "age": 69,
+    "sex": "other",
+    "activity": 130,
+    "climate": "warm",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 1683,
+    "age": -100.98,
+    "sex": 0,
+    "activity": 600,
+    "climate": 300,
+    "lifeStage": 700,
+    "food": -572.7636,
+    "total": 2610
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 160,
+    "age": 31,
+    "sex": "female",
+    "activity": 115,
+    "climate": "temperate",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2394.96576,
+    "age": 0,
+    "sex": -47.899315,
+    "activity": 600,
+    "climate": 0,
+    "lifeStage": 700,
+    "food": -656.47196,
+    "total": 2990
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 46,
+    "age": 91,
+    "sex": "male",
+    "activity": 130,
+    "climate": "cool",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 1518,
+    "age": -91.08,
+    "sex": 60.72,
+    "activity": 600,
+    "climate": -100,
+    "lifeStage": 300,
+    "food": -411.7752,
+    "total": 1880
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 133,
+    "age": 86,
+    "sex": "female",
+    "activity": 40,
+    "climate": "hot",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 4389,
+    "age": -263.34,
+    "sex": -87.78,
+    "activity": 466.666667,
+    "climate": 550,
+    "lifeStage": 700,
+    "food": -1035.8184,
+    "total": 4720
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 105,
+    "age": 68,
+    "sex": "other",
+    "activity": 25,
+    "climate": "temperate",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 1571.69628,
+    "age": -94.301777,
+    "sex": 0,
+    "activity": 291.666667,
+    "climate": 0,
+    "lifeStage": 0,
+    "food": -318.431011,
+    "total": 1450
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 284,
+    "age": 71,
+    "sex": "male",
+    "activity": 230,
+    "climate": "warm",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 4251.064224,
+    "age": -255.063853,
+    "sex": 170.042569,
+    "activity": 600,
+    "climate": 300,
+    "lifeStage": 0,
+    "food": -911.887729,
+    "total": 4150
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 100,
+    "age": 73,
+    "sex": "male",
+    "activity": 225,
+    "climate": "temperate",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 1496.8536,
+    "age": -89.811216,
+    "sex": 59.874144,
+    "activity": 600,
+    "climate": 0,
+    "lifeStage": 300,
+    "food": -426.044975,
+    "total": 1940
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 111,
+    "age": 33,
+    "sex": "female",
+    "activity": 145,
+    "climate": "hot",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 1661.507496,
+    "age": 0,
+    "sex": -33.23015,
+    "activity": 600,
+    "climate": 550,
+    "lifeStage": 300,
+    "food": -554.089922,
+    "total": 2520
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 139,
+    "age": 46,
+    "sex": "female",
+    "activity": 185,
+    "climate": "cool",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2080.626504,
+    "age": 0,
+    "sex": -41.61253,
+    "activity": 600,
+    "climate": -100,
+    "lifeStage": 700,
+    "food": -583.022515,
+    "total": 2660
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 156,
+    "age": 15,
+    "sex": "other",
+    "activity": 215,
+    "climate": "temperate",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 5148,
+    "age": 205.92,
+    "sex": 0,
+    "activity": 600,
+    "climate": 0,
+    "lifeStage": 700,
+    "food": -1197.7056,
+    "total": 5000
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 109,
+    "age": 43,
+    "sex": "male",
+    "activity": 160,
+    "climate": "cool",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 3597,
+    "age": 0,
+    "sex": 143.88,
+    "activity": 600,
+    "climate": -100,
+    "lifeStage": 700,
+    "food": -889.3584,
+    "total": 4050
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 99,
+    "age": 50,
+    "sex": "other",
+    "activity": 180,
+    "climate": "warm",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 3267,
+    "age": 0,
+    "sex": 0,
+    "activity": 600,
+    "climate": 300,
+    "lifeStage": 0,
+    "food": -750.06,
+    "total": 3420
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 259,
+    "age": 48,
+    "sex": "male",
+    "activity": 70,
+    "climate": "temperate",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 3876.850824,
+    "age": 0,
+    "sex": 155.074033,
+    "activity": 600,
+    "climate": 0,
+    "lifeStage": 700,
+    "food": -959.746474,
+    "total": 4370
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 87,
+    "age": 61,
+    "sex": "other",
+    "activity": 85,
+    "climate": "cool",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 1302.262632,
+    "age": 0,
+    "sex": 0,
+    "activity": 600,
+    "climate": -100,
+    "lifeStage": 700,
+    "food": -450.407274,
+    "total": 2050
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 240,
+    "age": 74,
+    "sex": "female",
+    "activity": 105,
+    "climate": "hot",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 3592.44864,
+    "age": -215.546918,
+    "sex": -71.848973,
+    "activity": 600,
+    "climate": 550,
+    "lifeStage": 0,
+    "food": -801.909495,
+    "total": 3650
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 44,
+    "age": 70,
+    "sex": "male",
+    "activity": 220,
+    "climate": "warm",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 1452,
+    "age": -87.12,
+    "sex": 58.08,
+    "activity": 600,
+    "climate": 300,
+    "lifeStage": 300,
+    "food": -472.1328,
+    "total": 2150
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 53,
+    "age": 88,
+    "sex": "female",
+    "activity": 30,
+    "climate": "hot",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 1749,
+    "age": -104.94,
+    "sex": -34.98,
+    "activity": 350,
+    "climate": 550,
+    "lifeStage": 300,
+    "food": -505.6344,
+    "total": 2300
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 149,
+    "age": 16,
+    "sex": "female",
+    "activity": 95,
+    "climate": "warm",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 4917,
+    "age": 196.68,
+    "sex": -98.34,
+    "activity": 600,
+    "climate": 300,
+    "lifeStage": 0,
+    "food": -1064.7612,
+    "total": 4850
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 90,
+    "age": 48,
+    "sex": "female",
+    "activity": 80,
+    "climate": "warm",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2970,
+    "age": 0,
+    "sex": -59.4,
+    "activity": 600,
+    "climate": 300,
+    "lifeStage": 700,
+    "food": -811.908,
+    "total": 3700
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 181,
+    "age": 40,
+    "sex": "female",
+    "activity": 120,
+    "climate": "cool",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2709.305016,
+    "age": 0,
+    "sex": -54.1861,
+    "activity": 600,
+    "climate": -100,
+    "lifeStage": 0,
+    "food": -567.921405,
+    "total": 2590
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 137,
+    "age": 66,
+    "sex": "other",
+    "activity": 40,
+    "climate": "temperate",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2050.689432,
+    "age": -123.041366,
+    "sex": 0,
+    "activity": 466.666667,
+    "climate": 0,
+    "lifeStage": 700,
+    "food": -556.976652,
+    "total": 2540
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 162,
+    "age": 21,
+    "sex": "other",
+    "activity": 5,
+    "climate": "hot",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 5346,
+    "age": 0,
+    "sex": 0,
+    "activity": 58.333333,
+    "climate": 550,
+    "lifeStage": 700,
+    "food": -1197.78,
+    "total": 5000
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 83,
+    "age": 87,
+    "sex": "male",
+    "activity": 25,
+    "climate": "hot",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 1242.388488,
+    "age": -74.543309,
+    "sex": 49.69554,
+    "activity": 291.666667,
+    "climate": 550,
+    "lifeStage": 700,
+    "food": -496.657329,
+    "total": 2260
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 85,
+    "age": 25,
+    "sex": "male",
+    "activity": 120,
+    "climate": "temperate",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2805,
+    "age": 0,
+    "sex": 112.2,
+    "activity": 600,
+    "climate": 0,
+    "lifeStage": 0,
+    "food": -633.096,
+    "total": 2880
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 307,
+    "age": 63,
+    "sex": "male",
+    "activity": 230,
+    "climate": "warm",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 4595.340552,
+    "age": 0,
+    "sex": 183.813622,
+    "activity": 600,
+    "climate": 300,
+    "lifeStage": 0,
+    "food": -1022.247751,
+    "total": 4660
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 84,
+    "age": 33,
+    "sex": "male",
+    "activity": 190,
+    "climate": "hot",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2772,
+    "age": 0,
+    "sex": 110.88,
+    "activity": 600,
+    "climate": 550,
+    "lifeStage": 0,
+    "food": -725.9184,
+    "total": 3310
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 124,
+    "age": 60,
+    "sex": "female",
+    "activity": 100,
+    "climate": "cool",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 1856.098464,
+    "age": 0,
+    "sex": -37.121969,
+    "activity": 600,
+    "climate": -100,
+    "lifeStage": 0,
+    "food": -417.415769,
+    "total": 1900
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 175,
+    "age": 16,
+    "sex": "female",
+    "activity": 60,
+    "climate": "cool",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2619.4938,
+    "age": 104.779752,
+    "sex": -52.389876,
+    "activity": 600,
+    "climate": -100,
+    "lifeStage": 300,
+    "food": -624.939062,
+    "total": 2850
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 159,
+    "age": 44,
+    "sex": "other",
+    "activity": 150,
+    "climate": "warm",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 5247,
+    "age": 0,
+    "sex": 0,
+    "activity": 600,
+    "climate": 300,
+    "lifeStage": 300,
+    "food": -1160.46,
+    "total": 5000
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 55,
+    "age": 79,
+    "sex": "female",
+    "activity": 55,
+    "climate": "temperate",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 1815,
+    "age": -108.9,
+    "sex": -36.3,
+    "activity": 600,
+    "climate": 0,
+    "lifeStage": 300,
+    "food": -462.564,
+    "total": 2110
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 220,
+    "age": 26,
+    "sex": "male",
+    "activity": 70,
+    "climate": "cool",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 3293.07792,
+    "age": 0,
+    "sex": 131.723117,
+    "activity": 600,
+    "climate": -100,
+    "lifeStage": 0,
+    "food": -706.464187,
+    "total": 3220
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 62,
+    "age": 29,
+    "sex": "male",
+    "activity": 200,
+    "climate": "warm",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2046,
+    "age": 0,
+    "sex": 81.84,
+    "activity": 600,
+    "climate": 300,
+    "lifeStage": 700,
+    "food": -671.0112,
+    "total": 3060
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 38,
+    "age": 62,
+    "sex": "male",
+    "activity": 155,
+    "climate": "hot",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 1254,
+    "age": 0,
+    "sex": 50.16,
+    "activity": 600,
+    "climate": 550,
+    "lifeStage": 0,
+    "food": -441.7488,
+    "total": 2010
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 299,
+    "age": 40,
+    "sex": "other",
+    "activity": 140,
+    "climate": "temperate",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 4475.592264,
+    "age": 0,
+    "sex": 0,
+    "activity": 600,
+    "climate": 0,
+    "lifeStage": 300,
+    "food": -967.606608,
+    "total": 4410
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 182,
+    "age": 32,
+    "sex": "female",
+    "activity": 105,
+    "climate": "warm",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2724.273552,
+    "age": 0,
+    "sex": -54.485471,
+    "activity": 600,
+    "climate": 300,
+    "lifeStage": 700,
+    "food": -768.561855,
+    "total": 3500
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 128,
+    "age": 30,
+    "sex": "female",
+    "activity": 45,
+    "climate": "warm",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 4224,
+    "age": 0,
+    "sex": -84.48,
+    "activity": 525,
+    "climate": 300,
+    "lifeStage": 700,
+    "food": -1019.6136,
+    "total": 4640
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 154,
+    "age": 85,
+    "sex": "male",
+    "activity": 50,
+    "climate": "warm",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2305.154544,
+    "age": -138.309273,
+    "sex": 92.206182,
+    "activity": 583.333333,
+    "climate": 300,
+    "lifeStage": 300,
+    "food": -619.629262,
+    "total": 2820
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 57,
+    "age": 76,
+    "sex": "female",
+    "activity": 120,
+    "climate": "cool",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 1881,
+    "age": -112.86,
+    "sex": -37.62,
+    "activity": 600,
+    "climate": -100,
+    "lifeStage": 700,
+    "food": -527.4936,
+    "total": 2400
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 73,
+    "age": 59,
+    "sex": "female",
+    "activity": 220,
+    "climate": "cool",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2409,
+    "age": 0,
+    "sex": -48.18,
+    "activity": 600,
+    "climate": -100,
+    "lifeStage": 300,
+    "food": -568.9476,
+    "total": 2590
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 298,
+    "age": 46,
+    "sex": "other",
+    "activity": 180,
+    "climate": "hot",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 4460.623728,
+    "age": 0,
+    "sex": 0,
+    "activity": 600,
+    "climate": 550,
+    "lifeStage": 0,
+    "food": -1009.912271,
+    "total": 4600
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 301,
+    "age": 25,
+    "sex": "female",
+    "activity": 115,
+    "climate": "temperate",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 4505.529336,
+    "age": 0,
+    "sex": -90.110587,
+    "activity": 600,
+    "climate": 0,
+    "lifeStage": 0,
+    "food": -902.775375,
+    "total": 4110
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 226,
+    "age": 44,
+    "sex": "female",
+    "activity": 230,
+    "climate": "cool",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 3382.889136,
+    "age": 0,
+    "sex": -67.657783,
+    "activity": 600,
+    "climate": -100,
+    "lifeStage": 700,
+    "food": -812.741644,
+    "total": 3700
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 314,
+    "age": 22,
+    "sex": "other",
+    "activity": 120,
+    "climate": "cool",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 4700.120304,
+    "age": 0,
+    "sex": 0,
+    "activity": 600,
+    "climate": -100,
+    "lifeStage": 700,
+    "food": -1062.021655,
+    "total": 4840
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 134,
+    "age": 55,
+    "sex": "other",
+    "activity": 85,
+    "climate": "temperate",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 4422,
+    "age": 0,
+    "sex": 0,
+    "activity": 600,
+    "climate": 0,
+    "lifeStage": 300,
+    "food": -957.96,
+    "total": 4360
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 344,
+    "age": 84,
+    "sex": "female",
+    "activity": 240,
+    "climate": "warm",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 5149.176384,
+    "age": -308.950583,
+    "sex": -102.983528,
+    "activity": 600,
+    "climate": 300,
+    "lifeStage": 0,
+    "food": -1014.703609,
+    "total": 4620
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 286,
+    "age": 71,
+    "sex": "female",
+    "activity": 75,
+    "climate": "warm",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 4281.001296,
+    "age": -256.860078,
+    "sex": -85.620026,
+    "activity": 600,
+    "climate": 300,
+    "lifeStage": 700,
+    "food": -996.933815,
+    "total": 4540
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 339,
+    "age": 32,
+    "sex": "other",
+    "activity": 25,
+    "climate": "hot",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 5074.333704,
+    "age": 0,
+    "sex": 0,
+    "activity": 291.666667,
+    "climate": 550,
+    "lifeStage": 700,
+    "food": -1190.880067,
+    "total": 5000
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 129,
+    "age": 55,
+    "sex": "female",
+    "activity": 200,
+    "climate": "cool",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 4257,
+    "age": 0,
+    "sex": -85.14,
+    "activity": 600,
+    "climate": -100,
+    "lifeStage": 300,
+    "food": -894.9348,
+    "total": 4080
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 78,
+    "age": 24,
+    "sex": "female",
+    "activity": 35,
+    "climate": "temperate",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2574,
+    "age": 0,
+    "sex": -51.48,
+    "activity": 408.333333,
+    "climate": 0,
+    "lifeStage": 0,
+    "food": -527.5536,
+    "total": 2400
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 150,
+    "age": 17,
+    "sex": "male",
+    "activity": 235,
+    "climate": "warm",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2245.2804,
+    "age": 89.811216,
+    "sex": 89.811216,
+    "activity": 600,
+    "climate": 300,
+    "lifeStage": 300,
+    "food": -652.48251,
+    "total": 2970
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 170,
+    "age": 63,
+    "sex": "female",
+    "activity": 80,
+    "climate": "hot",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2544.65112,
+    "age": 0,
+    "sex": -50.893022,
+    "activity": 600,
+    "climate": 550,
+    "lifeStage": 300,
+    "food": -709.876458,
+    "total": 3230
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 359,
+    "age": 55,
+    "sex": "other",
+    "activity": 105,
+    "climate": "temperate",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 5373.704424,
+    "age": 0,
+    "sex": 0,
+    "activity": 600,
+    "climate": 0,
+    "lifeStage": 300,
+    "food": -1129.266796,
+    "total": 5000
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 190,
+    "age": 47,
+    "sex": "other",
+    "activity": 200,
+    "climate": "temperate",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2844.02184,
+    "age": 0,
+    "sex": 0,
+    "activity": 600,
+    "climate": 0,
+    "lifeStage": 700,
+    "food": -745.923931,
+    "total": 3400
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 227,
+    "age": 40,
+    "sex": "other",
+    "activity": 100,
+    "climate": "temperate",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 3397.857672,
+    "age": 0,
+    "sex": 0,
+    "activity": 600,
+    "climate": 0,
+    "lifeStage": 0,
+    "food": -719.614381,
+    "total": 3280
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 310,
+    "age": 28,
+    "sex": "female",
+    "activity": 160,
+    "climate": "temperate",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 4640.24616,
+    "age": 0,
+    "sex": -92.804923,
+    "activity": 600,
+    "climate": 0,
+    "lifeStage": 300,
+    "food": -980.539423,
+    "total": 4470
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 195,
+    "age": 40,
+    "sex": "male",
+    "activity": 60,
+    "climate": "cool",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2918.86452,
+    "age": 0,
+    "sex": 116.754581,
+    "activity": 600,
+    "climate": -100,
+    "lifeStage": 700,
+    "food": -762.411438,
+    "total": 3470
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 284,
+    "age": 55,
+    "sex": "other",
+    "activity": 75,
+    "climate": "warm",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 4251.064224,
+    "age": 0,
+    "sex": 0,
+    "activity": 600,
+    "climate": 300,
+    "lifeStage": 700,
+    "food": -1053.19156,
+    "total": 4800
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 302,
+    "age": 30,
+    "sex": "other",
+    "activity": 120,
+    "climate": "hot",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 4520.497872,
+    "age": 0,
+    "sex": 0,
+    "activity": 600,
+    "climate": 550,
+    "lifeStage": 700,
+    "food": -1146.689617,
+    "total": 5000
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 126,
+    "age": 79,
+    "sex": "female",
+    "activity": 185,
+    "climate": "cool",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 4158,
+    "age": -249.48,
+    "sex": -83.16,
+    "activity": 600,
+    "climate": -100,
+    "lifeStage": 300,
+    "food": -832.5648,
+    "total": 3790
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 60,
+    "age": 72,
+    "sex": "female",
+    "activity": 215,
+    "climate": "temperate",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 1980,
+    "age": -118.8,
+    "sex": -39.6,
+    "activity": 600,
+    "climate": 0,
+    "lifeStage": 0,
+    "food": -435.888,
+    "total": 1990
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 110,
+    "age": 52,
+    "sex": "female",
+    "activity": 80,
+    "climate": "temperate",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 3630,
+    "age": 0,
+    "sex": -72.6,
+    "activity": 600,
+    "climate": 0,
+    "lifeStage": 300,
+    "food": -802.332,
+    "total": 3660
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 72,
+    "age": 66,
+    "sex": "female",
+    "activity": 125,
+    "climate": "hot",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2376,
+    "age": -142.56,
+    "sex": -47.52,
+    "activity": 600,
+    "climate": 550,
+    "lifeStage": 700,
+    "food": -726.4656,
+    "total": 3310
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 146,
+    "age": 41,
+    "sex": "male",
+    "activity": 70,
+    "climate": "cool",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 4818,
+    "age": 0,
+    "sex": 192.72,
+    "activity": 600,
+    "climate": -100,
+    "lifeStage": 300,
+    "food": -1045.9296,
+    "total": 4760
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 191,
+    "age": 58,
+    "sex": "other",
+    "activity": 60,
+    "climate": "warm",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2858.990376,
+    "age": 0,
+    "sex": 0,
+    "activity": 600,
+    "climate": 300,
+    "lifeStage": 700,
+    "food": -802.618268,
+    "total": 3660
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 109,
+    "age": 58,
+    "sex": "female",
+    "activity": 45,
+    "climate": "temperate",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 3597,
+    "age": 0,
+    "sex": -71.94,
+    "activity": 525,
+    "climate": 0,
+    "lifeStage": 300,
+    "food": -783.0108,
+    "total": 3570
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 135,
+    "age": 72,
+    "sex": "female",
+    "activity": 10,
+    "climate": "hot",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 4455,
+    "age": -267.3,
+    "sex": -89.1,
+    "activity": 116.666667,
+    "climate": 550,
+    "lifeStage": 0,
+    "food": -857.748,
+    "total": 3910
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 67,
+    "age": 71,
+    "sex": "other",
+    "activity": 215,
+    "climate": "hot",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2211,
+    "age": -132.66,
+    "sex": 0,
+    "activity": 600,
+    "climate": 550,
+    "lifeStage": 700,
+    "food": -707.1012,
+    "total": 3220
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 96,
+    "age": 90,
+    "sex": "female",
+    "activity": 55,
+    "climate": "warm",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 3168,
+    "age": -190.08,
+    "sex": -63.36,
+    "activity": 600,
+    "climate": 300,
+    "lifeStage": 700,
+    "food": -812.6208,
+    "total": 3700
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 59,
+    "age": 49,
+    "sex": "female",
+    "activity": 45,
+    "climate": "hot",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 1947,
+    "age": 0,
+    "sex": -38.94,
+    "activity": 525,
+    "climate": 550,
+    "lifeStage": 300,
+    "food": -590.9508,
+    "total": 2690
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 54,
+    "age": 70,
+    "sex": "female",
+    "activity": 225,
+    "climate": "hot",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 1782,
+    "age": -106.92,
+    "sex": -35.64,
+    "activity": 600,
+    "climate": 550,
+    "lifeStage": 300,
+    "food": -556.0992,
+    "total": 2530
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 197,
+    "age": 36,
+    "sex": "other",
+    "activity": 215,
+    "climate": "hot",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2948.801592,
+    "age": 0,
+    "sex": 0,
+    "activity": 600,
+    "climate": 550,
+    "lifeStage": 300,
+    "food": -791.784287,
+    "total": 3610
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 155,
+    "age": 69,
+    "sex": "male",
+    "activity": 160,
+    "climate": "cool",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 5115,
+    "age": -306.9,
+    "sex": 204.6,
+    "activity": 600,
+    "climate": -100,
+    "lifeStage": 300,
+    "food": -1046.286,
+    "total": 4770
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 92,
+    "age": 32,
+    "sex": "male",
+    "activity": 20,
+    "climate": "temperate",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 3036,
+    "age": 0,
+    "sex": 121.44,
+    "activity": 233.333333,
+    "climate": 0,
+    "lifeStage": 0,
+    "food": -610.3392,
+    "total": 2780
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 147,
+    "age": 72,
+    "sex": "male",
+    "activity": 130,
+    "climate": "cool",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2200.374792,
+    "age": -132.022488,
+    "sex": 88.014992,
+    "activity": 600,
+    "climate": -100,
+    "lifeStage": 700,
+    "food": -604.146113,
+    "total": 2750
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 284,
+    "age": 50,
+    "sex": "other",
+    "activity": 160,
+    "climate": "temperate",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 4251.064224,
+    "age": 0,
+    "sex": 0,
+    "activity": 600,
+    "climate": 0,
+    "lifeStage": 700,
+    "food": -999.19156,
+    "total": 4550
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 119,
+    "age": 21,
+    "sex": "other",
+    "activity": 150,
+    "climate": "cool",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 1781.255784,
+    "age": 0,
+    "sex": 0,
+    "activity": 600,
+    "climate": -100,
+    "lifeStage": 300,
+    "food": -464.626041,
+    "total": 2120
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 302,
+    "age": 69,
+    "sex": "other",
+    "activity": 30,
+    "climate": "hot",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 4520.497872,
+    "age": -271.229872,
+    "sex": 0,
+    "activity": 350,
+    "climate": 550,
+    "lifeStage": 0,
+    "food": -926.86824,
+    "total": 4220
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 182,
+    "age": 26,
+    "sex": "female",
+    "activity": 35,
+    "climate": "cool",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2724.273552,
+    "age": 0,
+    "sex": -54.485471,
+    "activity": 408.333333,
+    "climate": -100,
+    "lifeStage": 0,
+    "food": -536.061855,
+    "total": 2440
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 164,
+    "age": 30,
+    "sex": "other",
+    "activity": 125,
+    "climate": "warm",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2454.839904,
+    "age": 0,
+    "sex": 0,
+    "activity": 600,
+    "climate": 300,
+    "lifeStage": 300,
+    "food": -657.871183,
+    "total": 3000
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 77,
+    "age": 65,
+    "sex": "other",
+    "activity": 5,
+    "climate": "warm",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2541,
+    "age": -152.46,
+    "sex": 0,
+    "activity": 58.333333,
+    "climate": 300,
+    "lifeStage": 0,
+    "food": -494.4372,
+    "total": 2250
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 86,
+    "age": 30,
+    "sex": "other",
+    "activity": 55,
+    "climate": "cool",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2838,
+    "age": 0,
+    "sex": 0,
+    "activity": 600,
+    "climate": -100,
+    "lifeStage": 300,
+    "food": -654.84,
+    "total": 2980
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 111,
+    "age": 15,
+    "sex": "male",
+    "activity": 180,
+    "climate": "temperate",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 1661.507496,
+    "age": 66.4603,
+    "sex": 66.4603,
+    "activity": 600,
+    "climate": 0,
+    "lifeStage": 700,
+    "food": -556.997057,
+    "total": 2540
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 139,
+    "age": 69,
+    "sex": "female",
+    "activity": 90,
+    "climate": "warm",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 4587,
+    "age": -275.22,
+    "sex": -91.74,
+    "activity": 600,
+    "climate": 300,
+    "lifeStage": 700,
+    "food": -1047.6072,
+    "total": 4770
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 177,
+    "age": 57,
+    "sex": "female",
+    "activity": 80,
+    "climate": "temperate",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2649.430872,
+    "age": 0,
+    "sex": -52.988617,
+    "activity": 600,
+    "climate": 0,
+    "lifeStage": 300,
+    "food": -629.359606,
+    "total": 2870
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 142,
+    "age": 31,
+    "sex": "female",
+    "activity": 230,
+    "climate": "temperate",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 4686,
+    "age": 0,
+    "sex": -93.72,
+    "activity": 600,
+    "climate": 0,
+    "lifeStage": 700,
+    "food": -1060.6104,
+    "total": 4830
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 145,
+    "age": 28,
+    "sex": "female",
+    "activity": 35,
+    "climate": "warm",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2170.43772,
+    "age": 0,
+    "sex": -43.408754,
+    "activity": 408.333333,
+    "climate": 300,
+    "lifeStage": 300,
+    "food": -564.365214,
+    "total": 2570
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 159,
+    "age": 50,
+    "sex": "female",
+    "activity": 45,
+    "climate": "temperate",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2379.997224,
+    "age": 0,
+    "sex": -47.599944,
+    "activity": 525,
+    "climate": 0,
+    "lifeStage": 700,
+    "food": -640.33151,
+    "total": 2920
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 253,
+    "age": 88,
+    "sex": "other",
+    "activity": 0,
+    "climate": "temperate",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 3787.039608,
+    "age": -227.222376,
+    "sex": 0,
+    "activity": 0,
+    "climate": 0,
+    "lifeStage": 0,
+    "food": -640.767102,
+    "total": 2920
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 163,
+    "age": 26,
+    "sex": "other",
+    "activity": 25,
+    "climate": "hot",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 2439.871368,
+    "age": 0,
+    "sex": 0,
+    "activity": 291.666667,
+    "climate": 550,
+    "lifeStage": 0,
+    "food": -590.676846,
+    "total": 2690
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 323,
+    "age": 63,
+    "sex": "male",
+    "activity": 160,
+    "climate": "warm",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 4834.837128,
+    "age": 0,
+    "sex": 193.393485,
+    "activity": 600,
+    "climate": 300,
+    "lifeStage": 300,
+    "food": -1121.08151,
+    "total": 5000
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 101,
+    "age": 15,
+    "sex": "male",
+    "activity": 85,
+    "climate": "hot",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 3333,
+    "age": 133.32,
+    "sex": 133.32,
+    "activity": 600,
+    "climate": 550,
+    "lifeStage": 300,
+    "food": -908.9352,
+    "total": 4140
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 144,
+    "age": 76,
+    "sex": "male",
+    "activity": 135,
+    "climate": "hot",
+    "special": "nursing",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 4752,
+    "age": -285.12,
+    "sex": 190.08,
+    "activity": 600,
+    "climate": 550,
+    "lifeStage": 700,
+    "food": -1171.2528,
+    "total": 5000
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 255,
+    "age": 40,
+    "sex": "female",
+    "activity": 225,
+    "climate": "hot",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 3816.97668,
+    "age": 0,
+    "sex": -76.339534,
+    "activity": 600,
+    "climate": 550,
+    "lifeStage": 0,
+    "food": -880.314686,
+    "total": 4010
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 138,
+    "age": 39,
+    "sex": "male",
+    "activity": 225,
+    "climate": "temperate",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 4554,
+    "age": 0,
+    "sex": 182.16,
+    "activity": 600,
+    "climate": 0,
+    "lifeStage": 300,
+    "food": -1014.5088,
+    "total": 4620
+   }
+  },
+  {
+   "units": "ml",
+   "profile": {
+    "weight": 55,
+    "age": 14,
+    "sex": "male",
+    "activity": 60,
+    "climate": "temperate",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 1815,
+    "age": 72.6,
+    "sex": 72.6,
+    "activity": 600,
+    "climate": 0,
+    "lifeStage": 0,
+    "food": -460.836,
+    "total": 2100
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 355,
+    "age": 16,
+    "sex": "male",
+    "activity": 205,
+    "climate": "temperate",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 5313.83028,
+    "age": 212.553211,
+    "sex": 212.553211,
+    "activity": 600,
+    "climate": 0,
+    "lifeStage": 300,
+    "food": -1195.008606,
+    "total": 5000
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 348,
+    "age": 39,
+    "sex": "other",
+    "activity": 170,
+    "climate": "cool",
+    "special": "none",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 5209.050528,
+    "age": 0,
+    "sex": 0,
+    "activity": 600,
+    "climate": -100,
+    "lifeStage": 0,
+    "food": -1027.629095,
+    "total": 4680
+   }
+  },
+  {
+   "units": "oz",
+   "profile": {
+    "weight": 332,
+    "age": 72,
+    "sex": "female",
+    "activity": 95,
+    "climate": "cool",
+    "special": "pregnant",
+    "wake": "07:00",
+    "sleep": "22:30",
+    "wakeMinutes": 420,
+    "sleepMinutes": 1350
+   },
+   "expected": {
+    "base": 4969.553952,
+    "age": -298.173237,
+    "sex": -99.391079,
+    "activity": 600,
+    "climate": -100,
+    "lifeStage": 300,
+    "food": -966.958134,
+    "total": 4410
+   }
+  }
+ ],
+ "formats": [
+  {
+   "millilitres": 2356.096745,
+   "units": "oz",
+   "expected": "80 oz"
+  },
+  {
+   "millilitres": 2356.096745,
+   "units": "ml",
+   "expected": "2355 ml"
+  },
+  {
+   "millilitres": 291.862965,
+   "units": "oz",
+   "expected": "10 oz"
+  },
+  {
+   "millilitres": 291.862965,
+   "units": "ml",
+   "expected": "290 ml"
+  },
+  {
+   "millilitres": 2920.263886,
+   "units": "oz",
+   "expected": "99 oz"
+  },
+  {
+   "millilitres": 2920.263886,
+   "units": "ml",
+   "expected": "2920 ml"
+  },
+  {
+   "millilitres": 2122.44606,
+   "units": "oz",
+   "expected": "72 oz"
+  },
+  {
+   "millilitres": 2122.44606,
+   "units": "ml",
+   "expected": "2120 ml"
+  },
+  {
+   "millilitres": 99.573135,
+   "units": "oz",
+   "expected": "3 oz"
+  },
+  {
+   "millilitres": 99.573135,
+   "units": "ml",
+   "expected": "100 ml"
+  },
+  {
+   "millilitres": 879.861936,
+   "units": "oz",
+   "expected": "30 oz"
+  },
+  {
+   "millilitres": 879.861936,
+   "units": "ml",
+   "expected": "880 ml"
+  },
+  {
+   "millilitres": 3841.627121,
+   "units": "oz",
+   "expected": "130 oz"
+  },
+  {
+   "millilitres": 3841.627121,
+   "units": "ml",
+   "expected": "3840 ml"
+  },
+  {
+   "millilitres": 1597.730637,
+   "units": "oz",
+   "expected": "54 oz"
+  },
+  {
+   "millilitres": 1597.730637,
+   "units": "ml",
+   "expected": "1600 ml"
+  },
+  {
+   "millilitres": 2888.01384,
+   "units": "oz",
+   "expected": "98 oz"
+  },
+  {
+   "millilitres": 2888.01384,
+   "units": "ml",
+   "expected": "2890 ml"
+  },
+  {
+   "millilitres": 3903.88298,
+   "units": "oz",
+   "expected": "132 oz"
+  },
+  {
+   "millilitres": 3903.88298,
+   "units": "ml",
+   "expected": "3905 ml"
+  },
+  {
+   "millilitres": 3508.619308,
+   "units": "oz",
+   "expected": "119 oz"
+  },
+  {
+   "millilitres": 3508.619308,
+   "units": "ml",
+   "expected": "3510 ml"
+  },
+  {
+   "millilitres": 3799.879074,
+   "units": "oz",
+   "expected": "128 oz"
+  },
+  {
+   "millilitres": 3799.879074,
+   "units": "ml",
+   "expected": "3800 ml"
+  },
+  {
+   "millilitres": 3422.193527,
+   "units": "oz",
+   "expected": "116 oz"
+  },
+  {
+   "millilitres": 3422.193527,
+   "units": "ml",
+   "expected": "3420 ml"
+  },
+  {
+   "millilitres": 629.468918,
+   "units": "oz",
+   "expected": "21 oz"
+  },
+  {
+   "millilitres": 629.468918,
+   "units": "ml",
+   "expected": "630 ml"
+  },
+  {
+   "millilitres": 3097.486615,
+   "units": "oz",
+   "expected": "105 oz"
+  },
+  {
+   "millilitres": 3097.486615,
+   "units": "ml",
+   "expected": "3095 ml"
+  },
+  {
+   "millilitres": 1035.670757,
+   "units": "oz",
+   "expected": "35 oz"
+  },
+  {
+   "millilitres": 1035.670757,
+   "units": "ml",
+   "expected": "1035 ml"
+  },
+  {
+   "millilitres": 1474.317074,
+   "units": "oz",
+   "expected": "50 oz"
+  },
+  {
+   "millilitres": 1474.317074,
+   "units": "ml",
+   "expected": "1475 ml"
+  },
+  {
+   "millilitres": 2926.414013,
+   "units": "oz",
+   "expected": "99 oz"
+  },
+  {
+   "millilitres": 2926.414013,
+   "units": "ml",
+   "expected": "2925 ml"
+  },
+  {
+   "millilitres": 426.660061,
+   "units": "oz",
+   "expected": "14 oz"
+  },
+  {
+   "millilitres": 426.660061,
+   "units": "ml",
+   "expected": "425 ml"
+  },
+  {
+   "millilitres": 1616.565347,
+   "units": "oz",
+   "expected": "55 oz"
+  },
+  {
+   "millilitres": 1616.565347,
+   "units": "ml",
+   "expected": "1615 ml"
+  },
+  {
+   "millilitres": 641.863823,
+   "units": "oz",
+   "expected": "22 oz"
+  },
+  {
+   "millilitres": 641.863823,
+   "units": "ml",
+   "expected": "640 ml"
+  },
+  {
+   "millilitres": 1824.996114,
+   "units": "oz",
+   "expected": "62 oz"
+  },
+  {
+   "millilitres": 1824.996114,
+   "units": "ml",
+   "expected": "1825 ml"
+  },
+  {
+   "millilitres": 1618.874073,
+   "units": "oz",
+   "expected": "55 oz"
+  },
+  {
+   "millilitres": 1618.874073,
+   "units": "ml",
+   "expected": "1620 ml"
+  },
+  {
+   "millilitres": 3322.287083,
+   "units": "oz",
+   "expected": "112 oz"
+  },
+  {
+   "millilitres": 3322.287083,
+   "units": "ml",
+   "expected": "3320 ml"
+  },
+  {
+   "millilitres": 3995.281696,
+   "units": "oz",
+   "expected": "135 oz"
+  },
+  {
+   "millilitres": 3995.281696,
+   "units": "ml",
+   "expected": "3995 ml"
+  },
+  {
+   "millilitres": 3958.13942,
+   "units": "oz",
+   "expected": "134 oz"
+  },
+  {
+   "millilitres": 3958.13942,
+   "units": "ml",
+   "expected": "3960 ml"
+  },
+  {
+   "millilitres": 3315.149307,
+   "units": "oz",
+   "expected": "112 oz"
+  },
+  {
+   "millilitres": 3315.149307,
+   "units": "ml",
+   "expected": "3315 ml"
+  },
+  {
+   "millilitres": 2.664566,
+   "units": "oz",
+   "expected": "0 oz"
+  },
+  {
+   "millilitres": 2.664566,
+   "units": "ml",
+   "expected": "5 ml"
+  },
+  {
+   "millilitres": 1246.51538,
+   "units": "oz",
+   "expected": "42 oz"
+  },
+  {
+   "millilitres": 1246.51538,
+   "units": "ml",
+   "expected": "1245 ml"
+  },
+  {
+   "millilitres": 1198.247194,
+   "units": "oz",
+   "expected": "41 oz"
+  },
+  {
+   "millilitres": 1198.247194,
+   "units": "ml",
+   "expected": "1200 ml"
+  },
+  {
+   "millilitres": 2177.692652,
+   "units": "oz",
+   "expected": "74 oz"
+  },
+  {
+   "millilitres": 2177.692652,
+   "units": "ml",
+   "expected": "2180 ml"
+  },
+  {
+   "millilitres": 129.141808,
+   "units": "oz",
+   "expected": "4 oz"
+  },
+  {
+   "millilitres": 129.141808,
+   "units": "ml",
+   "expected": "130 ml"
+  },
+  {
+   "millilitres": 1405.093312,
+   "units": "oz",
+   "expected": "48 oz"
+  },
+  {
+   "millilitres": 1405.093312,
+   "units": "ml",
+   "expected": "1405 ml"
+  },
+  {
+   "millilitres": 2730.328083,
+   "units": "oz",
+   "expected": "92 oz"
+  },
+  {
+   "millilitres": 2730.328083,
+   "units": "ml",
+   "expected": "2730 ml"
+  },
+  {
+   "millilitres": 3484.446049,
+   "units": "oz",
+   "expected": "118 oz"
+  },
+  {
+   "millilitres": 3484.446049,
+   "units": "ml",
+   "expected": "3485 ml"
+  },
+  {
+   "millilitres": 3160.843372,
+   "units": "oz",
+   "expected": "107 oz"
+  },
+  {
+   "millilitres": 3160.843372,
+   "units": "ml",
+   "expected": "3160 ml"
+  },
+  {
+   "millilitres": 439.909458,
+   "units": "oz",
+   "expected": "15 oz"
+  },
+  {
+   "millilitres": 439.909458,
+   "units": "ml",
+   "expected": "440 ml"
+  },
+  {
+   "millilitres": 1499.714494,
+   "units": "oz",
+   "expected": "51 oz"
+  },
+  {
+   "millilitres": 1499.714494,
+   "units": "ml",
+   "expected": "1500 ml"
+  },
+  {
+   "millilitres": 3002.288818,
+   "units": "oz",
+   "expected": "102 oz"
+  },
+  {
+   "millilitres": 3002.288818,
+   "units": "ml",
+   "expected": "3000 ml"
+  },
+  {
+   "millilitres": 952.629089,
+   "units": "oz",
+   "expected": "32 oz"
+  },
+  {
+   "millilitres": 952.629089,
+   "units": "ml",
+   "expected": "955 ml"
+  },
+  {
+   "millilitres": 2934.249997,
+   "units": "oz",
+   "expected": "99 oz"
+  },
+  {
+   "millilitres": 2934.249997,
+   "units": "ml",
+   "expected": "2935 ml"
+  },
+  {
+   "millilitres": 484.090328,
+   "units": "oz",
+   "expected": "16 oz"
+  },
+  {
+   "millilitres": 484.090328,
+   "units": "ml",
+   "expected": "485 ml"
+  },
+  {
+   "millilitres": 1144.042611,
+   "units": "oz",
+   "expected": "39 oz"
+  },
+  {
+   "millilitres": 1144.042611,
+   "units": "ml",
+   "expected": "1145 ml"
+  },
+  {
+   "millilitres": 2302.901268,
+   "units": "oz",
+   "expected": "78 oz"
+  },
+  {
+   "millilitres": 2302.901268,
+   "units": "ml",
+   "expected": "2305 ml"
+  },
+  {
+   "millilitres": 973.780632,
+   "units": "oz",
+   "expected": "33 oz"
+  },
+  {
+   "millilitres": 973.780632,
+   "units": "ml",
+   "expected": "975 ml"
+  },
+  {
+   "millilitres": 718.771935,
+   "units": "oz",
+   "expected": "24 oz"
+  },
+  {
+   "millilitres": 718.771935,
+   "units": "ml",
+   "expected": "720 ml"
+  },
+  {
+   "millilitres": 3409.15215,
+   "units": "oz",
+   "expected": "115 oz"
+  },
+  {
+   "millilitres": 3409.15215,
+   "units": "ml",
+   "expected": "3410 ml"
+  },
+  {
+   "millilitres": 2219.616413,
+   "units": "oz",
+   "expected": "75 oz"
+  },
+  {
+   "millilitres": 2219.616413,
+   "units": "ml",
+   "expected": "2220 ml"
+  },
+  {
+   "millilitres": 1926.249027,
+   "units": "oz",
+   "expected": "65 oz"
+  },
+  {
+   "millilitres": 1926.249027,
+   "units": "ml",
+   "expected": "1925 ml"
+  },
+  {
+   "millilitres": 3239.243031,
+   "units": "oz",
+   "expected": "110 oz"
+  },
+  {
+   "millilitres": 3239.243031,
+   "units": "ml",
+   "expected": "3240 ml"
+  },
+  {
+   "millilitres": 2469.847202,
+   "units": "oz",
+   "expected": "84 oz"
+  },
+  {
+   "millilitres": 2469.847202,
+   "units": "ml",
+   "expected": "2470 ml"
+  },
+  {
+   "millilitres": 559.803486,
+   "units": "oz",
+   "expected": "19 oz"
+  },
+  {
+   "millilitres": 559.803486,
+   "units": "ml",
+   "expected": "560 ml"
+  },
+  {
+   "millilitres": 862.108827,
+   "units": "oz",
+   "expected": "29 oz"
+  },
+  {
+   "millilitres": 862.108827,
+   "units": "ml",
+   "expected": "860 ml"
+  },
+  {
+   "millilitres": 1043.310404,
+   "units": "oz",
+   "expected": "35 oz"
+  },
+  {
+   "millilitres": 1043.310404,
+   "units": "ml",
+   "expected": "1045 ml"
+  },
+  {
+   "millilitres": 3886.75046,
+   "units": "oz",
+   "expected": "131 oz"
+  },
+  {
+   "millilitres": 3886.75046,
+   "units": "ml",
+   "expected": "3885 ml"
+  },
+  {
+   "millilitres": 1757.751465,
+   "units": "oz",
+   "expected": "59 oz"
+  },
+  {
+   "millilitres": 1757.751465,
+   "units": "ml",
+   "expected": "1760 ml"
+  },
+  {
+   "millilitres": 2376.182556,
+   "units": "oz",
+   "expected": "80 oz"
+  },
+  {
+   "millilitres": 2376.182556,
+   "units": "ml",
+   "expected": "2375 ml"
+  },
+  {
+   "millilitres": 3617.202759,
+   "units": "oz",
+   "expected": "122 oz"
+  },
+  {
+   "millilitres": 3617.202759,
+   "units": "ml",
+   "expected": "3615 ml"
+  },
+  {
+   "millilitres": 579.811096,
+   "units": "oz",
+   "expected": "20 oz"
+  },
+  {
+   "millilitres": 579.811096,
+   "units": "ml",
+   "expected": "580 ml"
+  },
+  {
+   "millilitres": 3867.401242,
+   "units": "oz",
+   "expected": "131 oz"
+  },
+  {
+   "millilitres": 3867.401242,
+   "units": "ml",
+   "expected": "3865 ml"
+  }
+ ],
+ "paces": [
+  {
+   "wakeMinutes": 90,
+   "sleepMinutes": 780,
+   "goal": 2518,
+   "total": 3730,
+   "nowMinutes": 278,
+   "expected": {
+    "through": 0.298413,
+    "expected": 751.403175,
+    "delta": 2978.596825
+   }
+  },
+  {
+   "wakeMinutes": 300,
+   "sleepMinutes": 1050,
+   "goal": 3748,
+   "total": 1976,
+   "nowMinutes": 125,
+   "expected": {
+    "through": 0,
+    "expected": 0,
+    "delta": 1976
+   }
+  },
+  {
+   "wakeMinutes": 150,
+   "sleepMinutes": 1050,
+   "goal": 3796,
+   "total": 372,
+   "nowMinutes": 217,
+   "expected": {
+    "through": 0.079762,
+    "expected": 302.77619,
+    "delta": 69.22381
+   }
+  },
+  {
+   "wakeMinutes": 300,
+   "sleepMinutes": 900,
+   "goal": 1531,
+   "total": 2684,
+   "nowMinutes": 1206,
+   "expected": {
+    "through": 1,
+    "expected": 1531,
+    "delta": 1153
+   }
+  },
+  {
+   "wakeMinutes": 60,
+   "sleepMinutes": 870,
+   "goal": 3240,
+   "total": 1140,
+   "nowMinutes": 1209,
+   "expected": {
+    "through": 1,
+    "expected": 3240,
+    "delta": -2100
+   }
+  },
+  {
+   "wakeMinutes": 150,
+   "sleepMinutes": 810,
+   "goal": 4420,
+   "total": 3424,
+   "nowMinutes": 343,
+   "expected": {
+    "through": 0.321667,
+    "expected": 1421.766667,
+    "delta": 2002.233333
+   }
+  },
+  {
+   "wakeMinutes": 90,
+   "sleepMinutes": 840,
+   "goal": 4397,
+   "total": 3820,
+   "nowMinutes": 1379,
+   "expected": {
+    "through": 1,
+    "expected": 4397,
+    "delta": -577
+   }
+  },
+  {
+   "wakeMinutes": 150,
+   "sleepMinutes": 870,
+   "goal": 3136,
+   "total": 740,
+   "nowMinutes": 279,
+   "expected": {
+    "through": 0.195455,
+    "expected": 612.945455,
+    "delta": 127.054545
+   }
+  },
+  {
+   "wakeMinutes": 60,
+   "sleepMinutes": 690,
+   "goal": 2496,
+   "total": 51,
+   "nowMinutes": 507,
+   "expected": {
+    "through": 0.784211,
+    "expected": 1957.389474,
+    "delta": -1906.389474
+   }
+  },
+  {
+   "wakeMinutes": 30,
+   "sleepMinutes": 720,
+   "goal": 4336,
+   "total": 188,
+   "nowMinutes": 1356,
+   "expected": {
+    "through": 1,
+    "expected": 4336,
+    "delta": -4148
+   }
+  },
+  {
+   "wakeMinutes": 60,
+   "sleepMinutes": 840,
+   "goal": 1742,
+   "total": 2291,
+   "nowMinutes": 115,
+   "expected": {
+    "through": 0.076389,
+    "expected": 133.069444,
+    "delta": 2157.930556
+   }
+  },
+  {
+   "wakeMinutes": 300,
+   "sleepMinutes": 990,
+   "goal": 2670,
+   "total": 3431,
+   "nowMinutes": 109,
+   "expected": {
+    "through": 0,
+    "expected": 0,
+    "delta": 3431
+   }
+  },
+  {
+   "wakeMinutes": 150,
+   "sleepMinutes": 660,
+   "goal": 4048,
+   "total": 964,
+   "nowMinutes": 374,
+   "expected": {
+    "through": 0.497778,
+    "expected": 2015.004444,
+    "delta": -1051.004444
+   }
+  },
+  {
+   "wakeMinutes": 300,
+   "sleepMinutes": 1200,
+   "goal": 2303,
+   "total": 1925,
+   "nowMinutes": 481,
+   "expected": {
+    "through": 0.215476,
+    "expected": 496.241667,
+    "delta": 1428.758333
+   }
+  },
+  {
+   "wakeMinutes": 300,
+   "sleepMinutes": 1200,
+   "goal": 2201,
+   "total": 2350,
+   "nowMinutes": 722,
+   "expected": {
+    "through": 0.502381,
+    "expected": 1105.740476,
+    "delta": 1244.259524
+   }
+  },
+  {
+   "wakeMinutes": 270,
+   "sleepMinutes": 1080,
+   "goal": 3764,
+   "total": 2001,
+   "nowMinutes": 213,
+   "expected": {
+    "through": 0,
+    "expected": 0,
+    "delta": 2001
+   }
+  },
+  {
+   "wakeMinutes": 270,
+   "sleepMinutes": 960,
+   "goal": 3355,
+   "total": 686,
+   "nowMinutes": 1125,
+   "expected": {
+    "through": 1,
+    "expected": 3355,
+    "delta": -2669
+   }
+  },
+  {
+   "wakeMinutes": 150,
+   "sleepMinutes": 960,
+   "goal": 1641,
+   "total": 2487,
+   "nowMinutes": 324,
+   "expected": {
+    "through": 0.232,
+    "expected": 380.712,
+    "delta": 2106.288
+   }
+  },
+  {
+   "wakeMinutes": 90,
+   "sleepMinutes": 870,
+   "goal": 3078,
+   "total": 876,
+   "nowMinutes": 821,
+   "expected": {
+    "through": 1,
+    "expected": 3078,
+    "delta": -2202
+   }
+  },
+  {
+   "wakeMinutes": 210,
+   "sleepMinutes": 930,
+   "goal": 2912,
+   "total": 3946,
+   "nowMinutes": 644,
+   "expected": {
+    "through": 0.657576,
+    "expected": 1914.860606,
+    "delta": 2031.139394
+   }
+  },
+  {
+   "wakeMinutes": 30,
+   "sleepMinutes": 840,
+   "goal": 4373,
+   "total": 1134,
+   "nowMinutes": 767,
+   "expected": {
+    "through": 0.982667,
+    "expected": 4297.201333,
+    "delta": -3163.201333
+   }
+  },
+  {
+   "wakeMinutes": 210,
+   "sleepMinutes": 750,
+   "goal": 2154,
+   "total": 1006,
+   "nowMinutes": 1300,
+   "expected": {
+    "through": 1,
+    "expected": 2154,
+    "delta": -1148
+   }
+  },
+  {
+   "wakeMinutes": 60,
+   "sleepMinutes": 930,
+   "goal": 2756,
+   "total": 3887,
+   "nowMinutes": 416,
+   "expected": {
+    "through": 0.439506,
+    "expected": 1211.279012,
+    "delta": 2675.720988
+   }
+  },
+  {
+   "wakeMinutes": 270,
+   "sleepMinutes": 1200,
+   "goal": 1513,
+   "total": 2707,
+   "nowMinutes": 1188,
+   "expected": {
+    "through": 1,
+    "expected": 1513,
+    "delta": 1194
+   }
+  },
+  {
+   "wakeMinutes": 150,
+   "sleepMinutes": 1020,
+   "goal": 3478,
+   "total": 903,
+   "nowMinutes": 294,
+   "expected": {
+    "through": 0.177778,
+    "expected": 618.311111,
+    "delta": 284.688889
+   }
+  },
+  {
+   "wakeMinutes": 180,
+   "sleepMinutes": 990,
+   "goal": 4176,
+   "total": 824,
+   "nowMinutes": 1296,
+   "expected": {
+    "through": 1,
+    "expected": 4176,
+    "delta": -3352
+   }
+  },
+  {
+   "wakeMinutes": 300,
+   "sleepMinutes": 870,
+   "goal": 1509,
+   "total": 1633,
+   "nowMinutes": 715,
+   "expected": {
+    "through": 0.813725,
+    "expected": 1227.911765,
+    "delta": 405.088235
+   }
+  },
+  {
+   "wakeMinutes": 120,
+   "sleepMinutes": 750,
+   "goal": 4273,
+   "total": 2724,
+   "nowMinutes": 642,
+   "expected": {
+    "through": 0.915789,
+    "expected": 3913.168421,
+    "delta": -1189.168421
+   }
+  },
+  {
+   "wakeMinutes": 90,
+   "sleepMinutes": 780,
+   "goal": 3093,
+   "total": 3784,
+   "nowMinutes": 176,
+   "expected": {
+    "through": 0.136508,
+    "expected": 422.219048,
+    "delta": 3361.780952
+   }
+  },
+  {
+   "wakeMinutes": 90,
+   "sleepMinutes": 810,
+   "goal": 1655,
+   "total": 3341,
+   "nowMinutes": 702,
+   "expected": {
+    "through": 0.927273,
+    "expected": 1534.636364,
+    "delta": 1806.363636
+   }
+  },
+  {
+   "wakeMinutes": 150,
+   "sleepMinutes": 900,
+   "goal": 1660,
+   "total": 141,
+   "nowMinutes": 1028,
+   "expected": {
+    "through": 1,
+    "expected": 1660,
+    "delta": -1519
+   }
+  },
+  {
+   "wakeMinutes": 240,
+   "sleepMinutes": 1140,
+   "goal": 1509,
+   "total": 3215,
+   "nowMinutes": 21,
+   "expected": {
+    "through": 0,
+    "expected": 0,
+    "delta": 3215
+   }
+  },
+  {
+   "wakeMinutes": 0,
+   "sleepMinutes": 810,
+   "goal": 3537,
+   "total": 3242,
+   "nowMinutes": 926,
+   "expected": {
+    "through": 1,
+    "expected": 3537,
+    "delta": -295
+   }
+  },
+  {
+   "wakeMinutes": 60,
+   "sleepMinutes": 930,
+   "goal": 3136,
+   "total": 1224,
+   "nowMinutes": 1070,
+   "expected": {
+    "through": 1,
+    "expected": 3136,
+    "delta": -1912
+   }
+  },
+  {
+   "wakeMinutes": 120,
+   "sleepMinutes": 1020,
+   "goal": 2674,
+   "total": 2470,
+   "nowMinutes": 246,
+   "expected": {
+    "through": 0.15,
+    "expected": 401.1,
+    "delta": 2068.9
+   }
+  },
+  {
+   "wakeMinutes": 90,
+   "sleepMinutes": 630,
+   "goal": 3255,
+   "total": 1389,
+   "nowMinutes": 1006,
+   "expected": {
+    "through": 1,
+    "expected": 3255,
+    "delta": -1866
+   }
+  },
+  {
+   "wakeMinutes": 60,
+   "sleepMinutes": 570,
+   "goal": 2692,
+   "total": 3078,
+   "nowMinutes": 790,
+   "expected": {
+    "through": 1,
+    "expected": 2692,
+    "delta": 386
+   }
+  },
+  {
+   "wakeMinutes": 300,
+   "sleepMinutes": 1200,
+   "goal": 3888,
+   "total": 3283,
+   "nowMinutes": 8,
+   "expected": {
+    "through": 0,
+    "expected": 0,
+    "delta": 3283
+   }
+  },
+  {
+   "wakeMinutes": 30,
+   "sleepMinutes": 930,
+   "goal": 4022,
+   "total": 785,
+   "nowMinutes": 714,
+   "expected": {
+    "through": 0.814286,
+    "expected": 3275.057143,
+    "delta": -2490.057143
+   }
+  },
+  {
+   "wakeMinutes": 150,
+   "sleepMinutes": 870,
+   "goal": 1733,
+   "total": 3864,
+   "nowMinutes": 1155,
+   "expected": {
+    "through": 1,
+    "expected": 1733,
+    "delta": 2131
+   }
+  },
+  {
+   "wakeMinutes": 120,
+   "sleepMinutes": 900,
+   "goal": 1894,
+   "total": 245,
+   "nowMinutes": 1398,
+   "expected": {
+    "through": 1,
+    "expected": 1894,
+    "delta": -1649
+   }
+  },
+  {
+   "wakeMinutes": 270,
+   "sleepMinutes": 870,
+   "goal": 3706,
+   "total": 3780,
+   "nowMinutes": 125,
+   "expected": {
+    "through": 0,
+    "expected": 0,
+    "delta": 3780
+   }
+  },
+  {
+   "wakeMinutes": 240,
+   "sleepMinutes": 780,
+   "goal": 3594,
+   "total": 3399,
+   "nowMinutes": 459,
+   "expected": {
+    "through": 0.45625,
+    "expected": 1639.7625,
+    "delta": 1759.2375
+   }
+  },
+  {
+   "wakeMinutes": 90,
+   "sleepMinutes": 840,
+   "goal": 3090,
+   "total": 3357,
+   "nowMinutes": 852,
+   "expected": {
+    "through": 1,
+    "expected": 3090,
+    "delta": 267
+   }
+  },
+  {
+   "wakeMinutes": 90,
+   "sleepMinutes": 960,
+   "goal": 3919,
+   "total": 2349,
+   "nowMinutes": 325,
+   "expected": {
+    "through": 0.290123,
+    "expected": 1136.993827,
+    "delta": 1212.006173
+   }
+  },
+  {
+   "wakeMinutes": 150,
+   "sleepMinutes": 1050,
+   "goal": 1911,
+   "total": 2439,
+   "nowMinutes": 1206,
+   "expected": {
+    "through": 1,
+    "expected": 1911,
+    "delta": 528
+   }
+  },
+  {
+   "wakeMinutes": 90,
+   "sleepMinutes": 600,
+   "goal": 3180,
+   "total": 746,
+   "nowMinutes": 1319,
+   "expected": {
+    "through": 1,
+    "expected": 3180,
+    "delta": -2434
+   }
+  },
+  {
+   "wakeMinutes": 30,
+   "sleepMinutes": 690,
+   "goal": 2225,
+   "total": 3052,
+   "nowMinutes": 534,
+   "expected": {
+    "through": 0.84,
+    "expected": 1869,
+    "delta": 1183
+   }
+  },
+  {
+   "wakeMinutes": 30,
+   "sleepMinutes": 960,
+   "goal": 2355,
+   "total": 655,
+   "nowMinutes": 369,
+   "expected": {
+    "through": 0.389655,
+    "expected": 917.637931,
+    "delta": -262.637931
+   }
+  },
+  {
+   "wakeMinutes": 120,
+   "sleepMinutes": 810,
+   "goal": 2693,
+   "total": 1331,
+   "nowMinutes": 1422,
+   "expected": {
+    "through": 1,
+    "expected": 2693,
+    "delta": -1362
+   }
+  },
+  {
+   "wakeMinutes": 120,
+   "sleepMinutes": 810,
+   "goal": 3494,
+   "total": 2411,
+   "nowMinutes": 812,
+   "expected": {
+    "through": 1,
+    "expected": 3494,
+    "delta": -1083
+   }
+  },
+  {
+   "wakeMinutes": 30,
+   "sleepMinutes": 840,
+   "goal": 2770,
+   "total": 2337,
+   "nowMinutes": 538,
+   "expected": {
+    "through": 0.677333,
+    "expected": 1876.213333,
+    "delta": 460.786667
+   }
+  },
+  {
+   "wakeMinutes": 270,
+   "sleepMinutes": 810,
+   "goal": 3496,
+   "total": 924,
+   "nowMinutes": 585,
+   "expected": {
+    "through": 0.65625,
+    "expected": 2294.25,
+    "delta": -1370.25
+   }
+  },
+  {
+   "wakeMinutes": 150,
+   "sleepMinutes": 660,
+   "goal": 3112,
+   "total": 2198,
+   "nowMinutes": 323,
+   "expected": {
+    "through": 0.384444,
+    "expected": 1196.391111,
+    "delta": 1001.608889
+   }
+  },
+  {
+   "wakeMinutes": 300,
+   "sleepMinutes": 1140,
+   "goal": 4124,
+   "total": 2701,
+   "nowMinutes": 61,
+   "expected": {
+    "through": 0,
+    "expected": 0,
+    "delta": 2701
+   }
+  },
+  {
+   "wakeMinutes": 60,
+   "sleepMinutes": 780,
+   "goal": 1813,
+   "total": 3898,
+   "nowMinutes": 826,
+   "expected": {
+    "through": 1,
+    "expected": 1813,
+    "delta": 2085
+   }
+  },
+  {
+   "wakeMinutes": 60,
+   "sleepMinutes": 720,
+   "goal": 2814,
+   "total": 2786,
+   "nowMinutes": 1238,
+   "expected": {
+    "through": 1,
+    "expected": 2814,
+    "delta": -28
+   }
+  },
+  {
+   "wakeMinutes": 180,
+   "sleepMinutes": 1050,
+   "goal": 4108,
+   "total": 1865,
+   "nowMinutes": 968,
+   "expected": {
+    "through": 0.97284,
+    "expected": 3996.424691,
+    "delta": -2131.424691
+   }
+  },
+  {
+   "wakeMinutes": 240,
+   "sleepMinutes": 1050,
+   "goal": 2776,
+   "total": 215,
+   "nowMinutes": 1278,
+   "expected": {
+    "through": 1,
+    "expected": 2776,
+    "delta": -2561
+   }
+  },
+  {
+   "wakeMinutes": 60,
+   "sleepMinutes": 750,
+   "goal": 2548,
+   "total": 1408,
+   "nowMinutes": 374,
+   "expected": {
+    "through": 0.498413,
+    "expected": 1269.955556,
+    "delta": 138.044444
+   }
+  }
+ ],
+ "streaks": [
+  {
+   "goal": 2724,
+   "days": [
+    {
+     "offset": -11,
+     "millilitres": 2860
+    },
+    {
+     "offset": -9,
+     "millilitres": 2860
+    },
+    {
+     "offset": -8,
+     "millilitres": 2860
+    },
+    {
+     "offset": -4,
+     "millilitres": 1362
+    },
+    {
+     "offset": -3,
+     "millilitres": 1362
+    },
+    {
+     "offset": -1,
+     "millilitres": 1362
+    }
+   ],
+   "expected": {
+    "currentStreak": 0,
+    "bestStreak": 2,
+    "loggedDays": 6,
+    "metDays": 3,
+    "average": 2111,
+    "intent": "behind"
+   }
+  },
+  {
+   "goal": 2474,
+   "days": [
+    {
+     "offset": -11,
+     "millilitres": 1237
+    },
+    {
+     "offset": -10,
+     "millilitres": 1237
+    },
+    {
+     "offset": -8,
+     "millilitres": 2598
+    },
+    {
+     "offset": -6,
+     "millilitres": 2598
+    },
+    {
+     "offset": -5,
+     "millilitres": 2598
+    },
+    {
+     "offset": -4,
+     "millilitres": 2598
+    },
+    {
+     "offset": -3,
+     "millilitres": 2598
+    },
+    {
+     "offset": 0,
+     "millilitres": 2598
+    }
+   ],
+   "expected": {
+    "currentStreak": 1,
+    "bestStreak": 4,
+    "loggedDays": 8,
+    "metDays": 6,
+    "average": 2257.75,
+    "intent": "done"
+   }
+  },
+  {
+   "goal": 2029,
+   "days": [
+    {
+     "offset": -11,
+     "millilitres": 1015
+    },
+    {
+     "offset": -10,
+     "millilitres": 2130
+    },
+    {
+     "offset": -9,
+     "millilitres": 2130
+    },
+    {
+     "offset": -8,
+     "millilitres": 2130
+    },
+    {
+     "offset": -5,
+     "millilitres": 2130
+    },
+    {
+     "offset": -4,
+     "millilitres": 2130
+    },
+    {
+     "offset": -2,
+     "millilitres": 1015
+    },
+    {
+     "offset": -1,
+     "millilitres": 1015
+    }
+   ],
+   "expected": {
+    "currentStreak": 0,
+    "bestStreak": 3,
+    "loggedDays": 8,
+    "metDays": 5,
+    "average": 1711.875,
+    "intent": "behind"
+   }
+  },
+  {
+   "goal": 3295,
+   "days": [
+    {
+     "offset": -11,
+     "millilitres": 3460
+    },
+    {
+     "offset": -9,
+     "millilitres": 3460
+    },
+    {
+     "offset": -8,
+     "millilitres": 3460
+    },
+    {
+     "offset": -7,
+     "millilitres": 1648
+    },
+    {
+     "offset": -6,
+     "millilitres": 3460
+    },
+    {
+     "offset": -4,
+     "millilitres": 1648
+    },
+    {
+     "offset": -3,
+     "millilitres": 1648
+    },
+    {
+     "offset": -2,
+     "millilitres": 1648
+    },
+    {
+     "offset": 0,
+     "millilitres": 1648
+    }
+   ],
+   "expected": {
+    "currentStreak": 0,
+    "bestStreak": 2,
+    "loggedDays": 9,
+    "metDays": 4,
+    "average": 2453.333333,
+    "intent": "ontrack"
+   }
+  },
+  {
+   "goal": 3071,
+   "days": [
+    {
+     "offset": -10,
+     "millilitres": 3225
+    },
+    {
+     "offset": -9,
+     "millilitres": 3225
+    },
+    {
+     "offset": -7,
+     "millilitres": 1536
+    },
+    {
+     "offset": -6,
+     "millilitres": 1536
+    },
+    {
+     "offset": -5,
+     "millilitres": 1536
+    },
+    {
+     "offset": -1,
+     "millilitres": 3225
+    }
+   ],
+   "expected": {
+    "currentStreak": 1,
+    "bestStreak": 2,
+    "loggedDays": 6,
+    "metDays": 3,
+    "average": 2380.5,
+    "intent": "behind"
+   }
+  },
+  {
+   "goal": 2848,
+   "days": [
+    {
+     "offset": -11,
+     "millilitres": 2990
+    },
+    {
+     "offset": -10,
+     "millilitres": 2990
+    },
+    {
+     "offset": -9,
+     "millilitres": 2990
+    },
+    {
+     "offset": -7,
+     "millilitres": 1424
+    },
+    {
+     "offset": -4,
+     "millilitres": 2990
+    },
+    {
+     "offset": -2,
+     "millilitres": 2990
+    },
+    {
+     "offset": 0,
+     "millilitres": 1424
+    }
+   ],
+   "expected": {
+    "currentStreak": 0,
+    "bestStreak": 3,
+    "loggedDays": 7,
+    "metDays": 5,
+    "average": 2542.571429,
+    "intent": "ontrack"
+   }
+  },
+  {
+   "goal": 2541,
+   "days": [
+    {
+     "offset": -11,
+     "millilitres": 1271
+    },
+    {
+     "offset": -10,
+     "millilitres": 1271
+    },
+    {
+     "offset": -8,
+     "millilitres": 1271
+    },
+    {
+     "offset": -7,
+     "millilitres": 1271
+    },
+    {
+     "offset": -6,
+     "millilitres": 1271
+    },
+    {
+     "offset": -2,
+     "millilitres": 1271
+    },
+    {
+     "offset": -1,
+     "millilitres": 1271
+    },
+    {
+     "offset": 0,
+     "millilitres": 2668
+    }
+   ],
+   "expected": {
+    "currentStreak": 1,
+    "bestStreak": 1,
+    "loggedDays": 8,
+    "metDays": 1,
+    "average": 1445.625,
+    "intent": "done"
+   }
+  },
+  {
+   "goal": 3443,
+   "days": [
+    {
+     "offset": -10,
+     "millilitres": 1722
+    },
+    {
+     "offset": -9,
+     "millilitres": 3615
+    },
+    {
+     "offset": -7,
+     "millilitres": 3615
+    },
+    {
+     "offset": -6,
+     "millilitres": 1722
+    },
+    {
+     "offset": -5,
+     "millilitres": 3615
+    },
+    {
+     "offset": -3,
+     "millilitres": 3615
+    },
+    {
+     "offset": -2,
+     "millilitres": 3615
+    },
+    {
+     "offset": -1,
+     "millilitres": 3615
+    },
+    {
+     "offset": 0,
+     "millilitres": 3615
+    }
+   ],
+   "expected": {
+    "currentStreak": 4,
+    "bestStreak": 4,
+    "loggedDays": 9,
+    "metDays": 7,
+    "average": 3194.333333,
+    "intent": "done"
+   }
+  },
+  {
+   "goal": 3108,
+   "days": [
+    {
+     "offset": -9,
+     "millilitres": 3263
+    },
+    {
+     "offset": -7,
+     "millilitres": 1554
+    },
+    {
+     "offset": -4,
+     "millilitres": 3263
+    },
+    {
+     "offset": -3,
+     "millilitres": 1554
+    }
+   ],
+   "expected": {
+    "currentStreak": 0,
+    "bestStreak": 1,
+    "loggedDays": 4,
+    "metDays": 2,
+    "average": 2408.5,
+    "intent": "comeback"
+   }
+  },
+  {
+   "goal": 2945,
+   "days": [
+    {
+     "offset": -11,
+     "millilitres": 3092
+    },
+    {
+     "offset": -10,
+     "millilitres": 1473
+    },
+    {
+     "offset": -9,
+     "millilitres": 1473
+    },
+    {
+     "offset": -8,
+     "millilitres": 3092
+    },
+    {
+     "offset": -4,
+     "millilitres": 3092
+    },
+    {
+     "offset": -3,
+     "millilitres": 3092
+    },
+    {
+     "offset": -2,
+     "millilitres": 3092
+    },
+    {
+     "offset": 0,
+     "millilitres": 1473
+    }
+   ],
+   "expected": {
+    "currentStreak": 0,
+    "bestStreak": 3,
+    "loggedDays": 8,
+    "metDays": 5,
+    "average": 2484.875,
+    "intent": "ontrack"
+   }
+  },
+  {
+   "goal": 2951,
+   "days": [
+    {
+     "offset": -10,
+     "millilitres": 3099
+    },
+    {
+     "offset": -9,
+     "millilitres": 3099
+    },
+    {
+     "offset": -8,
+     "millilitres": 1476
+    },
+    {
+     "offset": -7,
+     "millilitres": 3099
+    },
+    {
+     "offset": -5,
+     "millilitres": 3099
+    },
+    {
+     "offset": -4,
+     "millilitres": 3099
+    },
+    {
+     "offset": -3,
+     "millilitres": 3099
+    },
+    {
+     "offset": -1,
+     "millilitres": 3099
+    },
+    {
+     "offset": 0,
+     "millilitres": 1476
+    }
+   ],
+   "expected": {
+    "currentStreak": 1,
+    "bestStreak": 3,
+    "loggedDays": 9,
+    "metDays": 7,
+    "average": 2738.333333,
+    "intent": "ontrack"
+   }
+  },
+  {
+   "goal": 3273,
+   "days": [
+    {
+     "offset": -11,
+     "millilitres": 3437
+    },
+    {
+     "offset": -9,
+     "millilitres": 3437
+    },
+    {
+     "offset": -8,
+     "millilitres": 3437
+    },
+    {
+     "offset": -6,
+     "millilitres": 1637
+    },
+    {
+     "offset": -5,
+     "millilitres": 1637
+    },
+    {
+     "offset": -4,
+     "millilitres": 3437
+    },
+    {
+     "offset": -3,
+     "millilitres": 1637
+    },
+    {
+     "offset": -2,
+     "millilitres": 3437
+    },
+    {
+     "offset": -1,
+     "millilitres": 3437
+    }
+   ],
+   "expected": {
+    "currentStreak": 2,
+    "bestStreak": 2,
+    "loggedDays": 9,
+    "metDays": 6,
+    "average": 2837,
+    "intent": "behind"
+   }
+  },
+  {
+   "goal": 3440,
+   "days": [
+    {
+     "offset": -11,
+     "millilitres": 3612
+    },
+    {
+     "offset": -8,
+     "millilitres": 3612
+    },
+    {
+     "offset": -5,
+     "millilitres": 1720
+    },
+    {
+     "offset": -4,
+     "millilitres": 3612
+    }
+   ],
+   "expected": {
+    "currentStreak": 0,
+    "bestStreak": 1,
+    "loggedDays": 4,
+    "metDays": 3,
+    "average": 3139,
+    "intent": "comeback"
+   }
+  },
+  {
+   "goal": 3097,
+   "days": [
+    {
+     "offset": -9,
+     "millilitres": 3252
+    },
+    {
+     "offset": -8,
+     "millilitres": 3252
+    },
+    {
+     "offset": -7,
+     "millilitres": 1549
+    },
+    {
+     "offset": -6,
+     "millilitres": 3252
+    },
+    {
+     "offset": -5,
+     "millilitres": 1549
+    },
+    {
+     "offset": -4,
+     "millilitres": 3252
+    },
+    {
+     "offset": -2,
+     "millilitres": 3252
+    },
+    {
+     "offset": -1,
+     "millilitres": 1549
+    }
+   ],
+   "expected": {
+    "currentStreak": 0,
+    "bestStreak": 2,
+    "loggedDays": 8,
+    "metDays": 5,
+    "average": 2613.375,
+    "intent": "behind"
+   }
+  },
+  {
+   "goal": 2261,
+   "days": [
+    {
+     "offset": -11,
+     "millilitres": 2374
+    },
+    {
+     "offset": -10,
+     "millilitres": 2374
+    },
+    {
+     "offset": -8,
+     "millilitres": 1131
+    },
+    {
+     "offset": -7,
+     "millilitres": 2374
+    },
+    {
+     "offset": -6,
+     "millilitres": 2374
+    },
+    {
+     "offset": -5,
+     "millilitres": 2374
+    },
+    {
+     "offset": -3,
+     "millilitres": 1131
+    },
+    {
+     "offset": -2,
+     "millilitres": 1131
+    }
+   ],
+   "expected": {
+    "currentStreak": 0,
+    "bestStreak": 3,
+    "loggedDays": 8,
+    "metDays": 5,
+    "average": 1907.875,
+    "intent": "comeback"
+   }
+  },
+  {
+   "goal": 2465,
+   "days": [
+    {
+     "offset": -11,
+     "millilitres": 2588
+    },
+    {
+     "offset": -9,
+     "millilitres": 1233
+    },
+    {
+     "offset": -7,
+     "millilitres": 2588
+    },
+    {
+     "offset": -6,
+     "millilitres": 1233
+    },
+    {
+     "offset": -5,
+     "millilitres": 1233
+    },
+    {
+     "offset": -4,
+     "millilitres": 1233
+    },
+    {
+     "offset": -3,
+     "millilitres": 1233
+    },
+    {
+     "offset": 0,
+     "millilitres": 2588
+    }
+   ],
+   "expected": {
+    "currentStreak": 1,
+    "bestStreak": 1,
+    "loggedDays": 8,
+    "metDays": 3,
+    "average": 1741.125,
+    "intent": "done"
+   }
+  },
+  {
+   "goal": 3305,
+   "days": [
+    {
+     "offset": -8,
+     "millilitres": 3470
+    },
+    {
+     "offset": -7,
+     "millilitres": 1653
+    },
+    {
+     "offset": -4,
+     "millilitres": 3470
+    },
+    {
+     "offset": -3,
+     "millilitres": 1653
+    },
+    {
+     "offset": -2,
+     "millilitres": 1653
+    },
+    {
+     "offset": -1,
+     "millilitres": 3470
+    }
+   ],
+   "expected": {
+    "currentStreak": 1,
+    "bestStreak": 1,
+    "loggedDays": 6,
+    "metDays": 3,
+    "average": 2561.5,
+    "intent": "behind"
+   }
+  },
+  {
+   "goal": 2444,
+   "days": [
+    {
+     "offset": -11,
+     "millilitres": 2566
+    },
+    {
+     "offset": -8,
+     "millilitres": 1222
+    },
+    {
+     "offset": -7,
+     "millilitres": 2566
+    },
+    {
+     "offset": -6,
+     "millilitres": 2566
+    },
+    {
+     "offset": -4,
+     "millilitres": 2566
+    },
+    {
+     "offset": -3,
+     "millilitres": 1222
+    },
+    {
+     "offset": -2,
+     "millilitres": 2566
+    },
+    {
+     "offset": 0,
+     "millilitres": 2566
+    }
+   ],
+   "expected": {
+    "currentStreak": 1,
+    "bestStreak": 2,
+    "loggedDays": 8,
+    "metDays": 6,
+    "average": 2230,
+    "intent": "done"
+   }
+  },
+  {
+   "goal": 2592,
+   "days": [
+    {
+     "offset": -9,
+     "millilitres": 2722
+    },
+    {
+     "offset": -8,
+     "millilitres": 1296
+    },
+    {
+     "offset": -5,
+     "millilitres": 1296
+    },
+    {
+     "offset": -4,
+     "millilitres": 2722
+    },
+    {
+     "offset": -1,
+     "millilitres": 2722
+    },
+    {
+     "offset": 0,
+     "millilitres": 2722
+    }
+   ],
+   "expected": {
+    "currentStreak": 2,
+    "bestStreak": 2,
+    "loggedDays": 6,
+    "metDays": 4,
+    "average": 2246.666667,
+    "intent": "done"
+   }
+  },
+  {
+   "goal": 3129,
+   "days": [
+    {
+     "offset": -10,
+     "millilitres": 1565
+    },
+    {
+     "offset": -8,
+     "millilitres": 1565
+    },
+    {
+     "offset": -6,
+     "millilitres": 1565
+    },
+    {
+     "offset": -3,
+     "millilitres": 3285
+    },
+    {
+     "offset": -2,
+     "millilitres": 3285
+    },
+    {
+     "offset": -1,
+     "millilitres": 3285
+    },
+    {
+     "offset": 0,
+     "millilitres": 1565
+    }
+   ],
+   "expected": {
+    "currentStreak": 3,
+    "bestStreak": 3,
+    "loggedDays": 7,
+    "metDays": 3,
+    "average": 2302.142857,
+    "intent": "ontrack"
+   }
+  },
+  {
+   "goal": 2200,
+   "days": [
+    {
+     "offset": -9,
+     "millilitres": 2310
+    },
+    {
+     "offset": -8,
+     "millilitres": 1100
+    },
+    {
+     "offset": -7,
+     "millilitres": 2310
+    },
+    {
+     "offset": -6,
+     "millilitres": 2310
+    },
+    {
+     "offset": -3,
+     "millilitres": 1100
+    },
+    {
+     "offset": -2,
+     "millilitres": 1100
+    },
+    {
+     "offset": -1,
+     "millilitres": 2310
+    },
+    {
+     "offset": 0,
+     "millilitres": 2310
+    }
+   ],
+   "expected": {
+    "currentStreak": 2,
+    "bestStreak": 2,
+    "loggedDays": 8,
+    "metDays": 5,
+    "average": 1856.25,
+    "intent": "done"
+   }
+  },
+  {
+   "goal": 3078,
+   "days": [
+    {
+     "offset": -11,
+     "millilitres": 1539
+    },
+    {
+     "offset": -8,
+     "millilitres": 1539
+    },
+    {
+     "offset": -7,
+     "millilitres": 3232
+    },
+    {
+     "offset": -6,
+     "millilitres": 3232
+    },
+    {
+     "offset": -3,
+     "millilitres": 3232
+    }
+   ],
+   "expected": {
+    "currentStreak": 0,
+    "bestStreak": 2,
+    "loggedDays": 5,
+    "metDays": 3,
+    "average": 2554.8,
+    "intent": "comeback"
+   }
+  },
+  {
+   "goal": 2182,
+   "days": [
+    {
+     "offset": -11,
+     "millilitres": 2291
+    },
+    {
+     "offset": -9,
+     "millilitres": 2291
+    },
+    {
+     "offset": -6,
+     "millilitres": 2291
+    },
+    {
+     "offset": -5,
+     "millilitres": 2291
+    },
+    {
+     "offset": -4,
+     "millilitres": 2291
+    },
+    {
+     "offset": -3,
+     "millilitres": 1091
+    },
+    {
+     "offset": -2,
+     "millilitres": 2291
+    },
+    {
+     "offset": -1,
+     "millilitres": 1091
+    }
+   ],
+   "expected": {
+    "currentStreak": 0,
+    "bestStreak": 3,
+    "loggedDays": 8,
+    "metDays": 6,
+    "average": 1991,
+    "intent": "behind"
+   }
+  },
+  {
+   "goal": 3222,
+   "days": [
+    {
+     "offset": -11,
+     "millilitres": 3383
+    },
+    {
+     "offset": -10,
+     "millilitres": 3383
+    },
+    {
+     "offset": -9,
+     "millilitres": 3383
+    },
+    {
+     "offset": -6,
+     "millilitres": 3383
+    },
+    {
+     "offset": -3,
+     "millilitres": 3383
+    },
+    {
+     "offset": -2,
+     "millilitres": 3383
+    },
+    {
+     "offset": -1,
+     "millilitres": 1611
+    },
+    {
+     "offset": 0,
+     "millilitres": 1611
+    }
+   ],
+   "expected": {
+    "currentStreak": 0,
+    "bestStreak": 3,
+    "loggedDays": 8,
+    "metDays": 6,
+    "average": 2940,
+    "intent": "ontrack"
+   }
+  },
+  {
+   "goal": 3077,
+   "days": [
+    {
+     "offset": -11,
+     "millilitres": 3231
+    },
+    {
+     "offset": -9,
+     "millilitres": 3231
+    },
+    {
+     "offset": -8,
+     "millilitres": 1539
+    },
+    {
+     "offset": -7,
+     "millilitres": 3231
+    },
+    {
+     "offset": -5,
+     "millilitres": 3231
+    },
+    {
+     "offset": -4,
+     "millilitres": 3231
+    },
+    {
+     "offset": -3,
+     "millilitres": 1539
+    },
+    {
+     "offset": -2,
+     "millilitres": 3231
+    },
+    {
+     "offset": -1,
+     "millilitres": 3231
+    },
+    {
+     "offset": 0,
+     "millilitres": 3231
+    }
+   ],
+   "expected": {
+    "currentStreak": 3,
+    "bestStreak": 3,
+    "loggedDays": 10,
+    "metDays": 8,
+    "average": 2892.6,
+    "intent": "done"
+   }
+  },
+  {
+   "goal": 2390,
+   "days": [
+    {
+     "offset": -10,
+     "millilitres": 2510
+    },
+    {
+     "offset": -9,
+     "millilitres": 1195
+    },
+    {
+     "offset": -8,
+     "millilitres": 2510
+    },
+    {
+     "offset": -7,
+     "millilitres": 1195
+    },
+    {
+     "offset": -4,
+     "millilitres": 2510
+    },
+    {
+     "offset": -3,
+     "millilitres": 1195
+    },
+    {
+     "offset": -1,
+     "millilitres": 1195
+    },
+    {
+     "offset": 0,
+     "millilitres": 2510
+    }
+   ],
+   "expected": {
+    "currentStreak": 1,
+    "bestStreak": 1,
+    "loggedDays": 8,
+    "metDays": 4,
+    "average": 1852.5,
+    "intent": "done"
+   }
+  },
+  {
+   "goal": 2628,
+   "days": [
+    {
+     "offset": -10,
+     "millilitres": 2759
+    },
+    {
+     "offset": -8,
+     "millilitres": 1314
+    },
+    {
+     "offset": -7,
+     "millilitres": 1314
+    },
+    {
+     "offset": -6,
+     "millilitres": 1314
+    },
+    {
+     "offset": -2,
+     "millilitres": 1314
+    },
+    {
+     "offset": 0,
+     "millilitres": 1314
+    }
+   ],
+   "expected": {
+    "currentStreak": 0,
+    "bestStreak": 1,
+    "loggedDays": 6,
+    "metDays": 1,
+    "average": 1554.833333,
+    "intent": "ontrack"
+   }
+  },
+  {
+   "goal": 2874,
+   "days": [
+    {
+     "offset": -10,
+     "millilitres": 3018
+    },
+    {
+     "offset": -9,
+     "millilitres": 1437
+    },
+    {
+     "offset": -8,
+     "millilitres": 3018
+    },
+    {
+     "offset": -7,
+     "millilitres": 3018
+    },
+    {
+     "offset": -6,
+     "millilitres": 1437
+    },
+    {
+     "offset": -5,
+     "millilitres": 1437
+    },
+    {
+     "offset": -4,
+     "millilitres": 3018
+    },
+    {
+     "offset": -2,
+     "millilitres": 3018
+    },
+    {
+     "offset": -1,
+     "millilitres": 3018
+    },
+    {
+     "offset": 0,
+     "millilitres": 3018
+    }
+   ],
+   "expected": {
+    "currentStreak": 3,
+    "bestStreak": 3,
+    "loggedDays": 10,
+    "metDays": 7,
+    "average": 2543.7,
+    "intent": "done"
+   }
+  },
+  {
+   "goal": 3442,
+   "days": [
+    {
+     "offset": -10,
+     "millilitres": 3614
+    },
+    {
+     "offset": -7,
+     "millilitres": 3614
+    },
+    {
+     "offset": -6,
+     "millilitres": 3614
+    },
+    {
+     "offset": -4,
+     "millilitres": 3614
+    },
+    {
+     "offset": -3,
+     "millilitres": 3614
+    },
+    {
+     "offset": -1,
+     "millilitres": 3614
+    }
+   ],
+   "expected": {
+    "currentStreak": 1,
+    "bestStreak": 2,
+    "loggedDays": 6,
+    "metDays": 6,
+    "average": 3614,
+    "intent": "behind"
+   }
+  },
+  {
+   "goal": 3031,
+   "days": [
+    {
+     "offset": -10,
+     "millilitres": 1516
+    },
+    {
+     "offset": -8,
+     "millilitres": 1516
+    },
+    {
+     "offset": -7,
+     "millilitres": 1516
+    },
+    {
+     "offset": -5,
+     "millilitres": 3183
+    },
+    {
+     "offset": -4,
+     "millilitres": 3183
+    },
+    {
+     "offset": -3,
+     "millilitres": 1516
+    },
+    {
+     "offset": 0,
+     "millilitres": 1516
+    }
+   ],
+   "expected": {
+    "currentStreak": 0,
+    "bestStreak": 2,
+    "loggedDays": 7,
+    "metDays": 2,
+    "average": 1992.285714,
+    "intent": "ontrack"
+   }
+  },
+  {
+   "goal": 3100,
+   "days": [
+    {
+     "offset": -10,
+     "millilitres": 1550
+    },
+    {
+     "offset": -9,
+     "millilitres": 3255
+    },
+    {
+     "offset": -8,
+     "millilitres": 3255
+    },
+    {
+     "offset": -7,
+     "millilitres": 3255
+    },
+    {
+     "offset": -5,
+     "millilitres": 1550
+    },
+    {
+     "offset": -4,
+     "millilitres": 3255
+    },
+    {
+     "offset": -2,
+     "millilitres": 3255
+    },
+    {
+     "offset": -1,
+     "millilitres": 3255
+    },
+    {
+     "offset": 0,
+     "millilitres": 1550
+    }
+   ],
+   "expected": {
+    "currentStreak": 2,
+    "bestStreak": 3,
+    "loggedDays": 9,
+    "metDays": 6,
+    "average": 2686.666667,
+    "intent": "ontrack"
+   }
+  },
+  {
+   "goal": 2090,
+   "days": [
+    {
+     "offset": -8,
+     "millilitres": 2195
+    },
+    {
+     "offset": -5,
+     "millilitres": 2195
+    },
+    {
+     "offset": -4,
+     "millilitres": 2195
+    },
+    {
+     "offset": -2,
+     "millilitres": 2195
+    }
+   ],
+   "expected": {
+    "currentStreak": 0,
+    "bestStreak": 2,
+    "loggedDays": 4,
+    "metDays": 4,
+    "average": 2195,
+    "intent": "comeback"
+   }
+  },
+  {
+   "goal": 2558,
+   "days": [
+    {
+     "offset": -11,
+     "millilitres": 2686
+    },
+    {
+     "offset": -10,
+     "millilitres": 1279
+    },
+    {
+     "offset": -8,
+     "millilitres": 2686
+    },
+    {
+     "offset": -5,
+     "millilitres": 2686
+    },
+    {
+     "offset": -3,
+     "millilitres": 2686
+    },
+    {
+     "offset": -1,
+     "millilitres": 2686
+    },
+    {
+     "offset": 0,
+     "millilitres": 1279
+    }
+   ],
+   "expected": {
+    "currentStreak": 1,
+    "bestStreak": 1,
+    "loggedDays": 7,
+    "metDays": 5,
+    "average": 2284,
+    "intent": "ontrack"
+   }
+  },
+  {
+   "goal": 3124,
+   "days": [
+    {
+     "offset": -11,
+     "millilitres": 1562
+    },
+    {
+     "offset": -9,
+     "millilitres": 1562
+    },
+    {
+     "offset": -8,
+     "millilitres": 3280
+    },
+    {
+     "offset": -7,
+     "millilitres": 3280
+    },
+    {
+     "offset": -6,
+     "millilitres": 3280
+    },
+    {
+     "offset": -2,
+     "millilitres": 1562
+    },
+    {
+     "offset": 0,
+     "millilitres": 3280
+    }
+   ],
+   "expected": {
+    "currentStreak": 1,
+    "bestStreak": 3,
+    "loggedDays": 7,
+    "metDays": 4,
+    "average": 2543.714286,
+    "intent": "done"
+   }
+  },
+  {
+   "goal": 2908,
+   "days": [
+    {
+     "offset": -10,
+     "millilitres": 3053
+    },
+    {
+     "offset": -9,
+     "millilitres": 3053
+    },
+    {
+     "offset": -8,
+     "millilitres": 3053
+    },
+    {
+     "offset": -7,
+     "millilitres": 3053
+    },
+    {
+     "offset": -6,
+     "millilitres": 3053
+    },
+    {
+     "offset": -4,
+     "millilitres": 3053
+    },
+    {
+     "offset": -3,
+     "millilitres": 3053
+    },
+    {
+     "offset": -2,
+     "millilitres": 3053
+    },
+    {
+     "offset": 0,
+     "millilitres": 1454
+    }
+   ],
+   "expected": {
+    "currentStreak": 0,
+    "bestStreak": 5,
+    "loggedDays": 9,
+    "metDays": 8,
+    "average": 2875.333333,
+    "intent": "ontrack"
+   }
+  },
+  {
+   "goal": 2103,
+   "days": [
+    {
+     "offset": -11,
+     "millilitres": 2208
+    },
+    {
+     "offset": -10,
+     "millilitres": 1052
+    },
+    {
+     "offset": -7,
+     "millilitres": 1052
+    },
+    {
+     "offset": -6,
+     "millilitres": 1052
+    },
+    {
+     "offset": -3,
+     "millilitres": 2208
+    },
+    {
+     "offset": -2,
+     "millilitres": 2208
+    },
+    {
+     "offset": -1,
+     "millilitres": 1052
+    },
+    {
+     "offset": 0,
+     "millilitres": 2208
+    }
+   ],
+   "expected": {
+    "currentStreak": 1,
+    "bestStreak": 2,
+    "loggedDays": 8,
+    "metDays": 4,
+    "average": 1630,
+    "intent": "done"
+   }
+  },
+  {
+   "goal": 2179,
+   "days": [
+    {
+     "offset": -11,
+     "millilitres": 2288
+    },
+    {
+     "offset": -10,
+     "millilitres": 2288
+    },
+    {
+     "offset": -9,
+     "millilitres": 2288
+    },
+    {
+     "offset": -8,
+     "millilitres": 2288
+    },
+    {
+     "offset": -7,
+     "millilitres": 1090
+    },
+    {
+     "offset": -6,
+     "millilitres": 2288
+    },
+    {
+     "offset": -4,
+     "millilitres": 1090
+    },
+    {
+     "offset": -2,
+     "millilitres": 2288
+    },
+    {
+     "offset": -1,
+     "millilitres": 2288
+    },
+    {
+     "offset": 0,
+     "millilitres": 1090
+    }
+   ],
+   "expected": {
+    "currentStreak": 2,
+    "bestStreak": 4,
+    "loggedDays": 10,
+    "metDays": 7,
+    "average": 1928.6,
+    "intent": "ontrack"
+   }
+  },
+  {
+   "goal": 3084,
+   "days": [
+    {
+     "offset": -11,
+     "millilitres": 3238
+    },
+    {
+     "offset": -10,
+     "millilitres": 3238
+    },
+    {
+     "offset": -9,
+     "millilitres": 1542
+    },
+    {
+     "offset": -8,
+     "millilitres": 3238
+    },
+    {
+     "offset": -7,
+     "millilitres": 3238
+    },
+    {
+     "offset": -5,
+     "millilitres": 3238
+    },
+    {
+     "offset": -4,
+     "millilitres": 3238
+    },
+    {
+     "offset": -2,
+     "millilitres": 1542
+    },
+    {
+     "offset": -1,
+     "millilitres": 1542
+    },
+    {
+     "offset": 0,
+     "millilitres": 3238
+    }
+   ],
+   "expected": {
+    "currentStreak": 1,
+    "bestStreak": 2,
+    "loggedDays": 10,
+    "metDays": 7,
+    "average": 2729.2,
+    "intent": "done"
+   }
+  },
+  {
+   "goal": 2053,
+   "days": [
+    {
+     "offset": -10,
+     "millilitres": 2156
+    },
+    {
+     "offset": -9,
+     "millilitres": 2156
+    },
+    {
+     "offset": -8,
+     "millilitres": 2156
+    },
+    {
+     "offset": -5,
+     "millilitres": 2156
+    },
+    {
+     "offset": -4,
+     "millilitres": 2156
+    },
+    {
+     "offset": -2,
+     "millilitres": 2156
+    },
+    {
+     "offset": -1,
+     "millilitres": 2156
+    }
+   ],
+   "expected": {
+    "currentStreak": 2,
+    "bestStreak": 3,
+    "loggedDays": 7,
+    "metDays": 7,
+    "average": 2156,
+    "intent": "behind"
+   }
+  },
+  {
+   "goal": 3049,
+   "days": [
+    {
+     "offset": -11,
+     "millilitres": 3201
+    },
+    {
+     "offset": -10,
+     "millilitres": 1525
+    },
+    {
+     "offset": -8,
+     "millilitres": 3201
+    },
+    {
+     "offset": -7,
+     "millilitres": 3201
+    },
+    {
+     "offset": -4,
+     "millilitres": 3201
+    },
+    {
+     "offset": -3,
+     "millilitres": 1525
+    },
+    {
+     "offset": -1,
+     "millilitres": 1525
+    }
+   ],
+   "expected": {
+    "currentStreak": 0,
+    "bestStreak": 2,
+    "loggedDays": 7,
+    "metDays": 4,
+    "average": 2482.714286,
+    "intent": "behind"
+   }
+  }
+ ]
+}

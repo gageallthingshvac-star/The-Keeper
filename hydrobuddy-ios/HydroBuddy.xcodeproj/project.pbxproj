@@ -1,0 +1,461 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		AB000000000000000000001D /* CoachContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000000000000000000001C /* CoachContent.swift */; };
+		AB000000000000000000001F /* CoachEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000000000000000000001E /* CoachEngine.swift */; };
+		AB0000000000000000000021 /* CoachView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000020 /* CoachView.swift */; };
+		AB0000000000000000000023 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000022 /* Haptics.swift */; };
+		AB0000000000000000000025 /* HealthKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000024 /* HealthKitManager.swift */; };
+		AB0000000000000000000027 /* HydrationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000026 /* HydrationEngine.swift */; };
+		AB0000000000000000000029 /* HydroBuddyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000028 /* HydroBuddyApp.swift */; };
+		AB000000000000000000002B /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000000000000000000002A /* Models.swift */; };
+		AB000000000000000000002D /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000000000000000000002C /* NotificationManager.swift */; };
+		AB000000000000000000002F /* RingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000000000000000000002E /* RingView.swift */; };
+		AB0000000000000000000031 /* SetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000030 /* SetupView.swift */; };
+		AB0000000000000000000033 /* StatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000032 /* StatsView.swift */; };
+		AB0000000000000000000035 /* Store.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000034 /* Store.swift */; };
+		AB0000000000000000000037 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000036 /* Theme.swift */; };
+		AB0000000000000000000039 /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000038 /* TodayView.swift */; };
+		AB000000000000000000003B /* CoachEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000000000000000000003A /* CoachEngineTests.swift */; };
+		AB000000000000000000003D /* HydrationEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000000000000000000003C /* HydrationEngineTests.swift */; };
+		AB000000000000000000003F /* NotificationScheduleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000000000000000000003E /* NotificationScheduleTests.swift */; };
+		AB0000000000000000000041 /* ParityVectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000040 /* ParityVectorTests.swift */; };
+		AB0000000000000000000043 /* StoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000042 /* StoreTests.swift */; };
+		AB0000000000000000000045 /* parity-vectors.json in Resources */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000044 /* parity-vectors.json */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		AB000000000000000000001A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AB0000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AB0000000000000000000002;
+			remoteInfo = HydroBuddy;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		AB0000000000000000000004 /* HydroBuddy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HydroBuddy.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AB0000000000000000000005 /* HydroBuddyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HydroBuddyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		AB000000000000000000001C /* CoachContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachContent.swift; sourceTree = "<group>"; };
+		AB000000000000000000001E /* CoachEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachEngine.swift; sourceTree = "<group>"; };
+		AB0000000000000000000020 /* CoachView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachView.swift; sourceTree = "<group>"; };
+		AB0000000000000000000022 /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
+		AB0000000000000000000024 /* HealthKitManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitManager.swift; sourceTree = "<group>"; };
+		AB0000000000000000000026 /* HydrationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HydrationEngine.swift; sourceTree = "<group>"; };
+		AB0000000000000000000028 /* HydroBuddyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HydroBuddyApp.swift; sourceTree = "<group>"; };
+		AB000000000000000000002A /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		AB000000000000000000002C /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
+		AB000000000000000000002E /* RingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RingView.swift; sourceTree = "<group>"; };
+		AB0000000000000000000030 /* SetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupView.swift; sourceTree = "<group>"; };
+		AB0000000000000000000032 /* StatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsView.swift; sourceTree = "<group>"; };
+		AB0000000000000000000034 /* Store.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Store.swift; sourceTree = "<group>"; };
+		AB0000000000000000000036 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		AB0000000000000000000038 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
+		AB000000000000000000001B /* HydroBuddy.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HydroBuddy.entitlements; sourceTree = "<group>"; };
+		AB000000000000000000003A /* CoachEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachEngineTests.swift; sourceTree = "<group>"; };
+		AB000000000000000000003C /* HydrationEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HydrationEngineTests.swift; sourceTree = "<group>"; };
+		AB000000000000000000003E /* NotificationScheduleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationScheduleTests.swift; sourceTree = "<group>"; };
+		AB0000000000000000000040 /* ParityVectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParityVectorTests.swift; sourceTree = "<group>"; };
+		AB0000000000000000000042 /* StoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreTests.swift; sourceTree = "<group>"; };
+		AB0000000000000000000044 /* parity-vectors.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = parity-vectors.json; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		AB000000000000000000000B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AB000000000000000000000E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		AB0000000000000000000006 = {
+			isa = PBXGroup;
+			children = (
+				AB0000000000000000000007 /* HydroBuddy */,
+				AB0000000000000000000008 /* HydroBuddyTests */,
+				AB0000000000000000000009 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		AB0000000000000000000007 /* HydroBuddy */ = {
+			isa = PBXGroup;
+			children = (
+				AB000000000000000000001C /* CoachContent.swift */,
+				AB000000000000000000001E /* CoachEngine.swift */,
+				AB0000000000000000000020 /* CoachView.swift */,
+				AB0000000000000000000022 /* Haptics.swift */,
+				AB0000000000000000000024 /* HealthKitManager.swift */,
+				AB0000000000000000000026 /* HydrationEngine.swift */,
+				AB0000000000000000000028 /* HydroBuddyApp.swift */,
+				AB000000000000000000002A /* Models.swift */,
+				AB000000000000000000002C /* NotificationManager.swift */,
+				AB000000000000000000002E /* RingView.swift */,
+				AB0000000000000000000030 /* SetupView.swift */,
+				AB0000000000000000000032 /* StatsView.swift */,
+				AB0000000000000000000034 /* Store.swift */,
+				AB0000000000000000000036 /* Theme.swift */,
+				AB0000000000000000000038 /* TodayView.swift */,
+				AB000000000000000000001B /* HydroBuddy.entitlements */,
+			);
+			path = HydroBuddy;
+			sourceTree = "<group>";
+		};
+		AB0000000000000000000008 /* HydroBuddyTests */ = {
+			isa = PBXGroup;
+			children = (
+				AB000000000000000000003A /* CoachEngineTests.swift */,
+				AB000000000000000000003C /* HydrationEngineTests.swift */,
+				AB000000000000000000003E /* NotificationScheduleTests.swift */,
+				AB0000000000000000000040 /* ParityVectorTests.swift */,
+				AB0000000000000000000042 /* StoreTests.swift */,
+				AB0000000000000000000044 /* parity-vectors.json */,
+			);
+			path = HydroBuddyTests;
+			sourceTree = "<group>";
+		};
+		AB0000000000000000000009 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AB0000000000000000000004 /* HydroBuddy.app */,
+				AB0000000000000000000005 /* HydroBuddyTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		AB0000000000000000000002 /* HydroBuddy */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AB0000000000000000000011 /* Build configuration list for PBXNativeTarget "HydroBuddy" */;
+			buildPhases = (
+				AB000000000000000000000A /* Sources */,
+				AB000000000000000000000B /* Frameworks */,
+				AB000000000000000000000C /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = HydroBuddy;
+			productName = HydroBuddy;
+			productReference = AB0000000000000000000004 /* HydroBuddy.app */;
+			productType = "com.apple.product-type.application";
+		};
+		AB0000000000000000000003 /* HydroBuddyTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AB0000000000000000000012 /* Build configuration list for PBXNativeTarget "HydroBuddyTests" */;
+			buildPhases = (
+				AB000000000000000000000D /* Sources */,
+				AB000000000000000000000E /* Frameworks */,
+				AB000000000000000000000F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AB0000000000000000000019 /* PBXTargetDependency */,
+			);
+			name = HydroBuddyTests;
+			productName = HydroBuddyTests;
+			productReference = AB0000000000000000000005 /* HydroBuddyTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		AB0000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1520;
+				LastUpgradeCheck = 1520;
+				TargetAttributes = {
+					AB0000000000000000000002 = {
+						CreatedOnToolsVersion = 15.2;
+					};
+					AB0000000000000000000003 = {
+						CreatedOnToolsVersion = 15.2;
+						TestTargetID = AB0000000000000000000002;
+					};
+				};
+			};
+			buildConfigurationList = AB0000000000000000000010 /* Build configuration list for PBXProject "HydroBuddy" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = AB0000000000000000000006;
+			productRefGroup = AB0000000000000000000009 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				AB0000000000000000000002 /* HydroBuddy */,
+				AB0000000000000000000003 /* HydroBuddyTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		AB000000000000000000000C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AB000000000000000000000F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AB0000000000000000000045 /* parity-vectors.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		AB000000000000000000000A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AB000000000000000000001D /* CoachContent.swift in Sources */,
+				AB000000000000000000001F /* CoachEngine.swift in Sources */,
+				AB0000000000000000000021 /* CoachView.swift in Sources */,
+				AB0000000000000000000023 /* Haptics.swift in Sources */,
+				AB0000000000000000000025 /* HealthKitManager.swift in Sources */,
+				AB0000000000000000000027 /* HydrationEngine.swift in Sources */,
+				AB0000000000000000000029 /* HydroBuddyApp.swift in Sources */,
+				AB000000000000000000002B /* Models.swift in Sources */,
+				AB000000000000000000002D /* NotificationManager.swift in Sources */,
+				AB000000000000000000002F /* RingView.swift in Sources */,
+				AB0000000000000000000031 /* SetupView.swift in Sources */,
+				AB0000000000000000000033 /* StatsView.swift in Sources */,
+				AB0000000000000000000035 /* Store.swift in Sources */,
+				AB0000000000000000000037 /* Theme.swift in Sources */,
+				AB0000000000000000000039 /* TodayView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AB000000000000000000000D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AB000000000000000000003B /* CoachEngineTests.swift in Sources */,
+				AB000000000000000000003D /* HydrationEngineTests.swift in Sources */,
+				AB000000000000000000003F /* NotificationScheduleTests.swift in Sources */,
+				AB0000000000000000000041 /* ParityVectorTests.swift in Sources */,
+				AB0000000000000000000043 /* StoreTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		AB0000000000000000000019 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AB0000000000000000000002 /* HydroBuddy */;
+			targetProxy = AB000000000000000000001A /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		AB0000000000000000000013 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		AB0000000000000000000014 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		AB0000000000000000000015 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = HydroBuddy/HydroBuddy.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "HydroBuddy+ reads nothing from Health unless you turn the Health switch on.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "HydroBuddy+ writes the drinks you log as dietary water, so Health and this app agree.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleLightContent;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait";
+				INFOPLIST_KEY_UIUserInterfaceStyle = Dark;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hydrobuddy.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		AB0000000000000000000016 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = HydroBuddy/HydroBuddy.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "HydroBuddy+ reads nothing from Health unless you turn the Health switch on.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "HydroBuddy+ writes the drinks you log as dietary water, so Health and this app agree.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleLightContent;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait";
+				INFOPLIST_KEY_UIUserInterfaceStyle = Dark;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hydrobuddy.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		AB0000000000000000000017 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hydrobuddy.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/HydroBuddy.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/HydroBuddy";
+			};
+			name = Debug;
+		};
+		AB0000000000000000000018 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hydrobuddy.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/HydroBuddy.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/HydroBuddy";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		AB0000000000000000000010 /* Build configuration list for PBXProject "HydroBuddy" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AB0000000000000000000013 /* Debug */,
+				AB0000000000000000000014 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AB0000000000000000000011 /* Build configuration list for PBXNativeTarget "HydroBuddy" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AB0000000000000000000015 /* Debug */,
+				AB0000000000000000000016 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AB0000000000000000000012 /* Build configuration list for PBXNativeTarget "HydroBuddyTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AB0000000000000000000017 /* Debug */,
+				AB0000000000000000000018 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = AB0000000000000000000001 /* Project object */;
+}
