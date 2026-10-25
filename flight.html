@@ -333,10 +333,14 @@
         </section>
 
         <section data-pane="plane" class="sect" id="secPlane">
-          <h2>Power</h2>
-          <div class="row" id="pwrRow"></div>
-          <h2>Agility</h2>
-          <div class="row" id="aglRow"></div>
+          <h2>Aircraft</h2>
+          <div class="row" id="acRow"></div>
+          <div id="tuneRows">
+            <h2>Power</h2>
+            <div class="row" id="pwrRow"></div>
+            <h2>Agility</h2>
+            <div class="row" id="aglRow"></div>
+          </div>
           <h2>Livery</h2>
           <div class="row" id="livRow"></div>
           <h2>Trim colour</h2>
@@ -417,7 +421,7 @@
 
       <div class="mfoot">
         <div id="statbar">
-          <div class="statname"><b>SR-71A &middot; KEEPER FIELD</b><i id="statKit">&nbsp;</i></div>
+          <div class="statname"><b id="statName">SR-71A &middot; KEEPER FIELD</b><i id="statKit">&nbsp;</i></div>
           <div class="stats" id="stats"></div>
         </div>
         <button class="go" id="startBtn">BEGIN FLIGHT</button>
@@ -3118,6 +3122,286 @@ function buildAircraft() {
   }
   return P;
 }
+/* ===== the other aeroplane ===============================================
+
+   A little single-engined sport aeroplane: high wing, fat round nose with a
+   propeller on it, a tall round fin, and a bubble of glass to sit in. Six
+   and a half metres of it, against thirty-three metres of Blackbird.
+
+   It is built from the same palette, so every livery works on it, and to
+   the same contract as buildAircraft(): a flat object of named meshes,
+   hinged parts carrying their own pivot. Nose is +Z, up is +Y, right is +X,
+   and the origin sits where the wing meets the fuselage so that the whole
+   thing banks about the place a wing actually banks about. */
+function buildSport() {
+  const P = {};
+  const FINE = !MOBILE && !COARSE;
+  const N = FINE ? 16 : 10;                       // sections round the body
+  const CH = { two: true, spec: .30, gloss: 22 }; // a cartoon has a soft sheen
+  /* [z, half width, half height, y of the section centre] */
+  const FST = [
+    [2.90, .56, .62, .22], [2.40, .62, .70, .18], [1.70, .64, .76, .12],
+    [.80, .64, .78, .06], [-.20, .60, .74, .04], [-1.10, .50, .62, .08],
+    [-1.90, .38, .48, .14], [-2.60, .25, .34, .22], [-3.10, .13, .20, .30]
+  ];
+  const fpt = (st, k) => {
+    const a = k / N * TAU, sa = Math.sin(a), ca = Math.cos(a);
+    return [sa * st[1], st[3] + Math.sign(ca) * Math.pow(Math.abs(ca), .88) * st[2], st[0]];
+  };
+  {
+    const mb = MB();
+    for (let s2 = 0; s2 < FST.length - 1; s2++) {
+      const A = FST[s2], B = FST[s2 + 1];
+      for (let k = 0; k < N; k++) {
+        const k2 = (k + 1) % N;
+        const up = Math.cos(k / N * TAU);
+        const col = up > .50 ? LIV.top : up < -.50 ? LIV.belly : LIV.skin;
+        mb.quad(fpt(A, k), fpt(B, k), fpt(B, k2), fpt(A, k2), shade(col, 1 + (k % 2) * .03), CH);
+      }
+    }
+    mb.disc(0, FST[FST.length - 1][3], -3.12, .13, N, 2, shade(LIV.belly, .9), TWO);
+    /* ---- the nose: a cowling, a spinner, and nothing sticking out of it ---- */
+    /* The cowling is drawn from the SAME cross-section as the body. A round
+       cylinder on a square-ish fuselage leaves a step at the top and bottom
+       where the body is taller than the tube, and the step reads as a chunk
+       missing out of the nose. */
+    const CWL = { two: true, spec: .45, gloss: 36 };
+    const CST = [[2.90, .56, .62, .22], [3.16, .50, .55, .22], [3.38, .40, .43, .22]];
+    for (let s2 = 0; s2 < CST.length - 1; s2++) {
+      const A = CST[s2], B = CST[s2 + 1];
+      for (let k = 0; k < N; k++) {
+        const k2 = (k + 1) % N;
+        mb.quad(fpt(A, k), fpt(B, k), fpt(B, k2), fpt(A, k2), shade(LIV.red, 1 + (k % 2) * .03), CWL);
+      }
+    }
+    // and the ring of metal round the spinner that closes the front of it
+    const LIP = CST[CST.length - 1], HUB = .21;
+    for (let k = 0; k < N; k++) {
+      const k2 = (k + 1) % N;
+      const h = (kk) => [Math.sin(kk / N * TAU) * HUB, .22 + Math.cos(kk / N * TAU) * HUB, 3.42];
+      mb.quad(fpt(LIP, k), fpt(LIP, k2), h(k2), h(k), shade(LIV.red, .80), TWO);
+    }
+    // a cooling mouth under the spinner, because every one of these has one
+    mb.cyl(0, -.12, 3.20, .17, .17, .22, 8, [26, 28, 34], TWO, 2, 2);
+    // and a little exhaust stub down the side
+    for (const s2 of [-1, 1])
+      mb.cyl(s2 * .34, -.22, 2.60, .055, .055, .40, 6, LIV.metal, TWO, 2, 2);
+    /* ---- the fin: tall and round, which is most of the character ---- */
+    {
+      const RT = [[0, .96], [.26, .92], [.55, .80], [.80, .60], [.94, .36], [1, .12]];
+      const Y0 = .42, HH = 1.76, Z0 = -2.02, RAKE = .52;
+      for (let i = 0; i < RT.length - 1; i++) {
+        const A = RT[i], B = RT[i + 1];
+        const ya = Y0 + A[0] * HH, yb = Y0 + B[0] * HH;
+        const za = Z0 - A[0] * RAKE, zb = Z0 - B[0] * RAKE;
+        for (const s2 of [-1, 1])
+          mb.quad([s2 * .06, ya, za], [s2 * .06, yb, zb], [s2 * .06, yb, zb - B[1]], [s2 * .06, ya, za - A[1]],
+            s2 > 0 ? LIV.skin : shade(LIV.skin, .93), CH);
+        mb.quad([-.06, ya, za], [.06, ya, za], [.06, yb, zb], [-.06, yb, zb], LIV.edge, TWO);
+        mb.quad([.06, ya, za - A[1]], [-.06, ya, za - A[1]], [-.06, yb, zb - B[1]], [.06, yb, zb - B[1]], shade(LIV.skin, .88), TWO);
+      }
+      // the flash up the fin
+      for (const s2 of [-1, 1])
+        mb.quad([s2 * .068, Y0 + .18, Z0 - .10], [s2 * .068, Y0 + HH * .86, Z0 - RAKE * .86],
+                [s2 * .068, Y0 + HH * .86, Z0 - RAKE * .86 - .34], [s2 * .068, Y0 + .18, Z0 - .80],
+          LIV.red, { two: true, bias: -.6 });
+    }
+    // tailplane
+    for (const s2 of [-1, 1]) {
+      const sp = 1.60, pt = (t, zz) => [s2 * t * sp, .30 + t * .06, zz];
+      mb.quad(pt(0, -1.86), pt(1, -2.02), pt(1, -2.42), pt(0, -2.48), LIV.top, CH);
+      mb.quad(pt(0, -2.48), pt(1, -2.42), pt(1, -2.02), pt(0, -1.86), LIV.belly, CH);
+      mb.quad(pt(0, -1.86), pt(1, -2.02), [s2 * sp, .26, -2.02], [0, .26, -1.86], LIV.edge, TWO);
+    }
+    P.fuse = mb.done();
+  }
+  /* ---- the wing: high, thick, strutted ---- */
+  const WY = .86, WZ = .62, SPAN = 4.25, WC = 1.46;
+  for (const s2 of [-1, 1]) {
+    const mb = MB();
+    const sec = (t) => {
+      const ch = WC * (1 - t * .14);
+      return { x: s2 * t * SPAN, le: WZ + ch * .40 + t * .04, te: WZ - ch * .60 + t * .04,
+               y: WY + t * .13, th: .165 * (1 - t * .38) };
+    };
+    const NW = FINE ? 7 : 4;
+    for (let i = 0; i < NW; i++) {
+      const A = sec(i / NW), B = sec((i + 1) / NW);
+      mb.quad([A.x, A.y + A.th, A.le], [B.x, B.y + B.th, B.le], [B.x, B.y + B.th, B.te], [A.x, A.y + A.th, A.te], LIV.top, CH);
+      mb.quad([A.x, A.y - A.th, A.te], [B.x, B.y - B.th, B.te], [B.x, B.y - B.th, B.le], [A.x, A.y - A.th, A.le], LIV.belly, CH);
+      mb.quad([A.x, A.y - A.th, A.le], [B.x, B.y - B.th, B.le], [B.x, B.y + B.th, B.le], [A.x, A.y + A.th, A.le], LIV.edge, TWO);
+      mb.quad([A.x, A.y + A.th, A.te], [B.x, B.y + B.th, B.te], [B.x, B.y - B.th, B.te], [A.x, A.y - A.th, A.te], shade(LIV.skin, .88), TWO);
+    }
+    const T = sec(1);
+    mb.quad([T.x, T.y + T.th, T.le], [T.x, T.y + T.th, T.te], [T.x, T.y - T.th, T.te], [T.x, T.y - T.th, T.le], LIV.nac, TWO);
+    // the flash along the top of the wing
+    mb.quad([s2 * SPAN * .26, WY + .172, WZ + .40], [s2 * SPAN * .97, WY + .185, WZ + .34],
+            [s2 * SPAN * .97, WY + .185, WZ + .10], [s2 * SPAN * .26, WY + .172, WZ + .14],
+      LIV.red, { two: true, bias: -.6 });
+    // the lift strut, which is what says HIGH WING from any angle
+    const sx = s2 * SPAN * .50, sy = WY - .14, sz = WZ + .22;
+    const bx = s2 * .44, by = -.34, bz = WZ - .10;
+    const dx = bx - sx, dy = by - sy, dz = bz - sz, L = Math.hypot(dx, dy, dz);
+    const nx = -dy / L, ny = dx / L;
+    for (const o of [-.045, .045])
+      mb.quad([sx + nx * o, sy + ny * o, sz + .05], [bx + nx * o, by + ny * o, bz + .05],
+              [bx + nx * o, by + ny * o, bz - .05], [sx + nx * o, sy + ny * o, sz - .05], LIV.metal, TWO);
+    P[s2 > 0 ? "wingR" : "wingL"] = mb.done();
+  }
+  /* ---- hinged surfaces ---- */
+  const flat = (x0, x1, z0, z1, y, th, col, pivz) => {
+    const mb = MB();
+    mb.quad([x0, y + th, z0], [x1, y + th, z0], [x1, y + th, z1], [x0, y + th, z1], col, CH);
+    mb.quad([x0, y - th, z1], [x1, y - th, z1], [x1, y - th, z0], [x0, y - th, z0], shade(col, .84), CH);
+    mb.quad([x0, y + th, z1], [x1, y + th, z1], [x1, y - th, z1], [x0, y - th, z1], shade(col, .76), TWO);
+    for (const x of [x0, x1]) mb.quad([x, y + th, z0], [x, y + th, z1], [x, y - th, z1], [x, y - th, z0], shade(col, .9), TWO);
+    /* The verts stay where they are: drawMesh() takes them relative to the
+       pivot itself, and hinge() hands it the same pivot. Subtracting it
+       here as well moves the part to minus-pivot, which is how a whole set
+       of control surfaces ends up inside the tail. */
+    return { mesh: mb.done(), pivot: [0, y, pivz] };
+  };
+  P.elevR = flat(.12, 1.60, -2.48, -3.00, .34, .06, LIV.top, -2.48);
+  P.elevL = flat(-1.60, -.12, -2.48, -3.00, .34, .06, LIV.top, -2.48);
+  P.ailR = flat(SPAN * .54, SPAN * .96, WZ - .56, WZ - .94, WY + .10, .055, LIV.top, WZ - .56);
+  P.ailL = flat(-SPAN * .96, -SPAN * .54, WZ - .56, WZ - .94, WY + .10, .055, LIV.top, WZ - .56);
+  P.flapR = flat(SPAN * .14, SPAN * .50, WZ - .56, WZ - .92, WY + .07, .055, LIV.skin, WZ - .56);
+  P.flapL = flat(-SPAN * .50, -SPAN * .14, WZ - .56, WZ - .92, WY + .07, .055, LIV.skin, WZ - .56);
+  {
+    const mb = MB();
+    const RT = [[0, .80], [.42, .68], [.76, .46], [1, .16]];
+    const Y0 = .50, HH = 1.58, Z0 = -2.60, RAKE = .44;
+    for (let i = 0; i < RT.length - 1; i++) {
+      const A = RT[i], B = RT[i + 1];
+      const ya = Y0 + A[0] * HH, yb = Y0 + B[0] * HH;
+      const za = Z0 - A[0] * RAKE, zb = Z0 - B[0] * RAKE;
+      for (const s2 of [-1, 1])
+        mb.quad([s2 * .055, ya, za], [s2 * .055, yb, zb], [s2 * .055, yb, zb - B[1]], [s2 * .055, ya, za - A[1]],
+          s2 > 0 ? shade(LIV.skin, .97) : shade(LIV.skin, .91), CH);
+      mb.quad([.055, ya, za - A[1]], [-.055, ya, za - A[1]], [-.055, yb, zb - B[1]], [.055, yb, zb - B[1]], shade(LIV.skin, .85), TWO);
+    }
+    P.rudder = { mesh: mb.done(), pivot: [0, Y0, Z0] };
+  }
+  /* ---- the propeller ---- */
+  const PZ = 3.46, PY = .22, PR = 1.06;
+  {
+    const mb = MB();
+    /* The spinner: a smooth dome in rings. A cone closed to a point by a fan
+       of triangles, each one shaded differently by cyl()'s barrel twist, is
+       a handful of red shards stuck on the nose rather than a spinner. */
+    const SN = FINE ? 16 : 10, SR = .21, SO = { two: true, spec: .62, gloss: 56 };
+    const sdr = (t) => SR * Math.sqrt(Math.max(1 - t * t, 0));
+    const sdz = (t) => PZ - .04 + t * .36;
+    const sdp = (a, t) => [Math.sin(a) * sdr(t), PY + Math.cos(a) * sdr(t), sdz(t)];
+    for (let r = 0; r < 4; r++) {
+      const t0 = r / 4, t1 = (r + 1) / 4;
+      for (let k = 0; k < SN; k++) {
+        const a0 = k / SN * TAU, a1 = (k + 1) / SN * TAU;
+        const col = shade(LIV.red, 1.16 + (k % 2) * .03);
+        if (r === 3) mb.tri(sdp(a0, t0), sdp(a1, t0), [0, PY, sdz(1)], col, SO);
+        else mb.quad(sdp(a0, t0), sdp(a1, t0), sdp(a1, t1), sdp(a0, t1), col, SO);
+      }
+    }
+    for (let k = 0; k < 2; k++) {
+      /* Parked at an angle, not flat. A two-blade propeller stopped dead
+         level is a horizontal sliver that reads as a crack across the nose
+         rather than as a propeller, and in the hangar it is always stopped. */
+      const a = k * Math.PI + 1.15, ca = Math.cos(a), sa = Math.sin(a);
+      const NB = FINE ? 5 : 3;
+      /* A blade: a strip from the hub to the tip, twisted so the root is
+         nearly in the disc and the tip is biting. The twist is what stops
+         it reading as a flat lolly stick. */
+      const q = (t, s3, tw, w) => [ca * (t * PR) + sa * (s3 * w) * Math.sin(tw),
+                                   PY + sa * (t * PR) - ca * (s3 * w) * Math.sin(tw),
+                                   PZ + s3 * w * Math.cos(tw)];
+      for (let i = 0; i < NB; i++) {
+        const t0 = .14 + (i / NB) * .86, t1 = .14 + ((i + 1) / NB) * .86;
+        const w0 = .27 * (1 - t0 * .30), w1 = .27 * (1 - t1 * .30);
+        const tw0 = .46 - t0 * .34, tw1 = .46 - t1 * .34;
+        const col = [38, 40, 48];
+        mb.quad(q(t0, -1, tw0, w0), q(t1, -1, tw1, w1), q(t1, 1, tw1, w1), q(t0, 1, tw0, w0),
+          col, { two: true, spec: .35, gloss: 28 });
+      }
+      mb.quad(q(.92, -1, .15, .200), q(1, -1, .13, .165), q(1, 1, .13, .165), q(.92, 1, .15, .200),
+        [232, 198, 58], TWO);
+    }
+    P.prop = { mesh: mb.done(), pivot: [0, PY, PZ] };
+  }
+  {
+    const mb = MB(), ND = FINE ? 18 : 10;
+    for (let r = 0; r < 2; r++) {
+      const r0 = [.20, .66][r], r1 = [.66, PR][r], al = [.16, .09][r];
+      for (let i = 0; i < ND; i++) {
+        const a0 = i / ND * TAU, a1 = (i + 1) / ND * TAU;
+        const p = (a, rr) => [Math.cos(a) * rr, PY + Math.sin(a) * rr, PZ];
+        mb.quad(p(a0, r0), p(a1, r0), p(a1, r1), p(a0, r1), [198, 204, 214],
+          { two: true, alpha: al, bias: -2 });
+      }
+    }
+    P.propDisc = mb.done();
+  }
+  /* ---- the glass: a bubble over the cockpit and nothing else ---- */
+  {
+    const mb = MB();
+    const CT = [[1.72, .38, .30], [1.28, .54, .60], [.60, .56, .66], [-.10, .46, .54], [-.52, .26, .34]];
+    const NG = FINE ? 7 : 4;
+    for (let i = 0; i < CT.length - 1; i++) {
+      const A = CT[i], B = CT[i + 1];
+      for (let k = 0; k < NG; k++) {
+        const t0 = k / NG * Math.PI, t1 = (k + 1) / NG * Math.PI;
+        const pa = (t, st) => [Math.cos(t) * st[1], .50 + Math.sin(t) * st[2], st[0]];
+        mb.quad(pa(t0, A), pa(t0, B), pa(t1, B), pa(t1, A), LIV.glass,
+          { two: true, spec: .9, gloss: 96, alpha: .58 });
+      }
+    }
+    P.glass = mb.done();
+  }
+  /* ---- fat little wheels on short legs ---- */
+  /* `ax` is where the axle sits, and it is chosen so that every tyre's
+     BOTTOM lands on the same line -- which has to be the same line the
+     contact points in SPECS.wheels are on, or the aeroplane floats on its
+     nosewheel and drags its mains through the tarmac. */
+  const leg = (r, spat, ax) => {
+    const mb = MB();
+    mb.cyl(0, ax * .5, 0, .06, .06, -ax, 6, LIV.metal, TWO, 1, 0);
+    mb.cyl(0, ax, 0, r, r, .17, FINE ? 12 : 8, LIV.rubber, TWO, 2, 2);
+    mb.cyl(0, ax, 0, r * .40, r * .40, .19, 7, LIV.metal, TWO, 2, 2);
+    if (spat) {
+      // a teardrop spat over the top of the wheel
+      const pts = [[.00, ax + .38], [.30, ax + .26], [.34, ax + .04], [.10, ax - .14],
+                   [-.26, ax - .10], [-.34, ax + .16]];
+      for (let i = 0; i < pts.length; i++) {
+        const a = pts[i], b = pts[(i + 1) % pts.length];
+        mb.quad([-.17, a[1], a[0]], [.17, a[1], a[0]], [.17, b[1], b[0]], [-.17, b[1], b[0]],
+          shade(LIV.red, 1.02), TWO);
+      }
+      for (const sx of [-.17, .17])
+        for (let i = 1; i < pts.length - 1; i++)
+          mb.tri([sx, pts[0][1], pts[0][0]], [sx, pts[i][1], pts[i][0]], [sx, pts[i + 1][1], pts[i + 1][0]],
+            shade(LIV.red, sx > 0 ? .96 : .90), TWO);
+    }
+    return mb.done();
+  };
+  P.gearL = { mesh: leg(.32, 1, -.80), pivot: [-1.15, -.02, -.42] };
+  P.gearR = { mesh: leg(.32, 1, -.80), pivot: [1.15, -.02, -.42] };
+  P.gearN = { mesh: leg(.26, 0, -.86), pivot: [0, -.02, 2.05] };
+  // leg() builds at the origin; move each one out to where it belongs
+  for (const k of ["gearL", "gearR", "gearN"]) {
+    const g = P[k], q = g.pivot, v = g.mesh.v;
+    for (let i = 0; i < v.length; i += 3) { v[i] += q[0]; v[i + 1] += q[1]; v[i + 2] += q[2]; }
+  }
+  /* ---- markings ---- */
+  {
+    const mb = MB();
+    for (const s2 of [-1, 1])
+      mb.quad([s2 * .648, .36, .34], [s2 * .648, .36, -.44], [s2 * .648, -.06, -.44], [s2 * .648, -.06, .34],
+        LIV.paint, { two: true, bias: -.5 });
+    P.marks = mb.done();
+  }
+  P.chute = MB().done();                 // it has no drag chute; the slot stays
+  return P;
+}
+
 /* ===== the aeroplane is YOURS =============================================
 
    A livery is not decoration. The whole machine is built out of one palette
@@ -3145,7 +3429,13 @@ const LIVERIES = [
     chine: [236, 112, 40], nac: [222, 226, 232], glass: [104, 148, 180] },
   { id: "hunter", name: "NIGHT HUNTER", note: "Matte black on black, with the edges picked out. You will lose it against the ground.",
     skin: [17, 18, 22], top: [21, 22, 27], belly: [13, 14, 17], edge: [62, 64, 72],
-    chine: [15, 16, 20], nac: [19, 20, 25], glass: [58, 88, 110] }
+    chine: [15, 16, 20], nac: [19, 20, 25], glass: [58, 88, 110] },
+  { id: "sunday", name: "SUNDAY RED", note: "Pillarbox red over cream, which is what a light aeroplane is painted when somebody loves it. On the Blackbird it is a joke; on the sport aeroplane it is the point.",
+    skin: [206, 52, 46], top: [222, 66, 56], belly: [238, 234, 222], edge: [246, 242, 232],
+    chine: [196, 46, 40], nac: [214, 58, 50], glass: [138, 196, 224] },
+  { id: "cub", name: "CUB YELLOW", note: "Chrome yellow with a black flash, off a nineteen-forties trainer. It is visible from the next county, which was the idea.",
+    skin: [232, 186, 40], top: [244, 202, 54], belly: [214, 168, 32], edge: [38, 38, 42],
+    chine: [220, 176, 36], nac: [238, 194, 46], glass: [132, 190, 218] }
 ];
 const TRIMS = [
   ["SCARLET", [176, 40, 36]], ["GOLD", [214, 168, 58]], ["SKY", [64, 150, 216]],
@@ -3160,16 +3450,17 @@ const VISORS = [["GOLD", [214, 172, 66]], ["SMOKE", [42, 46, 54]], ["MIRROR", [1
                 ["CLEAR", [120, 150, 170]]];
 const SUITS = [["PRESSURE SILVER", [176, 180, 188]], ["FLIGHT GREEN", [92, 104, 74]],
                ["ORANGE", [214, 118, 48]], ["SLATE", [64, 70, 82]], ["TAN", [172, 156, 124]]];
-const KIT = { liv: 0, trim: 0, helm: 0, visor: 0, suit: 0, name: "", call: "", pwr: 0, agl: 1 };
+const KIT = { ac: 0, liv: 0, trim: 0, helm: 0, visor: 0, suit: 0, name: "", call: "", pwr: 0, agl: 1 };
 const KIT_KEY = "skyward.kit";
 (function kitLoad() {
   try {
     const o = JSON.parse(localStorage.getItem(KIT_KEY) || "null");
     if (!o) return;
-    for (const k of ["liv", "trim", "helm", "visor", "suit", "pwr", "agl"])
+    for (const k of ["ac", "liv", "trim", "helm", "visor", "suit", "pwr", "agl"])
       if (typeof o[k] === "number" && o[k] >= 0) KIT[k] = o[k] | 0;
     if (typeof o.name === "string") KIT.name = o.name.slice(0, 18);
     if (typeof o.call === "string") KIT.call = o.call.slice(0, 10);
+    if (o.seen && typeof o.seen === "object") KIT.seen = o.seen;
   } catch (e) {}
   KIT.liv = clamp(KIT.liv, 0, LIVERIES.length - 1);
   KIT.trim = clamp(KIT.trim, 0, TRIMS.length - 1);
@@ -3192,7 +3483,7 @@ function applyLivery() {
 }
 applyLivery();
 let AC = buildAircraft();
-function rebuildAircraft() { applyLivery(); AC = buildAircraft(); PILOTMESH = bakePilot(buildPilot()); }
+function rebuildAircraft() { applyLivery(); AC = acNow().build(); AC.kind = acNow().kind; PILOTMESH = bakePilot(buildPilot()); }
 /* A pilot, properly.
 
    The aeroplane is an SR-71 and the men who flew it did not wear a flight
@@ -4521,7 +4812,8 @@ function stageShot(name, t) {
     /* Thirty-three metres of aeroplane on a lit plate: the shot stands off
        the starboard bow and slightly ABOVE it, so what is behind the
        aeroplane is the plate and not the roof. */
-    const s = stageFit(18.4, 5.6, 17, 32, .60, 1.52);
+    const F = acNow().fit;
+    const s = stageFit(F.pw, F.ph, F.pmin, F.pmax, .60, 1.52);
     const d = s.d;
     const th = .66 + Math.sin(t * .15) * .07;
     /* The aeroplane is not symmetrical about the point the eye is pointed
@@ -4529,10 +4821,11 @@ function stageShot(name, t) {
        off to one side. The look-at slides along the camera's own right
        hand until the silhouette is centred, which is a pan and keeps the
        shot square on. */
-    const SHIFT = 3.2;
-    const c = v3(P.x + 1.2 + Math.sin(th) * SHIFT, E + 1.95, P.z - Math.cos(th) * SHIFT);
+    const SHIFT = F.shift;
+    const c = v3(P.x + F.lookX + Math.sin(th) * SHIFT, E + F.lookY, P.z - Math.cos(th) * SHIFT);
     return {
-      pos: v3(c.x + Math.cos(th) * d, E + 5.10 + Math.sin(t * .20) * .26, c.z + Math.sin(th) * d),
+      pos: v3(c.x + Math.cos(th) * d, E + F.camY + Math.sin(t * .20) * .26 * (F.camY / 5.1),
+              c.z + Math.sin(th) * d),
       look: c, fov: s.fov
     };
   }
@@ -4541,14 +4834,16 @@ function stageShot(name, t) {
      which is wider than the aeroplane: asking the solver to fit 16.8 metres
      when the pair of them span 18.3 is how the nose ended up off the edge
      on a phone held sideways. The allowance is the pair, with margin. */
-  const s = stageFit(18.0, 6.1, 20, 38, .75, 1.60);
+  const F = acNow().fit;
+  const s = stageFit(F.ww, F.wh, F.wmin, F.wmax, .75, 1.60);
   const d = s.d;
   const th = .34 + Math.sin(t * .09) * .11;
   // the same pan: aeroplane and pilot together are not centred on either
-  const WS = 7.0;
-  const c = v3(P.x + 1.0 + Math.sin(th) * WS, E + 2.40, P.z + 2.4 - Math.cos(th) * WS);
+  const WS = F.wshift;
+  const c = v3(P.x + F.wlookX + Math.sin(th) * WS, E + F.wlookY, P.z + F.wlookZ - Math.cos(th) * WS);
   return {
-    pos: v3(c.x + Math.cos(th) * d, E + 4.20 + Math.sin(t * .105) * .32, c.z + Math.sin(th) * d),
+    pos: v3(c.x + Math.cos(th) * d, E + F.wcamY + Math.sin(t * .105) * .32 * (F.wcamY / 4.2),
+            c.z + Math.sin(th) * d),
     look: c, fov: s.fov
   };
 }
@@ -4619,8 +4914,8 @@ function stageBox(pts) {
   return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
 }
 function stagePickBoxes() {
-  const P = PLANE, m = P.m, o = P.pos, pts = [];
-  for (const sx of [-8.6, 8.6]) for (const sy of [-1.9, 3.2]) for (const sz of [-16.5, 16.5])
+  const P = PLANE, m = P.m, o = P.pos, pts = [], B = acNow().box;
+  for (const sx of [-B[0], B[0]]) for (const sy of [B[1], B[2]]) for (const sz of [-B[3], B[3]])
     pts.push(vadd(o, mRot(m, v3(sx, sy, sz))));
   STAGE.pick.plane = stageBox(pts);
   const hp = STAGE.pilotPos(), pp = [];
@@ -5915,10 +6210,11 @@ function drawShadow(k) {
   /* Under a roof full of lamps a shadow is soft and pale, not one hard
      black cut-out: the hangar asks for a fraction of the sun's. */
   const fade = ((1 - sstep(150, 1400, agl)) * .46 + .04) * (k === undefined ? 1 : k);
-  const N = SHADOW_HULL.length;
+  const HULL = SPECS.hull || SHADOW_HULL;
+  const N = HULL.length;
   let cxs = 0, cys = 0, ok = true, dmin = 1e9;
   for (let i = 0; i < N; i++) {
-    const w = vadd(P.pos, mRot(P.m, SHADOW_HULL[i]));
+    const w = vadd(P.pos, mRot(P.m, HULL[i]));
     const t = (w.y - gh) / sun.y;
     const sx = w.x - sun.x * t, sz = w.z - sun.z * t;
     const sp = projectPoint(v3(sx, groundH(sx, sz) + .10, sz));
@@ -6062,19 +6358,173 @@ const SPECS = {
   hard: [v3(-8.40, -.10, -9.60), v3(8.40, -.10, -9.60), v3(0, -.20, 18.20),
          v3(0, .25, -14.10), v3(0, -1.05, 0), v3(-4.65, -1.02, -2), v3(4.65, -1.02, -2)]
 };
+/* ===== there is more than one aeroplane in the hangar ==================
+
+   Everything below this line used to be written as though SPECS were the
+   only set of numbers there would ever be, which was true right up until
+   the hangar got a second aeroplane in it. SPECS is still the ONE object
+   the whole flight model reads \u2014 nothing had to change to find its
+   numbers somewhere else \u2014 but its fields are now copied in from
+   whichever airframe is selected. Mutating it in place rather than
+   swapping the reference is deliberate: a hundred and forty sites say
+   `SPECS.mass`, and a hundred and forty sites would otherwise be holding
+   the wrong aeroplane. */
+const SPEC_BB = JSON.parse(JSON.stringify(SPECS));
+SPEC_BB.engines = 2;
+SPEC_BB.cd0 = .0165;          // the supersonic floor; the hump is added on top
+SPEC_BB.prop = 0;
+SPEC_BB.park = 2.92;          // how high the origin sits with the wheels down
+SPEC_BB.floor = 1.2;          // the belly: the origin never goes below this
+SPEC_BB.gearDrop = [1.9, 2.4];
+SPEC_BB.chase = 1;            // chase-camera distance multiplier
+/* Where the rate law hands over to the g law. Just above the Blackbird's
+   stall \u2014 and a long way ABOVE everything a sport aeroplane ever sees,
+   which is why it has to be a per-aircraft number: left at the jet's, the
+   sport aeroplane would fly the runway's attitude-holding law for the whole
+   of its life and never once get the law that holds a flight path. */
+SPEC_BB.fbwLo = 50; SPEC_BB.fbwHi = 72;
+SPEC_BB.eye = [0, .92, 9.10];      // where the pilot's head is
+SPEC_BB.vsLim = 5.6;               // sink rate the undercarriage survives
+SPEC_BB.gTrack = 60;               // speed above which g peaks are logged
+SPEC_BB.land = { ideal: 380, sink: 11 };
+SPEC_BB.apVS = 60; SPEC_BB.apBank = 1;
+/* No `hull`: SHADOW_HULL is declared below this point, and drawShadow falls
+   back to it when an airframe does not carry one of its own. */
+SPEC_BB.vne = 0;              // 0 = no arcade speed governor
+
 /* Zero-lift drag against Mach: the transonic hump, then the thin-wing
-   supersonic floor that lets it cruise at three times the speed of sound. */
+   supersonic floor that lets it cruise at three times the speed of sound.
+   A propeller aeroplane has no business with either \u2014 it has a fixed,
+   much draggier number and it will never see Mach 0.3. */
 function cd0OfMach(M) {
-  return .0165 + .040 * Math.exp(-Math.pow((M - 1.06) / .30, 2)) + .012 * sstep(0, .35, .35 - M);
+  if (SPECS.prop) return SPECS.cd0;
+  return SPECS.cd0 + .040 * Math.exp(-Math.pow((M - 1.06) / .30, 2)) + .012 * sstep(0, .35, .35 - M);
 }
 /* Lift-curve slope: slender-delta value subsonic, 4/sqrt(M^2-1) supersonic. */
 function claOfMach(M) {
+  // A straight wing at a tenth of the speed of sound has one lift-curve
+  // slope and that is the end of it.
+  if (SPECS.prop) return SPECS.CLa;
   // 4/sqrt(M^2-1) collapses toward nothing hypersonically; a floor keeps the
   // wing usable up there instead of leaving you purely ballistic.
   const suP = 4 / Math.sqrt(Math.max(M * M - 1, .30));
   return lerp(SPECS.CLa, clamp(suP, .85, 4.6), sstep(.82, 1.25, M));
 }
 
+/* The numbers for it. A seven-hundred-kilogram aeroplane with one engine,
+   a fat wing and a propeller, in a file whose other aeroplane weighs fifty
+   tonnes and has two engines each making nine hundred kilonewtons. */
+const SPEC_SPORT = {
+  mass: 680, S: 11.4, b: 8.44, cbar: 1.32,
+  Ipitch: 1250, Iroll: 980, Iyaw: 1900,
+  CL0: .14, CLa: 4.9, k: .052,
+  CmA: .80, CmE: .62, CmQ: 11.0,
+  Cnb: .105, Cndr: .092, Cnr: .180,
+  Cla: .118, Clp: .480, Clb: .038,
+  engines: 1,
+  /* One engine. Military is what holds the cruise; "afterburner" is the
+     BOOST button, and it is three times the power rather than a tenth
+     more, because a boost you cannot feel is not a boost. */
+  thrustMil: 1700, thrustAB: 3400,
+  cd0: .0335, prop: 1,
+  wheels: [
+    { p: v3(-1.15, -1.14, -.42), brake: 1, steer: 0, grip: 1 },
+    { p: v3(1.15, -1.14, -.42), brake: 1, steer: 0, grip: 1 },
+    { p: v3(0, -1.14, 2.05), brake: .12, steer: 1, grip: 0 }
+  ],
+  rcsP: 2600, rcsY: 3400, rcsR: 2000,
+  gearK: 42000, gearC: 7800,
+  hard: [v3(-4.25, .99, .66), v3(4.25, .99, .66), v3(0, .22, 3.72),
+         v3(0, 2.18, -2.54), v3(0, -.36, 0)],
+  park: 1.16, floor: .42, gearDrop: [.70, .44], chase: .30,
+  /* Its own planform. Without this it casts a Blackbird's shadow, which on
+     a runway is thirty-three metres of aeroplane under a six-metre one. */
+  hull: [
+    v3(0, 0, 3.80), v3(.52, 0, 2.90), v3(.62, 0, 1.30), v3(4.25, 0, 1.00),
+    v3(4.25, 0, .20), v3(.58, 0, -.40), v3(.40, 0, -1.70), v3(1.62, 0, -2.00),
+    v3(1.62, 0, -2.44), v3(.20, 0, -2.60), v3(0, 0, -3.46), v3(-.20, 0, -2.60),
+    v3(-1.62, 0, -2.44), v3(-1.62, 0, -2.00), v3(-.40, 0, -1.70), v3(-.58, 0, -.40),
+    v3(-4.25, 0, .20), v3(-4.25, 0, 1.00), v3(-.62, 0, 1.30), v3(-.52, 0, 2.90)
+  ],
+  fbwLo: 17, fbwHi: 26,          // just above its own stall, not the jet's
+  eye: [0, 1.02, 1.30],
+  vsLim: 7.5,                    // a toy aeroplane's wheels are forgiving
+  gTrack: 18,
+  land: { ideal: 120, sink: 26 },
+  apVS: 7, apBank: .55,
+  hull: [v3(0, 0, 3.6), v3(.6, 0, 2.6), v3(4.25, 0, 1.2), v3(4.25, 0, -.2),
+         v3(1.6, 0, -1.6), v3(1.6, 0, -2.1), v3(.4, 0, -3.1), v3(0, 0, -3.2),
+         v3(-.4, 0, -3.1), v3(-1.6, 0, -2.1), v3(-1.6, 0, -1.6),
+         v3(-4.25, 0, -.2), v3(-4.25, 0, 1.2), v3(-.6, 0, 2.6)],
+  /* The arcade governor: left alone the throttle would run this thing to
+     two hundred metres a second, because the flight model does not know it
+     is supposed to be a toy. */
+  vne: 62, vboost: 96
+};
+const AIRCRAFT = [
+  { id: "blackbird", kind: "jet", name: "SR-71A BLACKBIRD",
+    note: "Thirty-three metres of titanium built to cross a continent at three times the speed of sound and eighty thousand feet. It does not turn, it does not go slowly, and nothing else in the sky does what it does.",
+    stat: "MACH 3 · 80,000 FT", spec: SPEC_BB, build: buildAircraft,
+    box: [8.6, -1.9, 3.2, 16.5],
+    fit: { pw: 18.4, ph: 5.6, pmin: 17, pmax: 32, shift: 3.2, lookX: 1.2, lookY: 1.95, camY: 5.10,
+           ww: 18.0, wh: 6.1, wmin: 20, wmax: 38, wshift: 7.0, wlookX: 1.0, wlookZ: 2.4,
+           wlookY: 2.40, wcamY: 4.20 },
+    pilot: [14.6, 6.0] },
+  { id: "sport", kind: "prop", name: "ISLAND SPORT",
+    note: "Six and a half metres, one propeller and a seat. Gentle gravity, a wing that will not let go, and a boost button. It cannot be stalled, it cannot be over-stressed, and it is the only aeroplane here you can fly round a tree.",
+    stat: "120 MPH · BOOST", spec: SPEC_SPORT, build: buildSport, liv: 6,
+    /* Not tunable: POWER and AGILITY are the Blackbird's levers and they
+       mean nothing here. This aeroplane is one thing, and the one thing
+       it is is easy. */
+    tunable: false,
+    fbw: { gMax: 4.6, gMin: -2.0, pMax: 2.60, qMax: .95, bMax: 9 * DEG, aoaMax: 19 * DEG,
+           kRoll: 11.0, pSmooth: 5.5, kPitch: 2.0, kPitchI: 1.8, qRef: 900 },
+    box: [4.3, -1.0, 2.1, 3.7],
+    fit: { pw: 6.4, ph: 2.6, pmin: 7, pmax: 20, shift: .90, lookX: .30, lookY: .72, camY: 2.70,
+           ww: 9.2, wh: 3.5, wmin: 10, wmax: 26, wshift: 3.2, wlookX: .35, wlookZ: 1.0,
+           wlookY: .95, wcamY: 2.60 },
+    /* The pilot stands on the OTHER side of it. Five metres in front of a
+       six-metre aeroplane, on the same quarter the camera is on, is a
+       person standing in front of the thing you came to look at. */
+    pilot: [4.6, -3.3] },
+];
+const acNow = () => AIRCRAFT[clamp(KIT.ac | 0, 0, AIRCRAFT.length - 1)];
+/* Where each aeroplane starts each scenario. Twenty-three thousand feet and
+   Mach 0.8 is a reasonable place to hand somebody a Blackbird and a
+   ridiculous place to hand them a sport aeroplane, which would spend the
+   next four minutes gliding down to somewhere it can see. */
+const AC_START = {
+  blackbird: {
+    air: { alt: 7000, z: 9000, v: 250, thr: .70, gear: 0 },
+    rings: { alt: 4200, z: 6000, v: 320, thr: .88, gear: 0 },
+    hohenwald: { agl: 5200, v: 240, thr: .62, gear: 0 },
+    land: { agl: 500, z: 9000, v: 100, thr: .40 }
+  },
+  sport: {
+    air: { alt: 900, z: 2600, v: 52, thr: .85, gear: 1 },
+    rings: { alt: 620, z: 2000, v: 54, thr: .90, gear: 1 },
+    hohenwald: { agl: 520, v: 50, thr: .80, gear: 1 },
+    land: { agl: 170, z: 2400, v: 34, thr: .35 }
+  }
+};
+const acStart = (scen) => (AC_START[acNow().id] || AC_START.blackbird)[scen];
+/* Copy the chosen airframe's numbers INTO the one SPECS object the whole
+   model reads, and rebuild the mesh to match. */
+function applyAircraft() {
+  const A = acNow();
+  for (const k in SPECS) delete SPECS[k];
+  const src = JSON.parse(JSON.stringify(A.spec));
+  for (const k in src) SPECS[k] = src[k];
+  HANGAR.pos.y = E + SPECS.park;
+  HANGAR.pilot.x = HANGAR.pos.x + A.pilot[0];
+  HANGAR.pilot.z = HANGAR.pos.z + A.pilot[1];
+  AC = A.build();
+  AC.kind = A.kind;
+  applyTune();
+  // the panel is not the same panel: one of these has a drag chute and the
+  // other has a boost button where the chute handle goes
+  if (typeof layoutTouch === "function") layoutTouch();
+}
 const PLANE = {
   pos: v3(0, E + 2.92, 860), vel: v3(), q: qId(), w: v3(), m: mIdent(),
   thr: 0, inE: 0, inA: 0, inR: 0, dE: 0, dA: 0, dR: 0,
@@ -6474,30 +6924,35 @@ function resetPlane(scen) {
   P.q = qAxis(0, 1, 0, Math.PI);            // runway 18: heading south
   P.thr = 0;
   if (scen === "free") {
-    P.pos = v3(0, E + 2.92, 860); P.thr = 0; P.park = true; P.brake = 1;
+    // on its wheels, whichever aeroplane's wheels they are
+    P.pos = v3(0, E + SPECS.park, 860); P.thr = 0; P.park = true; P.brake = 1;
   } else if (scen === "air") {
-    P.pos = v3(0, 7000, 9000); P.q = qAxis(0, 1, 0, Math.PI);
-    P.vel = mRot(qMat(P.q, new Float32Array(9)), v3(0, 0, 250)); P.thr = .70; P.park = false;
-    P.gear = P.gearCmd = 0;
+    const S = acStart("air");
+    P.pos = v3(0, S.alt, S.z); P.q = qAxis(0, 1, 0, Math.PI);
+    P.vel = mRot(qMat(P.q, new Float32Array(9)), v3(0, 0, S.v)); P.thr = S.thr; P.park = false;
+    P.gear = P.gearCmd = S.gear;
   } else if (scen === "rings") {
-    P.pos = v3(0, 4200, 6000); P.q = qAxis(0, 1, 0, Math.PI);
-    P.vel = mRot(qMat(P.q, new Float32Array(9)), v3(0, 0, 320)); P.thr = .88; P.park = false;
-    P.gear = P.gearCmd = 0;
+    const S = acStart("rings");
+    P.pos = v3(0, S.alt, S.z); P.q = qAxis(0, 1, 0, Math.PI);
+    P.vel = mRot(qMat(P.q, new Float32Array(9)), v3(0, 0, S.v)); P.thr = S.thr; P.park = false;
+    P.gear = P.gearCmd = S.gear;
   } else if (scen === "hohenwald") {
-    // 6 km up and a little north-west of the town, running in toward it
+    // a little north-west of the town, running in toward it
+    const S = acStart("hohenwald");
     const cx = lonToX(-87.62), cz = latToZ(35.72);
-    P.pos = v3(cx, terrainH(cx, cz) + 5200, cz);
+    P.pos = v3(cx, terrainH(cx, cz) + S.agl, cz);
     P.q = qAxis(0, 1, 0, Math.PI * .86);
-    P.vel = mRot(qMat(P.q, new Float32Array(9)), v3(0, 0, 240));
-    P.thr = .62; P.park = false; P.gear = P.gearCmd = 0;
+    P.vel = mRot(qMat(P.q, new Float32Array(9)), v3(0, 0, S.v));
+    P.thr = S.thr; P.park = false; P.gear = P.gearCmd = S.gear;
   } else if (scen === "land") {
-    // 4.2 km out on final for runway 18, ~720 ft above the field, dirty and slow
-    // 9 km out on final, 500 m above the field, dirty and on speed
-    P.pos = v3(0, E + 500, 9000); P.q = qAxis(0, 1, 0, Math.PI);
+    // out on final for runway 18, dirty and on speed
+    const S = acStart("land");
+    P.pos = v3(0, E + S.agl, S.z); P.q = qAxis(0, 1, 0, Math.PI);
     P.q = qmul(P.q, qAxis(1, 0, 0, 3 * DEG));
-    P.vel = mRot(qMat(P.q, new Float32Array(9)), v3(0, 0, 100)); P.thr = .40;
+    P.vel = mRot(qMat(P.q, new Float32Array(9)), v3(0, 0, S.v)); P.thr = S.thr;
     P.flap = P.flapCmd = 1; P.park = false;
   }
+  P.boostCmd = 0; P.boost = 0; P.boostE = 1; P.propA = 0;
   qMat(P.q, P.m);
 }
 
@@ -6592,21 +7047,34 @@ function vecMoment(P) {
     * clamp(P.rpm || 0, 0, 1) * (.35 + .65 * (P.abSm || 0));
 }
 function applyTune() {
+  /* The control laws start from the aeroplane's own numbers, not the
+     Blackbird's. A seven-hundred-kilogram sport aeroplane with a straight
+     wing rolls quicker, pulls less, and gives up at nineteen degrees of
+     angle of attack rather than twenty-seven, and none of that is a
+     "setting" \u2014 it is what it is. */
+  const base = Object.assign({}, FBW0, (typeof AIRCRAFT !== "undefined" ? (acNow().fbw || {}) : {}));
+  for (const k in base) FBW[k] = base[k];
   const p = POWERS[clamp(KIT.pwr | 0, 0, POWERS.length - 1)];
   const a = AGILS[clamp(KIT.agl | 0, 0, AGILS.length - 1)][1];
-  TUNE.spd = p[1];
-  TUNE.thrust = p[1] * p[1];
-  TUNE.lift = a.lift; TUNE.alpha = a.alpha; TUNE.hiMach = a.hiMach; TUNE.rate = a.rate;
-  TUNE.vec = a.vec;
-  FBW.gMax = a.gMax;
-  FBW.pMax = FBW0.pMax * a.rate;
-  FBW.qMax = FBW0.qMax * a.rate;
-  FBW.kRoll = FBW0.kRoll * (1 + (a.rate - 1) * .55);
-  FBW.pSmooth = FBW0.pSmooth * (1 + (a.rate - 1) * .70);
-  FBW.aoaMax = FBW0.aoaMax * a.alpha;
+  const tuned = typeof AIRCRAFT === "undefined" || acNow().tunable !== false;
+  TUNE.spd = tuned ? p[1] : 1;
+  TUNE.thrust = TUNE.spd * TUNE.spd;
+  if (tuned) {
+    TUNE.lift = a.lift; TUNE.alpha = a.alpha; TUNE.hiMach = a.hiMach; TUNE.rate = a.rate;
+    TUNE.vec = a.vec;
+    FBW.gMax = base.gMax * (a.gMax / 9);
+    FBW.pMax = base.pMax * a.rate;
+    FBW.qMax = base.qMax * a.rate;
+    FBW.kRoll = base.kRoll * (1 + (a.rate - 1) * .55);
+    FBW.pSmooth = base.pSmooth * (1 + (a.rate - 1) * .70);
+    FBW.aoaMax = base.aoaMax * a.alpha;
+  } else {
+    TUNE.lift = 1; TUNE.alpha = 1; TUNE.hiMach = 1; TUNE.rate = 1; TUNE.vec = 0;
+  }
 }
 
 applyTune();
+applyAircraft();
 
 /* A stick curve. Straight through would give the same gearing everywhere,
    which makes small corrections at speed impossible: a couple of degrees of
@@ -6799,7 +7267,7 @@ function flightControl(P, dt, e, cE, cA, cR) {
      stall, and the g law owns the aeroplane everywhere above that.
      (P.ias is metres per second: 50 to 72 is 97 to 140 knots.) */
   P.fbwG = approach(P.fbwG === undefined ? 1 : P.fbwG,
-    P.onGround ? 1 : (1 - sstep(50, 72, P.ias || 0)), 3.0, dt);
+    P.onGround ? 1 : (1 - sstep(SPECS.fbwLo, SPECS.fbwHi, P.ias || 0)), 3.0, dt);
   /* Pointing hands the pitch axis to the rate law, which is the same law the
      runway and the vacuum use and the only one that means anything when lift
      no longer decides where the aeroplane goes. */
@@ -7186,7 +7654,7 @@ function autopilot(P, dt, e) {
     if (hands) {
       P.apHdg = undefined; P.apAlt = undefined;
       bankTgt = P.inA * 60 * DEG;
-      const vsCmd = P.inE * 60;
+      const vsCmd = P.inE * (SPECS.apVS || 60);
       dG = clamp((vsCmd - P.vel.y) * .055, -1.7, 3.4);
       const cA0 = clamp((bankTgt - e.roll) * 1.15, -.85, .85);
       return { e: gToStick(dG, lvl), a: cA0, r: 0 };
@@ -7196,7 +7664,8 @@ function autopilot(P, dt, e) {
     let he = P.apHdg - e.hdg;
     if (he > Math.PI) he -= TAU; else if (he < -Math.PI) he += TAU;
     bankTgt = clamp(he * 1.5, -24 * DEG, 24 * DEG);
-    const vsTgt = clamp((P.apAlt - P.pos.y) * .042, -34, 34);
+    const vsTgt = clamp((P.apAlt - P.pos.y) * .042,
+      -34 * (SPECS.apBank || 1), 34 * (SPECS.apBank || 1));
     dG = clamp((vsTgt - P.vel.y) * .058, -.9, 1.15);
   }
   // bank angle through the roll-rate law
@@ -7322,7 +7791,23 @@ function physics(P, dt) {
   P.ias = P.vAero * Math.sqrt(Math.max(rho * P.cont, 0) / 1.225);
   // Afterburner lives in the top fifth of the throttle and is what the gate
   // between "fast aeroplane" and "Mach 3" actually is.
-  P.ab = clamp((thrCmd - AB_GATE) / (1 - AB_GATE), 0, 1);
+  /* ===== BOOST ========================================================
+
+     On the jet the burner lives in the top fifth of the throttle, because
+     that is where it lives. On the sport aeroplane it is a BUTTON, and a
+     button you can hold for ever is not a button \u2014 so it is a tank: four
+     and a half seconds of it, nine seconds to fill again, and a gauge on
+     the panel so you can see what you have left. */
+  if (SPECS.vne) {
+    const want = (P.boostCmd && P.boostE > .02 && !P.crashed) ? 1 : 0;
+    P.boostE = clamp((P.boostE === undefined ? 1 : P.boostE)
+      + (want ? -dt / 4.5 : dt / 9.0), 0, 1);
+    P.boost = approach(P.boost || 0, want, want ? 7 : 2.4, dt);
+    P.ab = P.boost;
+  } else {
+    P.boost = 0; P.boostE = 1;
+    P.ab = clamp((thrCmd - AB_GATE) / (1 - AB_GATE), 0, 1);
+  }
   const abSm = approach(P.abSm === undefined ? 0 : P.abSm, P.ab, 3.5, dt);
   P.abSm = abSm;
   // Ram compression keeps climbing well past Mach 3 — the inlet is doing more
@@ -7333,7 +7818,7 @@ function physics(P, dt) {
     - 2.6 * sstep(18, 26.5, P.mach);
   const dens = Math.max(Math.pow(clamp(rho / 1.225, .0005, 1), .62), .14);
   const perEngine = SPECS.thrustMil * clamp(P.rpm, 0, 1) + SPECS.thrustAB * abSm * TUNE.thrust;
-  const thrust = 2 * perEngine * ram * dens;
+  const thrust = (SPECS.engines || 2) * perEngine * ram * dens;
 
   /* Gravity. It used to be a flat 9.81 straight down at every altitude and
      every speed, which is exactly right for an aeroplane and quite wrong for
@@ -7439,6 +7924,12 @@ function physics(P, dt) {
     const aStall = (27 * TUNE.alpha - P.flap * 2) * DEG;
     let st = 1 - sstep(aStall, aStall + 12 * DEG, Math.abs(P.alpha));
     if (AP.on) st = Math.max(st, .55);
+    /* The sport aeroplane's wing does not let go. Not "stalls gently" \u2014
+       does not let go: the angle-of-attack limiter in the control laws
+       already stops the nose going anywhere the wing cannot follow, and
+       past that point this is a toy and a toy that drops a wing on a
+       fourteen-year-old is not a toy. */
+    if (SPECS.vne) st = 1;
     const sa = Math.sin(P.alpha);
     const vortex = 1.55 * sa * sa * Math.cos(P.alpha) * Math.sign(P.alpha);
     const CLlin = SPECS.CL0 + claOfMach(M8) * P.alpha + vortex + .35 * P.flap;
@@ -7447,7 +7938,14 @@ function physics(P, dt) {
        any height: lift is what bends the flight path, and everything else
        is just permission to use it. The drag below is computed from the
        scaled figure, so the turn still costs what a turn costs. */
-    const CL = lerp(CLstall, CLlin, st) * TUNE.lift;
+    let CL = lerp(CLstall, CLlin, st) * TUNE.lift;
+    /* An unstallable wing is not a wing that makes more and more lift for
+       ever. Holding the stick back with no speed on should leave the sport
+       aeroplane mushing down with its nose up \u2014 which is what a real one
+       does and what the arcade one it is modelled on does \u2014 and not
+       hanging off a coefficient of seven. Flat-topping the curve gives the
+       mush without ever giving the drop. */
+    if (SPECS.vne) CL = clamp(CL, -1.45, 1.80);
     /* A stall is a wing that has stopped working, and a wing that was never
        working cannot stop. In vacuum `alpha` is just the angle between the
        nose and the velocity vector, and coasting it runs to eighty degrees
@@ -7588,6 +8086,44 @@ function physics(P, dt) {
         aCmd = -Math.min(-err * 2.4, stop);
       }
       const along = thrust * vd.z - D;            // what the engine is already doing
+      const add = SPECS.mass * aCmd - along;
+      fb.x += add * vd.x; fb.y += add * vd.y; fb.z += add * vd.z;
+    } else if (SPECS.vne && !P.crashed && !P.onGround && V > 12) {
+      /* ===== the arcade governor ======================================
+
+         It does NOT run on the ground or below a walking pace. It drives
+         the aeroplane along its own velocity vector, and at a standstill
+         that vector points nowhere in particular \u2014 so parked, with the
+         brakes on, it was shoving a seven-hundred-kilogram aeroplane in a
+         direction made of rounding error and tipping it onto one wheel.
+         A take-off roll is the engine against the brakes and the tyres,
+         the way it is in anything else.
+
+
+         A light aeroplane with this much wing would sit at about fifty
+         metres a second and the flight model knows it; what the flight
+         model does not know is that this one is supposed to feel like a
+         toy aeroplane in a holiday advert. So the throttle sets a SPEED
+         and the engine finds it \u2014 which is what a constant-speed
+         propeller does anyway \u2014 and the boost button sets a much
+         higher one for as long as the tank lasts.
+
+         It is deliberately SOFT. A hard governor pins the number and kills
+         the two things that make flying a toy aeroplane pleasant: the
+         sag when you haul it into a climb, and the way it runs away from
+         you down the other side. Two and a half seconds of time constant
+         leaves both of those in and still never lets it run away. */
+      const tgt = lerp(SPECS.vne * .44, SPECS.vne, clamp(P.thr, 0, 1))
+        + (SPECS.vboost - SPECS.vne) * abSm;
+      const err = tgt - V;
+      const aMax = 7.5 + 20 * abSm;
+      /* Soft one way, firm the other. Accelerating is allowed to take its
+         time, because that is the feel; being a hundred metres a second
+         over the number is not a feel, it is a bug somewhere else, and the
+         brake scales with how far out it is so that it always comes back. */
+      const aCmd = err > 0 ? Math.min(err / 2.5, aMax)
+        : -Math.min(-err / 1.6, aMax * .7 + Math.max(0, -err - 12) * .35);
+      const along = thrust * vd.z - D;
       const add = SPECS.mass * aCmd - along;
       fb.x += add * vd.x; fb.y += add * vd.y; fb.z += add * vd.z;
     } else if (abSm > .01 && !P.crashed) {
@@ -7748,7 +8284,7 @@ function physics(P, dt) {
         const wp = vadd(P.pos, mRot(m, hp));
         if (wp.y < groundH(wp.x, wp.z) - .05) { crash("STRUCTURAL CONTACT"); break; }
       }
-      const vsLim = AP.on ? 9.0 : 5.6;
+      const vsLim = AP.on ? (SPECS.vsLim + 3.4) : SPECS.vsLim;
       if (wow && P.lastVS < -vsLim && !P.touched) crash("HARD LANDING");
       // the undercarriage is still made of metal, but it is a lot harder to fold
       if (maxFn > SPECS.mass * 9.81 * (AP.on ? 9.5 : 8.0)) crash("GEAR COLLAPSE");
@@ -7912,7 +8448,7 @@ function physics(P, dt) {
 
   // peak tracking, and the physiological price of pulling
   // only once actually flying, or the spawn transient records a false peak
-  if (!P.onGround && V > 60 && GAME.t > 2) {
+  if (!P.onGround && V > (SPECS.gTrack || 60) && GAME.t > 2) {
     if (P.gload > (P.gMax || 0)) P.gMax = Math.min(P.gload, 20);
     if (P.gload < (P.gMin === undefined ? 1 : P.gMin)) P.gMin = Math.max(P.gload, -8);
   }
@@ -7961,9 +8497,12 @@ function physics(P, dt) {
   }
   P.prev = v3(P.pos.x, P.pos.y, P.pos.z);
 
-  // never let the aircraft sink through the world
-  const gh = groundH(P.pos.x, P.pos.z);
-  if (P.pos.y < gh + 1.2) { P.pos.y = gh + 1.2; if (P.vel.y < 0) P.vel.y *= -.05; }
+  /* Never let the aircraft sink through the world. The floor is the belly of
+     THIS airframe, not of the Blackbird: a sport aeroplane parks its origin
+     1.16 m up, so a 1.2 m floor held it hovering a finger's width above its
+     own wheels, for ever, with nothing in contact. */
+  const gh = groundH(P.pos.x, P.pos.z), fl = SPECS.floor || 1.2;
+  if (P.pos.y < gh + fl) { P.pos.y = gh + fl; if (P.vel.y < 0) P.vel.y *= -.05; }
 }
 
 /* ---- standing on another world ------------------------------------------
@@ -7972,7 +8511,7 @@ function physics(P, dt) {
    is wherever bodyRelief puts it — the SAME function the renderer draws, at
    full detail, so the wheels touch the surface you can see rather than a
    sphere somewhere underneath it. */
-const gearDrop = P => 1.9 + (P.gear || 0) * 2.4;
+const gearDrop = P => SPECS.gearDrop[0] + (P.gear || 0) * SPECS.gearDrop[1];
 /* A planet cannot break this aeroplane.
 
    Hitting a world at speed used to end the flight. It no longer does: the
@@ -8300,7 +8839,7 @@ function updateCamera(dt) {
   const fwd = v3(m[6], m[7], m[8]), up = v3(m[3], m[4], m[5]), right = v3(m[0], m[1], m[2]);
   let want, look, rollBlend = 1;
   if (camMode === 1) {                      // cockpit
-    want = vadd(P.pos, mRot(m, v3(0, .92, 9.10)));
+    want = vadd(P.pos, mRot(m, v3(SPECS.eye[0], SPECS.eye[1], SPECS.eye[2])));
     cam.pos = want;
     cam.m = qMat(P.q, cam.m);
     FOV = FOVBASE * 1.16; F = (H * .5) / Math.tan(FOV * .5);
@@ -8308,19 +8847,23 @@ function updateCamera(dt) {
     return;
   }
   FOV = FOVBASE; F = (H * .5) / Math.tan(FOV * .5);
+  /* Every one of these stand-off distances was measured against a
+     thirty-three-metre aeroplane. On a six-metre one the same numbers put
+     the subject three pixels across, so they all scale with it. */
+  const ch = SPECS.chase === undefined ? 1 : SPECS.chase;
   if (camMode === 0) {
-    const back = 52 + clamp(vlen(P.vel) * .10, 0, 34);
-    want = vadd(P.pos, vadd(vmul(fwd, -back), vmul(up, 9)));
-    look = vadd(P.pos, vmul(fwd, 24));
+    const back = (52 + clamp(vlen(P.vel) * .10, 0, 34)) * ch;
+    want = vadd(P.pos, vadd(vmul(fwd, -back), vmul(up, 9 * ch)));
+    look = vadd(P.pos, vmul(fwd, 24 * ch));
     rollBlend = .35;
   } else if (camMode === 2) {
     orbitA += dt * .22;
-    const r = 62;
-    want = vadd(P.pos, v3(Math.cos(orbitA) * r, 16, Math.sin(orbitA) * r));
+    const r = 62 * ch;
+    want = vadd(P.pos, v3(Math.cos(orbitA) * r, 16 * ch, Math.sin(orbitA) * r));
     look = P.pos; rollBlend = 0;
   } else if (camMode === 3) {
-    want = vadd(P.pos, mRot(m, v3(26, 6, -14)));
-    look = vadd(P.pos, mRot(m, v3(0, .3, 2)));
+    want = vadd(P.pos, mRot(m, v3(26 * ch, 6 * ch, -14 * ch)));
+    look = vadd(P.pos, mRot(m, v3(0, .3, 2 * ch)));
     rollBlend = 1;
   } else {
     want = v3(-70, E + 26, 620);
@@ -8367,6 +8910,52 @@ function updateCamera(dt) {
 }
 
 /* ======================================================= draw aircraft == */
+/* The sport aeroplane. The propeller is the only part of this that is not
+   obvious: two blades turning at two thousand revolutions a minute are not
+   two blades to look at, they are a disc, so the blades fade out and a pair
+   of translucent rings fade in as the engine comes up. Below about a fifth
+   of power you can still count them, which is exactly what you can do
+   standing next to a real one at idle. */
+function drawSport(P, Rb, pos, glow, gk, external, ail, ele, rud, fl, gearAng, hinge) {
+  if (external) {
+    drawMesh(AC.fuse, pos, Rb, null, glow, undefined, gk);
+    drawMesh(AC.wingL, pos, Rb, null, glow, undefined, gk * .8);
+    drawMesh(AC.wingR, pos, Rb, null, glow, undefined, gk * .8);
+    drawMesh(AC.marks, pos, Rb, null);
+    hinge(AC.elevR, mAxis(1, 0, 0, -ele));
+    hinge(AC.elevL, mAxis(1, 0, 0, -ele));
+    hinge(AC.ailR, mAxis(1, 0, 0, -ail));
+    hinge(AC.ailL, mAxis(1, 0, 0, ail));
+    hinge(AC.flapR, mAxis(1, 0, 0, fl));
+    hinge(AC.flapL, mAxis(1, 0, 0, fl));
+    hinge(AC.rudder, mAxis(0, 1, 0, rud));
+    if (P.gear > .01) {
+      hinge(AC.gearL, mAxis(0, 0, 1, -gearAng * .9));
+      hinge(AC.gearR, mAxis(0, 0, 1, gearAng * .9));
+      hinge(AC.gearN, mAxis(1, 0, 0, gearAng * .9));
+    }
+    const spin = clamp((P.rpm || 0) * 1.6 - .12, 0, 1);
+    if (spin < .98) {
+      const o = vadd(pos, mRot(Rb, v3(AC.prop.pivot[0], AC.prop.pivot[1], AC.prop.pivot[2])));
+      drawMesh(AC.prop.mesh, o, mmul(Rb, mAxis(0, 0, 1, P.propA || 0)), AC.prop.pivot,
+        null, 1 - spin * .92);
+    }
+    if (spin > .04) drawMesh(AC.propDisc, pos, Rb, null, null, spin);
+    drawMesh(AC.glass, pos, Rb, null);
+    const navs = [[v3(-4.22, .90, .10), [255, 70, 60]], [v3(4.22, .90, .10), [70, 255, 120]],
+                  [v3(0, 1.72, -2.95), [255, 255, 255]]];
+    for (const [lp, c] of navs) {
+      const sp = projectPoint(vadd(pos, mRot(Rb, lp)));
+      if (!sp) continue;
+      DL.sprite(sp.z - 2, sp.x, sp.y, clamp(.5 * sp.s, 1.2, 10), sprite(c[0], c[1], c[2], 3), .9);
+    }
+  } else {
+    drawMesh(AC.wingL, pos, Rb, null);
+    drawMesh(AC.wingR, pos, Rb, null);
+    drawMesh(AC.glass, pos, Rb, null, null, .16);
+  }
+  if (P.crashed && Math.random() < .5) spawnSmoke(vadd(pos, mRot(Rb, v3(0, .3, 1))), P.vel);
+}
 function drawAircraft(hi) {
   const P = PLANE, Rb = P.m, pos = P.pos;
   const external = camMode !== 1;
@@ -8385,6 +8974,7 @@ function drawAircraft(hi) {
   let gk = glow ? clamp((heat - .22) * .62, 0, .94) : 0;
   // a cold highlight, for the hangar: this is the thing you just changed
   if (!glow && hi > .01) { glow = [150, 226, 255]; gk = hi; }
+  if (AC.kind === "prop") { drawSport(P, Rb, pos, glow, gk, external, ail, ele, rud, fl, gearAng, hinge); return; }
   if (external) {
     drawMesh(AC.fuse, pos, Rb, null, glow, undefined, gk);
     drawMesh(AC.chine, pos, Rb, null, glow, undefined, gk);
@@ -10547,9 +11137,19 @@ const audio = {
     // two turbojets: a low rumble, a compressor whine that tracks spool speed,
     // and a wall of noise that the afterburners open right up
     const spool = P.rpm, ab = P.abSm || 0;
+    /* A propeller is not a turbojet. Two blades at a couple of thousand
+       revolutions a minute is a hard low beat in the sixties of hertz with
+       almost no whine over it, and the "afterburner" is the boost, which
+       just makes all of it faster and angrier. */
+    if (SPECS.vne) {
+      this.o1.frequency.setTargetAtTime(28 + spool * 44 + ab * 16, t, .10);
+      this.o2.frequency.setTargetAtTime(96 + spool * 210 + ab * 90, t, .10);
+      this.ef.frequency.setTargetAtTime(180 + spool * 520 + ab * 300, t, .12);
+    } else {
     this.o1.frequency.setTargetAtTime(52 + spool * 46, t, .12);
     this.o2.frequency.setTargetAtTime(390 + spool * 1150, t, .12);
     this.ef.frequency.setTargetAtTime(300 + spool * 2600 + ab * 1800, t, .12);
+    }
     this.eg.gain.setTargetAtTime(P.crashed ? 0 : (camMode === 1 ? .15 : .11) * (.18 + spool * .85), t, .12);
     const wv = clamp(P.tas / 240, 0, 1.5);
     this.ng.gain.setTargetAtTime(clamp(wv * wv * .16 + ab * .20 + spool * .06, 0, .42), t, .12);
@@ -10600,14 +11200,15 @@ const LOG_KEY = "skyward.log.v1";
    The number is the point: it is the thing you can quote back when something
    is wrong, and the list under it is what to go and look at. */
 const BUILD = {
-  no: 42,
-  name: "ALL OF IT",
-  date: "2 OCT 2026",
+  no: 43,
+  name: "TWO IN THE SHED",
+  date: "25 OCT 2026",
   notes: [
-    ["A GRAPHICS SETTING, AND TWO RUNGS ABOVE THE LADDER", "The quality tuner\u2019s job is to protect the frame rate, which is right nearly all of the time and is also why it would never show you everything: from fifteen thousand feet the county is a hundred kilometres across and it is still budgeting for the aerodrome under the nose. SET-UP \u00b7 GRAPHICS pins it instead. AUTO is the tuner; LOW through MAX are a choice, and ULTRA and MAX are above anything it will climb to on its own."],
-    ["WHAT THEY ACTUALLY BUY", "Towns drawn out to forty and sixty-two kilometres instead of twenty-six, so the country under you has towns in it rather than name tags on farmland. Five thousand buildings instead of seventeen hundred. Trees to nine kilometres. The ground described in finer pieces, further out. And a second cloud field past twenty-one kilometres with twice the puffs in each cloud \u2014 from fifteen thousand feet you are looking DOWN on the deck, and a deck that stopped at twenty-one kilometres was a disc of cloud sitting on an empty county."],
-    ["AND THE DISPLAY LIST GREW TO FIT", "Running out of display list does not slow the frame down: it silently drops whatever asked last, which is the near detail. Fourteen thousand entries was sized for the ladder the tuner climbs, and the new rungs filled it on their own \u2014 so the near ground would have gone missing exactly where the setting was supposed to add it. Thirty-four thousand now, about two and a half megabytes, allocated once."],
-    ["AND FROM LAST TIME", "POWER and AGILITY on the PLANE page, vectoring nozzles, and the hangar laid out like a garage."]
+    ["A SECOND AEROPLANE, AND A SHED TO CHOOSE IT IN", "PLANE \u00b7 AIRCRAFT now has two cards in it. The ISLAND SPORT is six and a half metres of cartoon sport aeroplane \u2014 high wing, lift struts, bubble canopy, spatted wheels and a two-blade propeller \u2014 and picking it swaps the airframe, the paint, the numbers along the bottom and the camera that walks up to it. Your choice is remembered."],
+    ["IT FLIES LIKE AN ARCADE AEROPLANE, ON PURPOSE", "A governor holds the speed the throttle asks for instead of letting drag and thrust argue about it: a hundred and thirty-nine miles an hour cruising, two hundred and fifteen on the button. It cannot be stalled and it will not spin \u2014 full back stick for twenty seconds just turns hard \u2014 and hands off, the wings come back level on their own. A hundred and three degrees a second of roll, forty-seven of turn at four and a half g."],
+    ["A BOOST BUTTON WITH SOMETHING BEHIND IT", "Where the Blackbird carries its drag chute the sport aeroplane has BOOST, and inside the pad is the tank. Hold it and it empties in four and a half seconds; let go and it fills again in nine. X on a keyboard, or the space bar in the air."],
+    ["THE THINGS THAT WERE SIZED FOR A THIRTY-THREE-METRE JET", "Every stand-off distance \u2014 chase, orbit, wing \u2014 was measured against the Blackbird, which put a six-metre aeroplane three pixels across. They scale with the airframe now. So does the shadow, which was a Blackbird\u2019s planform on the ground under anything. And the floor that stops an aeroplane sinking through the world was the Blackbird\u2019s belly, which held the sport aeroplane hovering a finger\u2019s width above its own wheels for ever."],
+    ["AND THE LIST STAYS WHERE YOU LEFT IT", "Tapping a paint swatch no longer scrolls the list back to the top under your finger. It only resets when you actually change page."]
   ]
 };
 const NEWS_KEY = "skyward.build";
@@ -10729,7 +11330,13 @@ const GAME = {
 };
 function buildRingCourse() {
   GAME.rings = [];
-  let a = Math.PI, x = 0, z = -2000, y = 4000;
+  /* The course is laid out in SECONDS of flying, not metres. Twelve gates
+     eleven to twenty kilometres apart is about ninety seconds in a Mach 3
+     aeroplane and the better part of an hour in a sport aeroplane, which is
+     not a race, it is a commute. The whole course scales with the speed of
+     whatever is flying it. */
+  const K = SPECS.vne ? (SPECS.vne / 820) : 1;
+  let a = Math.PI, x = 0, z = -2000 * K, y = 4000 * K;
   for (let i = 0; i < 12; i++) {
     a += (hash2(i, 51) - .5) * .70 + (i % 2 ? .22 : -.22);
     if (i >= 6) {   // second half curves back toward the field
@@ -10737,10 +11344,10 @@ function buildRingCourse() {
       if (d > Math.PI) d -= TAU; else if (d < -Math.PI) d += TAU;
       a += clamp(d, -.8, .8) * .55;
     }
-    // gates are minutes apart, not seconds, at three times the speed of sound
-    const step = 11000 + hash2(i, 52) * 9000;
+    const step = (11000 + hash2(i, 52) * 9000) * K;
     x += Math.sin(a) * step; z += Math.cos(a) * step;
-    y = clamp(terrainH(x, z) + 2600 + hash2(i, 53) * 7000, 1200, 20000);
+    y = clamp(terrainH(x, z) + (2600 + hash2(i, 53) * 7000) * Math.sqrt(K),
+      300 * Math.sqrt(K), 20000);
     GAME.rings.push({ p: v3(x, y, z), a, passed: false });
   }
   GAME.ringIdx = 0; GAME.ringT = 0;
@@ -10794,9 +11401,14 @@ function checkLanding() {
     if (!onRwy) { notes.push("OFF RUNWAY"); }
     else {
       sc = 100;
-      sc -= clamp(Math.abs(vs) * 11, 0, 45); notes.push("SINK " + (Math.abs(vs) * 196.85).toFixed(0) + " fpm");
+      /* Scored against the aeroplane you are flying. A Blackbird lands
+         twelve hundred feet down the runway at a sink rate a light
+         aeroplane would call an arrival; marking a sport aeroplane against
+         those numbers punishes it for landing well. */
+      const LD = SPECS.land || { ideal: 380, sink: 11 };
+      sc -= clamp(Math.abs(vs) * LD.sink, 0, 45); notes.push("SINK " + (Math.abs(vs) * 196.85).toFixed(0) + " fpm");
       sc -= clamp(offC * 1.8, 0, 25); notes.push("CENTRE " + (offC * M_FT).toFixed(0) + " ft");
-      sc -= clamp(Math.abs(zone - 380) * .05, 0, 30);
+      sc -= clamp(Math.abs(zone - LD.ideal) * .05, 0, 30);
       notes.push("TOUCHDOWN " + comma(zone * M_FT) + " ft");
       sc = Math.max(0, Math.round(sc));
     }
@@ -10884,7 +11496,8 @@ function layoutTouch() {
     T.btns.push(
       { k: "gear", kind: "lever", x: LE, y: bot - hL * 3 - gp * 2, w: cw, h: hL },
       { k: "flap", kind: "lever", x: LE, y: bot - hL * 2 - gp, w: cw, h: hL },
-      { k: "chute", kind: "handle", x: LE, y: bot - hL, w: cw, h: hL });
+      SPECS.vne ? { k: "boost", kind: "pad", x: LE, y: bot - hL, w: cw, h: hL, hold: 1 }
+              : { k: "chute", kind: "handle", x: LE, y: bot - hL, w: cw, h: hL });
     const k2 = fitK(band, [hTog, hTog, hTog, hPad]);
     const tg = hTog * k2, pd = hPad * k2;
     T.btns.push(
@@ -10936,7 +11549,8 @@ function layoutTouch() {
     T.btns.push(
       { k: "gear", kind: "lever", x: LE, y: LTOP, w: cw, h: hLev },
       { k: "flap", kind: "lever", x: LE + cw + gp, y: LTOP, w: cw, h: hLev },
-      { k: "chute", kind: "handle", x: LE + (cw + gp) * 2, y: LTOP, w: cw, h: hLev });
+      SPECS.vne ? { k: "boost", kind: "pad", x: LE + (cw + gp) * 2, y: LTOP, w: cw, h: hLev, hold: 1 }
+              : { k: "chute", kind: "handle", x: LE + (cw + gp) * 2, y: LTOP, w: cw, h: hLev });
     T.rud.boxes = [
       { k: "rudL", x: LE + (cw + gp) * 3, y: LTOP, w: cw, h: hLev },
       { k: "rudR", x: RX + (cw + gp) * 2, y: y4, w: cw, h: pd }
@@ -11012,7 +11626,9 @@ function touchAct(k) {
   else if (k === "ap") toggleAP();
   else if (k === "keys") SHOWKEYS = !SHOWKEYS;
   else if (k === "flapup") { P.flapCmd = clamp(P.flapCmd - .25, 0, 1); toast("FLAPS " + Math.round(P.flapCmd * 100) + "%", 1); }
+  else if (k === "boost") { /* held, not tapped: applyInput reads it */ }
   else if (k === "chute") {
+    if (SPECS.vne) return;
     if (P.chuteCmd) { P.chuteCmd = 0; toast("CHUTE JETTISONED", 1.4); }
     else if (P.ias * 1.94384 > CHUTE_LIMIT) toast("TOO FAST FOR THE CHUTE", 1.6);
     else { P.chuteCmd = 1; toast("DRAG CHUTE STREAMED", 1.6); }
@@ -11414,6 +12030,39 @@ function drawStick() {
   hudFont(10 * u); ctx.fillStyle = "rgba(170,200,224,.55)"; ctx.textAlign = "center";
   ctx.fillText(lbl, sx, sy + r + 14 * u);
 }
+/* BOOST. A big amber pad with the tank drawn down the inside of it, so the
+   one thing you need to know \u2014 how much is left \u2014 is the thing the
+   control is made of rather than a number somewhere else on the glass. */
+function drawBoost(b, P, fl) {
+  const u = UI, on = (P.boost || 0) > .12;
+  const e = clamp(P.boostE === undefined ? 1 : P.boostE, 0, 1);
+  padBox(b.x, b.y, b.w, b.h, 9 * u, on || fl, null);
+  const ix = b.x + 5 * u, iw = b.w - 10 * u;
+  const iy = b.y + 20 * u, ih = b.h - 40 * u;
+  ctx.save();
+  ctx.fillStyle = "rgba(255,255,255,.07)";
+  ctx.fillRect(ix, iy, iw, ih);
+  const fh = ih * e;
+  const g = ctx.createLinearGradient(0, iy + ih, 0, iy);
+  g.addColorStop(0, e < .22 ? "rgba(255,110,60,.85)" : "rgba(255,168,52,.85)");
+  g.addColorStop(1, e < .22 ? "rgba(255,170,120,.95)" : "rgba(255,230,140,.98)");
+  ctx.fillStyle = g;
+  ctx.fillRect(ix, iy + ih - fh, iw, fh);
+  for (let k = 1; k < 4; k++) {
+    ctx.fillStyle = "rgba(10,16,22,.45)";
+    ctx.fillRect(ix, iy + ih * (k / 4) - .5 * u, iw, 1 * u);
+  }
+  ctx.strokeStyle = on ? "rgba(255,210,120,.95)" : "rgba(190,214,232,.35)";
+  ctx.lineWidth = 1.2 * u; ctx.strokeRect(ix, iy, iw, ih);
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  hudFont(11 * u, 700);
+  ctx.fillStyle = on ? "#ffe8bc" : "rgba(226,240,250,.92)";
+  ctx.fillText("BOOST", b.x + b.w / 2, b.y + 11 * u);
+  hudFont(9 * u, 600);
+  ctx.fillStyle = on ? "rgba(255,210,140,.95)" : "rgba(168,192,212,.75)";
+  ctx.fillText(e < .03 ? "EMPTY" : "HOLD  X", b.x + b.w / 2, b.y + b.h - 10 * u);
+  ctx.restore();
+}
 function drawPanel(P, u) {
   const T = TOUCH;
   // throttle
@@ -11423,17 +12072,19 @@ function drawPanel(P, u) {
   const abY = t.y + 3 * u + inner * (1 - AB_GATE);
   ctx.fillStyle = "rgba(120,220,255,.40)";
   ctx.fillRect(t.x + 3 * u, t.y + t.h - 3 * u - fh, t.w - 6 * u, fh);
-  if (P.thr > AB_GATE) {   // the afterburner band burns orange
+  if (P.thr > AB_GATE && !SPECS.vne) {   // the afterburner band burns orange
     const abH = inner * (P.thr - AB_GATE);
     const g2 = ctx.createLinearGradient(0, abY, 0, abY - abH);
     g2.addColorStop(0, "rgba(255,150,40,.75)"); g2.addColorStop(1, "rgba(255,226,120,.95)");
     ctx.fillStyle = g2;
     ctx.fillRect(t.x + 3 * u, abY - abH, t.w - 6 * u, abH);
   }
-  ctx.strokeStyle = "rgba(255,170,70,.75)"; ctx.lineWidth = 1.4 * u;
-  ctx.beginPath(); ctx.moveTo(t.x + 1 * u, abY); ctx.lineTo(t.x + t.w - 1 * u, abY); ctx.stroke();
-  hudFont(9 * u, 600); ctx.fillStyle = "rgba(255,190,110,.9)"; ctx.textAlign = "right";
-  ctx.textBaseline = "middle"; ctx.fillText("A/B", t.x - 4 * u, abY);
+  if (!SPECS.vne) {
+    ctx.strokeStyle = "rgba(255,170,70,.75)"; ctx.lineWidth = 1.4 * u;
+    ctx.beginPath(); ctx.moveTo(t.x + 1 * u, abY); ctx.lineTo(t.x + t.w - 1 * u, abY); ctx.stroke();
+    hudFont(9 * u, 600); ctx.fillStyle = "rgba(255,190,110,.9)"; ctx.textAlign = "right";
+    ctx.textBaseline = "middle"; ctx.fillText("A/B", t.x - 4 * u, abY);
+  }
   ctx.fillStyle = "rgba(226,244,255,.95)"; ctx.textAlign = "center";
   hudFont(13 * u, 700);
   ctx.fillText(Math.round(P.thr * 100) + "", t.x + t.w / 2, t.y + t.h - 3 * u - fh - 12 * u);
@@ -11450,6 +12101,8 @@ function drawPanel(P, u) {
     } else if (b.k === "flap") {
       drawLever(b, P.flapCmd, "FLAPS", Math.round(P.flapCmd * 100) + "%   F / V",
         "wedge", 4, P.flapCmd > .02 || fl);
+    } else if (b.k === "boost") {
+      drawBoost(b, P, fl);
     } else if (b.k === "chute") {
       drawHandle(b, P.chuteCmd > .5, "CHUTE", P.chuteCmd > .5 ? "STREAMED" : "PULL  X");
     } else if (b.k === "brake") {
@@ -11568,12 +12221,30 @@ function drawHUDFull() {
   const mx = 96 * U - 24 * U, my = CY + tapeH / 2 + 92 * U;
   box(mx, my, 132 * U, 52 * U, 4 * U, PANEL, GD);
   hudFont(10 * U); ctx.fillStyle = GD; ctx.textAlign = "left";
-  ctx.fillText("MACH", mx + 8 * U, my + 11 * U);
-  hudFont(20 * U, 700); ctx.fillStyle = P.mach > 3.2 ? "rgba(255,150,90,.95)" : G;
-  ctx.fillText((P.qbar || 0) > 5 ? machStr(P.mach) : "\u2014", mx + 8 * U, my + 27 * U);
-  hudFont(11 * U, 700); ctx.textAlign = "left";
-  ctx.fillStyle = P.ab > .01 ? "rgba(255,176,80,.95)" : "rgba(120,140,155,.55)";
-  ctx.fillText(P.ab > .01 ? "A/B  " + Math.round(P.ab * 100) + "%" : "A/B  \u2014", mx + 8 * U, my + 43 * U);
+  if (SPECS.vne) {
+    /* Mach 0.08 is not a number anybody needs. What a sport pilot wants in
+       that box is how fast in miles an hour and how much boost is left. */
+    const e = clamp(P.boostE === undefined ? 1 : P.boostE, 0, 1);
+    ctx.fillText("MPH", mx + 8 * U, my + 11 * U);
+    hudFont(20 * U, 700); ctx.fillStyle = (P.boost || 0) > .2 ? "rgba(255,196,110,.98)" : G;
+    ctx.fillText(Math.round(P.tas * 2.23694) + "", mx + 8 * U, my + 27 * U);
+    hudFont(11 * U, 700);
+    ctx.fillStyle = (P.boost || 0) > .2 ? "rgba(255,176,80,.95)"
+      : e < .2 ? "rgba(255,130,90,.85)" : "rgba(120,140,155,.65)";
+    ctx.fillText("BOOST", mx + 8 * U, my + 43 * U);
+    const gx = mx + 54 * U, gw = 70 * U, gy = my + 38 * U, gh = 9 * U;
+    ctx.fillStyle = "rgba(255,255,255,.10)"; ctx.fillRect(gx, gy, gw, gh);
+    ctx.fillStyle = (P.boost || 0) > .2 ? "rgba(255,206,120,.95)"
+      : e < .2 ? "rgba(255,120,80,.85)" : "rgba(150,255,190,.70)";
+    ctx.fillRect(gx, gy, gw * e, gh);
+  } else {
+    ctx.fillText("MACH", mx + 8 * U, my + 11 * U);
+    hudFont(20 * U, 700); ctx.fillStyle = P.mach > 3.2 ? "rgba(255,150,90,.95)" : G;
+    ctx.fillText((P.qbar || 0) > 5 ? machStr(P.mach) : "\u2014", mx + 8 * U, my + 27 * U);
+    hudFont(11 * U, 700); ctx.textAlign = "left";
+    ctx.fillStyle = P.ab > .01 ? "rgba(255,176,80,.95)" : "rgba(120,140,155,.55)";
+    ctx.fillText(P.ab > .01 ? "A/B  " + Math.round(P.ab * 100) + "%" : "A/B  \u2014", mx + 8 * U, my + 43 * U);
+  }
 
   /* ---- heading tape ---- */
   const hw2 = Math.min(W * .34, 420 * U), hx = CX - hw2 / 2, hy = 26 * U;
@@ -11738,10 +12409,18 @@ function drawHUDFull() {
     hudFont(16 * U, 600); ctx.fillStyle = G;
     ctx.fillText(Math.round((P.pos.y - groundH(P.pos.x, P.pos.z)) * FT), rx + 8 * U, CY + 16 * U);
   }
-  hudFont(12 * U); ctx.fillStyle = GD; ctx.fillText("MACH", rx + 8 * U, CY + 38 * U);
-  hudFont(16 * U, 600); ctx.fillStyle = G;
-  // Mach against air that is not there is a number about nothing
-  ctx.fillText((P.qbar || 0) > 5 ? machStr(P.mach) : "--", rx + 8 * U, CY + 54 * U);
+  hudFont(12 * U); ctx.fillStyle = GD;
+  ctx.fillText(SPECS.vne ? "BOOST" : "MACH", rx + 8 * U, CY + 38 * U);
+  hudFont(16 * U, 600);
+  if (SPECS.vne) {
+    const e = clamp(P.boostE === undefined ? 1 : P.boostE, 0, 1);
+    ctx.fillStyle = (P.boost || 0) > .2 ? "rgba(255,196,110,.98)" : e < .2 ? "rgba(255,130,90,.9)" : G;
+    ctx.fillText(Math.round(e * 100) + "%", rx + 8 * U, CY + 54 * U);
+  } else {
+    ctx.fillStyle = G;
+    // Mach against air that is not there is a number about nothing
+    ctx.fillText((P.qbar || 0) > 5 ? machStr(P.mach) : "--", rx + 8 * U, CY + 54 * U);
+  }
   drawGMeter(P, 96 * U + tw + 74 * U, H - 146 * U, 60 * U);
 
   // throttle + prop
@@ -11908,15 +12587,22 @@ function drawHUDCompact() {
       W - sr - 12 * u, py + ph + 11 * u);
   }
   drawGMeter(P, W - sr - 12 * u - pw * .5, py + ph + 24 * u + 46 * u, 46 * u);
-  // Mach and A/P badge under the speed panel
+  /* Mach and A/P badge under the speed panel. A Mach number means nothing
+     at a hundred and forty miles an hour, so the sport aeroplane gets its
+     boost tank in the same slot instead. */
   box(sl + 12 * u, py + ph + 6 * u, pw, 34 * u, 5 * u, PANEL, GD);
   hudFont(10 * u); ctx.fillStyle = GD; ctx.textAlign = "left";
-  ctx.fillText("MACH", sl + 20 * u, py + ph + 16 * u);
-  hudFont(17 * u, 700); ctx.fillStyle = P.mach > 3.2 ? "rgba(255,150,90,.95)" : G;
-  ctx.fillText((P.qbar || 0) > 5 ? machStr(P.mach) : "\u2014", sl + 60 * u, py + ph + 23 * u);
+  const arc = SPECS.vne > 0, tank = P.boostE === undefined ? 1 : P.boostE;
+  ctx.fillText(arc ? "BOOST" : "MACH", sl + 20 * u, py + ph + 16 * u);
+  hudFont(17 * u, 700);
+  ctx.fillStyle = arc
+    ? ((P.boost || 0) > .2 ? "rgba(255,206,120,.95)" : tank < .2 ? "rgba(255,120,80,.9)" : G)
+    : (P.mach > 3.2 ? "rgba(255,150,90,.95)" : G);
+  ctx.fillText(arc ? Math.round(tank * 100) + "%"
+    : (P.qbar || 0) > 5 ? machStr(P.mach) : "\u2014", sl + 60 * u, py + ph + 23 * u);
   if (P.ab > .01) {
     hudFont(11 * u, 700); ctx.fillStyle = "rgba(255,176,80,.95)";
-    ctx.fillText("A/B", sl + 20 * u, py + ph + 30 * u);
+    ctx.fillText(arc ? "BOOST" : "A/B", sl + 20 * u, py + ph + 30 * u);
   }
   if (AP.on) {
     hudFont(11 * u, 700); ctx.fillStyle = "rgba(124,232,154,.95)"; ctx.textAlign = "right";
@@ -12182,6 +12868,7 @@ const KEYCARD = [
   ["Full stop", "Q   speed hold to zero, from any speed", "the STOP chip on the map"],
   ["Speed limiter", "U   off takes the ceiling in air to 10 \u00d7 c", "the menu, under Speed limiter"],
   ["Wheel brakes", "Space (hold)", "the BRAKES pad, held"],
+  ["Boost (sport)", "X or Space, held", "the BOOST pad, held"],
   ["Parking brake", "B", "\u2014"],
   ["Drag chute", "X", "pull the striped T-handle"],
   ["Landing gear", "G", "the gear lever"],
@@ -12250,7 +12937,8 @@ const KEYMAP = {
     ["E", "<b>jump</b> &mdash; open a corridor to the nav target and arrive in orbit around it"],
     ["Q", "full stop &mdash; speed hold to zero, from any speed"],
     ["U", "speed limiter &mdash; off takes the atmospheric ceiling to 10&times; light"],
-    ["Space", "wheel brakes"],
+    ["Space", "wheel brakes &mdash; and, on the sport aeroplane in the air, <b>boost</b>"],
+    ["X", "<b>boost</b> (sport aeroplane) &middot; drag chute (Blackbird)"],
     ["B", "parking brake"],
     ["G", "landing gear"],
     ["F V", "flaps extend / retract"],
@@ -12278,11 +12966,16 @@ syncFreeRow();
 function menuTab(name, fromStage) {
   const tabs = document.getElementById("tabs");
   if (!tabs) return;
+  const was = (tabs.querySelector("button.on") || {}).dataset;
+  const same = was && was.tab === name;
   tabs.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.tab === name));
   document.querySelectorAll("#mbody section[data-pane]").forEach(s =>
     s.classList.toggle("on", s.dataset.pane === name));
+  /* Only when the page actually changes. Tapping a livery swatch re-enters
+     here through stageFocus, and scrolling the list back to the top under
+     the finger that is using it means you never see what you just picked. */
   const body = document.getElementById("mbody");
-  if (body) body.scrollTop = 0;
+  if (body && !same) body.scrollTop = 0;
   // the sheet shrinks on the two pages that are about looking at something
   const menu = document.getElementById("menu");
   if (menu) menu.classList.toggle("look", !GAME.started && (name === "plane" || name === "pilot"));
@@ -12335,6 +13028,48 @@ fillLiveries();
    shows it as bars because a bar is a comparison and a number is a fact
    you have to already understand. These four are live: change POWER or
    AGILITY and they move while you are looking at them. */
+/* The aircraft chooser. This is the one control in the hangar that changes
+   everything downstream of it: the mesh standing on the plate, the numbers
+   the flight model reads, the laws the stick is flown through, the panel
+   (one of these has a drag chute and the other has a boost button), the
+   camera that frames it, and the half of the set-up page that only means
+   something on a Mach 3 aeroplane. All of it goes through applyAircraft()
+   so there is exactly one place for it to be wrong. */
+function fillAircraft() {
+  const el = document.getElementById("acRow");
+  if (!el) return;
+  el.innerHTML = AIRCRAFT.map((A, i) =>
+    "<button class=\"opt" + (KIT.ac === i ? " on" : "") + "\" data-i=\"" + i + "\"><b>" +
+    A.name + "</b><i>" + A.note + "</i></button>").join("");
+  el.querySelectorAll(".opt").forEach(btn => btn.addEventListener("click", () => {
+    const i = +btn.dataset.i;
+    if (i === KIT.ac) return;
+    /* The first time you take an aeroplane out it arrives in the paint it
+       ought to be in. After that it is yours and nothing touches it. */
+    KIT.seen = KIT.seen || {};
+    if (!KIT.seen[AIRCRAFT[i].id] && AIRCRAFT[i].liv !== undefined) {
+      KIT.liv = clamp(AIRCRAFT[i].liv, 0, LIVERIES.length - 1);
+      KIT.seen[AIRCRAFT[i].id] = 1;
+      if (typeof fillLiveries === "function") fillLiveries();
+    }
+    KIT.ac = i; kitSave();
+    applyAircraft();
+    applyLivery(); AC = acNow().build(); AC.kind = acNow().kind;
+    fillAircraft(); fillTune(); fillStats();
+    const t = document.getElementById("tuneRows");
+    if (t) t.classList.toggle("hide", acNow().tunable === false);
+    if (!GAME.started) {
+      STAGE.init = false; stageFocus("plane", true);
+      /* One caption at a time. stageFocus has just put the LIVERY name up;
+         what you actually changed is the aeroplane, so say that instead of
+         printing a toast across the top of it. */
+      STAGE.capLab = "AIRCRAFT"; STAGE.cap = acNow().name; STAGE.capT = 3.4;
+    } else toast(acNow().name, 1.8);
+    audio.beep(560, .12, .07);
+  }));
+  const t = document.getElementById("tuneRows");
+  if (t) t.classList.toggle("hide", acNow().tunable === false);
+}
 function fillTune() {
   const mk = (el, list, key) => {
     if (!el) return;
@@ -12365,18 +13100,32 @@ function fillStats() {
     "<div class=\"stat" + (hot ? " hot" : "") + "\"><div class=\"k\"><span>" + lab +
     "</span><em>" + val + "</em></div><div class=\"bar\"><u style=\"width:" +
     Math.round(clamp(frac, 0, 1) * 100) + "%\"></u></div></div>";
-  el.innerHTML =
-    bar("POWER", "\u00d7" + s, (Math.log(s) / Math.log(8)) * .88 + .12, s > 3) +
-    bar("0\u2192M3", (t3 >= 10 ? Math.round(t3) : t3.toFixed(1)) + "s", 1 - t3 / 22, s > 3) +
-    bar("ROLL", Math.round(FBW.pMax * 57.3) + "\u00b0/s", FBW.pMax / 2.9, KIT.agl > 1) +
-    bar("TURN", TURN_AT_M16[clamp(KIT.agl | 0, 0, 2)] + "\u00b0/s \u00b7 "
-      + FBW.gMax + "g", FBW.gMax / 15, KIT.agl > 1);
+  if (SPECS.vne) {
+    /* A propeller aeroplane measured in Mach numbers and seconds-to-Mach-3
+       is a joke at its expense. Miles an hour, what the button does, how
+       fast it rolls and how hard it turns. */
+    const cr = Math.round(SPECS.vne * 2.23694), bo = Math.round(SPECS.vboost * 2.23694);
+    el.innerHTML =
+      bar("CRUISE", cr + " mph", cr / 260, false) +
+      bar("BOOST", bo + " mph", bo / 260, true) +
+      bar("ROLL", Math.round(FBW.pMax * 57.3) + "\u00b0/s", FBW.pMax / 2.9, false) +
+      bar("TURN", "47\u00b0/s \u00b7 " + FBW.gMax + "g", FBW.gMax / 15, false);
+  } else {
+    el.innerHTML =
+      bar("POWER", "\u00d7" + s, (Math.log(s) / Math.log(8)) * .88 + .12, s > 3) +
+      bar("0\u2192M3", (t3 >= 10 ? Math.round(t3) : t3.toFixed(1)) + "s", 1 - t3 / 22, s > 3) +
+      bar("ROLL", Math.round(FBW.pMax * 57.3) + "\u00b0/s", FBW.pMax / 2.9, KIT.agl > 1) +
+      bar("TURN", TURN_AT_M16[clamp(KIT.agl | 0, 0, 2)] + "\u00b0/s \u00b7 "
+        + FBW.gMax + "g", FBW.gMax / 15, KIT.agl > 1);
+  }
+  const nm = document.getElementById("statName");
+  if (nm) nm.textContent = acNow().name + " \u00b7 KEEPER FIELD";
   const k = document.getElementById("statKit");
-  if (k) k.textContent = LIVERIES[KIT.liv].name.toUpperCase() + " \u00b7 "
-    + AGILS[clamp(KIT.agl | 0, 0, AGILS.length - 1)][0] + " \u00b7 "
-    + POWERS[clamp(KIT.pwr | 0, 0, POWERS.length - 1)][0];
+  if (k) k.textContent = LIVERIES[KIT.liv].name.toUpperCase()
+    + (SPECS.vne ? "" : " \u00b7 " + AGILS[clamp(KIT.agl | 0, 0, AGILS.length - 1)][0]
+       + " \u00b7 " + POWERS[clamp(KIT.pwr | 0, 0, POWERS.length - 1)][0]);
 }
-fillTune(); fillStats();
+fillAircraft(); fillTune(); fillStats();
 swatches(document.getElementById("trimRow"), TRIMS, "trim");
 swatches(document.getElementById("helmRow"), HELMETS, "helm");
 swatches(document.getElementById("visorRow"), VISORS, "visor");
@@ -12471,6 +13220,7 @@ function onKeyPress(k) {
   if (lk === "q") { spaceStop(); }
   if (lk === "u") { toggleFree(); }
   if (lk === "x") {
+    if (SPECS.vne) return;          // X is the boost, and it is held, not tapped
     if (P.chuteCmd) { P.chuteCmd = 0; toast("CHUTE JETTISONED", 1.4); }
     else if (P.ias * 1.94384 > CHUTE_LIMIT) toast("TOO FAST FOR THE CHUTE", 1.6);
     else { P.chuteCmd = 1; toast("DRAG CHUTE STREAMED", 1.6); audio.beep(240, .3, .16); }
@@ -12544,8 +13294,17 @@ function applyInput(dt) {
     if (K[","] || K.home) P.trim = clamp(P.trim + .30 * dt, -.8, .8);
     if (K["."] || K.end) P.trim = clamp(P.trim - .30 * dt, -.8, .8);
   }
+  /* BOOST, and what the space bar does.
+     On the jet, space is the wheel brakes and nothing else. On the sport
+     aeroplane the wheel brakes still matter on the ground and are useless
+     in the air, so space is the brakes while the wheels are on and the
+     boost the moment they are not \u2014 which is the key you already have
+     your thumb on, and one fewer thing to learn. X is the explicit one. */
+  const arcade = SPECS.vne > 0;
+  P.boostCmd = arcade && !GAME.paused &&
+    (touchHeld("boost") || K.x || (K[" "] && !P.onGround)) ? 1 : 0;
   // brakes
-  const held = (K[" "] || touchHeld("brake")) ? 1 : 0;
+  const held = ((arcade ? (K[" "] && P.onGround) : K[" "]) || touchHeld("brake")) ? 1 : 0;
   P.brake = clamp(approach(P.brake, Math.max(held, P.park && P.onGround ? 1 : 0), 12, dt), 0, 1);
   /* Any control at all ends the arrival. It is a view, not a cutscene: the
      moment the pilot does anything, the camera is theirs again. */
@@ -12766,6 +13525,13 @@ function frame(now) {
        and not a start screen. */
     stageStep(dt);
   }
+
+  /* The propeller. Two revolutions a second at idle so that it is alive in
+     the hangar, and a couple of thousand a minute at full power, which is
+     far past what sixty frames a second can show — which is the whole
+     reason the blades hand over to a disc. */
+  PLANE.propA = (PLANE.propA || 0) + dt * (2.2 + (PLANE.rpm || 0) * 190);
+  if (PLANE.propA > 1e6) PLANE.propA = 0;
 
   // ---- render ----
   updateAtmosphere(cam.pos.y);
