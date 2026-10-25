@@ -51,6 +51,15 @@ canvas { display: block; width: 100%; height: 100%; }
 }
 #settings.open { transform: none; }
 @media (prefers-reduced-motion: reduce) { #settings { transition: none; } .ring { transition: none; } }
+.dials { margin-top: 14px; display: grid; gap: 10px; width: 150px; }
+.dial { display: grid; grid-template-columns: 22px 1fr 24px; align-items: center; gap: 8px; font-family: "Chivo Mono", monospace; font-size: 13px; font-weight: 700; color: #2a1d10; }
+.dial svg { width: 22px; height: 22px; display: block; }
+.dial output { text-align: right; font-variant-numeric: tabular-nums; }
+.dial input { -webkit-appearance: none; appearance: none; width: 100%; height: 22px; background: transparent; margin: 0; touch-action: none; }
+.dial input::-webkit-slider-runnable-track { height: 4px; background: #2a1d10; border-radius: 2px; }
+.dial input::-moz-range-track { height: 4px; background: #2a1d10; border-radius: 2px; }
+.dial input::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; margin-top: -8px; border-radius: 50%; background: #d9cbb0; border: 3px solid #2a1d10; box-shadow: inset 0 0 0 3px #d9cbb0, inset 0 0 0 4px #2a1d10; }
+.dial input::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #d9cbb0; border: 3px solid #2a1d10; }
 .overlay { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(30, 20, 10, .5); z-index: 2; cursor: pointer; }
 </style>
 
@@ -59,6 +68,10 @@ canvas { display: block; width: 100%; height: 100%; }
   <div id="corner" role="button" aria-label="Settings" tabindex="0"></div>
   <div id="settings" class="leader" aria-hidden="true">
     <button class="ring" id="unstuckBtn" aria-label="Reset this round"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M50 26A20 20 0 1 0 54 38" fill="none" stroke="#1e1409" stroke-width="6" stroke-linecap="round"/><path d="M50 12v14H36" fill="none" stroke="#1e1409" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <div class="dials">
+      <label class="dial" title="Floppiness"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 14c3-8 6 8 9 0s6 8 9 0" fill="none" stroke="#2a1d10" stroke-width="2.6" stroke-linecap="round"/></svg><input type="range" id="floppy" min="0" max="10" step="1" value="6" aria-label="Floppiness"><output for="floppy" id="floppyV">6</output></label>
+      <label class="dial" title="Stickiness"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c3 4 6 7 6 11a6 6 0 0 1-12 0c0-4 3-7 6-11z" fill="none" stroke="#2a1d10" stroke-width="2.6" stroke-linejoin="round"/></svg><input type="range" id="sticky" min="0" max="10" step="1" value="6" aria-label="Stickiness"><output for="sticky" id="stickyV">6</output></label>
+    </div>
   </div>
   <div class="overlay" id="startScreen">
     <div class="ring" style="width:150px;height:150px" aria-label="Start"><svg viewBox="0 0 64 64" aria-hidden="true" style="width:64px;height:64px"><path d="M22 14v36l30-18z" fill="#1e1409"/></svg></div>
@@ -79,7 +92,9 @@ canvas { display: block; width: 100%; height: 100%; }
   const WW = 1000, WH = 600, G = 2400;
   const PX = 270, PY = 440;               // pan cooking-surface centre
   const N = 9, SEG = 17, R = 19;          // sausage: 9 particles, 136px long, 38px thick
-  const SUB = 1 / 240, REST = .01, MU = .8, MU_PAN = .02, PAN_TILT = .11;
+  const SUB = 1 / 240, REST = .01, MU_PAN = .02, PAN_TILT = .11;
+  // tuned from the settings dials: grip on objects, and how limp the casing is
+  let MU = .8, BEND = .012, K4 = .03;
   let W = 0, H = 0, DPR = 1, S = 1, OX = 0, OY = 0, bgCache = null;
 
   function resize() {
@@ -505,8 +520,9 @@ canvas { display: block; width: 100%; height: 100%; }
     simT += SUB;
   }
   // pulls the middle of three neighbours back toward the line between them: a firm casing that still flexes
-  // bend stiffness: the softest setting of the old firmness slider (level 1)
-  const BEND = .012, K4 = .03;
+  // floppy 0..10: stiff casing down to a limp one. sticky 0..10: slides off most things up to clinging
+  function setFloppy(v) { const u = v / 10; BEND = .045 * Math.pow(.002 / .045, u); K4 = .1 * Math.pow(.004 / .1, u); }
+  function setSticky(v) { MU = .3 + (v / 10) * 1.5; }
   function straighten(a, b, c, k) {
     const dx = (a.x + c.x) / 2 - b.x, dy = (a.y + c.y) / 2 - b.y;
     b.x += dx * k; b.y += dy * k; a.x -= dx * k / 2; a.y -= dy * k / 2; c.x -= dx * k / 2; c.y -= dy * k / 2;
@@ -1281,6 +1297,14 @@ canvas { display: block; width: 100%; height: 100%; }
   corner.addEventListener('pointerdown', e => { e.preventDefault(); toggleSettings(); });
   corner.addEventListener('keydown', e => { if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); toggleSettings(); } });
   document.getElementById('unstuckBtn').addEventListener('click', resetRound);
+  // the dials remember themselves on this device
+  for (const [id, set] of [['floppy', setFloppy], ['sticky', setSticky]]) {
+    const el = document.getElementById(id), out = document.getElementById(id + 'V');
+    let v = +el.value; try { const sv = localStorage.getItem('hf_' + id); if (sv != null && sv !== '') v = +sv; } catch (e) {}
+    el.value = v; out.textContent = v; set(v);
+    el.addEventListener('input', () => { out.textContent = el.value; set(+el.value); try { localStorage.setItem('hf_' + id, el.value); } catch (e) {} });
+    el.addEventListener('pointerdown', e => e.stopPropagation());
+  }
   // the ring buttons click like old switches
   document.querySelectorAll('.ring').forEach(b => {
     b.addEventListener('pointerdown', () => { initAudio(); b.classList.add('down'); sfx('click_down', .8); buzz(8); });
