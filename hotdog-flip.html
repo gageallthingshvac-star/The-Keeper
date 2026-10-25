@@ -89,7 +89,7 @@ canvas { display: block; width: 100%; height: 100%; }
   if (!CanvasRenderingContext2D.prototype.roundRect) CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h) { this.rect(x, y, w, h); };
 
   // ---------- world ----------
-  const WW = 1000, WH = 600, G = 2400;
+  const WW = 1000, WH = 600, G = 4800;   // plain constant gravity, about twice what it was: a sausage falls like a sausage
   const PX = 270, PY = 440;               // pan cooking-surface centre
   const N = 9, SEG = 17, R = 19;          // sausage: 9 particles, 136px long, 38px thick
   const SUB = 1 / 240, REST = .01, MU_PAN = .02, PAN_TILT = .11;
@@ -495,7 +495,7 @@ canvas { display: block; width: 100%; height: 100%; }
     mvx /= N; mvy /= N;
     for (const q of ps) {
       q.touch = null;
-      const vx = mvx * .9995 + (q.x - q.px - mvx) * .965, vy = mvy * .9995 + (q.y - q.py - mvy) * .965;
+      const vx = mvx + (q.x - q.px - mvx) * .965, vy = mvy + (q.y - q.py - mvy) * .965;   // no air drag: flight is a clean parabola
       q.px = q.x; q.py = q.y;
       q.x += vx; q.y += vy + G * SUB * SUB;
     }
@@ -560,7 +560,7 @@ canvas { display: block; width: 100%; height: 100%; }
   function launch(p) {
     // steeper arc than it used to be: full power still lands on screen, and the sausage comes down onto a perch instead of skidding across it
     // the cubic term is extra range at the top of the band: full power clears the far edge of the screen, mid power stays steep
-    const vx = 214 + p * 300 + p * p * p * 200, vy = 632 + p * 834, T = 2 * vy / G, w = Math.PI / T;
+    const vx = 303 + p * 424 + p * p * p * 283, vy = 894 + p * 1179, T = 2 * vy / G, w = Math.PI / T;   // same arcs as before, flown in 70% of the time
     const c = centroid();
     for (const q of sau.p) {
       const rx = q.x - c.x, ry = q.y - c.y;
