@@ -568,7 +568,7 @@ canvas { display: block; width: 100%; height: 100%; }
 
   // ---------- state ----------
   let state = 'menu', phase = 'idle', phaseT = 0, time = 0;
-  let charge = 0, power = 0, target = null, spot = 0, spotOn = false, settle = { pan: 0, target: 0 }, stableT = 0;
+  let charge = 0, power = 0, target = null, spot = 0, spotOn = false, settle = { pan: 0, target: 0 }, stableT = 0, touchT = 0;
   let big = false, hold = { t: 0, lost: 0, beat: 0 }, zoom = 1, zc = { x: 500, y: 300 }, shake = 0;
   const notes = [], popups = [], confetti = [];
   const motes = Array.from({ length: 70 }, () => ({ x: Math.random() * 1200 - 100, y: Math.random() * 700 - 50, z: .3 + Math.random() * .7, ph: Math.random() * 6.28 }));
@@ -577,7 +577,7 @@ canvas { display: block; width: 100%; height: 100%; }
     chop.mode = 'in'; chop.t = 0; chop.open = 0; chop.out = 0; chop.queued = false;
     const pose = chopPose(simT); chop.tip = { x: pose.x, y: pose.y }; chop.a = pose.a;
     sau = makeSausage(pose.x + (N - 1) / 2 * SEG, pose.y); sau.pinned = true;
-    phase = 'hang'; phaseT = 0; settle = { pan: 0, target: 0 }; stableT = 0;
+    phase = 'hang'; phaseT = 0; settle = { pan: 0, target: 0 }; stableT = 0; touchT = 0;
   }
   function newRound() {
     target = makeTarget(target && target.k);
@@ -663,15 +663,17 @@ canvas { display: block; width: 100%; height: 100%; }
     settle.target = onTg >= 1 && sp < 40 ? settle.target + dt : 0;
     // stable: at rest and held by at least three points of the casing. Balanced on one or two: unstable.
     stableT = onTg >= 3 && sp < 25 ? stableT + dt : 0;
+    // on the object at all, still or not: rolling, sliding and wobbling count as 'on' and start the clock
+    touchT = onTg >= 1 ? touchT + dt : 0;
 
     if (state !== 'play') return;
     const c = centroid(), { y1 } = ext();
     setSizzle(onPan > 0 ? .25 + onPan / N * .75 : 0);
     zc.x += (c.x - zc.x) * Math.min(1, dt * 4); zc.y += (c.y - zc.y) * Math.min(1, dt * 4);
     if ((phase === 'drop' || phase === 'flight') && settle.pan > .3) { phase = 'ready'; phaseT = 0; }
-    // stable on the object: the round is won. Balanced on an edge: the 5-second countdown, won early if it steadies
+    // stable on the object: the round is won. On it but not settled (balanced on an edge, or still moving): the 5-second countdown, won early if it steadies
     if (phase === 'flight' && stableT > .4) celebrate(false);
-    else if (phase === 'flight' && settle.target > .5 && onTg <= 2) startHold();
+    else if (phase === 'flight' && touchT > .35) startHold();
     if (phase === 'hold') {
       hold.t += dt;
       hold.lost = onTg === 0 ? hold.lost + dt : 0;
@@ -679,7 +681,7 @@ canvas { display: block; width: 100%; height: 100%; }
       else { hold.beat -= dt; if (hold.beat <= 0) { sfx('heartbeat', .9, 1 + hold.t * .08); hold.beat = Math.max(.42, .85 - hold.t * .09); } }
       const sec = Math.ceil(5 - hold.t);
       if (sec !== hold.sec && sec > 0) { hold.sec = sec; buzz(12); blip(1000, .07, 'sine', .12); }
-      if (hold.lost > .3) { stopBeat(); phase = 'flight'; phaseT = 0; settle.target = 0; popup('NOOOO'); buzz([20, 60, 20]); }
+      if (hold.lost > .3) { stopBeat(); phase = 'flight'; phaseT = 0; settle.target = 0; touchT = 0; popup('NOOOO'); buzz([20, 60, 20]); }
       else if (stableT > .4) { stopBeat(); celebrate(false); }
       else if (hold.t >= 5) { stopBeat(); celebrate(true); }
     }
