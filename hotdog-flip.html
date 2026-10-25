@@ -112,7 +112,7 @@ canvas { display: block; width: 100%; height: 100%; }
   if (!CanvasRenderingContext2D.prototype.roundRect) CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h) { this.rect(x, y, w, h); };
 
   // ---------- world ----------
-  const WW = 1000, WH = 600, G = 3400;   // plain constant gravity, between the old floaty value and double it
+  const WW = 1000, WH = 600, G = 3000;   // plain constant gravity, a touch lighter than before
   const PX = 270, PY = 440;               // pan cooking-surface centre
   const N = 9, SEG = 17, R = 19;          // sausage: 9 particles, 136px long, 38px thick
   const SUB = 1 / 240, REST = .01, MU_PAN = .02, PAN_TILT = .11;
@@ -519,7 +519,7 @@ canvas { display: block; width: 100%; height: 100%; }
     mvx /= N; mvy /= N;
     for (const q of ps) {
       q.touch = null;
-      const vx = mvx + (q.x - q.px - mvx) * .965, vy = mvy + (q.y - q.py - mvy) * .965;   // no air drag: flight is a clean parabola
+      const vx = mvx + (q.x - q.px - mvx) * .94, vy = mvy + (q.y - q.py - mvy) * .94;   // no air drag: flight is a clean parabola. The wobble is damped harder: dense meat, not jelly
       q.px = q.x; q.py = q.y;
       q.x += vx; q.y += vy + G * SUB * SUB;
     }
@@ -584,7 +584,7 @@ canvas { display: block; width: 100%; height: 100%; }
   function launch(p) {
     // steeper arc than it used to be: full power still lands on screen, and the sausage comes down onto a perch instead of skidding across it
     // the cubic term is extra range at the top of the band: full power clears the far edge of the screen, mid power stays steep
-    const vx = 286 + p * 400 + p * p * p * 266, vy = 797 + p * 1052, T = 2 * vy / G, w = Math.PI / T;   // a bit more send than before: objects sit farther out now
+    const vx = 269 + p * 376 + p * p * p * 250, vy = 748 + p * 988, T = 2 * vy / G, w = Math.PI / T;   // a bit more send than before: objects sit farther out now
     tries++;
     const c = centroid();
     for (const q of sau.p) {
