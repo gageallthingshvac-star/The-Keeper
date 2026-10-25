@@ -46,7 +46,7 @@ fully playable with a mouse on desktop. No build step. No network: everything is
 
 ```
 Boot/Loading → Title ("Tap to start") → [first run: Pal Creator] → Main Menu (Plaza)
-  Main Menu: 4 sport cards (name, icon, medal row, your skill level) + bottom bar: Pals · Records · Settings
+  Main Menu: 5 sport cards (name, icon, medal row, your skill level) + bottom bar: Pals · Records · Settings
   Sport card → Setup sheet: mode → players (hot-seat Pals) or CPU opponent → Start
   → How-to overlay (auto first time, always reachable from Pause) → Title card ("BOWLING") → Play
   Play: HUD (sport-owned) + pause button (top-left, core-owned)
@@ -55,7 +55,7 @@ Boot/Loading → Title ("Tap to start") → [first run: Pal Creator] → Main Me
             → Play Again · Change Mode · Menu
 ```
 
-## 4. The four sports (summary — each sport file owns the detailed design)
+## 4. The five sports (summary — each sport file owns the detailed design)
 
 | id | Sport | Gesture | Modes | Players |
 |----|-------|---------|-------|---------|
@@ -63,6 +63,7 @@ Boot/Loading → Title ("Tap to start") → [first run: Pal Creator] → Main Me
 | `tennis` | Tennis (sunny stadium) | auto-run; **swipe** to swing, timing aims, speed = power; tap+swipe to serve | Quick Match · Match · Rally Challenge | 1 vs CPU |
 | `baseball` | Home Run Derby | **swipe across** to swing; timing pulls/pushes, swipe angle = launch | Derby (10 pitches) · Sudden Death | 1 vs CPU pitcher |
 | `golf` | Golf (9-hole parkland) | aim, **pull down then flick up**; pull = power, flick straightness = accuracy | Beginner 3 · Expert 3 · Full 9 | 1–4 hot-seat |
+| `flight` | Flight (island flyover, "Sunny Isle") | **drag anywhere** = floating stick (sideways banks/turns, up climbs, down dives; release levels), hold BOOST / BRAKE | Balloon Pop · Ring Run · Island Tour (collect the 40 "!" markers) | 1–4 hot-seat |
 
 ## 5. Files & ownership
 
@@ -89,6 +90,7 @@ sports/
   js/sports/tennis.js
   js/sports/baseball.js
   js/sports/golf.js
+  js/sports/flight.js
   js/main.js               boot, screens, menu scene, editor, results flow  (ui owner)
   tools/shoot.mjs          headless playtest driver (Playwright)
   tools/gallery.html       dev showcase of SS.world + SS.pals (?view=lineup|faces|anims|…)
@@ -256,12 +258,18 @@ SFX names (all must exist; unknown names log a warning once and do nothing):
   `ball_land_grass`
 - Golf: `golf_drive` (intensity) `golf_iron` `golf_chip` `golf_putt` (intensity) `golf_cup` `golf_land_grass`
   `golf_land_sand` `golf_tree` `golf_water` `flag_flap`
+- Flight: `balloon_pop` (intensity = balloon size; ≥ 0.8 adds a gold sparkle) `ring_pass` (`rate` raises the chime: a streak
+  climbs with rate = 2^(steps/12)) `boost` (engine rev + whoosh) `plane_bump` (intensity) `water_skim` (intensity) `info_found`
+  (the "!" discovery jingle) `flyby` (a prop plane passing close; loudest ~0.9 s after the call, sweeps left → right,
+  a negative `pan` sweeps right → left; intensity = how close)
 
 Loops: `ball_roll` (bowling; use rate+volume for speed) `crowd_ambience` `park_ambience` (birds, breeze)
-`stadium_ambience` `wind` (volume = strength) `alley_ambience` (distant pins, murmur).
+`stadium_ambience` `wind` (volume = strength) `alley_ambience` (distant pins, murmur)
+`plane_engine` (flight; setRate = throttle: ≈ 0.85 brake · 1 cruise · 1.3 boost) `air_rush` (wind over the wings; set the
+volume from speed, optional setRate = speed / cruise brightens it) `ocean_ambience` (sea wash + waves breaking now and then).
 
 Music tracks (cheerful, light, loopable, sequenced — sampled marimba/glockenspiel/kalimba/drums over a soft synth bass/pad):
-`title` `menu` `editor` `bowling` `tennis` `baseball` `golf` `results`. Keep music under SFX in the mix.
+`title` `menu` `editor` `bowling` `tennis` `baseball` `golf` `flight` `results`. Keep music under SFX in the mix.
 
 ### 6.5 `js/world.js` — `SS.world` (shared environment & effects)
 
@@ -507,7 +515,7 @@ Everything in §6 works as written. The items below are what the implementation 
 sport modules may rely on all of them.
 
 ### 10.1 Sport files today
-`js/sports/*.js` hold the four complete sports. Mode ids are stable save keys (records, last setup), so a
+`js/sports/*.js` hold the five complete sports. Mode ids are stable save keys (records, last setup), so a
 renamed mode keeps its id: bowling's `hundred` is shown as **Power Pins**.
 
 | id | accent / tint | modes | players / opponent |
@@ -516,6 +524,7 @@ renamed mode keeps its id: bowling's `hundred` is shown as **Power Pins**.
 | tennis | `#8E5BE0` / `#F1EAFF` | `quick` Quick Match · `match` Match · `rally` Rally Challenge | 1 / CPU |
 | baseball | `#2E86F0` / `#E4F0FF` | `derby` Home Run Derby · `sudden` Sudden Death | 1 / CPU |
 | golf | `#2FAE55` / `#E5F7E8` | `beginner` Beginner 3 · `expert` Expert 3 · `full9` Full 9 | 1–4 / – |
+| flight | `#FF9F1C` / `#FFF1DC` | `balloons` Balloon Pop (2:00 a turn) · `rings` Ring Run (time trial) · `tour` Island Tour (5:00, "!" markers) | 1–4 / – |
 
 Keep taglines ≤ 23 characters (they are single-line on landscape menu cards).
 
@@ -567,6 +576,15 @@ Keep taglines ≤ 23 characters (they are single-line on landscape menu cards).
   `sampleResults()`, `plaza`, getters `game`, `screen`.
   `SS.debug.screen` ∈ title · menu · editor · pals · records · settings · play · results.
 - Setup choices are remembered per sport in `SS.save.settings.lastSetup` (wiped by reset).
+- Main menu with five sports (`.menu-cards.n5`): portrait is a two-column grid whose odd card out (the last one) becomes a
+  wide feature card (`.sport-card.wide`: icon · name + tagline · medals and rank), taglines on one line; portrait phones
+  shorter than 760 px (most phones in a browser tab) switch to compact cards (icon beside the name, tagline below).
+  Landscape is one row of five (short landscape: icon + name with the tagline under them; under 700 px wide: no tagline
+  or rank chip). Nothing scrolls from 320×568 to 1280×720. A sport listed in main.js `NEW_SPORTS` (today `flight`) wears
+  a wiggling "New!" sticker until the active Pal has played it once (or earned one of its medals). Records tabs stay
+  five equal tabs on phones (icon over the name, 11.5 px names under 360 px).
+- The plaza has a toy prop plane circling the fountain at ~2.5 m (3 draw calls, no shadow): visible on the title, the
+  landscape/desktop menu and the wide Records/Settings views (the portrait hero framing ends below it).
 
 ### 10.4 Engine & input (engine.js)
 - `addUpdate(fn, priority)`: **lower priority runs first** (stable). Use ~100 for a camera follow.
@@ -613,7 +631,7 @@ yet or cannot be decoded; nothing ever waits for audio.
 - **Banks.** `tools/build-audio.mjs` (from `tools/audio-sources.json`) generates classic-script IIFEs that fill
   `SS.audioBank.samples[id] = { b64 (mono MP3), gain, cat, sport?, dur, peakAt?, loop?, loopStart?, loopEnd?,
   root?, inst?, who?, sr, enc? }` and `SS.audioBank.banks[name] = { count, ids }`. `index.html` loads the core bank
-  (`js/audio-bank.js`, ~2.9 MB: UI, generic, crowd, voices, beds, instruments, drums). The per-sport banks
+  (`js/audio-bank.js`, ~3.1 MB: UI, generic, crowd, voices, beds, instruments, drums). The per-sport banks
   (`js/audio-bank-<sport>.js`) are injected as `<script>` next to `audio.js` on demand (works on file:// and http);
   `tools/build.mjs` inlines every bank into the single-file bundle, where they are used directly (no fetch, so a
   strict `script-src 'unsafe-inline'` CSP is fine). Do not edit the banks by hand; rebuild them.
@@ -638,8 +656,28 @@ yet or cannot be decoded; nothing ever waits for audio.
   synthesized (the wind recording only had sub-300 Hz rumble once its howl was removed).
 - **Loops.** `ball_roll`, `crowd_ambience`, `stadium_ambience`, `park_ambience`, `alley_ambience` play seamless
   recorded loops (alley adds distant real strikes every 6–14 s). A loop requested before its recording is decoded
-  starts synthesized and crossfades to the recording (~1 s) as soon as it is ready; `setVolume/setRate/stop` work
+  stays silent up to 1.5 s, else starts synthesized, and crossfades to the recording (~1 s) as soon as it is ready
+  (when the recording lives in a sport bank whose script is still loading, it is requested once the bank registers); `setVolume/setRate/stop` work
   the same on both. `ball_roll.setRate(r)` maps speed to playback rate 0.8–1.25 and level.
+- **Flight** (bank `js/audio-bank-flight.js`, 8 recordings, ~290 KB base64; `prepare('flight')` also decodes the core
+  `amb_forest` and `amb_crowd` beds for `park_ambience` / crowd cheers over the venues). `plane_engine` is the steady
+  approach of a real propeller fly-by (paulprit, Freesound #507446) cut before its Doppler, level-flattened and looped
+  at the length whose wrap is most in phase (`loop.align` in the manifest); `setRate(r)` = playback rate r (0.5–2;
+  ≈ 0.85 brake · 1 cruise · 1.3 boost) plus a slightly louder, brighter note when revving, with a quiet synthesized
+  prop buzz (sawtooth at the recording's 77 Hz blade rate, chopped at half that) following the same rate so the toy
+  character survives phone speakers. `air_rush` = real wind (DAVESTALKER, #331527) split at build time into its low
+  buffeting (< 380 Hz) and its airy hiss (> 1.8 kHz, from the stretch without howl overtones); the sport sets the
+  volume from speed and `setRate(speed / cruise)` tilts toward the hiss. `ocean_ambience` = two copies of a real sea
+  wash (kkenny101, #852826) at rates 0.93 / 1.11 so the pattern never lines up, a slow random swell, and the clip's
+  breaking wave replayed every 3.5–8 s somewhere along the shore. One-shots: `balloon_pop` (the real balloon burst,
+  three voicings, size → pitch and level, gold ≥ 0.8 adds a soft thump + glockenspiel glints), `ring_pass` (vibraphone +
+  glockenspiel two-note chime through a soft whoosh; `rate` transposes it), `boost` (the engine recording revving
+  1 → 1.5× under a heavy whoosh), `plane_bump` (thud + wood knock + sub), `water_skim` (real spray, shorter and
+  thinner at low intensity), `info_found` (marimba + glockenspiel rising figure, harp strum, triangle) and `flyby` (the
+  whole fly-by, panned across). Music `flight`: 120 bpm, D major, A A2 B A2 (32 bars, ~64 s) — recorder tune doubled
+  by the glockenspiel over kalimba arpeggios, B section on marimba. Levels (offline, intensity 1, vol 1): engine
+  ≈ −20.5 LUFS, air_rush −22, ocean −24.5, balloon_pop max −19, ring_pass −16, boost −17.5, plane_bump −21,
+  water_skim −21.5, info_found −14, flyby −14.
 - **Instruments.** `marimba`, `bell` (glockenspiel), `vibes`/`epiano` (vibraphone), `pluck` (kalimba), `pizz`
   (folk harp), `flute` (recorder, pitch-synchronous sustain loop for long notes), drums (`kick` + a quiet synth
   beater click, `snare`/ghost, `clap`, `rim`, `hat`, `ride`, `shaker`, `brush`, `block`), timpani and cymbals are
@@ -693,5 +731,6 @@ yet or cannot be decoded; nothing ever waits for audio.
   so sports that dispose their equipment before `pal.dispose()` need no change.
 
 ### 10.9 Performance reference (menu plaza, 390×844)
-low: ~62 draw calls / 98k triangles · medium (shadows): ~103 calls / 161k triangles. Title view (whole plaza):
+low: ~62 draw calls / 98k triangles · medium (shadows): ~103 calls / 161k triangles (+ up to 3 calls for the toy
+plane when it is in view). Title view (whole plaza):
 ~124 / ~165 calls. Seven Pals account for ~105 of the low-quality calls.

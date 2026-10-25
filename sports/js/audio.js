@@ -66,9 +66,9 @@
   // per-sport bank scripts loaded on demand, lazy prioritized decoding, variant groups.
   // ---------------------------------------------------------------------------------------------
 
-  const SPORT_BANKS = ['bowling', 'tennis', 'baseball', 'golf'];
+  const SPORT_BANKS = ['bowling', 'tennis', 'baseball', 'golf', 'flight'];
   /** Core ambience beds each sport's loops need (decoded together with that sport's bank). */
-  const SPORT_BEDS = { bowling: ['amb_cafe'], tennis: ['amb_crowd'], baseball: ['amb_crowd'], golf: ['amb_forest'] };
+  const SPORT_BEDS = { bowling: ['amb_cafe'], tennis: ['amb_crowd'], baseball: ['amb_crowd'], golf: ['amb_forest'], flight: ['amb_forest', 'amb_crowd'] };
   /** Decode priority: lower first. `track` = the instruments of the music about to start (ahead of crowds/voices). */
   const PRIO = { now: 0, ui: 1, track: 1.5, high: 2, sport: 3, normal: 4, idle: 5 };
   const DECODE_CONCURRENCY = 3;
@@ -1895,6 +1895,73 @@
     return noise(M, am, { t, a: 0.05, d: 0.6, v: 0.25, type: 'bandpass', f: 1300, q: 1 });
   }, 1);
 
+  // ---- Flight ------------------------------------------------------------------------------------
+
+  def('balloon_pop', 0.1, (M, t, o, out) => {
+    const I = o.intensity, R = o.rate * (1.25 - 0.4 * I);
+    noise(M, out, { t, a: 0.0005, d: 0.05 + 0.05 * I, v: 0.5 + 0.3 * I, type: 'bandpass', f: 2600 * R, to: 900 * R, q: 0.8 });
+    tone(M, out, { t, f: 320 * R, to: 120 * R, a: 0.001, d: 0.06, v: 0.25 + 0.2 * I });
+    return noise(M, out, { t, kind: 'brown', a: 0.001, d: 0.12 + 0.1 * I, v: 0.3 * I, type: 'lowpass', f: 800 });
+  }, 4);
+
+  def('ring_pass', 0.25, (M, t, o, out) => {
+    const R = o.rate;
+    INST.vibes(M, out, t, mtof(79) * R, 0.2, 0.6);
+    INST.bell(M, out, t, mtof(91) * R, 0.15, 0.4);
+    INST.vibes(M, out, t + 0.075, mtof(84) * R, 0.5, 0.7);
+    return INST.bell(M, out, t + 0.075, mtof(96) * R, 0.4, 0.5);
+  }, 2);
+
+  def('boost', 0.12, (M, t, o, out) => {
+    const I = o.intensity;
+    const saw = M.osc('sawtooth', 80), lp = M.filter('lowpass', 900, 1.2), g = M.gain(0);
+    saw.frequency.setValueAtTime(80, t); saw.frequency.exponentialRampToValueAtTime(130, t + 0.5);
+    lp.frequency.setValueAtTime(700, t); lp.frequency.exponentialRampToValueAtTime(2400, t + 0.5);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.18 * (0.5 + 0.5 * I), t + 0.08);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+    saw.connect(lp); lp.connect(g); g.connect(out);
+    saw.start(t); saw.stop(t + 0.95);
+    return Math.max(t + 0.9, sweep(M, out, { t, dur: 0.7, f0: 500, f1: 3000, f2: 1500, v: 0.25 + 0.2 * I, peak: 0.35, kind: 'pink' }));
+  }, 1);
+
+  def('plane_bump', 0.08, (M, t, o, out) => {
+    const I = o.intensity;
+    tone(M, out, { t, f: 120 * o.rate, to: 70 * o.rate, a: 0.002, d: 0.14, v: 0.3 + 0.3 * I });
+    knock(M, out, t + 0.01, 'wood', { v: 0.25 + 0.25 * I, rate: 0.7 * o.rate });
+    return noise(M, out, { t, kind: 'brown', a: 0.002, d: 0.16, v: 0.3 * I, type: 'lowpass', f: 700 });
+  }, 2);
+
+  def('water_skim', 0.12, (M, t, o, out) => {
+    const I = o.intensity;
+    noise(M, out, { t, a: 0.02, d: 0.35 + 0.3 * I, v: 0.18 + 0.2 * I, type: 'bandpass', f: 3500, to: 1800, q: 0.7 });
+    return noise(M, out, { t, kind: 'pink', a: 0.01, d: 0.25 + 0.2 * I, v: 0.15 + 0.15 * I, type: 'lowpass', f: 1500, to: 600 });
+  }, 2);
+
+  /** "!" discovery jingle: rising marimba + glockenspiel figure, then a harp-strummed chord and a triangle glint. */
+  function infoJingle(M, out, t, R) {
+    const st = 60 / 190 / 4;
+    phrase(M, out, t, 190, 'G5 C6 E6 . G6 - - -', 'marimba', 0.8, Math.round(12 * Math.log2(R)));
+    phrase(M, out, t, 190, 'G6 C7 E7 . G7 - - -', 'bell', 0.32, Math.round(12 * Math.log2(R)));
+    const tc = t + 4 * st;
+    ['C5', 'E5', 'G5', 'C6'].forEach((n, i) => INST.pizz(M, out, tc + i * 0.03, mtof(noteMidi(n)) * R, 0.7, 0.55));
+    return glints(M, out, tc + 0.05, 4, 0.4, 0.035, 1) + 0.9;
+  }
+  def('info_found', 0.25, (M, t, o, out) => infoJingle(M, out, t, o.rate), 1);
+
+  def('flyby', 0.1, (M, t, o, out) => {
+    const I = o.intensity, dur = 2.6, mid = t + 1.0;
+    const saw = M.osc('sawtooth', 160), lp = M.filter('lowpass', 1400, 1), g = M.gain(0), p = M.panner(-0.7);
+    saw.frequency.setValueAtTime(170 * o.rate, t);
+    saw.frequency.setValueAtTime(170 * o.rate, mid - 0.15);
+    saw.frequency.exponentialRampToValueAtTime(128 * o.rate, mid + 0.3);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.16 * (0.4 + 0.6 * I), mid);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    if (p.pan) { p.pan.setValueAtTime(-0.7, t); p.pan.linearRampToValueAtTime(0.7, t + dur); }
+    saw.connect(lp); lp.connect(g); g.connect(p); p.connect(out);
+    saw.start(t); saw.stop(t + dur + 0.05);
+    return noise(M, out, { t: mid - 0.4, kind: 'pink', a: 0.4, d: 0.9, v: 0.12 * I, type: 'bandpass', f: 1200, q: 0.6 });
+  }, 1);
+
   // ---------------------------------------------------------------------------------------------
   // Recorded SFX. real(name, needs, fn, wet) attaches a recipe built from real recordings; it plays
   // whenever every group in `needs` has a decoded recording (optional layers just skip when missing),
@@ -2219,6 +2286,70 @@
   real('golf_water', ['splash'], (M, t, o, out) =>
     rec(M, out, has(M, 'splash_big') && Math.random() < 0.5 ? 'splash_big' : 'splash_1', { t, gain: 0.65, rate: o.rate }), 0.12);
 
+  // ---- Flight --------------------------------------------------------------------------------------
+
+  // A real balloon burst; size = intensity: bigger balloons pop lower and fuller, a gold one (>= 0.8) adds a soft
+  // thump and a glockenspiel sparkle. Three voicings (speed / EQ) so a chain of pops never repeats.
+  real('balloon_pop', ['balloon_pop'], (M, t, o, out) => {
+    const I = o.intensity, v = irand(0, 2);
+    const rate = o.rate * (1.32 - 0.42 * I) * [1, 1.07, 0.94][v];
+    let end = rec(M, out, 'balloon_pop', { t, gain: 0.6 + 0.9 * I, rate, jit: 0.05, hp: [0, 250, 120][v], lp: [0, 9000, 0][v] });
+    if (I >= 0.8) {
+      sub(M, out, t, 0.16, 70);
+      end = Math.max(end, glints(M, out, t + 0.04, 3, 0.25, 0.03));
+    }
+    return end;
+  });
+
+  // Ring chime on the real vibraphone + glockenspiel; opts.rate raises the pitch (a streak climbs: rate = 2^(steps/12)).
+  real('ring_pass', ['inst:glock', 'inst:vibes'], (M, t, o, out) => {
+    const R = clamp(o.rate, 0.5, 2.5);
+    rec(M, out, 'whoosh_soft', { t, gain: 0.12, rate: 1.25, lp: 5000 });
+    INST.vibes(M, out, t, mtof(79) * R, 0.2, 0.62);
+    INST.bell(M, out, t, mtof(91) * R, 0.15, 0.36);
+    INST.vibes(M, out, t + 0.075, mtof(84) * R, 0.5, 0.72);
+    return INST.bell(M, out, t + 0.075, mtof(96) * R, 0.45, 0.48);
+  }, 0.25);
+
+  // Boost: the recorded engine revving up (playback rate sweeping 1 → 1.5) under a real air whoosh.
+  real('boost', ['flight_engine', 'swing_heavy'], (M, t, o, out) => {
+    const I = o.intensity;
+    const p = playRec(M, out, 'flight_engine', { t, dur: 1.0, attack: 0.06, fade: 0.55, gain: 0.45 + 0.3 * I, jit: 0, gj: 0.5,
+      offset: rand(0.15, 0.6), lp: 4200 });
+    if (p) { p.src.playbackRate.setValueAtTime(1, t); p.src.playbackRate.exponentialRampToValueAtTime(1.5 * o.rate, t + 0.45); }
+    rec(M, out, 'swing_heavy', { t, gain: 0.3 + 0.3 * I, rate: 0.72 * o.rate, lp: 3500 });
+    return Math.max(t + 1.0, rec(M, out, 'whoosh_soft', { t: t + 0.12, gain: 0.25, rate: 0.85 }));
+  });
+
+  // Soft bump (wing tip on a hill, a roof, a tree top): a cushioned thud and a light wood knock.
+  real('plane_bump', ['thud', 'knock_wood'], (M, t, o, out) => {
+    const I = o.intensity;
+    sub(M, out, t, 0.18 + 0.18 * I, 62 * o.rate);
+    rec(M, out, 'knock_wood', { t: t + 0.008, gain: 0.4 + 0.45 * I, rate: 0.72 * o.rate, lp: 2400 });
+    return rec(M, out, 'thud', { t, gain: 0.7 + 0.7 * I, rate: o.rate });
+  });
+
+  // Skimming the sea: a real water spray, lighter (high-passed, shorter) at low intensity.
+  real('water_skim', ['flight_spray'], (M, t, o, out) => {
+    const I = o.intensity;
+    rec(M, out, 'whoosh_soft', { t, gain: 0.12 + 0.12 * I, rate: 0.9 });
+    return rec(M, out, 'flight_spray', { t, gain: 0.35 + 0.55 * I, rate: o.rate * rand(0.95, 1.1), hp: 220 + 400 * (1 - I),
+      dur: 0.45 + 0.8 * I, fade: 0.3 });
+  });
+
+  real('info_found', ['inst:marimba', 'inst:glock', 'inst:harp'], (M, t, o, out) => infoJingle(M, out, t, o.rate), 0.25);
+
+  // A real propeller plane passing close: it sweeps left → right (a negative opts.pan sweeps right → left) and is
+  // loudest ~0.9 s after the call. intensity = how close.
+  real('flyby', ['flight_flyby'], (M, t, o, out) => {
+    const I = o.intensity, dir = (o.pan || 0) < 0 ? -1 : 1, p = M.panner(-0.75 * dir);
+    p.connect(out);
+    const r = playRec(M, p, 'flight_flyby', { t, lead: 0.9, gain: 0.25 + 0.5 * I, rate: o.rate, jit: 0.03, lp: 2500 + 9000 * I });
+    if (!r) return t;
+    if (p.pan) { p.pan.setValueAtTime(-0.75 * dir, t); p.pan.linearRampToValueAtTime(-0.1 * dir, t + 0.8); p.pan.linearRampToValueAtTime(0.8 * dir, r.end); }
+    return r.end;
+  });
+
   /** Sport whose bank holds a sfx/loop's recordings (requesting one loads that bank). */
   const SPORT_OF = {};
   for (const [sport, names] of Object.entries({
@@ -2226,6 +2357,7 @@
     tennis: ['racket_hit', 'racket_frame', 'ball_bounce_court'],
     baseball: ['bat_crack', 'bat_foul'],
     golf: ['golf_drive', 'golf_iron', 'golf_chip', 'golf_putt', 'golf_cup', 'golf_tree'],
+    flight: ['boost', 'water_skim', 'flyby', 'plane_engine', 'air_rush', 'ocean_ambience'],
   })) for (const n of names) SPORT_OF[n] = sport;
 
   // ---------------------------------------------------------------------------------------------
@@ -2362,6 +2494,56 @@
         stop(at) { srcs.forEach(s => s.stop(at)); },
       };
     },
+
+    // ---- Flight (synthesized fallbacks; the recorded versions are in REAL_LOOPS) ----
+
+    /** Prop engine: a sawtooth at the blade-pass rate chopped by the propeller, through a low-pass. setRate = throttle (1 = cruise). */
+    plane_engine(M, out) {
+      const t = M.now;
+      const saw = M.osc('sawtooth', 77), lp = M.filter('lowpass', 900, 1.4), g = M.gain(0.16);
+      const chop = M.osc('sine', 38.5), cg = M.gain(0.35), am = M.gain(0.65);
+      chop.connect(cg); cg.connect(am.gain);
+      saw.connect(lp); lp.connect(am); am.connect(g); g.connect(out);
+      const hiss = M.noiseSrc('pink', t, null), hb = M.filter('bandpass', 1400, 0.8), hg = M.gain(0.05);
+      hiss.connect(hb); hb.connect(hg); hg.connect(out);
+      saw.start(t); chop.start(t);
+      return {
+        setRate(r, at, ramp) {
+          glideParam(saw.frequency, 77 * r, at, ramp);
+          glideParam(chop.frequency, 38.5 * r, at, ramp);
+          glideParam(lp.frequency, 600 + 500 * r, at, ramp);
+        },
+        stop(at) { for (const n of [saw, chop, hiss]) n.stop(at); },
+      };
+    },
+
+    /** Air over the wings: low buffeting + airy hiss. setRate = speed relative to cruise (brightens the hiss). */
+    air_rush(M, out) {
+      const t = M.now;
+      const lo = M.noiseSrc('brown', t, null), llp = M.filter('lowpass', 350, 0.7), lg = M.gain(0.28);
+      const gust = M.lfoNoise(t, 0.6, null), gd = M.gain(0.12);
+      gust.connect(gd); gd.connect(lg.gain);
+      lo.connect(llp); llp.connect(lg); lg.connect(out);
+      const hi = M.noiseSrc('pink', t, null), hbp = M.filter('bandpass', 2600, 0.6), hg = M.gain(0.05);
+      hi.connect(hbp); hbp.connect(hg); hg.connect(out);
+      return {
+        setRate(r, at, ramp) {
+          glideParam(hbp.frequency, 1800 + 1200 * r, at, ramp);
+          glideParam(hg.gain, 0.025 + 0.025 * r * r, at, ramp);
+        },
+        stop(at) { for (const n of [lo, gust, hi]) n.stop(at); },
+      };
+    },
+
+    /** Sea: a slowly swelling low-passed wash. */
+    ocean_ambience(M, out) {
+      const t = M.now;
+      const src = M.noiseSrc('pink', t, null), lp = M.filter('lowpass', 900, 0.6), g = M.gain(0.22);
+      const swell = M.lfoNoise(t, 0.18, null), sd = M.gain(0.14), sweepF = M.lfoNoise(t, 0.15, null), fd = M.gain(400);
+      swell.connect(sd); sd.connect(g.gain); sweepF.connect(fd); fd.connect(lp.frequency);
+      src.connect(lp); lp.connect(g); g.connect(out);
+      return { stop(at) { for (const n of [src, swell, sweepF]) n.stop(at); } };
+    },
   };
 
   // ---- Recorded loops: seamless bank loops (loopStart/loopEnd), same handle semantics ------------
@@ -2431,6 +2613,81 @@
         };
       },
     },
+
+    // ---- Flight ----
+
+    // Small prop engine: the steady approach of a real fly-by as a seamless loop. setRate = throttle (≈ 0.85 brake,
+    // 1 cruise, 1.3 boost) → playback rate (pitch + prop speed) and a slightly brighter, louder note when revving.
+    // A quiet synthesized prop "buzz" (sawtooth at the recording's 77 Hz blade rate, chopped) follows the same rate
+    // so the toy-plane character survives small phone speakers.
+    plane_engine: {
+      needs: ['flight_engine'],
+      make(M, out) {
+        const t = M.now, lp = M.filter('lowpass', 3600, 0.7);
+        lp.connect(out);
+        const p = playRec(M, lp, 'flight_engine', { loop: true, gain: 0.55, gj: 0, jit: 0 });
+        const base = p.g.gain.value;
+        const saw = M.osc('sawtooth', 77), blp = M.filter('lowpass', 700, 1.2), chop = M.osc('sine', 38.5), cg = M.gain(0.4), am = M.gain(0.6), bg = M.gain(0.035);
+        chop.connect(cg); cg.connect(am.gain);
+        saw.connect(blp); blp.connect(am); am.connect(bg); bg.connect(out);
+        saw.start(t); chop.start(t);
+        return {
+          setRate(r, at, ramp) {
+            const k = clamp(r, 0.5, 2);
+            glideParam(p.src.playbackRate, k, at, ramp);
+            glideParam(p.g.gain, base * clamp(0.75 + 0.25 * k, 0.6, 1.25), at, ramp);
+            glideParam(lp.frequency, clamp(1800 + 2200 * k, 1500, 9000), at, ramp);
+            glideParam(saw.frequency, 77 * k, at, ramp);
+            glideParam(chop.frequency, 38.5 * k, at, ramp);
+          },
+          stop(at) { p.src.stop(at); saw.stop(at); chop.stop(at); },
+        };
+      },
+    },
+
+    // Air rushing over the wings: real wind, split into its low buffeting and its airy high band (the howl in between
+    // was filtered out at build time). The sport sets the volume from speed; setRate (speed / cruise, default 1) tilts
+    // the balance toward the hiss and lifts its pitch as the plane goes faster.
+    air_rush: {
+      needs: ['flight_wind_lo', 'flight_wind_hi'],
+      make(M, out) {
+        const lo = playRec(M, out, 'flight_wind_lo', { loop: true, gain: 0.55, gj: 0, jit: 0 });
+        const hi = playRec(M, out, 'flight_wind_hi', { loop: true, gain: 0.8, gj: 0, jit: 0 });
+        const lb = lo.g.gain.value, hb = hi.g.gain.value;
+        return {
+          setRate(r, at, ramp) {
+            const k = clamp(r, 0.3, 2);
+            glideParam(hi.g.gain, hb * clamp(0.35 + 0.65 * k * k, 0.2, 2.2), at, ramp);
+            glideParam(hi.src.playbackRate, 0.85 + 0.15 * k, at, ramp);
+            glideParam(lo.g.gain, lb * clamp(0.6 + 0.4 * k, 0.5, 1.4), at, ramp);
+            glideParam(lo.src.playbackRate, 0.9 + 0.1 * k, at, ramp);
+          },
+          stop(at) { lo.src.stop(at); hi.src.stop(at); },
+        };
+      },
+    },
+
+    // The sea: two copies of a real wash loop at different speeds (so their pattern never lines up), a slow random swell,
+    // and every few seconds a real wave breaking somewhere along the shore.
+    ocean_ambience: {
+      needs: ['flight_ocean'],
+      make(M, out) {
+        const t = M.now, lp = M.filter('lowpass', 2400, 0.6), g = M.gain(0.55);
+        const swell = M.lfoNoise(t, 0.12, null), sd = M.gain(0.2);
+        swell.connect(sd); sd.connect(g.gain);
+        lp.connect(g); g.connect(out);
+        const a = playRec(M, lp, 'flight_ocean', { loop: true, gain: 0.7, gj: 0, jit: 0, rate: 0.93 });
+        const b = playRec(M, lp, 'flight_ocean', { loop: true, gain: 0.5, gj: 0, jit: 0, rate: 1.11 });
+        return {
+          event(at) {
+            const far = distance(M, out, rand(1400, 3200), rand(-0.8, 0.8));
+            rec(M, far, 'flight_wave', { t: at, gain: rand(0.15, 0.32), rate: rand(0.8, 1.05), attack: 0.08 });
+            return rand(3.5, 8);
+          },
+          stop(at) { a.src.stop(at); b.src.stop(at); swell.stop(at); },
+        };
+      },
+    },
   };
 
   /**
@@ -2449,21 +2706,24 @@
       this.nextEvent = M.now + rand(0.4, 1.5);
       const real = REAL_LOOPS[name], st = M.store;
       const isReal = !!(real && st && st.ready(real.needs));
+      // The recordings may live in a sport bank whose script is still loading (a sport starts its loops right
+      // after launch): ask for them once the bank is registered, or the request would match no sample at all.
+      const fetch = () => (SPORT_OF[name] ? loadBank(SPORT_OF[name]) : Promise.resolve(true)).then(() => {
+        if (this.done) return;
+        st.want(real.needs, PRIO.now);
+        st.settled(real.needs).then(() => this.upgrade());
+      });
       if (real && st && !isReal && M.live) {
         // Not decoded yet (a sport's bank loads as it launches): stay silent up to LOOP_WAIT_MS for the
         // recording rather than open on the synthesized bed, then fall back to synthesis and upgrade later.
         this.impl = { stop() {} };
         this.waiting = true;
-        st.want(real.needs, PRIO.now);
-        st.settled(real.needs).then(() => this.upgrade());
+        fetch();
         setTimeout(() => this.fallback(), LOOP_WAIT_MS);
       } else {
         this.impl = this.build(isReal ? real.make : LOOPS[name], 1);
         if (real) mark(M, 'loop:' + name, isReal);
-        if (real && st && !isReal) {
-          st.want(real.needs, PRIO.now);
-          st.settled(real.needs).then(() => this.upgrade());
-        }
+        if (real && st && !isReal) fetch();
       }
       this.setRate(rate, 0);
       glideParam(this.out.gain, vol, M.now, 0.4);
@@ -2674,6 +2934,35 @@
       form: ['A', 'B', 'A'],
     },
 
+    flight: {
+      // breezy and adventurous: a soaring recorder tune doubled by the glockenspiel, rippling kalimba arpeggios,
+      // a driving bass and a light backbeat; the B section hands the tune to marimba + glockenspiel
+      bpm: 120, swing16: 0.06, lead: 'flute', dbl: { inst: 'bell', oct: 12 }, arp: 'pluck', arpLo: 62, bass: 'bass', pad: 'pad',
+      arpPat: '1 . 5 . 8 . 5 . 10 . 8 . 5 . 8 .', bassPat: '1 - - 1 - - 5 - 1 - - 1 - - 5 -',
+      mix: { lead: 0.6, dbl: 0.12, arp: 0.2, bass: 0.42, drums: 0.5, pad: 0.32 }, fill: 'snare',
+      drums: {
+        main: { kick: 'x.....x...x.....', clap: '....x.......x...', shaker: 'xgxgxgxgxgxgxgxg' },
+        lift: { kick: 'x.......x.......', rim: '..x...x...x...x.', shaker: 'x.g.x.g.x.g.x.g.' },
+      },
+      sections: {
+        A: {
+          chords: 'D | G | Bm | A | D | G | Em A | D', drums: 'lift',
+          lead: 'D5 - E5 F#5 A5 - - - | B5 - A5 - G5 - D5 - | F#5 - - E5 D5 - B4 - | C#5 - E5 - A5 - - - | ' +
+                'D5 - E5 F#5 A5 - - - | B5 - C#6 - D6 - B5 - | A5 - G5 - F#5 - E5 - | D5 - - - - - . .',
+        },
+        A2: {
+          chords: 'D | G | Bm | A | D | G | Em A | D', dbl: true,
+          lead: 'D5 - E5 F#5 A5 - - - | B5 - A5 - G5 - D5 - | F#5 - - E5 D5 - B4 - | C#5 - E5 - A5 - - - | ' +
+                'D5 - E5 F#5 A5 - - - | B5 - C#6 - D6 - B5 - | G5 - B5 - A5 - C#6 - | D6 - - - - - . .',
+        },
+        B: {
+          chords: 'G | A | F#m | Bm | G | A | Bm | A7', leadInst: 'marimba', dbl: true,
+          lead: 'B5 . B5 A5 B5 - D6 - | C#6 . C#6 B5 A5 - E5 - | F#5 . F#5 G#5 A5 - C#6 - | B5 - - - . . A5 B5 | ' +
+                'D6 . D6 C#6 B5 - G5 - | A5 . A5 B5 C#6 - E6 - | D6 - C#6 - B5 - F#5 - | E5 - G5 - A5 - C#6 -',
+        },
+      },
+      form: ['A', 'A2', 'B', 'A2'],
+    },
     results: {
       bpm: 108, swing16: 0.1, lead: 'marimba', dbl: { inst: 'bell', oct: 0 }, comp: 'epiano', bass: 'bass',
       compPat: 'x - - . . . x - . . x - . . . .', bassPat: '1 - - - - - 5 - 8 - - - 5 - - -', pad: 'pad',
@@ -3312,6 +3601,7 @@
       ["pool_break.wav","reg7783","https://freesound.org/s/204187/"],
       ["Minigolf putt, right into the hole!","pfranzen","https://freesound.org/s/512505/"],
       ["FallingLeaves","falcospizaetus","https://freesound.org/s/489911/"],
+      ["Aeroplane Passing Close.wav","paulprit","https://freesound.org/s/507446/"],
     ] },
     { title: 'Crowds', rows: [
       ["cheering and clapping crowd 1","AlaskaRobotics","https://freesound.org/s/221568/"],
@@ -3375,6 +3665,8 @@
     { title: 'Ambience', rows: [
       ["Bustling Cafe Ambience","Talitha5","https://freesound.org/s/509950/"],
       ["Early summer, czech wood outside the camp, early morning ambiance","J.Zazvurek","https://freesound.org/s/353311/"],
+      ["Gentle Ocean Waves Loop","kkenny101","https://freesound.org/s/852826/"],
+      ["Wind Howling thru window crack","DAVESTALKER","https://freesound.org/s/331527/"],
     ] },
     { title: 'Instruments & drums', rows: [
       ["Versilian Community Sample Library: Marimba","Versilian Studios & VCSL contributors","https://github.com/sgossner/VCSL/tree/master/Idiophones/Struck%20Idiophones/Marimba"],

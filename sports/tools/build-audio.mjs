@@ -11,7 +11,7 @@
 //         audio/samples.json            generated metadata per sample (duration, gain, root, loop points, levels, size)
 //         audio/CREDITS.md              human-readable credits (every source is CC0 1.0)
 //         js/audio-bank.js              core bank  (ui, generic, crowd, voices, ambience, instruments, drums)
-//         js/audio-bank-<sport>.js      one bank per sport (bowling, tennis, baseball, golf)
+//         js/audio-bank-<sport>.js      one bank per sport (bowling, tennis, baseball, golf, flight)
 // Each bank is a classic-script IIFE that merges into SS.audioBank = { samples: { id: { b64, gain, cat, ... } } }
 // without clobbering other banks, so it works from file:// and inlined in the single-file bundle (no fetch, data only).
 //
@@ -48,7 +48,7 @@ const ONLY = opt('only') ? new Set(String(opt('only')).split(',')) : null;
 const BANKS_ONLY = !!opt('banks-only');
 const D = man.defaults;
 const LOOP_WRAP = 4096;            // samples of wrap-around audio encoded before/after a loop body
-const BANKS = ['core', 'bowling', 'tennis', 'baseball', 'golf'];
+const BANKS = ['core', 'bowling', 'tennis', 'baseball', 'golf', 'flight'];
 
 const dbToLin = (db) => Math.pow(10, db / 20);
 const linToDb = (v) => 20 * Math.log10(Math.max(v, 1e-12));
@@ -139,12 +139,32 @@ function risingZero(x, i, w) {
   return best < 0 ? i : best;
 }
 
+/**
+ * Loop length (<= Lmax, >= Lmax - win) whose continuation x[s0+L ..] is most in phase with the head x[s0 ..] over the
+ * crossfade (normalized cross-correlation): periodic material (an engine drone) then crossfades without phasing.
+ */
+function alignedLength(x, s0, Lmax, X, win) {
+  let best = -Infinity, bestL = Lmax;
+  let ea = 0; for (let i = 0; i < X; i++) ea += x[s0 + i] * x[s0 + i];
+  for (let L = Lmax; L >= Math.max(X + 1, Lmax - win); L--) {
+    let c = 0, eb = 0;
+    for (let i = 0; i < X; i++) { const b = x[s0 + L + i]; c += x[s0 + i] * b; eb += b * b; }
+    const r = c / Math.sqrt(ea * eb + 1e-12);
+    if (r > best) { best = r; bestL = L; }
+  }
+  return { L: bestL, r: best };
+}
+
 /** Seamless loop: body of length L whose first X samples are crossfaded with the X samples that follow it. */
-function makeLoop(x, sr, xfadeSec) {
+function makeLoop(x, sr, xfadeSec, alignSec) {
   const X = Math.round(xfadeSec * sr);
   const s0 = risingZero(x, 0, Math.round(sr * 0.01));
   let L = x.length - s0 - X;
-  L = risingZero(x, s0 + L, Math.round(sr * 0.01)) - s0;
+  if (alignSec) {
+    const a = alignedLength(x, s0, L, X, Math.round(alignSec * sr));
+    L = a.L;
+    makeLoop.lastAlign = Math.round(a.r * 1000) / 1000;
+  } else L = risingZero(x, s0 + L, Math.round(sr * 0.01)) - s0;
   if (s0 + L + X > x.length) L = x.length - s0 - X;
   const y = new Float32Array(L);
   for (let i = 0; i < L; i++) {
@@ -274,7 +294,9 @@ function processSample(e) {
   if (e.loop) {
     // Beds / loops: loudness-normalize, seamless crossfade loop, encode with wrap-around padding.
     if (e.flatten) flatten(x, sr, e.flatten);
-    let y = makeLoop(x, sr, e.loop.xfade);
+    makeLoop.lastAlign = undefined;
+    let y = makeLoop(x, sr, e.loop.xfade, e.loop.align);
+    if (makeLoop.lastAlign !== undefined) info.align = makeLoop.lastAlign;
     const lufs = lufsOf(y, sr);
     const target = e.lufs ?? -24;
     let k = dbToLin(target - lufs);
@@ -369,14 +391,14 @@ for (const e of man.samples) {
     peakDb: v.peakDb, loudDb: r2(loudOf(body, sr)), peakAt: r3(loudAt(body, sr).at), enc: lameGapless(buf),
   };
   if (!info.loop) { m.onsetMs = r2(onsetMs(x, sr)); if (e.inst) m.headDb = r2(headLoud(x, sr)); }
-  for (const k of ['root', 'f0', 'loop', 'lufs']) if (info[k] !== undefined) m[k] = typeof info[k] === 'number' ? r3(info[k]) : info[k];
+  for (const k of ['root', 'f0', 'loop', 'lufs', 'align']) if (info[k] !== undefined) m[k] = typeof info[k] === 'number' ? r3(info[k]) : info[k];
   if (info.loop) { m.loopStart = r6(info.loopStart); m.loopEnd = r6(info.loopEnd); }   // sample-accurate
   if (e.inst) m.inst = e.inst;
   if (e.who) m.who = e.who;
   m.check = v;
   if (!v.lenOk || !v.clipOk || v.loopOk === false) problems.push(`${e.id}: ${JSON.stringify(v)}`);
   meta[e.id] = m;
-  process.stdout.write(`${e.id.padEnd(22)} ${m.dur.toFixed(3)}s ${String(kbps).padStart(3)}k ${String(buf.length).padStart(6)}B peak ${m.peakDb} loud ${m.loudDb}${m.onsetMs != null ? ' onset ' + m.onsetMs + 'ms' : ''}${m.root ? ' root ' + m.root : ''}${m.loop ? ` loop ${m.loopStart.toFixed(3)}-${m.loopEnd.toFixed(3)} join ${v.loopJump}x median step (nominal ${v.loopJumpNominal}x, natural p99.9 ${v.loopP999}x, shift ${v.loopShift}) ${m.lufs} LUFS` : ''}\n`);
+  process.stdout.write(`${e.id.padEnd(22)} ${m.dur.toFixed(3)}s ${String(kbps).padStart(3)}k ${String(buf.length).padStart(6)}B peak ${m.peakDb} loud ${m.loudDb}${m.onsetMs != null ? ' onset ' + m.onsetMs + 'ms' : ''}${m.root ? ' root ' + m.root : ''}${m.loop ? ` loop ${m.loopStart.toFixed(3)}-${m.loopEnd.toFixed(3)} join ${v.loopJump}x median step (nominal ${v.loopJumpNominal}x, natural p99.9 ${v.loopP999}x, shift ${v.loopShift}) ${m.lufs} LUFS${m.align !== undefined ? ' align r=' + m.align : ''}` : ''}\n`);
 }
 
 // Playback gain: evens out short-term loudness within a category (instruments: within each instrument).

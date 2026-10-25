@@ -14,7 +14,7 @@ normalized, looped, MP3-encoded) produced by `tools/build-audio.mjs` from `tools
 | Impact Sounds | Kenney (kenney.nl) | <https://kenney.nl/assets/impact-sounds> | CC0 1.0 | <https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds> | `thud_1` `thud_2` `soft_hit_1` `soft_hit_2` `knock_wood_1` `knock_wood_2` `knock_wood_heavy_1` `knock_wood_heavy_2` `knock_plank_1` `knock_plank_2` `leather_pop_1` `leather_pop_2` `leather_pop_heavy` `metal_ping_1` `metal_ping_2` `land_grass_1` `land_grass_2` `land_grass_3` `land_sand_1` `land_sand_2` |
 | Retail Therapy Sample Pack | Ben Burnes (abstractionmusic.com) | <https://gumroad.com/ben_burnes> (pack README: CC0) | CC0 1.0 | <https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds> | `bounce_soft_1` `bounce_soft_2` |
 | Water drop (splash) | bolkmar | <https://freesound.org/s/451126/> | CC0 1.0 | <https://github.com/abgnydn/oddball> | `splash_1` |
-| 40 CC0 water splash / slime SFX | OpenGameArt CC0 pack | <https://opengameart.org/> (40 CC0 water splash slime SFX) | CC0 1.0 | <https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds> | `splash_2` `splash_3` `splash_big` |
+| 40 CC0 water splash / slime SFX | OpenGameArt CC0 pack | <https://opengameart.org/> (40 CC0 water splash slime SFX) | CC0 1.0 | <https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds> | `splash_2` `splash_3` `splash_big` `flight_spray_1` `flight_spray_2` |
 | Vintage Camera Flash Powder and Shutter | Werra | <https://freesound.org/s/232130/> | CC0 1.0 | <https://github.com/ryanjosephkamp/splashery> (CREDITS.md) | `camera_flash` |
 | Balloon-Burst-07.wav | Gniffelbaf | <https://freesound.org/s/82121/> | CC0 1.0 | <https://github.com/ryanjosephkamp/splashery> (CREDITS.md) | `balloon_pop` |
 | 25 CC0 bang SFX | OpenGameArt CC0 pack | <https://opengameart.org/> (25 CC0 bang / firework SFX) | CC0 1.0 | <https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds> | `firework_boom_1` `firework_boom_2` `firework_boom_3` `firework_boom_4` `firework_far` `firework_crackle_1` `firework_crackle_2` |
@@ -106,5 +106,8 @@ normalized, looped, MP3-encoded) produced by `tools/build-audio.mjs` from `tools
 | pool_break.wav | reg7783 | <https://freesound.org/s/204187/> | CC0 1.0 | <https://github.com/ryanjosephkamp/splashery> (CREDITS.md) | `golf_clack` |
 | Minigolf putt, right into the hole! | pfranzen | <https://freesound.org/s/512505/> | CC0 1.0 | <https://github.com/cner-smith/opengolfapp> | `golf_putt` `golf_cup` |
 | FallingLeaves | falcospizaetus | <https://freesound.org/s/489911/> | CC0 1.0 | <https://github.com/ryanjosephkamp/splashery> (CREDITS.md) | `golf_leaves` |
+| Aeroplane Passing Close.wav | paulprit | <https://freesound.org/s/507446/> | CC0 1.0 | <https://github.com/ryanjosephkamp/splashery> (CREDITS.md) | `flight_engine` `flight_flyby` |
+| Gentle Ocean Waves Loop | kkenny101 | <https://freesound.org/s/852826/> | CC0 1.0 | <https://github.com/ryanjosephkamp/splashery> (CREDITS.md) | `flight_ocean` `flight_wave` |
+| Wind Howling thru window crack | DAVESTALKER | <https://freesound.org/s/331527/> | CC0 1.0 | <https://github.com/abhinandansharma/ambiently> (CREDITS.json) | `flight_wind_lo` `flight_wind_hi` |
 
-Totals: core 190 samples / 3127 KB base64 · bowling 10 samples / 128 KB base64 · tennis 5 samples / 20 KB base64 · baseball 1 samples / 8 KB base64 · golf 4 samples / 50 KB base64.
+Totals: core 190 samples / 3127 KB base64 · bowling 10 samples / 128 KB base64 · tennis 5 samples / 20 KB base64 · baseball 1 samples / 8 KB base64 · golf 4 samples / 50 KB base64 · flight 8 samples / 290 KB base64.

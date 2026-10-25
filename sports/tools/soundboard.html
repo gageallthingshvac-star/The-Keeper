@@ -123,13 +123,14 @@
     ['Tennis', ['racket_hit', 'racket_frame', 'ball_bounce_court', 'serve_toss', 'net_hit', 'line_call']],
     ['Baseball', ['bat_crack', 'bat_foul', 'mitt_pop', 'pitch_whoosh', 'ump_strike', 'ball_land_grass']],
     ['Golf', ['golf_drive', 'golf_iron', 'golf_chip', 'golf_putt', 'golf_cup', 'golf_land_grass', 'golf_land_sand', 'golf_tree', 'golf_water', 'flag_flap']],
+    ['Flight', ['balloon_pop', 'ring_pass', 'boost', 'plane_bump', 'water_skim', 'info_found', 'flyby']],
   ];
   const listed = new Set(GROUPS.flatMap(g => g[1]));
   const extra = A.names.sfx.filter(n => !listed.has(n));
   if (extra.length) GROUPS.push(['Other', extra]);
 
   const num = id => Number($(id).value);
-  ['bowling', 'tennis', 'baseball', 'golf'].forEach(s => A.prepare(s));
+  ['bowling', 'tennis', 'baseball', 'golf', 'flight'].forEach(s => A.prepare(s));
 
   // REAL / LOADING / SYNTH badge on every button, refreshed as recordings decode.
   const badges = [];

@@ -5957,6 +5957,275 @@
     "clipOk": true
    },
    "gain": 1
+  },
+  "flight_engine": {
+   "bank": "flight",
+   "cat": "ambience",
+   "sport": "flight",
+   "file": "audio/flight/flight_engine.mp3",
+   "dur": 1.369,
+   "sr": 32000,
+   "kbps": 80,
+   "bytes": 14760,
+   "b64": 19680,
+   "peakDb": -8.21,
+   "loudDb": -19.26,
+   "peakAt": 0.1,
+   "enc": {
+    "delay": 576,
+    "pad": 1681
+   },
+   "loop": true,
+   "lufs": -21,
+   "align": 0.256,
+   "loopStart": 0.12175,
+   "loopEnd": 1.235,
+   "check": {
+    "decodedLen": 43823,
+    "srcLen": 43816,
+    "peakDb": -8.21,
+    "lag": 0,
+    "lenOk": true,
+    "clipOk": true,
+    "loopShift": [
+     -200,
+     0
+    ],
+    "loopJumpNominal": 0.74,
+    "loopJump": 2.06,
+    "loopP999": 6.94,
+    "loopOk": true
+   },
+   "gain": 1
+  },
+  "flight_flyby": {
+   "bank": "flight",
+   "cat": "flight",
+   "sport": "flight",
+   "file": "audio/flight/flight_flyby.mp3",
+   "dur": 3,
+   "sr": 32000,
+   "kbps": 96,
+   "bytes": 37152,
+   "b64": 49536,
+   "peakDb": -1.95,
+   "loudDb": -12.76,
+   "peakAt": 1.588,
+   "enc": {
+    "delay": 576,
+    "pad": 1344
+   },
+   "onsetMs": 5.41,
+   "check": {
+    "decodedLen": 96000,
+    "srcLen": 96000,
+    "peakDb": -1.95,
+    "lag": 0,
+    "lenOk": true,
+    "clipOk": true
+   },
+   "gain": 1
+  },
+  "flight_ocean": {
+   "bank": "flight",
+   "cat": "ambience",
+   "sport": "flight",
+   "file": "audio/flight/flight_ocean.mp3",
+   "dur": 1.284,
+   "sr": 32000,
+   "kbps": 48,
+   "bytes": 8208,
+   "b64": 10944,
+   "peakDb": -9.8,
+   "loudDb": -21.78,
+   "peakAt": 0.675,
+   "enc": {
+    "delay": 576,
+    "pad": 968
+   },
+   "loop": true,
+   "lufs": -25,
+   "loopStart": 0.128063,
+   "loopEnd": 1.155813,
+   "check": {
+    "decodedLen": 41080,
+    "srcLen": 41080,
+    "peakDb": -9.8,
+    "lag": 0,
+    "lenOk": true,
+    "clipOk": true,
+    "loopShift": [
+     2,
+     0
+    ],
+    "loopJumpNominal": 2.02,
+    "loopJump": 1.81,
+    "loopP999": 12.88,
+    "loopOk": true
+   },
+   "gain": 1
+  },
+  "flight_wave": {
+   "bank": "flight",
+   "cat": "flight",
+   "sport": "flight",
+   "file": "audio/flight/flight_wave.mp3",
+   "dur": 0.95,
+   "sr": 32000,
+   "kbps": 96,
+   "bytes": 12528,
+   "b64": 16704,
+   "peakDb": -1.95,
+   "loudDb": -14.67,
+   "peakAt": 0.15,
+   "enc": {
+    "delay": 576,
+    "pad": 1280
+   },
+   "onsetMs": 77.78,
+   "check": {
+    "decodedLen": 30400,
+    "srcLen": 30400,
+    "peakDb": -1.95,
+    "lag": 0,
+    "lenOk": true,
+    "clipOk": true
+   },
+   "gain": 1
+  },
+  "flight_wind_lo": {
+   "bank": "flight",
+   "cat": "ambience",
+   "sport": "flight",
+   "file": "audio/flight/flight_wind_lo.mp3",
+   "dur": 15.012,
+   "sr": 16000,
+   "kbps": 32,
+   "bytes": 60516,
+   "b64": 80688,
+   "peakDb": -8.1,
+   "loudDb": -14.83,
+   "peakAt": 10.113,
+   "enc": {
+    "delay": 576,
+    "pad": 576
+   },
+   "loop": true,
+   "lufs": -24,
+   "loopStart": 0.24425,
+   "loopEnd": 14.74425,
+   "check": {
+    "decodedLen": 240192,
+    "srcLen": 240192,
+    "peakDb": -8.1,
+    "lag": 0,
+    "lenOk": true,
+    "clipOk": true,
+    "loopShift": [
+     -188,
+     0
+    ],
+    "loopJumpNominal": 0.67,
+    "loopJump": 0.9,
+    "loopP999": 5.19,
+    "loopOk": true
+   },
+   "gain": 1
+  },
+  "flight_wind_hi": {
+   "bank": "flight",
+   "cat": "ambience",
+   "sport": "flight",
+   "file": "audio/flight/flight_wind_hi.mp3",
+   "dur": 12.871,
+   "sr": 22050,
+   "kbps": 40,
+   "bytes": 64835,
+   "b64": 86448,
+   "peakDb": -7.31,
+   "loudDb": -25.09,
+   "peakAt": 3.218,
+   "enc": {
+    "delay": 576,
+    "pad": 733
+   },
+   "loop": true,
+   "lufs": -30,
+   "loopStart": 0.181723,
+   "loopEnd": 12.681451,
+   "check": {
+    "decodedLen": 283811,
+    "srcLen": 283811,
+    "peakDb": -7.31,
+    "lag": 0,
+    "lenOk": true,
+    "clipOk": true,
+    "loopShift": [
+     -89,
+     0
+    ],
+    "loopJumpNominal": 1.26,
+    "loopJump": 0.9,
+    "loopP999": 16.57,
+    "loopOk": true
+   },
+   "gain": 1
+  },
+  "flight_spray_1": {
+   "bank": "flight",
+   "cat": "flight",
+   "sport": "flight",
+   "file": "audio/flight/flight_spray_1.mp3",
+   "dur": 1.232,
+   "sr": 32000,
+   "kbps": 96,
+   "bytes": 15984,
+   "b64": 21312,
+   "peakDb": -1.93,
+   "loudDb": -16.99,
+   "peakAt": 0.013,
+   "enc": {
+    "delay": 576,
+    "pad": 1457
+   },
+   "onsetMs": 6.31,
+   "check": {
+    "decodedLen": 39439,
+    "srcLen": 39439,
+    "peakDb": -1.93,
+    "lag": 0,
+    "lenOk": true,
+    "clipOk": true
+   },
+   "gain": 1
+  },
+  "flight_spray_2": {
+   "bank": "flight",
+   "cat": "flight",
+   "sport": "flight",
+   "file": "audio/flight/flight_spray_2.mp3",
+   "dur": 0.621,
+   "sr": 32000,
+   "kbps": 96,
+   "bytes": 8640,
+   "b64": 11520,
+   "peakDb": -1.78,
+   "loudDb": -19.58,
+   "peakAt": 0.013,
+   "enc": {
+    "delay": 576,
+    "pad": 1453
+   },
+   "onsetMs": 14.09,
+   "check": {
+    "decodedLen": 19859,
+    "srcLen": 19859,
+    "peakDb": -1.78,
+    "lag": 0,
+    "lenOk": true,
+    "clipOk": true
+   },
+   "gain": 1
   }
  }
 }

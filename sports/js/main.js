@@ -20,6 +20,8 @@
   const DEFAULT_ACCENT = '#1FA2FF';
   const DEFAULT_TINT = '#E6F5FF';
   const MEDAL_TIERS = ['bronze', 'silver', 'gold', 'platinum'];
+  /** Sports added after launch: their menu card wears a "New!" sticker until the active Pal has played them once. */
+  const NEW_SPORTS = ['flight'];
   const DEG = Math.PI / 180;
   const esc = ui.esc;
   const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -67,6 +69,10 @@
 
   function formatValue(value, fmt) {
     if (typeof fmt === 'string') {
+      if (fmt === 'time1') {   // m:ss.t (time trials such as Flight's Ring Run)
+        const t = Math.round(Math.max(0, value) * 10) / 10, m = Math.floor(t / 60), r = t - m * 60;
+        return m + ':' + (r < 10 ? '0' : '') + r.toFixed(1);
+      }
       if (U.fmt[fmt]) return U.fmt[fmt](value);
       if (fmt.indexOf('{v}') >= 0) return fmt.replace('{v}', U.fmt.int(value));
     }
@@ -372,6 +378,61 @@
       scene.add(trees);
     }
 
+    // ---- toy plane circling over the plaza (a nod to Flight; 3 draw calls, no shadow) --------------
+
+    let plane = null, planeAngle = 1.2;
+    const PLANE_C = new THREE.Vector3(0, 2.55, -5.6), PLANE_R = 7, PLANE_W = 0.3;   // centre, radius (m), rad/s
+    const _p0 = new THREE.Vector3(), _p1 = new THREE.Vector3();
+
+    function buildPlane() {
+      const parts = [];
+      const C = { body: 0xFF9F1C, wing: 0xFFC93C, white: 0xFFFFFF, dark: 0x3A4A60, skin: 0xF2C29B, scarf: 0xFF5A5F };
+      // nose toward +Z; 1 unit ≈ 1 m, a toy about 1.6 m across the wings
+      const fus = new THREE.CylinderGeometry(0.13, 0.08, 1.1, 12);
+      fus.rotateX(Math.PI / 2);
+      parts.push(colored(fus, C.body));
+      parts.push(colored(at(new THREE.SphereGeometry(0.135, 12, 8), 0, 0, 0.55), C.body));
+      parts.push(colored(at(new THREE.CylinderGeometry(0.05, 0.09, 0.12, 10), 0, 0, 0.66, 0, Math.PI / 2), C.white));
+      parts.push(colored(at(new THREE.BoxGeometry(1.6, 0.04, 0.32), 0, -0.04, 0.16), C.wing));
+      parts.push(colored(at(new THREE.BoxGeometry(0.62, 0.03, 0.2), 0, 0.02, -0.48), C.wing));
+      parts.push(colored(at(new THREE.BoxGeometry(0.03, 0.24, 0.2), 0, 0.13, -0.48), C.body));
+      parts.push(colored(at(new THREE.BoxGeometry(0.2, 0.012, 0.3), -0.72, -0.02, 0.16), C.white));   // wingtip stripes
+      parts.push(colored(at(new THREE.BoxGeometry(0.2, 0.012, 0.3), 0.72, -0.02, 0.16), C.white));
+      parts.push(colored(at(new THREE.SphereGeometry(0.085, 10, 8), 0, 0.17, 0.02), C.skin));           // pilot
+      parts.push(colored(at(new THREE.SphereGeometry(0.09, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), 0, 0.19, 0.02), C.dark));
+      parts.push(colored(at(new THREE.BoxGeometry(0.05, 0.03, 0.22), 0.05, 0.12, -0.12, 0.25), C.scarf));
+      for (const x of [-0.16, 0.16]) {
+        parts.push(colored(at(new THREE.CylinderGeometry(0.012, 0.012, 0.16, 6), x, -0.16, 0.22), C.dark));
+        parts.push(colored(at(new THREE.CylinderGeometry(0.05, 0.05, 0.03, 10), x, -0.24, 0.22, 0, 0, Math.PI / 2), C.dark));
+      }
+      plane = new THREE.Group();
+      plane.add(new THREE.Mesh(W().mergeGeometries(parts), W().mat(0xffffff, { vertexColors: true })));
+      const blades = new THREE.Mesh(colored(new THREE.BoxGeometry(0.5, 0.05, 0.015), C.dark), W().mat(0xffffff, { vertexColors: true }));
+      blades.position.z = 0.72;
+      const blur = new THREE.Mesh(new THREE.CircleGeometry(0.27, 20), W().mat(0xffffff, { kind: 'basic', transparent: true, opacity: 0.28, depthWrite: false }));
+      blur.position.z = 0.73;
+      plane.add(blades, blur);
+      plane.userData.blades = blades;
+      plane.scale.setScalar(1.1);
+      scene.add(plane);
+      placePlane(0);
+    }
+
+    function planePos(a, out) {
+      return out.set(PLANE_C.x + Math.cos(a) * PLANE_R, PLANE_C.y + Math.sin(a * 2) * 0.35, PLANE_C.z + Math.sin(a) * PLANE_R * 0.72);
+    }
+
+    function placePlane(dt) {
+      if (!plane) return;
+      planeAngle += PLANE_W * dt;
+      planePos(planeAngle, _p0);
+      planePos(planeAngle + 0.05, _p1);
+      plane.position.copy(_p0);
+      plane.lookAt(_p1);
+      plane.rotateZ(0.38 + Math.sin(planeAngle * 3) * 0.05);   // banked into the turn, a little wobble
+      plane.userData.blades.rotation.z += dt * 31;
+    }
+
     // ---- strolling & playing Pals ------------------------------------------------------------------
 
     function addActor(rosterIndex, kind, o) {
@@ -559,6 +620,7 @@
       if (!active) return;
       updateActors(dt);
       updateHero(dt);
+      placePlane(dt);
       if (flag) flag.rotation.y = Math.sin(SS.engine.time * 1.7) * 0.35 + 0.3;
       sprayTimer -= dt;
       if (sprayTimer <= 0) {
@@ -578,6 +640,7 @@
         trees: { ring: 30, count: 46 }, shadow: { center: new THREE.Vector3(0, 0, -3), size: 30 }, seed: 21,
       });
       buildProps();
+      buildPlane();
       buildActors();
       built = true;
       SS.engine.addUpdate(update, 50);
@@ -757,8 +820,10 @@
     const earned = save.medals(sport.id);
     const pips = (sport.medals || []).slice(0, 4).map(m =>
       '<i class="pip m-' + medalTier(sport, m.id) + (earned.has(m.id) ? ' on' : '') + '" title="' + esc(m.name) + '"></i>').join('');
-    const level = profile ? save.skill(profile.id, sport.id).level : 0;
-    b.innerHTML = '<span class="sc-icon">' + sportIcon(sport) + '</span>' +
+    const sk = profile ? save.skill(profile.id, sport.id) : null;
+    const level = sk ? sk.level : 0;
+    const fresh = NEW_SPORTS.indexOf(sport.id) >= 0 && !(sk && sk.games) && !save.medals(sport.id).size;
+    b.innerHTML = (fresh ? '<span class="sc-new">New!</span>' : '') + '<span class="sc-icon">' + sportIcon(sport) + '</span>' +
       '<span class="sc-text"><span class="sc-name">' + esc(sport.name) + '</span>' +
       '<span class="sc-tag">' + esc(sport.tagline || '') + '</span></span>' +
       '<span class="sc-foot"><span class="sc-medals">' + pips + '</span>' + rankChip(level, 'small') + '</span>';
@@ -793,7 +858,9 @@
     const sports = sportList();
     if (sports.length) sports.forEach((s, i) => cards.appendChild(sportCard(s, profile, i)));
     else cards.appendChild(ui.el('div', 'menu-empty ss-panel', '<b>Sports are warming up!</b><span>Check back in a moment.</span>'));
-    cards.classList.add('n' + Math.min(4, Math.max(1, sports.length)));
+    cards.classList.add('n' + Math.min(6, Math.max(1, sports.length)));
+    // An odd count leaves the last card alone on its row in the two-column (portrait) grid: it becomes a wide feature card.
+    if (sports.length > 1 && sports.length % 2 === 1) cards.lastElementChild.classList.add('wide');
     el.appendChild(cards);
 
     plaza.setHero(profile, opts && opts.greet ? 'wave' : null);
@@ -2011,6 +2078,15 @@
       }
       sec.appendChild(grid);
       colB.appendChild(sec);
+    }
+    // Sport-provided sections ({ title, icon, badge, html, className, col: 'a' | 'b' (default) }), e.g. Flight's "!" list
+    if (Array.isArray(result.sections)) {
+      for (const x of result.sections) {
+        if (!x || !x.html) continue;
+        const sec = ui.el('section', 'res-sec' + (x.className ? ' ' + x.className : ''));
+        sec.innerHTML = '<h3>' + (x.icon ? ui.icon(x.icon) : '') + esc(x.title || '') + (x.badge ? '<small class="res-badge">' + esc(x.badge) + '</small>' : '') + '</h3>' + x.html;
+        (x.col === 'a' ? colA : colB).appendChild(sec);
+      }
     }
     if (!colB.children.length) body.classList.add('single');
 
