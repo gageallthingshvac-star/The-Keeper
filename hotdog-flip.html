@@ -274,8 +274,9 @@ canvas { display: block; width: 100%; height: 100%; }
   // wide enough that the sausage (148 px with its rounded ends) has room to slide to the front lip
   const PAN_POLYS = [
     poly([[-100, 0], [100, 0], [94, 12], [-94, 12]]),
-    poly([[-128, -20], [-118, -22], [-94, 2], [-102, 7]]),
-    poly([[118, -22], [128, -20], [102, 7], [94, 2]]),
+    // rims: tall and near-vertical, so a sausage that slides to the lip stops there instead of rolling over it
+    poly([[-116, -36], [-104, -36], [-94, 2], [-108, 7]]),
+    poly([[104, -36], [116, -36], [108, 7], [94, 2]]),
   ];
   let lift = { t0: -10, p: 0, d0: 0 }, dip = 0;
   function panT(t) {
@@ -610,7 +611,7 @@ canvas { display: block; width: 100%; height: 100%; }
   let state = 'menu', phase = 'idle', phaseT = 0, time = 0;
   let charge = 0, power = 0, target = null, spot = 0, spotOn = false, settle = { pan: 0, target: 0 }, stableT = 0, touchT = 0;
   let big = false, hold = { t: 0, lost: 0, beat: 0 }, zoom = 1, zc = { x: 500, y: 300 }, shake = 0;
-  let tries = 0, streak = 0, bonusPending = false;   // two rounds won on the first flip in a row: hot dog mode
+  let tries = 0, streak = 0, bonusPending = false, pressed = false;   // two rounds won on the first flip in a row: hot dog mode
   const notes = [], popups = [], confetti = [];
   const motes = Array.from({ length: 70 }, () => ({ x: Math.random() * 1200 - 100, y: Math.random() * 700 - 50, z: .3 + Math.random() * .7, ph: Math.random() * 6.28 }));
 
@@ -630,8 +631,10 @@ canvas { display: block; width: 100%; height: 100%; }
   function press() {
     if (state !== 'play') return;
     initAudio();
+    pressed = true;
     if (phase === 'hang') {
-      if (chop.mode === 'hold') dropIt(); else chop.queued = true;
+      // the same press lets go of the sausage and starts pulling the pan back; release flips once it is in the pan
+      if (chop.mode === 'hold') { dropIt(); phase = 'charge'; charge = 0; } else chop.queued = true;
     } else if (phase === 'ready' || phase === 'drop' || phase === 'flight') {
       phase = 'charge'; charge = 0;
     }
@@ -641,11 +644,14 @@ canvas { display: block; width: 100%; height: 100%; }
     sfx('chopstick', .7);
   }
   function release() {
+    pressed = false;
     if (state === 'play' && phase === 'charge') {
       // the jerk throws the sausage if it is in the pan or falling into it; otherwise the pan just swings
       const P = panT(simT), c = centroid(), l = lpt(P, c.x, c.y);
       const nearPan = Math.abs(l.x) < 110 && l.y > -110 && l.y < 4;
-      if (sau.p.some(q => q.touch === 'pan') || nearPan) launch(power); else { lift = { t0: simT, p: power, d0: dip }; sfx('whoosh', .3, 1.2); }
+      const inPan = sau.p.some(q => q.touch === 'pan');
+      // a quick tap from the chopsticks just lets go: no throw, no swing. Otherwise the jerk throws a sausage that is in the pan or falling into it
+      if (inPan || (nearPan && power > .2)) launch(power); else if (power > .2) { lift = { t0: simT, p: power, d0: dip }; sfx('whoosh', .3, 1.2); }
       dip = 0; phase = 'flight'; phaseT = 0; settle = { pan: 0, target: 0 };
     }
   }
@@ -678,7 +684,7 @@ canvas { display: block; width: 100%; height: 100%; }
     // chopsticks
     if (chop.mode) {
       chop.t += dt;
-      if (chop.mode === 'in' && chop.t >= CH_IN) { chop.mode = 'hold'; if (chop.queued) dropIt(); }
+      if (chop.mode === 'in' && chop.t >= CH_IN) { chop.mode = 'hold'; if (chop.queued) { dropIt(); if (pressed && state === 'play') { phase = 'charge'; charge = 0; } } }
       if (chop.mode === 'open') { chop.open = Math.min(1, chop.t / .08); if (chop.t > .1) chop.out = Math.min(1, (chop.t - .1) / .35); if (chop.out >= 1) chop.mode = null; }
       const pose = chopPose(simT);
       chop.vx = (pose.x - chop.tip.x) / Math.max(dt, 1e-3); chop.vy = (pose.y - chop.tip.y) / Math.max(dt, 1e-3);
