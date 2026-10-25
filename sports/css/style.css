@@ -1042,6 +1042,19 @@
 .pause-head p { margin: 4px 0 0; font: 800 14px/1.25 var(--font-ui); color: var(--ink-soft); }
 .pause-btns { display: grid; gap: 10px; }
 .pause-btns .ss-btn { width: 100%; }
+.pause-set { margin-top: 14px; padding-top: 4px; border-top: 2px solid var(--panel-2); }
+.pause-set h3 { display: flex; align-items: center; gap: 6px; margin: 8px 0 0; font: 600 17px/1.2 var(--font-display); color: var(--ink); }
+.pause-set h3 .ss-icon { width: 20px; height: 20px; color: var(--blue); }
+.pause-set .set-row { min-height: 50px; padding: 5px 0; }
+.pause-set .set-row:last-child { border-bottom: 0; }
+.pause-set .set-label { font-size: 14px; }
+.pause-set .set-label small { font-size: 12px; }
+.set-row.seg-row { flex-wrap: wrap; row-gap: 2px; }
+.set-row.seg-row .segmented { flex: 1 1 200px; margin: 0; }
+.set-row.seg-row .seg { min-height: 40px; font-size: 15px; }
+.set-sport h3 { display: flex; align-items: center; gap: 8px; }
+.set-sport-icon { width: 26px; height: 26px; flex: none; }
+.set-sport-icon svg { width: 100%; height: 100%; display: block; }
 
 /* ============================================================================================
    Results

@@ -60,12 +60,15 @@
     ],
     howTo: {
       steps: [
-        { gesture: 'drag-h', text: 'Touch and drag anywhere: sideways to bank and turn' },
-        { gesture: 'drag-down-up', text: 'Drag up to climb, down to dive. Let go to level out' },
+        { gesture: 'drag-h', text: 'Touch and drag anywhere: sideways to bank and turn. All the way over to roll!' },
+        { gesture: 'drag-down-up', text: 'Hold up to climb, keep holding to loop! Down dives. Let go to level out' },
         { gesture: 'hold', text: 'Hold BOOST to zoom, BRAKE for tight turns' },
-        { gesture: 'drag-h', text: 'Fly through balloons, rings and "!" markers' },
+        { gesture: 'tap', text: 'On a phone? Tap TILT, hold it sideways and fly by tilting it' },
       ],
       tips: [
+        'Fly through the mountain tunnel, the sea cave under the lighthouse and the arch in the gorge!',
+        'Upside down? Just let go: the plane rolls itself upright.',
+        'Sensitivity and Invert up/down are in the pause menu and in Settings.',
         'Bumps never end your flight: you bounce back and keep going.',
         'Pop balloons quickly one after another for a combo. Gold ones are +5 points and +5 seconds!',
         'BOOST runs out. It refills on its own, and faster with every balloon and ring.',
@@ -78,6 +81,14 @@
       { id: 'gold', name: 'Gold', desc: 'Score 60 points in Balloon Pop' },
       { id: 'platinum', name: 'Platinum', desc: 'Find all 40 "!" markers' },
     ],
+    // control settings (rendered by main.js in the pause menu and the Settings screen; saved in SS.save.settings)
+    settings: [
+      { key: 'flightControl', label: 'Steering', type: 'seg', def: 'touch', options: [['touch', 'Touch'], ['tilt', 'Tilt']],
+        desc: 'Tilt: hold your phone sideways and fly by tilting it', when: () => tiltCapable(),
+        onPick: v => { if (v === 'tilt') askTiltPermission(); } },
+      { key: 'flightSensitivity', label: 'Sensitivity', type: 'seg', def: 'normal', options: [['low', 'Low'], ['normal', 'Normal'], ['high', 'High']] },
+      { key: 'flightInvert', label: 'Invert up/down', type: 'toggle', def: false, desc: 'Pull down to climb, like a pilot' },
+    ],
     create,
   };
 
@@ -89,16 +100,20 @@
   const TAU = Math.PI * 2;
 
   const FLY = {
-    vBrake: 18, vCruise: 30, vBoost: 50, vMin: 16, vMax: 56,
+    vBrake: 18, vCruise: 30, vBoost: 50, vMin: 15, vMax: 58,
     accel: 0.9,                 // 1/s toward the throttle speed
-    gravityTrade: 5.2,          // m/s² of speed traded per unit sin(pitch)
-    maxBank: 62 * DEG,
-    maxClimb: 34 * DEG, maxDive: 42 * DEG,
-    turnRate: 0.95,             // rad/s at full bank (cruise); a little more when slow
-    bankLambda: 4.2, pitchLambda: 2.8, levelLambda: 1.8,
-    rollLevelLambda: 5,         // roll-out on release: crisp, so a turn stops close to where you let go
-    ceiling: 300, hardCeiling: 360,
-    dead: 0.1,                  // stick dead zone (fraction of the stick radius)
+    gravityTrade: 6.2,          // m/s² of speed traded per unit sin(climb): loops slow at the top, dives speed up
+    // attitude: the roll input sets a TARGET BANK (position control), the pitch input sets a PITCH RATE
+    bankMax: 100 * DEG,         // full sideways input: just past knife-edge
+    keepRoll: 0.94,             // raw roll input past this keeps rolling (full rolls)
+    rollRate: 3.4,              // rad/s, the fastest the plane rolls (a full roll in ~1.9 s)
+    rollGain: 5.2,              // 1/s, how briskly the bank follows the input
+    levelGain: 2.6,             // 1/s, the gentle roll back to level on release
+    pitchRate: 1.2,             // rad/s at full up/down (cruise): a loop takes ~5 s
+    turnK: 1.1,                 // rad/s of coordinated heading change per unit sin(bank) (cruise)
+    levelK: 0.75,               // 1/s, the nose easing back to the horizon once the stick is released
+    // input shaping (touch, tilt and keys alike)
+    dead: 0.06, expo: 0.55,     // dead zone, then an expo curve: fine near the centre, fast at the edge
     boostDrain: 0.2, boostRefill: 0.085, boostDelay: 0.7,
     stunTime: 1.5,
     radius: 2.4,                // collision radius of the plane (m)
@@ -111,6 +126,67 @@
     rings: { time: null, missPenalty: 3, ringTimeout: 30, silver: 160 },
     tour: { time: 300, hintCooldown: 16, hintShow: 12, ptsNew: 3, ptsRevisit: 1 },
   };
+
+  // Sensitivity (settings.flightSensitivity): the touch stick's radius, the tilt angles for full deflection,
+  // the pitch-rate and roll-rate scale.
+  const SENS = {
+    low: { stick: 1.3, tiltRoll: 42, tiltPitch: 34, rate: 0.78, roll: 0.82 },
+    normal: { stick: 1, tiltRoll: 32, tiltPitch: 26, rate: 1, roll: 1 },
+    high: { stick: 0.76, tiltRoll: 24, tiltPitch: 19, rate: 1.22, roll: 1.18 },
+  };
+  const sensFor = settings => SENS[settings && settings.flightSensitivity] || SENS.normal;
+  /** Dead zone, then an expo curve (fine control near the centre, quick at the edge); keeps the sign. */
+  function shapeInput(v) {
+    const a = Math.abs(v);
+    if (a <= FLY.dead) return 0;
+    const t = Math.min(1, (a - FLY.dead) / (1 - FLY.dead));
+    return Math.sign(v) * ((1 - FLY.expo) * t + FLY.expo * t * t * t);
+  }
+  /** Exact critically damped spring step toward `target` (no overshoot, no jitter, frame-rate independent). */
+  function critDamp(x, v, target, w, dt, out) {
+    const d = x - target, e = Math.exp(-w * dt), k = v + w * d;
+    out.x = target + (d + k * dt) * e;
+    out.v = (v - k * w * dt) * e;
+    return out;
+  }
+  /** One-euro filter (Casiez et al.): smooth when still, responsive when moving. */
+  function oneEuro(minCut, beta, dCut = 1) {
+    let x = null, dx = 0, t0 = 0;
+    const alpha = (dt, fc) => 1 / (1 + 1 / (TAU * fc * dt));
+    return (v, t) => {
+      if (x == null) { x = v; t0 = t; return v; }
+      const dt = Math.max(1e-3, t - t0);
+      t0 = t;
+      const ad = alpha(dt, dCut);
+      dx = ad * ((v - x) / dt) + (1 - ad) * dx;
+      const a = alpha(dt, minCut + beta * Math.abs(dx));
+      x = a * v + (1 - a) * x;
+      return x;
+    };
+  }
+  function screenAngle() {
+    if (window.screen && screen.orientation && typeof screen.orientation.angle === 'number') return screen.orientation.angle;
+    return typeof window.orientation === 'number' ? window.orientation : 0;
+  }
+  /** Tilt is offered on touch devices that know DeviceOrientation (whether events really come is checked live). */
+  function tiltCapable() {
+    if (typeof window.DeviceOrientationEvent !== 'function') return false;
+    return (navigator.maxTouchPoints || 0) > 0 || !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+  }
+  function needsTiltPermission() { return !!(window.DeviceOrientationEvent && typeof window.DeviceOrientationEvent.requestPermission === 'function'); }
+  /** Must be called from a tap: iOS asks for motion access. Resolves true when tilt may be used. */
+  function askTiltPermission() {
+    if (!needsTiltPermission()) return Promise.resolve(true);
+    let p;
+    try { p = window.DeviceOrientationEvent.requestPermission(); } catch (err) { return Promise.resolve(false); }
+    return Promise.resolve(p).then(s => s === 'granted', () => false);
+  }
+  let tiltNoticeShown = false;
+  /** How much of the bank the chase camera follows: about a third up to knife-edge, back to none upside down. */
+  function camRollFollow(b) {
+    const a = Math.abs(b);
+    return 0.3 * Math.sign(b) * (a <= Math.PI / 2 ? a : Math.PI - a);
+  }
 
   const MARKER_COUNT = 40;
   const MARKER_R = 9;           // fly within this of a "!" to collect it
@@ -2110,6 +2186,22 @@
   box-shadow: 0 0 0 2px rgba(20,32,56,.12); pointer-events: none; transition: opacity .15s; will-change: transform; }
 .fl-stick i { position: absolute; left: 50%; top: 50%; width: 38px; height: 38px; margin: -19px 0 0 -19px; border-radius: 50%; background: #fff;
   box-shadow: 0 2px 8px rgba(20,32,56,.35); will-change: transform; }
+.fl-stick b { position: absolute; inset: -5px; border-radius: 50%; opacity: 0;
+  background: conic-gradient(from calc(var(--ang, 0deg) - 50deg), rgba(255,226,125,.95) 0deg, rgba(255,201,60,.9) 50deg, rgba(255,226,125,.95) 100deg, transparent 100deg);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 7px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 7px)); }
+.fl-stick em { position: absolute; top: 50%; width: 0; height: 0; margin-top: -7px; border: 7px solid transparent; opacity: .55; transition: opacity .15s, filter .15s; }
+.fl-stick em.l { left: -19px; border-right: 9px solid #fff; border-left-width: 0; }
+.fl-stick em.r { right: -19px; border-left: 9px solid #fff; border-right-width: 0; }
+.fl-stick.roll { border-color: #FFB627; }
+.fl-stick.roll em { opacity: 1; filter: drop-shadow(0 0 4px #FF9F1C); }
+.fl-ctl { display: flex; gap: 6px; }
+.fl-ctl button { min-width: 48px; height: 48px; padding: 0 10px; border: 0; border-radius: 24px; display: flex; align-items: center; gap: 5px; cursor: pointer;
+  background: rgba(255,255,255,.95); color: var(--ink); box-shadow: 0 3px 0 #CEDBEA, 0 6px 14px rgba(22,58,108,.18); font: 900 11px/1 var(--font-ui); letter-spacing: .08em;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+.fl-ctl button svg { width: 22px; height: 22px; flex: none; }
+.fl-ctl .fl-tilt.on { background: linear-gradient(180deg, #FFB547, #FF8A00); color: #fff; box-shadow: inset 0 -3px 0 rgba(160,70,0,.35), 0 6px 14px rgba(22,58,108,.2); }
+.fl-ctl .fl-tilt.pending { animation: fl-beat .6s ease-in-out infinite alternate; }
 .fl-lines { position: absolute; inset: 0; pointer-events: none; opacity: 0; }
 .fl-lines svg { width: 100%; height: 100%; display: block; }
 .fl-lines line { stroke: rgba(255,255,255,.75); stroke-width: 2.5; stroke-linecap: round; }
@@ -2187,6 +2279,8 @@
     brake: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 16.5a8.5 8.5 0 0 1 17 0"/><path d="M12 16.5 6.6 11.4"/><circle cx="12" cy="16.5" r="1.6" fill="currentColor"/></svg>',
     star: '<svg viewBox="0 0 24 24"><path d="M12 2.8l2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 16.6l-5.4 2.9 1.1-6.1-4.5-4.2 6.1-.8z" fill="#FFC93C" stroke="#E0A000" stroke-width="1.2" stroke-linejoin="round"/></svg>',
     edge: '<svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="17" fill="#fff"/><path d="M14 27 22 11l8 16-8-4.4z" fill="currentColor"/></svg>',
+    tilt: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8.2" width="16" height="9" rx="2.2" transform="rotate(-16 12 12.7)"/><path d="M3.4 6.2A10 10 0 0 1 9 3.2"/><path d="M20.6 19.4A10 10 0 0 1 15 21.4"/></svg>',
+    center: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="6.6"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><path d="M12 2.6v3M12 18.4v3M2.6 12h3M18.4 12h3"/></svg>',
   };
 
   // =============================================================================================
@@ -2204,6 +2298,9 @@
     const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
     const A = assets(THREE, W);
     const S = STRUCT, L = ISLE.L;
+    const sens = () => sensFor(save.settings);
+    /** The ground under (x, z) for something at height y (tunnels: the floor inside the tube, the rock above it). */
+    function groundFor(x, z, y) { return groundAt(x, z); }
 
     // ---- world -----------------------------------------------------------------------------------------
     const env = W.environment(scene, {
@@ -2294,7 +2391,6 @@
 
     // ---- the plane & its pilots -------------------------------------------------------------------------
     const plane = new THREE.Group();
-    plane.rotation.order = 'YXZ';
     scene.add(plane);
     const bodyMat = new THREE.MeshPhongMaterial({ color: 0xFF9F1C, shininess: 70, specular: 0x555555 });
     const planeBody = new THREE.Mesh(A.planeBody, bodyMat);
@@ -2446,13 +2542,18 @@
     });
 
     // ---- per-game state ----------------------------------------------------------------------------------
+    // The attitude is a PATH frame (qp: heading and climb, never banked against the horizon except through a
+    // loop, where it turns upside down with the plane) times a BANK about the nose: plane = qp · Rz(bank).
+    // yaw / pitch / roll are derived each step for the HUD, the minimap and the guides.
     const P = {
-      pos: V(), prev: V(), dir: V(0, 0, 1), yaw: 0, pitch: 0, roll: 0, speed: FLY.vCruise, boost: 1, boostIdle: 0, boosting: false, braking: false,
-      stun: 0, wobble: 0, softCd: 0, skimCd: 0, bumpCd: 0, sprayCd: 0, agl: 50, overSea: true,
+      pos: V(), prev: V(), dir: V(0, 0, 1), qp: new THREE.Quaternion(), bank: 0, fwd: V(0, 0, 1), up: V(0, 1, 0),
+      yaw: 0, pitch: 0, roll: 0, speed: FLY.vCruise, boost: 1, boostIdle: 0, boosting: false, braking: false,
+      stun: 0, wobble: 0, softCd: 0, skimCd: 0, bumpCd: 0, sprayCd: 0, wallCd: 0, agl: 50, overSea: true,
+      // the chase camera's roll offset after a path flip (it rolls with the plane instead of snapping)
+      camOff: 0, camOff0: 0, camTie: 0, camRatio: 1, lastBank: 0, loops: 0, rolls: 0, loopAcc: 0, rollAcc: 0, inTunnel: -1,
     };
-    const stick = { id: null, ox: 0, oy: 0, x: 0, y: 0, active: false, R: 60 };
+    const stick = { id: null, ox: 0, oy: 0, cx: 0, cy: 0, active: false, R: 60, steadyX: 0, steadyY: 0, steadyT: 0 };
     const keys = { left: false, right: false, up: false, down: false, boost: false, brake: false };
-    const kx = { x: 0, y: 0 };
     let btnBoost = false, btnBrake = false;
     let phase = 'intro';
     let cur = 0;
@@ -2530,7 +2631,17 @@
       hintBtn.addEventListener('click', () => useHint());
       hintB.append(hintBtn, ui.el('small', '', 'FIND'));
       const readout = ui.el('div', 'fl-readout', '<span class="ss-chip dark"><b class="spd">30</b>m/s</span><span class="ss-chip dark"><b class="alt">40</b>m</span>');
-      const stickEl = ui.el('div', 'fl-stick fl-off', '<i></i>');
+      const stickEl = ui.el('div', 'fl-stick fl-off', '<b></b><em class="l"></em><em class="r"></em><i></i>');
+      // steering chip (phones): TILT on/off and Re-center
+      const ctl = ui.el('div', 'fl-ctl ss-block fl-off');
+      const tiltBtn = ui.el('button', 'fl-tilt', SVG.tilt + '<span>TILT</span>');
+      tiltBtn.type = 'button';
+      tiltBtn.setAttribute('aria-label', 'Steer by tilting the phone');
+      const rcBtn = ui.el('button', 'fl-rc fl-off', SVG.center + '<span>CENTER</span>');
+      rcBtn.type = 'button';
+      rcBtn.setAttribute('aria-label', 'Re-center tilt');
+      ctl.append(tiltBtn, rcBtn);
+      left.append(ctl);
       const lines = ui.el('div', 'fl-lines');
       let svg = '<svg viewBox="-100 -100 200 200" preserveAspectRatio="none">';
       for (let i = 0; i < 26; i++) {
@@ -2544,7 +2655,8 @@
       return {
         top, time, timeB: time.querySelector('b'), score, scoreB: score.querySelector('b'), combo, comboB: combo.querySelector('b'), comboBar: combo.querySelector('i'),
         mk, mkB: mk.querySelector('b'), player, map, mapC, mapG: mapC.getContext('2d'), boost, brake, hintB, readout,
-        spd: readout.querySelector('.spd'), alt: readout.querySelector('.alt'), stick: stickEl, knob: stickEl.querySelector('i'), lines, linesSvg: lines.firstChild,
+        spd: readout.querySelector('.spd'), alt: readout.querySelector('.alt'), stick: stickEl, knob: stickEl.querySelector('i'), stickGlow: stickEl.querySelector('b'), lines, linesSvg: lines.firstChild,
+        ctl, tiltBtn, rcBtn,
         flash: flashEl, edge, last: {},
       };
     }
@@ -2656,7 +2768,10 @@
       g.restore();
     }
 
-    // ---- the stick ----------------------------------------------------------------------------------------
+    // ---- the touch stick ----------------------------------------------------------------------------------
+    // Touch and drag anywhere: the offset from the touch-down point is the input, like tilting the remote. A soft
+    // ring shows the deflection. Small offsets held steady for 1.5 s re-anchor (a resting thumb creeps on the
+    // glass), a drag far past the rim pulls the centre along, and letting go eases the input back to neutral.
     const blockedTarget = t => t instanceof Element && !!t.closest('button, a, input, .ss-block, #ss-screens, #ss-overlay');
     function stickActive() { return (phase === 'fly' || phase === 'countdown') && !engine.paused && SS.input.enabled !== false && !autoplay; }
     function onPDown(e) {
@@ -2664,9 +2779,10 @@
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       const r = ui.root.getBoundingClientRect();
       stick.id = e.pointerId; stick.active = true;
-      stick.ox = stick.x0 = e.clientX - r.left; stick.oy = e.clientY - r.top;
+      stick.ox = e.clientX - r.left; stick.oy = e.clientY - r.top;
       stick.cx = stick.ox; stick.cy = stick.oy;
-      stick.R = clamp(Math.min(engine.size.w, engine.size.h) * 0.15, 46, 84);
+      stick.steadyX = stick.cx; stick.steadyY = stick.cy; stick.steadyT = 0;
+      stick.R = clamp(Math.min(engine.size.w, engine.size.h) * 0.15, 46, 84) * sens().stick;
       placeStick();
       hud.stick.classList.remove('fl-off');
       if (!firstDrag) { firstDrag = true; if (hintHandle) { hintHandle.hide(); hintHandle = null; } }
@@ -2675,33 +2791,48 @@
       if (e.pointerId !== stick.id) return;
       const r = ui.root.getBoundingClientRect();
       stick.cx = e.clientX - r.left; stick.cy = e.clientY - r.top;
-      // a floating stick: dragging past the rim pulls the centre along
-      const dx = stick.cx - stick.ox, dy = stick.cy - stick.oy, d = Math.hypot(dx, dy), lim = stick.R * 1.6;
+      // a floating stick: dragging well past the rim (and the keep-rolling zone) pulls the centre along
+      const dx = stick.cx - stick.ox, dy = stick.cy - stick.oy, d = Math.hypot(dx, dy), lim = stick.R * 1.25;
       if (d > lim) { stick.ox += dx / d * (d - lim); stick.oy += dy / d * (d - lim); }
-      placeStick();
+      if (Math.hypot(stick.cx - stick.steadyX, stick.cy - stick.steadyY) > 6) { stick.steadyX = stick.cx; stick.steadyY = stick.cy; stick.steadyT = 0; }
     }
     function onPUp(e) { if (e.pointerId === stick.id) releaseStick(); }
     function releaseStick() {
       stick.id = null; stick.active = false;
       hud.stick.classList.add('fl-off');
     }
+    function updateStick(dt) {
+      if (!stick.active) return;
+      stick.steadyT += dt;
+      if (stick.steadyT > 1.5) {
+        const k = 1 - Math.exp(-dt / 0.6);
+        if (Math.abs(stick.cx - stick.ox) < stick.R * 0.22) stick.ox += (stick.cx - stick.ox) * k;
+        if (Math.abs(stick.cy - stick.oy) < stick.R * 0.35) stick.oy += (stick.cy - stick.oy) * k;
+      }
+      placeStick();
+    }
     function placeStick() {
       const R = stick.R;
-      hud.stick.style.width = hud.stick.style.height = (R * 2) + 'px';
+      const sz = Math.round(R * 2) + 'px';
+      if (hud.last.stickSz !== sz) { hud.last.stickSz = sz; hud.stick.style.width = hud.stick.style.height = sz; }
       hud.stick.style.transform = 'translate(' + Math.round(stick.ox - R) + 'px,' + Math.round(stick.oy - R) + 'px)';
       let dx = stick.cx - stick.ox, dy = stick.cy - stick.oy;
       const d = Math.hypot(dx, dy);
       if (d > R) { dx = dx / d * R; dy = dy / d * R; }
       hud.knob.style.transform = 'translate(' + Math.round(dx) + 'px,' + Math.round(dy) + 'px)';
+      // the rim glows toward the deflection; past the keep-rolling mark it turns orange
+      const mag = clamp(d / R, 0, 1);
+      hud.stickGlow.style.opacity = (mag * mag).toFixed(2);
+      hud.stickGlow.style.setProperty('--ang', Math.round(Math.atan2(dx, -dy) / DEG) + 'deg');
+      hud.stick.classList.toggle('roll', Math.abs(stick.cx - stick.ox) >= R * FLY.keepRoll);
     }
-    /** Stick deflection → (-1..1, -1..1): x right, y up; generous dead zone and an eased curve. */
-    function stickValue(out) {
+    /** Raw stick deflection: x right, y up, about −1.15..1.15 (past 1 sideways is the keep-rolling zone). */
+    function stickRaw(out) {
       if (!stick.active) { out.x = 0; out.y = 0; return out; }
       let dx = (stick.cx - stick.ox) / stick.R, dy = -(stick.cy - stick.oy) / stick.R;
       const d = Math.hypot(dx, dy);
-      if (d > 1) { dx /= d; dy /= d; }
-      const shape = v => { const a = Math.abs(v); return a < FLY.dead ? 0 : Math.sign(v) * Math.pow((a - FLY.dead) / (1 - FLY.dead), 1.35); };
-      out.x = shape(dx); out.y = shape(dy);
+      if (d > 1.15) { dx *= 1.15 / d; dy *= 1.15 / d; }
+      out.x = dx; out.y = dy;
       return out;
     }
     window.addEventListener('pointerdown', onPDown);
@@ -2713,12 +2844,139 @@
       const map = { ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', Space: 'boost', ShiftLeft: 'brake', ShiftRight: 'brake' };
       const name = map[code] || (k.key === ' ' ? 'boost' : k.key === 'Shift' ? 'brake' : null);
       if (name) keys[name] = !!k.down;
+      if (k.down && !k.repeat && (code === 'KeyC') && tilt.on) recenterTilt(false);
     });
     function releaseAll() {
       releaseStick();
       hud.boost.release(); hud.brake.release();
       btnBoost = btnBrake = false;
       for (const k in keys) keys[k] = false;
+    }
+
+    // ---- tilt control: the Wii feel. Hold the phone sideways like the remote ----------------------------
+    // The world-up vector in screen axes (from beta/gamma and the screen orientation) gives a sideways tilt
+    // (roll) and a forward/back tilt (pitch) with no wrap-around in any comfortable hold; a one-euro filter
+    // takes the jitter out, and the neutral is calibrated at GO, with Re-center or a double-tap.
+    const tilt = { on: false, have: false, pending: false, roll: 0, pitch: 0, zr: 0, zp: 0, fr: oneEuro(1.2, 0.025), fp: oneEuro(1.2, 0.025), timer: 0, lastTap: 0, events: 0 };
+    function onOrient(e) {
+      if (e.beta == null || e.gamma == null) return;
+      const b = e.beta * DEG, gm = e.gamma * DEG;
+      const ux = -Math.sin(gm) * Math.cos(b), uy = Math.sin(b), uz = Math.cos(b) * Math.cos(gm);
+      const a = screenAngle() * DEG;
+      const sx = ux * Math.cos(a) - uy * Math.sin(a), sy = ux * Math.sin(a) + uy * Math.cos(a);
+      const t = (e.timeStamp || performance.now()) / 1000;
+      tilt.roll = tilt.fr(Math.asin(clamp(-sx, -1, 1)) / DEG, t);
+      tilt.pitch = tilt.fp(Math.atan2(sy, uz) / DEG, t);
+      tilt.events++;
+      if (!tilt.have) {
+        tilt.have = true;
+        if (tilt.on) { recenterTilt(true); refreshTiltChip(); }
+      }
+    }
+    function tiltRaw(out) {
+      if (!tilt.on || !tilt.have) { out.x = 0; out.y = 0; return out; }
+      const sv = sens();
+      out.x = clamp((tilt.roll - tilt.zr) / sv.tiltRoll, -1.15, 1.15);
+      out.y = clamp((tilt.pitch - tilt.zp) / sv.tiltPitch, -1.15, 1.15);
+      return out;
+    }
+    function recenterTilt(silent) {
+      if (!tilt.on || !tilt.have) return;
+      tilt.zr = clamp(tilt.roll, -25, 25); tilt.zp = tilt.pitch;
+      if (!silent) { ui.toast('Tilt centered', { duration: 1.2 }); ui.sfx('ui_tick'); }
+    }
+    /** Start listening; with `asked` (a tap granted access), a quiet device after 800 ms falls back to touch. */
+    function enableTilt(asked) {
+      if (!tiltCapable()) { tiltFallback(); return; }
+      if (!tilt.on) window.addEventListener('deviceorientation', onOrient);
+      tilt.on = true; tilt.pending = false;
+      clearTimeout(tilt.timer);
+      tilt.timer = setTimeout(() => {
+        tilt.timer = 0;
+        if (!ctx.alive || !tilt.on || tilt.have) return;
+        // iOS answers only after a tap grants motion access: wait for the TILT chip instead of giving up
+        if (!asked && needsTiltPermission()) { tilt.pending = true; refreshTiltChip(); return; }
+        tiltFallback();
+      }, 800);
+      if (engine.size.aspect < 1 && !SS.save.seen('flight_tilt_sideways')) ui.toast('Tip: hold your phone sideways, like a remote', { duration: 2.6 });
+      refreshTiltChip();
+    }
+    function disableTilt() {
+      if (tilt.on) window.removeEventListener('deviceorientation', onOrient);
+      tilt.on = false; tilt.have = false; tilt.pending = false;
+      clearTimeout(tilt.timer); tilt.timer = 0;
+      refreshTiltChip();
+    }
+    function tiltFallback() {
+      disableTilt();
+      if (!tiltNoticeShown) { tiltNoticeShown = true; ui.toast('Tilt isn\'t available here — using touch', { duration: 2.8 }); }
+      if (save.settings.flightControl === 'tilt') save.setSetting('flightControl', 'touch');
+    }
+    /** Runs inside the tap that asked for tilt (iOS shows its motion-access prompt then). */
+    function askForTilt() {
+      askTiltPermission().then(ok => {
+        if (!ctx.alive) return;
+        if (ok) enableTilt(true);
+        else tiltFallback();
+      });
+    }
+    function refreshTiltChip() {
+      hud.ctl.classList.toggle('fl-off', !tiltCapable());
+      hud.tiltBtn.classList.toggle('on', tilt.on && tilt.have);
+      hud.tiltBtn.classList.toggle('pending', tilt.pending || (tilt.on && !tilt.have));
+      hud.tiltBtn.setAttribute('aria-pressed', tilt.on ? 'true' : 'false');
+      hud.rcBtn.classList.toggle('fl-off', !(tilt.on && tilt.have));
+    }
+    const offSetting = save.events.on('setting', (key, value) => {
+      if (key !== 'flightControl') return;
+      if (value === 'tilt') { if (!tilt.on || !tilt.have) askForTilt(); }
+      else disableTilt();
+    });
+    ctx.input.on('tap', () => {
+      const now = engine.realTime;
+      if (tilt.on && now - tilt.lastTap < 0.35) { tilt.lastTap = 0; recenterTilt(false); }
+      else tilt.lastTap = now;
+    });
+    hud.tiltBtn.addEventListener('click', () => {
+      ui.sfx('ui_toggle', { intensity: tilt.on && tilt.have ? 0 : 1 });
+      if (tilt.on && tilt.have) { save.setSetting('flightControl', 'touch'); ui.toast('Touch steering', { duration: 1.4 }); }
+      else if (save.settings.flightControl === 'tilt') askForTilt();     // waiting for access: ask again
+      else save.setSetting('flightControl', 'tilt');
+    });
+    hud.rcBtn.addEventListener('click', () => recenterTilt(false));
+    refreshTiltChip();
+    if (save.settings.flightControl === 'tilt' && tiltCapable()) enableTilt(false);
+
+    // ---- input mapping shared by touch, tilt and keys ---------------------------------------------------
+    // raw (−1.15..1.15) → dead zone + expo curve → critically damped smoothing → commands:
+    // roll → a target bank (±100° at full; the far edge keeps rolling), pitch → a pitch rate.
+    const IN = { x: 0, vx: 0, y: 0, vy: 0, keepT: 0, relT: 1 };
+    const cmd = { bank: 0, keep: 0, pitch: 0, relT: 1, boost: false, brake: false };
+    const autoCmd = { bank: 0, keep: 0, pitch: 0, relT: 0, boost: false, brake: false };
+    const _sv = { x: 0, y: 0 }, _tv = { x: 0, y: 0 }, _cr = { x: 0, v: 0 };
+    function controls(dt) {
+      if (autoplay) return autoCmd;
+      stickRaw(_sv);
+      tiltRaw(_tv);
+      updateStick(dt);
+      // keys: held = (nearly) full deflection through the same curve and smoothing
+      const kx = (keys.right ? 0.88 : 0) - (keys.left ? 0.88 : 0), ky = (keys.up ? 1 : 0) - (keys.down ? 1 : 0);
+      const rx = clamp(_sv.x + _tv.x + kx, -1.15, 1.15);
+      let ry = clamp(_sv.y + _tv.y + ky, -1.15, 1.15);
+      if (save.settings.flightInvert === true) ry = -ry;
+      const w = tilt.on && tilt.have && !stick.active ? 11 : 13;
+      critDamp(IN.x, IN.vx, shapeInput(rx), w, dt, _cr); IN.x = _cr.x; IN.vx = _cr.v;
+      critDamp(IN.y, IN.vy, shapeInput(ry), w, dt, _cr); IN.y = _cr.x; IN.vy = _cr.v;
+      IN.keepT = Math.abs(rx) >= FLY.keepRoll ? IN.keepT + dt : 0;
+      const idle = Math.abs(shapeInput(rx)) < 0.02 && Math.abs(shapeInput(ry)) < 0.02 && Math.abs(IN.x) < 0.04 && Math.abs(IN.y) < 0.04;
+      IN.relT = idle ? IN.relT + dt : 0;
+      cmd.bank = clamp(IN.x, -1, 1) * FLY.bankMax;
+      cmd.keep = IN.keepT > 0.1 ? Math.sign(rx) : 0;
+      cmd.pitch = clamp(IN.y, -1, 1);
+      cmd.relT = IN.relT;
+      cmd.boost = btnBoost || keys.boost;
+      cmd.brake = btnBrake || keys.brake;
+      return cmd;
     }
 
     function useHint() {
@@ -2732,55 +2990,148 @@
     }
 
     // =============================================================================================
-    // Flight model
+    // Flight model: attitude = path frame · bank. Full control (loops, rolls, knife-edge, inverted) with a
+    // forgiving safety net: a gentle return to level on release, an Immelmann-style roll upright when the
+    // stick is let go upside down, a pull-up near the ground, the ground cushion, the soft ceiling.
     // =============================================================================================
 
-    const _sv = { x: 0, y: 0 };
-    const autoIn = { x: 0, y: 0, boost: false, brake: false };
-    function controls(dt) {
-      if (autoplay) return autoIn;
-      stickValue(_sv);
-      const kt = 1 - Math.exp(-6 * dt);
-      kx.x += ((keys.right ? 1 : 0) - (keys.left ? 1 : 0) - kx.x) * kt;
-      kx.y += ((keys.up ? 1 : 0) - (keys.down ? 1 : 0) - kx.y) * kt;
-      return { x: clamp(_sv.x + kx.x, -1, 1), y: clamp(_sv.y + kx.y, -1, 1), boost: btnBoost || keys.boost, brake: btnBrake || keys.brake };
+    const _q = new THREE.Quaternion(), _ax = V(), _f = V(), _u = V(), _c = V(), _w = V(), _tmp = V(), _n = V();
+    const Y_UP = V(0, 1, 0);
+    function pathAxes() { _f.set(0, 0, 1).applyQuaternion(P.qp); _u.set(0, 1, 0).applyQuaternion(P.qp); }
+    function rotLocal(x, y, z, ang) { _q.setFromAxisAngle(_ax.set(x, y, z), ang); P.qp.multiply(_q); }
+    function rotWorld(axis, ang) { _q.setFromAxisAngle(axis, ang); P.qp.premultiply(_q); }
+    /** An upright path frame flying along `dir` (the plane's look stays the same: an inverted path hands its
+     *  half turn to the bank). */
+    const _m4 = new THREE.Matrix4(), _bx = V(), _by = V(), _bz = V();
+    function setPathDir(dir) {
+      pathAxes();
+      const wasInv = _u.y < 0;
+      _bz.copy(dir).normalize();
+      _bx.crossVectors(Y_UP, _bz);
+      if (_bx.lengthSq() < 1e-6) _bx.set(1, 0, 0);
+      _bx.normalize();
+      _by.crossVectors(_bz, _bx);
+      P.qp.setFromRotationMatrix(_m4.makeBasis(_bx, _by, _bz));
+      if (wasInv) { P.bank = wrapA(P.bank + Math.PI); P.lastBank = wrapA(P.lastBank + Math.PI); }
+      P.dir.copy(_bz);
+    }
+    /** Half-turn the path frame about the nose and hand it to the bank: the plane's look does not change.
+     *  `tie`: the camera rolls along with the plane's roll that follows (Immelmann); else it eases over. */
+    function flipPath(tie) {
+      const rf0 = camRollFollow(P.bank);
+      rotLocal(0, 0, 1, Math.PI);
+      P.bank = wrapA(P.bank - Math.PI);
+      P.lastBank = wrapA(P.lastBank - Math.PI);
+      let off = wrapA(rf0 - camRollFollow(P.bank) - Math.PI + P.camOff);
+      if (Math.sign(off) !== Math.sign(P.bank) && Math.abs(off) > 0.05) off += Math.sign(P.bank) * TAU;
+      P.camOff = off; P.camOff0 = off; P.camTie = tie ? P.bank : 0; P.camRatio = 1;
+    }
+    /** Keep the path frame's up on the horizon's vertical plane (or its upside-down twin through a loop):
+     *  any drift is handed to the bank, so the bank always reads against the real horizon. */
+    function realign() {
+      pathAxes();
+      _c.copy(Y_UP).addScaledVector(_f, -_f.y);
+      const cl = _c.length();
+      if (cl < 0.17) return;          // nose (nearly) vertical: carry the frame through
+      _c.multiplyScalar(1 / cl);
+      if (_c.dot(_u) < 0) _c.negate();
+      const eps = Math.atan2(_f.dot(_w.crossVectors(_u, _c)), clamp(_u.dot(_c), -1, 1));
+      if (Math.abs(eps) < 1e-7) return;
+      rotLocal(0, 0, 1, eps);
+      P.bank = wrapA(P.bank - eps);
+      P.lastBank = wrapA(P.lastBank - eps);
+    }
+    function deriveAngles() {
+      pathAxes();
+      P.fwd.copy(_f); P.up.copy(_u);
+      // the heading reads through vertical too: climbing, the path's up points back the way we came
+      const hx = _f.x - _u.x * _f.y, hz = _f.z - _u.z * _f.y;
+      if (hx * hx + hz * hz > 1e-8) P.yaw = Math.atan2(hx, hz);
+      P.pitch = Math.asin(clamp(_f.y, -1, 1));
+      P.roll = _u.y >= 0 ? P.bank : wrapA(P.bank + Math.PI);
     }
 
-    const _fw = V(), _tmp = V(), _n = V();
-    function stepFlight(dt, inp, onRails) {
-      let sx = onRails ? 0 : inp.x, sy = onRails ? 0 : inp.y;
-      if (P.stun > 0) { sx = 0; sy = 0.75; }
-      // bank → coordinated turn
-      const rollT = sx * FLY.maxBank;
-      P.roll += (rollT - P.roll) * (1 - Math.exp(-(sx ? FLY.bankLambda : FLY.rollLevelLambda) * dt));
-      let pitchT = sy >= 0 ? sy * FLY.maxClimb : sy * FLY.maxDive;
-      // soft ceiling
-      if (P.pos.y > S.ceiling) pitchT = Math.min(pitchT, lerp(FLY.maxClimb, -8 * DEG, sstep(S.ceiling, S.hardCeiling - 10, P.pos.y)));
-      // ground cushion and a gentle terrain-follow assist (steep walls still bump)
-      const g = groundAt(P.pos.x, P.pos.z), floor = Math.max(g, 0);
+    function stepFlight(dt, c, onRails) {
+      pathAxes();
+      const sv = sens();
+      const stunned = P.stun > 0;
+      let bankT = c.bank, keep = c.keep, pc = c.pitch, relT = c.relT;
+      if (onRails || stunned) { bankT = 0; keep = 0; pc = 0; relT = 9; }
+      const released = relT > 0.15;
+      const g = groundFor(P.pos.x, P.pos.z, P.pos.y), floor = Math.max(g, 0);
       P.agl = P.pos.y - floor;
       P.overSea = g < 0.5;
-      if (pitchT < 0) pitchT *= sstep(2.4, 9, P.agl);
-      const look = Math.max(18, P.speed * 0.9);
-      const ax = P.pos.x + Math.sin(P.yaw) * look, az = P.pos.z + Math.cos(P.yaw) * look;
-      const gAhead = Math.max(0, groundAt(ax, az));
-      const need = Math.atan2(gAhead + 3.5 - P.pos.y, look);
-      if (need > pitchT && need < 24 * DEG && P.stun <= 0) pitchT = lerp(pitchT, need, 0.85);
-      const pl = (sy || P.stun > 0) ? FLY.pitchLambda : FLY.levelLambda;
-      P.pitch += (pitchT - P.pitch) * (1 - Math.exp(-pl * dt));
+      const inv = _u.y < 0;
+      // upside down low over the ground with the stick let go: roll upright briskly
+      const worldUpsideDown = (inv ? -1 : 1) * Math.cos(P.bank) < -0.2;
+      const urgent = released && worldUpsideDown && P.agl < 45;
+      // ---- roll toward the target bank (or keep rolling at the far edge) ----
+      const rollMax = FLY.rollRate * sv.roll;
+      if (keep) P.bank = wrapA(P.bank + keep * rollMax * dt);
+      else {
+        let err = wrapA(bankT - P.bank);
+        // coming out of a full roll: carry on the way the stick points rather than unwinding
+        if (Math.abs(bankT) > 0.4 && Math.sign(err) !== Math.sign(bankT) && Math.abs(err) > Math.PI / 2) err += Math.sign(bankT) * TAU;
+        const gain = stunned ? 6 : urgent ? 4.5 : released ? FLY.levelGain : FLY.rollGain * sv.roll;
+        P.bank = wrapA(P.bank + clamp(err * gain, -rollMax, rollMax) * dt);
+      }
+      // ---- pitch: the input is a rate about the plane's own wing axis (hold up = loop) ----
       const v01 = clamp((P.speed - FLY.vBrake) / (FLY.vBoost - FLY.vBrake), 0, 1);
-      const rate = FLY.turnRate * lerp(1.22, 0.88, v01);
-      P.yaw = wrapA(P.yaw - rate * Math.sin(P.roll) / Math.sin(FLY.maxBank) * dt);
-      // throttle & boost energy
-      P.boosting = !onRails && !!inp.boost && P.boost > 0.02 && P.stun <= 0;
-      P.braking = !onRails && !!inp.brake && !P.boosting;
+      if (P.pos.y > S.ceiling && pc > 0 && !inv) pc *= 1 - sstep(S.ceiling, S.hardCeiling - 10, P.pos.y);
+      const om = pc * FLY.pitchRate * sv.rate * lerp(1.12, 0.86, v01);
+      if (om) rotLocal(Math.cos(P.bank), Math.sin(P.bank), 0, -om * dt);
+      // ---- coordinated turn from the bank (about world up while the path is upright, its own up in a loop) ----
+      pathAxes();
+      const wy = sstep(0.2, 0.6, Math.abs(_u.y));
+      _ax.copy(_u).multiplyScalar(1 - wy).addScaledVector(Y_UP, (_u.y < 0 ? -1 : 1) * wy).normalize();
+      rotWorld(_ax, -FLY.turnK * lerp(1.22, 0.86, v01) * Math.sin(P.bank) * dt);
+      // ---- assists, as a pull (+) or push (−) of the path frame ----
+      pathAxes();
+      const gam = Math.asin(clamp(_f.y, -1, 1)), pinv = _u.y < 0;
+      let wa = 0;
+      if (stunned) wa = pinv ? 1.4 : (14 * DEG - gam) * 3;
+      else {
+        // released: the nose eases back to the horizon (through a loop that means carrying on over the top)
+        const relW = sstep(0.15, 0.6, relT);
+        if (relW > 0) wa += relW * FLY.levelK * (pinv ? Math.abs(Math.sin(gam)) : -gam);
+        if (!pinv && P.inTunnel < 0) {
+          // diving at the ground: a soft floor, and a firm pull-up when an impact is close
+          if (gam < 0) {
+            wa += -gam * 4 * sstep(9, 2.4, P.agl);
+            const tti = P.agl / (P.speed * Math.max(0.08, -_f.y));
+            wa += 1.6 * sstep(2.6, 0.9, tti) * (released ? 1 : 0.55);
+          }
+          // the ground cushion: rising ground ahead lifts the nose
+          const look = Math.max(18, P.speed * 0.9);
+          const gAhead = Math.max(0, groundFor(P.pos.x + _f.x * look, P.pos.z + _f.z * look, P.pos.y));
+          const need = Math.atan2(gAhead + 3.5 - P.pos.y, look);
+          if (need > gam && need < 30 * DEG) wa = Math.max(wa, (need - gam) * 3.2);
+          // the soft ceiling
+          if (P.pos.y > S.ceiling) wa += sstep(S.ceiling, S.hardCeiling - 10, P.pos.y) * (-8 * DEG - gam) * 2.2;
+        }
+      }
+      if (wa) rotLocal(1, 0, 0, -clamp(wa, -1.6, 1.6) * dt);
+      // ---- keep the frame honest: loops keep it upside down, everything else is read against the horizon ----
+      pathAxes();
+      const fy = Math.abs(_f.y);
+      if (_u.y < 0) {
+        if (Math.abs(P.bank) > 100 * DEG && fy < 0.7) flipPath(false);            // rolled back upright in a loop
+        else if ((relT > 0.45 || stunned) && fy < 0.6) flipPath(true);             // let go upside down: roll out
+      } else if (pc > 0.25 && Math.abs(P.bank) > 90 * DEG && fy > 0.75) flipPath(false);   // a pull from inverted (split-S)
+      realign();
+      // ---- loop / roll bookkeeping for the juice ----
+      trackManeuvers(dt, om);
+      // ---- throttle, boost and the energy trade ----
+      pathAxes();
+      P.boosting = !onRails && !!c.boost && P.boost > 0.02 && !stunned;
+      P.braking = !onRails && !!c.brake && !P.boosting;
       if (P.boosting) { P.boost = Math.max(0, P.boost - FLY.boostDrain * dt); P.boostIdle = 0; }
       else { P.boostIdle += dt; if (P.boostIdle > FLY.boostDelay) P.boost = Math.min(1, P.boost + FLY.boostRefill * dt); }
-      const vT = P.stun > 0 ? FLY.vBrake + 4 : P.boosting ? FLY.vBoost : P.braking ? FLY.vBrake : FLY.vCruise;
-      P.speed += (vT - P.speed) * (1 - Math.exp(-FLY.accel * dt)) - FLY.gravityTrade * Math.sin(P.pitch) * dt;
+      const vT = stunned ? FLY.vBrake + 4 : P.boosting ? FLY.vBoost : P.braking ? FLY.vBrake : FLY.vCruise;
+      P.speed += (vT - P.speed) * (1 - Math.exp(-FLY.accel * dt)) - FLY.gravityTrade * _f.y * dt;
       P.speed = clamp(P.speed, FLY.vMin, FLY.vMax);
-      const cp = Math.cos(P.pitch);
-      P.dir.set(Math.sin(P.yaw) * cp, Math.sin(P.pitch), Math.cos(P.yaw) * cp);
+      // lift turns the flight path toward the nose
+      P.dir.lerp(_f, 1 - Math.exp(-12 * dt)).normalize();
       P.prev.copy(P.pos);
       P.pos.addScaledVector(P.dir, P.speed * dt);
       if (P.pos.y > S.hardCeiling) P.pos.y = S.hardCeiling;
@@ -2790,19 +3141,71 @@
       P.stun = Math.max(0, P.stun - dt);
       P.wobble *= Math.exp(-2.2 * dt);
       P.softCd = Math.max(0, P.softCd - dt); P.skimCd = Math.max(0, P.skimCd - dt); P.bumpCd = Math.max(0, P.bumpCd - dt);
-      P.sprayCd = Math.max(0, P.sprayCd - dt);
+      P.sprayCd = Math.max(0, P.sprayCd - dt); P.wallCd = Math.max(0, P.wallCd - dt);
+      // the camera's roll offset after a path flip: tied to the plane's roll-out, or easing away
+      if (P.camOff) {
+        if (P.camTie) { P.camRatio = Math.min(P.camRatio, Math.abs(P.bank) / Math.max(0.05, Math.abs(P.camTie))); P.camOff = P.camOff0 * P.camRatio; if (P.camRatio < 0.01) P.camTie = 0; }
+        else P.camOff *= Math.exp(-2.4 * dt);
+        if (Math.abs(P.camOff) < 1e-3) P.camOff = 0;
+      }
       collide();
+      deriveAngles();
     }
 
-    /** A friendly breeze far out at sea: past FLY.breeze it blends the stick toward home (never inside FLY.edge). */
-    const _li = { x: 0, y: 0, boost: false, brake: false };
-    function leash(inp) {
+    /** Full loops and rolls are counted (and cheered) as they complete. */
+    function trackManeuvers(dt, om) {
+      if (phase !== 'fly') { P.loopAcc = 0; P.rollAcc = 0; return; }
+      // a loop: the path frame pitched through a full turn about its wing axis
+      P.loopAcc = om > 0.3 ? P.loopAcc + om * dt * Math.max(0, Math.cos(P.bank)) : Math.max(0, P.loopAcc - dt * 0.6);
+      if (P.loopAcc >= TAU * 0.96) { P.loopAcc = 0; P.loops++; maneuver('LOOP!'); }
+      // a roll: the bank turned all the way round one way (path flips and realignment are not rolls)
+      const db = wrapA(P.bank - P.lastBank);
+      P.lastBank = P.bank;
+      if (Math.abs(db) < 0.002) P.rollAcc *= Math.exp(-dt * 1.5);
+      else if (P.rollAcc && Math.sign(db) !== Math.sign(P.rollAcc)) P.rollAcc = db;
+      else P.rollAcc += db;
+      if (Math.abs(P.rollAcc) >= TAU * 0.97) { P.rollAcc = 0; P.rolls++; maneuver('BARREL ROLL!'); }
+    }
+    function maneuver(txt) {
+      if (turn) turn.tricks = (turn.tricks || 0) + 1;
+      ui.banner(txt, { kind: 'good', duration: 0.9 });
+      audio.sfx('star', { rate: 1.1, vol: 0.7 });
+      pilotFeel('joy', 1.2);
+    }
+
+    /** A friendly breeze far out at sea: past FLY.breeze it blends the bank toward home (never inside FLY.edge). */
+    const _li = { bank: 0, keep: 0, pitch: 0, relT: 0, boost: false, brake: false };
+    function leash(c) {
       const r = Math.hypot(P.pos.x, P.pos.z);
-      if (phase !== 'fly' || r < FLY.breeze) return inp;
+      if (phase !== 'fly' || r < FLY.breeze) return c;
       const k = sstep(FLY.breeze, FLY.breezeFull, r);
-      const want = clamp(-wrapA(Math.atan2(-P.pos.x, -P.pos.z) - P.yaw) * 2.4, -1, 1);
-      _li.x = lerp(inp.x, want, k); _li.y = inp.y; _li.boost = inp.boost; _li.brake = inp.brake;
+      const want = clamp(-wrapA(Math.atan2(-P.pos.x, -P.pos.z) - P.yaw) * 2.4, -1, 1) * 60 * DEG;
+      Object.assign(_li, c);
+      _li.bank = lerp(c.bank, want, k); _li.keep = k > 0.3 ? 0 : c.keep;
       return _li;
+    }
+    /** What the plane does on its own: a gentle banked circle (intro) or a climbing turn (after a turn ends). */
+    const freeCmd = { bank: 0, keep: 0, pitch: 0, relT: 0, boost: false, brake: false };
+    function cruiseCmd(bankDeg, climb) {
+      freeCmd.bank = bankDeg * DEG;
+      freeCmd.pitch = clamp((Math.sin(climb * DEG) - P.fwd.y) * 3, -0.5, 0.5);
+      freeCmd.relT = 0;
+      return freeCmd;
+    }
+    /** Lifts the flight path to at least `sinMin` (bounces off the ground and the sea). */
+    function minClimb(sinMin) {
+      pathAxes();
+      if (_f.y >= sinMin) return;
+      const h = Math.hypot(_f.x, _f.z) || 1, k = Math.sqrt(1 - sinMin * sinMin) / h;
+      setPathDir(_tmp.set(_f.x * k, sinMin, _f.z * k));
+    }
+    /** Reflects the flight path off a wall (the flat part of its normal). */
+    function reflectOff(n) {
+      const fl = Math.hypot(n.x, n.z);
+      if (fl <= 0.25) return;
+      pathAxes();
+      const nx = n.x / fl, nz = n.z / fl, fd = _f.x * nx + _f.z * nz;
+      if (fd < 0) setPathDir(_tmp.set(_f.x - 2 * fd * nx, _f.y, _f.z - 2 * fd * nz));
     }
 
     // ---- collisions -------------------------------------------------------------------------------------
@@ -2836,7 +3239,7 @@
 
     function collide() {
       const x = P.pos.x, z = P.pos.z, r = FLY.radius;
-      const g = groundAt(x, z);
+      const g = groundFor(x, z, P.pos.y);
       // the sea: a skim and a hop, never a crash
       if (g < 0.4 && P.pos.y < 2.9 && phase === 'fly') {
         if (P.skimCd <= 0) {
@@ -2847,10 +3250,10 @@
         }
         if (Math.random() < 0.6) W.burst(scene, _tmp.set(x - P.dir.x * 3, 0.3, z - P.dir.z * 3), { count: 3, color: 0xFFFFFF, speed: 4, size: 0.18, gravity: -12, life: 0.5 });
       }
-      if (g < 0.4 && P.pos.y < 1.6) { P.pos.y = 1.6; P.pitch = Math.max(P.pitch, 7 * DEG); P.speed *= 0.985; }
+      if (g < 0.4 && P.pos.y < 1.6) { P.pos.y = 1.6; minClimb(Math.sin(7 * DEG)); P.speed *= 0.985; }
       // ground (in the falls basin the spray cushions you instead)
       if (g >= 0.4 && P.pos.y - 1.2 < g) {
-        const hx = groundAt(x + 2, z) - groundAt(x - 2, z), hz = groundAt(x, z + 2) - groundAt(x, z - 2);
+        const y = P.pos.y, hx = groundFor(x + 2, z, y) - groundFor(x - 2, z, y), hz = groundFor(x, z + 2, y) - groundFor(x, z - 2, y);
         _n.set(-hx / 4, 1, -hz / 4).normalize();
         if (inFallsZone(x, P.pos.y, z, _fc)) sprayBounce(_n, g);
         else {
@@ -2896,11 +3299,10 @@
       const fl = Math.hypot(n.x, n.z);
       if (fl > 0.35) {
         P.pos.x = P.prev.x; P.pos.z = P.prev.z; P.pos.y = Math.max(P.prev.y, P.pos.y);
-        const nx = n.x / fl, nz = n.z / fl, fd = P.dir.x * nx + P.dir.z * nz;
-        if (fd < 0) P.yaw = Math.atan2(P.dir.x - 2 * fd * nx, P.dir.z - 2 * fd * nz);
+        reflectOff(n);
       }
       if (P.pos.y - 1.2 < groundAt(P.pos.x, P.pos.z)) P.pos.y = Math.max(P.pos.y, g + 1.25);
-      P.pitch = Math.max(P.pitch, 8 * DEG);
+      minClimb(Math.sin(8 * DEG));
       P.speed = Math.max(FLY.vMin, P.speed * 0.9);
       P.wobble = Math.max(P.wobble, 0.6);
       if (P.softCd > 0 || phase !== 'fly') return;
@@ -2923,19 +3325,15 @@
     function bump(n, kind) {
       if (P.bumpCd > 0) {
         // already recovering: just keep clear
-        if (n.y < 0.9) { const fd = P.dir.x * n.x + P.dir.z * n.z; if (fd < 0) P.yaw = Math.atan2(P.dir.x - 2 * fd * n.x, P.dir.z - 2 * fd * n.z); }
+        if (n.y < 0.9) reflectOff(n);
         return;
       }
       P.bumpCd = FLY.stunTime + 0.4;
       P.stun = FLY.stunTime;
       P.speed = Math.max(FLY.vMin, P.speed * 0.55);
-      // bounce the heading off the wall (flat part of the normal), nose up
-      const fl = Math.hypot(n.x, n.z);
-      if (fl > 0.25) {
-        const nx = n.x / fl, nz = n.z / fl, fd = P.dir.x * nx + P.dir.z * nz;
-        if (fd < 0) P.yaw = Math.atan2(P.dir.x - 2 * fd * nx, P.dir.z - 2 * fd * nz);
-      }
-      P.pitch = Math.max(P.pitch, 16 * DEG);
+      // bounce the heading off the wall (flat part of the normal), nose up; the stun then rolls it upright
+      reflectOff(n);
+      minClimb(Math.sin(16 * DEG));
       P.wobble = 1;
       if (phase !== 'fly') return;
       audio.sfx('plane_bump', { intensity: 0.8 });
@@ -2952,10 +3350,20 @@
     // Camera
     // =============================================================================================
 
-    const cam = { pos: V(), look: V(), up: V(0, 1, 0), fov: 60, roll: 0, mode: 'chase', snap: true };
-    const _cp = V(), _cl = V();
+    // The chase camera rides a smoothed copy of the plane's PATH frame (plus about a third of the bank): it
+    // follows a loop all the way round looking along the flight path, rolls a little into turns and rolls,
+    // and never flips (a path flip hands the camera a roll offset that unwinds with the plane).
+    const cam = { pos: V(), look: V(), up: V(0, 1, 0), fov: 60, snap: true, q: new THREE.Quaternion() };
+    const _cp = V(), _cl = V(), _cu = V(), _cf = V(), _cq = new THREE.Quaternion(), _cr4 = new THREE.Quaternion();
 
-    function chaseGoal(out, look) {
+    function updateCamFrame(k) {
+      _cr4.setFromAxisAngle(_ax.set(0, 0, 1), camRollFollow(P.bank) + P.camOff);
+      _cq.copy(P.qp).multiply(_cr4);
+      if (k == null) cam.q.copy(_cq);
+      else cam.q.slerp(_cq, 1 - Math.exp(-4.5 * k));
+    }
+
+    function chaseGoal(out, look, up) {
       const aspect = engine.size.aspect;
       const v01 = clamp((P.speed - FLY.vBrake) / (FLY.vBoost - FLY.vBrake), 0, 1);
       // portrait sees less sideways: a taller view and a camera a little further back keep the plane readable
@@ -2963,16 +3371,21 @@
       const wide = clamp((aspect - 1.2) / 0.8, 0, 1);   // desktop / landscape: a narrower lens, a little closer
       const vfov = portrait ? lerp(66, 76, v01) : lerp(lerp(54, 46, wide), lerp(64, 56, wide), v01);
       const dist = (portrait ? 14.5 : lerp(13, 12, wide)) + v01 * 3.5;
-      const height = (portrait ? 5.6 : lerp(4.2, 3.7, wide)) - Math.sin(P.pitch) * 3;
-      const fx = Math.sin(P.yaw), fz = Math.cos(P.yaw);
-      out.set(P.pos.x - fx * dist, P.pos.y + height, P.pos.z - fz * dist);
-      look.set(P.pos.x + fx * 16 + P.dir.x * 6, P.pos.y + (portrait ? 2.6 : 1.8) + P.dir.y * 10, P.pos.z + fz * 16 + P.dir.z * 6);
+      const height = portrait ? 5.6 : lerp(4.2, 3.7, wide);
+      _cf.set(0, 0, 1).applyQuaternion(cam.q);
+      up.set(0, 1, 0).applyQuaternion(cam.q);
+      out.copy(P.pos).addScaledVector(_cf, -dist).addScaledVector(up, height);
+      look.copy(P.pos).addScaledVector(_cf, 16).addScaledVector(P.dir, 6).addScaledVector(up, portrait ? 2.6 : 1.8);
       return vfov;
     }
 
     function updateCamera(dt, rdt) {
       let vfov = 60;
       const k = rdt != null ? rdt : dt;
+      const snap = cam.snap;
+      cam.snap = false;
+      updateCamFrame(snap ? null : k);
+      let up = Y_UP;
       if (cinematic) {
         cinematic.t += k;
         const c = cinematic;
@@ -2987,34 +3400,31 @@
           vfov = engine.size.aspect < 0.9 ? 58 : 44;
         } else if (c.kind === 'swoop') {
           const t = sstep(0, c.dur, c.t);
-          vfov = chaseGoal(_cp, _cl);
+          vfov = chaseGoal(_cp, _cl, _cu);
           const a = P.yaw + Math.PI * 0.5 * (1 - t);
           _tmp.set(P.pos.x - Math.sin(a) * lerp(30, 0, t), P.pos.y + lerp(8, 0, t), P.pos.z - Math.cos(a) * lerp(30, 0, t));
           _cp.lerp(_tmp, 1 - t);
           _cl.lerp(P.pos, 1 - t);
+          up = _cu.lerp(Y_UP, 1 - t).normalize();
           if (c.t >= c.dur) cinematic = null;
         } else if (c.kind === 'pull') {
-          vfov = chaseGoal(_cp, _cl);
+          vfov = chaseGoal(_cp, _cl, _cu);
           _cp.y += c.t * 6; _cp.x -= Math.sin(P.yaw) * c.t * 8; _cp.z -= Math.cos(P.yaw) * c.t * 8;
           _cl.copy(P.pos);
         }
-      } else vfov = chaseGoal(_cp, _cl);
-      const snap = cam.snap;
-      cam.snap = false;
-      const lag = cinematic && cinematic.kind === 'flyby' ? 30 : 3.6;
-      if (snap) { cam.pos.copy(_cp); cam.look.copy(_cl); cam.fov = vfov; }
+      } else { vfov = chaseGoal(_cp, _cl, _cu); up = _cu; }
+      const lag = cinematic ? (cinematic.kind === 'flyby' ? 30 : 3.6) : 11;
+      if (snap) { cam.pos.copy(_cp); cam.look.copy(_cl); cam.fov = vfov; cam.up.copy(up); }
       else {
         cam.pos.lerp(_cp, 1 - Math.exp(-lag * k));
-        cam.look.lerp(_cl, 1 - Math.exp(-7 * k));
+        cam.look.lerp(_cl, 1 - Math.exp(-12 * k));
+        cam.up.lerp(up, 1 - Math.exp(-8 * k)).normalize();
         cam.fov += (vfov - cam.fov) * (1 - Math.exp(-3 * k));
       }
       keepCameraClear();
       camera.position.copy(cam.pos);
-      const rollT = cinematic ? 0 : -P.roll * 0.24;
-      cam.roll += (rollT - cam.roll) * (1 - Math.exp(-4 * k));
-      camera.up.set(0, 1, 0);
+      camera.up.copy(cam.up);
       camera.lookAt(cam.look);
-      camera.rotateZ(cam.roll);
       if (Math.abs(camera.fov - cam.fov) > 0.01 || camera.aspect !== engine.size.aspect) {
         camera.fov = cam.fov;
         camera.aspect = engine.size.aspect;
@@ -3081,7 +3491,8 @@
     function updatePlaneVisual(dt, t) {
       plane.position.copy(P.pos);
       const wob = Math.sin(t * 17) * P.wobble * 0.5;
-      plane.rotation.set(-P.pitch + Math.sin(t * 13) * P.wobble * 0.15, P.yaw, P.roll + wob);
+      plane.quaternion.copy(P.qp).multiply(_q.setFromAxisAngle(_ax.set(0, 0, 1), P.bank + wob))
+        .multiply(_q.setFromAxisAngle(_ax.set(1, 0, 0), Math.sin(t * 13) * P.wobble * 0.15));
       propSpin += dt * (34 + P.speed * 0.9);
       prop.rotation.z = propSpin;
       blur.material.opacity = 0.55 + 0.15 * Math.sin(t * 40);
@@ -3099,7 +3510,7 @@
       if (lookT > 0) { lookT -= dt; if (lookT <= 0) pal.lookAt(null); }
       pal.update(dt);
       // trails at speed or in a hard bank
-      const want = P.speed > 38 || Math.abs(P.roll) > 0.75;
+      const want = P.speed > 38 || Math.abs(Math.sin(P.roll)) > 0.68 || Math.abs(P.roll) > 2 || Math.abs(P.fwd.y) > 0.45;
       if (want !== trailOn) { trailOn = want; if (want) for (const tr of trails) tr.visible = true; }
       const op = trailOn ? clamp((P.speed - 30) / 20, 0.2, 0.7) : 0;
       for (const tr of trails) {
@@ -3683,10 +4094,14 @@
     }
 
     function placeAt(st, back) {
-      P.yaw = st.yaw; P.pitch = 0; P.roll = 0; P.speed = FLY.vCruise; P.boost = 1; P.boostIdle = 0;
+      P.speed = FLY.vCruise; P.boost = 1; P.boostIdle = 0;
       P.stun = 0; P.wobble = 0; P.bumpCd = 0;
+      P.qp.identity(); P.bank = 0; P.lastBank = 0;
+      setPathDir(_tmp.set(Math.sin(st.yaw), 0, Math.cos(st.yaw)));
+      P.bank = 0; P.lastBank = 0; P.camOff = 0; P.camTie = 0; P.loopAcc = 0; P.rollAcc = 0;
       P.pos.set(st.x - Math.sin(st.yaw) * back, st.y, st.z - Math.cos(st.yaw) * back);
-      P.dir.set(Math.sin(P.yaw), 0, Math.cos(P.yaw));
+      deriveAngles();
+      IN.x = IN.vx = IN.y = IN.vy = 0;
       for (const tr of trails) tr.visible = false;
       trailOn = false;
     }
@@ -3760,6 +4175,7 @@
       if (!live()) return;
       phase = 'fly';
       cinematic = null;
+      if (tilt.on && tilt.have) recenterTilt(true);
       audio.sfx('boost', { vol: 0.6 });
       if (mode === 'tour' && countOf(pilots[p].markers) === MARKER_COUNT) ui.toast('Every "!" found! Revisit them for points.', { icon: 'star', duration: 3 });
       await new Promise(resolve => { turnDone = resolve; });
@@ -4033,43 +4449,47 @@
         wantYaw = Math.atan2(dx, dz);
         wantY = tg.y;
       } else if (Math.hypot(P.pos.x, P.pos.z) > 700) wantYaw = Math.atan2(-P.pos.x, -P.pos.z);
-      // terrain look-ahead: never plan below the hills ahead
+      const fx = Math.sin(P.yaw), fz = Math.cos(P.yaw), y = P.pos.y;
+      const tube = P.inTunnel >= 0;
+      // terrain look-ahead: never plan below the hills ahead (inside a tunnel the tube keeps us clear)
       let maxG = 0;
-      for (const k of [0.6, 1.2, 2]) {
-        const ax = P.pos.x + Math.sin(P.yaw) * P.speed * k, az = P.pos.z + Math.cos(P.yaw) * P.speed * k;
-        maxG = Math.max(maxG, groundAt(ax, az));
-      }
+      if (!tube) for (const k of [0.6, 1.2, 2]) maxG = Math.max(maxG, groundFor(P.pos.x + fx * P.speed * k, P.pos.z + fz * P.speed * k, y));
       const close = tg && dist < 90;
       const floorY = maxG + (close ? 6 : 16);
-      if (wantY < floorY && !(close && tg.y < floorY)) wantY = floorY;
+      if (!tube && wantY < floorY && !(close && tg.y < floorY)) wantY = floorY;
       const yawErr = wrapA(wantYaw - P.yaw);
-      autoIn.x = clamp(-yawErr * 2.4 + Math.sin(auto.wob * 0.7) * 0.05, -1, 1);
-      const wantPitch = clamp(Math.atan2(wantY - P.pos.y, Math.max(dist, 10)), -FLY.maxDive, FLY.maxClimb);
-      autoIn.y = clamp((wantPitch - P.pitch) * 3.2 + wantPitch / FLY.maxClimb * 0.4, -1, 1);
-      if (P.agl < 14 && maxG > P.pos.y - 10) autoIn.y = Math.max(autoIn.y, 0.7);
-      autoIn.boost = Math.abs(yawErr) < 0.35 && dist > 80 && P.boost > 0.15 && P.agl > 8;
-      autoIn.brake = Math.abs(yawErr) > 0.7 && dist < 160;
+      let bank = clamp(-yawErr * 1.8 + Math.sin(auto.wob * 0.7) * 0.03, -1.2, 1.2);
+      const v01 = clamp((P.speed - FLY.vBrake) / (FLY.vBoost - FLY.vBrake), 0, 1);
+      const gd = clamp(Math.atan2(wantY - y, Math.max(dist, 10)), -35 * DEG, 32 * DEG);
+      let pitch = clamp((gd - P.pitch) * 2.6 / Math.max(0.4, Math.cos(P.bank)) / (FLY.pitchRate * lerp(1.12, 0.86, v01)), -1, 1);
+      if (!tube && P.agl < 14 && maxG > y - 10) pitch = Math.max(pitch, 0.7);
+      let boost = Math.abs(yawErr) < 0.35 && dist > 80 && P.boost > 0.15 && P.agl > 8, brake = Math.abs(yawErr) > 0.7 && dist < 160;
       // a bridge deck, a roof or a tower near the path ahead: stay under it, clear it, or go round it
-      const fx = Math.sin(P.yaw), fz = Math.cos(P.yaw), R = FLY.radius + 0.4;
-      const hitAhead = (d, up) => blockedAt(_sp.set(P.pos.x + fx * d, P.pos.y + up, P.pos.z + fz * d), R);
-      if (hitAhead(8, 6) || hitAhead(18, 6)) autoIn.y = Math.min(autoIn.y, -0.35);
-      else if (hitAhead(14, -5)) autoIn.y = Math.max(autoIn.y, 0.6);
+      const R = FLY.radius + 0.4;
+      const hitAhead = (d, up) => blockedAt(_sp.set(P.pos.x + fx * d, y + up, P.pos.z + fz * d), R);
+      if (hitAhead(8, 6) || hitAhead(18, 6)) pitch = Math.min(pitch, -0.35);
+      else if (hitAhead(14, -5)) pitch = Math.max(pitch, 0.6);
       if (hitAhead(12, 0) || hitAhead(22, 0)) {
-        if (!hitAhead(16, 8)) autoIn.y = 1;
+        if (!hitAhead(16, 8)) pitch = 1;
         else {
-          const side = k => blockedAt(_sp.set(P.pos.x + Math.sin(P.yaw + k) * 20, P.pos.y, P.pos.z + Math.cos(P.yaw + k) * 20), R);
-          autoIn.x = side(0.7) ? 1 : -1;
-          autoIn.brake = true;
+          const side = k => blockedAt(_sp.set(P.pos.x + Math.sin(P.yaw + k) * 20, y, P.pos.z + Math.cos(P.yaw + k) * 20), R);
+          bank = side(0.7) ? 1.2 : -1.2;
+          brake = true;
         }
       }
       // a slope ahead steeper than the plane can climb: full climb and turn toward the lower side
-      const ahead = groundAt(P.pos.x + Math.sin(P.yaw) * P.speed * 0.8, P.pos.z + Math.cos(P.yaw) * P.speed * 0.8);
-      if (ahead > P.pos.y - 3 && !(tg && dist < 40)) {
-        const side = k => groundAt(P.pos.x + Math.sin(P.yaw + k) * P.speed, P.pos.z + Math.cos(P.yaw + k) * P.speed);
-        autoIn.y = 1;
-        autoIn.x = side(0.8) < side(-0.8) ? -1 : 1;
-        autoIn.boost = false;
+      const ahead = tube ? -99 : groundFor(P.pos.x + fx * P.speed * 0.8, P.pos.z + fz * P.speed * 0.8, y);
+      if (ahead > y - 3 && !(tg && dist < 40)) {
+        const side = k => groundFor(P.pos.x + Math.sin(P.yaw + k) * P.speed, P.pos.z + Math.cos(P.yaw + k) * P.speed, y);
+        pitch = 1;
+        bank = side(0.8) < side(-0.8) ? -1.2 : 1.2;
+        boost = false;
       }
+      autoCmd.bank = bank;
+      autoCmd.pitch += (pitch - autoCmd.pitch) * (1 - Math.exp(-8 * dt));
+      autoCmd.keep = 0;
+      autoCmd.relT = P.up.y < 0 ? 1 : 0;   // upside down through a loop: let the safety net roll it upright
+      autoCmd.boost = boost; autoCmd.brake = brake;
     }
 
     // =============================================================================================
@@ -4112,14 +4532,13 @@
       if (phase === 'intro') {
         // a gentle level circle while the how-to and the title card show
         const steps = Math.max(1, Math.ceil(dt / 0.05));
-        for (let k = 0; k < steps; k++) stepFlight(dt / steps, { x: 0.35, y: 0, boost: false, brake: false }, false);
+        for (let k = 0; k < steps; k++) stepFlight(dt / steps, cruiseCmd(22, 0), false);
       } else if (phase === 'countdown') {
         const steps = Math.max(1, Math.ceil(dt / 0.05));
         for (let k = 0; k < steps; k++) stepFlight(dt / steps, inp, true);
       } else if (phase === 'fly' || phase === 'end' || phase === 'done') {
         const steps = Math.max(1, Math.ceil(P.speed * dt / 1.4));
-        const free = phase === 'fly' ? leash(inp) : { x: 0.3, y: P.pos.y < 80 ? 0.45 : 0, boost: false, brake: false };
-        for (let k = 0; k < steps; k++) stepFlight(dt / steps, free, false);
+        for (let k = 0; k < steps; k++) stepFlight(dt / steps, phase === 'fly' ? leash(inp) : cruiseCmd(20, P.pos.y < 80 ? 10 : 0), false);
       }
       if (phase === 'fly' && turn) {
         const paused = mode === 'tour' && !!card;
@@ -4204,6 +4623,8 @@
         window.removeEventListener('pointermove', onPMove);
         window.removeEventListener('pointerup', onPUp);
         window.removeEventListener('pointercancel', onPUp);
+        disableTilt();
+        offSetting();
         if (loops) for (const k in loops) loops[k].stop(0.3);
         loops = null;
         if (hintHandle) { hintHandle.hide(); hintHandle = null; }
@@ -4218,7 +4639,11 @@
           score: turn ? (mode === 'rings' ? turn.next : turn.score) : null,
           position: { x: +P.pos.x.toFixed(1), y: +P.pos.y.toFixed(1), z: +P.pos.z.toFixed(1) },
           speed: +P.speed.toFixed(1), boost: +P.boost.toFixed(2), yawDeg: Math.round(P.yaw / DEG), pitchDeg: Math.round(P.pitch / DEG), rollDeg: Math.round(P.roll / DEG),
-          agl: +P.agl.toFixed(1), stun: +P.stun.toFixed(2),
+          agl: +P.agl.toFixed(1), stun: +P.stun.toFixed(2), bankDeg: Math.round(P.bank / DEG), pathInverted: P.up.y < 0,
+          upY: +(P.up.y * Math.cos(P.bank)).toFixed(2), loops: P.loops, rolls: P.rolls, tunnel: P.inTunnel,
+          input: { x: +IN.x.toFixed(3), y: +IN.y.toFixed(3), keep: cmd.keep, relT: +Math.min(9, IN.relT).toFixed(2) },
+          tilt: { on: tilt.on, have: tilt.have, pending: tilt.pending, events: tilt.events, roll: +tilt.roll.toFixed(1), pitch: +tilt.pitch.toFixed(1), zr: +tilt.zr.toFixed(1), zp: +tilt.zp.toFixed(1) },
+          stickR: +stick.R.toFixed(1), control: save.settings.flightControl || 'touch', sensitivity: save.settings.flightSensitivity || 'normal', invert: save.settings.flightInvert === true,
           target: mode === 'rings' ? (turn && turn.next < RINGS.length ? { ring: turn.next } : null) : auto.target >= 0 ? { [mode === 'balloons' ? 'balloon' : 'marker']: auto.target } : null,
           balloonsLeft: balState.filter(s => !s.popped).length, ringsHit: turn ? turn.hit : 0, ringsMissed: turn ? turn.missed : 0,
           markers: countOf(pilots[cur].markers), foundThisFlight: foundThisFlight[cur].length, revisited: revisited[cur].length, card: card ? MARKERS[card.i].id : null,
@@ -4241,7 +4666,9 @@
         teleport(x, y, z, yawDeg) {
           debugTouched = true;
           P.pos.set(x, y, z);
-          if (yawDeg != null) P.yaw = yawDeg * DEG;
+          if (yawDeg != null) { setPathDir(_tmp.set(Math.sin(yawDeg * DEG), 0, Math.cos(yawDeg * DEG))); P.bank = 0; P.lastBank = 0; }
+          cam.snap = true;
+          deriveAngles();
           P.stun = 0; P.bumpCd = 0;
           for (const tr of trails) tr.visible = false;
           cam.snap = true;

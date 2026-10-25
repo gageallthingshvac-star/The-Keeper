@@ -40,6 +40,61 @@
   function sportList() { return SS.sportOrder.map(id => SS.sports[id]).filter(Boolean); }
   function humanPals() { return save.profiles().filter(p => !p.isGuest); }
   function sportIcon(sport) { return (sport && sport.icon) || GENERIC_ICON; }
+
+  /** A sport's own control settings (sport.settings: [{ key, label, type: 'seg'|'toggle', options, def, desc, when, onPick }])
+   *  as rows of segmented buttons and switches. Values live in SS.save.settings; the sport listens for changes.
+   *  `pick` (Settings screen only) also runs the item's onPick inside the tap (e.g. asking for motion access). */
+  function sportSettingRows(sport, parent, { pick = false } = {}) {
+    const st = save.settings;
+    const items = (sport.settings || []).filter(it => typeof it.when !== 'function' || it.when());
+    for (const it of items) {
+      const cur = () => (st[it.key] === undefined ? it.def : st[it.key]);
+      if (it.type === 'toggle') {
+        const row = ui.el('div', 'set-row toggle');
+        row.innerHTML = '<span class="set-label">' + esc(it.label) + (it.desc ? '<small>' + esc(it.desc) + '</small>' : '') + '</span>';
+        const b = ui.el('button', 'switch' + (cur() ? ' on' : ''), '<i></i>');
+        b.type = 'button';
+        b.setAttribute('role', 'switch');
+        b.setAttribute('aria-checked', cur() ? 'true' : 'false');
+        b.setAttribute('aria-label', it.label);
+        b.addEventListener('click', () => {
+          const v = !cur();
+          if (pick && typeof it.onPick === 'function') it.onPick(v);
+          save.setSetting(it.key, v);
+          b.classList.toggle('on', !!cur());
+          b.setAttribute('aria-checked', cur() ? 'true' : 'false');
+          sfx('ui_toggle', { intensity: cur() ? 1 : 0 });
+        });
+        row.appendChild(b);
+        row.addEventListener('click', e => { if (e.target !== b && !b.contains(e.target)) b.click(); });
+        parent.appendChild(row);
+      } else {
+        const row = ui.el('div', 'set-row seg-row');
+        row.innerHTML = '<span class="set-label">' + esc(it.label) + (it.desc ? '<small>' + esc(it.desc) + '</small>' : '') + '</span>';
+        const seg = ui.el('div', 'segmented');
+        const paint = () => { for (const c of seg.children) c.classList.toggle('on', c.dataset.v === String(cur())); };
+        for (const [v, name] of it.options) {
+          const o = ui.el('button', 'seg', esc(name));
+          o.type = 'button';
+          o.dataset.v = String(v);
+          o.addEventListener('click', () => {
+            if (pick && typeof it.onPick === 'function') it.onPick(v);
+            save.setSetting(it.key, v);
+            sfx('ui_tick');
+            paint();
+          });
+          seg.appendChild(o);
+        }
+        // the sport may change a value itself (e.g. tilt falling back to touch)
+        // (the listener drops itself on the first change after the row is gone)
+        const off = save.events.on('setting', k => { if (!row.isConnected && parent.isConnected === false) { off(); return; } if (k === it.key) paint(); });
+        paint();
+        row.appendChild(seg);
+        parent.appendChild(row);
+      }
+    }
+    return items.length;
+  }
   function modeOf(sport, id) { return (sport.modes || []).find(m => m.id === id) || (sport.modes || [])[0] || { id: 'play', name: 'Play' }; }
 
   function setAccent(accent, tint) {
@@ -1549,6 +1604,14 @@
     toggle(play, 'Gesture hints', 'Show the hand that demonstrates moves', 'hints');
     toggle(play, 'Left-handed', 'Mirror swings and controls', 'leftHanded');
 
+    for (const id of SS.sportOrder) {
+      const sp = SS.sports[id];
+      if (!sp || !sp.settings || !sp.settings.length) continue;
+      const g = ui.el('section', 'set-group set-sport');
+      g.innerHTML = '<h3><span class="set-sport-icon">' + sportIcon(sp) + '</span>' + esc(sp.name) + '</h3>';
+      if (sportSettingRows(sp, g, { pick: true })) body.appendChild(g);
+    }
+
     const gfx = group('Graphics', 'sparkle');
     const seg = ui.el('div', 'segmented');
     const note = ui.el('p', 'set-note');
@@ -1853,6 +1916,11 @@
     btns.appendChild(ui.button('Restart', () => restartGame(), { kind: 'secondary', icon: 'retry' }));
     btns.appendChild(ui.button('Quit', () => quitGame(true), { kind: 'secondary', icon: 'home' }));
     panel.appendChild(btns);
+    if (g.sport.settings && g.sport.settings.length) {
+      const box = ui.el('section', 'pause-set');
+      box.innerHTML = '<h3>' + ui.icon('gear') + 'Controls</h3>';
+      if (sportSettingRows(g.sport, box)) panel.appendChild(box);
+    }
     pauseEl.appendChild(panel);
     ui.overlay.appendChild(pauseEl);
     ui.fx.classList.add('is-muted');
