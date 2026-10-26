@@ -1050,7 +1050,8 @@
 .pause-set .set-label { font-size: 14px; }
 .pause-set .set-label small { font-size: 12px; }
 .set-row.seg-row { flex-wrap: wrap; row-gap: 2px; }
-.set-row.seg-row .segmented { flex: 1 1 200px; margin: 0; }
+.set-row.seg-row .set-label { flex: 0 1 auto; min-width: min(100%, 92px); }
+.set-row.seg-row .segmented { flex: 1 1 180px; margin: 0; }
 .set-row.seg-row .seg { min-height: 40px; font-size: 15px; }
 .set-sport h3 { display: flex; align-items: center; gap: 8px; }
 .set-sport-icon { width: 26px; height: 26px; flex: none; }

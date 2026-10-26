@@ -4,15 +4,23 @@
  *    a waterfall and river gorge, venue pads) baked into a single vertex-colored grid mesh, a cheap
  *    animated sea, instanced trees/houses/boats/birds, one merged mesh for every static landmark and one
  *    atlas-textured decal mesh for the courts, fields and signs. The four other sports' venues sit on it.
- *  · Control: touch-and-drag anywhere is a floating virtual stick (sideways banks and turns, up climbs,
- *    down dives; release auto-levels), BOOST / BRAKE are held buttons, keyboard and mouse work the same.
- *  · Flight model: arcade and forgiving. Coordinated turns from bank, a gentle energy trade on climbs and
- *    dives, no stalls, a soft ceiling, bounce-back bumps instead of crashes and spray skims on the water.
+ *  · Control (Wii-style, full 360°): the roll input sets a target bank (all the way over keeps rolling), the
+ *    pitch input a pitch rate (hold up to loop). Touch-and-drag anywhere is a floating stick; on phones TILT flies
+ *    by tilting the phone held sideways (calibrated, filtered, falls back to touch); keys work the same. Input is
+ *    shaped by a dead zone + expo curve and critically damped smoothing; Sensitivity and Invert are settings.
+ *  · Flight model: a quaternion attitude (path frame · bank) with loops, rolls, knife-edge and inverted flight,
+ *    an energy trade, and a safety net that only acts when the stick is let go (rolls upright, pulls up).
+ *  · Seaplane: every flight (each turn and after a crash) starts afloat in the bay; hold BOOST (or steer) and it
+ *    runs up and takes off. A gentle glide onto the sea is a splashdown; head-on impacts are real crashes: the
+ *    plane breaks up, the Pal parachutes down, a fresh plane waits on the water nearby.
+ *  · Tunnels: the Shoulder Tunnel through the mountain, the sea cave under the lighthouse, the gorge arch and the
+ *    sea arch, with soft walls (a scrape, a crash only head-on), portal lights and their own camera framing.
  *  · Modes: balloons (Balloon Pop, 2:00 a turn), rings (Ring Run time trial), tour (Island Tour, 5:00,
  *    built around the 40 "!" info markers). 1–4 players fly hot-seat turns.
  *  · "!" markers persist per profile (save.data.stats.flight[profileId].markers) and can be collected in
  *    every mode; Island Tour shows an info card for each one.
- *  · Debug: instance.debug = { autoplay, teleport, popAll, collectAll, resetMarkers, skip, … } and debugState().
+ *  · Debug: instance.debug = { autoplay, teleport, crash, toWater, tunnels, popAll, collectAll, skip, … } and
+ *    debugState().
  */
 (function () {
   'use strict';
@@ -43,6 +51,7 @@
     '<circle cx="19" cy="49.6" r="2.6" fill="#24324A"/><circle cx="36" cy="49.6" r="2.6" fill="#24324A"/>' +
     '</svg>';
 
+  let ctlOwner = null;   // the pilot whose control settings the pause rows edit (hot-seat games)
   const DEF = {
     id: 'flight',
     name: 'Flight',
@@ -60,24 +69,25 @@
     ],
     howTo: {
       steps: [
+        { gesture: 'hold', text: 'Every flight starts on the water: hold BOOST to take off!' },
         { gesture: 'drag-h', text: 'Touch and drag anywhere: sideways to bank and turn. All the way over to roll!' },
         { gesture: 'drag-down-up', text: 'Hold up to climb, keep holding to loop! Down dives. Let go to level out' },
-        { gesture: 'hold', text: 'Hold BOOST to zoom, BRAKE for tight turns' },
         { gesture: 'tap', text: 'On a phone? Tap TILT, hold it sideways and fly by tilting it' },
       ],
       tips: [
-        'Fly through the mountain tunnel, the sea cave under the lighthouse and the arch in the gorge!',
+        'Fly through the Shoulder Tunnel, the sea cave under the lighthouse and the arch over the gorge!',
         'Upside down? Just let go: the plane rolls itself upright.',
-        'Sensitivity and Invert up/down are in the pause menu and in Settings.',
-        'Bumps never end your flight: you bounce back and keep going.',
+        'Crash, and your Pal parachutes down while a fresh plane waits on the water. Tap to hurry them along.',
+        'Glide down gently over the sea for a splashdown, then pull up or BOOST to take off again.',
         'Pop balloons quickly one after another for a combo. Gold ones are +5 points and +5 seconds!',
-        'BOOST runs out. It refills on its own, and faster with every balloon and ring.',
+        'Sensitivity and Invert up/down are in the pause menu and in Settings (each player keeps their own).',
+        'On a keyboard: arrows or WASD fly, Space boosts, Shift brakes, and Q / E do barrel rolls.',
         'Every "!" you find is saved. Can you find all 40?',
       ],
     },
     medals: [
       { id: 'bronze', name: 'Bronze', desc: 'Score 25 points in Balloon Pop' },
-      { id: 'silver', name: 'Silver', desc: 'Finish Ring Run in under 2:40' },
+      { id: 'silver', name: 'Silver', desc: 'Finish Ring Run in under 2:50' },
       { id: 'gold', name: 'Gold', desc: 'Score 60 points in Balloon Pop' },
       { id: 'platinum', name: 'Platinum', desc: 'Find all 40 "!" markers' },
     ],
@@ -86,8 +96,9 @@
       { key: 'flightControl', label: 'Steering', type: 'seg', def: 'touch', options: [['touch', 'Touch'], ['tilt', 'Tilt']],
         desc: 'Tilt: hold your phone sideways and fly by tilting it', when: () => tiltCapable(),
         onPick: v => { if (v === 'tilt') askTiltPermission(); } },
-      { key: 'flightSensitivity', label: 'Sensitivity', type: 'seg', def: 'normal', options: [['low', 'Low'], ['normal', 'Normal'], ['high', 'High']] },
-      { key: 'flightInvert', label: 'Invert up/down', type: 'toggle', def: false, desc: 'Pull down to climb, like a pilot' },
+      // (each pilot keeps their own: in a hot-seat game the pause rows show whose turn it is)
+      { key: 'flightSensitivity', get label() { return 'Sensitivity' + (ctlOwner ? ' · ' + ctlOwner : ''); }, type: 'seg', def: 'normal', options: [['low', 'Low'], ['normal', 'Normal'], ['high', 'High']] },
+      { key: 'flightInvert', get label() { return 'Invert up/down' + (ctlOwner ? ' · ' + ctlOwner : ''); }, type: 'toggle', def: false, desc: 'Pull down to climb, like a pilot' },
     ],
     create,
   };
@@ -105,9 +116,11 @@
     gravityTrade: 6.2,          // m/s² of speed traded per unit sin(climb): loops slow at the top, dives speed up
     // attitude: the roll input sets a TARGET BANK (position control), the pitch input sets a PITCH RATE
     bankMax: 100 * DEG,         // full sideways input: just past knife-edge
-    keepRoll: 0.94,             // raw roll input past this keeps rolling (full rolls)
+    keepRoll: 1.08,             // raw roll input past this keeps rolling (full rolls): beyond full bank, a deliberate push
+    keepHold: 0.25,             // s in the keep-rolling zone before the roll starts (a flick through it stays a turn)
+    rawMax: 1.3,                // raw input clamp (1 = full bank; 1.08..1.3 is the keep-rolling zone)
     rollRate: 3.4,              // rad/s, the fastest the plane rolls (a full roll in ~1.9 s)
-    rollGain: 5.2,              // 1/s, how briskly the bank follows the input
+    rollGain: 7.5,              // 1/s, how briskly the bank follows the input
     levelGain: 2.6,             // 1/s, the gentle roll back to level on release
     pitchRate: 1.2,             // rad/s at full up/down (cruise): a loop takes ~5 s
     turnK: 1.1,                 // rad/s of coordinated heading change per unit sin(bank) (cruise)
@@ -116,6 +129,10 @@
     dead: 0.06, expo: 0.55,     // dead zone, then an expo curve: fine near the centre, fast at the edge
     boostDrain: 0.2, boostRefill: 0.085, boostDelay: 0.7,
     stunTime: 1.5,
+    // the seaplane on the water: afloat its centre rides floatY above the sea; a run-up to vTakeoff lifts it off
+    floatY: 1.6, vTakeoff: 22, waterAccel: 7.5, waterBoostAccel: 11, autoGo: 1.3, climbTime: 2.8, climbDeg: 13,
+    // crashes: an impact this fast into a surface (m/s along its normal) breaks the plane; gentler is a scrape
+    crashV: 9, chuteTime: 3.4,
     radius: 2.4,                // collision radius of the plane (m)
     // the friendly breeze: past `edge` the island is pointed out, past `breeze` the wind turns the plane home
     edge: 1050, breeze: 1150, breezeFull: 1400, leash: 1450,
@@ -123,16 +140,16 @@
 
   const MODE_RULES = {
     balloons: { time: 120 },
-    rings: { time: null, missPenalty: 3, ringTimeout: 30, silver: 160 },
+    rings: { time: null, missPenalty: 3, ringTimeout: 30, silver: 170 },   // 48 rings, both tunnels: tuned on flown runs
     tour: { time: 300, hintCooldown: 16, hintShow: 12, ptsNew: 3, ptsRevisit: 1 },
   };
 
   // Sensitivity (settings.flightSensitivity): the touch stick's radius, the tilt angles for full deflection,
   // the pitch-rate and roll-rate scale.
   const SENS = {
-    low: { stick: 1.3, tiltRoll: 42, tiltPitch: 34, rate: 0.78, roll: 0.82 },
-    normal: { stick: 1, tiltRoll: 32, tiltPitch: 26, rate: 1, roll: 1 },
-    high: { stick: 0.76, tiltRoll: 24, tiltPitch: 19, rate: 1.22, roll: 1.18 },
+    low: { stick: 1.3, tiltRoll: 50, tiltPitch: 34, rate: 0.78, roll: 0.82 },
+    normal: { stick: 1, tiltRoll: 40, tiltPitch: 26, rate: 1, roll: 1 },
+    high: { stick: 0.76, tiltRoll: 30, tiltPitch: 19, rate: 1.22, roll: 1.18 },
   };
   const sensFor = settings => SENS[settings && settings.flightSensitivity] || SENS.normal;
   /** Dead zone, then an expo curve (fine control near the centre, quick at the edge); keeps the sign. */
@@ -259,6 +276,90 @@
     return out;
   }
 
+  // ---- tubes: centrelines with frames (tunnels, the sea cave, arches) ---------------------------------
+  /** A circular arc through three (x, z) points, its height running y0 → y1, sampled every ~step m and trimmed
+   *  to the arc-length window [cut0, len − cut1]: the centreline of a tunnel. */
+  function arcLine(a, m, b, y0, y1, step, cut0 = 0, cut1 = 0) {
+    const [ax, az] = a, [bx, bz] = m, [cx, cz] = b;
+    const dd = 2 * (ax * (bz - cz) + bx * (cz - az) + cx * (az - bz));
+    const ux = ((ax * ax + az * az) * (bz - cz) + (bx * bx + bz * bz) * (cz - az) + (cx * cx + cz * cz) * (az - bz)) / dd;
+    const uz = ((ax * ax + az * az) * (cx - bx) + (bx * bx + bz * bz) * (ax - cx) + (cx * cx + cz * cz) * (bx - ax)) / dd;
+    const r = Math.hypot(ax - ux, az - uz);
+    const t0 = Math.atan2(az - uz, ax - ux), dm = wrapA(Math.atan2(bz - uz, bx - ux) - t0);
+    let d1 = wrapA(Math.atan2(cz - uz, cx - ux) - t0);
+    if (Math.sign(dm) !== Math.sign(d1) || Math.abs(dm) > Math.abs(d1)) d1 += d1 > 0 ? -TAU : TAU;
+    const len = Math.abs(d1) * r, from = cut0 / len, to = 1 - cut1 / len, n = Math.max(2, Math.ceil(len * (to - from) / step));
+    const out = [];
+    for (let i = 0; i <= n; i++) {
+      const u = lerp(from, to, i / n), t = t0 + d1 * u;
+      out.push([ux + Math.cos(t) * r, lerp(y0, y1, u), uz + Math.sin(t) * r]);
+    }
+    return out;
+  }
+  /** Centreline points [[x, y, z], …] → a tube: points with arc length s and a frame (t along, b sideways and
+   *  level, n up), plus a bounding box grown by `pad`. */
+  function makeTube(line, R, pad) {
+    const pts = [];
+    let s = 0;
+    for (let i = 0; i < line.length; i++) {
+      const p = line[i], a = line[Math.max(0, i - 1)], c = line[Math.min(line.length - 1, i + 1)];
+      if (i) s += Math.hypot(p[0] - line[i - 1][0], p[1] - line[i - 1][1], p[2] - line[i - 1][2]);
+      let tx = c[0] - a[0], ty = c[1] - a[1], tz = c[2] - a[2];
+      const tl = Math.hypot(tx, ty, tz); tx /= tl; ty /= tl; tz /= tl;
+      const bl = Math.hypot(tz, tx), bx = tz / bl, bz = -tx / bl;
+      pts.push({ x: p[0], y: p[1], z: p[2], s, tx, ty, tz, bx, bz, nx: ty * bz, ny: tz * bx - tx * bz, nz: -ty * bx });
+    }
+    const box = { x0: Infinity, x1: -Infinity, y0: Infinity, y1: -Infinity, z0: Infinity, z1: -Infinity };
+    for (const p of pts) {
+      box.x0 = Math.min(box.x0, p.x - pad); box.x1 = Math.max(box.x1, p.x + pad);
+      box.y0 = Math.min(box.y0, p.y - pad); box.y1 = Math.max(box.y1, p.y + pad);
+      box.z0 = Math.min(box.z0, p.z - pad); box.z1 = Math.max(box.z1, p.z + pad);
+    }
+    return { pts, len: s, R, box };
+  }
+  /** Where (x, y, z) sits relative to a tube: s along it (negative before the start, past len after the end),
+   *  b and n its offsets in the cross-section (d = their length), the centre point and frame there. False when
+   *  the point is outside the tube's padded box. */
+  function tubeAt(T, x, y, z, out) {
+    const B = T.box;
+    if (x < B.x0 || x > B.x1 || z < B.z0 || z > B.z1 || y < B.y0 || y > B.y1) return false;
+    const P = T.pts;
+    let best = Infinity, bi = 0, bt = 0;
+    for (let i = 0; i < P.length - 1; i++) {
+      const a = P[i], c = P[i + 1];
+      const dx = c.x - a.x, dy = c.y - a.y, dz = c.z - a.z, l2 = dx * dx + dy * dy + dz * dz;
+      let t = ((x - a.x) * dx + (y - a.y) * dy + (z - a.z) * dz) / l2;
+      if (i > 0) t = Math.max(0, t);
+      if (i < P.length - 2) t = Math.min(1, t);
+      const ex = a.x + dx * t - x, ey = a.y + dy * t - y, ez = a.z + dz * t - z, e = ex * ex + ey * ey + ez * ez;
+      if (e < best) { best = e; bi = i; bt = t; }
+    }
+    const a = P[bi], c = P[bi + 1], k = clamp(bt, 0, 1);
+    out.s = a.s + (c.s - a.s) * bt;
+    out.cx = a.x + (c.x - a.x) * bt; out.cy = a.y + (c.y - a.y) * bt; out.cz = a.z + (c.z - a.z) * bt;
+    out.tx = lerp(a.tx, c.tx, k); out.ty = lerp(a.ty, c.ty, k); out.tz = lerp(a.tz, c.tz, k);
+    out.bx = lerp(a.bx, c.bx, k); out.bz = lerp(a.bz, c.bz, k);
+    out.nx = lerp(a.nx, c.nx, k); out.ny = lerp(a.ny, c.ny, k); out.nz = lerp(a.nz, c.nz, k);
+    const ox = x - out.cx, oy = y - out.cy, oz = z - out.cz;
+    out.b = ox * out.bx + oz * out.bz;
+    out.n = ox * out.nx + oy * out.ny + oz * out.nz;
+    out.d = Math.hypot(out.b, out.n);
+    return true;
+  }
+  /** Level distance from (x, z) to a tube's centreline and the arc length there. */
+  function tubeFlat(T, x, z, out) {
+    const P = T.pts;
+    let best = Infinity, bs = 0;
+    for (let i = 0; i < P.length - 1; i++) {
+      const a = P[i], c = P[i + 1], dx = c.x - a.x, dz = c.z - a.z;
+      const t = clamp(((x - a.x) * dx + (z - a.z) * dz) / (dx * dx + dz * dz), 0, 1);
+      const ex = a.x + dx * t - x, ez = a.z + dz * t - z, e = ex * ex + ez * ez;
+      if (e < best) { best = e; bs = a.s + (c.s - a.s) * t; }
+    }
+    out.d = Math.sqrt(best); out.s = bs;
+    return out;
+  }
+
   // =============================================================================================
   // 4. Sunny Isle: coastline, landmarks, heightfield (pure; built once and shared by every game)
   // =============================================================================================
@@ -341,6 +442,69 @@
     const tmp = { d: 0, t: 0 };
     const wm0 = L.windmills[0], wm1 = L.windmills[L.windmills.length - 1];
 
+    // ---- tunnels -------------------------------------------------------------------------------------
+    // tube: a bore you fly through (stone portals, carved approach cuttings, a ridge of rock over it);
+    // arch: a rock band overhead only (the gorge's natural arch, the sea arch), open below.
+    const hd = [Math.cos(-0.8), Math.sin(-0.8)], hp = [-hd[1], hd[0]];      // the headland's axis and across it
+    const cave = { x: L.lighthouse.x + hd[0] * 6, z: L.lighthouse.z + hd[1] * 6 };
+    const ri = Math.round(0.2 * (L.river.length - 1)), rA = L.river[ri - 1], rB = L.river[ri + 1], rC = L.river[ri];
+    const rl = Math.hypot(rB[0] - rA[0], rB[1] - rA[1]), rd = [(rB[0] - rA[0]) / rl, (rB[1] - rA[1]) / rl];
+    const sa = { x: L.arch.x, z: L.arch.z, ry: -L.arch.rot + Math.PI / 2 };
+    const straight = (cx, cy, cz, dx, dz, half) => [[cx - dx * half, cy, cz - dz * half], [cx + dx * half, cy, cz + dz * half]];
+    L.tunnels = [
+      { id: 'shoulder', name: 'Shoulder Tunnel', kind: 'tube', style: 'road', R: 9, portal: 18,
+        line: arcLine([-452, -40], [-374, -165], [-414, -288], 17, 17, 3, 16, 18), ridge: { h: 22, w: 60 } },
+      { id: 'cave', name: 'Lighthouse Sea Cave', kind: 'tube', style: 'cave', R: 8.5, portal: 9,
+        line: arcLine([cave.x - hp[0] * 62, cave.z - hp[1] * 62], [cave.x + hd[0] * 6, cave.z + hd[1] * 6], [cave.x + hp[0] * 62, cave.z + hp[1] * 62], 6.5, 6.5, 3, 10, 10),
+        mesa: { x: cave.x, z: cave.z, ax: hp, bx: hd, h: 30, a0: 40, a1: 56, b0: 28, b1: 46 } },
+      { id: 'gorgearch', name: 'Gorge Arch', kind: 'arch', R: 15, T: 5.5, line: straight(rC[0], riverBed(0.2) + 12, rC[1], rd[0], rd[1], 6.5) },
+      { id: 'seaarch', name: 'Sea Arch', kind: 'arch', R: 9.2, T: 10, line: straight(sa.x, 9, sa.z, Math.sin(sa.ry), Math.cos(sa.ry), 6.2) },
+    ];
+    for (const T of L.tunnels) Object.assign(T, makeTube(T.line, T.R, T.R + (T.kind === 'tube' ? 40 : T.T + 8)));
+    const _tf = { d: 0, s: 0 };
+    /** The rock over the tunnels: a ridge along the Shoulder Tunnel, a mesa over the sea cave. */
+    function tunnelRock(x, z) {
+      let h = 0;
+      for (const T of L.tunnels) {
+        if (T.ridge) {
+          const B = T.box;
+          if (x < B.x0 - 40 || x > B.x1 + 40 || z < B.z0 - 40 || z > B.z1 + 40) continue;
+          tubeFlat(T, x, z, _tf);
+          h += T.ridge.h * sstep(T.ridge.w, T.ridge.w * 0.3, _tf.d) * sstep(-16, 55, _tf.s) * sstep(T.len + 18, T.len - 53, _tf.s);
+        } else if (T.mesa) {
+          const M = T.mesa, dx = x - M.x, dz = z - M.z;
+          const a = Math.abs(dx * M.ax[0] + dz * M.ax[1]), b = Math.abs(dx * M.bx[0] + dz * M.bx[1]);
+          if (a < M.a1 && b < M.b1) h += M.h * sstep(M.a1, M.a0, a) * sstep(M.b1, M.b0, b);
+        }
+      }
+      return h;
+    }
+    /** Each tube mouth: where it is, which way is out (level), and the floor of the bore there. */
+    for (const T of L.tunnels) {
+      if (T.kind !== 'tube') continue;
+      T.mouths = [0, T.pts.length - 1].map((i, k) => {
+        const p = T.pts[i], sg = k ? 1 : -1, l = Math.hypot(p.tx, p.tz);
+        return { x: p.x, y: p.y, z: p.z, ox: sg * p.tx / l, oz: sg * p.tz / l, floor: p.y - T.R, end: k, s: p.s };
+      });
+    }
+    /** The approach cuttings: in front of each mouth the ground is dug down below the bore's floor. */
+    function carve(x, z, h) {
+      for (const T of L.tunnels) {
+        if (!T.mouths) continue;
+        for (const M of T.mouths) {
+          // (it runs on in under the portal block, so no ground slants across the opening)
+          const dx = x - M.x, dz = z - M.z, a = dx * M.ox + dz * M.oz, a0 = -T.portal + 2;
+          if (a < a0 || a > 140) continue;
+          const b = Math.abs(-dx * M.oz + dz * M.ox);
+          if (b > T.R + 26) continue;
+          const want = M.floor - 1.5;
+          if (h <= want) continue;
+          h = lerp(h, want, sstep(T.R + 26, T.R + 4, b) * sstep(140, 100, a) * sstep(a0, a0 + 3, a));
+        }
+      }
+      return h;
+    }
+
     /** Ground before rivers and pads: coast, beach, hills, mountain, ridge, rocks, islets. */
     function natural(x, z) {
       const r = Math.hypot(x, z), th = Math.atan2(z, x);
@@ -375,7 +539,7 @@
         const di = Math.hypot(x - s.x, z - s.z) / s.r;
         if (di < 1.6) h = Math.max(h, s.h * Math.pow(Math.max(0, 1 - di), 1.3) - 1.6 * di + (fbm(x * 0.05, z * 0.05, 31, 2) - 0.5) * 4);
       }
-      return h;
+      return h + tunnelRock(x, z);
     }
 
     function riverAt(x, z, out) {
@@ -419,7 +583,7 @@
       // harbor basin
       const dh = Math.hypot(x - L.harbor.x, z - L.harbor.z);
       if (dh < 90) h = Math.min(h, lerp(-7, h, sstep(50, 90, dh)));
-      return h;
+      return carve(x, z, h);
     }
 
     return { L, pads, height, natural, riverAt, riverBed, riverLens, riverTotal, coastR, polar };
@@ -468,6 +632,15 @@
     S.harbor = { x: L.harbor.x, z: L.harbor.z };
     S.lifeguard = (() => { const [x, z] = ISLE.polar(1.30, 30); return { x, z, g: H(x, z) }; })();
     S.bay = (() => { const [x, z] = ISLE.polar(0.75, -120); return { x, z }; })();
+    S.tunnels = L.tunnels;
+    /** A point s metres into tunnel `id` (centre of the bore), with its heading. */
+    S.tunnelPoint = (id, s, up = 0) => {
+      const T = L.tunnels.find(t => t.id === id), P = T.pts;
+      let i = 0;
+      while (i < P.length - 2 && P[i + 1].s < s) i++;
+      const a = P[i], c = P[i + 1], k = clamp((s - a.s) / (c.s - a.s), 0, 1);
+      return { x: lerp(a.x, c.x, k), y: lerp(a.y, c.y, k) + up, z: lerp(a.z, c.z, k), yaw: Math.atan2(lerp(a.tx, c.tx, k), lerp(a.tz, c.tz, k)), len: T.len };
+    };
     S.ceiling = 330;
     S.hardCeiling = 382;
     return S;
@@ -506,7 +679,9 @@
     const sea = (x, z, up) => [x, water(H(x, z)) + up, z];
     const lhDir = [Math.cos(-0.8), Math.sin(-0.8)];
     const riverPt = t => { const i = Math.round(t * (L.river.length - 1)); return L.river[i]; };
-    const gz = riverPt(0.14), mouth = riverPt(0.97);
+    const mouth = riverPt(0.97);
+    const tp = (id, f, up) => { const p = S.tunnelPoint(id, S.tunnels.find(t => t.id === id).len * f, up); return [p.x, p.y, p.z]; };
+    const arch = S.tunnelPoint('gorgearch', 6.5);
     const wm = S.windmills[2];
     // along the fall line from the lip toward the pool: the cliff drops away steeply and the water sheet arcs out,
     // leaving a gap between the cliff (about 4 m out at mid-height) and the sheet (about 13 m out); the spray
@@ -516,8 +691,9 @@
     const list = [
       ['lighthouse', 'Lighthouse Point', [L.lighthouse.x + lhDir[0] * 11, S.lighthouse.ground + 27, L.lighthouse.z + lhDir[1] * 11],
         'The lighthouse has 151 steps. Keeper Pip counts them out loud every evening, and the gulls have learned to count along.'],
-      ['rocks', 'Lighthouse Rocks', sea(...ISLE.polar(-0.8, -14), 5),
-        'These rocks are speckled with tide pools. At low tide you can spot sea stars holding very still, as if they are playing statues.'],
+      // (this slot was "Lighthouse Rocks" before the sea cave opened)
+      ['cave', 'Lighthouse Sea Cave', tp('cave', 0.55, 1),
+        'Waves rush through the sea cave under the lighthouse with a great WHOOSH. Keeper Pip says it sounds like the rock is humming along.'],
       ['harbor', 'Sunny Harbor', [S.harbor.x - 6, 11, S.harbor.z],
         'Every morning the fishing boats toot their horns in a little tune. Locals call it the island\'s alarm clock.'],
       ['breakwater', 'The Breakwater', sea(...ISLE.polar(0.255, -58), 9),
@@ -526,11 +702,12 @@
         'The town square hosts a market every Saturday. The most popular stall sells mango jam in jars shaped like little suns.'],
       ['clock', 'Clock Tower', [S.clock.x, S.town.g + S.clock.h + 14, S.clock.z],
         'The clock tower runs exactly two minutes fast, on purpose, so that nobody on Sunny Isle is ever late for a picnic.'],
-      ['ridge', 'Windmill Ridge', g((L.windmills[0].x + L.windmills[1].x) / 2 + 6, (L.windmills[0].z + L.windmills[1].z) / 2, 22),
-        'The five windmills are named Breezy, Gusty, Whirly, Puff and Doris. Nobody remembers why the last one is called Doris.'],
+      // (this slot was "Windmill Ridge"; Windmill Whirl still tells the windmills' story)
+      ['tunnel', 'Shoulder Tunnel', tp('shoulder', 0.5, 0),
+        'The old road tunnel through Mount Sunny\'s shoulder was dug by hand. A proud Pal named Lumen switches its lamps on every evening.'],
       // in front of Whirly's rotor, clear of the tower, so the blades sweep past right beside you
       ['whirl', 'Windmill Whirl', [wm.hx + Math.sin(wm.face) * 9 + Math.cos(wm.face) * 3, wm.hy + 0.5, wm.hz + Math.cos(wm.face) * 9 - Math.sin(wm.face) * 3],
-        'Each windmill blade is longer than a bus. When the sea breeze picks up, they grind enough flour for the whole island.'],
+        'The five windmills are Breezy, Gusty, Whirly, Puff and Doris, and each blade is longer than a bus. Nobody remembers why the last one is called Doris.'],
       ['bridge', 'Sunny Bridge', [L.bridge.x, S.bridge.archTop + 7, L.bridge.z],
         'The bridge is painted bright orange so boats, birds and pilots can all see it from far away. It gets a fresh coat every spring.'],
       ['underbridge', 'Under the Bridge', [L.bridge.x + 3, S.bridge.water + 7, L.bridge.z + 6],
@@ -539,8 +716,8 @@
         'Sunny Falls drops about fifty meters into the pool below. On clear afternoons the spray paints a rainbow across the valley.'],
       ['pool', 'Rainbow Pool', [L.pool.x + 10, S.falls.pool + 6, L.pool.z + 10],
         'The pool at the foot of the falls stays chilly all year. Swimmers call jumping in "the Sunny Isle wake-up".'],
-      ['gorge', 'River Gorge', [gz[0], ISLE.riverBed(0.14) + 9, gz[1]],
-        'Over thousands of years the river carved this gorge out of solid rock, one tiny pebble at a time. Now that is patience!'],
+      ['gorge', 'Gorge Arch', [arch.x, arch.y + 3, arch.z],
+        'The river wore away a whole hill here, one pebble at a time, and left this stone arch standing. Swallows nest under it and swoop out to greet pilots.'],
       ['mouth', 'River Mouth', [mouth[0], 5, mouth[1]],
         'Here the fresh river water meets the salty sea. Crabs gather at the mouth to argue about which side is better.'],
       ['summit', 'Mount Sunny Summit', [S.peak.x, S.peak.y + 12, S.peak.z],
@@ -598,8 +775,14 @@
     ];
     // the falls basin and the gorge are a dead-end canyon: they are flown up the canyon, from downstream
     const upCanyon = Math.atan2(L.fallsTop.x - L.pool.x, L.fallsTop.z - L.pool.z);
-    const canyon = new Set(['fallstop', 'pool', 'gorge', 'behindfalls']);
-    return list.map(([id, name, p, fact], i) => ({ i, id, name, fact, x: p[0], y: p[1], z: p[2], approach: canyon.has(id) ? upCanyon : null }));
+    const canyon = new Set(['fallstop', 'pool', 'behindfalls']);
+    // the ones inside tunnels are flown along the bore
+    const inside = { cave: 'cave', tunnel: 'shoulder', gorge: 'gorgearch', arch: 'seaarch' };
+    return list.map(([id, name, p, fact], i) => {
+      const tn = inside[id] || null;
+      const approach = canyon.has(id) ? upCanyon : tn ? S.tunnelPoint(tn, S.tunnels.find(t => t.id === tn).len / 2).yaw : null;
+      return { i, id, name, fact, x: p[0], y: p[1], z: p[2], approach, tunnel: tn };
+    });
   })();
 
   // ---- Balloon Pop: 60 balloons in clusters (7 gold) -----------------------------------------------
@@ -651,7 +834,8 @@
     // 10. down the river gorge (5, one gold)
     for (let i = 0; i < 5; i++) {
       const t = 0.05 + i * 0.05, p = L.river[Math.round(t * (L.river.length - 1))];
-      add(p[0], ISLE.riverBed(t) + 7 + (i === 2 ? 2 : 0), p[1], i === 2);
+      // the fourth floats right under the Gorge Arch
+      add(p[0], ISLE.riverBed(t) + (i === 3 ? 12 : 7) + (i === 2 ? 2 : 0), p[1], i === 2);
     }
     // 11. down the face of the waterfall (3, gold at the bottom)
     for (let i = 0; i < 3; i++) {
@@ -664,11 +848,16 @@
     add(lerp(L.golf[1].tee[0], L.golf[1].green[0], 0.5), H(lerp(L.golf[1].tee[0], L.golf[1].green[0], 0.5), lerp(L.golf[1].tee[1], L.golf[1].green[1], 0.5)) + 16, lerp(L.golf[1].tee[1], L.golf[1].green[1], 0.5));
     // 13. a gold one hidden inside the sea arch
     add(S.arch.x, S.arch.clear * 0.45, S.arch.z, true);
-    // 14. the welcome trail: straight ahead of the start, gently descending, so the first pops (and the first
-    //     combo) come in the opening seconds
+    // 14. the welcome trail: straight ahead of the take-off run, climbing away with the plane, so the first
+    //     pops (and the first combo) come in the opening seconds
     {
       const st = startFor('balloons'), fx = Math.sin(st.yaw), fz = Math.cos(st.yaw);
-      [60, 110, 160, 210, 260].forEach((d, i) => add(st.x + fx * d, lerp(44, 26, i / 4), st.z + fz * d));
+      [80, 125, 170, 215, 260].forEach((d, i) => add(st.x + fx * d, 8 + i * 2, st.z + fz * d));
+    }
+    // 15. inside the tunnels: three through the Shoulder Tunnel (a gold one in the middle), two in the sea cave
+    for (const [id, f, gold] of [['shoulder', 0.28, false], ['shoulder', 0.5, true], ['shoulder', 0.72, false], ['cave', 0.32, false], ['cave', 0.7, false]]) {
+      const p = S.tunnelPoint(id, S.tunnels.find(t => t.id === id).len * f, 0);
+      add(p.x, p.y, p.z, gold);
     }
     return out;
   })();
@@ -679,9 +868,27 @@
     const g = (x, z, up) => [x, H(x, z) + up, z];
     const sea = (x, z, up) => [x, water(H(x, z)) + up, z];
     const rp = t => L.river[Math.round(clamp(t, 0, 1) * (L.river.length - 1))];
+    // a point on the river at arc-length fraction t (smoothly between its samples)
+    const rpi = t => {
+      const want = clamp(t, 0, 1) * ISLE.riverTotal, ls = ISLE.riverLens;
+      let i = 0;
+      while (i < ls.length - 2 && ls[i + 1] < want) i++;
+      const k = (want - ls[i]) / (ls[i + 1] - ls[i]), a = L.river[i], b = L.river[i + 1];
+      return [lerp(a[0], b[0], k), lerp(a[1], b[1], k)];
+    };
+    const tun = id => S.tunnels.find(t => t.id === id);
+    // a ring s metres into a tunnel (facing along the bore), or `a` metres out in front of one of its mouths
+    const inTube = (id, f) => { const T = tun(id), p = S.tunnelPoint(id, T.len * f, 0); return { p: [p.x, p.y, p.z], n: [Math.sin(p.yaw), 0, Math.cos(p.yaw)], tunnel: id }; };
+    const gate = (id, end, a, up = 0) => {
+      const M = tun(id).mouths[end], k = end ? 1 : -1;
+      return { p: [M.x + M.ox * a, M.y + up, M.z + M.oz * a], n: [M.ox * k, 0, M.oz * k], tunnel: id };   // facing the way through
+    };
     const pts = [
-      sea(...ISLE.polar(1.42, -150), 16),
-      g(L.beach.x - 6, L.beach.z - 4, 13),
+      // the take-off leads straight into a ring tunnel low along Palm Beach
+      ...[0, 1, 2, 3, 4, 5, 6, 7].map(i => {
+        const a = ISLE.polar(1.22 + i * 0.04, -12), b = ISLE.polar(1.26 + i * 0.04, -12), l = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        return { p: sea(...ISLE.polar(1.24 + i * 0.04, -12), 7 + (i % 2) * 0.6), s: 0.85, n: [(b[0] - a[0]) / l, 0, (b[1] - a[1]) / l] };   // facing along the beach
+      }),
       g(lerp(L.beach.x, L.plaza.x, 0.5) - 10, lerp(L.beach.z, L.plaza.z, 0.5), 18),
       [L.plaza.x, S.plaza.g + 20, L.plaza.z],
       [L.tennis.x + 10, S.tennis.g + 22, L.tennis.z - 6],
@@ -689,14 +896,16 @@
       [L.ballpark.x, S.ballpark.g + 24, L.ballpark.z],
       g(-345, 190, 22),
       g((L.windmills[1].x + L.windmills[2].x) / 2, (L.windmills[1].z + L.windmills[2].z) / 2, 13),
-      sea(-575, -40, 11),
-      g(-472, -195, 12),                                    // along the west coast
-      g(L.farm.x + 30, L.farm.z - 20, 18),
+      // out over the sea, swing round onto the line of the tunnel, a gate, then in through the south portal
+      { p: gate('shoulder', 0, 165, -4).p, s: 1.15 },
+      gate('shoulder', 0, 70), inTube('shoulder', 0.36), inTube('shoulder', 0.7), gate('shoulder', 1, 60, 5),
+      g(L.farm.x + 28, L.farm.z - 62, 20),
       g(-255, -433, 14),                                    // over the northern plain
       g(L.airstrip.x - 110, L.airstrip.z - 11, 7),
       g(L.airstrip.x + 110, L.airstrip.z + 11, 7),
-      g(L.golf[1].green[0] - 10, L.golf[1].green[1] + 10, 16),
-      [L.lighthouse.x - 34, S.lighthouse.ground + 16, L.lighthouse.z + 20],
+      sea(300, -585, 9),                                    // along the north shore to the lighthouse point
+      // the sea cave right under the lighthouse
+      gate('cave', 0, 32, 0.5), inTube('cave', 0.5), gate('cave', 1, 30, 0.5),
       sea(532, -303, 10),                                   // a low skim ring off the north-east cliffs
       sea(...ISLE.polar(-0.25, -50), 13),
       [S.harbor.x - 10, 12, S.harbor.z + 4],
@@ -707,29 +916,36 @@
       g(-32, -95, 14),
       [L.fallsTop.x + 4, S.falls.top + 27, L.fallsTop.z + 4],
       [fallLine(90, 0)[0], S.falls.pool + 22, fallLine(90, 0)[1]],
-      [rp(0.2)[0], ISLE.riverBed(0.2) + 9, rp(0.2)[1]],
+      // a ring tunnel down the canyon, the first one right under the Gorge Arch
+      ...[0, 1, 2, 3, 4, 5, 6, 7].map(i => { const t = 0.2 + i * 0.025, q = rpi(t); return { p: [q[0], ISLE.riverBed(t) + (i ? 8 : 9), q[1]], s: 0.85 }; }),
       [L.bridge.x, S.bridge.water + 7.6, L.bridge.z, 0.74],
       [rp(0.72)[0], 9, rp(0.72)[1]],
       sea(...ISLE.polar(0.98, -90), 14),
     ];
-    const rings = pts.map((p, i) => ({ i, x: p[0], y: p[1], z: p[2], s: p[3] || 1, nx: 0, ny: 0, nz: 1 }));
+    const rings = pts.map((q, i) => {
+      const o = Array.isArray(q) ? { p: q, s: q[3] } : q;
+      return { i, x: o.p[0], y: o.p[1], z: o.p[2], s: o.s || 1, nx: 0, ny: 0, nz: 1, fixed: o.n || null, tunnel: o.tunnel || null };
+    });
     for (let i = 0; i < rings.length; i++) {
+      const r = rings[i];
+      if (r.fixed) { [r.nx, r.ny, r.nz] = r.fixed; continue; }
       const a = rings[Math.max(0, i - 1)], b = rings[Math.min(rings.length - 1, i + 1)];
       let dx = b.x - a.x, dy = (b.y - a.y) * 0.5, dz = b.z - a.z;
       const l = Math.hypot(dx, dy, dz) || 1;
-      rings[i].nx = dx / l; rings[i].ny = dy / l; rings[i].nz = dz / l;
+      r.nx = dx / l; r.ny = dy / l; r.nz = dz / l;
     }
     return rings;
   })();
 
   /** Where each mode's flight begins: a point and a heading (yaw: 0 = +Z, π = toward −Z / north). */
+  /** Every flight starts sitting on the water of the bay off Palm Beach (Ring Run: lined up with the beach run). */
   function startFor(mode) {
     if (mode === 'rings') {
-      const r0 = RINGS[0];
-      return { x: r0.x - r0.nx * 150, y: r0.y + 4, z: r0.z - r0.nz * 150, yaw: Math.atan2(r0.nx, r0.nz) };
+      const r0 = RINGS[0], r1 = RINGS[1], dx = r1.x - r0.x, dz = r1.z - r0.z, l = Math.hypot(dx, dz);
+      return { x: r0.x - dx / l * 120, y: 0, z: r0.z - dz / l * 120, yaw: Math.atan2(dx, dz) };
     }
-    const [x, z] = ISLE.polar(1.42, -260);
-    return { x, y: 46, z, yaw: Math.atan2(ISLE.L.plaza.x - x, ISLE.L.plaza.z - z) };
+    const [x, z] = ISLE.polar(1.42, -150);
+    return { x, y: 0, z, yaw: Math.atan2(ISLE.L.plaza.x - x, ISLE.L.plaza.z - z) };
   }
 
   // =============================================================================================
@@ -764,6 +980,23 @@
     save.dirty();
   }
   const countOf = arr => arr.reduce((a, v) => a + v, 0);
+  // Each Pal's own Sensitivity / Invert (save.data.stats.flight[profileId].controls; guests: this session).
+  const sessionControls = new Map();
+  function loadControls(save, profile) {
+    const pid = markerOwner(save, profile);
+    if (!pid) return sessionControls.get(profile ? profile.id || profile.name : '_') || null;
+    const bySport = save.data.stats && save.data.stats[DEF.id], c = bySport && bySport[pid] ? bySport[pid].controls : null;
+    return c && typeof c === 'object' ? c : null;
+  }
+  function storeControls(save, profile, c) {
+    const pid = markerOwner(save, profile);
+    if (!pid) { sessionControls.set(profile ? profile.id || profile.name : '_', c); return; }
+    const stats = save.data.stats;
+    const bySport = stats[DEF.id] || (stats[DEF.id] = {});
+    const mine = bySport[pid] || (bySport[pid] = {});
+    mine.controls = c;
+    save.dirty();
+  }
 
   // =============================================================================================
   // 7. Canvas art: marker atlas, light beam, decal/sign atlas, water normals, minimap base
@@ -1087,6 +1320,32 @@
     return out;
   }
 
+  /** Sizes of a tube's portal (the stone headwall or the rock collar round each mouth). */
+  function portalOf(T) {
+    const cave = T.style === 'cave';
+    return { W: T.R + (cave ? 9 : 10), top: T.R + (cave ? 9 : 7), bottom: T.R + 7, depth: T.portal };
+  }
+  /** Terrain cells left out of the mesh: where the ground would cut through a tunnel's bore, and the cells hidden
+   *  inside its portals (which would otherwise poke through the stonework). */
+  const _th = { d: 0, s: 0 };
+  function tunnelHole(x, z, lo, hi) {
+    for (const T of ISLE.L.tunnels) {
+      if (T.kind !== 'tube') continue;
+      const B = T.box;
+      if (x < B.x0 || x > B.x1 || z < B.z0 || z > B.z1) continue;
+      const cy = T.pts[0].y;
+      const pt = portalOf(T);
+      tubeFlat(T, x, z, _th);
+      if (_th.s > pt.depth - 4 && _th.s < T.len - pt.depth + 4 && _th.d < T.R + 6 && hi > cy - T.R - 0.5 && lo < cy + T.R + 1.5) return true;
+      // cells wholly inside a portal block, under its top
+      for (const M of T.mouths) {
+        const dx = x - M.x, dz = z - M.z, a = dx * M.ox + dz * M.oz, b = Math.abs(-dx * M.oz + dz * M.ox);
+        if (a > -pt.depth + 3.5 && a < -2.5 && b < pt.W - 4 && hi < M.y + pt.top + 1) return true;
+      }
+    }
+    return false;
+  }
+
   /** The island as one indexed grid mesh with vertex colors (deep-sea quads are left out). */
   function terrainGeometry(THREE) {
     const G = buildGrid(), N = GRID.n, c = GRID.cell, e = GRID.ext, h = G.hts;
@@ -1106,7 +1365,9 @@
     const idx = [];
     for (let j = 0; j < N - 1; j++) for (let i = 0; i < N - 1; i++) {
       const a = j * N + i, b = a + 1, cc = a + N, d = cc + 1;
-      if (Math.max(h[a], h[b], h[cc], h[d]) < -24) continue;
+      const hi = Math.max(h[a], h[b], h[cc], h[d]);
+      if (hi < -24) continue;
+      if (tunnelHole(-e + (i + 0.5) * c, -e + (j + 0.5) * c, Math.min(h[a], h[b], h[cc], h[d]), hi)) continue;
       idx.push(a, cc, b, b, cc, d);
     }
     const g = new THREE.BufferGeometry();
@@ -1558,7 +1819,7 @@
         const hx = F.x + 30 + i * 9, hz = F.z + 24 - i * 4;
         put(cyl(1.6, 1.6, 2.2, 10, 0xF0D27A), hx, H(hx, hz) + 1.1, hz, 0, Math.PI / 2);
       }
-      house(F.x - 22, F.z + 16, 0.4, 9, 8, 5, 0xFFF1DA, 0xE8634F);
+      house(F.x + 4, F.z - 30, 0.4, 9, 8, 5, 0xFFF1DA, 0xE8634F);   // clear of the tunnel's north cutting
     }
 
     // Treetop Lookout: a giant fig tree with a deck and a little hut
@@ -1637,7 +1898,7 @@
         put(rock(6.4, 0x8E8476).scale(1, 2.2, 1), lx, -2, lz, rng.next());
         addCyl(lx, lz, 6, -12, A.clear - 4);
       }
-      addBox(A.x, A.z, 21, 5.6, ry, A.clear - 0.5, A.clear + 12);
+      // the band overhead is a tunnel arch (see TUNNELS): soft walls, portal lights
     }
 
     // Rocks around Seashell Cove and on Gull Rock
@@ -1741,6 +2002,188 @@
     return SS.world.mergeGeometries(parts.map(g => { SS.world.paint(g, 0xFFFFFF); return g; }));
   }
 
+  // ---- tunnels: bores (unlit, lamp light baked into vertex colors), portals and arches -------------------
+  // Each tunnel gives one "inside" geometry (the bore, lamps, glowing mouth rings: MeshBasic) and one "outside"
+  // geometry (stone portals, rock collars, the gorge arch: Lambert), each with a centre and radius for culling.
+
+  function tunnelKit(THREE, W) {
+    const out = [];
+    const c = new THREE.Color(), c2 = new THREE.Color();
+    const m4 = new THREE.Matrix4(), vx = new THREE.Vector3(), vy = new THREE.Vector3(), vz = new THREE.Vector3();
+    /** A geometry built in a local frame (x across, y up, z along) moved to `o` with axes along/up given. */
+    const place = (g, o, along, up) => {
+      vz.set(along[0], along[1], along[2]).normalize();
+      vy.set(up[0], up[1], up[2]);
+      vx.crossVectors(vy, vz).normalize();
+      vy.crossVectors(vz, vx);
+      m4.makeBasis(vx, vy, vz).setPosition(o[0], o[1], o[2]);
+      return g.applyMatrix4(m4);
+    };
+    const bulbs = (list, n, a0, a1, r, z, hex, size) => {
+      for (let i = 0; i < n; i++) {
+        const a = lerp(a0, a1, n === 1 ? 0.5 : i / (n - 1));
+        const g = W.paint(new THREE.IcosahedronGeometry(size, 0), hex);
+        g.translate(Math.cos(a) * r, Math.sin(a) * r, z);
+        list.push(g);
+      }
+    };
+    for (const T of ISLE.L.tunnels) {
+      const inside = [], outside = [], P = T.pts;
+      const mid = P[Math.floor(P.length / 2)];
+      if (T.kind === 'tube') {
+        const cave = T.style === 'cave', seg = 20;
+        // the bore: rings of vertices round the centreline; the cave's rock bulges outward only (never inside R)
+        const pos = [], col = [], idx = [];
+        const wall = new THREE.Color(cave ? 0x7A6F63 : 0xC4BBAA), low = new THREE.Color(cave ? 0x4C453E : 0x8C8479);
+        const road = new THREE.Color(0x4A4B52), dash = new THREE.Color(0xFFD34A), kerb = new THREE.Color(0xEDEDE6), sea = new THREE.Color(0x2E8A8E);
+        for (let i = 0; i < P.length; i++) {
+          const p = P[i];
+          const lampS = Math.round((p.s - 9) / 18) * 18 + 9, ds = p.s - lampS;
+          const day = Math.max(sstep(cave ? 30 : 16, 0, p.s), sstep(T.len - (cave ? 30 : 16), T.len, p.s));
+          for (let k = 0; k <= seg; k++) {
+            const ang = k / seg * TAU, cb = Math.sin(ang), cn = -Math.cos(ang);
+            const r = T.R + (cave ? 0.25 + hash2(i, k % seg, 9) * 1.5 : 0.05);
+            pos.push(p.x + (p.bx * cb + p.nx * cn) * r, p.y + p.ny * cn * r, p.z + (p.bz * cb + p.nz * cn) * r);
+            const fromBottom = Math.min(ang, TAU - ang);
+            c.copy(low).lerp(wall, sstep(0.5, 2.2, fromBottom));
+            let f;
+            if (cave) {
+              c.offsetHSL(0, 0, (hash2(i, k % seg, 4) - 0.5) * 0.08);
+              if (p.y + cn * r < 0.8) c.lerp(sea, 0.75);
+              f = lerp(0.36, 1, day) + 0.12 * sstep(1.2, 2.6, fromBottom) * (1 - day);
+            } else {
+              if (fromBottom < 0.42) c.copy(road);
+              if (Math.abs(fromBottom - 0.42) < 0.035) c.copy(kerb);
+              if (fromBottom < 0.03 && ((p.s % 9) + 9) % 9 < 4.5) c.copy(dash);
+              // warm pools of lamplight, strongest up the wall on the lamp's side
+              const pool = Math.exp(-(ds * ds) / (2 * 5.5 * 5.5)) * (0.75 + 0.25 * sstep(0.8, 2.6, fromBottom));
+              c.lerp(c2.set(0xFFCF8A), pool * 0.45 * (1 - day));
+              f = lerp(0.38 + 0.7 * pool, 1, day);
+            }
+            col.push(c.r * f, c.g * f, c.b * f);
+          }
+        }
+        for (let i = 0; i < P.length - 1; i++) for (let k = 0; k < seg; k++) {
+          const a = i * (seg + 1) + k, b = a + seg + 1;
+          idx.push(a, b, a + 1, a + 1, b, b + 1);
+        }
+        const bore = new THREE.BufferGeometry();
+        bore.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        bore.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+        bore.setIndex(idx);
+        bore.computeVertexNormals();
+        inside.push(bore);
+        // lamps along the upper walls (the road tunnel), alternating sides
+        if (!cave) for (let s = 9, n = 0; s < T.len - 4; s += 18, n++) {
+          const i = clamp(Math.round(s / (T.len / (P.length - 1))), 0, P.length - 1), p = P[i];
+          const g = W.paint(new THREE.BoxGeometry(1.1, 0.34, 0.7), 0xFFF2BE);
+          const a = Math.PI + (n % 2 ? 0.95 : -0.95);
+          g.translate(Math.sin(a) * (T.R - 0.25), -Math.cos(a) * (T.R - 0.25), 0);
+          inside.push(place(g, [p.x, p.y, p.z], [p.tx, p.ty, p.tz], [p.nx, p.ny, p.nz]));
+        }
+        // each mouth: a glowing ring on the face and a string of portal lights over it, then the portal itself
+        const pt = portalOf(T);
+        for (const M of T.mouths) {
+          const p = P[M.end ? P.length - 1 : 0], k = M.end ? -1 : 1;
+          const inward = [p.tx * k, p.ty * k, p.tz * k], up = [p.nx, p.ny, p.nz];
+          const face = [p.x - inward[0] * 1.6, p.y - inward[1] * 1.6, p.z - inward[2] * 1.6];
+          const ring = W.paint(new THREE.TorusGeometry(T.R + 0.75, 0.5, 6, 36), 0xFFD45A);
+          inside.push(place(ring, face, inward, up));
+          const lights = [];
+          bulbs(lights, 11, -0.25, Math.PI + 0.25, T.R + 2.3, -0.1, 0xFFF4C8, 0.42);
+          for (const g of lights) inside.push(place(g, face, inward, up));
+          // the portal block, extruded from the face into the hill (local z = inward)
+          const sh = new THREE.Shape();
+          if (cave) {
+            const n = 16;
+            for (let i = 0; i < n; i++) {
+              const a = i / n * TAU, rr = (T.R + 8.5 + hash2(i, M.end, 21) * 4.5) * (Math.sin(a) < -0.3 ? 1.15 : 1);
+              if (i) sh.lineTo(Math.cos(a) * rr * 1.08, Math.sin(a) * rr); else sh.moveTo(Math.cos(a) * rr * 1.08, Math.sin(a) * rr);
+            }
+            sh.closePath();
+          } else {
+            sh.moveTo(-pt.W, -pt.bottom); sh.lineTo(pt.W, -pt.bottom); sh.lineTo(pt.W, pt.top); sh.lineTo(-pt.W, pt.top); sh.closePath();
+          }
+          const hole = new THREE.Path();
+          hole.absarc(0, 0, T.R + 0.3, 0, TAU, true);
+          sh.holes.push(hole);
+          const blk = new THREE.ExtrudeGeometry(sh, { depth: pt.depth + 1.5, bevelEnabled: false, curveSegments: 30 });
+          blk.deleteAttribute('uv');
+          if (cave) {
+            const q = blk.attributes.position;
+            for (let i = 0; i < q.count; i++) {
+              const x = q.getX(i), y = q.getY(i), r = Math.hypot(x, y);
+              if (r < T.R + 2.5) continue;
+              const nz = hash2(Math.round(x * 3), Math.round(y * 3), 5), kk = 1 + (nz - 0.5) * 0.18;
+              q.setXYZ(i, x * kk, y * kk, q.getZ(i) + (q.getZ(i) < 0.5 ? (nz - 0.5) * 2.4 : 0));
+            }
+            blk.computeVertexNormals();
+            W.paint(blk, (x, y, z, o) => o.set(0x9A8E7E).lerp(c2.set(0x6F665B), hash2(Math.round(x), Math.round(y), 3) * 0.7).lerp(c2.set(0x7FA35E), y > T.R + 6 ? 0.35 : 0));
+          } else {
+            W.paint(blk, (x, y, z, o) => o.set(0xD9CFBB).offsetHSL(0, 0, (hash2(Math.round(x / 1.6), Math.round(y / 0.9), 8) - 0.5) * 0.05));
+            // a pale voussoir arch round the opening and a cornice along the top
+            const arch = W.paint(new THREE.TorusGeometry(T.R + 1.05, 0.85, 8, 28, Math.PI), 0xF1EADB);
+            arch.translate(0, 0, -0.25);
+            outside.push(place(arch, face, inward, up));
+            const cor = W.paint(new THREE.BoxGeometry(pt.W * 2 + 1.4, 1.1, 2.4), 0xC9BFA9);
+            cor.translate(0, pt.top + 0.45, 0.9);
+            outside.push(place(cor, face, inward, up));
+          }
+          outside.push(place(blk, face, inward, up));
+        }
+      } else {
+        // an arch: a rock band over the top (outward-only bumps), with lamps along both inner edges
+        const p0 = P[0], p1 = P[P.length - 1], ctr = [(p0.x + p1.x) / 2, (p0.y + p1.y) / 2, (p0.z + p1.z) / 2];
+        const along = [p0.tx, p0.ty, p0.tz], up = [p0.nx, p0.ny, p0.nz];
+        if (T.id !== 'seaarch') {
+          const g = new THREE.TorusGeometry(T.R + T.T / 2, T.T / 2, 8, 22, Math.PI + 0.7);
+          g.rotateZ(-0.35);
+          g.scale(1, 1, T.len / T.T);
+          const q = g.attributes.position;
+          for (let i = 0; i < q.count; i++) {
+            const x = q.getX(i), y = q.getY(i), r = Math.hypot(x, y), k = 1 + hash2(i, 2, 13) * (r > T.R + T.T * 0.5 ? 0.12 : 0.04);
+            q.setXYZ(i, x * k, y * k, q.getZ(i) * (1 + (hash2(i, 4, 13) - 0.5) * 0.2));
+          }
+          g.computeVertexNormals();
+          W.paint(g, (x, y, z, o) => o.set(0x9E9282).lerp(c2.set(0x7F7569), hash2(Math.round(x), Math.round(y), 2) * 0.6).lerp(c2.set(0x6FA35A), sstep(T.R + T.T * 0.8, T.R + T.T * 1.1, y) * 0.8));
+          g.deleteAttribute('uv');
+          outside.push(place(g, ctr, along, up));
+        }
+        for (const z of [-T.len / 2 + 0.2, T.len / 2 - 0.2]) {
+          const lights = [];
+          bulbs(lights, 9, 0.28, Math.PI - 0.28, T.R + 0.15, z, 0xFFF4C8, 0.38);
+          for (const g of lights) inside.push(place(g, ctr, along, up));
+        }
+      }
+      const ctr = [mid.x, mid.y, mid.z];
+      const rad = T.kind === 'tube' ? T.len / 2 + T.R + 30 : T.R + T.T + 14;
+      out.push({ id: T.id, inside: inside.length ? W.mergeGeometries(inside) : null, outside: outside.length ? W.mergeGeometries(outside) : null, ctr, rad });
+    }
+    return out;
+  }
+
+  /** The round parachute: a striped canopy and its lines, the pilot hangs 3.3 m below its top. */
+  function chuteGeometry(THREE, W) {
+    const prof = [[0.02, 3.6], [0.9, 3.52], [1.6, 3.3], [2.15, 2.92], [2.5, 2.48], [2.62, 2.18], [2.5, 2.05]];
+    const canopy = new THREE.LatheGeometry(prof.map(([r, y]) => new THREE.Vector2(r, y)), 12);
+    const GORES = [0xFF5A5F, 0xFFFFFF, 0xFFC93C, 0x1FA2FF];
+    W.paint(canopy, (x, y, z, o) => o.set(GORES[Math.floor((Math.atan2(z, x) + Math.PI) / TAU * 12 + 0.5) % 4]));
+    canopy.deleteAttribute('uv');
+    const parts = [canopy];
+    for (let i = 0; i < 6; i++) {
+      const a = i / 6 * TAU, x = Math.cos(a) * 2.45, z = Math.sin(a) * 2.45;
+      const l = new THREE.CylinderGeometry(0.025, 0.025, 1, 3);
+      l.deleteAttribute('uv');
+      const top = new THREE.Vector3(x, 2.1, z), bot = new THREE.Vector3(Math.cos(a) * 0.22, 0.95, Math.sin(a) * 0.22);
+      const mid = top.clone().add(bot).multiplyScalar(0.5), dir = top.clone().sub(bot);
+      l.scale(1, dir.length(), 1);
+      l.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize()));
+      l.translate(mid.x, mid.y, mid.z);
+      parts.push(W.paint(l, 0xF4F6FA));
+    }
+    return W.mergeGeometries(parts);
+  }
+
   // ---- trees (instanced: palms, round trees, pines) -------------------------------------------------
 
   function palmGeometry(THREE, W) {
@@ -1815,6 +2258,8 @@
     block(L.treehouse.x, L.treehouse.z, 18); block(L.picnic.x, L.picnic.z, 22); block(STRUCT.lifeguard.x, STRUCT.lifeguard.z, 12);
     block(L.bridge.x, L.bridge.z, 80); block(L.pool.x, L.pool.z, 40);
     for (const w of L.windmills) block(w.x, w.z, 14);
+    // tunnel cuttings and portals stay clear
+    for (const T of L.tunnels) for (const M of T.mouths || []) for (let a = -10; a <= 130; a += 14) block(M.x + M.ox * a, M.z + M.oz * a, T.R + 22);
     for (const g of L.golf) { block(g.tee[0], g.tee[1], 26); block(g.green[0], g.green[1], 34); }
     const isBlocked = (x, z) => blocked.some(([bx, bz, r]) => (x - bx) * (x - bx) + (z - bz) * (z - bz) < r * r);
     const tmp = { d: 0, t: 0 };
@@ -1973,16 +2418,19 @@
     const rim = new THREE.TorusGeometry(0.46, 0.07, 6, 16);
     rim.rotateX(Math.PI / 2); rim.scale(1, 1, 1.4); rim.translate(0, 0.68, -0.32);
     trim.push(W.paint(rim, 0x3A2E2A));
+    // seaplane floats: two pontoons on struts (the bottoms sit FLOAT_DRAFT below the waterline when afloat)
     for (const s of [-1, 1]) {
-      const strut = new THREE.CylinderGeometry(0.06, 0.06, 0.9, 5);
-      strut.rotateZ(s * 0.35); strut.translate(s * 0.75, -0.9, 0.85);
-      trim.push(W.paint(strut, 0x5B6577));
-      const wheel = new THREE.CylinderGeometry(0.3, 0.3, 0.18, 12);
-      wheel.rotateZ(Math.PI / 2); wheel.translate(s * 0.92, -1.32, 0.85);
-      trim.push(W.paint(wheel, 0x2A2F3A));
+      const fl = new THREE.LatheGeometry([[0, -2.0], [0.17, -1.9], [0.27, -1.3], [0.3, 0.4], [0.28, 1.5], [0.18, 2.15], [0.05, 2.38], [0, 2.4]].map(([r, y]) => new THREE.Vector2(r, y)), 10);
+      fl.rotateX(Math.PI / 2); fl.scale(1, 0.9, 1);
+      fl.translate(s * 1.0, -1.42, 0.25);
+      W.paint(fl, (x, y, z, o) => o.set(y > -1.36 && y < -1.24 ? 0xFF5A5F : 0xF4F6FA));
+      trim.push(fl);
+      for (const z of [1.1, -0.55]) {
+        const strut = new THREE.CylinderGeometry(0.055, 0.055, 0.95, 5);
+        strut.rotateZ(s * 0.5); strut.translate(s * 0.72, -0.86, z);
+        trim.push(W.paint(strut, 0x5B6577));
+      }
     }
-    const tw = new THREE.SphereGeometry(0.13, 8, 6); tw.translate(0, -0.48, -3.05);
-    trim.push(W.paint(tw, 0x2A2F3A));
     const prop = new THREE.BoxGeometry(0.2, 2.3, 0.05);
     W.paint(prop, 0x3A3F4E);
     const blur = new THREE.CircleGeometry(1.2, 28);
@@ -2028,6 +2476,13 @@
     const pg = planeGeometries(THREE, W);
     A.planeBody = shared(pg.body); A.planeTrim = shared(pg.trim); A.prop = shared(pg.prop); A.blur = shared(pg.blur);
     A.scarf = scarfGeometry;
+    A.tunnels = tunnelKit(THREE, W).map(t => ({ ...t, inside: t.inside && shared(t.inside), outside: t.outside && shared(t.outside) }));
+    A.chute = shared(chuteGeometry(THREE, W));
+    // crash debris: two wings, the fuselage, the tail (painted in the pilot's colour at run time)
+    A.debris = [
+      shared(new THREE.BoxGeometry(3.4, 0.2, 1.4)), shared(new THREE.BoxGeometry(3.4, 0.2, 1.4)),
+      shared(new THREE.CylinderGeometry(0.62, 0.42, 3.4, 10).rotateX(Math.PI / 2)), shared(new THREE.BoxGeometry(2.6, 0.9, 0.8)),
+    ];
     // balloons, strings, rings, guide arrow
     A.balloon = shared(new THREE.SphereGeometry(BALLOON_R, 14, 9).scale(1, 1.18, 1));
     A.knot = shared(new THREE.CylinderGeometry(0.05, 0.05, 3.2, 4).translate(0, -BALLOON_R * 1.18 - 1.6, 0));
@@ -2104,10 +2559,13 @@
       string: shared(new THREE.MeshBasicMaterial({ color: 0xF4F6FA })),
       ring: shared(new THREE.MeshPhongMaterial({ color: 0xFFFFFF, shininess: 60, specular: 0x444444, emissive: 0x2A2A2A })),
       halo: shared(new THREE.MeshBasicMaterial({ color: 0xFFE27D, transparent: true, opacity: 0.5, depthWrite: false })),
-      arrow: shared(new THREE.MeshPhongMaterial({ color: 0xFFC93C, emissive: 0x8A5A00, shininess: 50, transparent: true, opacity: 0.92 })),
+      arrow: shared(new THREE.MeshPhongMaterial({ color: 0xFFC93C, emissive: 0x8A5A00, shininess: 50, transparent: true, opacity: 0.75 })),
       trim: shared(new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 60, specular: 0x444444 })),
       prop: shared(new THREE.MeshPhongMaterial({ color: 0xFFFFFF, vertexColors: true, shininess: 30 })),
       blur: shared(new THREE.MeshBasicMaterial({ map: A.blurTex, transparent: true, depthWrite: false, side: THREE.DoubleSide })),
+      tunnelIn: shared(new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })),
+      tunnelOut: shared(new THREE.MeshLambertMaterial({ vertexColors: true })),
+      chute: shared(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide })),
     };
     A.mats.sea.map = null;
     // minimap base: the island painted from the height grid (sea, sand, grass, rock), 256² over ±900 m
@@ -2175,6 +2633,9 @@
 .fl-brake.on button { background: #DCE8F5; transform: translateY(2px); box-shadow: 0 1px 0 #CEDBEA; }
 .fl-readout { position: absolute; right: calc(var(--sar) + 104px); bottom: calc(var(--sab) + 22px); display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
 .fl-readout .ss-chip { font: 800 12px/1 var(--font-ui); padding: 5px 9px; gap: 4px; }
+.fl-readout, .fl-boost, .fl-brake { transition: opacity .3s; }
+.fl-crashing .fl-readout { opacity: .3; }
+.fl-crashing .fl-boost, .fl-crashing .fl-brake { opacity: .25; pointer-events: none; }
 .fl-readout .ss-chip b { font: 700 15px/1 var(--font-display); min-width: 24px; text-align: right; }
 .fl-hint { right: calc(var(--sar) + 22px); bottom: calc(var(--sab) + 128px); }
 .fl-hint button { width: 58px; height: 58px; position: relative; background: rgba(255,255,255,.97); color: #FF9F1C; box-shadow: 0 3px 0 #CEDBEA, 0 6px 16px rgba(22,58,108,.2);
@@ -2299,8 +2760,41 @@
     const A = assets(THREE, W);
     const S = STRUCT, L = ISLE.L;
     const sens = () => sensFor(save.settings);
-    /** The ground under (x, z) for something at height y (tunnels: the floor inside the tube, the rock above it). */
-    function groundFor(x, z, y) { return groundAt(x, z); }
+    // ---- tunnels: where things are relative to the bores ---------------------------------------------------
+    const TUN = S.tunnels;
+    const _tq = { s: 0, b: 0, n: 0, d: 0, cx: 0, cy: 0, cz: 0, tx: 0, ty: 0, tz: 0, bx: 0, bz: 0, nx: 0, ny: 0, nz: 0 };
+    /** The tube whose bore holds (x, y, z) (pad metres past its mouths), filling `q`; −1 when none. */
+    function boreAt(x, y, z, q = _tq, pad = 0) {
+      for (let i = 0; i < TUN.length; i++) {
+        const T = TUN[i];
+        if (T.kind !== 'tube' || !tubeAt(T, x, y, z, q)) continue;
+        if (q.s >= -pad && q.s <= T.len + pad && q.d < T.R) return i;
+      }
+      return -1;
+    }
+    /** The ground under (x, z) for something at height y: inside a bore, its floor (the sea cave's is water). */
+    function groundFor(x, z, y) {
+      const i = boreAt(x, y, z);
+      if (i < 0) return groundAt(x, z);
+      const T = TUN[i];
+      return T.style === 'cave' ? -2 : _tq.cy - T.R;
+    }
+    /** Rock or stonework at p: portal blocks, the rock round a bore, an arch's band. */
+    const _tb = { ..._tq };
+    function tunnelSolid(x, y, z, r = 0) {
+      for (const T of TUN) {
+        if (!tubeAt(T, x, y, z, _tb)) continue;
+        const q = _tb;
+        if (T.kind === 'tube') {
+          const pt = portalOf(T);
+          if (q.s > -1.6 && q.s < T.len + 1.6 && q.d > T.R + 0.3) {
+            const inBlock = (q.s < pt.depth || q.s > T.len - pt.depth) && q.d < pt.W + 1 && q.n < pt.top;
+            if (inBlock || y < groundAt(x, z)) return true;
+          }
+        } else if (q.s > -0.2 - r && q.s < T.len + 0.2 + r && q.d > T.R - r && q.d < T.R + T.T + r && q.n > -0.3 * q.d) return true;
+      }
+      return false;
+    }
 
     // ---- world -----------------------------------------------------------------------------------------
     const env = W.environment(scene, {
@@ -2331,6 +2825,14 @@
     add(A.statics, A.mats.statics, { receive: true }).name = 'landmarks';
     add(A.decals, A.mats.decals, { receive: true }).name = 'decals';
     add(A.clouds, A.cloudMat, {}).name = 'clouds';
+    // tunnels: each bore and its portals are culled by distance as well as by the view
+    const tunnelMeshes = A.tunnels.map(t => {
+      const o = { ctr: V(...t.ctr), rad: t.rad, meshes: [] };
+      if (t.inside) { const m = add(t.inside, A.mats.tunnelIn, {}); m.name = 'tunnel-' + t.id; o.meshes.push(m); }
+      if (t.outside) { const m = add(t.outside, A.mats.tunnelOut, { receive: true }); m.name = 'portal-' + t.id; o.meshes.push(m); }
+      return o;
+    });
+    const lightBase = { sun: env.sun ? env.sun.intensity : 0, hemi: env.hemi ? env.hemi.intensity : 0 };
 
     const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), e4 = new THREE.Euler(0, 0, 0, 'YXZ'), s4 = V(), p4 = V();
     function instanced(geo, mat, list, place) {
@@ -2415,6 +2917,19 @@
     const trails = [wingL, wingR].map(o => W.trail(o, { color: 0xFFFFFF, width: 0.32, length: 30, opacity: 0.55, maxJump: 30 }));
     for (const t of trails) t.visible = false;
     let trailOn = false;
+    // the take-off wake: two foam ribbons behind the floats, on the water only
+    const wakeL = new THREE.Object3D(), wakeR = new THREE.Object3D();
+    wakeL.position.set(1, -1.55, -1.6); wakeR.position.set(-1, -1.55, -1.6);
+    plane.add(wakeL, wakeR);
+    const wakes = [wakeL, wakeR].map(o => W.trail(o, { color: 0xFFFFFF, width: 0.9, length: 34, opacity: 0.6, maxJump: 12 }));
+    for (const t of wakes) t.visible = false;
+    // crash debris (wings, fuselage, tail, propeller) and the pilot's parachute
+    const debris = A.debris.map(g => new THREE.Mesh(g, bodyMat)).concat([new THREE.Mesh(A.prop, A.mats.prop)]);
+    const DEBRIS_AT = [[2.1, -0.28, 0.45], [-2.1, -0.28, 0.45], [0, 0, 0], [0, 0.3, -2.9], [0, 0, 2.62]];
+    for (const m of debris) { m.visible = false; m.userData.v = V(); m.userData.w = V(); scene.add(m); }
+    const chute = new THREE.Mesh(A.chute, A.mats.chute);
+    chute.visible = false;
+    scene.add(chute);
     const blob = W.blobShadow(4.2, 0.32);
     blob.renderOrder = 3;
     scene.add(blob);
@@ -2551,9 +3066,12 @@
       stun: 0, wobble: 0, softCd: 0, skimCd: 0, bumpCd: 0, sprayCd: 0, wallCd: 0, agl: 50, overSea: true,
       // the chase camera's roll offset after a path flip (it rolls with the plane instead of snapping)
       camOff: 0, camOff0: 0, camTie: 0, camRatio: 1, lastBank: 0, loops: 0, rolls: 0, loopAcc: 0, rollAcc: 0, inTunnel: -1,
+      // 'air' | 'water' (afloat: taxiing, the take-off run) | 'crash' (the pilot's parachute descent)
+      state: 'air', wgo: false, autoLift: false, wT: 0, climbT: 0, pup: V(0, 1, 0), tunS: 0, dim: 0, camLow: 0, camTun: 0, camLoop: 0, loopH: 0, wallYaw: 0, wallBank: 0,
     };
-    const stick = { id: null, ox: 0, oy: 0, cx: 0, cy: 0, active: false, R: 60, steadyX: 0, steadyY: 0, steadyT: 0 };
-    const keys = { left: false, right: false, up: false, down: false, boost: false, brake: false };
+    let CR = null;   // the crash in progress
+    const stick = { id: null, ox: 0, oy: 0, cx: 0, cy: 0, active: false, R: 60, steadyX: 0, steadyY: 0, steadyT: 0, inRoll: false };
+    const keys = { left: false, right: false, up: false, down: false, boost: false, brake: false, rollL: false, rollR: false };
     let btnBoost = false, btnBrake = false;
     let phase = 'intro';
     let cur = 0;
@@ -2770,11 +3288,14 @@
 
     // ---- the touch stick ----------------------------------------------------------------------------------
     // Touch and drag anywhere: the offset from the touch-down point is the input, like tilting the remote. A soft
-    // ring shows the deflection. Small offsets held steady for 1.5 s re-anchor (a resting thumb creeps on the
-    // glass), a drag far past the rim pulls the centre along, and letting go eases the input back to neutral.
+    // ring shows the deflection. Only a tiny offset (inside the dead zone) held steady for 2.5 s re-anchors (a
+    // resting thumb creeps on the glass); a deliberate gentle hold is never erased. The centre stays where the
+    // finger first touched (bringing the thumb back is always neutral), and letting go eases the input back.
     const blockedTarget = t => t instanceof Element && !!t.closest('button, a, input, .ss-block, #ss-screens, #ss-overlay');
-    function stickActive() { return (phase === 'fly' || phase === 'countdown') && !engine.paused && SS.input.enabled !== false && !autoplay; }
+    function stickActive() { return (phase === 'fly' || phase === 'countdown') && P.state !== 'crash' && !engine.paused && SS.input.enabled !== false && !autoplay; }
     function onPDown(e) {
+      // a tap during the parachute descent skips it
+      if (CR && CR.t > 0.5 && !engine.paused && !blockedTarget(e.target)) { CR.skip = true; return; }
       if (stick.id != null || !stickActive() || blockedTarget(e.target)) return;
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       const r = ui.root.getBoundingClientRect();
@@ -2791,23 +3312,21 @@
       if (e.pointerId !== stick.id) return;
       const r = ui.root.getBoundingClientRect();
       stick.cx = e.clientX - r.left; stick.cy = e.clientY - r.top;
-      // a floating stick: dragging well past the rim (and the keep-rolling zone) pulls the centre along
-      const dx = stick.cx - stick.ox, dy = stick.cy - stick.oy, d = Math.hypot(dx, dy), lim = stick.R * 1.25;
-      if (d > lim) { stick.ox += dx / d * (d - lim); stick.oy += dy / d * (d - lim); }
       if (Math.hypot(stick.cx - stick.steadyX, stick.cy - stick.steadyY) > 6) { stick.steadyX = stick.cx; stick.steadyY = stick.cy; stick.steadyT = 0; }
     }
     function onPUp(e) { if (e.pointerId === stick.id) releaseStick(); }
     function releaseStick() {
-      stick.id = null; stick.active = false;
+      stick.id = null; stick.active = false; stick.inRoll = false;
       hud.stick.classList.add('fl-off');
+      hud.stick.classList.remove('roll');
     }
     function updateStick(dt) {
       if (!stick.active) return;
       stick.steadyT += dt;
-      if (stick.steadyT > 1.5) {
-        const k = 1 - Math.exp(-dt / 0.6);
-        if (Math.abs(stick.cx - stick.ox) < stick.R * 0.22) stick.ox += (stick.cx - stick.ox) * k;
-        if (Math.abs(stick.cy - stick.oy) < stick.R * 0.35) stick.oy += (stick.cy - stick.oy) * k;
+      if (stick.steadyT > 2.5) {
+        const k = 1 - Math.exp(-dt / 1.0), lim = stick.R * 0.08;
+        if (Math.abs(stick.cx - stick.ox) < lim) stick.ox += (stick.cx - stick.ox) * k;
+        if (Math.abs(stick.cy - stick.oy) < lim) stick.oy += (stick.cy - stick.oy) * k;
       }
       placeStick();
     }
@@ -2824,14 +3343,19 @@
       const mag = clamp(d / R, 0, 1);
       hud.stickGlow.style.opacity = (mag * mag).toFixed(2);
       hud.stickGlow.style.setProperty('--ang', Math.round(Math.atan2(dx, -dy) / DEG) + 'deg');
-      hud.stick.classList.toggle('roll', Math.abs(stick.cx - stick.ox) >= R * FLY.keepRoll);
+      const inRoll = Math.abs(stick.cx - stick.ox) >= R * FLY.keepRoll;
+      if (inRoll !== stick.inRoll) {
+        stick.inRoll = inRoll;
+        hud.stick.classList.toggle('roll', inRoll);
+        if (inRoll && ui.haptic) ui.haptic(10);
+      }
     }
-    /** Raw stick deflection: x right, y up, about −1.15..1.15 (past 1 sideways is the keep-rolling zone). */
+    /** Raw stick deflection: x right, y up, about −1.3..1.3 (1 is full bank; past 1.08 sideways keeps rolling). */
     function stickRaw(out) {
       if (!stick.active) { out.x = 0; out.y = 0; return out; }
       let dx = (stick.cx - stick.ox) / stick.R, dy = -(stick.cy - stick.oy) / stick.R;
-      const d = Math.hypot(dx, dy);
-      if (d > 1.15) { dx *= 1.15 / d; dy *= 1.15 / d; }
+      const d = Math.hypot(dx, dy), M = FLY.rawMax;
+      if (d > M) { dx *= M / d; dy *= M / d; }
       out.x = dx; out.y = dy;
       return out;
     }
@@ -2841,7 +3365,8 @@
     window.addEventListener('pointercancel', onPUp);
     ctx.input.on('key', k => {
       const code = k.code || k.key;
-      const map = { ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', Space: 'boost', ShiftLeft: 'brake', ShiftRight: 'brake' };
+      // Q / E: hold to keep rolling (a held arrow banks steeply but stops short of a roll)
+      const map = { ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', Space: 'boost', ShiftLeft: 'brake', ShiftRight: 'brake', KeyQ: 'rollL', KeyE: 'rollR' };
       const name = map[code] || (k.key === ' ' ? 'boost' : k.key === 'Shift' ? 'brake' : null);
       if (name) keys[name] = !!k.down;
       if (k.down && !k.repeat && (code === 'KeyC') && tilt.on) recenterTilt(false);
@@ -2857,7 +3382,7 @@
     // The world-up vector in screen axes (from beta/gamma and the screen orientation) gives a sideways tilt
     // (roll) and a forward/back tilt (pitch) with no wrap-around in any comfortable hold; a one-euro filter
     // takes the jitter out, and the neutral is calibrated at GO, with Re-center or a double-tap.
-    const tilt = { on: false, have: false, pending: false, roll: 0, pitch: 0, zr: 0, zp: 0, fr: oneEuro(1.2, 0.025), fp: oneEuro(1.2, 0.025), timer: 0, lastTap: 0, events: 0 };
+    const tilt = { on: false, have: false, pending: false, roll: 0, pitch: 0, zr: 0, zp: 0, fr: oneEuro(1.2, 0.025), fp: oneEuro(1.2, 0.025), timer: 0, lastTap: 0, events: 0, lastT: 0, quiet: 0 };
     function onOrient(e) {
       if (e.beta == null || e.gamma == null) return;
       const b = e.beta * DEG, gm = e.gamma * DEG;
@@ -2868,21 +3393,28 @@
       tilt.roll = tilt.fr(Math.asin(clamp(-sx, -1, 1)) / DEG, t);
       tilt.pitch = tilt.fp(Math.atan2(sy, uz) / DEG, t);
       tilt.events++;
+      tilt.lastT = performance.now(); tilt.quiet = 0;
       if (!tilt.have) {
         tilt.have = true;
-        if (tilt.on) { recenterTilt(true); refreshTiltChip(); }
+        if (tilt.on) { if (!tilt.cal) recenterTilt(true); refreshTiltChip(); }
       }
     }
     function tiltRaw(out) {
       if (!tilt.on || !tilt.have) { out.x = 0; out.y = 0; return out; }
+      // (quiet for half a second AND a few frames: one long frame on a slow device is not a dead sensor)
+      if (++tilt.quiet > 6 && performance.now() - tilt.lastT > 500) {
+        // the sensor went quiet (paused, revoked, throttled): fly hands-off until it speaks again
+        tilt.have = false; refreshTiltChip();
+        out.x = 0; out.y = 0; return out;
+      }
       const sv = sens();
-      out.x = clamp((tilt.roll - tilt.zr) / sv.tiltRoll, -1.15, 1.15);
-      out.y = clamp((tilt.pitch - tilt.zp) / sv.tiltPitch, -1.15, 1.15);
+      out.x = clamp((tilt.roll - tilt.zr) / sv.tiltRoll, -FLY.rawMax, FLY.rawMax);
+      out.y = clamp((tilt.pitch - tilt.zp) / sv.tiltPitch, -FLY.rawMax, FLY.rawMax);
       return out;
     }
     function recenterTilt(silent) {
       if (!tilt.on || !tilt.have) return;
-      tilt.zr = clamp(tilt.roll, -25, 25); tilt.zp = tilt.pitch;
+      tilt.zr = clamp(tilt.roll, -25, 25); tilt.zp = tilt.pitch; tilt.cal = true;
       if (!silent) { ui.toast('Tilt centered', { duration: 1.2 }); ui.sfx('ui_tick'); }
     }
     /** Start listening; with `asked` (a tap granted access), a quiet device after 800 ms falls back to touch. */
@@ -2903,7 +3435,7 @@
     }
     function disableTilt() {
       if (tilt.on) window.removeEventListener('deviceorientation', onOrient);
-      tilt.on = false; tilt.have = false; tilt.pending = false;
+      tilt.on = false; tilt.have = false; tilt.pending = false; tilt.cal = false;
       clearTimeout(tilt.timer); tilt.timer = 0;
       refreshTiltChip();
     }
@@ -2927,7 +3459,23 @@
       hud.tiltBtn.setAttribute('aria-pressed', tilt.on ? 'true' : 'false');
       hud.rcBtn.classList.toggle('fl-off', !(tilt.on && tilt.have));
     }
+    // Sensitivity / Invert belong to the pilot: one player's High + Invert never carries into the next turn
+    const multiCtl = players.length > 1;
+    const curCtl = () => ({ sensitivity: save.settings.flightSensitivity || 'normal', invert: save.settings.flightInvert === true });
+    const baseCtl = curCtl();
+    let applyingCtl = false;
+    function applyControlsFor(p) {
+      const prof = players[p] && players[p].profile;
+      if (!multiCtl) { ctlOwner = null; return; }
+      ctlOwner = prof ? prof.name : null;
+      const c = loadControls(save, prof) || baseCtl, now = curCtl();
+      applyingCtl = true;
+      if (now.sensitivity !== c.sensitivity) save.setSetting('flightSensitivity', SENS[c.sensitivity] ? c.sensitivity : 'normal');
+      if (now.invert !== (c.invert === true)) save.setSetting('flightInvert', c.invert === true);
+      applyingCtl = false;
+    }
     const offSetting = save.events.on('setting', (key, value) => {
+      if ((key === 'flightSensitivity' || key === 'flightInvert') && !applyingCtl && players[cur]) storeControls(save, players[cur].profile, curCtl());
       if (key !== 'flightControl') return;
       if (value === 'tilt') { if (!tilt.on || !tilt.have) askForTilt(); }
       else disableTilt();
@@ -2960,18 +3508,18 @@
       tiltRaw(_tv);
       updateStick(dt);
       // keys: held = (nearly) full deflection through the same curve and smoothing
-      const kx = (keys.right ? 0.88 : 0) - (keys.left ? 0.88 : 0), ky = (keys.up ? 1 : 0) - (keys.down ? 1 : 0);
-      const rx = clamp(_sv.x + _tv.x + kx, -1.15, 1.15);
-      let ry = clamp(_sv.y + _tv.y + ky, -1.15, 1.15);
+      const kx = (keys.rollR ? 1.2 : keys.right ? 0.88 : 0) - (keys.rollL ? 1.2 : keys.left ? 0.88 : 0), ky = (keys.up ? 1 : 0) - (keys.down ? 1 : 0);
+      const M = FLY.rawMax, rx = clamp(_sv.x + _tv.x + kx, -M, M);
+      let ry = clamp(_sv.y + _tv.y + ky, -M, M);
       if (save.settings.flightInvert === true) ry = -ry;
-      const w = tilt.on && tilt.have && !stick.active ? 11 : 13;
+      const w = tilt.on && tilt.have && !stick.active ? 11 : 15;
       critDamp(IN.x, IN.vx, shapeInput(rx), w, dt, _cr); IN.x = _cr.x; IN.vx = _cr.v;
       critDamp(IN.y, IN.vy, shapeInput(ry), w, dt, _cr); IN.y = _cr.x; IN.vy = _cr.v;
       IN.keepT = Math.abs(rx) >= FLY.keepRoll ? IN.keepT + dt : 0;
       const idle = Math.abs(shapeInput(rx)) < 0.02 && Math.abs(shapeInput(ry)) < 0.02 && Math.abs(IN.x) < 0.04 && Math.abs(IN.y) < 0.04;
       IN.relT = idle ? IN.relT + dt : 0;
       cmd.bank = clamp(IN.x, -1, 1) * FLY.bankMax;
-      cmd.keep = IN.keepT > 0.1 ? Math.sign(rx) : 0;
+      cmd.keep = IN.keepT > FLY.keepHold ? Math.sign(rx) : 0;
       cmd.pitch = clamp(IN.y, -1, 1);
       cmd.relT = IN.relT;
       cmd.boost = btnBoost || keys.boost;
@@ -3044,6 +3592,8 @@
     function deriveAngles() {
       pathAxes();
       P.fwd.copy(_f); P.up.copy(_u);
+      // the plane's own up (the path frame banked about the nose)
+      P.pup.copy(_u).multiplyScalar(Math.cos(P.bank)).addScaledVector(_w.crossVectors(_f, _u), Math.sin(P.bank));
       // the heading reads through vertical too: climbing, the path's up points back the way we came
       const hx = _f.x - _u.x * _f.y, hz = _f.z - _u.z * _f.y;
       if (hx * hx + hz * hz > 1e-8) P.yaw = Math.atan2(hx, hz);
@@ -3052,6 +3602,8 @@
     }
 
     function stepFlight(dt, c, onRails) {
+      if (P.state === 'water') { stepWater(dt, c); return; }
+      if (P.state === 'crash') { stepCrash(dt); return; }
       pathAxes();
       const sv = sens();
       const stunned = P.stun > 0;
@@ -3078,7 +3630,13 @@
       // ---- pitch: the input is a rate about the plane's own wing axis (hold up = loop) ----
       const v01 = clamp((P.speed - FLY.vBrake) / (FLY.vBoost - FLY.vBrake), 0, 1);
       if (P.pos.y > S.ceiling && pc > 0 && !inv) pc *= 1 - sstep(S.ceiling, S.hardCeiling - 10, P.pos.y);
-      const om = pc * FLY.pitchRate * sv.rate * lerp(1.12, 0.86, v01);
+      // over the sea, gliding down near the water (a gentle push, or let go on the way down) is a landing:
+      // the flare eases the nose to a shallow glide so the floats meet the sea softly. A steep or hard-held
+      // dive still goes in.
+      const gam0 = Math.asin(clamp(_f.y, -1, 1));
+      const flare = P.overSea && !inv && P.inTunnel < 0 && !stunned && !onRails && !autoplay && phase === 'fly' && pc < 0.05 && pc > -0.55 && gam0 < -1 * DEG
+        ? sstep(12, 5, P.agl) * sstep(-40 * DEG, -28 * DEG, gam0) * (pc < -0.02 ? 1 : sstep(0, -6 * DEG, gam0)) : 0;
+      const om = pc * FLY.pitchRate * sv.rate * lerp(1.12, 0.86, v01) * (1 - 0.8 * flare);
       if (om) rotLocal(Math.cos(P.bank), Math.sin(P.bank), 0, -om * dt);
       // ---- coordinated turn from the bank (about world up while the path is upright, its own up in a loop) ----
       pathAxes();
@@ -3092,20 +3650,46 @@
       if (stunned) wa = pinv ? 1.4 : (14 * DEG - gam) * 3;
       else {
         // released: the nose eases back to the horizon (through a loop that means carrying on over the top)
-        const relW = sstep(0.15, 0.6, relT);
+        const relW = P.aimT > 0 ? 0 : sstep(0.15, 0.6, relT) * (1 - flare);
         if (relW > 0) wa += relW * FLY.levelK * (pinv ? Math.abs(Math.sin(gam)) : -gam);
+        // just off the water: the climb-away clears the beach (unless the stick pushes down; fading at the end)
+        if (P.climbT > 0) {
+          P.climbT -= dt;
+          if (pc > -0.2) wa = Math.max(wa, (FLY.climbDeg * DEG - gam) * 2.6 * clamp(P.climbT / 0.8, 0, 1));
+        }
+        if (flare) wa += flare * (-3 * DEG - gam) * 4;
         if (!pinv && P.inTunnel < 0) {
-          // diving at the ground: a soft floor, and a firm pull-up when an impact is close
+          // diving at the ground: a soft floor for shallow descents (over the sea a gentle glide may touch
+          // down), and a firm pull-up when an impact is close and the stick is let go. A held dive crashes.
           if (gam < 0) {
-            wa += -gam * 4 * sstep(9, 2.4, P.agl);
+            const shallow = gam > (P.overSea ? -4 : -16) * DEG;
+            if (shallow || released) wa += -gam * 4 * sstep(9, 2.4, P.agl) * (P.overSea && !released ? 0.3 : 1) * (1 - flare);
             const tti = P.agl / (P.speed * Math.max(0.08, -_f.y));
-            wa += 1.6 * sstep(2.6, 0.9, tti) * (released ? 1 : 0.55);
+            if (released) wa += 1.6 * sstep(2.6, 0.9, tti) * (1 - flare);
           }
-          // the ground cushion: rising ground ahead lifts the nose
-          const look = Math.max(18, P.speed * 0.9);
-          const gAhead = Math.max(0, groundFor(P.pos.x + _f.x * look, P.pos.z + _f.z * look, P.pos.y));
-          const need = Math.atan2(gAhead + 3.5 - P.pos.y, look);
-          if (need > gam && need < 30 * DEG) wa = Math.max(wa, (need - gam) * 3.2);
+          // the ground cushion: rising ground ahead lifts the nose. It never fights a held dive onto flat
+          // ground (that crashes, on land as at sea); a hill rising ahead still gets a capped pull.
+          // Hands-off for a while, it also looks further ahead and climbs over steeper ground (a let-go plane
+          // cruising inland clears the mountain rather than flying into it).
+          const look = Math.max(18, P.speed * 0.9), held = pc <= -0.15, lazy = released && relT > 0.6;
+          let gAhead = Math.max(0, groundFor(P.pos.x + _f.x * look, P.pos.z + _f.z * look, P.pos.y));
+          let need = Math.atan2(gAhead + 3.5 - P.pos.y, look);
+          if (lazy) {
+            const g2 = Math.max(0, groundFor(P.pos.x + _f.x * look * 2, P.pos.z + _f.z * look * 2, P.pos.y)), n2 = Math.atan2(g2 + 5 - P.pos.y, look * 2);
+            if (n2 > need) { need = n2; gAhead = Math.max(gAhead, g2); }
+            // and over a tall tree or a building in the way
+            for (const d of [look * 0.7, look * 1.4]) {
+              const x = P.pos.x + _f.x * d, z = P.pos.z + _f.z * d, list = A.cells.get(Math.floor(x / 40) * 1000 + Math.floor(z / 40));
+              if (list) for (const ci of list) {
+                const cc = A.colliders[ci];
+                if (!hitCollider(cc, x, P.pos.y, z, FLY.radius + 1.5, _hit)) continue;
+                const top = cc.cyl ? cc.cyl[4] : cc.box[6], nt = Math.atan2(top + 4 - P.pos.y, d);
+                if (nt > need) { need = nt; gAhead = Math.max(gAhead, top); }
+              }
+            }
+          }
+          if (gAhead > 0.5 && need > gam && need < (lazy ? 55 : 30) * DEG && (!held || gAhead > floor + 2))     // (the sea is no hill)
+            wa = Math.max(wa, held ? Math.min(need - gam, 25 * DEG) * 2 : (need - gam) * 3.2);
           // the soft ceiling
           if (P.pos.y > S.ceiling) wa += sstep(S.ceiling, S.hardCeiling - 10, P.pos.y) * (-8 * DEG - gam) * 2.2;
         }
@@ -3139,6 +3723,7 @@
       const r = Math.hypot(P.pos.x, P.pos.z);
       if (r > FLY.leash) { P.pos.x *= FLY.leash / r; P.pos.z *= FLY.leash / r; }
       P.stun = Math.max(0, P.stun - dt);
+      P.aimT = Math.max(0, (P.aimT || 0) - dt);
       P.wobble *= Math.exp(-2.2 * dt);
       P.softCd = Math.max(0, P.softCd - dt); P.skimCd = Math.max(0, P.skimCd - dt); P.bumpCd = Math.max(0, P.bumpCd - dt);
       P.sprayCd = Math.max(0, P.sprayCd - dt); P.wallCd = Math.max(0, P.wallCd - dt);
@@ -3148,7 +3733,7 @@
         else P.camOff *= Math.exp(-2.4 * dt);
         if (Math.abs(P.camOff) < 1e-3) P.camOff = 0;
       }
-      collide();
+      collide(dt);
       deriveAngles();
     }
 
@@ -3237,25 +3822,48 @@
       return true;
     }
 
-    function collide() {
-      const x = P.pos.x, z = P.pos.z, r = FLY.radius;
-      const g = groundFor(x, z, P.pos.y);
-      // the sea: a skim and a hop, never a crash
-      if (g < 0.4 && P.pos.y < 2.9 && phase === 'fly') {
-        if (P.skimCd <= 0) {
-          P.skimCd = 0.9;
-          audio.sfx('water_skim', { intensity: clamp(P.speed / 45, 0.3, 1) });
-          W.burst(scene, V(x, 0.4, z), { count: 22, colors: [0xFFFFFF, 0xCDEFFF], speed: 7, size: 0.22, gravity: -14, life: 0.8 });
-          if (turn) turn.skims++;
+    /** How hard the plane meets a surface with normal n (m/s along it, into the surface). */
+    const impact = n => -P.speed * (P.dir.x * n.x + P.dir.y * n.y + P.dir.z * n.z);
+    /** Turn the flight path to `nv` (the attitude turns with it). */
+    function nudgeDir(nv) {
+      nv.normalize();
+      _q.setFromUnitVectors(P.dir, nv);
+      P.qp.premultiply(_q);
+      P.dir.copy(nv);
+    }
+
+    function collide(dt) {
+      const x = P.pos.x, z = P.pos.z, r = FLY.radius, y = P.pos.y;
+      P.wallYaw = 0;
+      const bi = boreAt(x, y, z);
+      if (bi !== P.inTunnel) tunnelChange(P.inTunnel, bi);
+      P.inTunnel = bi;
+      if (bi >= 0) P.tunS = Math.min(_tq.s, TUN[bi].len - _tq.s);
+      if (collideTunnels(dt)) return;
+      const g = groundFor(x, z, y);
+      // the sea: low passes kick up spray; when the floats touch it the plane lands (gently) or crashes
+      if (g < 0.4) {
+        if (y < 3.6 && phase === 'fly') {
+          if (P.skimCd <= 0) {
+            P.skimCd = 0.9;
+            audio.sfx('water_skim', { intensity: clamp(P.speed / 45, 0.3, 1) * clamp((3.6 - y) / 1.6, 0.4, 1) });
+            W.burst(scene, V(x, 0.4, z), { count: 22, colors: [0xFFFFFF, 0xCDEFFF], speed: 7, size: 0.22, gravity: -14, life: 0.8 });
+            if (turn) turn.skims++;
+          }
+          if (Math.random() < 0.6) W.burst(scene, _tmp.set(x - P.dir.x * 3, 0.3, z - P.dir.z * 3), { count: 3, color: 0xFFFFFF, speed: 4, size: 0.18, gravity: -12, life: 0.5 });
         }
-        if (Math.random() < 0.6) W.burst(scene, _tmp.set(x - P.dir.x * 3, 0.3, z - P.dir.z * 3), { count: 3, color: 0xFFFFFF, speed: 4, size: 0.18, gravity: -12, life: 0.5 });
+        if (y < FLY.floatY + 0.05) {
+          const gentle = P.dir.y * P.speed > -10 && P.pup.y > 0.6 && P.fwd.y > -0.3;
+          if (gentle) touchDown(); else crash('water', Y_UP);
+          return;
+        }
       }
-      if (g < 0.4 && P.pos.y < 1.6) { P.pos.y = 1.6; minClimb(Math.sin(7 * DEG)); P.speed *= 0.985; }
-      // ground (in the falls basin the spray cushions you instead)
-      if (g >= 0.4 && P.pos.y - 1.2 < g) {
-        const y = P.pos.y, hx = groundFor(x + 2, z, y) - groundFor(x - 2, z, y), hz = groundFor(x, z + 2, y) - groundFor(x, z - 2, y);
+      // ground (in the falls basin the spray cushions you instead; in a bore its walls hold you)
+      if (bi < 0 && g >= 0.4 && y - 1.2 < g) {
+        const hx = groundAt(x + 2, z) - groundAt(x - 2, z), hz = groundAt(x, z + 2) - groundAt(x, z - 2);
         _n.set(-hx / 4, 1, -hz / 4).normalize();
-        if (inFallsZone(x, P.pos.y, z, _fc)) sprayBounce(_n, g);
+        if (inFallsZone(x, y, z, _fc)) sprayBounce(_n, g);
+        else if (impact(_n) > FLY.crashV || P.pup.dot(_n) < -0.25) { crash('ground', _n); return; }
         else {
           bump(_n, 'ground');
           P.pos.y = Math.max(P.pos.y, g + 1.25);
@@ -3269,14 +3877,20 @@
         P.wobble = Math.max(P.wobble, 0.35);
         if (turn) turn.splashes++;
       }
-      // structures and trees
+      // structures and trees: head-on is a crash, a glancing blow bounces
       const list = A.cells.get(Math.floor(x / 40) * 1000 + Math.floor(z / 40));
       if (list) {
         for (const ci of list) {
           const c = A.colliders[ci];
           if (!hitCollider(c, x, P.pos.y, z, c.soft ? r * 0.6 : r, _hit)) continue;
-          if (c.soft) { softHit(); continue; }
           _n.set(_hit.nx, _hit.ny, _hit.nz);
+          if (c.soft) {
+            // into a tree's crown (not just brushing the leaves on top)
+            if (_n.y < 0.5 && _hit.pen > r * 0.45 && impact(_n) > 12) { crash('tree', _n); return; }
+            softHit();
+            continue;
+          }
+          if (impact(_n) > FLY.crashV) { crash('solid', _n); return; }
           bump(_n, 'solid');
           P.pos.addScaledVector(_n, _hit.pen + 0.05);
         }
@@ -3291,6 +3905,87 @@
           if (P.softCd <= 0 && phase === 'fly') { P.softCd = 1; P.wobble = 0.6; audio.sfx('bounce_soft', { vol: 0.8 }); pilotFeel('surprised', 1); }
         }
       }
+    }
+
+    // ---- tunnel walls: soft near the wall, a scrape at it, a crash only head-on ----------------------------
+    const _nv = V(), _ax2 = V();
+    function scrape(nn, at) {
+      P.wobble = Math.max(P.wobble, 0.5);
+      if (P.wallCd > 0 || phase !== 'fly') return;
+      P.wallCd = 0.45;
+      audio.sfx('plane_bump', { intensity: 0.3, vol: 0.7 });
+      W.burst(scene, at, { count: 14, colors: [0xFFE27D, 0xFFFFFF, 0xFFB627], speed: 6, size: 0.2, gravity: -6, life: 0.5 });
+      engine.shake(0.12, 0.2);
+      if (turn) turn.scrapes++;
+    }
+    function collideTunnels(dt) {
+      const r = FLY.radius, q = _tb;
+      for (let i = 0; i < TUN.length; i++) {
+        const T = TUN[i];
+        if (!tubeAt(T, P.pos.x, P.pos.y, P.pos.z, q)) continue;
+        const ub = q.d > 1e-4 ? 1 / q.d : 0;
+        _n.set((q.bx * q.b + q.nx * q.n) * ub, q.ny * q.n * ub, (q.bz * q.b + q.nz * q.n) * ub);   // outward, in the cross-section
+        _ax2.set(q.tx, q.ty, q.tz);
+        if (T.kind === 'tube') {
+          if (q.s >= 0 && q.s <= T.len && q.d < T.R + 3) {
+            const lim = T.R - 2.6, soft = T.R - 4.6, out = P.dir.dot(_n);
+            // head-on (steeper than ~24° into the wall) is a crash; a shallower brush scrapes, even at boost
+            if (q.d > lim && out * P.speed > FLY.crashV && out > 0.4) { crash('wall', _tmp.copy(_n).negate()); return true; }
+            if (q.d > soft && out > 0) {
+              // the wall leans you back toward the middle (gently: threading a curve still needs steering)
+              const k = clamp((q.d - soft) / (lim - soft), 0, 1), h0 = Math.atan2(P.dir.x, P.dir.z);
+              _nv.copy(P.dir).addScaledVector(_n, -out * Math.min(1, k * k * 3.5 * dt) - k * 0.15 * dt);
+              nudgeDir(_nv);
+              P.wallYaw += wrapA(Math.atan2(P.dir.x, P.dir.z) - h0) / Math.max(dt, 1e-3);
+            }
+            if (q.d > lim) {
+              P.pos.addScaledVector(_n, lim - q.d);
+              const o2 = P.dir.dot(_n);
+              if (o2 > 0) nudgeDir(_nv.copy(P.dir).addScaledVector(_n, -o2 * 1.25));
+              scrape(_n, _tmp.copy(P.pos).addScaledVector(_n, 2.4));
+            }
+          }
+          // the stone (or rock) round each opening
+          const pt = portalOf(T);
+          for (const M of T.mouths) {
+            const sg = M.end ? 1 : -1, front = (M.end ? q.s - T.len : -q.s) - 1.6;
+            if (front > r || front < -2 || q.d < T.R - 0.8 || q.d > pt.W + 2) continue;
+            _nv.copy(_ax2).multiplyScalar(sg);                 // the face's normal, pointing out of the tunnel
+            if (q.d > T.R + 0.8) {
+              if (impact(_nv) > FLY.crashV * 0.6) { crash('wall', _nv); return true; }
+              P.pos.addScaledVector(_nv, r - front);
+              bump(_nv, 'solid');
+            } else {
+              P.pos.addScaledVector(_n, T.R - 0.8 - q.d);
+              scrape(_n, _tmp.copy(P.pos).addScaledVector(_n, 2));
+            }
+          }
+        } else {
+          if (q.n < -0.3 * q.d || q.s < -r || q.s > T.len + r) continue;
+          let pen, nn;
+          if (q.s >= 0 && q.s <= T.len) {
+            if (q.d < T.R + T.T / 2) { pen = q.d - (T.R - r * 0.8); nn = _nv.copy(_n).negate(); }
+            else { pen = T.R + T.T + r * 0.8 - q.d; nn = _nv.copy(_n); }
+          } else {
+            if (q.d < T.R - 0.5 || q.d > T.R + T.T + 0.5) continue;
+            pen = r - (q.s < 0 ? -q.s : q.s - T.len);
+            nn = _nv.copy(_ax2).multiplyScalar(q.s < 0 ? -1 : 1);
+          }
+          if (pen <= 0) continue;
+          if (impact(nn) > FLY.crashV) { crash('wall', nn); return true; }
+          P.pos.addScaledVector(nn, pen);
+          const into = -P.dir.dot(nn);
+          if (into > 0) nudgeDir(_tmp.copy(P.dir).addScaledVector(nn, into * 1.2));
+          scrape(nn, _tmp.copy(P.pos).addScaledVector(nn, -2));
+        }
+      }
+      return false;
+    }
+    /** Into or out of a bore: the rush of air, a whoosh at the exit. */
+    function tunnelChange(from, to) {
+      if (phase !== 'fly' && phase !== 'end') return;
+      if (to >= 0) { audio.sfx('whoosh', { intensity: 0.45, vol: 0.7 }); if (turn) turn.tunnels++; }
+      else if (from >= 0) { audio.sfx('whoosh', { intensity: 0.9 }); pilotFeel('joy', 1); }
     }
 
     const _fc = { s: 0, w: 0 };
@@ -3347,6 +4042,433 @@
     }
 
     // =============================================================================================
+    // The seaplane on the water: afloat, the take-off run, splashdowns
+    // =============================================================================================
+
+    let takeoffHint = null, splashTip = false, sprayW = 0, skimW = 0;
+    /** Sits the plane on the water at st (heading st.yaw); `go` starts the take-off run at once (a respawn). */
+    function placeOnWater(st, go) {
+      P.state = 'water';
+      P.speed = go ? 10 : 0; P.boostIdle = 0;
+      P.stun = 0; P.wobble = 0; P.bumpCd = 0; P.climbT = 0;
+      P.wgo = !!go; P.autoLift = true; P.wT = 0; P.taxi = false; P.boostRun = 0;
+      P.qp.identity(); P.bank = 0; P.lastBank = 0;
+      setPathDir(_tmp.set(Math.sin(st.yaw), 0, Math.cos(st.yaw)));
+      P.bank = 0; P.lastBank = 0; P.camOff = 0; P.camTie = 0; P.loopAcc = 0; P.rollAcc = 0;
+      P.pos.set(st.x, FLY.floatY, st.z); P.prev.copy(P.pos);
+      P.inTunnel = -1;
+      deriveAngles();
+      IN.x = IN.vx = IN.y = IN.vy = 0;
+      for (const tr of trails) tr.visible = false;
+      trailOn = false;
+      for (const w of wakes) { w.clear(); w.visible = false; }
+    }
+    function startRun() {
+      if (P.wgo) return;
+      P.wgo = true;
+      hideTakeoffHint();
+      audio.sfx('boost', { vol: 0.45 });
+    }
+    function showTakeoffHint() {
+      if (autoplay || takeoffHint || P.state !== 'water' || P.wgo) return;
+      const text = 'Hold BOOST for a fast take-off!';
+      if (!hintsOn) { ui.toast(text, { duration: 1.6 }); return; }
+      // above the BOOST button (short landscape: the compact hint by the right edge, which clears it)
+      const rb = hud.boost.getBoundingClientRect(), rr = ui.root.getBoundingClientRect(), sz = engine.size;
+      // (on the narrowest phones the bubble would sit on FIND: that button rests until the plane is away)
+      if (sz.w < 360) hud.hintB.style.visibility = 'hidden';
+      takeoffHint = sz.h <= 520 && sz.aspect > 1 ? ui.hint({ gesture: 'hold', text })
+        : ui.hint({ gesture: 'hold', text, x: rb.left - rr.left + rb.width / 2 - 46, y: rb.top - rr.top - 100, textMaxWidth: 170 });
+    }
+    function hideTakeoffHint() { if (takeoffHint) { takeoffHint.hide(); takeoffHint = null; } hud.hintB.style.visibility = ''; }
+
+    function stepWater(dt, c) {
+      const live = phase === 'fly';
+      if (live) P.wT += dt;
+      let steer = live ? clamp(c.bank / FLY.bankMax, -1, 1) : 0;
+      // stick, tilt or BOOST starts the run; nobody is ever left bobbing (it goes by itself after a moment)
+      if (!P.wgo && live && (c.boost || c.pitch > 0.2 || Math.abs(steer) > 0.3 || P.wT > FLY.autoGo)) startRun();
+      // after a splashdown it slows to a taxi: pull up or BOOST to go again (or, hands-off, it goes by itself)
+      if (P.taxi && live && (c.boost || c.pitch > 0.15 || P.wT > 2.6)) { P.taxi = false; P.autoLift = !(c.boost || c.pitch > 0.15); }
+      // a hands-off run heading for the shore swings round toward open water and eases off
+      let landAhead = false;
+      if (live && P.wgo && P.autoLift && Math.abs(steer) < 0.15) {
+        const dx = Math.sin(P.yaw), dz = Math.cos(P.yaw), reach = 30 + P.speed * 2.5;
+        for (let d = 15; d <= reach && !landAhead; d += 15) landAhead = groundAt(P.pos.x + dx * d, P.pos.z + dz * d) > -1.4;
+        if (landAhead) steer = -clamp(wrapA(Math.atan2(P.pos.x, P.pos.z) - P.yaw) * 2, -0.9, 0.9);
+      }
+      P.boosting = live && P.wgo && !!c.boost && P.boost > 0.02;
+      P.braking = live && !P.boosting && !!c.brake;
+      if (P.boosting) { P.boost = Math.max(0, P.boost - FLY.boostDrain * dt); P.boostIdle = 0; }
+      else { P.boostIdle += dt; if (P.boostIdle > FLY.boostDelay) P.boost = Math.min(1, P.boost + FLY.boostRefill * dt); }
+      P.boostRun = P.boosting ? (P.boostRun || 0) + dt : 0;          // (a BOOST-held run earns the big send-off)
+      const vT = !live || !P.wgo ? 0 : P.boosting ? FLY.vBoost : P.braking ? 6 : P.taxi || landAhead ? 7 : FLY.vCruise;
+      if (P.speed < vT) P.speed = Math.min(vT, P.speed + (P.boosting ? FLY.waterBoostAccel : FLY.waterAccel) * dt);
+      else P.speed = Math.max(vT, P.speed - (2 + (P.speed - vT) * 0.8) * dt);
+      // the water rudder turns it, and it leans a little into the turn
+      rotWorld(Y_UP, -steer * lerp(0.45, 0.8, sstep(0, 20, P.speed)) * dt);
+      pathAxes();
+      setPathDir(_tmp.set(_f.x, 0, _f.z));
+      P.bank += (steer * 9 * DEG * sstep(3, 18, P.speed) - P.bank) * (1 - Math.exp(-4 * dt));
+      P.prev.copy(P.pos);
+      P.pos.addScaledVector(P.dir, P.speed * dt);
+      P.pos.y = FLY.floatY + Math.sin(engine.time * 1.9) * 0.09 * (1 - sstep(4, 16, P.speed));
+      const r = Math.hypot(P.pos.x, P.pos.z);
+      if (r > FLY.leash) { P.pos.x *= FLY.leash / r; P.pos.z *= FLY.leash / r; }
+      P.agl = P.pos.y; P.overSea = true;
+      P.wobble *= Math.exp(-2.2 * dt);
+      P.softCd = Math.max(0, P.softCd - dt); P.skimCd = Math.max(0, P.skimCd - dt); P.wallCd = Math.max(0, P.wallCd - dt);
+      deriveAngles();
+      // up and away: fast enough, and pulled up, boosting, or on a take-off run
+      if (live && !P.taxi && P.speed >= FLY.vTakeoff && (c.pitch > 0.15 || P.boosting || (P.autoLift && !landAhead))) { liftOff(); return; }
+      waterContact();
+      if (P.state !== 'water') return;
+      // spray off the floats, the wake, the hiss of the water
+      for (const w of wakes) if (!w.visible && P.speed > 2) w.visible = true;
+      sprayW -= dt; skimW -= dt;
+      if (P.speed > 3 && sprayW <= 0) {
+        sprayW = 0.06;
+        const k = sstep(3, 24, P.speed);
+        for (const sd of [-1, 1]) {
+          _tmp.set(sd * 1.1, -1.5, -0.8).applyQuaternion(plane.quaternion).add(P.pos);
+          _tmp.y = 0.25;
+          W.burst(scene, _tmp, { count: 1 + Math.round(k * 3), colors: [0xFFFFFF, 0xDDF4FF], speed: 2 + k * 6, size: 0.12 + k * 0.15, gravity: -12, life: 0.4 + k * 0.3 });
+        }
+      }
+      if (P.speed > 6 && skimW <= 0 && live) { skimW = 0.55; audio.sfx('water_skim', { intensity: clamp(P.speed / 30, 0.25, 0.9), vol: 0.7 }); }
+    }
+    /** Afloat: the beach, the shallows or a rock ahead stop a slow plane and wreck a fast one. */
+    function waterContact() {
+      const x = P.pos.x, z = P.pos.z;
+      let hit = groundAt(x, z) > -0.7 && boreAt(x, 2, z) < 0;
+      if (!hit) {
+        const list = A.cells.get(Math.floor(x / 40) * 1000 + Math.floor(z / 40)) || [];
+        hit = list.some(ci => !A.colliders[ci].soft && hitCollider(A.colliders[ci], x, P.pos.y, z, FLY.radius, _hit));
+      }
+      if (!hit && collideTunnels(1 / 60)) return;
+      if (!hit) return;
+      if (P.speed > 20 && phase === 'fly') { crash('ground', _n.set(-P.dir.x, 0.3, -P.dir.z).normalize()); return; }
+      // nose in: back off and swing round toward open water
+      P.pos.copy(P.prev);
+      P.pos.y = FLY.floatY;
+      P.speed = Math.min(P.speed, 2);
+      const away = Math.atan2(x, z);
+      rotWorld(Y_UP, clamp(wrapA(away - P.yaw), -1, 1) * 0.06);
+      deriveAngles();
+    }
+    function liftOff() {
+      P.state = 'air';
+      P.climbT = FLY.climbTime; P.autoLift = false;
+      pathAxes();
+      const h = Math.hypot(_f.x, _f.z) || 1;
+      setPathDir(_tmp.set(_f.x / h * Math.cos(8 * DEG), Math.sin(8 * DEG), _f.z / h * Math.cos(8 * DEG)));
+      P.pos.y = FLY.floatY + 0.2;
+      deriveAngles();
+      for (const w of wakes) w.visible = false;
+      hideTakeoffHint();
+      // a BOOST-held run gets the big send-off
+      const big = P.boostRun > 0.8 && P.boosting;
+      P.boostRun = 0;
+      audio.sfx('splash', { vol: big ? 0.8 : 0.5 });
+      audio.sfx('whoosh', { intensity: big ? 1 : 0.6 });
+      W.burst(scene, _tmp.set(P.pos.x, 0.3, P.pos.z), { count: big ? 60 : 30, colors: [0xFFFFFF, 0xCDEFFF], speed: big ? 11 : 7, size: big ? 0.42 : 0.32, gravity: -12, life: big ? 1.2 : 0.9 });
+      if (big) { engine.shake(0.18, 0.3); if (ui.haptic) ui.haptic(15); }
+      pilotFeel('joy', 1.2);
+      if (turn) turn.takeoffs++;
+      SS.debug.log('[flight] lift-off at', P.pos.x.toFixed(1), P.pos.z.toFixed(1), 'speed', P.speed.toFixed(1));
+      // the very first flight: the steering hint once the plane is up
+      if (cur === 0 && !autoplay && hintsOn && !firstDrag && !hintHandle && phase === 'fly') {
+        const sz = engine.size, text = 'Drag anywhere to steer. Up climbs, down dives!';
+        hintHandle = sz.h <= 520 && sz.aspect > 1 ? ui.hint({ gesture: 'drag-h', text })
+          : ui.hint({ gesture: 'drag-h', text, x: sz.w * 0.5, y: sz.h * (sz.aspect < 1 ? 0.7 : 0.82), textMaxWidth: mode === 'tour' ? 214 : 260 });
+        ctx.wait(7).then(() => { if (hintHandle) { hintHandle.hide(); hintHandle = null; } });
+      }
+      // once, a little later: splashdowns are a thing
+      if (!autoplay && phase === 'fly' && !save.isSeen('flight_glide_tip')) {
+        save.seen('flight_glide_tip');
+        ctx.wait(9).then(() => { if (ctx.alive && phase === 'fly' && P.state === 'air') ui.toast('Tip: glide down gently onto the sea to splash down', { duration: 2.6 }); });
+      }
+    }
+    /** A gentle descent onto the sea: the floats take it and it skims along, ready to take off again. */
+    function touchDown() {
+      if (P.state !== 'air') return;
+      P.state = 'water';
+      P.wgo = true; P.taxi = true; P.autoLift = false; P.wT = 0; P.climbT = 0; P.boostRun = 0;
+      pathAxes();
+      setPathDir(_tmp.set(_f.x, 0, _f.z));
+      P.bank *= 0.3;
+      P.pos.y = FLY.floatY;
+      P.speed *= 0.9;
+      deriveAngles();
+      audio.sfx('splash', { vol: 0.8 });
+      audio.sfx('water_skim', { intensity: 1 });
+      W.burst(scene, _tmp.set(P.pos.x, 0.3, P.pos.z), { count: 40, colors: [0xFFFFFF, 0xCDEFFF], speed: 8, size: 0.36, gravity: -12, life: 1 });
+      if (phase !== 'fly') return;
+      ui.banner('SPLASHDOWN!', { kind: 'good', duration: 0.9 });
+      pilotFeel('joy', 1.2);
+      if (turn) turn.splashdowns++;
+      if (!splashTip && !autoplay) { splashTip = true; ui.toast('Pull up or hold BOOST to take off again', { duration: 2.4 }); }
+    }
+
+    // =============================================================================================
+    // Crashes: the plane breaks up, the pilot pops out under a parachute, a fresh plane waits on the water
+    // =============================================================================================
+
+    const _cn = V();
+    function crash(kind, n) {
+      _cn.copy(n || Y_UP);
+      if (phase !== 'fly' || P.state === 'crash') { if (P.state === 'air') bump(_cn, kind); return; }
+      const pal = pilots[cur].pal;
+      SS.debug.log('[flight] crash:', kind, 'at', P.pos.x.toFixed(0), P.pos.y.toFixed(0), P.pos.z.toFixed(0), 'speed', P.speed.toFixed(1), 'impact', impact(_cn).toFixed(1));
+      CR = { t: 0, kind, skip: false, open: 0, landed: -1, wave: 0, pv: V(), at: P.pos.clone(), water: kind === 'water', tunnel: P.inTunnel, yaw: P.yaw, face: P.yaw, tip: null };
+      P.state = 'crash'; P.boosting = false; P.braking = false; P.stun = 0;
+      // the plane breaks apart (from where it is this very tick)
+      plane.position.copy(P.pos);
+      plane.quaternion.copy(P.qp).multiply(_q.setFromAxisAngle(_ax.set(0, 0, 1), P.bank));
+      plane.updateMatrixWorld(true);
+      debris.forEach((m, i) => {
+        m.position.set(...DEBRIS_AT[i]).applyMatrix4(plane.matrixWorld);
+        m.quaternion.copy(plane.quaternion);
+        m.userData.v.copy(P.dir).multiplyScalar(P.speed * 0.3).add(_tmp.set((Math.random() - 0.5) * 9, 4 + Math.random() * 7, (Math.random() - 0.5) * 9)).addScaledVector(_cn, 5);
+        m.userData.w.set((Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12);
+        m.userData.life = 7;
+        m.visible = true;
+      });
+      plane.visible = false;
+      for (const tr of trails) tr.visible = false;
+      trailOn = false;
+      for (const w of wakes) w.visible = false;
+      // the pilot pops up out of the cockpit
+      scene.attach(pal.root);
+      pal.root.rotation.set(0, P.yaw, 0);
+      pal.root.position.y += 0.8;
+      pal.root.scale.setScalar(1.45);   // a touch bigger out here, so the pilot reads under the canopy
+      pal.parts.footL.visible = pal.parts.footR.visible = true;
+      CR.pv.copy(P.dir).multiplyScalar(Math.min(P.speed, 30) * 0.22).add(_tmp.set(0, CR.tunnel >= 0 ? 3 : 12, 0)).addScaledVector(_cn, 3);
+      pal.setExpression('surprised', 1.4);
+      // crunch, smoke, a gasp from anyone watching
+      audio.sfx('plane_bump', { intensity: 1 });
+      audio.sfx('pins_hit', { intensity: 0.85, rate: 0.72, vol: 0.85 });
+      audio.sfx('crowd_ooh', { intensity: 0.7, delay: 0.15 });
+      if (CR.water) audio.sfx('splash', { vol: 1 });
+      engine.shake(0.75, 0.6);
+      if (ui.haptic) ui.haptic(60);
+      W.burst(scene, P.pos, { count: 26, colors: [0x5E626C, 0x8A8F99, 0xB9BEC6], speed: 5, size: 1.4, gravity: 2.5, life: 1.8 });
+      W.burst(scene, P.pos, { count: 22, colors: [0xFFB627, 0xFF6A2B, 0xFFE27D], speed: 9, size: 0.3, gravity: -9, life: 0.7 });
+      if (CR.water) W.burst(scene, _tmp.set(P.pos.x, 0.4, P.pos.z), { count: 44, colors: [0xFFFFFF, 0xCDEFFF], speed: 11, size: 0.5, gravity: -14, life: 1.1 });
+      else W.burst(scene, P.pos, { count: 26, colors: kind === 'tree' ? [0x4FA64A, 0x7CCB5E, 0x8B5E3C] : [0x8BC66A, 0xC9A97A, 0xDDE3EA], speed: 8, size: 0.32, gravity: -8, life: 1 });
+      ui.banner('CRASH!', { kind: 'bad', duration: 1.1 });
+      if (!autoplay) engine.slowmo(0.3, 0.45);
+      releaseStick();
+      hideTakeoffHint();
+      dropFirstHint();
+      ctx.hud.classList.add('fl-crashing');
+      cinematic = { kind: 'chute', t: 0 };
+      if (turn) { turn.crashes++; if (mode === 'balloons') { turn.chain = 0; turn.comboT = 0; } }
+    }
+
+    function stepCrash(dt) {
+      if (!CR) { P.state = 'air'; return; }
+      const C = CR;
+      C.t += dt;
+      const pal = pilots[cur].pal, root = pal.root, pp = root.position, v = C.pv;
+      if (!C.open && (C.t > 0.55 || (v.y < 1 && C.t > 0.3))) {
+        C.open = 0.01;
+        chute.visible = true;
+        audio.sfx('flag_flap', { vol: 1 });
+        audio.sfx('whoosh', { intensity: 0.5, vol: 0.7 });
+        pal.play('wave');
+        pal.setExpression('happy', 3);
+        C.wave = 2;
+      }
+      if (C.open) C.open = Math.min(1, C.open + dt / 0.35);
+      if (C.landed < 0) {
+        if (!C.open) v.y -= 16 * dt;
+        else {
+          const k = 1 - Math.exp(-3 * dt), kh = 1 - Math.exp(-1.2 * dt);
+          v.y += (-3 - v.y) * k; v.x += (1.4 - v.x) * kh; v.z += (0.4 - v.z) * kh;
+        }
+        pp.addScaledVector(v, dt);
+        // under a tunnel roof the canopy stays inside
+        if (C.tunnel >= 0) {
+          const T = TUN[C.tunnel];
+          if (tubeAt(T, pp.x, pp.y + 2, pp.z, _tb) && _tb.n > 0 && _tb.d > T.R - 4.4) { pp.y -= _tb.d - (T.R - 4.4); v.y = Math.min(v.y, 0); }
+        }
+        const gy = Math.max(groundFor(pp.x, pp.z, pp.y + 1), 0);
+        if (pp.y < gy) {
+          pp.y = gy; C.landed = C.t; v.set(0, 0, 0);
+          if (gy < 0.05 && groundAt(pp.x, pp.z) < 0.2) { audio.sfx('splash', { vol: 0.7 }); W.burst(scene, pp, { count: 24, colors: [0xFFFFFF, 0xCDEFFF], speed: 5, size: 0.3, gravity: -12, life: 0.8 }); }
+          else W.burst(scene, pp, { count: 14, colors: [0xC9A97A, 0xFFFFFF], speed: 3, size: 0.3, gravity: -8, life: 0.7 });
+          pal.play('cheer');
+        }
+        C.wave -= dt;
+        if (C.open && C.wave <= 0) { C.wave = 2; pal.play('wave'); }
+      }
+      const sw = Math.sin(C.t * 2.1) * 0.13 * (C.open ? 1 : 0) * (C.landed < 0 ? 1 : 0);
+      // once the canopy is open the pilot turns to face the camera and wave
+      if (C.open) C.face += wrapA(Math.atan2(camera.position.x - pp.x, camera.position.z - pp.z) - C.face) * (1 - Math.exp(-3 * dt));
+      root.rotation.set(sw * 0.4, C.face, sw);
+      if (!C.tip && C.t > 0.8 && !autoplay && hintsOn) C.tip = ui.hint({ gesture: 'tap', text: 'Tap to fly again' });
+      if (chute.visible) {
+        chute.position.copy(pp);
+        chute.position.y += 0.5;
+        chute.rotation.copy(root.rotation);
+        const k = U.ease.outBack(C.open) * (C.tunnel >= 0 ? 0.7 : 1), fl = Math.sin(C.t * 5) * 0.03;   // (a smaller canopy under a tunnel roof)
+        if (C.landed >= 0) {
+          chute.scale.y *= Math.exp(-5 * dt);
+          chute.scale.x *= Math.exp(-0.6 * dt); chute.scale.z = chute.scale.x;
+        } else chute.scale.set(k * (1 + fl), k, k * (1 - fl));
+      }
+      const end = C.skip || C.t > (autoplay ? 1.6 : C.tunnel >= 0 ? FLY.chuteTime * 0.7 : FLY.chuteTime) || (C.landed >= 0 && C.t - C.landed > 0.7);
+      if (end && C.t > 0.35) respawn();
+    }
+
+    function updateDebris(dt) {
+      for (const m of debris) {
+        if (!m.visible) continue;
+        const u = m.userData;
+        u.life -= dt;
+        if (u.life <= 0) { m.visible = false; continue; }
+        u.v.y -= 14 * dt;
+        m.position.addScaledVector(u.v, dt);
+        m.rotation.x += u.w.x * dt; m.rotation.y += u.w.y * dt; m.rotation.z += u.w.z * dt;
+        const g = groundFor(m.position.x, m.position.z, m.position.y + 1);
+        if (g < 0.4 && m.position.y < 0.2) {
+          // on the sea: bob, drift and slowly sink
+          m.position.y = Math.max(m.position.y, -0.4 - (7 - u.life) * 0.25);
+          u.v.multiplyScalar(Math.exp(-3 * dt)); u.v.y = Math.min(u.v.y, -0.3);
+          u.w.multiplyScalar(Math.exp(-2 * dt));
+        } else if (g >= 0.4 && m.position.y < g + 0.3) {
+          m.position.y = g + 0.3;
+          u.v.y = Math.abs(u.v.y) * 0.3; u.v.x *= 0.6; u.v.z *= 0.6;
+          u.w.multiplyScalar(0.7);
+        }
+      }
+    }
+
+    /** Which way the next target lies (a fresh plane faces it). */
+    function targetYaw() {
+      let t = null;
+      if (mode === 'rings' && turn && turn.next < RINGS.length) t = RINGS[turn.next];
+      else if (mode === 'balloons') { const i = nearestBalloon(); if (i >= 0) t = BALLOONS[i]; }
+      else if (mode === 'tour') { const i = nearestMarker(false); if (i >= 0) t = MARKERS[i]; }
+      return t ? Math.atan2(t.x - P.pos.x, t.z - P.pos.z) : P.yaw;
+    }
+    /** Open water near (x0, z0) with a clear run of ~130 m, heading as close to `want` as it allows. */
+    function findWaterSpot(x0, z0, want) {
+      const clearRun = (x, z, h) => {
+        const dx = Math.sin(h), dz = Math.cos(h);
+        for (let d = -10; d <= 130; d += 14) {
+          const px = x + dx * d, pz = z + dz * d;
+          if (groundAt(px, pz) > -1.4 || boreAt(px, 3, pz, _tb, 30) >= 0 || blockedAt(_sp.set(px, 3, pz), FLY.radius + 2)) return false;
+        }
+        return true;
+      };
+      for (let r = 0; r <= 320; r += 20) {
+        let best = null, bc = Infinity;
+        const n = r ? 16 : 1;
+        for (let k = 0; k < n; k++) {
+          const a = k / n * TAU, x = x0 + Math.cos(a) * r, z = z0 + Math.sin(a) * r;
+          if (groundAt(x, z) > -2) continue;
+          for (let j = 0; j < 12; j++) {
+            const h = want + (j % 2 ? 1 : -1) * Math.ceil(j / 2) * (TAU / 12), cost = Math.abs(wrapA(h - want)) * 60;
+            if (cost >= bc) continue;
+            if (clearRun(x, z, h)) { bc = cost; best = { x, z, yaw: h }; break; }
+          }
+        }
+        if (best) return best;
+      }
+      return null;
+    }
+
+    /** A clear point in the air on the way into ring n: back along the line from the ring before (or the
+     *  ring's own facing; inside a bore, back along its centreline), with a clear flight into the ring. */
+    const _rs = V(), _rs2 = V();
+    function ringRespawnSpot(n) {
+      const R = RINGS[n], Q = RINGS[n - 1];
+      const clearAt = p => !blockedAt(p, FLY.radius + 1.5) && p.y > Math.max(groundFor(p.x, p.z, p.y), 0) + 4;
+      const clearLine = (a, b) => { for (let k = 0; k <= 8; k++) { if (!clearAt(_rs2.lerpVectors(a, b, k / 8))) return false; } return true; };
+      const toR = (p, back) => {
+        const dx = R.x - p.x, dy = R.y - p.y, dz = R.z - p.z, h = Math.hypot(dx, dz) || 1;
+        return { x: p.x, y: p.y, z: p.z, yaw: Math.atan2(dx, dz), pitch: clamp(Math.atan2(dy, h), -30 * DEG, 30 * DEG), back };
+      };
+      const tgt = V(R.x, R.y, R.z);
+      // in a bore: back along the centreline
+      if (R.tunnel) {
+        const T = TUN.find(t => t.id === R.tunnel);
+        if (T && T.kind === 'tube' && boreAt(R.x, R.y, R.z, _tcq) >= 0) {
+          const sg = R.nx * _tcq.tx + R.ny * _tcq.ty + R.nz * _tcq.tz >= 0 ? 1 : -1;
+          for (const back of [40, 30, 20]) {
+            const s1 = _tcq.s - sg * back;
+            if (s1 < 4 || s1 > T.len - 4) continue;
+            const bp = S.tunnelPoint(T.id, s1, 0);
+            _rs.set(bp.x, bp.y, bp.z);
+            if (clearAt(_rs)) return toR(_rs, back);
+          }
+        }
+      }
+      // back along the leg from the ring before, or along the ring's own facing
+      const lx = R.x - Q.x, ly = R.y - Q.y, lz = R.z - Q.z, leg = Math.hypot(lx, ly, lz) || 1;
+      // (on the line of the leg, even back past the ring before: a ring tube is threaded from its start)
+      const tries = [[50, 1], [40, 1], [50, 0], [40, 0], [30, 1], [30, 0], [Math.min(22, leg * 0.85), 1], [22, 0], [15, 0]];
+      for (const [back, along] of tries) {
+        if (along) _rs.set(R.x - lx / leg * back, R.y - ly / leg * back, R.z - lz / leg * back);
+        else _rs.set(R.x - R.nx * back, R.y - R.ny * back, R.z - R.nz * back);
+        if (clearAt(_rs) && clearLine(_rs, tgt)) return toR(_rs, back);
+      }
+      // last resort: the ring before, lifted clear (the old way)
+      _rs.set(Q.x, Q.y, Q.z);
+      if (!clearAt(_rs)) _rs.y = Math.max(Q.y, Math.max(groundAt(Q.x, Q.z), 0) + 20);
+      return toR(_rs, 0);
+    }
+
+    function respawn() {
+      const C = CR;
+      CR = null;
+      if (C.tip) C.tip.hide();
+      ctx.hud.classList.remove('fl-crashing');
+      const pal = pilots[cur].pal;
+      plane.add(pal.root);
+      pal.root.position.set(0, -0.04, -0.34);
+      pal.root.rotation.set(0, 0, 0);
+      pal.root.scale.setScalar(1);
+      pal.parts.footL.visible = pal.parts.footR.visible = false;
+      pal.play('idle');
+      pal.setExpression('happy');
+      chute.visible = false;
+      plane.visible = true;
+      cinematic = null;
+      cam.snap = true;
+      P.pos.copy(C.at);
+      const want = targetYaw();
+      // Ring Run picks up on the course, in the air just before the next ring and lined up with it
+      const rs = mode === 'rings' && turn && turn.next > 0 && turn.next < RINGS.length ? ringRespawnSpot(turn.next) : null;
+      const spot = rs ? null : findWaterSpot(C.at.x, C.at.z, want);
+      if (rs) {
+        placeAt(rs, 0);
+        if (rs.pitch) setPathDir(_tmp.set(Math.sin(rs.yaw) * Math.cos(rs.pitch), Math.sin(rs.pitch), Math.cos(rs.yaw) * Math.cos(rs.pitch)));
+        P.prev.copy(P.pos); P.aimT = 1.6;      // (it holds the line into the ring for a moment, hands-off)
+        deriveAngles();
+      }
+      else if (spot) placeOnWater(spot, phase === 'fly');
+      else {
+        // far inland: Ring Run picks up at the last ring, elsewhere a fresh plane appears high over the crash
+        let st;
+        if (mode === 'rings' && turn && turn.next > 0) {
+          const r0 = RINGS[turn.next - 1], r1 = RINGS[Math.min(RINGS.length - 1, turn.next)];
+          st = { x: r0.x, y: r0.y, z: r0.z, yaw: Math.atan2(r1.x - r0.x, r1.z - r0.z) };
+        } else st = { x: C.at.x, y: C.at.y, z: C.at.z, yaw: want };
+        let top = 0;
+        for (let d = 0; d <= 140; d += 20) top = Math.max(top, groundAt(st.x + Math.sin(st.yaw) * d, st.z + Math.cos(st.yaw) * d));
+        if (boreAt(st.x, st.y, st.z) < 0) st.y = Math.max(st.y, top + 26);
+        placeAt(st, 0);
+      }
+      W.burst(scene, P.pos, { count: 24, color: 0xFFFFFF, speed: 5, size: 0.8, gravity: 0, life: 0.8 });
+      audio.sfx('pop', { vol: 0.8 });
+      if (mode === 'rings' && turn && turn.next < RINGS.length) nextRingSetup();
+    }
+
+    // =============================================================================================
     // Camera
     // =============================================================================================
 
@@ -3363,19 +4485,45 @@
       else cam.q.slerp(_cq, 1 - Math.exp(-4.5 * k));
     }
 
+    const _tcq = { ..._tq };
     function chaseGoal(out, look, up) {
       const aspect = engine.size.aspect;
       const v01 = clamp((P.speed - FLY.vBrake) / (FLY.vBoost - FLY.vBrake), 0, 1);
       // portrait sees less sideways: a taller view and a camera a little further back keep the plane readable
       const portrait = aspect < 0.9;
       const wide = clamp((aspect - 1.2) / 0.8, 0, 1);   // desktop / landscape: a narrower lens, a little closer
-      const vfov = portrait ? lerp(66, 76, v01) : lerp(lerp(54, 46, wide), lerp(64, 56, wide), v01);
-      const dist = (portrait ? 14.5 : lerp(13, 12, wide)) + v01 * 3.5;
-      const height = portrait ? 5.6 : lerp(4.2, 3.7, wide);
+      let vfov = portrait ? lerp(66, 76, v01) : lerp(lerp(54, 46, wide), lerp(64, 56, wide), v01);
+      let dist = (portrait ? 14.5 : lerp(13, 12, wide)) + v01 * 3.5;
+      let height = portrait ? 5.6 : lerp(4.2, 3.7, wide);
+      // on the water and climbing away: low and wide; in a tunnel: tucked in close behind the plane
+      vfov += P.camLow * 6; dist += P.camLow * 1.5; height = lerp(height, portrait ? 3 : 2.3, P.camLow);
+      dist = lerp(dist, portrait ? 11.5 : 10.5, P.camTun); height = lerp(height, 3, P.camTun); vfov -= 4 * P.camTun;
+      dist += 3 * P.camLoop;
       _cf.set(0, 0, 1).applyQuaternion(cam.q);
       up.set(0, 1, 0).applyQuaternion(cam.q);
       out.copy(P.pos).addScaledVector(_cf, -dist).addScaledVector(up, height);
       look.copy(P.pos).addScaledVector(_cf, 16).addScaledVector(P.dir, 6).addScaledVector(up, portrait ? 2.6 : 1.8);
+      // in a bore: look down the bore (25 m ahead on its centreline), so a curving tunnel's exit stays framed
+      if (P.inTunnel >= 0 && P.camTun > 0.01 && TUN[P.inTunnel].kind === 'tube') {
+        const T = TUN[P.inTunnel];
+        if (boreAt(P.pos.x, P.pos.y, P.pos.z, _tcq) === P.inTunnel) {
+          const sg = P.dir.x * _tcq.tx + P.dir.y * _tcq.ty + P.dir.z * _tcq.tz >= 0 ? 1 : -1;
+          const bp = S.tunnelPoint(T.id, clamp(_tcq.s + sg * 25, 0, T.len), 0);
+          look.lerp(_tmp.set(bp.x, bp.y, bp.z), P.camTun * 0.5);
+        }
+      }
+      // through a loop (or a steep climb or dive) the camera stays level, behind the plane on the line it
+      // entered on, and watches it go round: up into the sky, over the top coming back upside down with the
+      // horizon and the island behind it, and down again. (A path-locked camera only ever saw sky, then sea.)
+      if (P.camLoop > 0.01) {
+        const w = 0.85 * P.camLoop, hx = Math.sin(P.loopH), hz = Math.cos(P.loopH);
+        out.lerp(_tmp.set(P.pos.x - hx * (dist + 2), P.pos.y + 5, P.pos.z - hz * (dist + 2)), w);
+        look.lerp(_tmp.set(P.pos.x + hx * 4, P.pos.y + 1.5, P.pos.z + hz * 4), w);
+        up.lerp(Y_UP, w);
+        if (up.lengthSq() < 0.04) up.copy(Y_UP);
+        up.normalize();
+        vfov += 6 * P.camLoop;
+      }
       return vfov;
     }
 
@@ -3411,9 +4559,17 @@
           vfov = chaseGoal(_cp, _cl, _cu);
           _cp.y += c.t * 6; _cp.x -= Math.sin(P.yaw) * c.t * 8; _cp.z -= Math.cos(P.yaw) * c.t * 8;
           _cl.copy(P.pos);
+        } else if (c.kind === 'chute') {
+          // follow the pilot down: off to one side, a little above, swinging round slowly
+          // from the front three-quarter, so the Pal's face and wave read under the canopy
+          const pp = pilots[cur].pal.root.position, a = (CR ? CR.yaw : P.yaw) + 0.55 + c.t * 0.12;
+          const rr = CR && CR.tunnel >= 0 ? 7 : 11;
+          _cp.set(pp.x + Math.sin(a) * rr, pp.y + (CR && CR.tunnel >= 0 ? 0.5 : 1.5), pp.z + Math.cos(a) * rr);
+          _cl.set(pp.x, pp.y + 1.8, pp.z);
+          vfov = engine.size.aspect < 0.9 ? 62 : 48;
         }
       } else { vfov = chaseGoal(_cp, _cl, _cu); up = _cu; }
-      const lag = cinematic ? (cinematic.kind === 'flyby' ? 30 : 3.6) : 11;
+      const lag = cinematic ? (cinematic.kind === 'flyby' ? 30 : cinematic.kind === 'chute' ? 4.5 : 3.6) : 11;
       if (snap) { cam.pos.copy(_cp); cam.look.copy(_cl); cam.fov = vfov; cam.up.copy(up); }
       else {
         cam.pos.lerp(_cp, 1 - Math.exp(-lag * k));
@@ -3421,7 +4577,7 @@
         cam.up.lerp(up, 1 - Math.exp(-8 * k)).normalize();
         cam.fov += (vfov - cam.fov) * (1 - Math.exp(-3 * k));
       }
-      keepCameraClear();
+      keepCameraClear(cinematic && cinematic.kind === 'chute' ? _cl : P.pos);
       camera.position.copy(cam.pos);
       camera.up.copy(cam.up);
       camera.lookAt(cam.look);
@@ -3435,8 +4591,29 @@
     // Never under the ground or the sea, never inside a building or a canopy, and nothing solid between the
     // camera and the plane: under a bridge deck the camera stays under it (closer), a hill crest lifts it.
     const _sp = V();
-    function keepCameraClear() {
-      const cp = cam.pos, pp = P.pos;
+    function keepCameraClear(pp) {
+      const cp = cam.pos;
+      // in (or right at) a tunnel: stay inside the bore or under the arch, never out in the rock
+      for (const T of TUN) {
+        if (!tubeAt(T, cp.x, cp.y, cp.z, _tb)) continue;
+        const q = _tb;
+        if (T.kind === 'tube') {
+          const plIn = P.inTunnel >= 0 && TUN[P.inTunnel] === T;
+          if (q.s > -1.4 && q.s < T.len + 1.4 && (q.d < T.R + 6 || plIn)) {
+            const lim = T.R - 1.6;
+            if (q.d > lim) cp.set(q.cx, q.cy, q.cz).addScaledVector(_tmp.set(q.bx * q.b + q.nx * q.n, q.ny * q.n, q.bz * q.b + q.nz * q.n), lim / q.d);
+            return;
+          }
+          if (plIn && q.s > -40 && q.s < T.len + 40) {
+            // just outside a mouth, the plane inside: stay on the approach line, below the portal's top
+            if (q.d > T.R - 1.6) cp.set(q.cx, q.cy, q.cz).addScaledVector(_tmp.set(q.bx * q.b + q.nx * q.n, q.ny * q.n, q.bz * q.b + q.nz * q.n), (T.R - 1.6) / q.d);
+            return;
+          }
+        } else if (q.s > -1 && q.s < T.len + 1 && q.n > -0.3 * q.d && q.d > T.R - 1.5 && q.d < T.R + T.T + 1.5) {
+          const want = q.d < T.R + T.T / 2 ? T.R - 1.5 : T.R + T.T + 1.5;
+          cp.set(q.cx, q.cy, q.cz).addScaledVector(_tmp.set(q.bx * q.b + q.nx * q.n, q.ny * q.n, q.bz * q.b + q.nz * q.n), want / q.d);
+        }
+      }
       let gy = Math.max(groundAt(cp.x, cp.z), 0) + 2.2;
       if (cp.y < gy) cp.y = gy;
       // terrain between: lift the camera until its line to the plane clears the ground (at most 25 m)
@@ -3477,6 +4654,7 @@
       if (Math.abs(A.mats.falls.opacity - fo) > 0.005) A.mats.falls.opacity = fo;
     }
     function blockedAt(p, r = 0.8) {
+      if (tunnelSolid(p.x, p.y, p.z, r)) return true;
       const list = A.cells.get(Math.floor(p.x / 40) * 1000 + Math.floor(p.z / 40));
       if (!list) return false;
       for (const ci of list) { const c = A.colliders[ci]; if (!c.soft && hitCollider(c, p.x, p.y, p.z, r, _hit)) return true; }
@@ -3488,11 +4666,47 @@
     // =============================================================================================
 
     let propSpin = 0, scarfT = 0, lookT = 0;
+    /** Lined up with a tunnel mouth and about to fly in. */
+    function approachingTunnel() {
+      for (const T of TUN) {
+        if (T.kind !== 'tube' || !tubeAt(T, P.pos.x, P.pos.y, P.pos.z, _tb) || _tb.d > T.R) continue;
+        const al = P.dir.x * _tb.tx + P.dir.y * _tb.ty + P.dir.z * _tb.tz;
+        if ((_tb.s < 0 && _tb.s > -30 && al > 0.8) || (_tb.s > T.len && _tb.s < T.len + 30 && al < -0.8)) return true;
+      }
+      return false;
+    }
+    /** Tunnels far from the camera are hidden; inside one the daylight dims to its lamps. */
+    function updateTunnels(dt) {
+      const cp = camera.position;
+      for (const t of tunnelMeshes) {
+        const vis = cp.distanceTo(t.ctr) < t.rad + 900;
+        for (const m of t.meshes) m.visible = vis;
+      }
+      let want = 0;
+      if (P.inTunnel >= 0) want = (TUN[P.inTunnel].style === 'cave' ? 0.65 : 1) * sstep(1, 20, P.tunS);
+      P.dim += (want - P.dim) * (1 - Math.exp(-4 * dt));
+      if (env.sun) env.sun.intensity = lightBase.sun * (1 - 0.78 * P.dim);
+      if (env.hemi) env.hemi.intensity = lightBase.hemi * (1 - 0.5 * P.dim);
+    }
+    let wPitch = 0;
     function updatePlaneVisual(dt, t) {
       plane.position.copy(P.pos);
       const wob = Math.sin(t * 17) * P.wobble * 0.5;
-      plane.quaternion.copy(P.qp).multiply(_q.setFromAxisAngle(_ax.set(0, 0, 1), P.bank + wob))
-        .multiply(_q.setFromAxisAngle(_ax.set(1, 0, 0), Math.sin(t * 13) * P.wobble * 0.15));
+      // afloat the nose rides up as the run builds ("on the step") and rocks with the swell
+      const wp = P.state === 'water' ? lerp(1.5, 6, sstep(6, FLY.vTakeoff, P.speed)) * DEG + Math.sin(t * 1.3) * 0.6 * DEG * (1 - sstep(4, 16, P.speed)) : 0;
+      wPitch += (wp - wPitch) * (1 - Math.exp(-6 * dt));
+      // a tunnel wall steering the plane round a curve: it leans into it, as if carving the turn (looks only)
+      const wb = P.state === 'air' ? clamp(-P.wallYaw * 0.9, -35 * DEG, 35 * DEG) : 0;
+      P.wallBank += (wb - P.wallBank) * (1 - Math.exp(-5 * dt));
+      plane.quaternion.copy(P.qp).multiply(_q.setFromAxisAngle(_ax.set(0, 0, 1), P.bank + wob + P.wallBank))
+        .multiply(_q.setFromAxisAngle(_ax.set(1, 0, 0), Math.sin(t * 13) * P.wobble * 0.15 - wPitch));
+      // the camera framing follows the plane's situation
+      const lowT = P.state === 'water' || P.climbT > 0 ? 1 : 0, tunT = P.inTunnel >= 0 ? 1 : approachingTunnel() ? 0.6 : 0;
+      P.camLow += (lowT - P.camLow) * (1 - Math.exp(-(lowT ? 3 : 1.2) * dt));
+      P.camTun += (tunT - P.camTun) * (1 - Math.exp(-3 * dt));
+      const loopT = P.state === 'air' && P.inTunnel < 0 && (Math.abs(P.pitch) > 45 * DEG || P.up.y < 0) ? 1 : 0;
+      if (P.camLoop < 0.05 && !loopT) P.loopH = P.yaw;          // the line a loop is entered on
+      P.camLoop += (loopT - P.camLoop) * (1 - Math.exp(-(loopT ? 2.5 : 1.2) * dt));
       propSpin += dt * (34 + P.speed * 0.9);
       prop.rotation.z = propSpin;
       blur.material.opacity = 0.55 + 0.15 * Math.sin(t * 40);
@@ -3670,13 +4884,16 @@
       _gp.set(target.x, target.y, target.z);
       // the 3D arrow reads best side-on: shown once the target is well off the nose
       const off = Math.abs(wrapA(Math.atan2(_gp.x - P.pos.x, _gp.z - P.pos.z) - P.yaw));
-      arrow.visible = phase === 'fly' && off > 0.5;
-      // 3D arrow just above the plane, pointing at the target
+      // (never in or at a tunnel, where it would cover the bore: the screen-edge chevron points the way there)
+      const tunnelView = P.camTun > 0.15 || P.inTunnel >= 0;
+      arrow.visible = phase === 'fly' && off > 0.5 && !tunnelView && P.state === 'air';
+      // 3D arrow above the plane (clear of the middle of the view), pointing at the target
       if (arrow.visible) {
-        arrow.position.set(P.pos.x + P.dir.x * 5, P.pos.y + 3.6 + Math.sin(t * 4) * 0.15, P.pos.z + P.dir.z * 5);
+        const bob = 5.5 + Math.sin(t * 4) * 0.15;
+        arrow.position.set(P.pos.x + P.up.x * bob + P.dir.x * 2, P.pos.y + P.up.y * bob + P.dir.y * 2, P.pos.z + P.up.z * bob + P.dir.z * 2);
         arrow.lookAt(_gp);
         const d = arrow.position.distanceTo(_gp);
-        arrow.scale.setScalar(clamp(d / 60, 0.7, 1.15));
+        arrow.scale.setScalar(0.7 * clamp(d / 60, 0.7, 1.15));
         A.mats.arrow.color.set(col);
       }
       const pr = engine.project(_gp, camera);
@@ -3821,7 +5038,7 @@
         halo.scale.setScalar(k);
         halo.material.opacity = 0.65 * (1 - ((t * 1.2) % 1));
       }
-      if (phase !== 'fly' || n >= RINGS.length) return;
+      if (phase !== 'fly' || n >= RINGS.length || P.state === 'crash') return;
       T.ringT += dt;
       const r = RINGS[n];
       // which side of the ring's plane are we on?
@@ -3877,6 +5094,7 @@
       const T = turn;
       ringState[n].state = 'missed'; ringState[n].t = 0;
       ringMesh.setColorAt(n, new THREE.Color(0xFF5A5F));
+      SS.debug.log('[flight] missed ring', n, txt, 'at', P.pos.x.toFixed(0), P.pos.y.toFixed(0), P.pos.z.toFixed(0));
       ringMesh.instanceColor.needsUpdate = true;
       T.missed++; T.streak = 0; T.penalty += RULES.missPenalty;
       T.next++;
@@ -4079,6 +5297,7 @@
       refreshMarkerTiles();
       refreshMarkerChip(false);
       refreshPlayerChip();
+      applyControlsFor(p);
     }
 
     // =============================================================================================
@@ -4094,7 +5313,8 @@
     }
 
     function placeAt(st, back) {
-      P.speed = FLY.vCruise; P.boost = 1; P.boostIdle = 0;
+      P.state = 'air'; P.climbT = 0;
+      P.speed = FLY.vCruise; P.boost = Math.max(P.boost, 0.5); P.boostIdle = 0;
       P.stun = 0; P.wobble = 0; P.bumpCd = 0;
       P.qp.identity(); P.bank = 0; P.lastBank = 0;
       setPathDir(_tmp.set(Math.sin(st.yaw), 0, Math.cos(st.yaw)));
@@ -4111,6 +5331,7 @@
         score: 0, popped: 0, golds: 0, chain: 0, comboT: 0, bestChain: 0, allBonus: 0, lastBalloon: -1, noBalT: 0, balGuide: 0, balTarget: -1,
         left: RULES.time || 0, elapsed: 0, penalty: 0, next: 0, hit: 0, missed: 0, streak: 0, bestStreak: 0, ringT: 0, lastSide: null, finalTime: null,
         topSpeed: 0, dist: 0, bumps: 0, skims: 0, splashes: 0, clouds: 0, cheers: 0, flocks: 0, skipMk: new Float32Array(MARKER_COUNT),
+        crashes: 0, scrapes: 0, tunnels: 0, takeoffs: 0, splashdowns: 0,
       };
     }
 
@@ -4155,7 +5376,8 @@
       turn = newTurn();
       const st = startFor(mode);
       const countdownTime = 2.75;
-      placeAt(st, FLY.vCruise * countdownTime);
+      placeOnWater(st, false);
+      P.boost = 1;
       cam.snap = true;
       cinematic = { kind: 'orbit', t: 0, a0: P.yaw + 2.2 };
       phase = 'turn';
@@ -4164,19 +5386,12 @@
       if (players.length > 1) { await turnCard(p); if (!live()) return; }
       phase = 'countdown';
       cinematic = { kind: 'swoop', t: 0, dur: countdownTime };
-      audio.sfx('flyby', { intensity: 0.55, pan: -0.6 });
-      if (p === 0 && !autoplay && hintsOn && !firstDrag && !hintHandle) {
-        const sz = engine.size, text = 'Drag anywhere to steer. Up climbs, down dives!';
-        hintHandle = sz.h <= 520 && sz.aspect > 1 ? ui.hint({ gesture: 'drag-h', text })
-          : ui.hint({ gesture: 'drag-h', text, x: sz.w * 0.5, y: sz.h * (sz.aspect < 1 ? 0.7 : 0.82), textMaxWidth: mode === 'tour' ? 214 : 260 });
-        ctx.wait(7).then(() => { if (hintHandle) { hintHandle.hide(); hintHandle = null; } });
-      }
       await ui.countdown(3);
       if (!live()) return;
       phase = 'fly';
       cinematic = null;
       if (tilt.on && tilt.have) recenterTilt(true);
-      audio.sfx('boost', { vol: 0.6 });
+      showTakeoffHint();
       if (mode === 'tour' && countOf(pilots[p].markers) === MARKER_COUNT) ui.toast('Every "!" found! Revisit them for points.', { icon: 'star', duration: 3 });
       await new Promise(resolve => { turnDone = resolve; });
       if (!live()) return;
@@ -4185,6 +5400,8 @@
 
     function endTurn(why) {
       if (phase !== 'fly') return;
+      if (CR) respawn();
+      hideTakeoffHint();
       phase = 'end';
       turn.why = why;
       releaseAll();
@@ -4218,6 +5435,7 @@
         score: T.score, popped: T.popped, golds: T.golds, bestChain: T.bestChain, allBonus: T.allBonus,
         time: mode === 'rings' ? (T.finalTime != null ? T.finalTime : T.elapsed + T.penalty) : null, hit: T.hit, missed: T.missed, bestStreak: T.bestStreak,
         topSpeed: T.topSpeed, dist: T.dist, bumps: T.bumps, cheers: T.cheers, found: foundThisFlight[p].length, revisits: revisited[p].length,
+        crashes: T.crashes, tunnels: T.tunnels,
       };
       await skippable(autoplay ? 1.6 : 3.2);
       if (!live()) return;
@@ -4240,7 +5458,8 @@
       const medals = [];
       const award = id => { if (!debugTouched && ctx.awardMedal(id)) medals.push(id); };
       let order, title, headline, headlineLabel, stats = [], scoreText, good;
-      const R = results.map(r => r || { score: 0, time: 999, found: 0, revisits: 0, popped: 0, golds: 0, bestChain: 0, hit: 0, missed: 0, bestStreak: 0, topSpeed: 0, dist: 0, bumps: 0, cheers: 0 });
+      const R = results.map(r => r || { score: 0, time: 999, found: 0, revisits: 0, popped: 0, golds: 0, bestChain: 0, hit: 0, missed: 0, bestStreak: 0, topSpeed: 0, dist: 0, bumps: 0, cheers: 0, crashes: 0, tunnels: 0 });
+      const crashStat = r => ({ label: 'Crashes', value: r.crashes ? String(r.crashes) : 'None!' });
       const lifetime = pilots.map(pl => countOf(pl.markers));
       if (mode === 'balloons') {
         const best = R.reduce((b, r, i) => (r.score > R[b].score ? i : b), 0);
@@ -4259,6 +5478,7 @@
           { label: 'Best chain', value: String(r0.bestChain) },
         ];
         if (solo && r0.allBonus) stats.push({ label: 'Time bonus', value: '+' + r0.allBonus });
+        if (solo) stats.push(crashStat(r0));
       } else if (mode === 'rings') {
         const best = R.reduce((b, r, i) => (r.time < R[b].time ? i : b), 0);
         order = R.map(r => -r.time);
@@ -4275,6 +5495,7 @@
           { label: 'Missed (+3 s)', value: String(r0.missed) },
           { label: 'Best streak', value: String(r0.bestStreak) },
           { label: 'Top speed', value: Math.round(r0.topSpeed) + ' m/s' },
+          crashStat(r0),
         ];
       } else {
         // Island Tour: points for the markers visited this flight (new +3, revisit +1)
@@ -4291,6 +5512,7 @@
           { label: 'Revisited', value: String(r0.revisits) },
           { label: 'All-time "!"', value: lifetime[0] + '/' + MARKER_COUNT },
           { label: 'Distance flown', value: (r0.dist / 1000).toFixed(1) + ' km' },
+          crashStat(r0),
         ];
       }
       // the lifetime "!" record and the platinum medal (any mode) belong to saved Pals only
@@ -4314,14 +5536,14 @@
         if (mode === 'balloons') { const a = lead(i => R[i].bestChain); stats.push({ label: 'Best chain · ' + a.who, value: String(a.v) }); const g2 = lead(i => R[i].golds); stats.push({ label: 'Most golds · ' + g2.who, value: String(g2.v) }); }
         if (mode === 'rings') { const a = lead(i => R[i].bestStreak); stats.push({ label: 'Best streak · ' + a.who, value: String(a.v) }); const m2 = lead(i => R[i].missed, true); stats.push({ label: 'Fewest misses · ' + m2.who, value: String(m2.v) }); }
         if (mode === 'tour') { const a = lead(i => R[i].found); stats.push({ label: 'Most new "!" · ' + a.who, value: String(a.v) }); }
-        const fb = lead(i => R[i].bumps, true); stats.push({ label: 'Fewest bumps · ' + fb.who, value: String(fb.v) });
+        const fc = lead(i => R[i].crashes, true); stats.push({ label: 'Fewest crashes · ' + fc.who, value: String(fc.v) });
       }
       // skill: score (or time / finds) against what this level should manage
       const deltaFor = i => {
         if (debugTouched) return 0;
         const lv01 = clamp(ctx.skillFor(players[i].profile) / 2500, 0, 1), r = R[i];
         if (mode === 'balloons') return Math.round(clamp(4 + (r.score - lerp(18, 85, lv01)) * 1.1, -40, 80));
-        if (mode === 'rings') return Math.round(clamp(4 + (lerp(210, 125, lv01) - r.time) * 1.2, -40, 80));
+        if (mode === 'rings') return Math.round(clamp(4 + (lerp(230, 140, lv01) - r.time) * 1.2, -40, 80));
         // points: a new "!" is 3, a revisit 1, so a pilot who knows the island already can still score
         return Math.round(clamp(2 + (r.score - lerp(10, 40, lv01)) * 1.6, -30, 60));
       };
@@ -4357,14 +5579,18 @@
     // Autoplay: steers toward the next balloon, ring or "!" with smooth, slightly varied inputs
     // =============================================================================================
 
-    const auto = { target: -1, t: 0, retarget: 0, wob: 0, skipB: new Float32Array(BALLOONS.length) };
+    const auto = { target: -1, t: 0, retarget: 0, wob: 0, guided: false, goal: null, aim: null, final: null, skipB: new Float32Array(BALLOONS.length) };
     function autoTarget(dt) {
       auto.retarget -= dt; auto.t += dt;
+      auto.goal = null;
       if (mode === 'rings') {
         if (!turn || turn.next >= RINGS.length) return null;
+        // line up on the ring's axis: aim at a point out in front of it, further out the more we are off to the side
         const r = RINGS[turn.next];
-        const dist = Math.hypot(r.x - P.pos.x, r.y - P.pos.y, r.z - P.pos.z);
-        const lead = clamp(dist * 0.45, 0, 45);
+        const dx = P.pos.x - r.x, dy = P.pos.y - r.y, dz = P.pos.z - r.z, along = dx * r.nx + dy * r.ny + dz * r.nz;
+        const side = Math.hypot(dx - r.nx * along, dy - r.ny * along, dz - r.nz * along);
+        const lead = along < -4 ? clamp(side * 1.3 + 3, 0, Math.min(70, -along * 0.75)) : 0;
+        auto.goal = r;
         return _gp.set(r.x - r.nx * lead, r.y - r.ny * lead, r.z - r.nz * lead);
       }
       if (turn) for (let i = 0; i < MARKER_COUNT; i++) if (turn.skipMk[i] > 0) turn.skipMk[i] -= dt;
@@ -4394,6 +5620,7 @@
         if (auto.t > 22) { auto.skipB[auto.target] = 30; auto.target = -1; return null; }
         const b = BALLOONS[auto.target];
         const d = Math.hypot(b.x - P.pos.x, b.z - P.pos.z);
+        auto.goal = b;
         if (d < 25) return _gp.set(b.x, b.y, b.z);
         const a = approachFor('b' + auto.target, b, Math.atan2(b.x - P.pos.x, b.z - P.pos.z), null), lead = clamp(d * 0.4, 0, 35);
         return _gp.set(b.x - Math.sin(a) * lead, b.y, b.z - Math.cos(a) * lead);
@@ -4409,6 +5636,7 @@
       // line up on a clear approach (like a ring), then fly straight through
       const m = MARKERS[auto.target], a = approachFor('m' + auto.target, m, Math.atan2(m.x - P.pos.x, m.z - P.pos.z), m.approach);
       const dist = Math.hypot(m.x - P.pos.x, m.z - P.pos.z), lead = clamp(dist * 0.45, 0, 50);
+      auto.goal = m;
       return _gp.set(m.x - Math.sin(a) * lead, m.y, m.z - Math.cos(a) * lead);
     }
     /** The clear heading through point m (70 m in, 40 m out) closest to `bearing`; `fixed` when given; the bearing
@@ -4439,9 +5667,62 @@
       return best;
     }
 
+    // Tunnels: inside a bore, fly its centreline; for a target in a bore, line up on the mouth from well out
+    const _ta = { ..._tq }, _tg2 = V();
+    function tunnelGuide(tg) {
+      if (P.inTunnel >= 0) {
+        const T = TUN[P.inTunnel];
+        tubeAt(T, P.pos.x, P.pos.y, P.pos.z, _ta);
+        const sg = P.dir.x * _ta.tx + P.dir.y * _ta.ty + P.dir.z * _ta.tz >= 0 ? 1 : -1, s0 = _ta.s;
+        const gl = auto.goal || tg;
+        if (gl && tubeAt(T, gl.x, gl.y, gl.z, _ta) && _ta.d < T.R && (_ta.s - s0) * sg > 4) return _tg2.set(gl.x, gl.y, gl.z);
+        const want = s0 + sg * 30, cl = clamp(want, 0, T.len), p = S.tunnelPoint(T.id, cl, 0), over = want - cl;
+        return _tg2.set(p.x + _ta.tx * over, p.y, p.z + _ta.tz * over);
+      }
+      auto.guided = false;
+      if (!tg) return tg;
+      const gl = auto.goal || tg;   // the balloon / ring / "!" itself, not the lead-in point
+      for (const T of TUN) {
+        if (T.kind !== 'tube' || !tubeAt(T, gl.x, gl.y, gl.z, _ta) || _ta.d > T.R + 1 || _ta.s < -6 || _ta.s > T.len + 6) continue;
+        // the mouth the plane is out in front of (or the nearer one)
+        let best = null, bd = Infinity;
+        for (const M of T.mouths) {
+          const dx = P.pos.x - M.x, dz = P.pos.z - M.z, a = dx * M.ox + dz * M.oz, d = Math.hypot(dx, dz) + (a < 0 ? 400 : 0);
+          if (d < bd) { bd = d; best = M; }
+        }
+        const M = best, dx = P.pos.x - M.x, dz = P.pos.z - M.z, a = dx * M.ox + dz * M.oz, b = Math.abs(-dx * M.oz + dz * M.ox);
+        // well out in front: pursue the axis; lined up close in: straight in; behind or beside it: go round to the front
+        // (once lined up for the final approach it stays committed, unless it drifts well off the line)
+        const final = a > -4 && a <= 32 && b < T.R * (auto.final === M ? 0.75 : 0.5);
+        auto.final = final ? M : null;
+        const lead = final ? a - 30 : a > 20 && b < a * 0.45 + 4 ? clamp(b * 1.6 + 8, 8, Math.min(120, a * 0.8)) : 120;
+        auto.guided = true;
+        return _tg2.set(M.x + M.ox * lead, M.y, M.z + M.oz * lead);
+      }
+      return tg;
+    }
+    /** In a tunnel's approach corridor, flying in: the cutting is clear, the hill beyond is not in the way. */
+    function inCorridor() {
+      for (const T of TUN) for (const M of T.mouths || []) {
+        const dx = P.pos.x - M.x, dz = P.pos.z - M.z, a = dx * M.ox + dz * M.oz, b = Math.abs(-dx * M.oz + dz * M.ox);
+        if (a > -2 && a < 150 && b < T.R + 3 && P.pos.y < M.y + 30 && -(P.dir.x * M.ox + P.dir.z * M.oz) > 0.75) return true;
+      }
+      return false;
+    }
+
     function autoSteer(dt) {
-      const tg = autoTarget(dt);
+      if (P.state === 'crash') { autoCmd.bank = 0; autoCmd.pitch = 0; autoCmd.boost = false; autoCmd.brake = false; autoCmd.keep = 0; return; }
+      const tg = tunnelGuide(autoTarget(dt));
+      auto.aim = tg ? [Math.round(tg.x), Math.round(tg.y), Math.round(tg.z)] : null;
       auto.wob += dt;
+      if (P.state === 'water') {
+        // the take-off run: full throttle, steer gently toward the target, pull up at take-off speed
+        const yawE = tg ? wrapA(Math.atan2(tg.x - P.pos.x, tg.z - P.pos.z) - P.yaw) : 0;
+        autoCmd.bank = clamp(-yawE * 1.8, -1.2, 1.2) * (P.speed > 8 ? 1 : 0.4);
+        autoCmd.pitch = P.speed > FLY.vTakeoff - 1 ? 0.7 : 0;
+        autoCmd.boost = P.boost > 0.1; autoCmd.brake = false; autoCmd.keep = 0; autoCmd.relT = 0;
+        return;
+      }
       let wantYaw = P.yaw, wantY = Math.max(P.pos.y, 60), dist = 200;
       if (tg) {
         const dx = tg.x - P.pos.x, dz = tg.z - P.pos.z;
@@ -4450,33 +5731,43 @@
         wantY = tg.y;
       } else if (Math.hypot(P.pos.x, P.pos.z) > 700) wantYaw = Math.atan2(-P.pos.x, -P.pos.z);
       const fx = Math.sin(P.yaw), fz = Math.cos(P.yaw), y = P.pos.y;
-      const tube = P.inTunnel >= 0;
+      const tube = P.inTunnel >= 0 || inCorridor();
       // terrain look-ahead: never plan below the hills ahead (inside a tunnel the tube keeps us clear)
       let maxG = 0;
       if (!tube) for (const k of [0.6, 1.2, 2]) maxG = Math.max(maxG, groundFor(P.pos.x + fx * P.speed * k, P.pos.z + fz * P.speed * k, y));
-      const close = tg && dist < 90;
-      const floorY = maxG + (close ? 6 : 16);
+      const close = tg && dist < 90 && !auto.guided;
+      const floorY = maxG + (close || maxG < 1 ? 6 : 16);   // over open sea it may fly low
       if (!tube && wantY < floorY && !(close && tg.y < floorY)) wantY = floorY;
       const yawErr = wrapA(wantYaw - P.yaw);
       let bank = clamp(-yawErr * 1.8 + Math.sin(auto.wob * 0.7) * 0.03, -1.2, 1.2);
       const v01 = clamp((P.speed - FLY.vBrake) / (FLY.vBoost - FLY.vBrake), 0, 1);
       const gd = clamp(Math.atan2(wantY - y, Math.max(dist, 10)), -35 * DEG, 32 * DEG);
       let pitch = clamp((gd - P.pitch) * 2.6 / Math.max(0.4, Math.cos(P.bank)) / (FLY.pitchRate * lerp(1.12, 0.86, v01)), -1, 1);
-      if (!tube && P.agl < 14 && maxG > y - 10) pitch = Math.max(pitch, 0.7);
-      let boost = Math.abs(yawErr) < 0.35 && dist > 80 && P.boost > 0.15 && P.agl > 8, brake = Math.abs(yawErr) > 0.7 && dist < 160;
+      if (!tube && !close && P.agl < 14 && maxG > 0.5 && maxG > y - 10) pitch = Math.max(pitch, 0.7);   // (a target close by may sit down in a canyon)
+      let boost = Math.abs(yawErr) < 0.35 && dist > 80 && P.boost > 0.15 && P.agl > 8 && !tube, brake = Math.abs(yawErr) > 0.7 && dist < 160;
       // a bridge deck, a roof or a tower near the path ahead: stay under it, clear it, or go round it
       const R = FLY.radius + 0.4;
       const hitAhead = (d, up) => blockedAt(_sp.set(P.pos.x + fx * d, y + up, P.pos.z + fz * d), R);
       if (hitAhead(8, 6) || hitAhead(18, 6)) pitch = Math.min(pitch, -0.35);
       else if (hitAhead(14, -5)) pitch = Math.max(pitch, 0.6);
       if (hitAhead(12, 0) || hitAhead(22, 0)) {
-        if (!hitAhead(16, 8)) pitch = 1;
+        // something solid level with us: duck under it (a bridge deck, a portal's top) or climb over it
+        const gUnder = groundFor(P.pos.x + fx * 16, P.pos.z + fz * 16, y - 6);
+        const under = !hitAhead(12, -6) && !hitAhead(22, -6) && gUnder < y - 10;
+        if (under && (wantY < y + 4 || hitAhead(16, 8))) pitch = Math.min(pitch, -0.7);
+        else if (!hitAhead(16, 8)) pitch = 1;
         else {
           const side = k => blockedAt(_sp.set(P.pos.x + Math.sin(P.yaw + k) * 20, y, P.pos.z + Math.cos(P.yaw + k) * 20), R);
           bank = side(0.7) ? 1.2 : -1.2;
           brake = true;
         }
       }
+      // a tree crown in the way (it would be a crash): hop over it
+      const treeAhead = d => {
+        const px = P.pos.x + fx * d, pz = P.pos.z + fz * d, list = A.cells.get(Math.floor(px / 40) * 1000 + Math.floor(pz / 40)) || [];
+        return list.some(ci => A.colliders[ci].soft && hitCollider(A.colliders[ci], px, y, pz, FLY.radius + 1, _hit));
+      };
+      if (!tube && P.agl < 30 && (treeAhead(10) || treeAhead(22) || treeAhead(34))) pitch = Math.max(pitch, 0.8);
       // a slope ahead steeper than the plane can climb: full climb and turn toward the lower side
       const ahead = tube ? -99 : groundFor(P.pos.x + fx * P.speed * 0.8, P.pos.z + fz * P.speed * 0.8, y);
       if (ahead > y - 3 && !(tg && dist < 40)) {
@@ -4511,14 +5802,17 @@
       if (!loops || audioT > 0) return;
       audioT = 0.1;
       const v01 = clamp((P.speed - FLY.vBrake) / (FLY.vBoost - FLY.vBrake), 0, 1);
-      const rate = P.boosting ? 1.3 : P.braking ? 0.86 : lerp(0.9, 1.18, v01);
+      const crashed = P.state === 'crash', afloat = P.state === 'water';
+      // afloat the engine idles, then revs up through the take-off run; a crash silences it
+      const rate = afloat ? lerp(0.7, P.boosting ? 1.3 : 1.12, sstep(0, FLY.vTakeoff, P.speed)) : P.boosting ? 1.3 : P.braking ? 0.86 : lerp(0.9, 1.18, v01);
       loops.engine.setRate(rate, 0.25);
-      loops.engine.setVolume(phase === 'done' ? 0.2 : 0.5 + v01 * 0.12, 0.2);
-      loops.rush.setVolume(0.08 + v01 * 0.42 + (P.boosting ? 0.1 : 0), 0.2);
-      loops.rush.setRate(clamp(P.speed / FLY.vCruise, 0.6, 1.8), 0.2);
-      const low = 1 - sstep(30, 220, P.agl);
-      loops.ocean.setVolume((P.overSea ? 0.55 : 0.18) * (0.35 + 0.65 * low), 0.4);
-      loops.park.setVolume(P.overSea ? 0 : 0.42 * low, 0.4);
+      const tun = P.dim;   // inside a bore: the walls echo the engine and the rushing air, the island goes quiet
+      loops.engine.setVolume(crashed ? 0 : phase === 'done' ? 0.2 : (afloat ? lerp(0.32, 0.55, sstep(0, 20, P.speed)) : 0.5 + v01 * 0.12) + tun * 0.1, crashed ? 0.08 : 0.2);
+      loops.rush.setVolume(crashed ? 0.05 : (afloat ? 0.04 : 0.08 + v01 * 0.42 + (P.boosting ? 0.1 : 0)) + tun * 0.35, 0.2);
+      loops.rush.setRate(clamp(P.speed / FLY.vCruise, 0.6, 1.8) + tun * 0.15, 0.2);
+      const low = 1 - sstep(30, 220, P.agl), quiet = 1 - 0.75 * tun;
+      loops.ocean.setVolume((P.overSea ? 0.55 : 0.18) * (0.35 + 0.65 * low) * quiet, 0.4);
+      loops.park.setVolume((P.overSea ? 0 : 0.42 * low) * quiet, 0.4);
     }
 
     // =============================================================================================
@@ -4528,17 +5822,19 @@
     let boostWas = false;
     function update(dt, t) {
       const inp = controls(dt);
-      if (autoplay && (phase === 'fly')) autoSteer(dt);
       if (phase === 'intro') {
-        // a gentle level circle while the how-to and the title card show
+        // afloat in the bay while the how-to and the title card show (a gentle level circle if airborne)
         const steps = Math.max(1, Math.ceil(dt / 0.05));
-        for (let k = 0; k < steps; k++) stepFlight(dt / steps, cruiseCmd(22, 0), false);
+        for (let k = 0; k < steps; k++) stepFlight(dt / steps, cruiseCmd(P.state === 'water' ? 0 : 22, 0), false);
       } else if (phase === 'countdown') {
         const steps = Math.max(1, Math.ceil(dt / 0.05));
         for (let k = 0; k < steps; k++) stepFlight(dt / steps, inp, true);
       } else if (phase === 'fly' || phase === 'end' || phase === 'done') {
         const steps = Math.max(1, Math.ceil(P.speed * dt / 1.4));
-        for (let k = 0; k < steps; k++) stepFlight(dt / steps, phase === 'fly' ? leash(inp) : cruiseCmd(20, P.pos.y < 80 ? 10 : 0), false);
+        for (let k = 0; k < steps; k++) {
+          if (autoplay && phase === 'fly') autoSteer(dt / steps);   // the autopilot steers every sub-step
+          stepFlight(dt / steps, phase === 'fly' ? leash(inp) : cruiseCmd(20, P.pos.y < 80 ? 10 : 0), false);
+        }
       }
       if (phase === 'fly' && turn) {
         const paused = mode === 'tour' && !!card;
@@ -4566,6 +5862,8 @@
         if (hint.cd > 0) hint.cd -= dt;
       }
       updatePlaneVisual(dt, t);
+      updateDebris(dt);
+      updateTunnels(dt);
       updateBalloons(dt, t);
       updateRings(dt, t);
       updateMarkers(dt, t);
@@ -4584,7 +5882,7 @@
     setPilot(0);
     {
       const st = startFor(mode);
-      placeAt(st, 120);
+      placeOnWater(st, false);
       cinematic = { kind: 'orbit', t: 0, a0: P.yaw + 2.2 };
       turn = newTurn();
       if (mode === 'rings') { nextRingSetup(); }
@@ -4624,10 +5922,20 @@
         window.removeEventListener('pointerup', onPUp);
         window.removeEventListener('pointercancel', onPUp);
         disableTilt();
+        // a hot-seat game leaves the device's own settings as it found them
+        if (multiCtl) {
+          applyingCtl = true;
+          save.setSetting('flightSensitivity', baseCtl.sensitivity); save.setSetting('flightInvert', baseCtl.invert);
+          applyingCtl = false;
+        }
+        ctlOwner = null;
         offSetting();
         if (loops) for (const k in loops) loops[k].stop(0.3);
         loops = null;
         if (hintHandle) { hintHandle.hide(); hintHandle = null; }
+        if (CR && CR.tip) CR.tip.hide();
+        hideTakeoffHint();
+        ctx.hud.classList.remove('fl-crashing');
         for (const tr of trails) tr.dispose();
         for (const pl of pilots) pl.pal.dispose();
         turnDone = null; skipWaiter = null; card = null; cardQueue = [];
@@ -4640,6 +5948,9 @@
           position: { x: +P.pos.x.toFixed(1), y: +P.pos.y.toFixed(1), z: +P.pos.z.toFixed(1) },
           speed: +P.speed.toFixed(1), boost: +P.boost.toFixed(2), yawDeg: Math.round(P.yaw / DEG), pitchDeg: Math.round(P.pitch / DEG), rollDeg: Math.round(P.roll / DEG),
           agl: +P.agl.toFixed(1), stun: +P.stun.toFixed(2), bankDeg: Math.round(P.bank / DEG), pathInverted: P.up.y < 0,
+          state: P.state, wgo: P.wgo, planeUpY: +P.pup.y.toFixed(2), crashes: turn ? turn.crashes : 0, scrapes: turn ? turn.scrapes : 0, tunnelsFlown: turn ? turn.tunnels : 0,
+          chute: CR ? { t: +CR.t.toFixed(2), open: +CR.open.toFixed(2), y: +pilots[cur].pal.root.position.y.toFixed(1), landed: CR.landed >= 0 } : null,
+          tunnelName: P.inTunnel >= 0 ? TUN[P.inTunnel].id : null, dim: +P.dim.toFixed(2), aim: autoplay ? auto.aim : null, guided: auto.guided,
           upY: +(P.up.y * Math.cos(P.bank)).toFixed(2), loops: P.loops, rolls: P.rolls, tunnel: P.inTunnel,
           input: { x: +IN.x.toFixed(3), y: +IN.y.toFixed(3), keep: cmd.keep, relT: +Math.min(9, IN.relT).toFixed(2) },
           tilt: { on: tilt.on, have: tilt.have, pending: tilt.pending, events: tilt.events, roll: +tilt.roll.toFixed(1), pitch: +tilt.pitch.toFixed(1), zr: +tilt.zr.toFixed(1), zp: +tilt.zp.toFixed(1) },
@@ -4665,7 +5976,11 @@
         },
         teleport(x, y, z, yawDeg) {
           debugTouched = true;
-          P.pos.set(x, y, z);
+          if (CR) respawn();
+          hideTakeoffHint();
+          P.state = 'air'; P.climbT = 0; P.speed = Math.max(P.speed, FLY.vCruise);
+          for (const w of wakes) w.visible = false;
+          P.pos.set(x, y, z); P.prev.copy(P.pos);
           if (yawDeg != null) { setPathDir(_tmp.set(Math.sin(yawDeg * DEG), 0, Math.cos(yawDeg * DEG))); P.bank = 0; P.lastBank = 0; }
           cam.snap = true;
           deriveAngles();
@@ -4701,6 +6016,30 @@
           if (phase === 'fly') { debugTouched = true; if (mode === 'rings') { turn.finalTime = turn.elapsed + turn.penalty; endTurn('finish'); } else endTurn('time'); }
           return true;
         },
+        /** Ring Run: jump to ring n (the ones before it count as flown), placed 60 m before it in the air. */
+        ringTo(n) {
+          if (mode !== 'rings' || !turn || phase !== 'fly') return false;
+          debugTouched = true;
+          for (let i = 0; i < RINGS.length; i++) ringState[i].state = i < n ? 'done' : 'todo';
+          turn.next = n;
+          const r = RINGS[n];
+          this.teleport(r.x - r.nx * 60, r.y - r.ny * 60, r.z - r.nz * 60, Math.atan2(r.nx, r.nz) / DEG);
+          nextRingSetup();
+          return true;
+        },
+        /** Breaks the plane now (as if it hit the ground head-on). */
+        crash() { if (phase !== 'fly' || P.state === 'crash') return false; debugTouched = true; crash('ground', _n.set(0, 1, 0)); return true; },
+        /** Sits the plane on the water at the nearest open spot, or a given one. */
+        toWater(x, z, yawDeg) {
+          debugTouched = true;
+          const sp = x != null ? { x, z, yaw: (yawDeg || 0) * DEG } : findWaterSpot(P.pos.x, P.pos.z, P.yaw);
+          if (!sp) return false;
+          placeOnWater(sp, false); cam.snap = true;
+          return { x: +sp.x.toFixed(1), z: +sp.z.toFixed(1), yaw: Math.round(sp.yaw / DEG) };
+        },
+        /** Centreline points of a tunnel: { x, y, z, yaw } at fraction f of its length. */
+        tunnel(id, f = 0, back = 0) { const T = TUN.find(t => t.id === id); if (!T) return null; const p = S.tunnelPoint(id, T.len * f - back, 0); return { x: +p.x.toFixed(2), y: +p.y.toFixed(2), z: +p.z.toFixed(2), yawDeg: +(p.yaw / DEG).toFixed(2), len: +T.len.toFixed(1), R: T.R }; },
+        tunnels: () => TUN.map(t => ({ id: t.id, kind: t.kind, len: +t.len.toFixed(1), R: t.R, mouths: (t.mouths || []).map(m => ({ x: +m.x.toFixed(1), y: m.y, z: +m.z.toFixed(1), ox: +m.ox.toFixed(3), oz: +m.oz.toFixed(3) })) })),
         setTime(s) { if (!turn) return false; debugTouched = true; if (mode === 'rings') turn.elapsed = s; else turn.left = s; return true; },
         markers: () => MARKERS.map(m => ({ id: m.id, name: m.name, x: +m.x.toFixed(1), y: +m.y.toFixed(1), z: +m.z.toFixed(1) })),
         rings: () => RINGS.map(r => ({ x: +r.x.toFixed(1), y: +r.y.toFixed(1), z: +r.z.toFixed(1) })),
