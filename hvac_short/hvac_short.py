@@ -336,6 +336,12 @@ def make_unit(new=False):
     fitting = Rectangle(width=0.18, height=0.18).move_to(WHIP_END).set_fill("#555555", 1).set_stroke(INK, 3)
     ring = Circle(radius=0.075).move_to(RING).set_fill("#222222", 1).set_stroke("#777777", 4)
     g = VGroup(rail, cab, coil, fins, guard, post, lid, shroud, grille, panels, vents, plate, plate_txt, fitting, ring)
+    # parody brand badge on the coil guard
+    word, plate_c, ink_c = ("BRRRIER", "#FFFFFF", "#1F5FA8") if new else ("LEMONNOX", "#F2E6A0", "#7A4A12")
+    badge = RoundedRectangle(width=1.0, height=0.28, corner_radius=0.06).move_to(P3((COIL_X + UNIT_R) / 2, 0.22)) \
+        .set_fill(plate_c, 1).set_stroke(INK, 3)
+    brand = Text(word, font="DejaVu Sans", weight=BOLD, slant=ITALIC).set(width=0.86).move_to(badge).set_fill(ink_c)
+    g.add(badge, brand)
     rng = random.Random(3)
     if new:
         g.add(VGroup(seg(P3(UNIT_L + 0.2, BASE_TOP + 0.9), P3(UNIT_L + 0.55, BASE_TOP + 1.5), w=6, color=WHITE),
