@@ -31,6 +31,8 @@ RUST = "#8B4513"
 RUST2 = "#A0522D"
 NEW_C = "#8EA9C1"
 NEW_LID = "#6F8FAB"
+OLD_COIL = "#8F877A"
+NEW_COIL = "#5F7D98"
 AIR_C = "#7CC6EE"
 DUCT_C = "#DADADA"
 FLASH_C = "#B4BCC4"
@@ -48,14 +50,21 @@ HIP = GROUND + 1.1
 STREET = -6.6
 SHIP = STREET + 1.1
 WALL_X = -3.2
-UNIT_L, UNIT_R, UNIT_TOP = -1.2, 1.6, 1.0
+UNIT_L, UNIT_R, UNIT_TOP = -1.2, 2.0, 0.55
+PAD_TOP = GROUND + 0.12
+BASE_TOP = PAD_TOP + 0.1
 LID_TOP = UNIT_TOP + 0.08
-RING = np.array([0.2, LID_TOP + 0.11, 0])
-WHIP_END = np.array([-0.6, LID_TOP, 0])
-LV_END = np.array([0.2, LID_TOP + 0.02, 0])
+COIL_X = 0.5
+RING = np.array([0.25, LID_TOP + 0.11, 0])
+WHIP_END = np.array([0.15, 0.15, 0])
+LV_END = np.array([0.25, LID_TOP + 0.02, 0])
 PIVOT = np.array([-3.58, 0.6, 0])
-FLASH_Y0, FLASH_Y1 = -0.95, 0.85
-STRIP_X = [-3.0, -2.6, -2.2]
+SUPPLY_Y = (-0.15, 0.35)
+RETURN_Y = (-1.0, -0.5)
+FLASH_Y0, FLASH_Y1 = -1.12, 0.47
+STRIP_H = (FLASH_Y1 - FLASH_Y0) / 3
+STRIP_Y = [FLASH_Y1 - STRIP_H * (i + 0.5) for i in range(3)]  # top, middle, bottom
+T2_HOME = 3.0
 
 
 def P3(x, y):
@@ -251,35 +260,59 @@ class Wire:
 
 # ---------------------------------------------------------------- props
 def make_unit(new=False):
-    w, h = UNIT_R - UNIT_L, UNIT_TOP - GROUND
-    cx, cy = (UNIT_L + UNIT_R) / 2, (UNIT_TOP + GROUND) / 2
-    body = Rectangle(width=w, height=h).move_to(P3(cx, cy)) \
-        .set_fill(NEW_C if new else OLD_C, 1).set_stroke(INK, 6)
-    lid = Rectangle(width=w + 0.16, height=0.16).move_to(P3(cx, UNIT_TOP)) \
-        .set_fill(NEW_LID if new else OLD_LID, 1).set_stroke(INK, 5)
-    louvers = VGroup(*[seg(P3(UNIT_L + 1.25, y), P3(UNIT_R - 0.2, y), w=3)
-                       for y in np.linspace(GROUND + 0.35, UNIT_TOP - 0.4, 6)])
-    panel = Rectangle(width=0.8, height=1.4).move_to(P3(UNIT_L + 0.6, cy - 0.05)) \
-        .set_fill(opacity=0).set_stroke(INK, 3)
-    bolts = VGroup(*[Dot(panel.get_corner(c) + 0.1 * (-c), radius=0.035, color=INK)
-                     for c in (UL, UR, DL, DR)])
-    fitting = Rectangle(width=0.22, height=0.1).move_to(WHIP_END + UP * 0.03) \
-        .set_fill("#555555", 1).set_stroke(INK, 3)
+    """Residential package unit, side view: blower/control panels left, condenser coil right, fan on top."""
+    fill, lid_c, coil_c = (NEW_C, NEW_LID, NEW_COIL) if new else (OLD_C, OLD_LID, OLD_COIL)
+    w, h = UNIT_R - UNIT_L, UNIT_TOP - BASE_TOP
+    cx, cy = (UNIT_L + UNIT_R) / 2, (UNIT_TOP + BASE_TOP) / 2
+    rail = Rectangle(width=w + 0.06, height=BASE_TOP - PAD_TOP).move_to(P3(cx, (BASE_TOP + PAD_TOP) / 2)) \
+        .set_fill("#4A4A4A", 1).set_stroke(INK, 4)
+    cab = Rectangle(width=w, height=h).move_to(P3(cx, cy)).set_fill(fill, 1).set_stroke(INK, 6)
+    lid = Rectangle(width=w + 0.14, height=0.08).move_to(P3(cx, UNIT_TOP + 0.04)) \
+        .set_fill(lid_c, 1).set_stroke(INK, 5)
+    # condenser fan shroud + grille on top
+    shroud = Polygon(P3(COIL_X + 0.15, LID_TOP), P3(COIL_X + 0.28, LID_TOP + 0.2),
+                     P3(UNIT_R - 0.28, LID_TOP + 0.2), P3(UNIT_R - 0.15, LID_TOP)) \
+        .set_fill(lid_c, 1).set_stroke(INK, 5)
+    grille = VGroup(*[seg(P3(x, LID_TOP + 0.02), P3(x, LID_TOP + 0.18), w=2)
+                      for x in np.arange(COIL_X + 0.32, UNIT_R - 0.3, 0.1)])
+    # condenser coil behind a wire guard
+    cy0, cy1 = BASE_TOP + 0.12, UNIT_TOP - 0.1
+    coil = Rectangle(width=UNIT_R - 0.1 - COIL_X - 0.08, height=cy1 - cy0) \
+        .move_to(P3((COIL_X + 0.08 + UNIT_R - 0.1) / 2, (cy0 + cy1) / 2)).set_fill(coil_c, 1).set_stroke(INK, 4)
+    fins = VGroup(*[seg(P3(x, cy0), P3(x, cy1), w=1.5, color="#3A3A3A")
+                    for x in np.arange(COIL_X + 0.16, UNIT_R - 0.12, 0.08)])
+    guard = VGroup(*[seg(P3(COIL_X + 0.08, y), P3(UNIT_R - 0.1, y), w=2.5)
+                     for y in np.arange(cy0 + 0.25, cy1, 0.28)])
+    post = seg(P3(COIL_X, BASE_TOP), P3(COIL_X, UNIT_TOP), w=5)
+    # blower and control access panels
+    panels = VGroup()
+    for x0, x1 in ((UNIT_L + 0.1, -0.35), (-0.27, COIL_X - 0.08)):
+        pnl = Rectangle(width=x1 - x0, height=h - 0.2).move_to(P3((x0 + x1) / 2, cy)) \
+            .set_fill(opacity=0).set_stroke(INK, 3)
+        handle = RoundedRectangle(width=0.22, height=0.06, corner_radius=0.03) \
+            .move_to(P3((x0 + x1) / 2, cy + 0.15)).set_fill("#333333", 1).set_stroke(INK, 2)
+        screws = VGroup(*[Dot(pnl.get_corner(c) + 0.07 * (-c), radius=0.03, color=INK) for c in (UL, UR, DL, DR)])
+        panels.add(pnl, handle, screws)
+    vents = VGroup(*[seg(P3(UNIT_L + 0.25, y), P3(-0.5, y), w=3) for y in np.arange(BASE_TOP + 0.25, cy - 0.15, 0.13)])
+    plate = Rectangle(width=0.4, height=0.28).move_to(P3(0.07, BASE_TOP + 0.35)).set_fill(WHITE, 1).set_stroke(INK, 2)
+    plate_txt = VGroup(*[seg(P3(-0.08, y), P3(0.22, y), w=1.5, color="#777777")
+                         for y in (BASE_TOP + 0.42, BASE_TOP + 0.35, BASE_TOP + 0.28)])
+    fitting = Rectangle(width=0.16, height=0.14).move_to(WHIP_END).set_fill("#555555", 1).set_stroke(INK, 3)
     ring = Ellipse(width=0.12, height=0.22).move_to(RING).set_stroke(INK, 4)
-    g = VGroup(body, lid, louvers, panel, bolts, fitting, ring)
+    g = VGroup(rail, cab, coil, fins, guard, post, lid, shroud, grille, panels, vents, plate, plate_txt, fitting, ring)
     rng = random.Random(3)
     if new:
-        g.add(VGroup(seg(P3(UNIT_L + 0.25, GROUND + 1.2), P3(UNIT_L + 0.75, GROUND + 2.0), w=6, color=WHITE),
-                     seg(P3(UNIT_L + 0.25, GROUND + 0.75), P3(UNIT_L + 0.5, GROUND + 1.15), w=6, color=WHITE))
+        g.add(VGroup(seg(P3(UNIT_L + 0.2, BASE_TOP + 0.9), P3(UNIT_L + 0.55, BASE_TOP + 1.5), w=6, color=WHITE),
+                     seg(P3(UNIT_L + 0.2, BASE_TOP + 0.55), P3(UNIT_L + 0.38, BASE_TOP + 0.85), w=6, color=WHITE))
               .set_stroke(opacity=0.75))
     else:
         spots = VGroup()
-        for _ in range(9):
-            e = Ellipse(width=rng.uniform(0.12, 0.35), height=rng.uniform(0.08, 0.22))
-            e.move_to(P3(rng.uniform(UNIT_L + 0.15, UNIT_R - 0.15), rng.uniform(GROUND + 0.1, UNIT_TOP - 0.2)))
+        for _ in range(10):
+            e = Ellipse(width=rng.uniform(0.12, 0.32), height=rng.uniform(0.08, 0.2))
+            e.move_to(P3(rng.uniform(UNIT_L + 0.15, UNIT_R - 0.15), rng.uniform(BASE_TOP + 0.08, UNIT_TOP - 0.15)))
             spots.add(e.set_fill(rng.choice([RUST, RUST2]), 0.75).set_stroke(width=0))
-        for x in (0.3, 0.75, 1.3):
-            spots.add(seg(P3(x, GROUND + 1.6), P3(x + 0.02, GROUND + 0.9), w=3, color=RUST).set_stroke(opacity=0.7))
+        for x in (-0.9, -0.1, 1.0, 1.6):
+            spots.add(seg(P3(x, UNIT_TOP - 0.05), P3(x + 0.02, UNIT_TOP - 0.6), w=3, color=RUST).set_stroke(opacity=0.7))
         g.add(spots)
     g.set_z_index(2)
     ring.set_z_index(5.5)
@@ -295,10 +328,11 @@ def make_duct(y0, y1):
     return VGroup(r, fl, seam).set_z_index(2)
 
 
-def make_strip(cx):
-    r = Rectangle(width=0.4, height=FLASH_Y1 - FLASH_Y0).move_to(P3(cx, (FLASH_Y0 + FLASH_Y1) / 2)) \
+def make_strip(cy):
+    cx = (WALL_X + UNIT_L) / 2
+    r = Rectangle(width=UNIT_L - WALL_X + 0.06, height=STRIP_H).move_to(P3(cx, cy)) \
         .set_fill(FLASH_C, 1).set_stroke(INK, 4)
-    crease = seg(P3(cx + 0.1, FLASH_Y0 + 0.08), P3(cx + 0.1, FLASH_Y1 - 0.08), w=2, color="#8D959E")
+    crease = seg(P3(WALL_X + 0.1, cy + STRIP_H * 0.28), P3(UNIT_L - 0.1, cy + STRIP_H * 0.28), w=2, color="#8D959E")
     return VGroup(r, crease).set_z_index(3)
 
 
@@ -446,15 +480,18 @@ class PackageUnitChangeout(MovingCameraScene):
         self.add(VGroup(wall, siding, roof, ground, street, curb, tufts).set_z_index(0))
 
         box = Rectangle(width=0.55, height=0.8).move_to(P3(-3.9, 0.6)).set_fill("#C7C7C7", 1).set_stroke(INK, 5)
-        self.add(box.set_z_index(1))
+        pad = Rectangle(width=UNIT_R - UNIT_L + 0.3, height=PAD_TOP - GROUND) \
+            .move_to(P3((UNIT_L + UNIT_R) / 2, (PAD_TOP + GROUND) / 2)).set_fill("#CFCFCF", 1).set_stroke(INK, 4)
+        self.add(box.set_z_index(3.5), pad.set_z_index(1))
         self.lever = VGroup(seg(PIVOT, PIVOT + UP * 0.37, w=10, color=CAP_C),
-                            Dot(PIVOT, radius=0.06, color=INK)).set_z_index(1.5)
+                            Dot(PIVOT, radius=0.06, color=INK)).set_z_index(3.6)
         self.add(self.lever)
 
-        self.ducts = [make_duct(0.1, 0.7), make_duct(-0.8, -0.2)]
+        self.ducts = [make_duct(*SUPPLY_Y), make_duct(*RETURN_Y)]
         self.duct_home = [d.copy() for d in self.ducts]
-        self.strips = [make_strip(x) for x in STRIP_X]
-        self.screws = [make_screw(P3(x, y)) for x in reversed(STRIP_X) for y in (0.67, -0.77)]
+        self.strips = [make_strip(y) for y in STRIP_Y]
+        self.strip_home = [st.copy() for st in self.strips]
+        self.screws = [make_screw(P3(x, y)) for y in STRIP_Y for x in (UNIT_L - 0.2, -2.2)]
         self.screw_home = [s.copy() for s in self.screws]
         self.unit = make_unit(new=False)
         self.add(*self.ducts, *self.strips, *self.screws, self.unit)
@@ -519,7 +556,7 @@ class PackageUnitChangeout(MovingCameraScene):
 
         self.play(
             Walk(t1, -2.85, HIP, steps=9, rt=2.3, hold=(1,), rf=smooth),
-            Walk(t2, 2.6, HIP, steps=9, rt=2.3, rf=smooth),
+            Walk(t2, T2_HOME, HIP, steps=9, rt=2.3, rf=smooth),
         )
 
     # ------------------------------------------------------------ 3
@@ -538,7 +575,7 @@ class PackageUnitChangeout(MovingCameraScene):
                   self.pose(t1, rt=0.4, lean=0.0, a1=0.2, e1=-0.1, squint=0.0, look=0.6, face=1))
 
         # Tech 2 goes for the whip anyway
-        self.play(Walk(t2, 0.15, steps=4, rt=0.9, rf=smooth))
+        self.play(Walk(t2, WHIP_END[0] + 0.7, steps=5, rt=1.0, rf=smooth))
         self.play(self.pose(t2, rt=0.55, rf=smooth, look=-0.7, **t2.arm(WHIP_END + UP * 0.05, 1, lean=-0.1)))
         zap = sfx_text("ZAP!", P3(0.9, 3.1), h=1.5, angle=0.15)
         self.play(GrowFromCenter(zap, rate_func=ease_out_back), run_time=0.15)
@@ -558,13 +595,13 @@ class PackageUnitChangeout(MovingCameraScene):
         # Tech 1: slow, disappointed head shake
         self.play(self.pose(t1, rt=0.3, squint=0.5, look=0.8))
         self.play(self.shake_head(t1, n=4, amt=0.08, rt=0.32))
-        self.play(Walk(t2, 2.6, steps=4, rt=0.9, rf=smooth), self.pose(t1, rt=0.4, squint=0.0, look=0.6))
+        self.play(Walk(t2, T2_HOME, steps=4, rt=0.9, rf=smooth), self.pose(t1, rt=0.4, squint=0.0, look=0.6))
 
     # ------------------------------------------------------------ 4
     def scene_banana_flashing(self):
         t1, t2 = self.t1, self.t2
-        self.play(Walk(t1, -1.55, steps=3, rt=0.6, rf=smooth))
-        self.play(self.pose(t1, rt=0.25, face=-1, look=-0.7, **t1.arm(P3(-2.4, 1.4), 1, lean=-0.1)))
+        self.play(Walk(t1, -0.75, steps=4, rt=0.7, rf=smooth))
+        self.play(self.pose(t1, rt=0.25, face=-1, look=-0.7, **t1.arm(P3(-1.8, 1.2), 1, lean=-0.1)))
         flights = []
         rng = random.Random(9)
         for i, s in enumerate(self.screws):
@@ -576,24 +613,19 @@ class PackageUnitChangeout(MovingCameraScene):
             ))
         self.play(LaggedStart(*flights, lag_ratio=0.3), self.pose(t2, rt=2.0, hair=0.0, squint=0.0, look=-0.6))
 
-        # banana peel: one flick per strip
-        pivots = [P3(x, FLASH_Y0) for x in STRIP_X]
-        top = lambda i: P3(STRIP_X[i], FLASH_Y1 - 0.05)
-        self.peel = [
-            (2, -2.6, -1.55),   # right strip falls right
-            (1, None, -1.95),   # middle folds straight down
-            (0, 2.6, -2.35),    # left strip falls left
-        ]
-        for i, ang, hip_x in self.peel:
-            if abs(t1.state["x"] - hip_x) > 0.05:
-                self.play(Walk(t1, hip_x, steps=1, rt=0.25, rf=smooth, hold=(1,)))
-                self.play(self.pose(t1, rt=0.01, face=-1, look=-0.7))
-            self.play(self.pose(t1, rt=0.18, **t1.arm(top(i), 1, lean=-0.1)))
-            strip_anim = (Rotate(self.strips[i], ang, about_point=pivots[i]) if ang is not None
-                          else self.strips[i].animate.stretch(-0.75, 1, about_point=pivots[i]))
-            hand_to = P3(STRIP_X[i] + (0.5 if i == 2 else -0.3 if i == 0 else 0.1), -0.9)
-            self.play(strip_anim, self.pose(t1, rt=0.32, rf=rush_from, **t1.arm(hand_to, 1, lean=-0.05)),
-                      run_time=0.32, rate_func=ease_out_back)
+        # banana peel back toward the house: one flick per strip, top to bottom
+        self.peeled = []
+        for i, (lean, ang) in enumerate(((-0.15, -0.45), (-0.3, 0.0), (-0.5, 0.45))):
+            st = self.strips[i]
+            pivot = P3(WALL_X, STRIP_Y[i])
+            peeled = st.copy().stretch(-0.55, 0, about_point=pivot).rotate(ang, about_point=pivot)
+            self.peeled.append(peeled)
+            corner = P3(UNIT_L - 0.08, STRIP_Y[i] + STRIP_H / 2)
+            self.play(self.pose(t1, rt=0.2, **t1.arm(corner, 1, lean=lean)))
+            self.play(Transform(st, peeled, rate_func=ease_out_back),
+                      self.pose(t1, rt=0.32, rf=rush_from,
+                                **t1.arm(P3(-2.0, STRIP_Y[i] + 0.3), 1, lean=-0.1)),
+                      run_time=0.32)
         # pretend bite
         mouth = t1.head() + P3(-0.28, -0.12)
         self.play(self.pose(t1, rt=0.25, look=-0.2, **t1.arm(mouth, 1, lean=0.0)))
@@ -634,15 +666,15 @@ class PackageUnitChangeout(MovingCameraScene):
     def scene_duct_yank(self):
         t1 = self.t1
         self.play(Walk(t1, -2.25, steps=2, rt=0.4, rf=smooth))
-        self.yank_duct(0, 0.4, HIP - 0.05, -0.75, P3(3.0, -3.25), big=True)
+        self.yank_duct(0, sum(SUPPLY_Y) / 2, HIP - 0.05, -0.75, P3(3.0, -3.25), big=True)
         self.play(Walk(t1, -2.25, HIP, steps=3, rt=0.5, rf=smooth))
-        self.yank_duct(1, -0.5, HIP - 0.3, -1.1, P3(3.0, -3.95), big=False)
+        self.yank_duct(1, sum(RETURN_Y) / 2, HIP - 0.3, -1.1, P3(3.0, -3.95), big=False)
 
     # ------------------------------------------------------------ 6
     def scene_wire_pullstart(self):
         t1, t2 = self.t1, self.t2
         self.play(Walk(t1, -0.2, HIP, steps=5, rt=0.9, rf=smooth))
-        grab = P3(-0.25, LID_TOP + 0.12)
+        grab = P3(0.2, 0.42)
         self.play(self.pose(t1, rt=0.25, face=1, look=0.3, **t1.arm(grab, 1, lean=0.1)))
         self.play(self.whip.end.animate.move_to(t1.hands[1] + LEFT * 0.04),
                   self.lv.end.animate.move_to(t1.hands[1] + RIGHT * 0.04), run_time=0.15)
@@ -650,7 +682,7 @@ class PackageUnitChangeout(MovingCameraScene):
         self.follow(self.lv.end, t1, 1, RIGHT * 0.04)
         # wind up, then YANK like a lawnmower cord
         wind = dict(y=HIP - 0.2, lean=0.25, l1=0.35, k1=-0.4, l2=-0.25, k2=0.3)
-        self.play(self.pose(t1, rt=0.3, squint=0.6, **t1.arm(P3(0.0, LID_TOP + 0.05), 1, **wind)))
+        self.play(self.pose(t1, rt=0.3, squint=0.6, **t1.arm(P3(0.2, 0.25), 1, **wind)))
         yank = dict(y=HIP, lean=-0.4, l1=0.15, k1=0.0, l2=-0.35, k2=0.0, a2=0.6, e2=0.3)
         self.play(self.pose(t1, rt=0.2, rf=rush_from, squint=0.0, **t1.arm(P3(-1.6, 2.6), 1, **yank)))
         # ...nothing happens
@@ -672,14 +704,14 @@ class PackageUnitChangeout(MovingCameraScene):
     # ------------------------------------------------------------ 7
     def scene_rip_unit(self):
         t1, t2, unit = self.t1, self.t2, self.unit
-        self.play(Walk(t1, -1.75, HIP, steps=2, rt=0.45, rf=smooth), Walk(t2, 2.15, HIP, steps=2, rt=0.45, rf=smooth))
+        self.play(Walk(t1, -1.75, HIP, steps=2, rt=0.45, rf=smooth), Walk(t2, UNIT_R + 0.55, HIP, steps=2, rt=0.45, rf=smooth))
         g1 = {**t1.arm(P3(UNIT_L, 0.25), 1, face=1, look=0.7, lean=0.0)}
         g1 = {**g1, **t1.arm(P3(UNIT_L, -0.1), 2, **g1)}
         g2 = {**t2.arm(P3(UNIT_R, 0.25), 1, face=-1, look=-0.7, lean=0.0)}
         g2 = {**g2, **t2.arm(P3(UNIT_R, -0.1), 2, **g2)}
         self.play(self.pose(t1, rt=0.25, **g1), self.pose(t2, rt=0.25, **g2))
         self.play(self.pose(t1, rt=0.3, squint=0.7, lean=-0.3, x=-1.85),
-                  self.pose(t2, rt=0.3, squint=0.7, lean=0.3, x=2.25),
+                  self.pose(t2, rt=0.3, squint=0.7, lean=0.3, x=UNIT_R + 0.65),
                   Wiggle(unit, scale_value=1.0, rotation_angle=0.05, n_wiggles=4, run_time=0.3))
 
         start = unit.get_center()
@@ -695,7 +727,7 @@ class PackageUnitChangeout(MovingCameraScene):
             UpdateFromAlphaFunc(unit, fly, run_time=1.0, rate_func=linear),
             self.pose(t1, rt=0.45, rf=ease_out_cubic, x=-2.4, y=HIP - 0.5, lean=-0.7, l1=1.2, k1=0.2, l2=0.6,
                       k2=0.3, a1=2.6, e1=0.0, a2=2.0, e2=0.0, squint=-1.0),
-            self.pose(t2, rt=0.45, rf=ease_out_cubic, x=2.9, y=HIP - 0.5, lean=0.7, l1=-1.2, k1=-0.2, l2=-0.6,
+            self.pose(t2, rt=0.45, rf=ease_out_cubic, x=UNIT_R + 1.3, y=HIP - 0.5, lean=0.7, l1=-1.2, k1=-0.2, l2=-0.6,
                       k2=-0.3, a1=-2.6, e1=0.0, a2=-2.0, e2=0.0, squint=-1.0),
         )
         bottom = unit.get_bottom()
@@ -712,7 +744,7 @@ class PackageUnitChangeout(MovingCameraScene):
             0.08 * np.exp(-3 * a) * np.sin(a * 6 * PI), about_point=bottom)), run_time=0.7),
             self.pose(t1, rt=0.4, rf=ease_out_back, x=-2.3, y=HIP, lean=0.0, l1=0.15, k1=0, l2=-0.15, k2=0,
                       a1=0.2, e1=-0.1, a2=-0.2, e2=0.1, squint=0.0, look=-0.5, face=-1),
-            self.pose(t2, rt=0.4, rf=ease_out_back, x=2.6, y=HIP, lean=0.0, l1=0.15, k1=0, l2=-0.15, k2=0,
+            self.pose(t2, rt=0.4, rf=ease_out_back, x=T2_HOME, y=HIP, lean=0.0, l1=0.15, k1=0, l2=-0.15, k2=0,
                       a1=0.2, e1=-0.1, a2=-0.2, e2=0.1, squint=0.0, look=-0.5, face=-1))
         self.play(puff(unit.get_top() + RIGHT * 0.9, n=3, seed=6, rt=0.8, rise=0.6))
 
@@ -730,7 +762,7 @@ class PackageUnitChangeout(MovingCameraScene):
                                  squint=0.0, look=-0.6, face=-1)),
             self.pose(t1, rt=0.6, look=0.7, face=1),
         )
-        pts = [P3(-1.4, 1.6), P3(1.8, 1.5), P3(0.6, 1.9), P3(1.9, -0.3), P3(-0.4, 0.2), P3(1.0, -1.0)]
+        pts = [P3(-1.4, 1.2), P3(2.2, 1.1), P3(0.9, 1.5), P3(2.3, -0.4), P3(-0.4, 0.0), P3(1.2, -0.9)]
         self.play(sparkles(pts, rt=0.8, seed=8), run_time=1.3)
 
     # ------------------------------------------------------------ 9
@@ -744,15 +776,8 @@ class PackageUnitChangeout(MovingCameraScene):
             Succession(Wait(0.75), sfx("CLICK", P3(-2.6, -2.6), h=0.8, color="#7CC6EE", angle=-0.1, hold=0.1)),
             self.whip.end.animate(path_arc=-1.0, run_time=0.6).move_to(WHIP_END),
         )
-        pivots = [P3(x, FLASH_Y0) for x in STRIP_X]
-        unpeel = []
-        for i, ang, _ in reversed(self.peel):
-            if ang is not None:
-                unpeel.append(Rotate(self.strips[i], -ang, about_point=pivots[i], run_time=0.4, rate_func=ease_out_back))
-            else:
-                unpeel.append(self.strips[i].animate(run_time=0.4, rate_func=ease_out_back)
-                              .stretch(-1 / 0.75, 1, about_point=pivots[i]))
-        self.play(LaggedStart(*unpeel, lag_ratio=0.45))
+        self.play(LaggedStart(*[Transform(st, h, run_time=0.4, rate_func=ease_out_back)
+                                for st, h in zip(reversed(self.strips), reversed(self.strip_home))], lag_ratio=0.45))
         self.play(LaggedStart(*[Transform(s, h, path_arc=1.2, run_time=0.45)
                                 for s, h in zip(reversed(self.screws), reversed(self.screw_home))], lag_ratio=0.35),
                   self.pose(t1, rt=0.8, a1=0.2, e1=-0.1))
@@ -810,14 +835,14 @@ class PackageUnitChangeout(MovingCameraScene):
                 g.add(Arc(radius=0.25 + 0.2 * k, start_angle=-0.55, angle=1.1, arc_center=P3(UNIT_R - 0.05, -0.3))
                       .set_stroke(INK, 4, opacity=op))
                 g.add(Arc(radius=0.2 + 0.18 * k, start_angle=PI / 2 - 0.5, angle=1.0,
-                          arc_center=P3(0.95, LID_TOP - 0.05)).set_stroke(INK, 4, opacity=op))
+                          arc_center=P3((COIL_X + UNIT_R) / 2, LID_TOP + 0.1)).set_stroke(INK, 4, opacity=op))
             return g.set_z_index(8)
 
         def air():
             t = T.get_value()
             g = VGroup()
             for i in range(7):
-                y = (0.25, 0.42, 0.58)[i % 3]
+                y = SUPPLY_Y[0] + (0.15, 0.25, 0.35)[i % 3]
                 prog = (t * 1.3 + i * 0.47) % 3.3
                 xr = UNIT_L + 0.15 - prog * 1.15
                 xs = np.linspace(xr - 0.95, xr, 24)
