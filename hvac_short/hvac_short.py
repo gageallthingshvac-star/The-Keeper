@@ -55,9 +55,11 @@ PAD_TOP = GROUND + 0.12
 BASE_TOP = PAD_TOP + 0.1
 LID_TOP = UNIT_TOP + 0.08
 COIL_X = 0.5
-RING = np.array([0.25, LID_TOP + 0.11, 0])
-WHIP_END = np.array([0.15, 0.15, 0])
-LV_END = np.array([0.25, LID_TOP + 0.02, 0])
+WHIP_END = np.array([-0.05, -1.0, 0])   # conduit fitting, low on the control panel
+LV_END = np.array([0.35, -0.72, 0])      # low-voltage grommet on the control panel
+RING = LV_END
+WHIP_TAILS = ["#111111", "#111111", "#2E9E44"]
+LV_TAILS = ["#111111", "#7B4A1E", "#2E9E44", "#2F6FD6", "#F2D21B", "#D63A2F", "#FFFFFF", "#F28C1B"]
 PIVOT = np.array([-3.58, 0.6, 0])
 SUPPLY_Y = (-0.15, 0.35)
 RETURN_Y = (-1.0, -0.5)
@@ -241,9 +243,12 @@ class Walk(Animation):
 
 # ---------------------------------------------------------------- wires
 class Wire:
-    def __init__(self, start, end, c1, c2, width, color, outline=False):
+    def __init__(self, start, end, c1, c2, width, color, outline=False,
+                 tails=(), tail_len=0.3, tail_w=3, spread=0.2):
         self.start, self.c1, self.c2 = P3(*start[:2]), P3(*c1), P3(*c2)
         self.w, self.color, self.outline = width, color, outline
+        self.tails, self.tail_len, self.tail_w, self.spread = tails, tail_len, tail_w, spread
+        self.show = ValueTracker(0.0)  # 0 = conductors hidden inside the unit, 1 = stripped ends showing
         self.end = Dot(P3(*end[:2]), radius=0.001).set_opacity(0)
         self.mob = self.build()
         self.mob.add_updater(lambda m: m.become(self.build()))
@@ -255,6 +260,16 @@ class Wire:
         if self.outline:
             layers.append(CubicBezier(*pts).set_stroke(INK, self.w + 7))
         layers.append(CubicBezier(*pts).set_stroke(self.color, self.w))
+        show = self.show.get_value()
+        d = -self.c2 / np.linalg.norm(self.c2)
+        base = np.arctan2(d[1], d[0])
+        n = len(self.tails)
+        for k, col in enumerate(self.tails):
+            ang = base + (k - (n - 1) / 2) * self.spread
+            tip = e + max(1e-3, self.tail_len * show) * P3(np.cos(ang), np.sin(ang))
+            op = 1.0 if show > 0.02 else 0.0
+            layers.append(Line(e, tip).set_stroke(INK, self.tail_w + 3, opacity=op))
+            layers.append(Line(e, tip).set_stroke(col, self.tail_w, opacity=op))
         return VGroup(*[m.set_cap_style(CapStyleType.ROUND) for m in layers]).set_z_index(5)
 
 
@@ -294,11 +309,11 @@ def make_unit(new=False):
         screws = VGroup(*[Dot(pnl.get_corner(c) + 0.07 * (-c), radius=0.03, color=INK) for c in (UL, UR, DL, DR)])
         panels.add(pnl, handle, screws)
     vents = VGroup(*[seg(P3(UNIT_L + 0.25, y), P3(-0.5, y), w=3) for y in np.arange(BASE_TOP + 0.25, cy - 0.15, 0.13)])
-    plate = Rectangle(width=0.4, height=0.28).move_to(P3(0.07, BASE_TOP + 0.35)).set_fill(WHITE, 1).set_stroke(INK, 2)
+    plate = Rectangle(width=0.4, height=0.28).move_to(P3(0.07, 0.05)).set_fill(WHITE, 1).set_stroke(INK, 2)
     plate_txt = VGroup(*[seg(P3(-0.08, y), P3(0.22, y), w=1.5, color="#777777")
-                         for y in (BASE_TOP + 0.42, BASE_TOP + 0.35, BASE_TOP + 0.28)])
-    fitting = Rectangle(width=0.16, height=0.14).move_to(WHIP_END).set_fill("#555555", 1).set_stroke(INK, 3)
-    ring = Ellipse(width=0.12, height=0.22).move_to(RING).set_stroke(INK, 4)
+                         for y in (0.12, 0.05, -0.02)])
+    fitting = Rectangle(width=0.18, height=0.18).move_to(WHIP_END).set_fill("#555555", 1).set_stroke(INK, 3)
+    ring = Circle(radius=0.075).move_to(RING).set_fill("#222222", 1).set_stroke("#777777", 4)
     g = VGroup(rail, cab, coil, fins, guard, post, lid, shroud, grille, panels, vents, plate, plate_txt, fitting, ring)
     rng = random.Random(3)
     if new:
@@ -315,7 +330,6 @@ def make_unit(new=False):
             spots.add(seg(P3(x, UNIT_TOP - 0.05), P3(x + 0.02, UNIT_TOP - 0.6), w=3, color=RUST).set_stroke(opacity=0.7))
         g.add(spots)
     g.set_z_index(2)
-    ring.set_z_index(5.5)
     return g
 
 
@@ -455,6 +469,13 @@ class PackageUnitChangeout(MovingCameraScene):
         moves = [base + P3(rng.uniform(-amt, amt), rng.uniform(-amt, amt)) for _ in range(n - 1)] + [base]
         return Succession(*[f.animate(run_time=rt / n, rate_func=linear).move_to(m) for m in moves])
 
+    def crouch(self, fig, drop, lean, spread=0.25, **over):
+        """Bend the knees (feet stay on the ground) and lean the torso."""
+        s = {**fig.state, **over}
+        d = {**over, "y": HIP - drop, "lean": lean}
+        d = fig.leg(P3(s["x"] - spread, GROUND), 1, **d)
+        return fig.leg(P3(s["x"] + spread, GROUND), 2, **d)
+
     def follow(self, mob, fig, which=1, offset=None):
         if offset is None:
             offset = mob.get_center() - fig.hands[which]
@@ -496,8 +517,10 @@ class PackageUnitChangeout(MovingCameraScene):
         self.unit = make_unit(new=False)
         self.add(*self.ducts, *self.strips, *self.screws, self.unit)
 
-        self.whip = Wire((-3.9, 1.0), WHIP_END, (0.3, 1.2), (-0.5, 1.0), 12, "#5A5A5A", outline=True)
-        self.lv = Wire((WALL_X, 2.9), LV_END, (1.2, 0.4), (-0.3, 1.4), 4, "#333333")
+        self.whip = Wire((-3.9, 0.2), WHIP_END, (0.0, -1.3), (-1.4, -0.3), 12, "#5A5A5A", outline=True,
+                         tails=WHIP_TAILS, tail_len=0.6, tail_w=7, spread=0.42)
+        self.lv = Wire((WALL_X, -1.22), LV_END, (0.8, -0.1), (-0.9, -0.45), 5, "#8A7560",
+                       tails=LV_TAILS, tail_len=0.5, tail_w=4, spread=0.2)
         self.add(self.whip.end, self.lv.end, self.whip.mob, self.lv.mob)
 
         self.truck = make_truck().shift(RIGHT * 9)
@@ -575,19 +598,21 @@ class PackageUnitChangeout(MovingCameraScene):
                   self.pose(t1, rt=0.4, lean=0.0, a1=0.2, e1=-0.1, squint=0.0, look=0.6, face=1))
 
         # Tech 2 goes for the whip anyway
-        self.play(Walk(t2, WHIP_END[0] + 0.7, steps=5, rt=1.0, rf=smooth))
-        self.play(self.pose(t2, rt=0.55, rf=smooth, look=-0.7, **t2.arm(WHIP_END + UP * 0.05, 1, lean=-0.1)))
+        self.play(Walk(t2, WHIP_END[0] + 0.75, steps=5, rt=1.0, rf=smooth))
+        c = self.crouch(t2, 0.35, -0.6, face=-1)
+        self.play(self.pose(t2, rt=0.55, rf=smooth, look=-0.7, **t2.arm(WHIP_END + P3(-0.2, 0.06), 1, **c)))
         zap = sfx_text("ZAP!", P3(0.9, 3.1), h=1.5, angle=0.15)
         self.play(GrowFromCenter(zap, rate_func=ease_out_back), run_time=0.15)
         for i in range(6):
             b = bolt(WHIP_END, t2.hands[1], seed=i)
             self.add(b)
             self.play(self.pose(t2, rt=0.07, rf=linear, lean=0.12 * (1 if i % 2 else -1), hair=1.0,
-                                squint=-1.0, a2=1.8 * (1 if i % 2 else -1), e2=0.4,
+                                squint=-1.0, a2=1.8 * (1 if i % 2 else -1), e2=0.4, y=HIP, k1=0.0, k2=0.0,
                                 l1=0.35 * (1 if i % 2 else -1), l2=-0.35 * (1 if i % 2 else -1)))
             self.remove(b)
         self.play(FadeOut(zap, scale=1.3), self.pose(
-            t2, rt=0.25, lean=0.0, a1=0.15, e1=0.0, a2=-0.15, e2=0.0, l1=0.12, l2=-0.12, look=0.0), run_time=0.25)
+            t2, rt=0.25, lean=0.0, a1=0.15, e1=0.0, a2=-0.15, e2=0.0, l1=0.12, l2=-0.12, k1=0.0, k2=0.0,
+            y=HIP, look=0.0), run_time=0.25)
         self.play(puff(t2.head() + UP * 0.5, n=5, seed=2, rt=1.1), Wait(0.3), run_time=1.1)
         self.play(self.pose(t2, rt=0.12, squint=0.95), run_time=0.12)
         self.play(self.pose(t2, rt=0.12, squint=-1.0), run_time=0.12)
@@ -673,18 +698,21 @@ class PackageUnitChangeout(MovingCameraScene):
     # ------------------------------------------------------------ 6
     def scene_wire_pullstart(self):
         t1, t2 = self.t1, self.t2
-        self.play(Walk(t1, -0.2, HIP, steps=5, rt=0.9, rf=smooth))
-        grab = P3(0.2, 0.42)
-        self.play(self.pose(t1, rt=0.25, face=1, look=0.3, **t1.arm(grab, 1, lean=0.1)))
+        self.play(Walk(t1, -0.75, HIP, steps=3, rt=0.6, rf=smooth))
+        grab = (WHIP_END + LV_END) / 2
+        c = self.crouch(t1, 0.4, 0.45, face=1)
+        self.play(self.pose(t1, rt=0.3, look=0.5, **t1.arm(grab, 1, **c)))
         self.play(self.whip.end.animate.move_to(t1.hands[1] + LEFT * 0.04),
                   self.lv.end.animate.move_to(t1.hands[1] + RIGHT * 0.04), run_time=0.15)
         self.follow(self.whip.end, t1, 1, LEFT * 0.04)
         self.follow(self.lv.end, t1, 1, RIGHT * 0.04)
         # wind up, then YANK like a lawnmower cord
-        wind = dict(y=HIP - 0.2, lean=0.25, l1=0.35, k1=-0.4, l2=-0.25, k2=0.3)
-        self.play(self.pose(t1, rt=0.3, squint=0.6, **t1.arm(P3(0.2, 0.25), 1, **wind)))
+        wind = self.crouch(t1, 0.5, 0.6)
+        self.play(self.pose(t1, rt=0.3, squint=0.6, **t1.arm(grab + P3(0.1, -0.05), 1, **wind)))
         yank = dict(y=HIP, lean=-0.4, l1=0.15, k1=0.0, l2=-0.35, k2=0.0, a2=0.6, e2=0.3)
-        self.play(self.pose(t1, rt=0.2, rf=rush_from, squint=0.0, **t1.arm(P3(-1.6, 2.6), 1, **yank)))
+        self.play(self.pose(t1, rt=0.2, rf=rush_from, squint=0.0, **t1.arm(P3(-1.6, 2.6), 1, **yank)),
+                  self.whip.show.animate(rate_func=rush_from).set_value(1.0),
+                  self.lv.show.animate(rate_func=rush_from).set_value(1.0), run_time=0.2)
         # ...nothing happens
         dots = VGroup(*[Dot(t1.head() + P3(-0.2 + 0.2 * k, 0.75), radius=0.06, color=INK) for k in range(3)]).set_z_index(10)
         self.play(LaggedStart(*[FadeIn(d, scale=0.3) for d in dots], lag_ratio=0.5), run_time=0.45)
@@ -693,8 +721,8 @@ class PackageUnitChangeout(MovingCameraScene):
         for e in (self.whip.end, self.lv.end):
             e.clear_updaters()
         self.play(FadeOut(dots),
-                  self.whip.end.animate(rate_func=ease_out_bounce).move_to(P3(-1.0, 0.1)),
-                  self.lv.end.animate(rate_func=ease_out_bounce).move_to(P3(0.55, 0.3)),
+                  self.whip.end.animate(rate_func=ease_out_bounce).move_to(P3(-1.4, GROUND + 0.1)),
+                  self.lv.end.animate(rate_func=ease_out_bounce).move_to(P3(0.6, GROUND + 0.12)),
                   self.pose(t1, rt=0.5, lean=0.0, a1=0.2, e1=-0.1, a2=-0.2, e2=0.1), run_time=0.5)
         # Tech 2 is not impressed
         self.play(self.pose(t2, rt=0.3, look=-1.0, squint=0.45))
@@ -775,6 +803,7 @@ class PackageUnitChangeout(MovingCameraScene):
             Succession(Wait(0.45), sfx("CLICK", P3(-1.0, 2.6), h=0.8, color="#7CC6EE", angle=0.1, hold=0.1)),
             Succession(Wait(0.75), sfx("CLICK", P3(-2.6, -2.6), h=0.8, color="#7CC6EE", angle=-0.1, hold=0.1)),
             self.whip.end.animate(path_arc=-1.0, run_time=0.6).move_to(WHIP_END),
+            self.whip.show.animate(run_time=0.6, rate_func=rush_into).set_value(0.0),
         )
         self.play(LaggedStart(*[Transform(st, h, run_time=0.4, rate_func=ease_out_back)
                                 for st, h in zip(reversed(self.strips), reversed(self.strip_home))], lag_ratio=0.45))
@@ -787,28 +816,32 @@ class PackageUnitChangeout(MovingCameraScene):
         t1 = self.t1
         frame = self.camera.frame
         lv = self.lv
-        self.play(Walk(t1, 0.95, HIP, steps=6, rt=1.0, rf=smooth),
-                  frame.animate(run_time=1.0).scale(0.5).move_to(P3(0.3, 0.6)))
-        self.play(self.pose(t1, rt=0.25, face=-1, look=-0.6, **t1.arm(lv.end.get_center(), 1, lean=-0.1)))
+        self.play(Walk(t1, 1.05, HIP, steps=6, rt=1.0, rf=smooth),
+                  frame.animate(run_time=1.0).scale(0.5).move_to(P3(0.5, -0.5)))
+        pick = self.crouch(t1, 0.55, -0.75, face=-1, look=-0.6)
+        self.play(self.pose(t1, rt=0.3, **t1.arm(lv.end.get_center(), 1, **pick)))
         self.follow(lv.end, t1, 1, LEFT * 0.1)
-        focus = dict(lean=-0.18, tongue=1.0, squint=0.8, hx=-0.04, look=-0.8, l1=0.25, k1=0.0, l2=-0.1)
-        ready = P3(0.62, RING[1])
+        focus = {**self.crouch(t1, 0.45, -0.45), "tongue": 1.0, "squint": 0.8, "hx": -0.04, "look": -0.8}
+        hand = lambda dx, dy: RING + P3(0.1 + dx, dy)  # hand target that puts the wire tip at RING + (dx, dy)
+        ready = hand(0.3, 0.0)
         self.play(self.pose(t1, rt=0.35, **t1.arm(ready, 1, **focus)))
-        # miss #1: bonks the top of the eye
-        self.play(self.pose(t1, rt=0.25, **t1.arm(P3(0.32, RING[1] + 0.13), 1)))
-        self.play(sfx("tink", RING + P3(0.0, 0.55), h=0.22, color="#FFD400", angle=0.2, hold=0.1),
+        # miss #1: bonks above the grommet
+        self.play(self.pose(t1, rt=0.25, **t1.arm(hand(0.09, 0.13), 1)))
+        self.play(sfx("tink", RING + P3(-0.1, 0.5), h=0.22, color="#FFD400", angle=0.2, hold=0.1),
                   self.pose(t1, rt=0.25, rf=ease_out_back, **t1.arm(ready + P3(0.05, 0.05), 1)))
-        # miss #2: sails underneath
-        self.play(self.pose(t1, rt=0.25, **t1.arm(P3(0.32, RING[1] - 0.14), 1)))
-        self.play(sfx("tink", RING + P3(0.1, -0.45), h=0.22, color="#FFD400", angle=-0.2, hold=0.1),
+        # miss #2: bonks below it
+        self.play(self.pose(t1, rt=0.25, **t1.arm(hand(0.09, -0.14), 1)))
+        self.play(sfx("tink", RING + P3(-0.1, -0.5), h=0.22, color="#FFD400", angle=-0.2, hold=0.1),
                   self.pose(t1, rt=0.25, rf=ease_out_back, hy=-0.03, **t1.arm(ready, 1)))
-        # got it
-        self.play(self.pose(t1, rt=0.5, rf=smooth, **t1.arm(P3(0.4, RING[1]), 1)))
-        self.play(self.pose(t1, rt=0.35, rf=ease_in_out_sine, **t1.arm(P3(0.2, RING[1]), 1)))
+        # got it: the eight conductors slide in
+        self.play(self.pose(t1, rt=0.5, rf=smooth, **t1.arm(hand(0.15, 0.0), 1)))
+        self.play(self.pose(t1, rt=0.4, rf=ease_in_out_sine, **t1.arm(hand(0.0, 0.0), 1)),
+                  lv.show.animate(run_time=0.4).set_value(0.0))
         self.play(sparkles([RING + P3(-0.25, 0.25), RING + P3(0.2, 0.3)], rt=0.6, seed=12),
-                  self.pose(t1, rt=0.35, rf=ease_out_back, tongue=0.0, squint=0.0, hx=0.0, hy=0.0, lean=0.0))
+                  self.pose(t1, rt=0.35, rf=ease_out_back, tongue=0.0, squint=0.0, hx=0.0, hy=0.0))
         lv.end.clear_updaters()
-        self.play(self.pose(t1, rt=0.25, rf=ease_out_back, a1=-2.6, e1=0.4),
+        self.play(self.pose(t1, rt=0.25, rf=ease_out_back, y=HIP, lean=0.0, l1=0.15, k1=0.0, l2=-0.15, k2=0.0,
+                            a1=-2.6, e1=0.4),
                   lv.end.animate(run_time=0.25).move_to(LV_END))
         self.play(self.pose(t1, rt=0.25, a1=-0.2, e1=0.0),
                   frame.animate(run_time=0.8).scale(2.0).move_to(ORIGIN))
