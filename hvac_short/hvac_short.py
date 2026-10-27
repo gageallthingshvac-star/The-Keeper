@@ -228,43 +228,140 @@ class Grab(Animation):
         self.fig.rebuild()
 
 
+def feet_of(fig, s):
+    """Forward kinematics: where both feet are for state s."""
+    hip = P3(s["x"], s["y"])
+    f1 = hip + fig.U * dirv(s["l1"]) + fig.U * dirv(s["l1"] + s["k1"])
+    f2 = hip + fig.U * dirv(s["l2"]) + fig.U * dirv(s["l2"] + s["k2"])
+    return f1, f2
+
+
+def legs_to(fig, hip, feet, face):
+    """Leg IK so both feet land exactly on the given points (knees toward the facing side)."""
+    bend = 1 if face >= 0 else -1
+    out = {}
+    for i, f in enumerate(feet, start=1):
+        a, k = ik2(hip, f, fig.U, fig.U, bend)
+        out[f"l{i}"], out[f"k{i}"] = a, k
+    return out
+
+
+def smoothstep(w):
+    return w * w * (3 - 2 * w)
+
+
+class Gait:
+    """Foot-planted walking: each foot stays fixed on the ground until it is its turn to step,
+    then lifts and swings in an arc to its next foothold. The hip dips so planted feet stay reachable."""
+
+    LIFT, STANCE, DROP, STEP_TIME = 0.13, 0.16, 1.06, 0.24
+
+    def __init__(self, fig, s0, hip1, rt, rf=smooth, face=None, steps=None, max_stride=0.62):
+        self.U, self.rf = fig.U, rf
+        self.h0, self.h1 = P3(s0["x"], s0["y"]), P3(hip1[0], hip1[1])
+        d = self.h1 - self.h0
+        dist = np.linalg.norm(d)
+        self.dirx = float(np.sign(d[0])) if abs(d[0]) > 0.05 else s0["face"]
+        self.face = face if face is not None else self.dirx
+        self.start = [f.copy() for f in feet_of(fig, s0)]
+        feet = [f.copy() for f in self.start]
+        if steps is None:
+            # aim for a brisk cartoon cadence (~0.24 s a step) without over-long strides
+            want = max(1, int(round(rt / self.STEP_TIME)) - 1)
+            stride = float(np.clip(dist / want, 0.25, max_stride))
+            steps = max(1, int(round(dist / stride)))
+        slots = steps + 1  # the extra step brings the trailing foot alongside at the end
+        u = d / dist if dist > 1e-6 else P3(self.dirx, 0)
+        g0 = min(feet[0][1], feet[1][1])
+        g1 = self.h1[1] - self.DROP
+        k = 0 if np.dot(feet[0] - self.h0, u) <= np.dot(feet[1] - self.h0, u) else 1  # back foot goes first
+        self.steps = []
+        for i in range(slots):
+            t0, t1 = i / slots, (i + 1) / slots
+            if i >= slots - 2:
+                lead = i == slots - 2
+                to = P3(self.h1[0] + (self.dirx if lead else -self.dirx) * self.STANCE, g1)
+            else:
+                e = rf(t1)
+                to = self.h0 + d * e + u * (dist / steps) * 0.5
+                to[1] = g0 + (g1 - g0) * e
+            self.steps.append((k, t0, t1, feet[k].copy(), to))
+            feet[k] = to
+            k = 1 - k
+
+    def at(self, alpha):
+        hip = self.h0 + (self.h1 - self.h0) * self.rf(alpha)
+        feet, swing = [], None
+        for k in (0, 1):
+            pos = self.start[k]
+            for kk, t0, t1, a, b in self.steps:
+                if kk != k or alpha < t0:
+                    continue
+                if alpha >= t1:
+                    pos = b
+                else:
+                    w = (alpha - t0) / (t1 - t0)
+                    lift = self.LIFT * min(1.0, np.linalg.norm(b - a) / 0.25)
+                    pos = a + (b - a) * smoothstep(w) + UP * lift * np.sin(PI * w)
+                    swing = (k, w)
+            feet.append(pos)
+        reach = 2 * self.U * 0.985
+        for k in (0, 1):
+            if swing and swing[0] == k:
+                continue
+            dx = feet[k][0] - hip[0]
+            if abs(dx) < reach:
+                hip[1] = min(hip[1], feet[k][1] + np.sqrt(reach ** 2 - dx ** 2))
+        return hip, feet, swing
+
+
 class Walk(Animation):
-    def __init__(self, fig, x, y=None, steps=4, rt=1.0, swing=0.45, hold=(), rf=linear):
-        self.fig, self.tx, self.ty, self.steps = fig, x, y, steps
-        self.swing, self.hold = swing, hold
-        super().__init__(fig, run_time=rt, rate_func=rf)
+    """Walk to (x, y) with planted feet. face can differ from the travel direction (walking backward);
+    hands={which: fn(eased_alpha) -> point} keeps a hand locked on a moving object; hold keeps arms still."""
+
+    def __init__(self, fig, x, y=None, rt=1.0, rf=smooth, face=None, hold=(), hands=None, steps=None,
+                 swing=0.4, **target):
+        self.fig, self.tx, self.ty = fig, x, y
+        self.gface, self.hold, self.hands, self.nsteps = face, hold, hands or {}, steps
+        self.swing, self.target, self.rf = swing, target, rf
+        super().__init__(fig, run_time=rt, rate_func=linear)
 
     def begin(self):
         self.s0 = dict(self.fig.state)
-        if self.ty is None:
-            self.ty = self.s0["y"]
-        d = self.tx - self.s0["x"]
-        self.face = float(np.sign(d)) if abs(d) > 1e-3 else self.s0["face"]
+        ty = self.s0["y"] if self.ty is None else self.ty
+        self.gait = Gait(self.fig, self.s0, P3(self.tx, ty), self.run_time, self.rf, self.gface, self.nsteps)
+        self.s1 = {**self.s0, **self.target}
+        self.s1["face"] = self.gait.face
+        if "look" not in self.target:
+            self.s1["look"] = 0.6 * self.gait.face
         super().begin()
 
     def interpolate_mobject(self, alpha):
-        a = self.rate_func(alpha)
-        s0 = self.s0
-        s = dict(s0)
-        sw = np.sin(self.steps * PI * alpha)
-        env = min(1.0, alpha * 8, (1 - alpha) * 8)
-        s["x"] = s0["x"] + (self.tx - s0["x"]) * a
-        s["y"] = s0["y"] + (self.ty - s0["y"]) * a + 0.08 * abs(sw) * env
-        s["l1"] = s0["l1"] * (1 - env) + self.swing * sw * env
-        s["l2"] = s0["l2"] * (1 - env) - self.swing * sw * env
-        s["k1"] = s0["k1"] * (1 - env) - 0.35 * self.face * max(0, -sw) * env
-        s["k2"] = s0["k2"] * (1 - env) - 0.35 * self.face * max(0, sw) * env
-        if 1 not in self.hold:
-            s["a1"] = s0["a1"] * (1 - env) - 0.45 * sw * env
-            s["e1"] = s0["e1"] * (1 - env) + 0.3 * self.face * env
-        if 2 not in self.hold:
-            s["a2"] = s0["a2"] * (1 - env) + 0.45 * sw * env
-            s["e2"] = s0["e2"] * (1 - env) + 0.3 * self.face * env
-        s["lean"] = s0["lean"] * (1 - env) + 0.08 * self.face * env
-        s["face"] = self.face
-        s["look"] = 0.6 * self.face
-        self.fig.state = s
-        self.fig.rebuild()
+        fig, s0, s1, g = self.fig, self.s0, self.s1, self.gait
+        e = self.rf(alpha)
+        turn = min(1.0, alpha / 0.15)
+        s = {k: s0[k] + (s1[k] - s0[k]) * e for k in s0}
+        s["face"] = s0["face"] + (s1["face"] - s0["face"]) * turn
+        s["look"] = s0["look"] + (s1["look"] - s0["look"]) * turn
+        hip, feet, swing = g.at(alpha)
+        s["x"], s["y"] = hip[0], hip[1]
+        env = min(1.0, alpha / 0.12, (1 - alpha) / 0.12)
+        if "lean" not in self.target:
+            s["lean"] += 0.06 * g.dirx * env
+        if swing:
+            k, w = swing
+            amp = self.swing * env * g.dirx
+            fwd = -amp + 2 * amp * smoothstep(w)  # the arm opposite the stepping leg swings forward
+            arm_sw = {2: fwd, 1: -fwd} if k == 0 else {1: fwd, 2: -fwd}
+            for i in (1, 2):
+                if i not in self.hold and i not in self.hands:
+                    s[f"a{i}"] = s[f"a{i}"] * (1 - env) + arm_sw[i]
+                    s[f"e{i}"] = s[f"e{i}"] * (1 - env) + 0.3 * g.dirx * env
+        fig.state = s
+        fig.state.update(legs_to(fig, hip, feet, s["face"]))
+        for which, fn in self.hands.items():
+            fig.state.update(fig.arm(fn(e), which))
+        fig.rebuild()
 
 
 # ---------------------------------------------------------------- wires
@@ -421,8 +518,10 @@ def make_truck():
     body = VGroup(rack, bed, cab, win_frame, door, light, bumper, label)
     wheels = VGroup()
     for x in (0.05, 3.8):
+        lugs = VGroup(*[seg(P3(x, -6.15), P3(x, -6.15) + 0.15 * P3(np.cos(t), np.sin(t)), w=4, color="#555555")
+                        for t in (PI / 2, PI / 2 + TAU / 3, PI / 2 + 2 * TAU / 3)])
         wheels.add(Circle(radius=0.45).move_to(P3(x, -6.15)).set_fill(INK, 1).set_stroke(INK, 2),
-                   Circle(radius=0.17).move_to(P3(x, -6.15)).set_fill("#CCCCCC", 1).set_stroke(INK, 2))
+                   VGroup(Circle(radius=0.17).move_to(P3(x, -6.15)).set_fill("#CCCCCC", 1).set_stroke(INK, 2), lugs))
     t = VGroup(body, wheels).set_z_index(6)
     t.body, t.wheels = body, wheels
     return t
@@ -567,7 +666,12 @@ class PackageUnitChangeout(MovingCameraScene):
             Rotate(self.lever, turn, about_point=PIVOT, rate_func=ease_out_back, run_time=rt),
             Grab(fig, lambda a: PIVOT + rotate_vector(tip0, turn * a), rt=rt, rf=ease_out_back, **kw))
 
-    def crouch(self, fig, drop, lean, spread=0.25, **over):
+    def reshape_wire(self, wire, c2_from, c2_to, rt):
+        """Ease how a cable runs into its end (its last bezier handle)."""
+        return UpdateFromAlphaFunc(Mobject(), lambda m, a: setattr(wire, "c2", c2_from + (c2_to - c2_from) * smooth(a)),
+                                   run_time=rt, rate_func=linear)
+
+    def crouch(self, fig, drop, lean, spread=Gait.STANCE, **over):
         """Bend the knees (feet stay on the ground) and lean the torso."""
         s = {**fig.state, **over}
         d = {**over, "y": HIP - drop, "lean": lean}
@@ -635,8 +739,16 @@ class PackageUnitChangeout(MovingCameraScene):
         self.add(self.bag.shift(RIGHT * 9))
         self.snd("truck")
         self.snd("cough", 0.3, gain=-3)
+        truck0 = self.truck.copy()
+
+        def drive_in(m, a):
+            # roll in: the wheels turn by exactly the distance covered
+            m.become(truck0.copy().shift(LEFT * 9 * a))
+            for hub in m.wheels[1::2]:
+                hub.rotate(9 * a / 0.45, about_point=hub.get_center())
+
         self.play(
-            self.truck.animate.shift(LEFT * 9), self.bag.animate.shift(LEFT * 9),
+            UpdateFromAlphaFunc(self.truck, drive_in), self.bag.animate.shift(LEFT * 9),
             self.pose(t1, rt=1.3, rf=ease_out_cubic, x=1.05),
             self.pose(t2, rt=1.3, rf=ease_out_cubic, x=1.55),
             Succession(Wait(0.3), puff(P3(1.1, LID_TOP + 0.2), n=4, seed=1, rt=1.0)),
@@ -670,7 +782,7 @@ class PackageUnitChangeout(MovingCameraScene):
         self.play(
             self.pose(t2, rt=0.7, arc=2.2, rf=linear, x=-2.7, y=SHIP - 0.3, lean=-1.3,
                       a1=-2.8, e1=0, a2=-2.4, e2=0, l1=0.6, k1=0.3, l2=0.2, k2=0.5, look=-0.8),
-            Walk(t1, 2.55, SHIP, steps=6, rt=1.0, rf=smooth),
+            Walk(t1, 2.55, SHIP, rt=1.6, rf=smooth),
         )
         t2.set_z_index(7)
         handle = bag[3].get_top()
@@ -684,8 +796,8 @@ class PackageUnitChangeout(MovingCameraScene):
         self.play(self.pose(t1, rt=0.25, lean=0.0, a1=0.15, e1=0.0, look=-0.5))
 
         self.play(
-            Walk(t1, -1.85, HIP, steps=10, rt=2.5, hold=(1,), rf=smooth),
-            Walk(t2, T2_HOME, HIP, steps=10, rt=2.5, rf=smooth),
+            Walk(t1, -1.85, HIP, rt=3.0, hold=(1,), rf=smooth),
+            Walk(t2, T2_HOME, HIP, rt=3.0, rf=smooth),
         )
 
     # ------------------------------------------------------------ 3
@@ -704,7 +816,7 @@ class PackageUnitChangeout(MovingCameraScene):
                          for k in range(5)]),
             Succession(Wait(0.3), Wiggle(self.strips[1], scale_value=1.0, rotation_angle=0.015,
                                          n_wiggles=5, run_time=1.1)),
-            Walk(t2, WHIP_END[0] + 0.75, steps=7, rt=1.4, rf=smooth),
+            Walk(t2, WHIP_END[0] + 0.75, rt=1.4, rf=smooth),
         )
         # Tech 2 goes for the whip anyway
         c = self.crouch(t2, 0.35, -0.6, face=-1)
@@ -728,12 +840,12 @@ class PackageUnitChangeout(MovingCameraScene):
         # Tech 1: slow, disappointed head shake... then kills the power
         self.play(self.pose(t1, rt=0.3, squint=0.5, look=0.8, face=1, lean=0.0, a1=0.2, e1=-0.1))
         self.play(self.shake_head(t1, n=4, amt=0.08, rt=0.32))
-        self.play(Walk(t1, -2.85, HIP, steps=4, rt=0.8, rf=smooth))
+        self.play(Walk(t1, -2.85, HIP, rt=0.8, rf=smooth))
         self.play(self.reach(t1, self.lever[0].get_end(), rt=0.25, lean=-0.2, face=-1, look=-0.6, squint=0.3))
         self.play(self.throw_lever(t1, PI, rt=0.3, lean=-0.05))
         self.play(Snd("clunk", rt=0.70),
                   self.pose(t1, rt=0.4, lean=0.0, a1=0.2, e1=-0.1, squint=0.0, look=0.6, face=1),
-                  Walk(t2, -0.6, steps=4, rt=0.9, rf=smooth))
+                  Walk(t2, -0.6, rt=0.9, rf=smooth))
 
     # ------------------------------------------------------------ 4a
     def fetch_drills(self):
@@ -809,17 +921,16 @@ class PackageUnitChangeout(MovingCameraScene):
 
     def scene_drills(self):
         t1, t2 = self.t1, self.t2
-        self.play(Walk(t1, -2.95, HIP, steps=1, rt=0.25, rf=smooth))
+        self.play(Walk(t1, -2.95, HIP, rt=0.25, rf=smooth))
         self.fetch_drills()
         self.drill_rows(driving_in=False)
         self.stow_drills()
-        self.play(Walk(t2, T2_HOME, steps=5, rt=1.0, rf=smooth), self.pose(t2, rt=1.0, hair=0.0, look=-0.6))
+        self.play(Walk(t2, T2_HOME, rt=1.6, rf=smooth, hair=0.0))
 
     # ------------------------------------------------------------ 4
     def scene_banana_flashing(self):
         t1, t2 = self.t1, self.t2
-        self.play(Walk(t1, -0.75, steps=4, rt=0.7, rf=smooth))
-        self.play(self.pose(t1, rt=0.25, face=-1, look=-0.7, **t1.arm(P3(-1.8, 1.2), 1, lean=-0.1)))
+        self.play(Walk(t1, -0.75, rt=1.1, rf=smooth))
         # peel back toward the house like a banana: top panel, then side panel
         self.peeled = []
         for i, (grip_y, squash, ang) in enumerate(((TOP_MID, 0.45, -0.6), (SIDE_MID, 0.42, 0.15))):
@@ -830,13 +941,12 @@ class PackageUnitChangeout(MovingCameraScene):
             peeled = peel_target(panel, pivot, squash, ang)
             self.peeled.append(peeled)
             if abs(t1.state["x"] + 0.75) > 0.05:
-                self.play(Walk(t1, -0.75, steps=3, rt=0.5, rf=smooth))
+                self.play(Walk(t1, -0.75, rt=0.9, rf=smooth))
             self.play(self.reach(t1, grip, rt=0.22, face=-1, look=-0.7, lean=-0.25 if i else -0.1))
             self.snd("creak", gain=-4)
-            self.play(Transform(panel, peeled, rate_func=ease_out_back, run_time=0.55),
-                      Grab(t1, lambda a, g=grip, e=end: g + (e - g) * a, rt=0.55, rf=ease_out_back,
-                           x=-2.95, lean=0.05, l1=-0.55, k1=0.3, l2=0.35, k2=0.0))
-            self.play(self.pose(t1, rt=0.15, l1=0.15, k1=0.0, l2=-0.15, k2=0.0))
+            self.play(Transform(panel, peeled, rate_func=smooth, run_time=1.0),
+                      Walk(t1, -2.95, rt=1.0, rf=smooth, face=-1, lean=-0.05,
+                           hands={1: lambda a, g=grip, e=end: g + (e - g) * a}))
         # pretend bite
         mouth = t1.head() + P3(-0.28, -0.12)
         self.play(self.pose(t1, rt=0.25, look=-0.2, **t1.arm(mouth, 1, lean=0.0)))
@@ -860,33 +970,30 @@ class PackageUnitChangeout(MovingCameraScene):
         for k in range(4 if big else 2):
             self.play(self.pose(t1, rt=0.07, rf=linear, lean=-0.38 if k % 2 == 0 else -0.3, hx=-0.03 if k % 2 == 0 else 0.0))
         self.follow(duct, t1, 1)
-        stumble = dict(x=-2.95, y=HIP - 1.3, lean=-0.55, l1=0.9, k1=-0.4, l2=-0.3, k2=0.2, squint=-0.8, hx=0.0)
-        stumble = {**stumble, **t1.arm(P3(-2.4, HIP - 0.3), 1, **stumble)}
-        stumble = {**stumble, **t1.arm(P3(-2.2, HIP - 0.3), 2, **stumble)}
-        word = Snd("pop_big", rt=0.75) if big else \
-            Snd("pop", rt=0.60)
-        self.play(word, self.pose(t1, rt=0.35, rf=ease_out_cubic, **stumble))
+        word = Snd("pop_big", rt=0.75) if big else Snd("pop", rt=0.60)
+        # staggers backward (still facing the unit) with the duct in both hands
+        self.play(word, Walk(t1, -2.95, HIP - 1.3, rt=0.6 if big else 0.5, rf=ease_out_cubic, face=1,
+                             hold=(1, 2), lean=-0.45, squint=-0.8, hx=0.0))
         if big:
-            self.play(self.pose(t1, rt=0.15, lean=-0.2, l1=0.3, k1=0.0, l2=-0.25, k2=0.0))
-            self.play(self.pose(t1, rt=0.15, lean=0.12))
+            self.play(self.pose(t1, rt=0.18, lean=-0.15))
+            self.play(self.pose(t1, rt=0.18, lean=0.1))
         duct.clear_updaters()
         self.snd("whoosh", gain=-6)
         self.snd("clatter", 0.62, gain=-4)
         self.play(duct.animate(path_arc=-1.6, run_time=0.65).move_to(pile).rotate(0.08 if big else -0.06),
-                  self.pose(t1, rt=0.45, lean=0.1, squint=0.0, look=0.7, l1=0.15, l2=-0.15, k1=0, k2=0,
-                            a1=2.4, e1=-0.3, a2=0.5, e2=0.0))
+                  self.pose(t1, rt=0.45, lean=0.1, squint=0.0, look=0.7, a1=2.4, e1=-0.3, a2=0.5, e2=0.0))
 
     def scene_duct_yank(self):
         t1 = self.t1
-        self.play(Walk(t1, -2.25, steps=2, rt=0.4, rf=smooth))
+        self.play(Walk(t1, -2.25, rt=0.4, rf=smooth))
         self.yank_duct(0, sum(SUPPLY_Y) / 2, HIP - 0.05, -0.75, P3(-2.3, -3.1), big=True)
-        self.play(Walk(t1, -2.25, HIP, steps=3, rt=0.5, rf=smooth))
+        self.play(Walk(t1, -2.25, HIP, rt=0.8, rf=smooth))
         self.yank_duct(1, sum(RETURN_Y) / 2, HIP - 0.3, -1.1, P3(-2.3, -3.75), big=False)
 
     # ------------------------------------------------------------ 6
     def scene_wire_pullstart(self):
         t1, t2 = self.t1, self.t2
-        self.play(Walk(t1, -0.75, HIP, steps=3, rt=0.6, rf=smooth))
+        self.play(Walk(t1, -0.75, HIP, rt=0.8, rf=smooth))
         grab = (WHIP_END + LV_END) / 2
         c = self.crouch(t1, 0.4, 0.45, face=1)
         self.play(self.pose(t1, rt=0.3, look=0.5, **t1.arm(grab, 1, **c)))
@@ -899,11 +1006,11 @@ class PackageUnitChangeout(MovingCameraScene):
         self.play(self.pose(t1, rt=0.3, squint=0.6, **t1.arm(grab + P3(0.1, -0.05), 1, **wind)))
         yank = dict(y=HIP, lean=-0.4, l1=0.15, k1=0.0, l2=-0.35, k2=0.0, a2=0.6, e2=0.3)
         self.snd("yank")
-        self.play(self.pose(t1, rt=0.2, rf=rush_from, squint=0.0, **t1.arm(P3(-1.6, 2.6), 1, **yank)),
+        self.play(self.pose(t1, rt=0.2, rf=rush_from, squint=0.0, **t1.arm(P3(-2.0, 1.25), 1, **yank)),
                   self.whip.show.animate(rate_func=rush_from).set_value(1.0),
                   self.lv.show.animate(rate_func=rush_from).set_value(1.0), run_time=0.2)
         # ...nothing happens
-        dots = VGroup(*[Dot(t1.head() + P3(-0.2 + 0.2 * k, 0.75), radius=0.06, color=INK) for k in range(3)]).set_z_index(10)
+        dots = VGroup(*[Dot(t1.head() + P3(0.45 + 0.2 * k, 0.45), radius=0.06, color=INK) for k in range(3)]).set_z_index(10)
         self.snd("crickets", 0.1, gain=-2)
         self.play(LaggedStart(*[FadeIn(d, scale=0.3) for d in dots], lag_ratio=0.5), run_time=0.45)
         self.wait(0.6)
@@ -921,28 +1028,35 @@ class PackageUnitChangeout(MovingCameraScene):
         self.play(self.pose(t2, rt=0.2, squint=0.0), self.pose(t1, rt=0.2, squint=0.0))
 
     # ------------------------------------------------------------ 7
-    def carry(self, rt, unit_pos, body_dy=lambda a: 0.0, steps=0, lean1=None, lean2=None,
-              rot=lambda a: 0.0, rf=smooth):
-        """Move the unit along unit_pos(a) with both techs' hands locked on its sides."""
+    def carry(self, rt, unit_pos, walk=None, rise=0.0, lean1=None, lean2=None, rot=lambda a: 0.0, rf=smooth):
+        """Move the unit along unit_pos(a) with both techs' hands locked on its sides.
+        walk=(dx, dy) makes both techs step (planted feet) by that offset while carrying."""
         t1, t2, unit = self.t1, self.t2, self.unit
-        c0 = unit.get_center()
         orig = unit.copy()
         s0 = {t1: dict(t1.state), t2: dict(t2.state)}
         leans = {t1: lean1, t2: lean2}
+        gaits = {}
+        planted = {fig: feet_of(fig, s0[fig]) for fig in (t1, t2)}
+        if walk is not None:
+            for fig in (t1, t2):
+                hip1 = P3(s0[fig]["x"] + walk[0], s0[fig]["y"] + walk[1])
+                gaits[fig] = Gait(fig, s0[fig], hip1, rt * 1.3, rf, face=s0[fig]["face"], max_stride=0.45)
 
         def f(m, alpha):
             a = rf(alpha)
             c, ang = unit_pos(a), rot(a)
             m.become(orig.copy().rotate(ang).move_to(c))
-            sw = np.sin(steps * PI * alpha) if steps else 0.0
             for fig in (t1, t2):
                 st = dict(s0[fig])
-                st["x"] += c[0] - c0[0]
-                st["y"] += body_dy(a) + 0.06 * abs(sw)
                 if leans[fig] is not None:
                     st["lean"] += (leans[fig] - st["lean"]) * a
-                if steps:
-                    st.update(l1=0.4 * sw, l2=-0.4 * sw, k1=0.0, k2=0.0)
+                if fig in gaits:
+                    hip, feet, _ = gaits[fig].at(alpha)
+                    st["x"], st["y"] = hip[0], hip[1]
+                    st.update(legs_to(fig, hip, feet, st["face"]))
+                elif rise:
+                    st["y"] += rise * a  # stand up out of the squat, feet stay put
+                    st.update(legs_to(fig, P3(st["x"], st["y"]), planted[fig], st["face"]))
                 fig.state = st
                 for which, off in zip((1, 2), self.grip_off[fig]):
                     fig.state.update(fig.arm(c + rotate_vector(off, ang), which))
@@ -952,13 +1066,15 @@ class PackageUnitChangeout(MovingCameraScene):
 
     def scene_rip_unit(self):
         t1, t2, unit, truck = self.t1, self.t2, self.unit, self.truck
-        self.play(Walk(t1, -1.75, HIP, steps=2, rt=0.45, rf=smooth), Walk(t2, UNIT_R + 0.55, HIP, steps=2, rt=0.45, rf=smooth))
+        self.play(Walk(t1, -1.75, HIP, rt=0.45, rf=smooth), Walk(t2, UNIT_R + 0.55, HIP, rt=0.45, rf=smooth))
         c = unit.get_center()
         self.grip_off = {t1: [P3(UNIT_L, 0.25) - c, P3(UNIT_L, -0.1) - c],
                          t2: [P3(UNIT_R, 0.25) - c, P3(UNIT_R, -0.1) - c]}
-        g1 = {**t1.arm(P3(UNIT_L, 0.25), 1, face=1, look=0.7, lean=0.0)}
+        g1 = {**self.crouch(t1, 0.25, 0.15, face=1, look=0.7)}
+        g1 = {**g1, **t1.arm(P3(UNIT_L, 0.25), 1, **g1)}
         g1 = {**g1, **t1.arm(P3(UNIT_L, -0.1), 2, **g1)}
-        g2 = {**t2.arm(P3(UNIT_R, 0.25), 1, face=-1, look=-0.7, lean=0.0)}
+        g2 = {**self.crouch(t2, 0.25, -0.15, face=-1, look=-0.7)}
+        g2 = {**g2, **t2.arm(P3(UNIT_R, 0.25), 1, **g2)}
         g2 = {**g2, **t2.arm(P3(UNIT_R, -0.1), 2, **g2)}
         self.play(self.pose(t1, rt=0.25, **g1), self.pose(t2, rt=0.25, **g2))
         # rattle it loose
@@ -967,12 +1083,11 @@ class PackageUnitChangeout(MovingCameraScene):
         self.play(self.carry(0.5, lambda a: c, lean1=-0.3, lean2=0.3, rot=lambda a: 0.05 * np.sin(8 * PI * a), rf=linear))
         # rip it free and lift
         self.play(Snd("rip", rt=0.60),
-                  self.carry(0.35, lambda a: c + UP * 0.35 * a, lean1=-0.1, lean2=0.1, rf=ease_out_back))
+                  self.carry(0.45, lambda a: c + UP * 0.35 * a, rise=0.25, lean1=-0.1, lean2=0.1, rf=smooth))
         # carry it down to the truck
         c1 = c + UP * 0.35
         walk = P3(1.2, -3.2)
-        self.play(self.carry(2.0, lambda a: c1 + walk * a, body_dy=lambda a: walk[1] * a, steps=8,
-                             lean1=0.05, lean2=0.05))
+        self.play(self.carry(2.6, lambda a: c1 + walk * a, walk=walk, lean1=0.05, lean2=0.05))
         # swing back... and toss it in the bed
         c2 = c1 + walk
         self.play(self.carry(0.35, lambda a: c2 + P3(-0.45, -0.3) * a, lean1=-0.3, lean2=-0.2, rf=smooth))
@@ -1002,7 +1117,7 @@ class PackageUnitChangeout(MovingCameraScene):
             self.pose(t2, rt=0.4, lean=0.0, a1=0.2, e1=-0.1, a2=-0.2, e2=0.1, squint=0.0),
         )
         self.play(puff(unit.get_top() + RIGHT * 0.5, n=3, seed=6, rt=0.8, rise=0.6),
-                  Walk(t1, -2.3, HIP, steps=8, rt=1.6, rf=smooth), Walk(t2, T2_HOME, HIP, steps=8, rt=1.6, rf=smooth))
+                  Walk(t1, -2.3, HIP, rt=2.0, rf=smooth), Walk(t2, T2_HOME, HIP, rt=2.0, rf=smooth))
         self.play(self.pose(t1, rt=0.2, face=-1, look=-0.5), self.pose(t2, rt=0.2, face=-1, look=-0.5))
 
     # ------------------------------------------------------------ 8
@@ -1044,20 +1159,20 @@ class PackageUnitChangeout(MovingCameraScene):
         loose = [h.copy().scale(1.3) for h in self.screw_home]
         self.play(LaggedStart(*[Transform(s, l, path_arc=1.2, run_time=0.45)
                                 for s, l in zip(reversed(self.screws), reversed(loose))], lag_ratio=0.3),
-                  Walk(t1, -2.95, HIP, steps=3, rt=0.8, rf=smooth),
-                  Walk(t2, -0.6, HIP, steps=8, rt=1.6, rf=smooth))
+                  Walk(t1, -2.95, HIP, rt=0.8, rf=smooth),
+                  Walk(t2, -0.6, HIP, rt=1.8, rf=smooth))
         # ...then get driven home with the drills
         self.fetch_drills()
         self.drill_rows(driving_in=True)
         self.stow_drills()
-        self.play(Walk(t2, T2_HOME, steps=5, rt=1.0, rf=smooth))
+        self.play(Walk(t2, T2_HOME, rt=1.6, rf=smooth))
 
     # ------------------------------------------------------------ 10
     def scene_thread_needle(self):
         t1 = self.t1
         frame = self.camera.frame
         lv = self.lv
-        self.play(Walk(t1, 1.05, HIP, steps=6, rt=1.0, rf=smooth),
+        self.play(Walk(t1, 1.05, HIP, rt=1.6, rf=smooth),
                   frame.animate(run_time=1.0).scale(0.5).move_to(P3(0.5, -0.5)))
         pick = self.crouch(t1, 0.55, -0.75, face=-1, look=-0.6)
         self.play(self.pose(t1, rt=0.3, **t1.arm(lv.end.get_center(), 1, **pick)))
@@ -1065,7 +1180,8 @@ class PackageUnitChangeout(MovingCameraScene):
         focus = {**self.crouch(t1, 0.45, -0.45), "tongue": 1.0, "squint": 0.8, "hx": -0.04, "look": -0.8}
         hand = lambda dx, dy: RING + P3(0.1 + dx, dy)  # hand target that puts the wire tip at RING + (dx, dy)
         ready = hand(0.3, 0.0)
-        self.play(self.pose(t1, rt=0.35, **t1.arm(ready, 1, **focus)))
+        c2_rest, c2_held = lv.c2.copy(), P3(0.65, -0.35)  # cable runs back through his hand, tips leading
+        self.play(self.pose(t1, rt=0.35, **t1.arm(ready, 1, **focus)), self.reshape_wire(lv, c2_rest, c2_held, 0.35))
         # miss #1: bonks above the grommet
         self.play(self.pose(t1, rt=0.25, **t1.arm(hand(0.09, 0.13), 1)))
         self.play(Snd("tink", rt=0.50),
@@ -1082,16 +1198,16 @@ class PackageUnitChangeout(MovingCameraScene):
         self.play(sparkles([RING + P3(-0.25, 0.25), RING + P3(0.2, 0.3)], rt=0.6, seed=12),
                   self.pose(t1, rt=0.35, rf=ease_out_back, tongue=0.0, squint=0.0, hx=0.0, hy=0.0))
         lv.end.clear_updaters()
-        self.play(self.pose(t1, rt=0.25, rf=ease_out_back, y=HIP, lean=0.0, l1=0.15, k1=0.0, l2=-0.15, k2=0.0,
-                            a1=-2.6, e1=0.4),
-                  lv.end.animate(run_time=0.25).move_to(LV_END))
+        stand = {**self.crouch(t1, 0.0, 0.0)}
+        self.play(self.pose(t1, rt=0.3, rf=ease_out_back, a1=-2.6, e1=0.4, **stand),
+                  lv.end.animate(run_time=0.3).move_to(LV_END), self.reshape_wire(lv, c2_held, c2_rest, 0.5))
         self.play(self.pose(t1, rt=0.25, a1=-0.2, e1=0.0),
                   frame.animate(run_time=0.8).scale(2.0).move_to(ORIGIN))
 
     # ------------------------------------------------------------ 11
     def scene_power_up(self):
         t1, t2, new = self.t1, self.t2, self.new
-        self.play(Walk(t1, -2.85, HIP, steps=6, rt=1.0, rf=smooth))
+        self.play(Walk(t1, -2.85, HIP, rt=1.6, rf=smooth))
         self.play(self.reach(t1, self.lever[0].get_end(), rt=0.25, face=-1, look=-0.6, lean=-0.05))
         self.play(self.throw_lever(t1, -PI, rt=0.3, lean=-0.2))
         T = ValueTracker(0)
