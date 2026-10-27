@@ -1,8 +1,10 @@
 """Stick-figure YouTube Short: HVAC package unit changeout.
 
+Sounds:   python make_sfx.py   (writes ./sfx/*.wav; needs numpy + scipy)
 Preview:  manim -ql hvac_short.py PackageUnitChangeout
 Final:    manim -qh --fps 30 -r 1080,1920 hvac_short.py PackageUnitChangeout
 """
+import os
 import random
 
 import numpy as np
@@ -22,6 +24,9 @@ if config.pixel_width > config.pixel_height:
 config.frame_height = 16
 config.frame_width = 9
 config.background_color = WHITE
+
+SFX_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sfx")  # built by make_sfx.py
+SCENE = None  # the running scene, so Snd animations can place audio mid-play
 
 # ---------------------------------------------------------------- palette
 INK = "#111111"
@@ -426,7 +431,7 @@ def make_truck():
 def make_bag(p):
     box = RoundedRectangle(width=0.95, height=0.5, corner_radius=0.08).set_fill("#1E1E1E", 1).set_stroke(INK, 4)
     band = Rectangle(width=0.93, height=0.2).move_to(box).set_fill(DRILL_RED, 1).set_stroke(width=0)
-    logo = Text("MILWAKUEE", font="DejaVu Sans", weight=BOLD, slant=ITALIC).set(width=0.8) \
+    logo = Text("MILWACKO", font="DejaVu Sans", weight=BOLD, slant=ITALIC).set(width=0.8) \
         .move_to(band).set_fill(WHITE)
     handle = Arc(radius=0.2, start_angle=0, angle=PI).set_stroke(INK, 6).next_to(box, UP, buff=-0.02)
     g = VGroup(box, band, logo, handle).set_z_index(7.5)
@@ -450,17 +455,19 @@ def make_drill(hand, face=1):
     return g.shift(hand).set_z_index(7.6)
 
 
-def sfx_text(word, pos, h=1.0, color="#FFD400", angle=0.12):
-    t = Text(word, font="DejaVu Sans", weight=BOLD).set(height=h)
-    t.set_fill(color, 1).set_stroke(INK, 10, background=True)
-    return t.rotate(angle).move_to(pos).set_z_index(10)
+class Snd(Animation):
+    """Plays a sound effect when it starts; its run time just holds the beat."""
 
+    def __init__(self, name, rt=0.0, gain=0.0):
+        super().__init__(Mobject(), run_time=max(rt, 1e-3))
+        self.sound, self.gain = name, gain
 
-def sfx(word, pos, h=1.0, color="#FFD400", angle=0.12, hold=0.35):
-    t = sfx_text(word, pos, h, color, angle)
-    return Succession(GrowFromCenter(t, run_time=0.18, rate_func=ease_out_back),
-                      Wait(hold),
-                      FadeOut(t, scale=1.35, run_time=0.22))
+    def begin(self):
+        SCENE.snd(self.sound, gain=self.gain)
+        super().begin()
+
+    def interpolate_mobject(self, alpha):
+        pass
 
 
 def puff(pos, n=5, r=0.17, spread=0.3, rise=0.8, rt=1.0, seed=0, color=SMOKE_C):
@@ -501,6 +508,9 @@ def bolt(a, b, seed):
 # ---------------------------------------------------------------- the short
 class PackageUnitChangeout(MovingCameraScene):
     def construct(self):
+        global SCENE
+        SCENE = self
+        self._play_t = 0.0
         self.build_set()
         self.scene_arrive()
         self.scene_hop_out()
@@ -516,6 +526,18 @@ class PackageUnitChangeout(MovingCameraScene):
         self.scene_power_up()
 
     # ------------------------------------------------------------ helpers
+    def play(self, *args, **kwargs):
+        self._play_t = 0.0
+        super().play(*args, **kwargs)
+        self._play_t = 0.0
+
+    def update_to_time(self, t):
+        self._play_t = t  # lets sounds triggered mid-play land at the right moment
+        super().update_to_time(t)
+
+    def snd(self, name, delay=0.0, gain=0.0):
+        self.add_sound(os.path.join(SFX_DIR, f"{name}.wav"), time_offset=self._play_t + delay, gain=gain)
+
     def pose(self, fig, rt=0.3, rf=smooth, arc=0.0, **kw):
         return Pose(fig, rt=rt, rf=rf, arc=arc, **kw)
 
@@ -611,6 +633,8 @@ class PackageUnitChangeout(MovingCameraScene):
     def scene_arrive(self):
         t1, t2 = self.t1, self.t2
         self.add(self.bag.shift(RIGHT * 9))
+        self.snd("truck")
+        self.snd("cough", 0.3, gain=-3)
         self.play(
             self.truck.animate.shift(LEFT * 9), self.bag.animate.shift(LEFT * 9),
             self.pose(t1, rt=1.3, rf=ease_out_cubic, x=1.05),
@@ -620,6 +644,7 @@ class PackageUnitChangeout(MovingCameraScene):
             run_time=1.3, rate_func=ease_out_cubic,
         )
         body = VGroup(self.truck.body, self.bag)
+        self.snd("squeak", gain=-6)
         self.play(
             body.animate(rate_func=there_and_back).shift(DOWN * 0.18),
             self.pose(t1, rt=0.3, rf=there_and_back, y=-6.31),
@@ -633,12 +658,15 @@ class PackageUnitChangeout(MovingCameraScene):
         t1, t2, bag = self.t1, self.t2, self.bag
         stand = dict(l1=0.15, k1=0.0, l2=-0.15, k2=0.0, a1=0.25, e1=-0.1, a2=-0.25, e2=0.1)
         self.play(self.pose(t1, rt=0.12, sy=0.9))
+        self.snd("whoosh", gain=-4)
         self.play(self.pose(t1, rt=0.6, arc=2.4, rf=linear, x=-1.15, y=SHIP, sy=1.0, a1=-2.5, e1=0.3,
                             a2=2.5, e2=-0.3, l1=0.2, l2=-0.5, k1=0, k2=0.4))
         t1.set_z_index(7)
+        self.snd("thump", gain=-8)
         self.play(self.pose(t1, rt=0.1, sy=0.75, **stand))
         self.play(self.pose(t1, rt=0.2, rf=ease_out_back, sy=1.0, look=0.6, face=1))
         # Tech 2 tumbles out while Tech 1 heads round to the bed for the tool bag
+        self.snd("whoosh", gain=-4)
         self.play(
             self.pose(t2, rt=0.7, arc=2.2, rf=linear, x=-2.7, y=SHIP - 0.3, lean=-1.3,
                       a1=-2.8, e1=0, a2=-2.4, e2=0, l1=0.6, k1=0.3, l2=0.2, k2=0.5, look=-0.8),
@@ -646,10 +674,11 @@ class PackageUnitChangeout(MovingCameraScene):
         )
         t2.set_z_index(7)
         handle = bag[3].get_top()
-        self.play(sfx("THUMP", P3(-2.4, -3.6), h=0.6, color="#FF8A00", angle=-0.15, hold=0.15),
+        self.play(Snd("thump", rt=0.55),
                   self.pose(t2, rt=0.35, rf=ease_out_back, y=SHIP, lean=0.0, look=0.4, face=1, **stand),
                   self.reach(t1, handle, rt=0.3, face=1, look=0.7, lean=0.15))
         self.follow(bag, t1, 1)
+        self.snd("tools", gain=-8)
         self.play(self.pose(t1, rt=0.3, rf=ease_out_back, **t1.arm(P3(2.75, -3.75), 1, lean=-0.1)))
         bag.set_z_index(7.5)
         self.play(self.pose(t1, rt=0.25, lean=0.0, a1=0.15, e1=0.0, look=-0.5))
@@ -663,10 +692,12 @@ class PackageUnitChangeout(MovingCameraScene):
     def scene_disconnect_zap(self):
         t1, t2, bag = self.t1, self.t2, self.bag
         bag.clear_updaters()
+        self.snd("tools", 0.3, gain=-6)
         self.play(bag.animate(path_arc=-0.8).move_to(P3(-2.8, GROUND - 0.35)),
                   self.pose(t1, rt=0.4, a1=-0.6, e1=0.2, face=1, look=0.7))
         # Tech 1 fights the screwed-down flashing while Tech 2 wanders over to unhook the whip
         edge = P3(UNIT_L - 0.05, SIDE_MID)
+        self.snd("rattle", 0.3, gain=-5)
         self.play(
             Succession(self.reach(t1, edge, rt=0.3, lean=0.1, squint=0.6),
                        *[self.hold(t1, edge, rt=0.22, rf=ease_in_out_sine, lean=-0.3 if k % 2 == 0 else 0.05)
@@ -678,8 +709,7 @@ class PackageUnitChangeout(MovingCameraScene):
         # Tech 2 goes for the whip anyway
         c = self.crouch(t2, 0.35, -0.6, face=-1)
         self.play(self.pose(t2, rt=0.55, rf=smooth, look=-0.7, **t2.arm(WHIP_END + P3(-0.2, 0.06), 1, **c)))
-        zap = sfx_text("ZAP!", P3(0.9, 3.1), h=1.5, angle=0.15)
-        self.play(GrowFromCenter(zap, rate_func=ease_out_back), run_time=0.15)
+        self.snd("zap", gain=2)
         for i in range(6):
             b = bolt(WHIP_END, t2.hands[1], seed=i)
             self.add(b)
@@ -687,9 +717,10 @@ class PackageUnitChangeout(MovingCameraScene):
                                 squint=-1.0, a2=1.8 * (1 if i % 2 else -1), e2=0.4, y=HIP, k1=0.0, k2=0.0,
                                 l1=0.35 * (1 if i % 2 else -1), l2=-0.35 * (1 if i % 2 else -1)))
             self.remove(b)
-        self.play(FadeOut(zap, scale=1.3), self.pose(
+        self.play(self.pose(
             t2, rt=0.25, lean=0.0, a1=0.15, e1=0.0, a2=-0.15, e2=0.0, l1=0.12, l2=-0.12, k1=0.0, k2=0.0,
             y=HIP, look=0.0), run_time=0.25)
+        self.snd("fizz", gain=-4)
         self.play(puff(t2.head() + UP * 0.5, n=5, seed=2, rt=1.1), Wait(0.3), run_time=1.1)
         self.play(self.pose(t2, rt=0.12, squint=0.95), run_time=0.12)
         self.play(self.pose(t2, rt=0.12, squint=-1.0), run_time=0.12)
@@ -700,19 +731,19 @@ class PackageUnitChangeout(MovingCameraScene):
         self.play(Walk(t1, -2.85, HIP, steps=4, rt=0.8, rf=smooth))
         self.play(self.reach(t1, self.lever[0].get_end(), rt=0.25, lean=-0.2, face=-1, look=-0.6, squint=0.3))
         self.play(self.throw_lever(t1, PI, rt=0.3, lean=-0.05))
-        self.play(sfx("CLUNK", P3(-2.6, 2.3), h=0.75, color="#FF8A00", angle=0.1, hold=0.3),
+        self.play(Snd("clunk", rt=0.70),
                   self.pose(t1, rt=0.4, lean=0.0, a1=0.2, e1=-0.1, squint=0.0, look=0.6, face=1),
                   Walk(t2, -0.6, steps=4, rt=0.9, rf=smooth))
 
     # ------------------------------------------------------------ 4a
-    def scene_drills(self):
+    def fetch_drills(self):
         t1, t2, bag = self.t1, self.t2, self.bag
         stand = dict(y=HIP, l1=0.15, k1=0.0, l2=-0.15, k2=0.0)
-        self.play(Walk(t1, -2.95, HIP, steps=1, rt=0.25, rf=smooth))
         # drill one for me...
         dig = self.crouch(t1, 0.45, 0.5, face=1, look=0.6)
         self.play(self.reach(t1, bag.get_top() + DOWN * 0.15, rt=0.3, **dig))
         d1 = make_drill(t1.hands[1], face=1)
+        self.snd("tools", gain=-10)
         self.play(FadeIn(d1, scale=0.5), run_time=0.1)
         self.follow(d1, t1, 1)
         self.play(self.pose(t1, rt=0.25, rf=ease_out_back, lean=0.0, a1=0.9, e1=-0.6, **stand))
@@ -724,38 +755,64 @@ class PackageUnitChangeout(MovingCameraScene):
         self.play(self.pose(t1, rt=0.2, lean=0.0, a2=1.6, e2=0.4, **stand))
         d2.clear_updaters()
         catch = P3(-1.0, 0.5)
+        self.snd("whoosh", gain=-6)
+        self.snd("catch", 0.55)
         self.play(d2.animate(path_arc=-1.4, run_time=0.55).move_to(catch).rotate(TAU),
                   self.pose(t1, rt=0.3, a2=-0.2, e2=0.1),
                   Succession(Wait(0.2), self.reach(t2, catch, rt=0.35, face=-1, look=-0.6)))
         self.follow(d2, t2, 1)
+        self.drills = (d1, d2)
 
-        # bzzt the screws out, one row at a time
+    def drill_rows(self, driving_in):
+        """Both techs work the screws row by row; Tech 2 takes x=UNIT_L-0.2, Tech 1 takes x=-2.2."""
+        t1, t2 = self.t1, self.t2
+        stand = dict(y=HIP, l1=0.15, k1=0.0, l2=-0.15, k2=0.0)
         rows = [(TOP_MID, False), (TOP_Y0 - 0.22, False), (FLASH_Y0 + 0.25, True)]
         for r, (y, low) in enumerate(rows):
-            s2, s1 = self.screws[2 * r], self.screws[2 * r + 1]  # Tech 2 takes x=UNIT_L-0.2, Tech 1 takes x=-2.2
+            s2, s1 = self.screws[2 * r], self.screws[2 * r + 1]
             h1 = s1.get_center() - DRILL_TIP
             h2 = s2.get_center() - DRILL_TIP * P3(-1, 1)
             b1 = self.crouch(t1, 0.45, 0.25, face=1) if low else dict(lean=0.1, **stand)
             b2 = self.crouch(t2, 0.45, -0.25, face=-1) if low else dict(lean=-0.1, **stand)
             self.play(self.reach(t1, h1, rt=0.25, squint=0.5, **b1), self.reach(t2, h2, rt=0.25, squint=0.5, **b2))
-            self.play(Rotate(s1, -6 * PI, rate_func=linear), Rotate(s2, -6 * PI, rate_func=linear),
-                      sfx("bzzt", s1.get_center() + P3(-0.3, 0.4), h=0.28, color="#FFD400", angle=0.2, hold=0.05),
-                      sfx("bzzt", s2.get_center() + P3(0.3, 0.4), h=0.28, color="#FFD400", angle=-0.2, hold=0.05),
-                      self.hold(t1, h1, rt=0.4, hx=0.02), self.hold(t2, h2, rt=0.4, hx=-0.02), run_time=0.4)
-            rng = random.Random(20 + r)
-            self.play(*[sc.animate(path_arc=rng.choice([-1, 1]) * 1.2).move_to(
-                          P3(rng.uniform(-6, 6), rng.choice([9.0, 8.5]))).scale(1.3).rotate(3 * PI)
-                        for sc in (s1, s2)],
-                      self.hold(t1, h1 + P3(-0.12, 0.0), rt=0.3, hx=0.0),
-                      self.hold(t2, h2 + P3(0.12, 0.0), rt=0.3, hx=0.0), run_time=0.45)
-        # drills back in the bag
+            if driving_in:
+                homes = [self.screw_home[2 * r + 1], self.screw_home[2 * r]]
+                spin = [UpdateFromAlphaFunc(sc, lambda m, a, h=h: m.become(h.copy().scale(1.3 - 0.3 * a).rotate(6 * PI * a)),
+                                            rate_func=linear) for sc, h in zip((s1, s2), homes)]
+            else:
+                spin = [Rotate(sc, -6 * PI, rate_func=linear) for sc in (s1, s2)]
+            self.play(*spin, Snd("drill", rt=0.4), self.hold(t1, h1, rt=0.4, hx=0.02),
+                      self.hold(t2, h2, rt=0.4, hx=-0.02), run_time=0.4)
+            back = [self.hold(t1, h1 + P3(-0.12, 0.0), rt=0.3, hx=0.0),
+                    self.hold(t2, h2 + P3(0.12, 0.0), rt=0.3, hx=0.0)]
+            if driving_in:
+                self.play(*back, run_time=0.3)
+            else:
+                rng = random.Random(20 + r)
+                self.snd("ping", 0.05, gain=-6)
+                self.play(*[sc.animate(path_arc=rng.choice([-1, 1]) * 1.2).move_to(
+                              P3(rng.uniform(-6, 6), rng.choice([9.0, 8.5]))).scale(1.3).rotate(3 * PI)
+                            for sc in (s1, s2)], *back, run_time=0.45)
+
+    def stow_drills(self):
+        t1, t2, bag = self.t1, self.t2, self.bag
+        stand = dict(y=HIP, l1=0.15, k1=0.0, l2=-0.15, k2=0.0)
+        d1, d2 = self.drills
         for d in (d1, d2):
             d.clear_updaters()
+        self.snd("tools", 0.45, gain=-6)
         self.play(d1.animate(path_arc=1.2).move_to(bag.get_center()).scale(0.4),
                   d2.animate(path_arc=1.6).move_to(bag.get_center()).scale(0.4),
                   self.pose(t1, rt=0.4, lean=0.0, a1=0.2, e1=-0.1, squint=0.0, **stand),
                   self.pose(t2, rt=0.4, lean=0.0, a1=0.2, e1=-0.1, squint=0.0, **stand), run_time=0.5)
         self.remove(d1, d2)
+
+    def scene_drills(self):
+        t1, t2 = self.t1, self.t2
+        self.play(Walk(t1, -2.95, HIP, steps=1, rt=0.25, rf=smooth))
+        self.fetch_drills()
+        self.drill_rows(driving_in=False)
+        self.stow_drills()
         self.play(Walk(t2, T2_HOME, steps=5, rt=1.0, rf=smooth), self.pose(t2, rt=1.0, hair=0.0, look=-0.6))
 
     # ------------------------------------------------------------ 4
@@ -775,6 +832,7 @@ class PackageUnitChangeout(MovingCameraScene):
             if abs(t1.state["x"] + 0.75) > 0.05:
                 self.play(Walk(t1, -0.75, steps=3, rt=0.5, rf=smooth))
             self.play(self.reach(t1, grip, rt=0.22, face=-1, look=-0.7, lean=-0.25 if i else -0.1))
+            self.snd("creak", gain=-4)
             self.play(Transform(panel, peeled, rate_func=ease_out_back, run_time=0.55),
                       Grab(t1, lambda a, g=grip, e=end: g + (e - g) * a, rt=0.55, rf=ease_out_back,
                            x=-2.95, lean=0.05, l1=-0.55, k1=0.3, l2=0.35, k2=0.0))
@@ -782,7 +840,7 @@ class PackageUnitChangeout(MovingCameraScene):
         # pretend bite
         mouth = t1.head() + P3(-0.28, -0.12)
         self.play(self.pose(t1, rt=0.25, look=-0.2, **t1.arm(mouth, 1, lean=0.0)))
-        self.play(sfx("CHOMP", P3(-1.0, 2.6), h=0.75, color="#FFD400", angle=-0.1, hold=0.3),
+        self.play(Snd("chomp", rt=0.70),
                   Succession(self.pose(t1, rt=0.15, hy=-0.07, squint=0.8),
                              self.pose(t1, rt=0.15, hy=0.0),
                              self.pose(t1, rt=0.15, hy=-0.07),
@@ -805,13 +863,15 @@ class PackageUnitChangeout(MovingCameraScene):
         stumble = dict(x=-2.95, y=HIP - 1.3, lean=-0.55, l1=0.9, k1=-0.4, l2=-0.3, k2=0.2, squint=-0.8, hx=0.0)
         stumble = {**stumble, **t1.arm(P3(-2.4, HIP - 0.3), 1, **stumble)}
         stumble = {**stumble, **t1.arm(P3(-2.2, HIP - 0.3), 2, **stumble)}
-        word = sfx("POP!", P3(-1.0, 2.8), h=1.3, color="#FF8A00", angle=-0.12, hold=0.35) if big else \
-            sfx("pop!", P3(-1.0, 2.2), h=0.6, color="#FF8A00", angle=0.12, hold=0.2)
+        word = Snd("pop_big", rt=0.75) if big else \
+            Snd("pop", rt=0.60)
         self.play(word, self.pose(t1, rt=0.35, rf=ease_out_cubic, **stumble))
         if big:
             self.play(self.pose(t1, rt=0.15, lean=-0.2, l1=0.3, k1=0.0, l2=-0.25, k2=0.0))
             self.play(self.pose(t1, rt=0.15, lean=0.12))
         duct.clear_updaters()
+        self.snd("whoosh", gain=-6)
+        self.snd("clatter", 0.62, gain=-4)
         self.play(duct.animate(path_arc=-1.6, run_time=0.65).move_to(pile).rotate(0.08 if big else -0.06),
                   self.pose(t1, rt=0.45, lean=0.1, squint=0.0, look=0.7, l1=0.15, l2=-0.15, k1=0, k2=0,
                             a1=2.4, e1=-0.3, a2=0.5, e2=0.0))
@@ -838,16 +898,19 @@ class PackageUnitChangeout(MovingCameraScene):
         wind = self.crouch(t1, 0.5, 0.6)
         self.play(self.pose(t1, rt=0.3, squint=0.6, **t1.arm(grab + P3(0.1, -0.05), 1, **wind)))
         yank = dict(y=HIP, lean=-0.4, l1=0.15, k1=0.0, l2=-0.35, k2=0.0, a2=0.6, e2=0.3)
+        self.snd("yank")
         self.play(self.pose(t1, rt=0.2, rf=rush_from, squint=0.0, **t1.arm(P3(-1.6, 2.6), 1, **yank)),
                   self.whip.show.animate(rate_func=rush_from).set_value(1.0),
                   self.lv.show.animate(rate_func=rush_from).set_value(1.0), run_time=0.2)
         # ...nothing happens
         dots = VGroup(*[Dot(t1.head() + P3(-0.2 + 0.2 * k, 0.75), radius=0.06, color=INK) for k in range(3)]).set_z_index(10)
+        self.snd("crickets", 0.1, gain=-2)
         self.play(LaggedStart(*[FadeIn(d, scale=0.3) for d in dots], lag_ratio=0.5), run_time=0.45)
         self.wait(0.6)
         self.play(self.pose(t1, rt=0.3, look=0.8))
         for e in (self.whip.end, self.lv.end):
             e.clear_updaters()
+        self.snd("thump", 0.25, gain=-12)
         self.play(FadeOut(dots),
                   self.whip.end.animate(rate_func=ease_out_bounce).move_to(P3(-1.4, GROUND + 0.1)),
                   self.lv.end.animate(rate_func=ease_out_bounce).move_to(P3(0.6, GROUND + 0.12)),
@@ -900,9 +963,10 @@ class PackageUnitChangeout(MovingCameraScene):
         self.play(self.pose(t1, rt=0.25, **g1), self.pose(t2, rt=0.25, **g2))
         # rattle it loose
         self.play(self.pose(t1, rt=0.15, squint=0.7), self.pose(t2, rt=0.15, squint=0.7))
+        self.snd("rattle", gain=-4)
         self.play(self.carry(0.5, lambda a: c, lean1=-0.3, lean2=0.3, rot=lambda a: 0.05 * np.sin(8 * PI * a), rf=linear))
         # rip it free and lift
-        self.play(sfx("RIIIP", P3(0.4, 2.4), h=0.8, color="#FF8A00", angle=-0.1, hold=0.2),
+        self.play(Snd("rip", rt=0.60),
                   self.carry(0.35, lambda a: c + UP * 0.35 * a, lean1=-0.1, lean2=0.1, rf=ease_out_back))
         # carry it down to the truck
         c1 = c + UP * 0.35
@@ -923,12 +987,13 @@ class PackageUnitChangeout(MovingCameraScene):
             m.become(orig.copy().scale(1 - 0.2 * a).rotate(-0.4 * np.sin(PI * a)).move_to(pos)).set_z_index(5.9)
 
         throw = dict(lean=0.25, a1=2.4, e1=-0.3, a2=2.2, e2=-0.2, squint=-1.0)
+        self.snd("whoosh_long", gain=-3)
         self.play(UpdateFromAlphaFunc(unit, toss, run_time=0.9, rate_func=linear),
                   self.pose(t1, rt=0.35, rf=ease_out_back, look=0.8, **throw),
                   self.pose(t2, rt=0.35, rf=ease_out_back, look=0.8, face=1, **throw))
         body = VGroup(truck.body, unit)
         self.play(
-            sfx("THUD", P3(3.0, -2.2), h=1.1, color="#C47A3A", angle=-0.08, hold=0.4),
+            Snd("crash", rt=0.80),
             body.animate(rate_func=there_and_back, run_time=0.3).shift(DOWN * 0.22),
             puff(P3(2.3, -4.9), n=3, seed=4, rt=0.7, rise=0.4),
             puff(P3(4.5, -4.9), n=3, seed=5, rt=0.7, rise=0.4),
@@ -946,6 +1011,7 @@ class PackageUnitChangeout(MovingCameraScene):
         new = make_unit(new=True).shift(RIGHT * 7.5)
         self.add(new)
         self.new = new
+        self.snd("whoosh_long", gain=-3)
         self.play(
             new.animate(rate_func=ease_out_back, run_time=1.1).shift(LEFT * 7.5),
             Succession(Wait(0.05), self.pose(t2, rt=0.55, arc=1.8, rf=linear, l1=0.7, k1=-1.2, l2=-0.4, k2=-1.0,
@@ -955,25 +1021,36 @@ class PackageUnitChangeout(MovingCameraScene):
             self.pose(t1, rt=0.6, look=0.7, face=1),
         )
         pts = [P3(-1.4, 1.2), P3(2.2, 1.1), P3(0.9, 1.5), P3(2.3, -0.4), P3(-0.4, 0.0), P3(1.2, -0.9)]
+        self.snd("chime", gain=-4)
         self.play(sparkles(pts, rt=0.8, seed=8), run_time=1.3)
 
     # ------------------------------------------------------------ 9
     def scene_rewind(self):
-        t1 = self.t1
+        t1, t2 = self.t1, self.t2
+        self.snd("rewind", gain=-4)
         self.play(self.pose(t1, rt=0.3, face=-1, look=-0.6, **t1.arm(P3(-3.0, 1.6), 1, lean=0.0)))
         self.play(
             LaggedStart(*[Transform(d, h, path_arc=1.4, run_time=0.6) for d, h in zip(self.ducts, self.duct_home)],
                         lag_ratio=0.5),
-            Succession(Wait(0.45), sfx("CLICK", P3(-1.0, 2.6), h=0.8, color="#7CC6EE", angle=0.1, hold=0.1)),
-            Succession(Wait(0.75), sfx("CLICK", P3(-2.6, -2.6), h=0.8, color="#7CC6EE", angle=-0.1, hold=0.1)),
+            Succession(Wait(0.45), Snd("click", rt=0.50)),
+            Succession(Wait(0.75), Snd("click", rt=0.50)),
             self.whip.end.animate(path_arc=-1.0, run_time=0.6).move_to(WHIP_END),
             self.whip.show.animate(run_time=0.6, rate_func=rush_into).set_value(0.0),
         )
+        self.snd("creak", gain=-6)
         self.play(LaggedStart(*[Transform(st, h, run_time=0.4, rate_func=ease_out_back)
                                 for st, h in zip(reversed(self.strips), reversed(self.strip_home))], lag_ratio=0.45))
-        self.play(LaggedStart(*[Transform(s, h, path_arc=1.2, run_time=0.45)
-                                for s, h in zip(reversed(self.screws), reversed(self.screw_home))], lag_ratio=0.35),
-                  self.pose(t1, rt=0.8, a1=0.2, e1=-0.1))
+        # screws fly back and sit loose in their holes...
+        loose = [h.copy().scale(1.3) for h in self.screw_home]
+        self.play(LaggedStart(*[Transform(s, l, path_arc=1.2, run_time=0.45)
+                                for s, l in zip(reversed(self.screws), reversed(loose))], lag_ratio=0.3),
+                  Walk(t1, -2.95, HIP, steps=3, rt=0.8, rf=smooth),
+                  Walk(t2, -0.6, HIP, steps=8, rt=1.6, rf=smooth))
+        # ...then get driven home with the drills
+        self.fetch_drills()
+        self.drill_rows(driving_in=True)
+        self.stow_drills()
+        self.play(Walk(t2, T2_HOME, steps=5, rt=1.0, rf=smooth))
 
     # ------------------------------------------------------------ 10
     def scene_thread_needle(self):
@@ -991,16 +1068,17 @@ class PackageUnitChangeout(MovingCameraScene):
         self.play(self.pose(t1, rt=0.35, **t1.arm(ready, 1, **focus)))
         # miss #1: bonks above the grommet
         self.play(self.pose(t1, rt=0.25, **t1.arm(hand(0.09, 0.13), 1)))
-        self.play(sfx("tink", RING + P3(-0.1, 0.5), h=0.22, color="#FFD400", angle=0.2, hold=0.1),
+        self.play(Snd("tink", rt=0.50),
                   self.pose(t1, rt=0.25, rf=ease_out_back, **t1.arm(ready + P3(0.05, 0.05), 1)))
         # miss #2: bonks below it
         self.play(self.pose(t1, rt=0.25, **t1.arm(hand(0.09, -0.14), 1)))
-        self.play(sfx("tink", RING + P3(-0.1, -0.5), h=0.22, color="#FFD400", angle=-0.2, hold=0.1),
+        self.play(Snd("tink", rt=0.50),
                   self.pose(t1, rt=0.25, rf=ease_out_back, hy=-0.03, **t1.arm(ready, 1)))
         # got it: the eight conductors slide in
         self.play(self.pose(t1, rt=0.5, rf=smooth, **t1.arm(hand(0.15, 0.0), 1)))
         self.play(self.pose(t1, rt=0.4, rf=ease_in_out_sine, **t1.arm(hand(0.0, 0.0), 1)),
                   lv.show.animate(run_time=0.4).set_value(0.0))
+        self.snd("ding", gain=-4)
         self.play(sparkles([RING + P3(-0.25, 0.25), RING + P3(0.2, 0.3)], rt=0.6, seed=12),
                   self.pose(t1, rt=0.35, rf=ease_out_back, tongue=0.0, squint=0.0, hx=0.0, hy=0.0))
         lv.end.clear_updaters()
@@ -1049,10 +1127,11 @@ class PackageUnitChangeout(MovingCameraScene):
         hum_m = always_redraw(hum)
         air_m = always_redraw(air)
         self.add(hum_m, air_m)
+        self.snd("hum", 0.15, gain=-2)
         dur = 4.0
         self.play(
             T.animate(run_time=dur, rate_func=linear).set_value(dur),
-            sfx("CLUNK", P3(-2.6, 2.3), h=0.75, color="#FF8A00", angle=0.1, hold=0.3),
+            Snd("clunk", rt=0.70),
             Succession(self.pose(t1, rt=0.4, lean=0.0, a1=0.2, e1=-0.1, look=0.7, face=1),
                        Wait(1.0), self.pose(t1, rt=0.5, look=-0.6, face=-1, squint=0.3)),
             Succession(Wait(0.6), self.pose(t2, rt=0.3, look=-0.8, squint=-0.6),
