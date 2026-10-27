@@ -64,8 +64,9 @@ PIVOT = np.array([-3.58, 0.6, 0])
 SUPPLY_Y = (-0.15, 0.35)
 RETURN_Y = (-1.0, -0.5)
 FLASH_Y0, FLASH_Y1 = -1.12, 0.47
-STRIP_H = (FLASH_Y1 - FLASH_Y0) / 3
-STRIP_Y = [FLASH_Y1 - STRIP_H * (i + 0.5) for i in range(3)]  # top, middle, bottom
+TOP_Y0 = FLASH_Y1 - 0.2          # top panel sits on the ducts; side panel covers their face
+TOP_MID = (TOP_Y0 + FLASH_Y1) / 2
+SIDE_MID = (FLASH_Y0 + TOP_Y0) / 2
 T2_HOME = 3.0
 
 
@@ -199,6 +200,25 @@ class Pose(Animation):
         s = {k: self.s0[k] + (self.s1[k] - self.s0[k]) * a for k in self.s0}
         s["y"] += self.arc * 4 * alpha * (1 - alpha)
         self.fig.state = s
+        self.fig.rebuild()
+
+
+class Grab(Animation):
+    """Lerp body state while the hand stays locked (via IK) on point_fn(eased alpha)."""
+
+    def __init__(self, fig, point_fn, which=1, rt=0.3, rf=smooth, **target):
+        self.fig, self.point_fn, self.which, self.target = fig, point_fn, which, target
+        super().__init__(fig, run_time=rt, rate_func=rf)
+
+    def begin(self):
+        self.s0 = dict(self.fig.state)
+        self.s1 = {**self.s0, **self.target}
+        super().begin()
+
+    def interpolate_mobject(self, alpha):
+        a = self.rate_func(alpha)
+        self.fig.state = {k: self.s0[k] + (self.s1[k] - self.s0[k]) * a for k in self.s0}
+        self.fig.state.update(self.fig.arm(self.point_fn(a), self.which))
         self.fig.rebuild()
 
 
@@ -342,12 +362,28 @@ def make_duct(y0, y1):
     return VGroup(r, fl, seam).set_z_index(2)
 
 
-def make_strip(cy):
-    cx = (WALL_X + UNIT_L) / 2
-    r = Rectangle(width=UNIT_L - WALL_X + 0.06, height=STRIP_H).move_to(P3(cx, cy)) \
+def make_flashing():
+    """Duct flashing: a top panel capping the duct run and a side panel over its face."""
+    cx, w = (WALL_X + UNIT_L) / 2, UNIT_L - WALL_X + 0.06
+    side = Rectangle(width=w, height=TOP_Y0 - FLASH_Y0).move_to(P3(cx, SIDE_MID)) \
         .set_fill(FLASH_C, 1).set_stroke(INK, 4)
-    crease = seg(P3(WALL_X + 0.1, cy + STRIP_H * 0.28), P3(UNIT_L - 0.1, cy + STRIP_H * 0.28), w=2, color="#8D959E")
-    return VGroup(r, crease).set_z_index(3)
+    hem = seg(P3(WALL_X + 0.05, FLASH_Y0 + 0.08), P3(UNIT_L - 0.05, FLASH_Y0 + 0.08), w=2, color="#8D959E")
+    ribs = VGroup(*[seg(P3(WALL_X + 0.1, y), P3(UNIT_L - 0.1, y), w=2, color="#9AA2AB")
+                    for y in (SIDE_MID + 0.3, SIDE_MID - 0.3)])
+    top = Polygon(P3(WALL_X, TOP_Y0), P3(WALL_X, FLASH_Y1 + 0.06), P3(UNIT_L + 0.04, FLASH_Y1 + 0.06),
+                  P3(UNIT_L + 0.1, TOP_Y0)).set_fill("#CDD3D9", 1).set_stroke(INK, 4)
+    bend = seg(P3(WALL_X + 0.05, TOP_Y0 + 0.05), P3(UNIT_L + 0.02, TOP_Y0 + 0.05), w=2, color="#8D959E")
+    return [VGroup(top, bend).set_z_index(3.1), VGroup(side, hem, ribs).set_z_index(3)]
+
+
+def peel_target(panel, pivot, squash, ang):
+    return panel.copy().stretch(-squash, 0, about_point=pivot).rotate(ang, about_point=pivot)
+
+
+def peel_point(p, pivot, squash, ang):
+    q = p.copy()
+    q[0] = pivot[0] + (p[0] - pivot[0]) * -squash
+    return pivot + rotate_vector(q - pivot, ang)
 
 
 def make_screw(p):
@@ -469,6 +505,20 @@ class PackageUnitChangeout(MovingCameraScene):
         moves = [base + P3(rng.uniform(-amt, amt), rng.uniform(-amt, amt)) for _ in range(n - 1)] + [base]
         return Succession(*[f.animate(run_time=rt / n, rate_func=linear).move_to(m) for m in moves])
 
+    def reach(self, fig, target, which=1, rt=0.3, rf=smooth, **kw):
+        p0, t = fig.hands[which].copy(), P3(target[0], target[1])
+        return Grab(fig, lambda a: p0 + (t - p0) * a, which, rt, rf, **kw)
+
+    def hold(self, fig, point, which=1, rt=0.3, rf=smooth, **kw):
+        p = P3(point[0], point[1])
+        return Grab(fig, lambda a: p, which, rt, rf, **kw)
+
+    def throw_lever(self, fig, turn, rt=0.3, **kw):
+        tip0 = self.lever[0].get_end() - PIVOT
+        return AnimationGroup(
+            Rotate(self.lever, turn, about_point=PIVOT, rate_func=ease_out_back, run_time=rt),
+            Grab(fig, lambda a: PIVOT + rotate_vector(tip0, turn * a), rt=rt, rf=ease_out_back, **kw))
+
     def crouch(self, fig, drop, lean, spread=0.25, **over):
         """Bend the knees (feet stay on the ground) and lean the torso."""
         s = {**fig.state, **over}
@@ -510,9 +560,10 @@ class PackageUnitChangeout(MovingCameraScene):
 
         self.ducts = [make_duct(*SUPPLY_Y), make_duct(*RETURN_Y)]
         self.duct_home = [d.copy() for d in self.ducts]
-        self.strips = [make_strip(y) for y in STRIP_Y]
+        self.strips = make_flashing()  # [top panel, side panel]
         self.strip_home = [st.copy() for st in self.strips]
-        self.screws = [make_screw(P3(x, y)) for y in STRIP_Y for x in (UNIT_L - 0.2, -2.2)]
+        self.screws = [make_screw(P3(x, y)) for y in (TOP_MID, TOP_Y0 - 0.22, FLASH_Y0 + 0.25)
+                       for x in (UNIT_L - 0.2, -2.2)]
         self.screw_home = [s.copy() for s in self.screws]
         self.unit = make_unit(new=False)
         self.add(*self.ducts, *self.strips, *self.screws, self.unit)
@@ -578,7 +629,7 @@ class PackageUnitChangeout(MovingCameraScene):
                   self.pose(t2, rt=0.35, rf=ease_out_back, y=SHIP, lean=0.0, look=0.4, face=1, **stand))
 
         self.play(
-            Walk(t1, -2.85, HIP, steps=9, rt=2.3, hold=(1,), rf=smooth),
+            Walk(t1, -1.85, HIP, steps=9, rt=2.3, hold=(1,), rf=smooth),
             Walk(t2, T2_HOME, HIP, steps=9, rt=2.3, rf=smooth),
         )
 
@@ -586,19 +637,19 @@ class PackageUnitChangeout(MovingCameraScene):
     def scene_disconnect_zap(self):
         t1, t2, bag = self.t1, self.t2, self.bag
         bag.clear_updaters()
-        self.play(bag.animate(path_arc=0.8).move_to(P3(-3.85, GROUND - 0.25)),
-                  self.pose(t1, rt=0.4, a1=-0.6, e1=0.2, face=-1, look=-0.6))
-        tip = PIVOT + UP * 0.37
-        self.play(self.pose(t1, rt=0.3, **t1.arm(tip, 1, lean=-0.2), squint=0.3))
+        self.play(bag.animate(path_arc=-0.8).move_to(P3(-2.8, GROUND - 0.35)),
+                  self.pose(t1, rt=0.4, a1=-0.6, e1=0.2, face=1, look=0.7))
+        # Tech 1 fights the screwed-down flashing while Tech 2 wanders over to unhook the whip
+        edge = P3(UNIT_L - 0.05, SIDE_MID)
         self.play(
-            Rotate(self.lever, PI, about_point=PIVOT, rate_func=ease_out_back, run_time=0.25),
-            self.pose(t1, rt=0.25, rf=rush_from, **t1.arm(PIVOT + DOWN * 0.37, 1, lean=-0.1)),
+            Succession(self.reach(t1, edge, rt=0.3, lean=0.1, squint=0.6),
+                       *[self.hold(t1, edge, rt=0.22, rf=ease_in_out_sine, lean=-0.3 if k % 2 == 0 else 0.05)
+                         for k in range(5)]),
+            Succession(Wait(0.3), Wiggle(self.strips[1], scale_value=1.0, rotation_angle=0.015,
+                                         n_wiggles=5, run_time=1.1)),
+            Walk(t2, WHIP_END[0] + 0.75, steps=7, rt=1.4, rf=smooth),
         )
-        self.play(sfx("CLUNK", P3(-2.6, 2.3), h=0.75, color="#FF8A00", angle=0.1, hold=0.3),
-                  self.pose(t1, rt=0.4, lean=0.0, a1=0.2, e1=-0.1, squint=0.0, look=0.6, face=1))
-
         # Tech 2 goes for the whip anyway
-        self.play(Walk(t2, WHIP_END[0] + 0.75, steps=5, rt=1.0, rf=smooth))
         c = self.crouch(t2, 0.35, -0.6, face=-1)
         self.play(self.pose(t2, rt=0.55, rf=smooth, look=-0.7, **t2.arm(WHIP_END + P3(-0.2, 0.06), 1, **c)))
         zap = sfx_text("ZAP!", P3(0.9, 3.1), h=1.5, angle=0.15)
@@ -617,10 +668,15 @@ class PackageUnitChangeout(MovingCameraScene):
         self.play(self.pose(t2, rt=0.12, squint=0.95), run_time=0.12)
         self.play(self.pose(t2, rt=0.12, squint=-1.0), run_time=0.12)
 
-        # Tech 1: slow, disappointed head shake
-        self.play(self.pose(t1, rt=0.3, squint=0.5, look=0.8))
+        # Tech 1: slow, disappointed head shake... then kills the power
+        self.play(self.pose(t1, rt=0.3, squint=0.5, look=0.8, face=1, lean=0.0, a1=0.2, e1=-0.1))
         self.play(self.shake_head(t1, n=4, amt=0.08, rt=0.32))
-        self.play(Walk(t2, T2_HOME, steps=4, rt=0.9, rf=smooth), self.pose(t1, rt=0.4, squint=0.0, look=0.6))
+        self.play(Walk(t1, -2.85, HIP, steps=4, rt=0.8, rf=smooth))
+        self.play(self.reach(t1, self.lever[0].get_end(), rt=0.25, lean=-0.2, face=-1, look=-0.6, squint=0.3))
+        self.play(self.throw_lever(t1, PI, rt=0.3, lean=-0.05))
+        self.play(sfx("CLUNK", P3(-2.6, 2.3), h=0.75, color="#FF8A00", angle=0.1, hold=0.3),
+                  self.pose(t1, rt=0.4, lean=0.0, a1=0.2, e1=-0.1, squint=0.0, look=0.6, face=1),
+                  Walk(t2, T2_HOME, steps=4, rt=0.9, rf=smooth))
 
     # ------------------------------------------------------------ 4
     def scene_banana_flashing(self):
@@ -638,19 +694,22 @@ class PackageUnitChangeout(MovingCameraScene):
             ))
         self.play(LaggedStart(*flights, lag_ratio=0.3), self.pose(t2, rt=2.0, hair=0.0, squint=0.0, look=-0.6))
 
-        # banana peel back toward the house: one flick per strip, top to bottom
+        # peel back toward the house like a banana: top panel, then side panel
         self.peeled = []
-        for i, (lean, ang) in enumerate(((-0.15, -0.45), (-0.3, 0.0), (-0.5, 0.45))):
-            st = self.strips[i]
-            pivot = P3(WALL_X, STRIP_Y[i])
-            peeled = st.copy().stretch(-0.55, 0, about_point=pivot).rotate(ang, about_point=pivot)
+        for i, (grip_y, squash, ang) in enumerate(((TOP_MID, 0.45, -0.6), (SIDE_MID, 0.42, 0.15))):
+            panel = self.strips[i]
+            pivot = P3(WALL_X, grip_y)
+            grip = P3(UNIT_L - 0.04, grip_y)
+            end = peel_point(grip, pivot, squash, ang)
+            peeled = peel_target(panel, pivot, squash, ang)
             self.peeled.append(peeled)
-            corner = P3(UNIT_L - 0.08, STRIP_Y[i] + STRIP_H / 2)
-            self.play(self.pose(t1, rt=0.2, **t1.arm(corner, 1, lean=lean)))
-            self.play(Transform(st, peeled, rate_func=ease_out_back),
-                      self.pose(t1, rt=0.32, rf=rush_from,
-                                **t1.arm(P3(-2.0, STRIP_Y[i] + 0.3), 1, lean=-0.1)),
-                      run_time=0.32)
+            if abs(t1.state["x"] + 0.75) > 0.05:
+                self.play(Walk(t1, -0.75, steps=3, rt=0.5, rf=smooth))
+            self.play(self.reach(t1, grip, rt=0.22, face=-1, look=-0.7, lean=-0.25 if i else -0.1))
+            self.play(Transform(panel, peeled, rate_func=ease_out_back, run_time=0.55),
+                      Grab(t1, lambda a, g=grip, e=end: g + (e - g) * a, rt=0.55, rf=ease_out_back,
+                           x=-2.95, lean=0.05, l1=-0.55, k1=0.3, l2=0.35, k2=0.0))
+            self.play(self.pose(t1, rt=0.15, l1=0.15, k1=0.0, l2=-0.15, k2=0.0))
         # pretend bite
         mouth = t1.head() + P3(-0.28, -0.12)
         self.play(self.pose(t1, rt=0.25, look=-0.2, **t1.arm(mouth, 1, lean=0.0)))
@@ -850,11 +909,8 @@ class PackageUnitChangeout(MovingCameraScene):
     def scene_power_up(self):
         t1, t2, new = self.t1, self.t2, self.new
         self.play(Walk(t1, -2.85, HIP, steps=6, rt=1.0, rf=smooth))
-        self.play(self.pose(t1, rt=0.25, face=-1, look=-0.6, **t1.arm(PIVOT + DOWN * 0.37, 1, lean=-0.1)))
-        self.play(
-            Rotate(self.lever, -PI, about_point=PIVOT, rate_func=ease_out_back, run_time=0.25),
-            self.pose(t1, rt=0.25, rf=rush_from, **t1.arm(PIVOT + UP * 0.37, 1, lean=-0.2)),
-        )
+        self.play(self.reach(t1, self.lever[0].get_end(), rt=0.25, face=-1, look=-0.6, lean=-0.05))
+        self.play(self.throw_lever(t1, -PI, rt=0.3, lean=-0.2))
         T = ValueTracker(0)
         home = new.get_center()
         new.add_updater(lambda m: m.move_to(home + 0.025 * P3(np.sin(T.get_value() * 95), np.sin(T.get_value() * 77))))
