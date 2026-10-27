@@ -2,3 +2,4 @@ media/
 __pycache__/
 *.pyc
 stickworld/audio/sfx/_music_bed.wav
+stickworld/test_scene_timing.md
