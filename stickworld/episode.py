@@ -61,9 +61,14 @@ class EpisodeScene(SoundScene, MovingCameraScene):
         holder.add_updater(advance)
         self.add(holder)
 
-    def finish(self, music=True):
+    def finish(self, music=True, tail_fade=0.35):
         if music and self.MUSIC:
             self.add_music(self.MUSIC, self.MUSIC_LEVEL)
+        # cues that ring past the last frame would make the file longer than the picture: cut the mix to length
+        fw = self.renderer.file_writer
+        total_ms = int(self.renderer.time * 1000)
+        if getattr(fw, "includes_sound", False) and fw.audio_segment is not None and len(fw.audio_segment) > total_ms:
+            fw.audio_segment = fw.audio_segment[:total_ms].fade_out(int(tail_fade * 1000))
         rows = ["| Scene | Start (s) | End (s) | Action (s) | TIMING (s) |", "| --- | --- | --- | --- | --- |"]
         for name, a, b, used, target in self.timeline:
             flag = " (over)" if used > target + 1e-3 else ""

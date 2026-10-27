@@ -136,6 +136,12 @@ Every prop is a `Prop` (props/base.py) with named sub-parts (`prop.parts`) and n
 
 Connections: `connect(child, "point", parent, "point")` / `Cable.connect_end(fn)` keep things attached while they move, until a figure's action disconnects them.
 
+Prop-building notes:
+- hvac_more.py holds shared drawing helpers for new props: `IN` (one inch at figure scale), `rect`, `seg`, `tube`, `rounded_path`, `offset_path`, `teardrop`, `SevenSeg` (LCD digits), `Tween` (an UpdateFromAlphaFunc that reads its start state when it begins). Material colours not in style.py (copper, brass, hoses, dirt...) are defined at the top of the *_more files; move one into style.py if a second file needs it.
+- Never animate a freshly built `VGroup(...)` of a prop's parts (`VGroup(a, b).animate...`): Manim adds that wrapper to the scene, so the parts draw twice and outlive the prop. Animate the prop, one part, or use an UpdateFromAlphaFunc on the prop.
+- Points that live on a moving sub-part (a filter's grip, a panel door handle) move with that part: animate `prop.parts["filter"]`, not the whole prop.
+- Small printed labels on equipment (R-410A, IN/OUT, MASTIC) can be turned off with `label=None` / `labels=False`.
+
 ### 9b. Sound
 
 - Effects are real recordings (stickworld/audio/src, credits and licenses in src/CREDITS.md), cut into cues in stickworld/audio/sfx by `prep_audio.py`. Cue names: truck, squeak, cough, whoosh, whoosh_long, thump, thud, crash, tools, rattle, zap, fizz, clunk, drill, ping, catch, creak, chomp, pop_big, pop, pop_small, clatter, yank, crickets, rip, chime, ding, tink, click, rewind, hum, step1–3.

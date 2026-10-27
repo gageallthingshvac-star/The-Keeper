@@ -169,5 +169,67 @@ class StickWorldTest(EpisodeScene):
         self.finish(music=False)
 
     def extras_gallery(self):
-        """Every extra prop and set from *_more.py, laid out for a visual check."""
-        pass
+        """Every extra prop, effect and set from *_more.py, laid out and exercised once."""
+        from manim import RIGHT, Circle
+        from stickworld.props.effects_more import heat_waves, motion_lines, question_mark, sweat
+        from stickworld.props.hvac_more import (AirHandler, BreakerPanel, CondensateDrain, EvapCoil, FilterRack, Furnace,
+                                                LineSet, SplitCondenser, Thermostat)
+        from stickworld.props.tools_more import (Dolly, Flashlight, GaugeSet, Ladder, Level, MasticBrush, MasticBucket,
+                                                 Multimeter, RecoveryMachine, RefrigerantTank, Screwdriver)
+        from stickworld.sets_more import attic, crawlspace, rooftop, utility_closet
+
+        self.clear()
+        with self.block("sets_more"):
+            for build, anchor in ((attic, "work_spot"), (crawlspace, "work_spot"), (rooftop, "curb"), (utility_closet, "equipment_spot")):
+                st = build()
+                spot = st.pt(anchor)
+                fig = StickFigure(x=spot[0] + 1.2, ground=spot[1], face_dir=-1, name=build.__name__)
+                if build is crawlspace:
+                    fig.set(**{"spine": 0.9})
+                    self.add(st, fig)
+                    self.play(fig.pose({"drop": 1.1, "spine": 0.9}, 0.3))
+                else:
+                    self.add(st, fig)
+                self.play(fig.look_at(spot), fig.expression("happy"), Wait(0.5))
+                self.remove(st, fig)
+
+        with self.block("hvac_more"):
+            g1, g2 = 2.0, -5.5
+            cond = SplitCondenser(-2.8, g1)
+            ah = AirHandler(2.6, g1, mirror=True)
+            ls = LineSet([cond.pt("lineset"), (-1.2, cond.pt("lineset")[1]), (-1.2, 4.5), (ah.get_left()[0], 4.5)])
+            fur = Furnace(-3.0, g2)
+            coil = EvapCoil(-3.0, fur.pt("supply_top")[1])
+            th = Thermostat((0.2, 0.6))
+            drn = CondensateDrain(coil.pt("drain"))
+            rack = FilterRack((0.3, -4.0))
+            bp = BreakerPanel((2.9, -3.2))
+            self.add(cond, ah, ls, fur, coil, th, drn, rack, bp)
+            self.play(fur.burner(True), th.set_temp(65), bp.open_door())
+            self.play(bp.flip(2, False), bp.flip("main", False), drn.drip(n=2, run_time=1.0), th.screen_on(False))
+            self.play(th.screen_on(True), ls.reshape([cond.pt("lineset"), (-1.6, 4.0), (ah.get_left()[0], 4.0)]),
+                      rack.parts["filter"].animate.shift(np.array([0, 0.9, 0])))
+            self.remove(cond, ah, ls, fur, coil, th, drn, rack, bp)
+
+        with self.block("tools_more"):
+            g = -0.8
+            mm, gs = Multimeter((-2.8, 3.6)), GaugeSet((1.2, 3.8))
+            lvl, fl = Level((0.0, 1.6)), Flashlight((-3.4, 1.5))
+            drv, brush = Screwdriver((-3.6, 5.6)), MasticBrush((-2.2, 5.6), angle=0.0)
+            yard = [RecoveryMachine(-3.1, g), RefrigerantTank(-1.6, g), MasticBucket(-0.5, g), Dolly(1.0, g),
+                    Ladder(3.2, g, height=2.2)]
+            tall = [Ladder(-2.4, -6.8, height=4.5), Ladder(1.6, -6.8, height=4.6, kind="straight", lean=0.25)]
+            fig = StickFigure(x=-0.3, ground=-6.8, face_dir=1, name="tester")
+            self.add(mm, gs, lvl, fl, drv, brush, *yard, *tall, fig)
+            self.play(mm.reading(240), gs.needles(118, 340), lvl.tilt(0.12), fl.beam(True))
+            self.play(mm.probes_to((-2.0, 2.6), (-1.6, 2.5)), gs.hoses_to(low=(0.6, 2.4), high=(2.0, 2.5)), lvl.tilt(-0.12), fl.beam(False))
+            self.play(fig.grab(fl, "R", "grip"))
+            self.play(fl.beam(True), fig.pose("point", 0.4))
+            self.remove(mm, gs, lvl, fl, drv, brush, *yard, *tall, fig)
+
+        with self.block("effects_more"):
+            fig = StickFigure(x=-1.0, ground=-2.0, face_dir=1, name="fx")
+            box = Circle(radius=0.4).move_to(P(-3.0, -4.5)).set_stroke(S.INK, 5)
+            self.add(fig, box)
+            self.play(heat_waves(P(1.5, -1.0), run_time=1.0), sweat(fig.head_center(), side=1), question_mark(fig.head_center() + P(0, S.HEAD_R)))
+            self.play(motion_lines(box, RIGHT, run_time=0.8), box.animate.shift(RIGHT * 4), run_time=0.8)
