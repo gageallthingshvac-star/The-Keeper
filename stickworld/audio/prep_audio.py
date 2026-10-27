@@ -1,4 +1,4 @@
-"""Turn the licensed recordings in ./audio_src (see audio_src/CREDITS.md) into ready-to-mix cues in ./sfx.
+"""Turn the licensed recordings in ./src (see src/CREDITS.md) into ready-to-mix cues in ./sfx.
 
 Each cue is trimmed to the moment it is used for, has leading silence removed, is peak-normalised,
 and gets a short fade so nothing clicks. Run:  python prep_audio.py
@@ -9,7 +9,7 @@ from pydub import AudioSegment, effects
 from pydub.silence import detect_leading_silence
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SRC = os.path.join(HERE, "audio_src")
+SRC = os.path.join(HERE, "src")
 OUT = os.path.join(HERE, "sfx")
 
 
