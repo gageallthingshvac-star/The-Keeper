@@ -1,0 +1,11 @@
+934-    category: 'Interior',
+935-  },
+936-  {
+937:    kind: 'fs-524598',
+938-    label: 'Refrigerator hum 2',
+939-    file: require('@/assets/sounds/bulk-fridge-buzz-loop-524598.mp3'),
+940-    title: 'Fridge buzz (loop)',
+941-    author: 'Matislav',
+942-    sourceUrl: 'https://freesound.org/people/Matislav/sounds/524598/',
+943-    license: 'CC0',
+944-    category: 'Interior',

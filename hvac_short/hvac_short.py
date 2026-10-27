@@ -1,6 +1,6 @@
 """Stick-figure YouTube Short: HVAC package unit changeout.
 
-Sounds:   python make_sfx.py   (writes ./sfx/*.wav; needs numpy + scipy)
+Sounds:   python prep_audio.py  (cuts the licensed recordings in ./audio_src into ./sfx cues)
 Preview:  manim -ql hvac_short.py PackageUnitChangeout
 Final:    manim -qh --fps 30 -r 1080,1920 hvac_short.py PackageUnitChangeout
 """
@@ -9,6 +9,7 @@ import random
 
 import numpy as np
 from manim import *
+from pydub import AudioSegment, effects
 from manim.utils.rate_functions import (
     ease_in_out_sine,
     ease_out_back,
@@ -25,7 +26,9 @@ config.frame_height = 16
 config.frame_width = 9
 config.background_color = WHITE
 
-SFX_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sfx")  # built by make_sfx.py
+SFX_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sfx")  # built by prep_audio.py
+SFX_TRIM = -5.0  # overall effects level, leaves headroom when cues overlap
+MUSIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "audio_src", "music.mp3")  # CC0, see audio_src/CREDITS.md
 SCENE = None  # the running scene, so Snd animations can place audio mid-play
 
 # ---------------------------------------------------------------- palette
@@ -315,6 +318,16 @@ class Gait:
         return hip, feet, swing
 
 
+def footsteps(fig, gait, rt, gain=-15.0):
+    """Schedule a footstep sound for every foot landing in the gait (skipped while hidden in the truck)."""
+    if SCENE is None or fig.z_index < 7:
+        return
+    rng = random.Random(len(gait.steps) * 31 + int(rt * 100))
+    for _, _, t1, a, b in gait.steps:
+        if np.linalg.norm(b - a) > 0.08:
+            SCENE.snd(f"step{rng.randint(1, 3)}", delay=t1 * rt, gain=gain + rng.uniform(-2, 1))
+
+
 class Walk(Animation):
     """Walk to (x, y) with planted feet. face can differ from the travel direction (walking backward);
     hands={which: fn(eased_alpha) -> point} keeps a hand locked on a moving object; hold keeps arms still."""
@@ -332,6 +345,7 @@ class Walk(Animation):
         self.gait = Gait(self.fig, self.s0, P3(self.tx, ty), self.run_time, self.rf, self.gface, self.nsteps)
         self.s1 = {**self.s0, **self.target}
         self.s1["face"] = self.gait.face
+        footsteps(self.fig, self.gait, self.run_time)
         if "look" not in self.target:
             self.s1["look"] = 0.6 * self.gait.face
         super().begin()
@@ -623,6 +637,7 @@ class PackageUnitChangeout(MovingCameraScene):
         self.scene_rewind()
         self.scene_thread_needle()
         self.scene_power_up()
+        self.add_music()
 
     # ------------------------------------------------------------ helpers
     def play(self, *args, **kwargs):
@@ -634,8 +649,17 @@ class PackageUnitChangeout(MovingCameraScene):
         self._play_t = t  # lets sounds triggered mid-play land at the right moment
         super().update_to_time(t)
 
+    def add_music(self, level=-13.0):
+        """Lay the music under everything, trimmed and faded to the exact running time."""
+        total = self.renderer.time
+        bed = effects.normalize(AudioSegment.from_file(MUSIC)[:int(total * 1000)])
+        bed = bed.apply_gain(level).fade_in(400).fade_out(2500)
+        path = os.path.join(SFX_DIR, "_music_bed.wav")
+        bed.export(path, format="wav")
+        self.add_sound(path, time_offset=-total)
+
     def snd(self, name, delay=0.0, gain=0.0):
-        self.add_sound(os.path.join(SFX_DIR, f"{name}.wav"), time_offset=self._play_t + delay, gain=gain)
+        self.add_sound(os.path.join(SFX_DIR, f"{name}.wav"), time_offset=self._play_t + delay, gain=gain + SFX_TRIM)
 
     def pose(self, fig, rt=0.3, rf=smooth, arc=0.0, **kw):
         return Pose(fig, rt=rt, rf=rf, arc=arc, **kw)
@@ -1041,6 +1065,7 @@ class PackageUnitChangeout(MovingCameraScene):
             for fig in (t1, t2):
                 hip1 = P3(s0[fig]["x"] + walk[0], s0[fig]["y"] + walk[1])
                 gaits[fig] = Gait(fig, s0[fig], hip1, rt * 1.3, rf, face=s0[fig]["face"], max_stride=0.45)
+                footsteps(fig, gaits[fig], rt, gain=-12.0)  # heavier steps under load
 
         def f(m, alpha):
             a = rf(alpha)
