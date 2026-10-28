@@ -54,7 +54,7 @@ class Ep02AtticAirHandler(EpisodeScene):
         "joist": 7.7,
         "old_out": 9.3,
         "dolly_up": 11.2,
-        "connect": 9.0,
+        "connect": 9.1,
         "thermostat": 2.3,
         "cold_air": 4.2,
     }

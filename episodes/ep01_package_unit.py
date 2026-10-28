@@ -50,7 +50,7 @@ class Ep01PackageUnit(EpisodeScene):
         "peel": 4.2,
         "ducts": 6.1,
         "pull_start": 4.6,
-        "carry_toss": 7.5,
+        "carry_toss": 7.55,
         "new_unit": 2.5,
         "rewind": 5.5,
         "thread": 4.5,

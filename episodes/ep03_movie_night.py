@@ -52,11 +52,11 @@ class Ep03MovieNight(EpisodeScene):
     TIMING = {
         "hook": 3.0,
         "arrive": 7.2,
-        "breakers": 9.8,
-        "filter": 7.4,
-        "thaw": 4.0,
+        "breakers": 7.6,
+        "filter": 6.1,
+        "thaw": 3.4,
         "power_on": 5.4,
-        "finale": 2.8,
+        "finale": 2.2,
     }
 
     # ------------------------------------------------------------ set up the world
@@ -93,7 +93,7 @@ class Ep03MovieNight(EpisodeScene):
             f.set(y=STREET + 0.72, **sit).set_z_index(S.Z_FIGURE_HIDDEN)
         self.new_filter = Filter((0, 0), width=0.55, height=1.2).set_z_index(S.Z_FIGURE_HIDDEN + 0.1)
         attach_to(self.new_filter, "grip", lambda: self.rookie.hand("R"))
-        self.flash = Flashlight((0, 0), angle=PI)
+        self.flash = Flashlight((0, 0), angle=PI, length=1.5)
         self.tag = LockoutTag(self.panel.pt(f"breaker_{FURNACE_BREAKER}"))
         self.dark = ValueTracker(0.0)
         x0, x1 = -4.65, 4.65
@@ -148,10 +148,9 @@ class Ep03MovieNight(EpisodeScene):
             self.play(Succession(Wait(0.3), rookie.blink()), Wait(0.7))
             # the lead's flashlight clicks on, he runs every circuit back on except the furnace's and tags it out
             self.flash.set_z_index(S.Z_FX - 0.6)
-            self.flash.shift(lead.hand("L") - self.flash.pt("grip"))
-            attach_to(self.flash, "grip", lambda: lead.hand("L"))
+            self.flash.hold(lambda: lead.hand("L"), aim=panel_c + np.array([-0.15, 0.1, 0]))   # beam stays on the panel
             self.play(FadeIn(self.flash, scale=0.6, run_time=0.12), self.flash.beam(True, 0.1), Snd("click", gain=-4),
-                      lead.pose({"shoulder_L": 1.35, "elbow_L": 0.25}, 0.2))
+                      lead.pose({"shoulder_L": 0.25, "elbow_L": 2.2}, 0.2))
             self.play(rookie.let_go(("R",)), rookie.step_back(0.7, run_time=0.4), lead.walk_to(2.45, F, face=-1, run_time=0.3))
             back_on = [i for i in range(panel.n_breakers) if i != FURNACE_BREAKER]
             self.play(lead.sweep_breakers(panel, on=True, per=0.06, order=back_on,
@@ -192,13 +191,17 @@ class Ep03MovieNight(EpisodeScene):
 
         with self.block("thaw"):
             # time passes: the clock whirls, the ice lets go, drip... drip...
-            self.play(self.clock.spin(1.5, 1.8), self.coil.melt(1.8), self.drain.drip(n=4, run_time=1.8, fall=0.6),
-                      Succession(*[Snd("tink", gain=-14) for _ in range(1)], Wait(0.4), Snd("tink", gain=-14), Wait(0.5), Snd("tink", gain=-14)),
-                      lead.arms_crossed(), rookie.pose({"spine": 0.0, "neck": 0.0}, 0.3),
-                      FX.sparkles([self.coil.pt("top") + np.array([0.2, -0.4, 0])], 0.6, 8))
+            # framed so the clock and the coil share the shot
+            self.play(camera.punch_in(self, np.array([1.0, 2.6, 0]), 0.68, 0.5), lead.arms_crossed(),
+                      rookie.pose({"spine": 0.0, "neck": 0.0}, 0.3), rookie.look_at(self.clock.pt("center"), 0.3))
+            self.play(self.clock.spin(1.5, 2.4), self.coil.melt(2.4), self.drain.drip(n=6, run_time=2.4, fall=0.6),
+                      Succession(Wait(0.45), Snd("tink", gain=-14), Wait(0.55), Snd("tink", gain=-14),
+                                 Wait(0.5), Snd("tink", gain=-14), Wait(0.45), Snd("tink", gain=-14)),
+                      Succession(Wait(1.2), rookie.look_at(self.coil.pt("top"), 0.3)),
+                      Succession(Wait(1.8), FX.sparkles([self.coil.pt("top") + np.array([0.2, -0.4, 0])], 0.6, 8)))
 
         with self.block("power_on"):
-            self.play(lead.pose("stand", 0.25), lead.reach("R", self.tag.pt("hang"), 0.3, lean=False))
+            self.play(lead.pose("stand", 0.25), lead.reach("R", self.tag.pt("hang"), 0.3, lean=False), camera.reset(self, 0.5))
             self.play(FadeOut(self.tag, run_time=0.15), panel.flip(FURNACE_BREAKER, True, 0.12), Succession(Wait(0.1), Snd("clunk")))
             self.play(lead.let_go(("R",)), panel.open_door(False, 0.3))
             clock = ValueTracker(0.0)

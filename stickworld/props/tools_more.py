@@ -10,7 +10,7 @@ from ..style import (
     CAP_RED, DETAIL_W, HARD_HAT, INK, METAL, METAL_DARK, METAL_HI, OLD_UNIT, PROP_W, ROOF, SPARK, TOOL_RED,
     WHITE, WOOD, Z_PROP, P,
 )
-from .base import Prop
+from .base import Prop, attach_to
 from .hvac_more import BRASS, IN, LCD_ON, SevenSeg, Tween, fmt_number, mix, rect, rounded_path, seg, teardrop, tube
 
 R410A = "#E9A0AE"       # rose cylinder colour
@@ -491,9 +491,23 @@ class Flashlight(Prop):
         self.mark("tail", (gx - 0.17, gy))
         if angle:
             self.rotate(angle, about_point=P(gx, gy))
+        self._angle = angle
         self.set_z_index(Z_PROP)
         self._level = 1.0
         self._set_beam(1.0 if on else 0.0)
+
+    def hold(self, hand_fn, aim=None):
+        """Ride hand_fn() by the grip (attach_to); with aim (a point or a callable) the lens keeps pointing at it,
+        so the beam stays on its target while the arm and body move. detach(flashlight) lets go."""
+        if aim is None:
+            return attach_to(self, "grip", hand_fn)
+        target = aim if callable(aim) else (lambda: np.array(aim, dtype=float))
+
+        def heading():
+            d = target() - hand_fn()
+            return float(np.arctan2(d[1], d[0])) - self._angle
+
+        return attach_to(self, "grip", hand_fn, rotate_fn=heading)
 
     def _set_beam(self, lv):
         self._level = float(lv)

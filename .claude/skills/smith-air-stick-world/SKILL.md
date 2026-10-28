@@ -33,13 +33,17 @@ stickworld/
   audio.py        SoundScene, Snd/cue/snd, footsteps, music bed
   audio/          src/ (licensed recordings + CREDITS.md + licenses/), sfx/ (cut cues), prep_audio.py
   props/          base.py (Prop, attach/connect), hvac.py (+hvac_more.py), tools.py (+tools_more.py),
-                  vehicles.py, effects.py (+effects_more.py)
-  sets.py         house_side, driveway (+ sets_more.py: attic, crawlspace, rooftop, utility_closet)
+                  vehicles.py, effects.py (+effects_more.py), home.py (couch, TV, wall clock, lockout tag, filter)
+  sets.py         house_side, driveway (+ sets_more.py: attic, house_night, crawlspace, rooftop, utility_closet)
+  continuity.py   season memory: what each episode starts with (rookie_marks, trophies)
   camera.py       punch_in, pan_to, reset, shake (MovingCameraScene)
   test_scene.py   exercises every action, expression, prop and set
 episodes/
   ep01_package_unit.py   one file per short; only scene logic + TIMING (writes <file>_timing.md)
   ep02_attic_air_handler.py
+  ep03_movie_night.py
+  SERIES.md              the season bible (arc, cast, episode guide, continuity tracker)
+  renders/               final MP4s
 ```
 
 Episode files import from stickworld and contain NO custom drawing code. If an episode needs something new, add it to the library first (with a line in test_scene.py).
@@ -64,7 +68,7 @@ Two recurring techs, both StickFigure instances.
 
 - TECH1 ("Lead", `name="lead", rest_face=dict(mouth_curve=0.45)`): THE MAIN CHARACTER, in every episode, and the likeable one. Warm, easy resting smile (his "neutral" face returns to it), calm and competent, patient with the rookie (he helps him up, he doesn't gloat). Signature: when the job is done he turns to the camera and gives a thumbs-up with a wink, a twinkle and a ding (`thumbs_up()`); end every episode on it. No facial hair and no blush on anyone (Gage's call). Carries the tool bag; deliberate timing.
 - TECH2 ("Rookie", `name="rookie", accessory="cap", marks=C.rookie_marks(ep)`): the goofy one, learning across the season (scars carry over, see 9d). Red ball cap with a brim that follows the face turn. Slightly faster, twitchier timing; overreacts.
-- Optional extras (same class): HOMEOWNER (`accessory="hair_tuft"`), GC/BUILDER (`accessory="hard_hat"`). Add new accessories in rig.py `_draw_accessory`.
+- Optional extras (same class): HOMEOWNER (`accessory="hair_tuft"`, the EP2 Sweaty Neighbor), the EP3 movie-night NEIGHBOR (`accessory="bun"`: hair bun with a hairline), GC/BUILDER (`accessory="hard_hat"`). Add new accessories in rig.py `_draw_accessory`.
 - Hair spikes (`hair` tracker) and the cap attach to the head and turn with it.
 
 ## 5. The rig (rig.py) — mandatory
@@ -130,6 +134,7 @@ Every action is a StickFigure method that returns an Animation and only moves tr
 - Tools up a ladder: `sling(bag)` swings the tool bag onto his back like a pack (hands free; it leans with him), `unsling(bag, floor_point)` sets it down upright at the work spot. `fetch_tool(bag, tool)` crouches and comes up with the tool from the bag's opening, `use_tool(tool, point, turns=3)` puts the tool's tip on a spot and works it in small circles (turns=0 holds it, for a torch), `stow_tool(bag, tool)` puts it back. Work with real tools: a tubing cutter to cut copper, a torch to braze, drills for screws.
 - `slide_push(obj, x, grips)`: both hands on a heavy box's near side, lean in, walk; it scrapes along flat on the floor. `wheel_to(x, load)`: walk a hand-truck load with both hands on the handle (take it with grab2 keep_pinned, tip it back with turn_about first).
 - `haul(rope, progress, amount, pulls, toward=lip)`: hand-over-hand on a Rope; each pull advances the load's ride tracker; the rope's hauler end follows the pulling hand.
+- `sweep_breakers(panel, on, side="R", order=None, per=0.075, main=True, each=None, at_main=None)`: the hand runs down an open BreakerPanel flipping breaker after breaker (click, click...) and the main last. `each(k, n)` returns an animation to run with the k-th flip (the house dimming one circuit at a time: `tween_value(dark, ...)`), `at_main` one to run with the main. `order=` skips circuits (all back on except the one being locked out).
 
 Timing rules: big actions 0.6–1.2 s; small gestures 0.3–0.5 s; holds of at least 0.3 s after a gag lands. Default rate_func smooth; there_and_back for nods, rush_from for snaps, ease_out_back for pops.
 
@@ -140,12 +145,15 @@ Scene helpers (episode.py): `with self.block("name"):` for each TIMING entry; `s
 Every prop is a `Prop` (props/base.py) with named sub-parts (`prop.parts`) and named points (`prop.pt(name)`) that move with it, so actions can target grip points and connection points.
 
 - hvac.py: `PackageUnit(cx, pad_top, old)` (points grip_L/R(+_low), supply_open, return_open, whip_terminal, lv_terminal, foot_spot, top_center, panel_screw_0..3; `arrive_sparkle()`), `Disconnect(center, on)` (handle, pivot, whip_out; `flip(on)`), `Duct(x_wall, x_unit, y)` (unit_end, wall_end, grip_L/R), `FlashingPanel(x_hinge, x_free, y0, y1, kind="top"|"side")` (free_end; `peel_to(p)`), `Screw(p)` (`back_out`, `drive_in`, `fly_off`, `fly_in`), `HighVoltageWhip(...)` / `LowVoltageWire(...)` (Cable: `connect_end(fn)`, `free_end()`, `strip(on)`, `reshape(c2)`; add `.mob` and `.end` to the scene). hvac_more.py: SplitCondenser, AirHandler (`drain_side="left"|"right"`; points grip_L/R(+_low), top_L/R, lineset, drain, supply_top, base...), Furnace, EvapCoil, LineSet (`reshape(points)`), Thermostat (`set_temp`), CondensateDrain, FilterRack, BreakerPanel.
-- tools.py: `ToolBag(handle_top)` (handle, opening), `Drill(grip, face)` (grip, tip, `tip_offset`). tools_more.py: Screwdriver, Multimeter, GaugeSet, RecoveryMachine, RefrigerantTank, Level, Dolly (hand truck; `facing=-1` puts the nose plate on the left; points handle, axle, nose, load, base), Ladder, Flashlight, MasticBucket, MasticBrush, `Rope(*anchors, tail_to=)` (anchors are points or callables, anchors[0] is the hauler's end with the slack tail to a coil; `hold(fn)`, `throw(anchors)`), `TubingCutter(grip, face)` (grip, tip), `Torch(grip, face)` (MAP-gas brazing torch; grip, tip; `flame(on)`).
+- hvac_more.py `EvapCoil(..., iced=True)` starts frozen solid (an ice block over the A-coil); `coil.melt(run_time)` shrinks and fades it (pair with `CondensateDrain.drip(n)` and a WallClock spin for a time-lapse).
+- tools.py: `ToolBag(handle_top)` (handle, opening), `Drill(grip, face)` (grip, tip, `tip_offset`). tools_more.py: Screwdriver, Multimeter, GaugeSet, RecoveryMachine, RefrigerantTank, Level, Dolly (hand truck; `facing=-1` puts the nose plate on the left; points handle, axle, nose, load, base), Ladder, Flashlight (`beam(on)`; `hold(hand_fn, aim=point)` rides the hand and keeps the beam pointed at its target while the body moves), MasticBucket, MasticBrush, `Rope(*anchors, tail_to=)` (anchors are points or callables, anchors[0] is the hauler's end with the slack tail to a coil; `hold(fn)`, `throw(anchors)`), `TubingCutter(grip, face)` (grip, tip), `Torch(grip, face)` (MAP-gas brazing torch; grip, tip; `flame(on)`).
 - vehicles.py: `WorkTruck(front_x, street_y)` (driver_seat, passenger_seat, door_step, door_hinge, bed_center, bed_floor, bed_rail, exhaust; `drive_in(dx, riders)` rolls in with turning wheels, a bounce and an exhaust puff; `open_door()`, `close_door()`, `bounce()`). No lettering unless asked. Riders sit behind the cab at `Z_FIGURE_HIDDEN` with tucked legs.
-- effects.py: `smoke`, `dust`, `sparkles`, `stars`, `bolt`, `zap_arcs`, `cold_air(clock, lanes, x_from, x_to, vertical=False)` (vertical: lanes are x positions, air pours down out of a register), `vibration_lines(clock, anchors)`, `hum_shake(mob, clock)`, `effect_word` (on request only). effects_more.py: heat_waves, motion_lines, sweat, question_mark, debris (drywall chips + insulation falling).
+- effects.py: `smoke`, `dust`, `sparkles`, `stars`, `bolt`, `zap_arcs`, `cold_air(clock, lanes, x_from, x_to, vertical=False)` (vertical: lanes are x positions, air pours down out of a register), `vibration_lines(clock, anchors)`, `hum_shake(mob, clock)`, `effect_word` (on request only). effects_more.py: heat_waves, motion_lines, sweat, question_mark, debris (drywall chips + insulation falling), spark_shower, impact_burst, squash_land, glow, pop, `lights_out(level, region, figures)` (power cut: a near-black overlay over the region as the `level` tracker goes 0 -> 1, leaving only the figures' eyes; a flashlight raised above it in z lights the dark).
+- home.py: `Couch(x, floor_y, width, facing)` (seat, seat_far, arm, base; a sitter's hips go at `seat`), `TV(x, floor_y, facing, on, reach)` (side view; the picture shows as a flickering coloured glow cone; `screen(on)`), `WallClock(center, radius, hour)` (`spin(hours, run_time)`: time-lapse hands), `LockoutTag(hang)` (red tag on a string at a breaker), `Filter(center, width, height, dirty)` (loose pleated filter; grip, center).
 - sets.py: `house_side(ground_y, wall_x, pad)` (ground, wall_face, disconnect_mount, pad_center, window, sky), `driveway(street_y, curb_y)` (street, curb, truck_front, lawn). sets_more.py: attic, crawlspace, rooftop, utility_closet, CeilingHole.
   - `attic(floor_y, room_floor=, hatch_x=, stair_foot="left", walkway=(x0, x1), register_x=, light_x=, thermostat_x=, work_x=, plenum_x=, plenum_y=)`: gable attic over a room in cutaway; the pull-down stair runs from the hatch to the room floor with even ~11 in risers and is drawn in front of props (a hauled load rides between its rails). Anchors: hatch, lip, ceiling, stair_top, stair_bottom, tread_0.. (`.treads`), room_floor, thermostat_spot (60 in up), register, plenum_bottom, work_spot, walkway_left/right, peak. Headroom is low toward the eaves (about 5.6 - 0.75|x| above the floor): keep standing figures within |x| < 1.4, hunch (spine 0.15) in the attic.
   - `CeilingHole(x, top_y, bottom_y)`: the hole a foot leaves (dark gap, torn drywall flaps, insulation fluff); `burst()`.
+  - `house_night(floor_y, room_color=, partition_x=, register_x=, window_x=, clock_x=, trunk_x=, trunk_y=)`: a house cut open at night under a starry sky (living room left, utility closet right behind a partition with a doorway, moon in the window, ceiling register, supply trunk into the ceiling). Add `driveway()` BEFORE it (its night tint darkens the yard). Anchors: floor, ceiling, doorway, couch_spot, tv_spot, thermostat_spot, panel_spot, equipment_spot, clock_spot, register, window, front_step. Tween `parts["room"]` from ROOM_HOT to ROOM_COOL for the payoff.
 - camera.py: `punch_in(scene, point, zoom)`, `pan_to`, `reset`, `shake`.
 
 Connections: `connect(child, "point", parent, "point")` / `Cable.connect_end(fn)` keep things attached while they move, until a figure's action disconnects them.
@@ -179,7 +187,7 @@ Game "juice" and classic animation principles, layered with restraint (big beats
 
 The shorts form one season-long story (`episodes/SERIES.md`, "The Rookie's First Summer") while each still works alone.
 - `stickworld/continuity.py`: `EPISODES` (per episode: job, the rookie's mistake, the lesson, what he earns, whether a LEMONNOX gets hauled off), `rookie_marks(ep)` (scars he starts with), `trophies(ep)` (LEMONNOX badges on the truck at the start), `title(ep)`.
-- Rig marks (`StickFigure(..., marks=...)`, `fig.add_mark(name)` to earn one on screen): `scorched_cap` (soot burnt into the rookie's cap, from EP1's zap), `shin_bandage` (plaster on his near shin, from EP2). New marks get drawn in `rig._draw_marks` and listed in `continuity.DRAWN_MARKS`.
+- Rig marks (`StickFigure(..., marks=...)`, `fig.add_mark(name)` / `remove_mark(name)` on screen): `cap_tag` (the price tag still swinging off his brand-new cap; EP1 only, it burns off at the zap), `scorched_cap` (soot burnt into the cap from EP1's zap on), `shin_bandage` (plaster on his near shin, from EP2). `dusty` (filter dust on his face) is a temporary gag mark, not a scar. New scars get drawn in `rig._draw_marks` and listed in `continuity.DRAWN_MARKS`.
 - `WorkTruck(..., trophies=n)` shows n LEMONNOX badges on the bed side; `truck.add_trophy()` slaps on the next one.
 - Every episode: one rookie mistake, one lesson, one callback to an earlier lesson, the lead's thumbs-up at the end.
 
@@ -209,7 +217,7 @@ Gage will describe the short in plain language as a list of scenes. For each epi
 
 ## 12. Episode 01 reference (package unit changeout)
 
-`episodes/ep01_package_unit.py`, the pattern for future shorts (~58.7 s):
+`episodes/ep01_package_unit.py`, the pattern for future shorts (~58.3 s). The pilot: the rookie's cap still has its price tag on (`cap_tag`), which burns off at the zap and leaves the scorch he wears all season; he pockets the first LEMONNOX badge.
 
 1. arrive: the truck rolls in (wheels turning) and stops with a bounce and an exhaust puff; the old unit coughs a puff of smoke.
 2. hop_out: TECH1 opens the door and steps out; TECH2 tumbles out face-first and gets up. TECH1 lifts the MILWACKO bag out of the truck bed and walks up to the unit; TECH2 wanders to the yard.
@@ -218,7 +226,7 @@ Gage will describe the short in plain language as a list of scenes. For each epi
 5. peel: TECH1 peels the top panel, then the side panel, back toward the house like a banana (hand on the edge, stepping back), and pretends to take a bite (no sound: Gage cut the chomp).
 6. ducts: TECH1 yank_plug()s each duct off the unit, foot on the cabinet: POP, stumble, throws it on the pile.
 7. pull_start: TECH1 grabs the whip and the low voltage low on the unit and rips them out in one lawnmower pull (conductors out). Nothing happens (crickets, two blinks). TECH2 stares and slowly shakes his head, eyes closed.
-8. carry_toss: both squat, grip the old unit, rattle it loose, RIIIP, carry it down to the truck and toss it in the bed (crash, bounce, camera shake).
+8. carry_toss: both squat, grip the old unit, rattle it loose, RIIIP, carry it down to the truck and toss it in the bed (crash, bounce, camera shake). TECH2 pries the LEMONNOX badge off the wreck, holds it up (ding, sparkles) and pockets it.
 9. new_unit: the new unit slides in with sparkles while they walk back.
 10. rewind: tape-rewind sound; the ducts click back in, the flashing un-peels, the screws fly back loose and the techs drive them in with the drills.
 11. thread: punch-in; TECH1 kneels and thread_wire()s the low voltage into the grommet: tongue out, squint, misses twice, gets it; the conductors slide in; exhale.
@@ -226,7 +234,7 @@ Gage will describe the short in plain language as a list of scenes. For each epi
 
 ## 13. Episode 02 reference (attic air handler swap)
 
-`episodes/ep02_attic_air_handler.py` (~53.4 s), one static cutaway (attic on top, the hot room below), camera punch-ins for the gag and the ending:
+`episodes/ep02_attic_air_handler.py` (~58 s), one static cutaway (attic on top, the hot room below), camera punch-ins for the gag and the ending. Callback: TECH2 proudly kills the air handler's disconnect first thing (the EP1 lesson); TECH1 turns it back on at the end.
 
 1. arrive: opens close on the homeowner sweating in a warm room at the thermostat (78) under heat waves, then pulls back as TECH1 walks in with the bag and TECH2 wheels the new BRRRIER air handler in on the hand truck; the homeowner points at the hatch.
 2. climb: TECH1 slings the MILWACKO bag on his back, climbs the pull-down stair facing it, steps off and sets the bag down by the unit; TECH2 follows once the stair is clear.
@@ -236,4 +244,16 @@ Gage will describe the short in plain language as a list of scenes. For each epi
 6. connect: TECH1 bends the line set back onto the stubs, takes the torch from the bag, lights it and brazes the joint (flame, sparkles, fizz), puts it away, clicks the condensate drain on, exhales.
 7. thermostat: the homeowner presses down 78 -> 72 (six clicks).
 8. cold_air: the unit hums, cold air pours out of the register over the homeowner (eyes closed, arms out); TECH2 fist-pumps; TECH1 gives the camera his thumbs-up and wink. Slow punch-in. End.
+
+## 14. Episode 03 reference (movie night)
+
+`episodes/ep03_movie_night.py` (~35 s), one night cutaway (`house_night`: living room and utility closet above, the street and truck below), lights-out gag in the middle:
+
+1. hook: opens close on the neighbor (bun) sweating on the couch in front of the TV, fanning, eyes on the thermostat (81); pulls back to the whole house.
+2. arrive: the truck (two LEMONNOX badges) rolls in; both hop out; TECH1 walks into the closet, TECH2 to the doorway carrying the new filter.
+3. breakers: callback to EP1: TECH2 touches his scorched cap, panics, runs to the panel and `sweep_breakers(on=False)`: the house dims one circuit at a time, the TV dies, the main goes: pitch black, only eyes, crickets. TECH1's flashlight clicks on (beam held on the panel); he runs every breaker back on except the furnace's, the lights and the TV come back, he hangs a LockoutTag on that one breaker and points at it; TECH2 nods.
+4. filter: TECH1 pulls the filthy filter: dust bomb (smoke cloud, TECH2 goes `dusty`, cough), throws it out; TECH2 hands over the clean one, it clicks home (pop, sparkles).
+5. thaw: framed on the clock and the iced coil: the clock whirls, the ice melts away, the drain drips.
+6. power_on: TECH1 pulls the tag and flips the furnace breaker on (clunk); hum, cold air pours from the register, the thermostat ticks 81 -> 72 one click at a time, the room goes from hot to cool, the neighbor relaxes eyes closed.
+7. finale: TECH1's thumbs-up and wink with a push-in; TECH2 dusts himself off.
 

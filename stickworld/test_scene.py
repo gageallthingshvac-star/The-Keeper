@@ -301,3 +301,36 @@ class StickWorldTest(EpisodeScene):
             self.add(air)
             self.play(clock.animate(run_time=1.5, rate_func=linear).set_value(1.5))
             self.remove(air, st, load, dl, rope, up, low, helper, hole, bag)
+
+        with self.block("night_house"):
+            from manim import AnimationGroup
+            from stickworld.actions import tween_value
+            from stickworld.props.effects_more import lights_out
+            from stickworld.props.home import TV, Couch, Filter, LockoutTag, WallClock
+            from stickworld.sets_more import ROOM_COOL, ROOM_HOT, house_night
+            F = -0.6
+            yard = driveway(-5.8, -2.7, F - 0.45)
+            st = house_night(F, room_color=ROOM_HOT, trunk_x=3.3, trunk_y=F + 3.4)
+            couch, tv, clk = Couch(-2.6, F), TV(-0.15, F, facing=-1), WallClock(st.pt("clock_spot"))
+            bp = BreakerPanel((1.75, F + 3.1))
+            fur = Furnace(3.3, F, mirror=True)
+            coil = EvapCoil(3.3, fur.pt("supply_top")[1] - 0.1, mirror=True, iced=True)
+            tag, filt = LockoutTag(bp.pt("breaker_9")), Filter((-1.0, F + 3.0), dirty=True)
+            seat = couch.pt("seat")
+            nb = StickFigure(x=seat[0], ground=F, face_dir=1, accessory="bun", name="neighbor")
+            nb.set(y=seat[1] + 0.08, legL_lock=0.0, legR_lock=0.0, hip_L=1.4, knee_L=-1.45, hip_R=1.5, knee_R=-1.5)
+            tech = StickFigure(x=2.45, ground=F, face_dir=-1, accessory="cap", name="tech", marks=("cap_tag", "dusty"))
+            fl = Flashlight((0, 0), angle=PI, length=1.5).set_z_index(S.Z_FX - 0.6)
+            dark = ValueTracker(0.0)
+            night = lights_out(dark, (-4.65, F - 0.12, 4.65, st.pt("ceiling")[1] + 0.06), [nb, tech])
+            self.add(yard, st, couch, tv, clk, bp, fur, coil, filt, nb, tech, night)
+            self.play(bp.open_door(True, 0.3))
+            self.play(tech.sweep_breakers(bp, on=False, each=lambda k, n: tween_value(dark, 0.6 * (k + 1) / n, 0.05),
+                                          at_main=AnimationGroup(tween_value(dark, 1.0, 0.06), tv.screen(False, 0.06))))
+            fl.hold(lambda: tech.hand("L"), aim=bp.pt("breaker_9"))
+            self.play(FadeIn(fl), fl.beam(True, 0.1), tech.pose({"shoulder_L": 0.25, "elbow_L": 2.2}, 0.2))
+            self.play(tech.sweep_breakers(bp, on=True, order=[i for i in range(bp.n_breakers) if i != 9],
+                                          at_main=AnimationGroup(tween_value(dark, 0.0, 0.1), tv.screen(True, 0.1))))
+            self.play(FadeIn(tag), fl.beam(False), Do(lambda: tech.remove_mark("dusty")), Do(lambda: tech.remove_mark("cap_tag")))
+            self.play(clk.spin(2.0, 1.0), coil.melt(1.0), st.parts["room"].animate(run_time=1.0).set_fill(ROOM_COOL))
+            self.remove(yard, st, couch, tv, clk, bp, fur, coil, filt, nb, tech, night, fl, tag)
