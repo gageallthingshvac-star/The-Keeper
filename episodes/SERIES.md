@@ -35,7 +35,7 @@ The memory between episodes lives in `stickworld/continuity.py`. Episodes read t
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Package Unit Changeout | Grabs a live whip, gets zapped (the price tag on his new cap burns off) | Kill the power first | (the pilot) | scorched cap; pockets the first LEMONNOX badge | +1 |
 | 2 | Attic Air Handler Swap | Steps between the joists, leg through the ceiling beside the homeowner's face | Walk the joists | Proudly kills the disconnect before touching anything (EP1) | shin plaster | +1 |
-| 3 | Movie Night | Terrified of power since EP1, he flips off **every** breaker: the house goes pitch black mid-movie | Lock out only the right breaker; change the filter (it bursts into a dust cloud) | Touches his scorched cap, then overdoes the EP1 lesson | | |
+| 3 | Movie Night | The coil is frozen solid (the lead snaps an icicle off it) and he's asked to shut that unit off. Terrified of power since EP1, he flips off **every** breaker: the house goes pitch black mid-movie | Lock out only the right breaker; a filthy filter freezes the coil (it bursts into a dust cloud) | Touches his scorched cap, then overdoes the EP1 lesson | | |
 | 4 | Crawlspace Duct Rescue | Walks the joists perfectly (EP2), then gets stuck in the crawlspace hatch, hips first | Seal the ducts (mastic) | EP2 joists | | |
 | 5 | Rooftop Unit | Climbs the ladder perfectly, facing it, then realizes the tools are on the ground | One trip: bag on your back | EP2 ladder and haul rope | | +1 |
 | 6 | Thermostat Wiring | The Sweaty Neighbor again (taped ceiling hole). He pulls all 8 low-voltage wires without labelling them: spaghetti | Label every wire | EP1's 8 conductors; the EP2 hole | | |

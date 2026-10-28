@@ -493,7 +493,15 @@ class EvapCoil(Prop):
         stub_ice = rect(x1 - 0.02, ys - 0.11, x1 + 0.24, ys + 0.11, ICE, 2.0, r=0.05, opacity=0.85, color=ICE_EDGE)
         glints = VGroup(*[seg((gx - 0.04, gy), (gx + 0.04, gy), w=2, color=WHITE) for gx, gy in
                           ((x - 0.25, y0 + 0.6), (x + 0.2, y0 + 0.9), (x1 + 0.1, ys + 0.04))])
-        self.part("ice", VGroup(crust, icicles, stub_ice, glints))
+        # outside the case: a frost rim along the bottom edge with icicles hanging over the furnace (the read from
+        # across the room), and a gap where a loose Icicle can hang (point "icicle") for a figure to snap off
+        frost = rect(x0 - 0.02, y0 - 0.03, x1 + 0.02, y0 + 0.05, ICE, 2.0, r=0.03, opacity=0.9, color=ICE_EDGE)
+        hang = VGroup(*[Polygon(P(ix - hw, y0 + 0.02), P(ix + hw, y0 + 0.02), P(ix + hw * 0.2, y0 - ln * 0.55), P(ix, y0 - ln))
+                        .set_fill(ICE, 0.92).set_stroke(ICE_EDGE, 2.0)
+                        for ix, hw, ln in zip(np.linspace(x0 + 0.1, x1 - 0.48, 5), (0.04, 0.05, 0.035, 0.05, 0.04),
+                                              (0.2, 0.32, 0.15, 0.28, 0.22))])
+        self.mark("icicle", (x1 - 0.24, y0 + 0.02))
+        self.part("ice", VGroup(crust, icicles, stub_ice, glints, frost, hang))
         self._ice_base = [(m, m.get_fill_opacity(), m.get_stroke_opacity()) for m in self.parts["ice"].family_members_with_points()]
         self._ice = 1.0 if iced else 0.0
         self._apply_ice(self._ice)
@@ -511,6 +519,21 @@ class EvapCoil(Prop):
         """The ice shrinks and fades away (pair with the drain's drip())."""
         return Tween(self.parts["ice"], lambda: self._ice, lambda s0, a: self._apply_ice(s0 * (1 - a)), run_time=run_time,
                      rate_func=linear)
+
+
+class Icicle(Prop):
+    """One loose icicle, hung at top (EvapCoil.pt("icicle")) for a figure to snap off, hold up and drop.
+    Points: grip (thick top), tip."""
+
+    def __init__(self, top=(0, 0), length=0.42, width=0.11, **kwargs):
+        super().__init__(**kwargs)
+        x, y = top[0], top[1]
+        body = Polygon(P(x - width / 2, y), P(x + width / 2, y), P(x + width * 0.18, y - length * 0.55), P(x, y - length))
+        self.part("ice", body.set_fill(ICE, 0.95).set_stroke(ICE_EDGE, 2.5))
+        self.part("glint", seg((x - width * 0.18, y - 0.05), (x - width * 0.06, y - length * 0.45), w=2, color=WHITE))
+        self.mark("grip", (x, y - 0.04))
+        self.mark("tip", (x, y - length))
+        self.set_z_index(Z_PROP + 0.3)
 
 
 class LineSet(Prop):
