@@ -36,7 +36,7 @@ class StickWorldTest(EpisodeScene):
         house = house_side(G, -3.35, pad=(-2.05, 1.85))
         drive = driveway(-5.8, -2.7, G)
         self.add(house, drive)
-        a = StickFigure(x=-2.4, ground=G, face_dir=1, name="lead")
+        a = StickFigure(x=-2.4, ground=G, face_dir=1, name="lead", mustache=True)
         b = StickFigure(x=2.6, ground=G, face_dir=-1, accessory="cap", name="rookie")
         c = StickFigure(x=0.2, ground=-4.2, face_dir=1, accessory="hard_hat", name="gc")
         d = StickFigure(x=-1.5, ground=-4.2, face_dir=-1, accessory="hair_tuft", name="owner")
@@ -54,6 +54,7 @@ class StickWorldTest(EpisodeScene):
                 self.wait(0.15)
             self.play(a.expression("neutral"), b.expression("neutral"), c.expression("neutral"), d.expression("neutral"))
             self.play(a.shake_head(3, slow=True, eyes_closed=True), b.nod(2), c.blink(), d.look_at(P(4, 4)))
+            self.play(a.twitch_mustache(), a.expression("smug", 0.2))
             self.play(a.talk(1.0), b.face.turn_to(0.9), c.turn(-1), d.turn(1))
 
         with self.block("locomotion"):

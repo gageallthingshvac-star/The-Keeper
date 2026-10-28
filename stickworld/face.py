@@ -12,26 +12,29 @@ from manim.utils.rate_functions import ease_in_out_sine
 from . import style as S
 
 FEATURES = dict(turn=0.0, up=0.0, tilt=0.0, eyes_open=1.0, blink=1.0, xeyes=0.0, mouth_curve=0.0, mouth_open=0.0,
-                smirk=0.0, lid=0.0, brow_angle=0.0, brow_y=0.0, eye_big=0.0, squint=0.0, tongue=0.0, teeth=0.0)
+                smirk=0.0, lid=0.0, brow_angle=0.0, brow_y=0.0, eye_big=0.0, squint=0.0, tongue=0.0, teeth=0.0,
+                stache=0.35, stache_tw=0.0)
+STACHE_REST = 0.35  # handlebar tips curl a little up at rest
 
 # Expression presets: only the feature trackers listed here change; turn/up/tilt/blink are left alone.
 EXPRESSIONS = {
     "neutral": dict(mouth_curve=0.0, mouth_open=0.0, smirk=0.0, lid=0.0, brow_angle=0.0, brow_y=0.0, eye_big=0.0,
-                    squint=0.0, tongue=0.0, teeth=0.0, eyes_open=1.0, xeyes=0.0),
-    "happy": dict(mouth_curve=1.0, brow_y=0.3),
-    "smug": dict(smirk=1.0, lid=0.6, mouth_curve=0.2),
-    "surprised": dict(eye_big=1.0, mouth_open=1.0, brow_y=1.0, smirk=0.0, lid=0.0, squint=0.0),
-    "squint": dict(squint=1.0, brow_angle=0.7, lid=0.0),
-    "disappointed": dict(eyes_open=0.0, mouth_curve=-0.35, brow_angle=-0.8, smirk=0.0),
-    "strain": dict(squint=1.0, teeth=1.0, brow_angle=0.9, mouth_curve=0.0),
-    "tongue_out": dict(tongue=1.0, squint=0.65, brow_angle=0.4),
-    "dazed": dict(xeyes=1.0, mouth_open=0.35, mouth_curve=-0.2),
+                    squint=0.0, tongue=0.0, teeth=0.0, eyes_open=1.0, xeyes=0.0, stache=STACHE_REST),
+    "happy": dict(mouth_curve=1.0, brow_y=0.3, stache=0.8),
+    "smug": dict(smirk=1.0, lid=0.6, mouth_curve=0.2, stache=1.0),
+    "surprised": dict(eye_big=1.0, mouth_open=1.0, brow_y=1.0, smirk=0.0, lid=0.0, squint=0.0, stache=0.3),
+    "squint": dict(squint=1.0, brow_angle=0.7, lid=0.0, stache=0.1),
+    "disappointed": dict(eyes_open=0.0, mouth_curve=-0.35, brow_angle=-0.8, smirk=0.0, stache=-0.7),
+    "strain": dict(squint=1.0, teeth=1.0, brow_angle=0.9, mouth_curve=0.0, stache=0.0),
+    "tongue_out": dict(tongue=1.0, squint=0.65, brow_angle=0.4, stache=0.2),
+    "dazed": dict(xeyes=1.0, mouth_open=0.35, mouth_curve=-0.2, stache=-0.5),
 }
 
 
 class Face:
-    def __init__(self, fig, turn=0.0):
+    def __init__(self, fig, turn=0.0, mustache=False):
         self.fig = fig
+        self.has_mustache = mustache
         self.t = {k: ValueTracker(v) for k, v in FEATURES.items()}
         self.t["turn"].set_value(turn)
         seg = lambda w=S.FACE_W: VMobject().set_stroke(S.INK, w)
@@ -41,7 +44,8 @@ class Face:
         self.mouth = seg(4)
         self.teeth = VMobject()
         self.tongue = Ellipse(width=0.1, height=0.1).set_fill(S.TONGUE, 0).set_stroke(S.INK, 2, opacity=0)
-        self.group = VGroup(*self.eyes, *self.lids, *self.brows, self.tongue, self.mouth, self.teeth)
+        self.stache = VMobject().set_fill(S.INK, 1).set_stroke(S.INK, 2)
+        self.group = VGroup(*self.eyes, *self.lids, *self.brows, self.tongue, self.mouth, self.teeth, self.stache)
 
     def v(self, key):
         return self.t[key].get_value()
@@ -124,6 +128,31 @@ class Face:
         tg = self.v("tongue")
         self.tongue.become(Ellipse(width=0.13 * R, height=0.17 * R).move_to([mx + sside * 0.13 * R, my - 0.1 * R, 0])
                            .set_fill(S.TONGUE, tg).set_stroke(S.INK, 2, opacity=tg))
+        self._draw_stache(mx, my, R, sq, t, mopen)
+
+    def _draw_stache(self, mx, my, R, sq, t, mopen):
+        """Handlebar mustache just over the mouth: slides and squashes with the turn, lifts when the mouth opens,
+        tips curl up with `stache` > 0 (happy, smug) and droop below 0 (disappointed); stache_tw twitches them."""
+        if not self.has_mustache:
+            self.stache.set_points_as_corners([[mx, my, 0], [mx, my + 1e-3, 0]]).set_fill(opacity=0).set_stroke(opacity=0)
+            return
+        curl, tw = self.v("stache"), self.v("stache_tw")
+        hw = 0.56 * R * sq
+        ux, uy = mx, my + 0.17 * R + 0.04 * R * min(1.0, mopen)
+        near = np.sign(t) if abs(t) > 0.05 else 0.0
+
+        def side(k):
+            far = 0.8 if k == -near else 1.0  # the far half foreshortens a little
+            tip = 0.14 * R * curl + 0.06 * R * tw * k
+            return [(ux + k * 0.12 * hw * far, uy + 0.085 * R), (ux + k * 0.55 * hw * far, uy + 0.08 * R),
+                    (ux + k * 0.93 * hw * far, uy + 0.025 * R + 0.55 * tip), (ux + k * 1.08 * hw * far, uy + tip),
+                    (ux + k * 0.92 * hw * far, uy - 0.035 * R + 0.35 * tip), (ux + k * 0.6 * hw * far, uy - 0.1 * R),
+                    (ux + k * 0.2 * hw * far, uy - 0.085 * R)]
+
+        left, right = side(-1), side(1)
+        pts = [(ux, uy + 0.04 * R)] + right + [(ux, uy - 0.04 * R)] + left[::-1] + [(ux, uy + 0.04 * R)]
+        self.stache.set_points_smoothly([[x, y, 0] for x, y in pts])
+        self.stache.set_fill(S.INK, 1).set_stroke(S.INK, 2, opacity=1)
 
     # ------------------------------------------------------------ actions (each returns an Animation)
     def _to(self, run_time=0.25, rate_func=smooth, **values):
@@ -132,6 +161,14 @@ class Face:
 
     def expression(self, name, run_time=0.25):
         return self._to(run_time, **EXPRESSIONS[name])
+
+    def twitch_mustache(self, times=2, run_time=0.4):
+        """The handlebar tips flick up and down in turn (the lead's tell: pleased with himself, or holding it in)."""
+        steps = []
+        for i in range(times):
+            steps += [self.t["stache_tw"].animate(run_time=run_time / (2 * times), rate_func=smooth).set_value(1.0 if i % 2 == 0 else -1.0)]
+        steps.append(self.t["stache_tw"].animate(run_time=run_time / (2 * times), rate_func=smooth).set_value(0.0))
+        return Succession(*steps)
 
     def blink(self):
         """Eyes squash fully flat, hold two frames, reopen (~0.15 s)."""

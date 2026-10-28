@@ -61,7 +61,7 @@ def wrap(a):
 
 
 class StickFigure(ActionsMixin, VGroup):
-    def __init__(self, x=0.0, ground=0.0, face_dir=1.0, accessory=None, name="", turn=None, **pose):
+    def __init__(self, x=0.0, ground=0.0, face_dir=1.0, accessory=None, name="", turn=None, mustache=False, **pose):
         super().__init__()
         self.name = name
         self.accessory = accessory
@@ -80,7 +80,7 @@ class StickFigure(ActionsMixin, VGroup):
                      handL_x=x, handL_y=hip_y, handR_x=x, handR_y=hip_y)
         for k, v in extra.items():
             self.t[k] = ValueTracker(v)
-        self.face = Face(self, turn=0.45 * face_dir if turn is None else turn)
+        self.face = Face(self, turn=0.45 * face_dir if turn is None else turn, mustache=mustache)
         self._build()
         self.add_updater(self._tick)
         self._redraw()

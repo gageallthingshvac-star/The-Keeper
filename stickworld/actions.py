@@ -241,6 +241,9 @@ class ActionsMixin:
     def blink(self):
         return self.face.blink()
 
+    def twitch_mustache(self, times=2, run_time=0.4):
+        return self.face.twitch_mustache(times, run_time)
+
     def shake_head(self, times=3, slow=False, eyes_closed=False):
         return self.face.shake_head(times, slow, eyes_closed)
 

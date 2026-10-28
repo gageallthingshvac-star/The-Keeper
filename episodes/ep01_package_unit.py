@@ -76,7 +76,7 @@ class Ep01PackageUnit(EpisodeScene):
         attach_to(self.bag, "handle", lambda: self.truck.pt("bed_rail") + P(-1.0, 0.19))
         sit = dict(legL_lock=0.0, legR_lock=0.0, hip_L=1.35, knee_L=-2.6, hip_R=1.45, knee_R=-2.6,
                    shoulder_L=1.0, elbow_L=0.8, shoulder_R=1.1, elbow_R=0.8)
-        self.t1 = StickFigure(x=self.truck.pt("driver_seat")[0], ground=STREET, face_dir=-1, name="lead")
+        self.t1 = StickFigure(x=self.truck.pt("driver_seat")[0], ground=STREET, face_dir=-1, name="lead", mustache=True)
         self.t2 = StickFigure(x=self.truck.pt("passenger_seat")[0], ground=STREET, face_dir=-1, accessory="cap", name="rookie")
         for f in (self.t1, self.t2):
             f.set(y=STREET + 0.72, **sit).set_z_index(S.Z_FIGURE_HIDDEN)
@@ -334,6 +334,6 @@ class Ep01PackageUnit(EpisodeScene):
             self.snd("hum", 0.1, gain=-2)
             self.play(clock.animate(run_time=1.8, rate_func=linear).set_value(1.8),
                       t1.look_at(new.pt("top_center"), 0.3), Succession(Wait(0.6), t2.expression("happy", 0.3)),
-                      Succession(Wait(0.8), t1.expression("smug", 0.3)))
+                      Succession(Wait(0.8), t1.expression("smug", 0.3), t1.twitch_mustache()))
 
         self.finish()

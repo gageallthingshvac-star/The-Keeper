@@ -62,7 +62,7 @@ Episode files import from stickworld and contain NO custom drawing code. If an e
 
 Two recurring techs, both StickFigure instances.
 
-- TECH1 ("Lead", `name="lead"`): the competent one. Plain head, carries the tool bag. Calm, deliberate timing, a little smug.
+- TECH1 ("Lead", `name="lead", mustache=True`): THE MAIN CHARACTER, in every episode. Signature: a big black handlebar mustache, the one thing no other character ever gets (never give a mustache, or anything like it, to anyone else). It follows the face turn, lifts when he talks, curls up when he's happy or smug, droops when he's disappointed or dazed, and `twitch_mustache()` flicks the tips: his tell when he's pleased with himself; give him at least one twitch per episode, usually on the final smug beat. The competent one: carries the tool bag, calm, deliberate timing, a little smug.
 - TECH2 ("Rookie", `name="rookie", accessory="cap"`): the goofy one. Red ball cap with a brim that follows the face turn. Slightly faster, twitchier timing; overreacts.
 - Optional extras (same class): HOMEOWNER (`accessory="hair_tuft"`), GC/BUILDER (`accessory="hard_hat"`). Add new accessories in rig.py `_draw_accessory`.
 - Hair spikes (`hair` tracker) and the cap attach to the head and turn with it.
@@ -101,6 +101,7 @@ The head circle pivots at the neck and never slides sideways. The face is separa
 - `fig.shake_head(times=3, slow=False, eyes_closed=False)`: sweeps -0.8 <-> +0.8 with ease in-out, ending at 0; slow = 0.6 s per sweep; eyes_closed shuts the eyes BEFORE the first sweep and opens them after a 0.2 s hold.
 - `fig.blink()`: eyes squash fully flat (never partly open), hold two frames, reopen (~0.15 s).
 - `fig.nod(times=2)`, `fig.look_at(point)` (eyes lead, head tilt follows 0.1 s later), `fig.talk(duration)`.
+- Mustache (lead only, `StickFigure(..., mustache=True)`): `stache` tracker sets the tip curl (rest 0.35; every expression sets it), `stache_tw` / `fig.twitch_mustache(times, run_time)` flicks the tips.
 - `fig.expression(name)`: neutral, happy, smug, surprised, squint, disappointed, strain, tongue_out, dazed (X eyes). Individual feature trackers: `face._to(run_time, mouth_open=..., ...)`.
 
 ## 8. Action library (actions.py)
