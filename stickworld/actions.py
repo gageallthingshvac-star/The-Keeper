@@ -174,6 +174,19 @@ class ActionsMixin:
         sh = rel_angle(J[f"knee_{side}"], J[f"foot_{side}"], sg)
         self.set(**{f"hip_{side}": th, f"knee_{side}": min(0.0, sh - th), f"leg{side}_lock": 0.0})
 
+    def relocate(self, x, ground=None):
+        """Move the whole figure to x (standing on ground) instantly, pose kept, carried things following: for an
+        off-screen move (walking out one side of the frame and back in somewhere else, e.g. around to the front door).
+        Call it with Do() while the figure is out of shot."""
+        g0 = self.ground_y()
+        g = g0 if ground is None else ground
+        dx, dy = x - self.v("x"), g - g0
+        vals = {"x": x, "y": self.v("y") + dy}
+        for side in "LR":
+            vals[f"foot{side}_x"] = self.v(f"foot{side}_x") + dx
+            vals[f"foot{side}_y"] = self.v(f"foot{side}_y") + dy
+        self.set(**vals)
+
     def plant_feet(self, ground=None):
         """Lock both legs with the feet where they are drawn now (optionally snapped to a ground height)."""
         J = self.solve()
@@ -867,6 +880,19 @@ class ActionsMixin:
         steps = [] if is_attached(obj) else [self.grab(obj, side, grip)]
         steps += [RigAnim(update, setup, run_time, smooth), Do(hang), self.let_go((side,), 0.3)]
         return Succession(*steps)
+
+    def wear(self, obj, grip="handle"):
+        """Put a bag on his back instantly (the end state of sling()): for a figure who arrives already carrying it."""
+        detach(obj)
+        obj._z_before_grab = None
+        obj.set_z_index(S.Z_FIGURE - 0.4)
+        spot, ang = self._back_spot()
+        obj.rotate(ang - self._hang_angle(obj, grip), about_point=obj.pt(grip))
+        obj.shift(spot - obj.pt(grip))
+        a0 = ang
+        attach_to(obj, grip, lambda: self._back_spot()[0], rotate_fn=lambda: _wrap(self._back_spot()[1] - a0),
+                  name=f"slung_{self.name}")
+        return obj
 
     def unsling(self, obj, at, grip="handle", side="R", z=S.Z_PROP_FRONT, run_time=0.55):
         """Take a slung bag off his back and set it down upright with its bottom centre at `at` (crouching)."""

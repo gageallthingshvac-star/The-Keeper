@@ -6,7 +6,7 @@ rounded path, the SevenSeg LCD digits and Tween (an UpdateFromAlphaFunc that rea
 """
 import numpy as np
 from manim import (
-    DOWN, CapStyleType, Circle, Dot, Line, LineJointType, Polygon, Rectangle, RoundedRectangle,
+    DOWN, CapStyleType, Circle, Dot, Ellipse, Line, LineJointType, Polygon, Rectangle, RoundedRectangle,
     ManimColor, UpdateFromAlphaFunc, VGroup, VMobject, linear, smooth,
 )
 
@@ -19,6 +19,8 @@ from .base import Prop
 IN = H / 69.0  # one inch, sized against a 5'9" figure
 
 ICE = "#CFEFFF"
+MODE_COOL = "#2D8FE0"
+MODE_FAN = "#3FA34D"
 ICE_EDGE = "#7FBFE6"
 
 # a few material colours style.py has no name for
@@ -581,7 +583,8 @@ class LineSet(Prop):
 class Thermostat(Prop):
     """Wall thermostat at center with an LCD temperature; points screen, button_up, button_down, terminal, wall; methods set_temp(value), screen_on(on)."""
 
-    def __init__(self, center=(0, 0), temp=72, on=True, **kwargs):
+    def __init__(self, center=(0, 0), temp=72, on=True, mode="cool", **kwargs):
+        """mode: "cool", "fan" (blower only) or None, shown by a lit icon under the screen; change it with mode()."""
         super().__init__(**kwargs)
         cx, cy = center[0], center[1]
         hgt = 0.12 * H
@@ -603,6 +606,18 @@ class Thermostat(Prop):
         leds = VGroup(*[Dot(P(cx - wid / 2 + 0.12 + i * 0.08, cy - hgt / 2 + 0.07), radius=0.016, color=METAL_DARK)
                         for i in range(3)])
         self.part("leds", leds)
+        # mode icons in the bottom row, right of the LEDs: a snowflake (COOL) and a three-blade fan (FAN only)
+        ix, iy = cx + 0.09, cy - hgt / 2 + 0.07
+        flake = VGroup(*[Line(P(ix, iy) + 0.05 * np.array([np.cos(a), np.sin(a), 0]),
+                              P(ix, iy) - 0.05 * np.array([np.cos(a), np.sin(a), 0]), stroke_width=2.2)
+                         for a in (np.pi / 2, np.pi / 6, -np.pi / 6)])
+        fx = ix + 0.13
+        fan = VGroup(*[Ellipse(width=0.045, height=0.022).move_to(P(fx, iy) + 0.026 * np.array([np.cos(a), np.sin(a), 0]))
+                       .rotate(a, about_point=P(fx, iy) + 0.026 * np.array([np.cos(a), np.sin(a), 0])).set_stroke(width=0)
+                       for a in (np.pi / 2, np.pi / 2 + 2 * np.pi / 3, np.pi / 2 + 4 * np.pi / 3)], Dot(P(fx, iy), radius=0.012))
+        self.part("mode_cool", flake)
+        self.part("mode_fan", fan)
+        self.mark("mode_button", (cx - 0.02, cy - hgt / 2 + 0.07))
         self.mark("screen", ((sx0 + sx1) / 2, (sy0 + sy1) / 2))
         self.mark("button_up", (bx, cy + 0.05))
         self.mark("button_down", (bx, cy - 0.05))
@@ -610,10 +625,37 @@ class Thermostat(Prop):
         self.mark("wall", (cx, cy))
         self.temp = int(round(temp))
         self._level = 1.0
+        self._mode = mode
         self._show(self.temp)
+        self._light_mode(mode)
         self.set_z_index(Z_PROP)
         if not on:
             self._apply_level(0.0)
+
+    def _light_mode(self, mode):
+        self._mode = mode
+        for name, col in (("cool", MODE_COOL), ("fan", MODE_FAN)):
+            on = mode == name
+            icon = self.parts[f"mode_{name}"]
+            icon.set_stroke(col if on else METAL_DARK, opacity=1)
+            for m in icon:
+                if isinstance(m, (Ellipse, Dot)):
+                    m.set_fill(col if on else METAL_DARK, 1)
+
+    def mode(self, mode, run_time=0.1):
+        """Switch the mode icon ("cool", "fan" or None) with a little pop (pair with a finger press and a click)."""
+        from manim import there_and_back
+        st = {}
+
+        def apply(m, a):
+            if not st:
+                st["c"] = m.get_center().copy()
+                self._light_mode(mode)
+            k = 1 + 0.35 * there_and_back(a)
+            m.scale(k / st.get("k", 1.0), about_point=st["c"])
+            st["k"] = k
+
+        return UpdateFromAlphaFunc(self.parts[f"mode_{mode}"] if mode else self.parts["leds"], apply, run_time=max(run_time, 0.18))
 
     def _show(self, v):
         v = int(np.clip(v, -9, 99))
