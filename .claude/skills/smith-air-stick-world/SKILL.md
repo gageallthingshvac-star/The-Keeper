@@ -159,6 +159,7 @@ Prop-building notes:
 
 - Effects are real recordings (stickworld/audio/src, credits and licenses in src/CREDITS.md), cut into cues in stickworld/audio/sfx by `prep_audio.py`. Cue names: truck, squeak, cough, whoosh, whoosh_long, thump, thud, crash, tools, rattle, zap, fizz, clunk, drill, ping, catch, creak, pop_big, pop, pop_small, clatter, yank, crickets, rip, chime, ding, tink, click, rewind, hum, step1–3.
 - Trigger with `Snd("name")` inside an animation group, `self.snd("name", delay)` in a scene, or let actions do it (footsteps, zap, pop, tink...). Cues land on the exact frame even mid-animation.
+- Mix ceiling: `finish()` caps the mix peak at `PEAK_DB` (-5.5 dB) because AAC encoding overshoots sharp transients by up to ~3 dB; the MP4 then peaks around -3 to -4 dB, leaving room for the voiceover.
 - Music: `audio/src/music.mp3` ("Happy Whistling Ukulele", Rafael Krux, CC0), laid under everything by `finish()`, trimmed and faded to the running time at about -13 dB below the effects.
 - New sounds: only CC0 / public domain / CC BY (record the credit line). Never NC/ND, "personal use", or sounds ripped from games, films or YouTube. Add the file to audio/src, a line to CREDITS.md, a cue to prep_audio.py, and rerun it. The video description must carry the CC BY credit lines listed in CREDITS.md.
 

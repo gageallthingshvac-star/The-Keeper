@@ -26,6 +26,7 @@ class EpisodeScene(SoundScene, MovingCameraScene):
     TIMING = {}
     MUSIC = "music.mp3"
     MUSIC_LEVEL = -13.0
+    PEAK_DB = -5.5      # mix peak ceiling; AAC encoding adds up to ~3 dB on sharp transients, so the MP4 lands near -3
 
     def setup(self):
         super().setup()
@@ -69,6 +70,9 @@ class EpisodeScene(SoundScene, MovingCameraScene):
         total_ms = int(self.renderer.time * 1000)
         if getattr(fw, "includes_sound", False) and fw.audio_segment is not None and len(fw.audio_segment) > total_ms:
             fw.audio_segment = fw.audio_segment[:total_ms].fade_out(int(tail_fade * 1000))
+        # keep headroom for the voiceover: cap the mix peak (cues that land together can stack up)
+        if getattr(fw, "includes_sound", False) and fw.audio_segment is not None and fw.audio_segment.max_dBFS > self.PEAK_DB:
+            fw.audio_segment = fw.audio_segment.apply_gain(self.PEAK_DB - fw.audio_segment.max_dBFS)
         rows = ["| Scene | Start (s) | End (s) | Action (s) | TIMING (s) |", "| --- | --- | --- | --- | --- |"]
         for name, a, b, used, target in self.timeline:
             flag = " (over)" if used > target + 1e-3 else ""
