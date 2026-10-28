@@ -34,6 +34,14 @@ class RigAnim(Animation):
         self._update(self.rate_func(alpha))
 
 
+def tween_value(tracker, value, run_time=0.3, rate_func=smooth):
+    """Animate a ValueTracker to value, reading its start when the step actually begins. Use this instead of
+    tracker.animate inside long Successions / action hooks (Manim's .animate on trackers can be overwritten there)."""
+    st = {}
+    return RigAnim(lambda a: tracker.set_value(st["v0"] + (value - st["v0"]) * a),
+                   lambda: st.update(v0=tracker.get_value()), run_time, rate_func)
+
+
 def Do(fn):
     """A zero-length step that runs fn when reached (for attaching/releasing inside a Succession)."""
     return RigAnim(lambda a: None, setup=fn, run_time=1e-3, rate_func=linear)
@@ -924,6 +932,25 @@ class ActionsMixin:
 
         to_spot = self.reach(side, lambda: P0 - (tool.pt(tip) - tool.pt(grip)), 0.3, lean=False)
         return Succession(AnimationGroup(to_spot, self.look_at(P0, 0.2)), RigAnim(update, setup, run_time, linear))
+
+    def sweep_breakers(self, panel, on=False, side="R", order=None, per=0.075, main=True, each=None, at_main=None):
+        """Run a hand down the breaker panel flipping every breaker (click, click, click...) and the main last:
+        the panicked everything-off, or the satisfying everything-back-on. The door must be open.
+        each(k, n) -> an animation to run with the k-th flip (lights dimming one circuit at a time); at_main -> an
+        animation to run as the main goes."""
+        idx = list(range(panel.n_breakers)) if order is None else list(order)
+        steps = []
+        for k, i in enumerate(idx):
+            extra = [each(k, len(idx))] if each is not None else []
+            steps.append(AnimationGroup(self.reach(side, panel.pt(f"breaker_{i}"), per, lean=False),
+                                        Succession(Wait(per * 0.6), panel.flip(i, on, per * 0.5)),
+                                        Succession(Wait(per * 0.7), Snd("click", gain=-12)), *extra))
+        if main:
+            extra = [Succession(Wait(0.12), at_main)] if at_main is not None else []
+            steps.append(AnimationGroup(self.reach(side, panel.pt("main"), 0.15, lean=False),
+                                        Succession(Wait(0.1), panel.flip("main", on, 0.08)),
+                                        Succession(Wait(0.12), Snd("clunk", gain=-4)), *extra))
+        return Succession(*steps)
 
     # ------------------------------------------------------------ loads
     def slide_push(self, obj, x, grips=("grip_R_low", "grip_R"), run_time=None, lean=0.45, sound="creak"):

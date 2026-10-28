@@ -15,11 +15,11 @@ SEASON = 1
 # per episode: the job, the rookie's mistake, the lesson, the scar he earns, and whether a LEMONNOX gets hauled off
 EPISODES = {
     1: dict(slug="package_unit", title="Package Unit Changeout", mistake="grabs a live whip", lesson="kill the power first",
-            earns=("scorched_cap",), lemon=True),
+            starts_with=("cap_tag",), earns=("scorched_cap",), lemon=True),
     2: dict(slug="attic_air_handler", title="Attic Air Handler Swap", mistake="steps between the joists",
             lesson="walk the joists", earns=("shin_bandage",), lemon=True),
-    3: dict(slug="furnace_closet", title="Furnace Closet", mistake="kills every breaker in the house (overdoing EP1)",
-            lesson="lock out the right breaker; change the filter", earns=(), lemon=True),
+    3: dict(slug="movie_night", title="Movie Night", mistake="kills every breaker in the house (overdoing EP1)",
+            lesson="lock out the right breaker; change the filter", earns=(), lemon=False),
     4: dict(slug="crawlspace_ducts", title="Crawlspace Duct Rescue", mistake="gets stuck in the crawlspace hatch",
             lesson="seal the ducts", earns=(), lemon=False),
     5: dict(slug="rooftop_unit", title="Rooftop Unit", mistake="climbs up perfectly (EP2) and leaves the tools at the bottom",
@@ -42,6 +42,7 @@ def rookie_marks(ep):
     marks = []
     for n in range(1, ep):
         marks += list(EPISODES[n]["earns"])
+    marks += list(EPISODES[ep].get("starts_with", ()))   # e.g. EP1: a brand-new cap with the price tag still on
     return tuple(m for m in marks if m in DRAWN_MARKS)
 
 
@@ -54,4 +55,4 @@ def title(ep):
     return f"EP {ep}: {EPISODES[ep]['title']}"
 
 
-DRAWN_MARKS = {"scorched_cap", "shin_bandage"}  # marks the rig can draw today (add the rest when their episode is built)
+DRAWN_MARKS = {"cap_tag", "scorched_cap", "shin_bandage"}  # marks the rig can draw today (add the rest when their episode is built)

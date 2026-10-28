@@ -308,3 +308,34 @@ def pop(mob, scale=1.18, run_time=0.17):
             st["k"] = 1.0
 
     return UpdateFromAlphaFunc(mob, upd, run_time=run_time, rate_func=linear)
+
+
+# ================================================================ lights out
+def lights_out(level, region, figures):
+    """The power's off: a near-black night overlay over region=(x0, y0, x1, y1) as level (a ValueTracker, 0 lights
+    on .. 1 pitch dark) rises, with only the figures' eyes left showing, white with pupils (they still blink and look
+    around). Add the returned mobject to the scene. Raise a flashlight above it (z) to light the dark."""
+    x0, y0, x1, y1 = region
+    dark = VMobject().set_points_as_corners([P(x0, y0), P(x1, y0), P(x1, y1), P(x0, y1), P(x0, y0)])
+    dark.set_fill("#080C1C", 0).set_stroke(width=0).set_z_index(Z_FX - 1)
+    eyes = []
+    for f in figures:
+        for e in f.face.eyes:
+            white = Ellipse(width=0.16, height=0.2).set_fill(WHITE, 0).set_stroke(WHITE, 0).set_z_index(Z_FX - 0.9)
+            pupil = Dot(radius=0.035).set_fill(INK, 0).set_z_index(Z_FX - 0.85)
+            eyes.append((f, e, white, pupil))
+    group = VGroup(dark, *[m for _, _, w, p in eyes for m in (w, p)])
+
+    def update(g):
+        k = float(np.clip(level.get_value(), 0.0, 1.0))
+        dark.set_fill("#080C1C", 0.94 * k)
+        for f, e, white, pupil in eyes:
+            c = e.get_center()
+            shut = e.height < 0.03
+            white.stretch_to_fit_height(0.025 if shut else 0.2).stretch_to_fit_width(0.16).move_to(c)
+            white.set_fill(WHITE, k)
+            pupil.move_to(c + P(0.035 * float(f.face.v("turn")), 0)).set_fill(INK, 0 if shut else k)
+
+    group.add_updater(update)
+    update(group)
+    return group

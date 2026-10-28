@@ -45,15 +45,15 @@ class Ep01PackageUnit(EpisodeScene):
     TIMING = {
         "arrive": 2.95,
         "hop_out": 5.75,
-        "zap": 6.4,
-        "drills": 4.8,
-        "peel": 4.55,
-        "ducts": 6.2,
-        "pull_start": 4.7,
-        "carry_toss": 6.4,
+        "zap": 6.35,
+        "drills": 4.45,
+        "peel": 4.2,
+        "ducts": 6.1,
+        "pull_start": 4.6,
+        "carry_toss": 7.5,
         "new_unit": 2.5,
-        "rewind": 5.8,
-        "thread": 4.7,
+        "rewind": 5.5,
+        "thread": 4.5,
         "power_up": 3.7,
     }
 
@@ -198,7 +198,7 @@ class Ep01PackageUnit(EpisodeScene):
                       t2.pose({"drop": 0.7, "spine": 0.55}, 0.4),
                       Succession(Wait(0.4), t2.reach("R", unit.pt("whip_terminal") + P(-0.25, 0.05), 0.35)))
             self.play(t2.zapped(source=unit.pt("whip_terminal")),
-                      Succession(Wait(0.55), Do(lambda: t2.add_mark("scorched_cap"))),   # series scar: the cap stays burnt
+                      Succession(Wait(0.55), Do(lambda: (t2.remove_mark("cap_tag"), t2.add_mark("scorched_cap")))),  # price tag burns off; the cap stays scorched for the series
                       spark_shower(unit.pt("whip_terminal"), 0.55, rate=48, speed=(1.6, 3.4), spread=(0.2, 2.9),
                                    colors=("#FFFFFF", "#BFE8FF", "#FFD54A")),
                       camera.punch_in(self, P(0.1, 0.4), 0.72, 0.25), Succession(Wait(0.25), camera.shake(self, 0.09, run_time=0.3)),
@@ -290,6 +290,17 @@ class Ep01PackageUnit(EpisodeScene):
                       camera.shake(self, 0.16), FX.dust(P(land[0], truck.pt("bed_rail")[1]), 4.0),
                       impact_burst(P(land[0], truck.pt("bed_rail")[1] + 0.9), 1.5),
                       t1.pose("stand", 0.4), t2.pose("stand", 0.4))
+            # the first trophy of the season: the rookie pries the LEMONNOX badge off the lemon and keeps it
+            badge = unit.parts["badge"]
+            t2.set_z_index(S.Z_TRUCK - 0.05)
+            self.play(t2.reach("R", lambda: badge.get_center(), 0.3), t2.look_at(badge.get_center()))
+            unit.remove(badge)
+            self.add(badge.set_z_index(S.Z_HELD))
+            attach_to(badge, lambda: badge.get_center(), lambda: t2.hand("R"))
+            self.play(Snd("yank", gain=-8), t2.pose({"shoulder_R": 2.7, "elbow_R": 0.3}, 0.3, rush_from), t2.expression("happy", 0.2))
+            self.play(Snd("ding", gain=-8), FX.sparkles([t2.hand("R") + P(0.25, 0.3)], 0.5, 9), Wait(0.25))
+            self.play(t2.reach("R", lambda: t2.hip_point() + P(-0.2 * t2.sg, -0.05), 0.25), Succession(Wait(0.2), FadeOut(badge, run_time=0.1)))
+            detach(badge)
 
         with self.block("new_unit"):
             new = PackageUnit(UCX + 8, G + 0.13, old=False)

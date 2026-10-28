@@ -22,6 +22,7 @@ from stickworld.face import KEEP
 from stickworld.props import effects as FX
 from stickworld.props.base import attach_to, bundle, detach, ground_shadow, ride, turn_about, unbundle
 from stickworld.props.effects_more import glow, heat_waves, impact_burst, pop, spark_shower, squash_land
+from stickworld.props.hvac import Disconnect
 from stickworld.props.hvac_more import AirHandler, CondensateDrain, LineSet, Thermostat
 from stickworld.props.tools import ToolBag
 from stickworld.props.tools_more import Dolly, Rope, Torch, TubingCutter
@@ -49,11 +50,11 @@ class Ep02AtticAirHandler(EpisodeScene):
     EPISODE = 2
     TIMING = {
         "arrive": 4.8,
-        "climb": 8.0,
+        "climb": 9.3,
         "joist": 7.7,
         "old_out": 9.3,
         "dolly_up": 11.2,
-        "connect": 6.8,
+        "connect": 9.0,
         "thermostat": 2.3,
         "cold_air": 4.2,
     }
@@ -63,7 +64,7 @@ class Ep02AtticAirHandler(EpisodeScene):
         probe = AirHandler(AH_X, F)
         self.set_ = attic(F, room_floor=RF, hatch_x=HATCH_X, walkway=(-1.2, 1.45), register_x=HO_X - 0.05, light_x=-0.45,
                           thermostat_x=2.45, work_x=AH_X, plenum_x=AH_X, plenum_y=probe.pt("supply_top")[1],
-                          room_color=ROOM_HOT)
+                          room_color=ROOM_HOT, stud_x=-1.05)
         a = self.set_
         self.treads = [a.pt(n) for n in a.treads]
         self.B, top = a.pt("stair_bottom")[:2], a.pt("stair_top")[:2]
@@ -77,6 +78,7 @@ class Ep02AtticAirHandler(EpisodeScene):
         d = self.old.pt("drain")
         self.drain = CondensateDrain(d, direction=1, stub=0.06, run=0.06, drop=d[1] - 0.06 - F)
         self.thermo = Thermostat(a.pt("thermostat_spot"), temp=78)
+        self.disc = Disconnect(a.pt("stud_mount"))     # the air handler's service switch, by the hatch
         self.hole = CeilingHole(HOLE_X, F - 0.05, a.pt("ceiling")[1])
         self.dolly = Dolly(DOLLY_X, RF, facing=-1)
         self.new = AirHandler(DOLLY_X - 0.705, RF + 0.05, new=True, drain_side="right")
@@ -92,7 +94,7 @@ class Ep02AtticAirHandler(EpisodeScene):
         self.load.rotate(-0.25, about_point=self.load.pt("axle"))
         self.rookie = StickFigure(self.load.pt("axle")[0] + 1.06, RF, -1, accessory="cap", name="rookie",
                                   marks=C.rookie_marks(self.EPISODE))   # still wearing the cap he scorched in EP1
-        self.add(a, self.drain, self.lineset, self.old, self.thermo, self.load, self.rope, self.ho, self.lead, self.rookie,
+        self.add(a, self.drain, self.lineset, self.old, self.thermo, self.disc, self.load, self.rope, self.ho, self.lead, self.rookie,
                  self.bag)
         attach_to(self.bag, "handle", lambda: self.lead.hand("R"))
         attic_floor = (-1.15, 4.6)  # the attic floor, not over the hatch
@@ -165,8 +167,11 @@ class Ep02AtticAirHandler(EpisodeScene):
 
         with self.block("climb"):
             self.background(camera.punch_in(self, np.array([-1.3, -0.5, 0]), 0.84, 4.0))
+            # callback to EP1: first thing up the stair, the rookie kills the power. He's learned. He's very proud.
             self.background(Succession(Wait(1.3), rookie.walk_to(start_x, speed=1.15),
                                        rookie.climb(self.treads, landing, lip, hunch=0.15),
+                                       rookie.turn(-1, 0.2), rookie.push_switch(self.disc, False), Snd("clunk", gain=-2),
+                                       AnimationGroup(rookie.expression("happy", 0.2), rookie.pose({"neck": -0.25}, 0.25)),
                                        rookie.walk_to(ROOKIE_SPOT, spine=0.15), rookie.turn(-1)))
             self.play(lead.sling(self.bag), lead.face._to(0.3, turn=0.6))
             self.play(lead.climb(self.treads, landing, lip, hunch=0.15), ho.turn(1), ho.look_at(a.pt("hatch")))
@@ -175,7 +180,8 @@ class Ep02AtticAirHandler(EpisodeScene):
             self.wait(2.2)
 
         with self.block("joist"):
-            self.play(lead.talk(0.8), lead.point_at(self.old.pt("top_R")), rookie.nod(2),
+            self.play(rookie.hands_on_hips(), rookie.expression("happy", 0.2, hold=1.0), rookie.pose({"neck": -0.25}, 0.3),
+                      lead.nod(1), lead.expression("happy", 0.2),
                       camera.punch_in(self, np.array([1.25, -0.3, 0]), 0.68, 0.8))
             ceil = a.pt("ceiling")[1]
             self.play(lead.pose("stand", 0.3), rookie.fall_through(HOLE_X, F, hole=self.hole),
@@ -300,8 +306,10 @@ class Ep02AtticAirHandler(EpisodeScene):
             self.play(lead.stow_tool(self.bag, self.torch))
             self.play(lead.reach("L", self.drain.pt("inlet"), 0.3), lead.look_at(self.drain.pt("inlet")))
             self.play(Snd("click"), FX.sparkles([self.drain.pt("inlet") + np.array([0.08, 0.12, 0])], 0.45, 3))
-            self.play(lead.let_go(("L",)), lead.exhale(),
-                      camera.punch_in(self, self.thermo.pt("screen") + np.array([-0.35, -0.25, 0]), 0.3, 0.8),
+            self.play(lead.let_go(("L",)), lead.exhale(), camera.reset(self, 0.8))
+            self.play(lead.walk_to(-0.4, face=-1, spine=0.15, run_time=0.9))
+            self.play(lead.push_switch(self.disc, True), Succession(Wait(0.2), Snd("clunk", gain=-2)))
+            self.play(camera.punch_in(self, self.thermo.pt("screen") + np.array([-0.35, -0.25, 0]), 0.3, 0.8),
                       Succession(Wait(0.15), Snd("whoosh", gain=-12)))
 
         with self.block("thermostat"):

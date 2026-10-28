@@ -94,14 +94,15 @@ def _cloud(cx, cy, s=1.0):
 
 # ================================================================ attic
 def attic(floor_y=-2.4, room_floor=None, hatch_x=-2.6, stair_foot="left", walkway=None, light_x=2.0,
-          register_x=None, thermostat_x=3.1, work_x=1.4, plenum_x=None, plenum_y=None, room_color=WALL):
+          register_x=None, thermostat_x=3.1, work_x=1.4, plenum_x=None, plenum_y=None, room_color=WALL, stud_x=None):
     """Gable attic over a room: rafters meeting at the ridge with a collar tie, joists with pink batts, a
     plywood walkway and a framed hatch with a pull-down stair into the room below.
     room_floor: draw the room's floor at that height (the stair lands on it); stair_foot "left"/"right": which way
     the stair runs down from the hatch; walkway=(x0, x1); register_x: a supply register in the room ceiling;
     plenum_x/plenum_y: a supply plenum hung from the rafters whose bottom sits at plenum_y (an air handler slides
     in under it). room_color: the room's wall colour (start a hot room warm, ROOM_HOT, and tween parts["room"] to
-    ROOM_COOL when the AC comes on). The stair is drawn in front of props (Z_PROP_FRONT) so a load hauled up it sits between the rails.
+    ROOM_COOL when the AC comes on). stud_x: a 2x4 standing from the floor to the rafter (mount a service disconnect on
+    it at anchor "stud_mount"). The stair is drawn in front of props (Z_PROP_FRONT) so a load hauled up it sits between the rails.
     Anchors: hatch, lip (top of the hatch curb on the stair-top side), floor_left, floor_right, work_spot, peak,
     walkway_left, walkway_right, ceiling (underside), stair_top, stair_bottom, tread_0.. (bottom up; .treads = list
     of names), and with room_floor: room_floor, thermostat_spot (60 in up); register; plenum_bottom."""
@@ -204,11 +205,106 @@ def attic(floor_y=-2.4, room_floor=None, hatch_x=-2.6, stair_foot="left", walkwa
         s.part("plenum", VGroup(straps, box, seams, takeoff))
         s.mark("plenum_bottom", (px, py))
     s.mark("lip", ((hx1 + 0.05) if stair_foot == "left" else (hx0 - 0.05), F + 0.28))
+    if stud_x is not None:
+        s.part("stud", rect(stud_x - 0.07, F, stud_x + 0.07, y_in(stud_x) + 0.05, WOOD, DETAIL_W))
+        s.mark("stud_mount", (stud_x, F + 3.0))
     s.mark("walkway_left", (wx0, F))
     s.mark("walkway_right", (wx1, F))
     s.mark("peak", (0, PY))
     s.set_z_index(Z_SET)
     s.parts["stair"].set_z_index(Z_PROP_FRONT)
+    return s
+
+
+# ================================================================ house at night (living room + utility closet)
+NIGHT_SKY = "#1B2A4A"
+NIGHT_GLASS = "#22355E"
+MOON = "#FFF3B0"
+
+
+def house_night(floor_y=-0.6, room_color=WALL, partition_x=1.0, register_x=-2.2, window_x=-3.25, clock_x=-1.3,
+                trunk_x=None, trunk_y=None, trunk_w=1.1):
+    """A house cut open at night: living room on the left, utility closet on the right behind a partition wall with
+    a doorway, ceiling and gable roof against a starry sky, a night window with the moon, a ceiling register, wood
+    floor on a foundation. Draw the yard and street below with sets.driveway() (added BEFORE this set, whose
+    night_tint part darkens it). room_color: ROOM_HOT for a hot house, tween parts["room"] to ROOM_COOL later.
+    Anchors: floor, ceiling, doorway, couch_spot, tv_spot, thermostat_spot, panel_spot, equipment_spot, clock_spot,
+    register, window, front_step (where you step up from the yard). trunk_x/trunk_y: a sheet-metal supply trunk
+    rising from trunk_y (the top of the equipment) into the ceiling."""
+    F = floor_y
+    s = Prop()
+    xa, xb = X0 - BLEED, X1 + BLEED
+    ceil = F + 92 * IN
+    px0, px1 = partition_x, partition_x + 0.2
+    rw = 4.25
+    door_h = 82 * IN
+    peak = ceil + 2.2
+    # sky with stars and the room colours
+    s.part("sky", _fill(xa, ceil, xb, Y1 + BLEED, NIGHT_SKY))
+    rng = np.random.default_rng(11)
+    roof_at = lambda x: peak + 0.32 - (peak - ceil - 0.4) * abs(x) / (X1 + BLEED)
+    stars = VGroup()
+    while len(stars) < 18:
+        sx = rng.uniform(-4.35, 4.35)
+        lo = roof_at(sx) + 0.25
+        if lo < Y1 - 0.15:
+            stars.add(Circle(radius=rng.uniform(0.02, 0.045)).move_to(P(sx, rng.uniform(lo, Y1 - 0.1)))
+                      .set_fill(WHITE, rng.uniform(0.5, 1.0)).set_stroke(width=0))
+    s.part("stars", stars)
+    s.part("room", _fill(xa, F, px0, ceil, room_color))
+    s.part("closet_wall", _fill(px1, F, xb, ceil, CLOSET_WALL))
+    s.part("baseboards", VGroup(rect(xa, F, px0, F + 0.14, WHITE, DETAIL_W), rect(px1, F, rw, F + 0.14, WHITE, DETAIL_W)))
+    # night window with the moon
+    wx0, wx1, wy0, wy1 = window_x - 0.65, window_x + 0.65, F + 2.2, F + 3.9
+    s.part("window", VGroup(rect(wx0, wy0, wx1, wy1, NIGHT_GLASS, PROP_W),
+                            Circle(radius=0.22).move_to(P(wx1 - 0.35, wy1 - 0.4)).set_fill(MOON, 1).set_stroke(width=0),
+                            Circle(radius=0.2).move_to(P(wx1 - 0.27, wy1 - 0.34)).set_fill(NIGHT_GLASS, 1).set_stroke(width=0),
+                            *[Circle(radius=0.025).move_to(P(sx, sy)).set_fill(WHITE, 1).set_stroke(width=0)
+                              for sx, sy in ((wx0 + 0.3, wy1 - 0.3), (wx0 + 0.55, wy0 + 0.6), (wx1 - 0.5, wy0 + 0.4))],
+                            seg((window_x, wy0), (window_x, wy1), w=DETAIL_W), seg((wx0, (wy0 + wy1) / 2), (wx1, (wy0 + wy1) / 2), w=DETAIL_W),
+                            rect(wx0 - 0.1, wy0 - 0.12, wx1 + 0.1, wy0, WHITE, DETAIL_W)))
+    s.part("curtains", VGroup(Polygon(P(wx0 - 0.3, wy1 + 0.2), P(wx0 + 0.25, wy1 + 0.2), P(wx0 - 0.05, wy0 - 0.3), P(wx0 - 0.3, wy0 - 0.3)),
+                              Polygon(P(wx1 + 0.3, wy1 + 0.2), P(wx1 - 0.25, wy1 + 0.2), P(wx1 + 0.05, wy0 - 0.3), P(wx1 + 0.3, wy0 - 0.3)))
+           .set_fill("#C96F5B", 1).set_stroke(INK, DETAIL_W))
+    # floor + foundation
+    s.part("floor", VGroup(rect(xa, F - 0.45, xb, F - 0.12, mix(CONCRETE, INK, 0.12), PROP_W),
+                           rect(xa, F - 0.12, xb, F, WOOD, PROP_W)))
+    # ceiling, attic and roof
+    s.part("ceiling", VGroup(rect(xa, ceil, xb, ceil + 0.06, WHITE, DETAIL_W), _joists(-4.6, 4.7, ceil + 0.45, 0.38)))
+    s.part("roof", VGroup(Polygon(P(xa, ceil + 0.5), P(0, peak), P(xb, ceil + 0.5), P(xb, ceil + 0.08), P(xa, ceil + 0.08))
+                          .set_fill(mix(WOOD, WHITE, 0.6), 1).set_stroke(width=0),
+                          Polygon(P(xa - 0.2, ceil + 0.42), P(0, peak), P(xb + 0.2, ceil + 0.42), P(xb + 0.2, ceil + 0.72),
+                                  P(0, peak + 0.32), P(xa - 0.2, ceil + 0.72)).set_fill(ROOF, 1).set_stroke(INK, PROP_W)))
+    # partition wall in section (header over the doorway) and the closet's right wall
+    s.part("partition", VGroup(rect(px0, F + door_h + 0.1, px1, ceil, WALL, PROP_W),
+                               rect(px0 - 0.05, F + door_h, px1 + 0.05, F + door_h + 0.1, WOOD, DETAIL_W),
+                               rect(px0 - 0.07, F, px0, F + door_h + 0.1, WHITE, DETAIL_W),
+                               rect(px1, F, px1 + 0.07, F + door_h + 0.1, WHITE, DETAIL_W)))
+    s.part("right_wall", rect(rw, F, xb, ceil, WALL, PROP_W))
+    # ceiling register over the couch
+    s.part("register", VGroup(rect(register_x - 0.42, ceil - 0.08, register_x + 0.42, ceil, METAL, DETAIL_W),
+                              *[seg((x, ceil - 0.07), (x, ceil - 0.01), w=1.5, color=METAL_DARK)
+                                for x in np.arange(register_x - 0.34, register_x + 0.36, 0.085)]))
+    if trunk_x is not None:
+        tx0, tx1 = trunk_x - trunk_w / 2, trunk_x + trunk_w / 2
+        s.part("trunk", VGroup(rect(tx0, trunk_y, tx1, ceil, METAL, PROP_W),
+                               *[seg((tx0 + 0.06, y), (tx1 - 0.06, y), w=1.5, color=METAL_HI) for y in np.arange(trunk_y + 0.35, ceil - 0.1, 0.45)]))
+    # the yard at night: a blue tint over whatever is drawn below the house (sets.driveway)
+    s.part("night_tint", _fill(xa, Y0 - BLEED, xb, F - 0.45, NIGHT_SKY, 0.42))
+    s.mark("floor", (0, F))
+    s.mark("ceiling", (0, ceil))
+    s.mark("doorway", ((px0 + px1) / 2, F))
+    s.mark("couch_spot", (-2.6, F))
+    s.mark("tv_spot", (-0.15, F))
+    s.mark("thermostat_spot", (0.55, F + 60 * IN))
+    s.mark("panel_spot", (px1 + 0.75, F + 3.1))
+    s.mark("equipment_spot", (3.15, F))
+    s.mark("clock_spot", (clock_x, F + 4.55))
+    s.mark("register", (register_x, ceil - 0.08))
+    s.mark("window", (window_x, (wy0 + wy1) / 2))
+    s.mark("front_step", (-4.3, F))
+    s.set_z_index(Z_SET)
+    s.parts["night_tint"].set_z_index(Z_SET + 0.3)
     return s
 
 

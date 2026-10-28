@@ -152,6 +152,7 @@ Connections: `connect(child, "point", parent, "point")` / `Cable.connect_end(fn)
 
 Prop-building notes:
 - hvac_more.py holds shared drawing helpers for new props: `IN` (one inch at figure scale), `rect`, `seg`, `tube`, `rounded_path`, `offset_path`, `teardrop`, `SevenSeg` (LCD digits), `Tween` (an UpdateFromAlphaFunc that reads its start state when it begins). Material colours not in style.py (copper, brass, hoses, dirt...) are defined at the top of the *_more files; move one into style.py if a second file needs it.
+- Animate a ValueTracker (a clock, a darkness level, a ride's progress) with `actions.tween_value(tracker, value, run_time)` when it sits inside a Succession or an action hook; `tracker.animate` gets overwritten there. Effects that are rebuilt every frame should keep a fixed set of shapes and update them (an updater), not `always_redraw` with a changing number of shapes, which loses their z order.
 - Never animate a freshly built `VGroup(...)` of a prop's parts (`VGroup(a, b).animate...`): Manim adds that wrapper to the scene, so the parts draw twice and outlive the prop. Animate the prop, one part, or use an UpdateFromAlphaFunc on the prop.
 - Points that live on a moving sub-part (a filter's grip, a panel door handle) move with that part: animate `prop.parts["filter"]`, not the whole prop.
 - Small printed labels on equipment (R-410A, IN/OUT, MASTIC) can be turned off with `label=None` / `labels=False`.

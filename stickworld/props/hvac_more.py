@@ -7,7 +7,7 @@ rounded path, the SevenSeg LCD digits and Tween (an UpdateFromAlphaFunc that rea
 import numpy as np
 from manim import (
     DOWN, CapStyleType, Circle, Dot, Line, LineJointType, Polygon, Rectangle, RoundedRectangle,
-    ManimColor, UpdateFromAlphaFunc, VGroup, VMobject, smooth,
+    ManimColor, UpdateFromAlphaFunc, VGroup, VMobject, linear, smooth,
 )
 
 from ..style import (
@@ -17,6 +17,9 @@ from ..style import (
 from .base import Prop
 
 IN = H / 69.0  # one inch, sized against a 5'9" figure
+
+ICE = "#CFEFFF"
+ICE_EDGE = "#7FBFE6"
 
 # a few material colours style.py has no name for
 COPPER = "#C87533"
@@ -446,8 +449,9 @@ class Furnace(Prop):
 class EvapCoil(Prop):
     """Cased A-coil at (x, bottom_y), sized to sit on a Furnace; points lineset_suction, lineset_liquid, lineset, drain, top, bottom."""
 
-    def __init__(self, x=0.0, bottom_y=0.0, width=17.5 * IN, new=True, mirror=False, **kwargs):
-        """width defaults to the Furnace width; mirror=True puts the stubs and drain on the left."""
+    def __init__(self, x=0.0, bottom_y=0.0, width=17.5 * IN, new=True, mirror=False, iced=False, **kwargs):
+        """width defaults to the Furnace width; mirror=True puts the stubs and drain on the left; iced=True starts
+        frozen solid (dirty filter, no airflow): melt() thaws it."""
         super().__init__(**kwargs)
         fill, dark = _palette(new)
         HC = 21 * IN
@@ -479,9 +483,34 @@ class EvapCoil(Prop):
         self.mark("drain", (x1 + 0.16, dy))
         self.mark("top", (x, y1))
         self.mark("bottom", (x, y0))
+        # ice: a frosty blue crust over the A-coil and the suction stub, with sparkly highlights
+        rng = np.random.default_rng(4)
+        crust = Polygon(P(x0 + 0.1, y0 + 0.12), P(x - 0.1, y1 - 0.05), P(x + 0.1, y1 - 0.05), P(x1 - 0.1, y0 + 0.12),
+                        P(x1 - 0.28, y0 + 0.2), P(x, y1 - 0.38), P(x0 + 0.28, y0 + 0.2))
+        crust.set_fill(ICE, 0.85).set_stroke(ICE_EDGE, 2.5)
+        icicles = VGroup(*[Polygon(P(ix - 0.035, y0 + 0.14), P(ix + 0.035, y0 + 0.14), P(ix, y0 + 0.14 - rng.uniform(0.08, 0.16)))
+                           .set_fill(ICE, 0.9).set_stroke(ICE_EDGE, 1.5) for ix in np.linspace(x0 + 0.25, x1 - 0.25, 5)])
+        stub_ice = rect(x1 - 0.02, ys - 0.11, x1 + 0.24, ys + 0.11, ICE, 2.0, r=0.05, opacity=0.85, color=ICE_EDGE)
+        glints = VGroup(*[seg((gx - 0.04, gy), (gx + 0.04, gy), w=2, color=WHITE) for gx, gy in
+                          ((x - 0.25, y0 + 0.6), (x + 0.2, y0 + 0.9), (x1 + 0.1, ys + 0.04))])
+        self.part("ice", VGroup(crust, icicles, stub_ice, glints))
+        self._ice_base = [(m, m.get_fill_opacity(), m.get_stroke_opacity()) for m in self.parts["ice"].family_members_with_points()]
+        self._ice = 1.0 if iced else 0.0
+        self._apply_ice(self._ice)
         if mirror:
             self.flip(about_point=P(x, bottom_y))
         self.set_z_index(Z_PROP)
+
+    def _apply_ice(self, k):
+        self._ice = k
+        for m, fo, so in self._ice_base:
+            m.set_fill(opacity=fo * k)
+            m.set_stroke(opacity=so * k)
+
+    def melt(self, run_time=1.5):
+        """The ice shrinks and fades away (pair with the drain's drip())."""
+        return Tween(self.parts["ice"], lambda: self._ice, lambda s0, a: self._apply_ice(s0 * (1 - a)), run_time=run_time,
+                     rate_func=linear)
 
 
 class LineSet(Prop):

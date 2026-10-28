@@ -138,8 +138,10 @@ class StickFigure(ActionsMixin, VGroup):
         self.add(self.parts["hair"], self.parts["head"])
         self.add(self.face.group)
         self.parts["scorch"] = VGroup()   # soot on the cap, over the cap
-        self.add(self.parts["acc"], self.parts["acc_brim"], self.parts["scorch"], self.parts["upper_R"], self.parts["fore_R"],
-                 self.parts["fist"])
+        self.parts["cap_tag"] = VGroup()
+        self.parts["dust"] = VGroup()
+        self.add(self.parts["acc"], self.parts["acc_brim"], self.parts["scorch"], self.parts["cap_tag"], self.parts["dust"],
+                 self.parts["upper_R"], self.parts["fore_R"], self.parts["fist"])
 
     def _tick(self, m, dt):
         self.clock += dt
@@ -269,6 +271,31 @@ class StickFigure(ActionsMixin, VGroup):
             scorch.become(VGroup(blob, *specks))
         elif len(scorch.submobjects):
             scorch.become(VGroup())
+        tag = self.parts["cap_tag"]
+        if "cap_tag" in self.marks and self.accessory == "cap":   # brand-new cap: the price tag is still on it
+            R, c = S.HEAD_R, J["head"]
+            turn = self.face.v("turn")
+            side = np.sign(turn) if abs(turn) > 0.05 else J["sg"]
+            knot = c + np.array([-side * 1.0 * R, 0.4 * R, 0])
+            swing = 0.25 * np.sin(self.clock * 3.1)
+            d = np.array([np.sin(swing) * -side, -np.cos(swing), 0])
+            end = knot + d * 0.2
+            string = VMobject().set_points_as_corners([knot, end]).set_stroke(S.INK, 2)
+            card = Polygon(end + np.array([-0.07, 0.0, 0]), end + np.array([0.07, 0.0, 0]), end + np.array([0.07, -0.13, 0]),
+                           end + np.array([-0.07, -0.13, 0])).set_fill(S.WHITE, 1).set_stroke(S.INK, 2)
+            tag.become(VGroup(string, card, VMobject().set_points_as_corners([end + np.array([-0.04, -0.07, 0]), end + np.array([0.04, -0.07, 0])])
+                                                         .set_stroke(S.TOOL_RED, 2)))
+        elif len(tag.submobjects):
+            tag.become(VGroup())
+        dust = self.parts["dust"]
+        if "dusty" in self.marks:   # grey filter dust all over his face (temporary, not a series scar)
+            R, c = S.HEAD_R, J["head"]
+            rng = np.random.default_rng(13)
+            dots = [Circle(radius=rng.uniform(0.02, 0.05)).move_to(c + np.array([rng.uniform(-0.75, 0.75) * R, rng.uniform(-0.7, 0.8) * R, 0]))
+                    .set_fill("#8E8577", 0.85).set_stroke(width=0) for _ in range(14)]
+            dust.become(VGroup(*dots))
+        elif len(dust.submobjects):
+            dust.become(VGroup())
         if "shin_bandage" in self.marks:
             k0, f0 = J["knee_R"], J["foot_R"]
             d = f0 - k0
@@ -286,6 +313,9 @@ class StickFigure(ActionsMixin, VGroup):
     def add_mark(self, name):
         """Give the figure a continuity scar from now on (it then appears in every later episode too)."""
         self.marks.add(name)
+
+    def remove_mark(self, name):
+        self.marks.discard(name)
 
     def _draw_thumb(self, J):
         """Near hand closed in a fist with the thumb straight up (thumbs-up), popped in by the `thumb` tracker."""
@@ -330,6 +360,15 @@ class StickFigure(ActionsMixin, VGroup):
             else:
                 brim.set_points_as_corners([cc + np.array([-r * 1.25, 0, 0]), cc + np.array([r * 1.25, 0, 0])])
                 brim.set_stroke(S.HARD_HAT, 8, opacity=1)
+        elif self.accessory == "bun":
+            # hair pulled back into a bun at the back of the head, with a hair tie
+            back = -side
+            bun_c = c + np.array([back * 0.78 * R, 0.62 * R, 0])
+            bun = Circle(radius=0.36 * R).move_to(bun_c).set_fill(S.INK, 1).set_stroke(S.INK, 3)
+            acc.become(bun)
+            brim.set_points_as_corners([c + np.array([side * 0.55 * R, 0.85 * R, 0]), c + np.array([0, 1.04 * R, 0]),
+                                        bun_c + np.array([-back * 0.25 * R, 0.08 * R, 0])])
+            brim.set_stroke(S.INK, 7, opacity=1)
         elif self.accessory == "hair_tuft":
             top = c + np.array([0, R, 0])
             pts = [top + np.array([dx, 0, 0]) for dx in np.linspace(-0.35 * R, 0.35 * R, 5)]
