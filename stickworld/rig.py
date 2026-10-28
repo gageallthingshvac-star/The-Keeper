@@ -61,10 +61,12 @@ def wrap(a):
 
 
 class StickFigure(ActionsMixin, VGroup):
-    def __init__(self, x=0.0, ground=0.0, face_dir=1.0, accessory=None, name="", turn=None, rest_face=None, **pose):
+    def __init__(self, x=0.0, ground=0.0, face_dir=1.0, accessory=None, name="", turn=None, rest_face=None, marks=(),
+                 **pose):
         super().__init__()
         self.name = name
         self.accessory = accessory
+        self.marks = set(marks)  # series continuity: scars a character carries from episode to episode
         self.ground = ground
         self.clock = 0.0
         self.idle_on = True
@@ -131,9 +133,12 @@ class StickFigure(ActionsMixin, VGroup):
         self.add(self.parts["shadow"])  # contact shadow, drawn first so the body is over it
         for n in order:
             self.add(self.parts[n])
+        self.parts["bandage"] = VGroup()  # on the near shin, over the leg
+        self.add(self.parts["bandage"])
         self.add(self.parts["hair"], self.parts["head"])
         self.add(self.face.group)
-        self.add(self.parts["acc"], self.parts["acc_brim"], self.parts["upper_R"], self.parts["fore_R"],
+        self.parts["scorch"] = VGroup()   # soot on the cap, over the cap
+        self.add(self.parts["acc"], self.parts["acc_brim"], self.parts["scorch"], self.parts["upper_R"], self.parts["fore_R"],
                  self.parts["fist"])
 
     def _tick(self, m, dt):
@@ -231,6 +236,7 @@ class StickFigure(ActionsMixin, VGroup):
             head.stretch(J["head_scale"][0], 0).stretch(J["head_scale"][1], 1)
         self._draw_hair(J)
         self._draw_accessory(J)
+        self._draw_marks(J)
         self._draw_thumb(J)
         self.face.draw(J)
 
@@ -243,6 +249,43 @@ class StickFigure(ActionsMixin, VGroup):
             base = c + d * S.HEAD_R
             spoke.set_points_as_corners([base, base + d * (0.02 + 0.55 * S.HEAD_R * 2.2 * hair)])
             spoke.set_stroke(opacity=1.0 if hair > 0.03 else 0.0)
+
+    def _draw_marks(self, J):
+        """Continuity scars (see stickworld/continuity.py): "scorched_cap" = soot burnt into the cap from the EP1 zap,
+        "shin_bandage" = a sticking plaster on the near shin from the EP2 ceiling."""
+        scorch, band = self.parts["scorch"], self.parts["bandage"]
+        if "scorched_cap" in self.marks and self.accessory == "cap":
+            R, c = S.HEAD_R, J["head"]
+            turn = self.face.v("turn")
+            side = np.sign(turn) if abs(turn) > 0.05 else J["sg"]
+            cc = c + np.array([0, R * 0.28 + 0.55 * R * J["hair"], 0])
+            blob_c = cc + np.array([-side * 0.3 * R, 0.55 * R, 0])
+            rng = np.random.default_rng(5)
+            pts = [blob_c + np.array([np.cos(t) * 0.3 * R * rng.uniform(0.7, 1.15), np.sin(t) * 0.2 * R * rng.uniform(0.7, 1.15), 0])
+                   for t in np.linspace(0, 2 * np.pi, 9)[:-1]]
+            blob = Polygon(*pts).set_fill("#3B2A22", 0.9).set_stroke(width=0)
+            specks = [Circle(radius=0.035 * R * k).move_to(blob_c + np.array([dx * R, dy * R, 0])).set_fill("#2A1E18", 1).set_stroke(width=0)
+                      for k, dx, dy in ((1.0, side * 0.08, 0.28), (0.8, -side * 0.62, 0.05), (0.6, side * 0.35, -0.12))]
+            scorch.become(VGroup(blob, *specks))
+        elif len(scorch.submobjects):
+            scorch.become(VGroup())
+        if "shin_bandage" in self.marks:
+            k0, f0 = J["knee_R"], J["foot_R"]
+            d = f0 - k0
+            d = d / max(1e-6, float(np.linalg.norm(d)))
+            mid = k0 + (f0 - k0) * 0.45
+            nrm = np.array([-d[1], d[0], 0])
+            hw, hl = 0.09, 0.17
+            corners = [mid + d * hw + nrm * hl, mid + d * hw - nrm * hl, mid - d * hw - nrm * hl, mid - d * hw + nrm * hl]
+            pad = Polygon(*corners).set_fill("#E8C39E", 1).set_stroke(S.INK, 2.5)
+            holes = [Circle(radius=0.012).move_to(mid + nrm * o).set_fill("#B08B66", 1).set_stroke(width=0) for o in (-0.05, 0.05)]
+            band.become(VGroup(pad, *holes))
+        elif len(band.submobjects):
+            band.become(VGroup())
+
+    def add_mark(self, name):
+        """Give the figure a continuity scar from now on (it then appears in every later episode too)."""
+        self.marks.add(name)
 
     def _draw_thumb(self, J):
         """Near hand closed in a fist with the thumb straight up (thumbs-up), popped in by the `thumb` tracker."""

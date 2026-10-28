@@ -16,6 +16,7 @@ from manim import (DOWN, LEFT, PI, UP, AnimationGroup, FadeIn, FadeOut, LaggedSt
 from manim.utils.rate_functions import ease_out_back, ease_out_bounce
 
 from stickworld import camera
+from stickworld import continuity as C
 from stickworld import style as S
 from stickworld.actions import Do, carry_together
 from stickworld.audio import Snd
@@ -40,6 +41,7 @@ T2_HOME = 3.0
 
 
 class Ep01PackageUnit(EpisodeScene):
+    EPISODE = 1
     TIMING = {
         "arrive": 2.95,
         "hop_out": 5.75,
@@ -72,13 +74,14 @@ class Ep01PackageUnit(EpisodeScene):
         self.disc = Disconnect(self.house.pt("disconnect_mount"))
         self.whip = HighVoltageWhip(self.disc.pt("whip_out"), self.unit.pt("whip_terminal"), (0, -1.6), (-1.6, -0.2))
         self.lv = LowVoltageWire((WX, G + 0.25), self.unit.pt("lv_terminal"), (0.9, -0.05), (-1.0, -0.4))
-        self.truck = WorkTruck(TRUCK_FRONT + 9, STREET)
+        self.truck = WorkTruck(TRUCK_FRONT + 9, STREET, trophies=C.trophies(self.EPISODE))
         self.bag = ToolBag(self.truck.pt("bed_rail") + P(-1.0, 0.22)).set_z_index(S.Z_FIGURE_HIDDEN + 0.3)
         attach_to(self.bag, "handle", lambda: self.truck.pt("bed_rail") + P(-1.0, 0.19))
         sit = dict(legL_lock=0.0, legR_lock=0.0, hip_L=1.35, knee_L=-2.6, hip_R=1.45, knee_R=-2.6,
                    shoulder_L=1.0, elbow_L=0.8, shoulder_R=1.1, elbow_R=0.8)
         self.t1 = StickFigure(x=self.truck.pt("driver_seat")[0], ground=STREET, face_dir=-1, name="lead", rest_face=dict(mouth_curve=0.45))
-        self.t2 = StickFigure(x=self.truck.pt("passenger_seat")[0], ground=STREET, face_dir=-1, accessory="cap", name="rookie")
+        self.t2 = StickFigure(x=self.truck.pt("passenger_seat")[0], ground=STREET, face_dir=-1, accessory="cap", name="rookie",
+                                marks=C.rookie_marks(self.EPISODE))
         for f in (self.t1, self.t2):
             f.set(y=STREET + 0.72, **sit).set_z_index(S.Z_FIGURE_HIDDEN)
         self.add(self.house, self.drive, *self.ducts, self.side, self.top, *[s for r in self.screw_rows for s in r],
@@ -161,6 +164,7 @@ class Ep01PackageUnit(EpisodeScene):
     # ------------------------------------------------------------ the episode
     def construct(self):
         self.build()
+        self.episode_tag()
         t1, t2, truck, unit, bag = self.t1, self.t2, self.truck, self.unit, self.bag
 
         with self.block("arrive"):
@@ -194,6 +198,7 @@ class Ep01PackageUnit(EpisodeScene):
                       t2.pose({"drop": 0.7, "spine": 0.55}, 0.4),
                       Succession(Wait(0.4), t2.reach("R", unit.pt("whip_terminal") + P(-0.25, 0.05), 0.35)))
             self.play(t2.zapped(source=unit.pt("whip_terminal")),
+                      Succession(Wait(0.55), Do(lambda: t2.add_mark("scorched_cap"))),   # series scar: the cap stays burnt
                       spark_shower(unit.pt("whip_terminal"), 0.55, rate=48, speed=(1.6, 3.4), spread=(0.2, 2.9),
                                    colors=("#FFFFFF", "#BFE8FF", "#FFD54A")),
                       camera.punch_in(self, P(0.1, 0.4), 0.72, 0.25), Succession(Wait(0.25), camera.shake(self, 0.09, run_time=0.3)),

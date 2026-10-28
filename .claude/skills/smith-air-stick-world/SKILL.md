@@ -15,7 +15,7 @@ You are building short, funny stick figure animations about HVAC work. The owner
   - preview: `manim -ql -r 540,960 episodes/<file>.py <SceneName>`
   - final: `manim -qh --fps 60 -r 1080,1920 episodes/<file>.py <SceneName>`
 - Length: under 60 seconds. Every scene duration lives in a TIMING dict at the top of the episode file so it can be retimed to the voiceover (a scene that finishes early holds to its TIMING value).
-- No text overlays, titles, outros, "subscribe" or calls to action, and no on-screen effect words by default: gags are sold with recorded sound (section 9b). Comic effect words (`effects.effect_word`) exist and are used only when Gage asks. End the video on the final action.
+- The only on-screen text is the series tag: `self.episode_tag()` pops a small "EP n" work-order ticket into the top-left corner for the first ~2.5 s (Gage asked for numbered episodes). Otherwise no text overlays, titles, outros, "subscribe" or calls to action, and no on-screen effect words by default: gags are sold with recorded sound (section 9b). Comic effect words (`effects.effect_word`) exist and are used only when Gage asks. End the video on the final action.
 - Shorts-safe framing: keep faces and gags out of the bottom ~20% of the frame (y < -4.8, where the YouTube title and buttons sit) and the right ~10% (x > 3.6).
 - Before handing back, scrub the preview at each scene boundary (save stills with ffmpeg or `-s`) and check the Quality checklist in section 10.
 
@@ -63,7 +63,7 @@ Episode files import from stickworld and contain NO custom drawing code. If an e
 Two recurring techs, both StickFigure instances.
 
 - TECH1 ("Lead", `name="lead", rest_face=dict(mouth_curve=0.45)`): THE MAIN CHARACTER, in every episode, and the likeable one. Warm, easy resting smile (his "neutral" face returns to it), calm and competent, patient with the rookie (he helps him up, he doesn't gloat). Signature: when the job is done he turns to the camera and gives a thumbs-up with a wink, a twinkle and a ding (`thumbs_up()`); end every episode on it. No facial hair and no blush on anyone (Gage's call). Carries the tool bag; deliberate timing.
-- TECH2 ("Rookie", `name="rookie", accessory="cap"`): the goofy one. Red ball cap with a brim that follows the face turn. Slightly faster, twitchier timing; overreacts.
+- TECH2 ("Rookie", `name="rookie", accessory="cap", marks=C.rookie_marks(ep)`): the goofy one, learning across the season (scars carry over, see 9d). Red ball cap with a brim that follows the face turn. Slightly faster, twitchier timing; overreacts.
 - Optional extras (same class): HOMEOWNER (`accessory="hair_tuft"`), GC/BUILDER (`accessory="hard_hat"`). Add new accessories in rig.py `_draw_accessory`.
 - Hair spikes (`hair` tracker) and the cap attach to the head and turn with it.
 
@@ -173,6 +173,14 @@ Game "juice" and classic animation principles, layered with restraint (big beats
 - The camera works: open close on the problem (the first frame must show tension: sweat, a broken unit, the 78), pull back to reveal as the heroes arrive, slow drifts under calm beats (`self.background(camera.punch_in(..., run_time=4))`), punch in on the satisfying details (a torch on copper, digits ticking down, a screw driving home), `camera.follow(scene, fn)` for a moving subject, swoop between close-ups with a quiet whoosh, and end on a gentle push-in on the payoff. Keep the focal point centred so it stays out of the Shorts UI zones.
 - Completion payoffs ("just right"): things click into place with a click and a small pop/sparkle; a colour change that resolves the problem (`attic(room_color=ROOM_HOT)` -> tween parts["room"] to ROOM_COOL when the AC comes on); one degree per click on a thermostat.
 
+## 9d. Series and continuity (episodes remember)
+
+The shorts form one season-long story (`episodes/SERIES.md`, "The Rookie's First Summer") while each still works alone.
+- `stickworld/continuity.py`: `EPISODES` (per episode: job, the rookie's mistake, the lesson, what he earns, whether a LEMONNOX gets hauled off), `rookie_marks(ep)` (scars he starts with), `trophies(ep)` (LEMONNOX badges on the truck at the start), `title(ep)`.
+- Rig marks (`StickFigure(..., marks=...)`, `fig.add_mark(name)` to earn one on screen): `scorched_cap` (soot burnt into the rookie's cap, from EP1's zap), `shin_bandage` (plaster on his near shin, from EP2). New marks get drawn in `rig._draw_marks` and listed in `continuity.DRAWN_MARKS`.
+- `WorkTruck(..., trophies=n)` shows n LEMONNOX badges on the bed side; `truck.add_trophy()` slaps on the next one.
+- Every episode: one rookie mistake, one lesson, one callback to an earlier lesson, the lead's thumbs-up at the end.
+
 ## 10. Quality checklist (check before every handoff)
 
 - Every moving object is held by a hand, attached by a connection, or obviously under gravity, a throw or a gag.
@@ -191,7 +199,8 @@ Game "juice" and classic animation principles, layered with restraint (big beats
 
 Gage will describe the short in plain language as a list of scenes. For each episode:
 
-1. Create `episodes/epNN_<slug>.py`: a class deriving from `EpisodeScene` with a TIMING dict (scene name -> seconds) and one `with self.block(name):` per scene that only calls library actions.
+0. Read `episodes/SERIES.md` (the season arc): the episode's row gives its mistake, lesson, callback and what the rookie earns; `stickworld/continuity.py` gives the starting state.
+1. Create `episodes/epNN_<slug>.py`: a class deriving from `EpisodeScene` with `EPISODE = NN`, a TIMING dict (scene name -> seconds), `self.episode_tag()` first in construct(), the rookie built with `marks=C.rookie_marks(NN)`, any truck with `trophies=C.trophies(NN)`, and one `with self.block(name):` per scene that only calls library actions.
 2. If a scene needs a new prop, action, expression or sound, add it to the library (with a line in test_scene.py) instead of hard-coding it in the episode.
 3. Render the preview, check the checklist, fix problems, then render the final.
 4. Hand back the file path, the timing table, and up to three suggestions for making the gags land better. Do not change the gags Gage chose without asking.

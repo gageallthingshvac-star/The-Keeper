@@ -148,9 +148,10 @@ class StickWorldTest(EpisodeScene):
             self.play(a.hands_on_hips(), b.arms_crossed(), c.point_at(P(0, 3)), d.flinch())
 
         with self.block("truck_fx"):
-            truck = WorkTruck(-3.95 + 9, -5.8)
+            truck = WorkTruck(-3.95 + 9, -5.8, trophies=2)
             self.add(truck)
             self.play(truck.drive_in(-9, 1.2))
+            self.play(truck.add_trophy(), Do(lambda: b.add_mark("scorched_cap")), Do(lambda: b.add_mark("shin_bandage")))
             self.play(truck.open_door(), Wait(0.2), truck.close_door())
             self.play(FX.smoke(P(0, 3)), FX.dust(P(1, G)), FX.sparkles([P(-1, 3), P(1, 3.5)]), FX.stars(lambda: c.head_center()))
             self.play(FX.zap_arcs(lambda: P(-1, 2), lambda: P(1, 2), 0.5))

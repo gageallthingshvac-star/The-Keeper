@@ -14,6 +14,7 @@ from manim import DOWN, PI, AnimationGroup, FadeIn, Succession, ValueTracker, Wa
 from manim.utils.rate_functions import ease_in_quad, ease_out_bounce
 
 from stickworld import camera
+from stickworld import continuity as C
 from stickworld.actions import Do, climb_start, pull_out
 from stickworld.audio import Snd
 from stickworld.episode import EpisodeScene
@@ -44,10 +45,11 @@ TILT = 0.351        # stair angle from vertical; a loaded hand truck rides it ly
 
 
 class Ep02AtticAirHandler(EpisodeScene):
+    EPISODE = 2
     TIMING = {
         "arrive": 4.8,
         "climb": 8.0,
-        "joist": 6.6,
+        "joist": 7.7,
         "old_out": 9.3,
         "dolly_up": 11.2,
         "connect": 6.8,
@@ -87,7 +89,8 @@ class Ep02AtticAirHandler(EpisodeScene):
         # the rookie comes in rolling the new unit on the hand truck, tipped back onto its wheels
         self.load.shift(np.array([6.0, 0, 0]))
         self.load.rotate(-0.25, about_point=self.load.pt("axle"))
-        self.rookie = StickFigure(self.load.pt("axle")[0] + 1.06, RF, -1, accessory="cap", name="rookie")
+        self.rookie = StickFigure(self.load.pt("axle")[0] + 1.06, RF, -1, accessory="cap", name="rookie",
+                                  marks=C.rookie_marks(self.EPISODE))   # still wearing the cap he scorched in EP1
         self.add(a, self.drain, self.lineset, self.old, self.thermo, self.load, self.rope, self.ho, self.lead, self.rookie,
                  self.bag)
         attach_to(self.bag, "handle", lambda: self.lead.hand("R"))
@@ -138,6 +141,7 @@ class Ep02AtticAirHandler(EpisodeScene):
     # ------------------------------------------------------------ scenes
     def construct(self):
         self.build()
+        self.episode_tag()
         a, lead, rookie, ho = self.set_, self.lead, self.rookie, self.ho
         lip = a.pt("lip")
         landing = (LANDING_X, F)
@@ -184,6 +188,13 @@ class Ep02AtticAirHandler(EpisodeScene):
                       Succession(Wait(0.3), lead.shake_head(2)))
             self.play(lead.walk_to(0.75, spine=0.15), ho.pose({"spine": 0.0, "neck": 0.0}, 0.4))
             self.play(pull_out(lead, rookie, ROOKIE_SPOT))
+            # the lead patches him up: a plaster on the shin he keeps for the rest of the series
+            shin = lambda: rookie.solve()["knee_R"] + (rookie.solve()["foot_R"] - rookie.solve()["knee_R"]) * 0.45
+            self.play(lead.pose({"drop": 0.75, "spine": 0.65, "neck": -0.2}, 0.3), lead.reach("R", shin, 0.3, lean=False),
+                      rookie.look_at(shin(), 0.2))
+            self.play(Do(lambda: rookie.add_mark("shin_bandage")), Snd("pop_small", gain=-8),
+                      FX.sparkles([shin() + np.array([0.15, 0.12, 0])], 0.4, 4), rookie.expression("happy", 0.2))
+            self.play(lead.pose({"drop": 0.0, "spine": 0.0, "neck": 0.0}, 0.3), lead.let_go(("R",), 0.3))
             self.play(lead.point_at(a.pt("hatch")), lead.talk(0.5), rookie.expression("disappointed"), camera.reset(self, 0.6))
 
         with self.block("old_out"):

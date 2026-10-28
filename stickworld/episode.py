@@ -14,7 +14,8 @@ import os
 import sys
 from contextlib import contextmanager
 
-from manim import MovingCameraScene
+import numpy as np
+from manim import LEFT as LEFT_, RIGHT as RIGHT_, UL as UL_, MovingCameraScene
 
 from .audio import SoundScene
 from .style import setup_frame
@@ -25,6 +26,7 @@ setup_frame()
 class EpisodeScene(SoundScene, MovingCameraScene):
     TIMING = {}
     MUSIC = "music.mp3"
+    EPISODE = None      # series episode number (shown by episode_tag(); see stickworld/continuity.py)
     MUSIC_LEVEL = -13.0
     PEAK_DB = -5.5      # mix peak ceiling; AAC encoding adds up to ~3 dB on sharp transients, so the MP4 lands near -3
 
@@ -41,6 +43,42 @@ class EpisodeScene(SoundScene, MovingCameraScene):
         if used < target - 1e-3:
             self.wait(target - used)
         self.timeline.append((name, t0, self.renderer.time, used, target))
+
+    def episode_tag(self, number=None, hold=2.2):
+        """Series tag: a small work-order ticket reading "EP n" pops into the top-left corner, holds while the hook plays,
+        then slides away. It rides with the camera (stays put on screen through zooms and pans). Call once at the
+        start of construct(); it runs in the background, so it takes no time."""
+        from manim import RoundedRectangle, Text, VGroup
+        from manim.utils.rate_functions import ease_out_back, smooth
+        from . import style as S
+        n = number if number is not None else self.EPISODE
+        card = RoundedRectangle(width=1.6, height=0.62, corner_radius=0.1).set_fill(S.WHITE, 1).set_stroke(S.INK, 5)
+        stripe = RoundedRectangle(width=0.22, height=0.62, corner_radius=0.1).set_fill(S.TOOL_RED, 1).set_stroke(S.INK, 5)
+        stripe.align_to(card, LEFT_)
+        word = Text(f"EP {n}", font="DejaVu Sans", weight="BOLD").set(height=0.34).set_fill(S.INK, 1)
+        word.move_to(card).shift(RIGHT_ * 0.11)
+        base = VGroup(card, stripe, word).set_z_index(S.Z_WORD)
+        tag = base.copy()
+        st = {"t": 0.0}
+        t_in, t_out = 0.35, 0.35 + hold
+
+        def place(m, dt):
+            st["t"] += dt
+            t = st["t"]
+            if t > t_out + 0.45:
+                m.remove_updater(place)
+                self.remove(m)
+                return
+            fr = self.camera.frame
+            s = fr.height / S.FRAME_H
+            pop = max(0.01, ease_out_back(min(1.0, t / t_in)))
+            out = smooth(min(1.0, max(0.0, (t - t_out) / 0.4)))
+            corner = fr.get_corner(UL_) + np.array([1.2, -0.95, 0]) * s
+            m.become(base.copy().scale(s * pop).move_to(corner + np.array([-2.6 * s * out, 0, 0])))
+            m.set_opacity(1.0 - out)
+
+        tag.add_updater(place)
+        self.add(tag)
 
     def background(self, anim):
         """Run an animation alongside whatever plays next (across several play() calls), e.g. a figure walking

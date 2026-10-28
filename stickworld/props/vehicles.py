@@ -1,6 +1,6 @@
 """Vehicles (skill doc section 9): the work truck, side view, facing left. No lettering unless asked."""
 import numpy as np
-from manim import (Circle, Difference, Polygon, Rectangle, RoundedRectangle, Succession, UpdateFromAlphaFunc, VGroup,
+from manim import (Circle, Difference, Polygon, Rectangle, RoundedRectangle, Succession, Text, UpdateFromAlphaFunc, VGroup,
                    linear, there_and_back)
 from manim.utils.rate_functions import ease_out_cubic
 
@@ -17,7 +17,8 @@ class WorkTruck(Prop):
 
     LENGTH = 8.3
 
-    def __init__(self, front_x, street_y, colour=S.WHITE):
+    def __init__(self, front_x, street_y, colour=S.WHITE, trophies=0):
+        """trophies: LEMONNOX badges already stuck on the bed side (series continuity: one per lemon hauled off)."""
         super().__init__()
         x0, g = front_x, street_y
         wr = 0.55
@@ -66,9 +67,32 @@ class WorkTruck(Prop):
         self.mark("tailgate", (bed_x1, rail))
         self.mark("exhaust", (bed_x1 + 0.3, body_y0 + 0.05))
         self.street_y = g
+        self._badge_slots = [P(cab_x1 + 0.5 + 0.58 * i, rail - 0.32) for i in range(8)]
+        self.part("trophies", VGroup(*[self._trophy(self._badge_slots[i]) for i in range(min(trophies, 8))]))
         self.set_z_index(S.Z_TRUCK)
         self.parts["door_opening"].set_z_index(S.Z_TRUCK + 0.05)
         self.parts["door"].set_z_index(S.Z_TRUCK + 0.2)
+
+    @staticmethod
+    def _trophy(at):
+        plate = RoundedRectangle(width=0.5, height=0.2, corner_radius=0.05).move_to(at).set_fill("#F2E6A0", 1).set_stroke(S.INK, 2.5)
+        word = Text("LEMONNOX", font="DejaVu Sans", weight="BOLD", slant="ITALIC").set(width=0.42).move_to(plate).set_fill("#7A4A12")
+        return VGroup(plate, word)
+
+    def add_trophy(self, run_time=0.35):
+        """Slap the next LEMONNOX badge on the bed side (a lemon hauled off). Returns the animation."""
+        from manim.utils.rate_functions import ease_out_back
+        badge = self._trophy(self._badge_slots[min(len(self.parts["trophies"]), 7)]).set_z_index(S.Z_TRUCK + 0.1)
+        badge.scale(0.01)
+        self.parts["trophies"].add(badge)     # part of the truck from now on, so it rides along
+        st = {"k": 0.01}
+
+        def grow(m, a):
+            k = max(0.01, ease_out_back(a))
+            m.scale(k / st["k"])
+            st["k"] = k
+
+        return UpdateFromAlphaFunc(badge, grow, run_time=run_time, rate_func=linear)
 
     def body(self):
         return VGroup(*[m for k, m in self.parts.items() if k != "wheels"])
