@@ -315,7 +315,7 @@ class StickWorldTest(EpisodeScene):
             bp = BreakerPanel((1.75, F + 3.1))
             fur = Furnace(3.3, F, mirror=True)
             coil = EvapCoil(3.3, fur.pt("supply_top")[1] - 0.1, mirror=True, iced=True)
-            tag, filt = LockoutTag(bp.pt("breaker_9")), Filter((-1.0, F + 3.0), dirty=True)
+            tag, filt = LockoutTag(bp.pt("breaker_9")), Filter((-1.0, F + 3.0), dirty=True, arrow=1)
             from stickworld.props.hvac_more import Icicle
             ice = Icicle(coil.pt("icicle"), length=0.6, width=0.15)
             th = Thermostat(st.pt("thermostat_spot"), temp=81, mode="cool")

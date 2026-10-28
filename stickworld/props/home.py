@@ -145,9 +145,10 @@ class LockoutTag(Prop):
 
 
 class Filter(Prop):
-    """Loose pleated air filter (cardboard frame), clean or filthy. Points: grip (top tab), center."""
+    """Loose pleated air filter (cardboard frame), clean or filthy. arrow=+1/-1 prints the airflow arrow on the bottom
+    edge (pointing toward the furnace). Points: grip (top tab), center."""
 
-    def __init__(self, center=(0, 0), width=1.3, height=1.1, dirty=False, **kwargs):
+    def __init__(self, center=(0, 0), width=1.3, height=1.1, dirty=False, arrow=None, **kwargs):
         super().__init__(**kwargs)
         cx, cy = center[0], center[1]
         x0, x1, y0, y1 = cx - width / 2, cx + width / 2, cy - height / 2, cy + height / 2
@@ -162,6 +163,11 @@ class Filter(Prop):
             self.part("grime", VGroup(*[Circle(radius=rng.uniform(0.04, 0.09)).move_to(P(rng.uniform(x0 + 0.15, x1 - 0.15), rng.uniform(y0 + 0.15, y1 - 0.15)))
                                         .set_fill("#5E574D", 0.7).set_stroke(width=0) for _ in range(9)]))
         self.part("tab", rect(cx - 0.1, y1 - 0.02, cx + 0.1, y1 + 0.08, WHITE, 1.5, r=0.02))
+        if arrow:
+            ay, d = y0 + 0.2, float(np.sign(arrow))
+            tip = P(cx + d * 0.2, ay)
+            self.part("arrow", VGroup(seg((cx - d * 0.2, ay), (cx + d * 0.08, ay), w=4),
+                                      Polygon(tip, tip + P(-d * 0.13, 0.08), tip + P(-d * 0.13, -0.08)).set_fill(INK, 1).set_stroke(INK, 1)))
         self.mark("grip", (cx, y1 + 0.05))
         self.mark("center", (cx, cy))
         self.set_z_index(Z_PROP)

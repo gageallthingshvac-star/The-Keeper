@@ -61,11 +61,11 @@ class Ep03MovieNight(EpisodeScene):
     EPISODE = 3
     TIMING = {
         "hook": 3.0,
-        "arrive": 8.8,
-        "diagnose": 5.7,
+        "arrive": 9.0,
+        "diagnose": 6.0,
         "breakers": 10.6,
         "filter": 8.2,
-        "power_on": 7.7,
+        "power_on": 8.6,
         "finale": 3.5,
     }
 
@@ -106,7 +106,7 @@ class Ep03MovieNight(EpisodeScene):
         self.bag = ToolBag((0, 0), scale=0.8)
         self.lead.wear(self.bag)
         self.bag.set_z_index(S.Z_FIGURE_HIDDEN - 0.05)
-        self.new_filter = Filter((0, 0), width=0.55, height=1.0).set_z_index(S.Z_HELD)   # comes from the truck later
+        self.new_filter = Filter((0, 0), width=0.55, height=1.0, arrow=1).set_z_index(S.Z_HELD)   # from the truck later; arrow to the furnace
         self.flash = Flashlight((0, 0), angle=PI, length=1.5)
         self.tag = LockoutTag(self.panel.pt(f"breaker_{FURNACE_BREAKER}"))
         self.dark = ValueTracker(0.0)
@@ -153,16 +153,20 @@ class Ep03MovieNight(EpisodeScene):
             self.play(lead.hop_out(truck, door - 0.35, STREET),
                       Succession(Wait(0.25), rookie.hop_out(truck, door + 0.25, STREET, run_time=0.6)),
                       Succession(Wait(0.55), Do(lambda: self.bag.set_z_index(S.Z_FIGURE - 0.4))))
-            self.play(lead.walk_to(OFF_LEFT, STREET, run_time=1.0), Succession(Wait(0.1), rookie.walk_to(OFF_LEFT, STREET, run_time=0.9)))
+            rookie.set_z_index(S.Z_FIGURE - 0.5)   # behind the lead's slung bag while they walk together (it's his)
+            self.play(lead.walk_to(OFF_LEFT, STREET, run_time=1.0), Succession(Wait(0.45), rookie.walk_to(OFF_LEFT, STREET, run_time=0.8)))   # a gap, so the lead's bag stays his
             self.play(Do(lambda: lead.relocate(OFF_LEFT, F)), Do(lambda: rookie.relocate(OFF_LEFT - 0.6, F)),
                       nb.look_at(np.array([-4.4, F + 3.4, 0]), 0.2))
             self.play(lead.walk_to(LEAD_SPOT, F, run_time=2.8), Succession(Wait(0.15), rookie.walk_to(ROOKIE_SPOT, F, run_time=2.5)),
-                      Succession(Wait(0.4), nb.look_at(np.array([0.6, F + 2.5, 0]), 0.4)))
+                      Succession(Wait(0.3), nb.pose({"shoulder_L": 2.6, "elbow_L": 0.6}, 0.25), Wait(0.45),
+                                 nb.pose({"shoulder_L": 0.35, "elbow_L": 0.9}, 0.3)),          # she waves them in
+                      Succession(Wait(1.4), nb.look_at(np.array([0.6, F + 2.5, 0]), 0.4)))
 
         with self.block("diagnose"):
             # why no cold air: the coil is frozen solid. The lead snaps an icicle off it and shows the rookie
             icicle = self.icicle
             self.play(lead.unsling(self.bag, (3.0, F)), camera.punch_in(self, np.array([2.1, 2.2, 0]), 0.42, 0.6))   # bag down, to work
+            rookie.set_z_index(S.Z_FIGURE)
             self.play(rookie.look_at(icicle.pt("tip")), lead.grab(icicle, "R", "grip"))
             h0 = lead.hand("R")
             self.play(lead.reach("R", h0 + np.array([-0.22, -0.1, 0]), 0.1, lean=False), Snd("pop_small", gain=-6),
@@ -170,14 +174,14 @@ class Ep03MovieNight(EpisodeScene):
             self.play(lead.turn(-1, 0.2), lead.reach("R", lambda: lead.head_center() + np.array([-0.5, 0.0, 0]), 0.3, lean=False),
                       lead.look_at(rookie.head_center()))
             self.play(lead.expression("surprised", 0.15), rookie.expression("surprised", 0.15),
-                      FX.sparkles([icicle.pt("tip") + np.array([0.05, 0.15, 0])], 0.5, 5), Wait(0.45))
+                      FX.sparkles([icicle.pt("tip") + np.array([0.05, 0.15, 0])], 0.5, 5), Wait(0.8))
             self.play(lead.release(icicle, "drop", ground=F, run_time=0.3, sound=False), Succession(Wait(0.1), Snd("tink", gain=-2)))
             self.play(FadeOut(icicle, run_time=0.1),
                       debris(np.array([icicle.get_center()[0], F + 0.08, 0]), width=0.3, n=5, fall=0.3, run_time=0.4, seed=12,
                              colors=[ICE, S.WHITE]))
             # shut that unit off: the lead points at the panel and gives the rookie the job
-            self.play(lead.point_at(panel_c, 0.3), Succession(Wait(0.1), rookie.look_at(panel_c, 0.2)),
-                      Succession(Wait(0.3), lead.look_at(rookie.head_center())))
+            self.play(lead.reach("R", panel_c + np.array([0.22, 0.12, 0]), 0.3, lean=False), Succession(Wait(0.25), Snd("tink", gain=-8)),
+                      Succession(Wait(0.1), rookie.look_at(panel_c, 0.2)), Succession(Wait(0.3), lead.look_at(rookie.head_center())))
             self.play(rookie.nod(2), rookie.expression("happy", 0.2), lead.let_go(("R",)))
 
         with self.block("breakers"):
@@ -186,9 +190,11 @@ class Ep03MovieNight(EpisodeScene):
                       rookie.expression("surprised", 0.2), camera.punch_in(self, np.array([0.8, 2.3, 0]), 0.5, 0.7))
             self.play(rookie.walk_to(DOOR_X, F, run=True, run_time=0.45, face=1), rookie.expression("strain", 0.2))
             self.play(panel.open_door(True, 0.3), rookie.reach("R", panel.pt("door_handle"), 0.25, lean=False))
-            # every breaker, one by one, top to bottom: the house dims circuit by circuit, the TV dies, then the main
-            steps = lambda k, n: AnimationGroup(tween_value(self.dark, 0.5 * (k + 1) / n, 0.08),
-                                                *([self.tv.screen(False, 0.05)] if k == 5 else []))
+            # every breaker, one by one, top to bottom: the lights go out in hard steps, circuit by circuit (the TV on
+            # the second), then the main
+            steps = lambda k, n: (AnimationGroup(tween_value(self.dark, 0.15 * (k // 4 + 1), 0.03),
+                                                 *([self.tv.screen(False, 0.03)] if k == 7 else []))
+                                  if k % 4 == 3 else Wait(0.01))
             self.play(rookie.sweep_breakers(panel, on=False, per=0.11, each=steps, at_main=tween_value(self.dark, 1.0, 0.05)))
             # pitch dark: just eyes. The rookie backs away from the panel, pleased with himself
             self.play(Snd("crickets", gain=-6), rookie.let_go(("R",)), rookie.step_back(0.7, run_time=0.4),
@@ -241,7 +247,7 @@ class Ep03MovieNight(EpisodeScene):
             self.play(lead.reach("R", lambda: lead.head_center() + np.array([0.45, -0.15, 0]), 0.3, lean=False),
                       lead.look_at(np.array([3.0, 2.0, 0]), 0.2))
             self.play(Wait(0.25), Succession(Wait(0.25), lead.look_at(self.coil.pt("top") + np.array([0, -0.4, 0]), 0.2)))
-            self.play(lead.nod(1), lead.expression("disappointed", 0.2))
+            self.play(lead.nod(1), lead.expression("smug", 0.2))
             # out it goes: the rookie runs the dirty one out to the truck and comes back with a clean one
             self.play(lead.turn(-1, 0.15), lead.reach("R", np.array([1.85, 2.2, 0]), 0.3, lean=False),
                       rookie.reach("R", lambda: self.rack.pt("grip"), 0.3, lean=False))
@@ -264,23 +270,25 @@ class Ep03MovieNight(EpisodeScene):
                       lead.pose({"drop": 0.0, "spine": 0.0}, 0.3), lead.let_go(("R",)))
 
         with self.block("power_on"):
-            # thermostat to FAN (blower only, no cooling), tag off, breaker on: air moves over the coil and melts the
-            # ice. Only then thermostat to COOL
-            self.play(camera.punch_in(self, np.array([1.8, 2.5, 0]), 0.46, 0.5), lead.pose("stand", 0.25),
-                      rookie.walk_to(1.15, F, face=-1, run_time=0.35))
+            # thermostat to FAN (blower only, no cooling), close on the stat so the icon reads
+            stat = self.thermo.pt("screen") + np.array([0.12, -0.12, 0])
+            self.play(camera.punch_in(self, stat, 0.2, 0.45), lead.pose("stand", 0.25), rookie.walk_to(1.15, F, face=-1, run_time=0.35))
             press = lambda mode: AnimationGroup(rookie.reach("R", self.thermo.pt("mode_button"), 0.22, lean=False),
                                                 Succession(Wait(0.2), AnimationGroup(Snd("click", gain=-4), self.thermo.mode(mode))))
-            self.play(press("fan"), lead.reach("R", self.tag.pt("hang"), 0.3, lean=False))
+            self.play(press("fan"))
+            self.play(Wait(0.2))
+            # tag off (into his pocket), furnace breaker on: the blower runs, air crosses the coil, the ice melts
+            self.play(camera.punch_in(self, np.array([2.3, 2.3, 0]), 0.42, 0.45), rookie.let_go(("R",)),
+                      lead.reach("R", self.tag.pt("hang"), 0.3, lean=False))
             attach_to(self.tag, "hang", lambda: lead.hand("R"))
-            self.play(lead.reach("R", chest, 0.25, lean=False), Succession(Wait(0.15), FadeOut(self.tag, run_time=0.1)),
-                      rookie.let_go(("R",)))
+            self.play(lead.reach("R", chest, 0.25, lean=False), Succession(Wait(0.15), FadeOut(self.tag, run_time=0.1)))
             detach(self.tag)
             self.play(lead.reach("R", panel.pt(f"breaker_{FURNACE_BREAKER}"), 0.25, lean=False))
             run = ValueTracker(0.0)   # the blower running: hum lines and a shake for the rest of the episode
             hum = FX.vibration_lines(run, [(np.array([self.furnace.get_right()[0] + 0.15, F + 1.4, 0]), 0.0)])
             FX.hum_shake(self.furnace, run)
             self.add(hum)
-            self.background(tween_value(run, 12.0, 12.0, rate_func=linear))
+            self.background(tween_value(run, 14.0, 14.0, rate_func=linear))
             self.play(panel.flip(FURNACE_BREAKER, True, 0.12), Succession(Wait(0.1), Snd("clunk")),
                       Succession(Wait(0.2), Snd("hum", gain=-6)))
             self.play(lead.let_go(("R",)), panel.open_door(False, 0.3), lead.look_at(self.coil.pt("top")),
@@ -288,17 +296,19 @@ class Ep03MovieNight(EpisodeScene):
             self.play(self.coil.melt(1.5), self.drain.drip(n=5, run_time=1.5, fall=0.6),
                       Succession(Wait(0.3), Snd("tink", gain=-14), Wait(0.4), Snd("tink", gain=-14), Wait(0.4), Snd("tink", gain=-14)),
                       Succession(Wait(1.0), FX.sparkles([self.coil.pt("top") + np.array([0.2, -0.4, 0])], 0.5, 8)))
-            self.play(press("cool"), rookie.look_at(self.thermo.pt("screen")))
-            # cold air pours out of the ceiling vent, the 81 ticks down, the room turns cool
+            # ice gone: thermostat to COOL (close on the stat again)
+            self.play(camera.punch_in(self, stat, 0.2, 0.45), rookie.look_at(self.thermo.pt("screen")))
+            self.play(press("cool"))
+            # cold air pours out of the ceiling vent, the room temperature starts down, the room turns cool
             air_t = ValueTracker(0.0)
             reg = self.house.pt("register")
             air = FX.cold_air(air_t, [reg[0] - 0.25, reg[0], reg[0] + 0.25], reg[1] - 0.05, F + 2.0, vertical=True)
             self.add(air)
             digits = self.thermo.parts["digits"]
-            ticks = [Succession(Wait(0.6 + 0.26 * i), AnimationGroup(self.thermo.set_temp(80 - i, run_time=0.04), pop(digits, 1.15, 0.16),
-                                                                    Snd("click", gain=-14))) for i in range(9)]
-            self.play(rookie.let_go(("R",)), camera.reset(self, 0.6), air_t.animate(run_time=3.4, rate_func=linear).set_value(3.4),
-                      Succession(Wait(0.3), self.house.parts["room"].animate(run_time=2.6).set_fill(ROOM_COOL)),
+            ticks = [Succession(Wait(0.7 + 0.55 * i), AnimationGroup(self.thermo.set_temp(80 - i, run_time=0.04), pop(digits, 1.15, 0.16),
+                                                                    Snd("click", gain=-14))) for i in range(4)]
+            self.play(rookie.let_go(("R",)), camera.reset(self, 0.6), air_t.animate(run_time=3.0, rate_func=linear).set_value(3.0),
+                      Succession(Wait(0.3), self.house.parts["room"].animate(run_time=2.4).set_fill(ROOM_COOL)),
                       Succession(Wait(0.8), AnimationGroup(nb.expression("happy", 0.3, hold=KEEP), nb.face.close_eyes(0.3, hold=KEEP))),
                       Succession(Wait(0.2), rookie.walk_to(1.55, F, face=-1, run_time=0.4)),   # clear of the thermostat
                       *ticks)

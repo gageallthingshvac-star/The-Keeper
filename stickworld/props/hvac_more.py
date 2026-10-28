@@ -607,14 +607,14 @@ class Thermostat(Prop):
                         for i in range(3)])
         self.part("leds", leds)
         # mode icons in the bottom row, right of the LEDs: a snowflake (COOL) and a three-blade fan (FAN only)
-        ix, iy = cx + 0.09, cy - hgt / 2 + 0.07
-        flake = VGroup(*[Line(P(ix, iy) + 0.05 * np.array([np.cos(a), np.sin(a), 0]),
-                              P(ix, iy) - 0.05 * np.array([np.cos(a), np.sin(a), 0]), stroke_width=2.2)
+        ix, iy = cx + 0.07, cy - hgt / 2 + 0.075
+        flake = VGroup(*[Line(P(ix, iy) + 0.065 * np.array([np.cos(a), np.sin(a), 0]),
+                              P(ix, iy) - 0.065 * np.array([np.cos(a), np.sin(a), 0]), stroke_width=2.8)
                          for a in (np.pi / 2, np.pi / 6, -np.pi / 6)])
-        fx = ix + 0.13
-        fan = VGroup(*[Ellipse(width=0.045, height=0.022).move_to(P(fx, iy) + 0.026 * np.array([np.cos(a), np.sin(a), 0]))
-                       .rotate(a, about_point=P(fx, iy) + 0.026 * np.array([np.cos(a), np.sin(a), 0])).set_stroke(width=0)
-                       for a in (np.pi / 2, np.pi / 2 + 2 * np.pi / 3, np.pi / 2 + 4 * np.pi / 3)], Dot(P(fx, iy), radius=0.012))
+        fx = ix + 0.16
+        fan = VGroup(*[Ellipse(width=0.06, height=0.03).move_to(P(fx, iy) + 0.034 * np.array([np.cos(a), np.sin(a), 0]))
+                       .rotate(a, about_point=P(fx, iy) + 0.034 * np.array([np.cos(a), np.sin(a), 0])).set_stroke(width=0)
+                       for a in (np.pi / 2, np.pi / 2 + 2 * np.pi / 3, np.pi / 2 + 4 * np.pi / 3)], Dot(P(fx, iy), radius=0.015))
         self.part("mode_cool", flake)
         self.part("mode_fan", fan)
         self.mark("mode_button", (cx - 0.02, cy - hgt / 2 + 0.07))
@@ -651,11 +651,11 @@ class Thermostat(Prop):
             if not st:
                 st["c"] = m.get_center().copy()
                 self._light_mode(mode)
-            k = 1 + 0.35 * there_and_back(a)
+            k = 1 + 0.8 * there_and_back(a)
             m.scale(k / st.get("k", 1.0), about_point=st["c"])
             st["k"] = k
 
-        return UpdateFromAlphaFunc(self.parts[f"mode_{mode}"] if mode else self.parts["leds"], apply, run_time=max(run_time, 0.18))
+        return UpdateFromAlphaFunc(self.parts[f"mode_{mode}"] if mode else self.parts["leds"], apply, run_time=max(run_time, 0.35))
 
     def _show(self, v):
         v = int(np.clip(v, -9, 99))
@@ -796,9 +796,13 @@ class BreakerPanel(Prop):
         self.main_on = True
         # door, hinged on the left, latch on the right
         dx0, dx1, dy0, dy1 = x0 + 0.04, x1 - 0.04, y0 + 0.04, y1 - 0.04
+        bc = np.array([(dx0 + dx1) / 2 - 0.03, cy + 0.05, 0])          # yellow high-voltage sticker: it's the panel
+        sticker = Polygon(bc + P(-0.13, -0.11), bc + P(0.13, -0.11), bc + P(0, 0.13)).set_fill("#F2C230", 1).set_stroke(INK, 1.5)
+        bolt = VMobject().set_points_as_corners([bc + P(0.02, 0.07), bc + P(-0.035, -0.005), bc + P(0.015, -0.005),
+                                                 bc + P(-0.02, -0.085)]).set_stroke(INK, 2.4).set_fill(opacity=0)
         door = VGroup(rect(dx0, dy0, dx1, dy1, METAL, PROP_W),
                       rect(dx0 + 0.1, dy1 - 0.42, dx1 - 0.16, dy1 - 0.12, None, 1.5, color=METAL_DARK),
-                      rect(dx1 - 0.1, cy - 0.12, dx1 - 0.04, cy + 0.12, "#3A3A3A", 1.5, r=0.02))
+                      rect(dx1 - 0.1, cy - 0.12, dx1 - 0.04, cy + 0.12, "#3A3A3A", 1.5, r=0.02), sticker, bolt)
         self.part("door", door)
         _mark_in(self, door, "door_handle", (dx1 - 0.07, cy))
         self.mark("door_hinge", (dx0, cy))
