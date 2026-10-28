@@ -4,7 +4,7 @@ Season 1, EP3 (see episodes/SERIES.md). The story, cause by cause: the AC blows 
 finds the coil frozen solid -> he asks the rookie to shut that unit off at the panel -> callback: since EP1's zap
 the rookie is terrified of live power, so he shuts off EVERY breaker (movie night goes black) -> the lead turns the
 house back on and tags out only the furnace's breaker -> the filthy filter (the reason it froze) comes out in a dust
-bomb -> new filter, the ice thaws -> power on, cold air. Lesson: lock out the right breaker.
+bomb -> new filter -> power on: air flows again, the ice melts, cold air. Lesson: lock out the right breaker.
 
 Preview:  manim -ql -r 540,960 episodes/ep03_movie_night.py Ep03MovieNight
 Final:    manim -qh --fps 60 -r 1080,1920 episodes/ep03_movie_night.py Ep03MovieNight
@@ -59,8 +59,7 @@ class Ep03MovieNight(EpisodeScene):
         "diagnose": 4.4,
         "breakers": 9.2,
         "filter": 6.1,
-        "thaw": 3.4,
-        "power_on": 5.4,
+        "power_on": 7.0,
         "finale": 2.2,
     }
 
@@ -223,33 +222,32 @@ class Ep03MovieNight(EpisodeScene):
             self.play(pop(self.new_filter, 1.08, 0.2), FX.sparkles([old_c + np.array([0.35, 0.5, 0])], 0.45, 6),
                       lead.pose({"drop": 0.0, "spine": 0.0}, 0.3), lead.let_go(("R",)), camera.reset(self, 0.7))
 
-        with self.block("thaw"):
-            # time passes: the clock whirls, the ice lets go, drip... drip...
-            # framed so the clock and the coil share the shot
-            self.play(camera.punch_in(self, np.array([1.0, 2.6, 0]), 0.68, 0.5), lead.arms_crossed(),
-                      rookie.pose({"spine": 0.0, "neck": 0.0}, 0.3), rookie.look_at(self.clock.pt("center"), 0.3))
-            self.play(self.clock.spin(1.5, 2.4), self.coil.melt(2.4), self.drain.drip(n=6, run_time=2.4, fall=0.6),
-                      Succession(Wait(0.45), Snd("tink", gain=-14), Wait(0.55), Snd("tink", gain=-14),
-                                 Wait(0.5), Snd("tink", gain=-14), Wait(0.45), Snd("tink", gain=-14)),
-                      Succession(Wait(1.2), rookie.look_at(self.coil.pt("top"), 0.3)),
-                      Succession(Wait(1.8), FX.sparkles([self.coil.pt("top") + np.array([0.2, -0.4, 0])], 0.6, 8)))
-
         with self.block("power_on"):
+            # clean filter in, power back on: air moves across the coil again, the ice lets go, THEN it blows cold
             self.play(lead.pose("stand", 0.25), lead.reach("R", self.tag.pt("hang"), 0.3, lean=False), camera.reset(self, 0.5))
-            self.play(FadeOut(self.tag, run_time=0.15), panel.flip(FURNACE_BREAKER, True, 0.12), Succession(Wait(0.1), Snd("clunk")))
-            self.play(lead.let_go(("R",)), panel.open_door(False, 0.3))
-            clock = ValueTracker(0.0)
+            run = ValueTracker(0.0)   # the blower running: hum lines and a shake for the rest of the episode
+            hum = FX.vibration_lines(run, [(np.array([self.furnace.get_right()[0] + 0.15, F + 1.4, 0]), 0.0)])
+            FX.hum_shake(self.furnace, run)
+            self.add(hum)
+            self.background(tween_value(run, 12.0, 12.0, rate_func=linear))
+            self.play(FadeOut(self.tag, run_time=0.15), panel.flip(FURNACE_BREAKER, True, 0.12), Succession(Wait(0.1), Snd("clunk")),
+                      Succession(Wait(0.2), Snd("hum", gain=-6)))
+            self.play(lead.let_go(("R",)), panel.open_door(False, 0.3), lead.look_at(self.coil.pt("top")),
+                      rookie.look_at(self.coil.pt("top")), camera.punch_in(self, np.array([2.6, 2.2, 0]), 0.45, 0.5))
+            self.play(self.coil.melt(1.6), self.drain.drip(n=5, run_time=1.6, fall=0.6),
+                      Succession(Wait(0.3), Snd("tink", gain=-14), Wait(0.4), Snd("tink", gain=-14), Wait(0.4), Snd("tink", gain=-14)),
+                      Succession(Wait(1.1), FX.sparkles([self.coil.pt("top") + np.array([0.2, -0.4, 0])], 0.5, 8)))
+            # ice gone: cold air pours out of the ceiling vent, the 81 ticks down, the room turns cool
+            air_t = ValueTracker(0.0)
             reg = self.house.pt("register")
-            air = FX.cold_air(clock, [reg[0] - 0.25, reg[0], reg[0] + 0.25], reg[1] - 0.05, F + 2.0, vertical=True)
-            hum = FX.vibration_lines(clock, [(np.array([self.furnace.get_right()[0] + 0.15, F + 1.4, 0]), 0.0)])
-            FX.hum_shake(self.furnace, clock)
-            self.add(air, hum)
+            air = FX.cold_air(air_t, [reg[0] - 0.25, reg[0], reg[0] + 0.25], reg[1] - 0.05, F + 2.0, vertical=True)
+            self.add(air)
             digits = self.thermo.parts["digits"]
-            ticks = [Succession(Wait(0.9 + 0.26 * i), AnimationGroup(self.thermo.set_temp(80 - i, run_time=0.04), pop(digits, 1.15, 0.16),
+            ticks = [Succession(Wait(0.7 + 0.26 * i), AnimationGroup(self.thermo.set_temp(80 - i, run_time=0.04), pop(digits, 1.15, 0.16),
                                                                     Snd("click", gain=-14))) for i in range(9)]
-            self.play(clock.animate(run_time=4.3, rate_func=linear).set_value(4.3), Snd("hum", gain=-6),
-                      Succession(Wait(0.6), self.house.parts["room"].animate(run_time=2.6).set_fill(ROOM_COOL)),
-                      Succession(Wait(1.0), AnimationGroup(nb.expression("happy", 0.3, hold=KEEP), nb.face.close_eyes(0.3, hold=KEEP))),
+            self.play(camera.reset(self, 0.6), air_t.animate(run_time=3.6, rate_func=linear).set_value(3.6),
+                      Succession(Wait(0.3), self.house.parts["room"].animate(run_time=2.6).set_fill(ROOM_COOL)),
+                      Succession(Wait(0.8), AnimationGroup(nb.expression("happy", 0.3, hold=KEEP), nb.face.close_eyes(0.3, hold=KEEP))),
                       *ticks)
 
         with self.block("finale"):
