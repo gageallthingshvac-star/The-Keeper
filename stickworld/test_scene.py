@@ -237,7 +237,8 @@ class StickWorldTest(EpisodeScene):
             self.remove(fig, box)
 
         with self.block("attic_actions"):
-            from stickworld.actions import pull_out
+            from stickworld.actions import climb_start, pull_out
+            from stickworld.props.tools_more import Torch, TubingCutter
             from stickworld.props.base import bundle, detach, ride, turn_about, unbundle
             from stickworld.props.effects_more import debris
             from stickworld.props.tools_more import Rope
@@ -251,11 +252,23 @@ class StickWorldTest(EpisodeScene):
             dl = Dolly(-0.6, RF, facing=-1)
             load = bundle(dl, AirHandler(-1.305, RF + 0.05, drain_side="right"))
             rope = Rope((1.2, F + 0.12), tail_to=(1.2, F))
-            up = StickFigure(x=treads[0][0] - 0.55, ground=RF, face_dir=1, name="climber")
+            up = StickFigure(x=climb_start(treads), ground=RF, face_dir=-1, name="climber")
+            bag = ToolBag(up.hand("R"), scale=0.8)
+            cutter, torch = TubingCutter((0, 0), face=-1), Torch((0, 0), face=-1)
             low = StickFigure(x=0.35, ground=RF, face_dir=-1, accessory="cap", name="pusher")
-            self.add(st, box, load, rope, up, low)
+            self.add(st, box, load, rope, up, low, bag)
+            self.play(up.sling(bag))
             self.play(up.climb(treads, (-0.75, F), lip, hunch=0.15))
             self.play(up.walk_to(1.0, spine=0.15), up.turn(-1))
+            self.play(up.unsling(bag, (1.6, F)), Wait(0.1))
+            self.play(up.turn(1))
+            self.play(up.fetch_tool(bag, cutter))
+            self.play(up.use_tool(cutter, P(1.6, F + 2.1), turns=2, run_time=0.6))
+            self.play(up.stow_tool(bag, cutter))
+            self.play(up.fetch_tool(bag, torch))
+            self.play(torch.flame(True))
+            self.play(up.use_tool(torch, P(1.6, F + 2.1), turns=0, run_time=0.5))
+            self.play(torch.flame(False), up.stow_tool(bag, torch), up.turn(-1))
             self.play(up.slide_push(box, -0.3, run_time=1.2))
             self.play(up.let_go(), up.walk_to(1.2, face=-1), FadeOut(box))
             self.play(up.fall_through(2.05, F, hole=hole), debris(P(-3.0, -2.0), run_time=0.8))
@@ -277,4 +290,4 @@ class StickWorldTest(EpisodeScene):
             air = FX.cold_air(clock, [1.15, 1.4, 1.65], st.pt("register")[1], RF + 2.5, vertical=True)
             self.add(air)
             self.play(clock.animate(run_time=1.5, rate_func=linear).set_value(1.5))
-            self.remove(air, st, load, dl, rope, up, low, helper, hole)
+            self.remove(air, st, load, dl, rope, up, low, helper, hole, bag)

@@ -1,5 +1,5 @@
 """Extra hand tools and service gear for later episodes: screwdriver, multimeter, gauge manifold, recovery machine,
-refrigerant tank, level, hand truck, ladders, flashlight, mastic bucket and brush, rope."""
+refrigerant tank, level, hand truck, ladders, flashlight, mastic bucket and brush, rope, tubing cutter, brazing torch."""
 import numpy as np
 from manim import (
     BOLD, PI, UP, Arc, CapStyleType, Circle, Difference, Dot, Ellipse, Line, Polygon, Text, Union, VGroup,
@@ -11,7 +11,7 @@ from ..style import (
     WHITE, WOOD, Z_PROP, P,
 )
 from .base import Prop
-from .hvac_more import BRASS, IN, LCD_ON, SevenSeg, Tween, fmt_number, mix, rect, rounded_path, seg, tube
+from .hvac_more import BRASS, IN, LCD_ON, SevenSeg, Tween, fmt_number, mix, rect, rounded_path, seg, teardrop, tube
 
 R410A = "#E9A0AE"       # rose cylinder colour
 HOSE_BLUE = "#2F6FD6"
@@ -21,6 +21,9 @@ FACE_DARK = "#3A3A3A"   # moulded dark-grey tool faces / rubber
 MASTIC = "#8E8E8E"
 VIAL = "#C8E66A"
 ROPE = "#C9A86A"
+MAPP = "#F2C230"         # yellow MAP-gas cylinder
+FLAME_OUT = "#F5A15A"
+FLAME_IN = "#4FA3FF"
 
 
 def _cubic(s, c1, c2, e, n=40):
@@ -635,3 +638,76 @@ class Rope(Prop):
                 m.anchors = list(anchors)
 
         return UpdateFromAlphaFunc(self, setup, run_time=run_time, rate_func=ease_out_cubic)
+
+
+class TubingCutter(Prop):
+    """Copper tubing cutter held by its red knob: a C-frame with the cutting wheel, opening toward `face`.
+    Points: grip, tip (where the pipe sits in the jaw)."""
+
+    def __init__(self, grip=(0, 0), face=1, **kwargs):
+        super().__init__(**kwargs)
+        gx, gy = grip[0], grip[1]
+        jx, jy = gx + 0.02, gy + 0.3
+        self.part("knob", rect(gx - 0.055, gy - 0.08, gx + 0.055, gy + 0.17, TOOL_RED, DETAIL_W, r=0.035))
+        self.part("knurl", VGroup(*[seg((gx - 0.04, y), (gx + 0.04, y), w=1.5) for y in (gy - 0.03, gy + 0.02, gy + 0.07)]))
+        frame = Arc(radius=0.12, start_angle=0.75 * PI, angle=1.5 * PI, arc_center=P(jx, jy))
+        frame.set_stroke(INK, 11)
+        frame_in = frame.copy().set_stroke(METAL, 6)
+        self.part("frame", VGroup(frame, frame_in))
+        self.part("wheel", Circle(radius=0.045).move_to(P(jx - 0.06, jy)).set_fill(METAL_HI, 1).set_stroke(INK, DETAIL_W))
+        self.part("roller", Circle(radius=0.03).move_to(P(jx + 0.06, jy)).set_fill(METAL_DARK, 1).set_stroke(INK, 1.5))
+        self.mark("grip", (gx, gy))
+        self.mark("tip", (jx, jy))
+        if face < 0:
+            self.flip(about_point=P(gx, gy))
+        self.set_z_index(Z_PROP)
+
+
+class Torch(Prop):
+    """Hand brazing torch screwed onto a yellow MAP-gas cylinder, nozzle angled toward `face`.
+    Points: grip (middle of the cylinder), tip (nozzle end). Method: flame(on) (blue core, orange outer flame,
+    flickering while lit)."""
+
+    def __init__(self, grip=(0, 0), face=1, **kwargs):
+        super().__init__(**kwargs)
+        gx, gy = grip[0], grip[1]
+        self.part("cylinder", VGroup(rect(gx - 0.085, gy - 0.25, gx + 0.085, gy + 0.2, MAPP, DETAIL_W, r=0.06),
+                                     rect(gx - 0.085, gy - 0.05, gx + 0.085, gy + 0.03, INK, 0)))
+        self.part("valve", rect(gx - 0.04, gy + 0.2, gx + 0.04, gy + 0.26, BRASS, DETAIL_W))
+        self.part("head", rect(gx - 0.07, gy + 0.26, gx + 0.08, gy + 0.4, FACE_DARK, DETAIL_W, r=0.025))
+        self.part("trigger", rect(gx + 0.08, gy + 0.28, gx + 0.12, gy + 0.33, TOOL_RED, 1.5))
+        a, b = P(gx + 0.06, gy + 0.36), P(gx + 0.3, gy + 0.46)
+        self.part("nozzle", tube(np.array([a, b]), 0.05, METAL, cap=CapStyleType.BUTT))
+        ang = float(np.arctan2(b[1] - a[1], b[0] - a[0]))
+        outer = teardrop(b, 0.15, 0.38, FLAME_OUT, 0, angle=ang - PI / 2)
+        inner = teardrop(b, 0.07, 0.2, FLAME_IN, 0, angle=ang - PI / 2)
+        self.part("flame", VGroup(outer, inner).set_opacity(0.0))
+        self.mark("grip", (gx, gy))
+        self.mark("tip", (b[0], b[1]))
+        self._lit = 0.0
+        self._tick = 0
+        if face < 0:
+            self.flip(about_point=P(gx, gy))
+        self.set_z_index(Z_PROP)
+        self.parts["flame"].add_updater(self._flicker)
+
+    def _flicker(self, m):
+        self._tick += 1
+        if self._lit <= 0.01:
+            return
+        k = 1.0 + 0.08 * np.sin(self._tick * 2.3) + 0.05 * np.sin(self._tick * 5.1)
+        base = self.pt("tip")
+        m.stretch(k / getattr(m, "_k", 1.0), 0, about_point=base).stretch(k / getattr(m, "_k", 1.0), 1, about_point=base)
+        m._k = k
+
+    def flame(self, on=True, run_time=0.2):
+        """Light (whoomp) or shut off the flame."""
+        target = 1.0 if on else 0.0
+
+        def apply(s0, a):
+            self._lit = s0 + (target - s0) * a
+            f = self.parts["flame"]
+            f[0].set_fill(FLAME_OUT, 0.9 * self._lit)
+            f[1].set_fill(FLAME_IN, 0.95 * self._lit)
+
+        return Tween(self.parts["flame"], lambda: self._lit, apply, run_time=run_time)

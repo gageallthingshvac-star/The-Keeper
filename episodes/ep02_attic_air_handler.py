@@ -14,13 +14,14 @@ from manim import DOWN, PI, AnimationGroup, FadeIn, Succession, ValueTracker, Wa
 from manim.utils.rate_functions import ease_in_quad, ease_out_bounce
 
 from stickworld import camera
-from stickworld.actions import Do, pull_out
+from stickworld.actions import Do, climb_start, pull_out
 from stickworld.audio import Snd
 from stickworld.episode import EpisodeScene
 from stickworld.props import effects as FX
-from stickworld.props.base import bundle, detach, ride, turn_about, unbundle
+from stickworld.props.base import attach_to, bundle, detach, ride, turn_about, unbundle
 from stickworld.props.hvac_more import AirHandler, CondensateDrain, LineSet, Thermostat
-from stickworld.props.tools_more import Dolly, Rope
+from stickworld.props.tools import ToolBag
+from stickworld.props.tools_more import Dolly, Rope, Torch, TubingCutter
 from stickworld.rig import StickFigure
 from stickworld.sets_more import CeilingHole, attic
 
@@ -33,6 +34,7 @@ HO_X = 1.5          # homeowner, at the thermostat
 HOLE_X = 2.05       # the gap between joists the rookie finds
 DOLLY_X = -0.6      # where the new unit waits in the room
 LANDING_X = -0.75   # where you stand after coming up through the hatch
+BAG_X = 0.8         # where the lead sets the tool bag down in the attic
 LEAD_SPOT = 0.25
 ROOKIE_SPOT = 1.15
 HAUL_X = 1.35
@@ -42,11 +44,11 @@ TILT = 0.351        # stair angle from vertical; a loaded hand truck rides it ly
 class Ep02AtticAirHandler(EpisodeScene):
     TIMING = {
         "arrive": 4.8,
-        "climb": 6.95,
+        "climb": 8.0,
         "joist": 6.6,
-        "old_out": 7.3,
+        "old_out": 9.3,
         "dolly_up": 10.5,
-        "connect": 3.6,
+        "connect": 5.8,
         "thermostat": 2.3,
         "cold_air": 4.2,
     }
@@ -73,14 +75,19 @@ class Ep02AtticAirHandler(EpisodeScene):
         self.dolly = Dolly(DOLLY_X, RF, facing=-1)
         self.new = AirHandler(DOLLY_X - 0.705, RF + 0.05, new=True, drain_side="right")
         self.load = bundle(self.dolly, self.new)
-        self.rope = Rope((1.2, F + 0.12), tail_to=(1.2, F))
+        self.rope = Rope((1.45, F + 0.12), tail_to=(1.45, F))
         self.ho = StickFigure(HO_X, RF, 1, accessory="hair_tuft", name="homeowner")
         self.lead = StickFigure(5.4, RF, -1, name="lead", rest_face=dict(mouth_curve=0.45))
+        self.bag = ToolBag(self.lead.hand("R"), scale=0.8)        # the lead carries the MILWACKO bag in
+        self.cutter = TubingCutter((0, 0), face=-1)
+        self.torch = Torch((0, 0), face=-1)
         # the rookie comes in rolling the new unit on the hand truck, tipped back onto its wheels
         self.load.shift(np.array([6.0, 0, 0]))
         self.load.rotate(-0.25, about_point=self.load.pt("axle"))
         self.rookie = StickFigure(self.load.pt("axle")[0] + 1.06, RF, -1, accessory="cap", name="rookie")
-        self.add(a, self.drain, self.lineset, self.old, self.thermo, self.load, self.rope, self.ho, self.lead, self.rookie)
+        self.add(a, self.drain, self.lineset, self.old, self.thermo, self.load, self.rope, self.ho, self.lead, self.rookie,
+                 self.bag)
+        attach_to(self.bag, "handle", lambda: self.lead.hand("R"))
         self.rookie.pin("L", lambda: self.dolly.pt("handle"))
         self.rookie.pin("R", lambda: self.dolly.pt("handle"))
 
@@ -127,10 +134,10 @@ class Ep02AtticAirHandler(EpisodeScene):
         a, lead, rookie, ho = self.set_, self.lead, self.rookie, self.ho
         lip = a.pt("lip")
         landing = (LANDING_X, F)
-        start_x = self.treads[0][0] - 0.55
+        start_x = climb_start(self.treads)
 
         with self.block("arrive"):
-            self.play(lead.walk_to(start_x, speed=1.25),
+            self.play(lead.walk_to(start_x, speed=1.25, hold=("R",)),
                       rookie.wheel_to(DOLLY_X + 0.2 + 1.06, self.load, run_time=3.0),
                       Succession(FX.heat_waves(ho.head_center() + np.array([0, 0.45, 0]), 1.2),
                                  AnimationGroup(FX.sweat(ho.head_center(), side=-1), ho.wipe_brow()),
@@ -140,11 +147,14 @@ class Ep02AtticAirHandler(EpisodeScene):
             self.play(rookie.let_go(), ho.pose("stand", 0.3), Wait(0.1))
 
         with self.block("climb"):
-            self.background(Succession(rookie.walk_to(start_x, speed=1.15), rookie.climb(self.treads, landing, lip, hunch=0.15),
+            self.background(Succession(Wait(1.3), rookie.walk_to(start_x, speed=1.15),
+                                       rookie.climb(self.treads, landing, lip, hunch=0.15),
                                        rookie.walk_to(ROOKIE_SPOT, spine=0.15), rookie.turn(-1)))
+            self.play(lead.sling(self.bag), lead.face._to(0.3, turn=0.6))
             self.play(lead.climb(self.treads, landing, lip, hunch=0.15), ho.turn(1), ho.look_at(a.pt("hatch")))
             self.play(lead.walk_to(LEAD_SPOT, spine=0.15), ho.expression("neutral"))
-            self.wait(3.4)
+            self.play(lead.unsling(self.bag, (BAG_X, F)))
+            self.wait(2.2)
 
         with self.block("joist"):
             self.play(lead.talk(0.8), lead.point_at(self.old.pt("top_R")), rookie.nod(2),
@@ -165,10 +175,11 @@ class Ep02AtticAirHandler(EpisodeScene):
                                        rookie.climb(self.treads, landing, lip, floor_y=RF, down=True),
                                        rookie.expression("neutral")))
             self.play(lead.pose("stand", 0.2), lead.walk_to(1.05, face=-1, spine=0.15))
-            end = lambda: self.lineset.pt("end_a")
-            self.play(lead.reach("R", end, 0.3), lead.look_at(end()))
-            self.play(Do(lambda: lead.pin("R", end)), self.lineset.reshape(self.LS_OFF, 0.3), Snd("tink"), Snd("fizz", gain=-10))
-            self.play(lead.let_go(("R",)))
+            self.play(lead.fetch_tool(self.bag, self.cutter))
+            cut = (self.LS_ON[0][0] + 0.1, self.LS_ON[0][1])
+            self.play(lead.use_tool(self.cutter, cut, turns=3, run_time=0.9))
+            self.play(self.lineset.reshape(self.LS_OFF, 0.3), Snd("tink"), Snd("fizz", gain=-12))
+            self.play(lead.stow_tool(self.bag, self.cutter))
             self.play(lead.slide_push(self.old, -0.25, run_time=1.85))
             prog = ValueTracker(0.0)
             self.play(lead.let_go(), Do(lambda: self.drop_old(prog)),
@@ -192,7 +203,7 @@ class Ep02AtticAirHandler(EpisodeScene):
                       lead.pose({"drop": 0.7, "spine": 0.6}, 0.35))
             self.play(turn_about(self.load, -TILT, "axle", 0.4),
                       rookie.walk_to(DOLLY_X + 0.2 + 1.31, face=-1, run_time=0.4),
-                      lead.reach("R", self.rope.pt("coil") if self.rope.has_pt("coil") else np.array([1.2, F + 0.15, 0]), 0.35))
+                      lead.reach("R", self.rope.pt("coil") if self.rope.has_pt("coil") else np.array([1.45, F + 0.15, 0]), 0.35))
             self.play(Do(lambda: self.rope.hold(lambda: lead.hand("R"))), lead.pose({"drop": 0.0, "spine": 0.25}, 0.3))
             wheel_x = self.B[0] - 0.09 + 1.31
             hook = lambda: self.dolly.pt("handle")
@@ -245,10 +256,16 @@ class Ep02AtticAirHandler(EpisodeScene):
             stubs = self.new.pt("lineset")
             self.play(lead.reach("R", end, 0.3), lead.look_at(stubs))
             self.play(Do(lambda: lead.pin("R", end)), self.lineset.reshape(self.LS_ON, 0.55))
-            self.play(FX.sparkles([stubs + np.array([0.05, 0.08, 0]), stubs + np.array([-0.04, -0.06, 0])], 0.9),
-                      FX.heat_waves(stubs + np.array([0, 0.1, 0]), 0.9, width=0.4, height=0.5),
-                      Snd("fizz", gain=-3), lead.expression("squint", 0.2))
-            self.play(lead.let_go(("R",)), lead.expression("neutral", 0.2))
+            self.play(lead.let_go(("R",)))
+            self.play(lead.fetch_tool(self.bag, self.torch))
+            self.play(self.torch.flame(True), Snd("click", gain=-4), Snd("fizz", gain=-8))
+            joint = stubs + np.array([0.04, 0.0, 0])
+            self.play(lead.use_tool(self.torch, joint, turns=0, run_time=1.1), lead.expression("squint", 0.2),
+                      Succession(Wait(0.35), AnimationGroup(
+                          FX.sparkles([stubs + np.array([0.05, 0.1, 0]), stubs + np.array([-0.04, -0.08, 0])], 0.7),
+                          FX.heat_waves(stubs + np.array([0, 0.12, 0]), 0.7, width=0.4, height=0.5), Snd("fizz", gain=-3))))
+            self.play(self.torch.flame(False), lead.expression("neutral", 0.2))
+            self.play(lead.stow_tool(self.bag, self.torch))
             self.play(lead.reach("L", self.drain.pt("inlet"), 0.3), lead.look_at(self.drain.pt("inlet")))
             self.play(Snd("click"), Wait(0.12))
             self.play(lead.let_go(("L",)), lead.exhale())

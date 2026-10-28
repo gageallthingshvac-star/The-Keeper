@@ -5,8 +5,8 @@ from RigAnim (a per-frame function of eased progress) so they can lock feet, pin
 held objects attached. Pose angles are relative and mirror with face_dir, so every pose works facing either way.
 """
 import numpy as np
-from manim import (Animation, AnimationGroup, Mobject, Succession, Wait, linear, rush_from, rush_into, smooth,
-                   there_and_back)
+from manim import (Animation, AnimationGroup, FadeIn, FadeOut, Mobject, Succession, Wait, linear, rush_from, rush_into,
+                   smooth, there_and_back)
 from manim.utils.rate_functions import ease_in_out_sine, ease_out_back, ease_out_bounce, ease_out_cubic
 
 from . import style as S
@@ -41,6 +41,10 @@ def Do(fn):
 
 def lerp(a, b, t):
     return a + (b - a) * t
+
+
+def _wrap(a):
+    return (a + np.pi) % (2 * np.pi) - np.pi
 
 
 def rel_angle(frm, to, sg):
@@ -706,22 +710,26 @@ class ActionsMixin:
         return RigAnim(update, setup, rt, linear)
 
     def climb(self, treads, landing, lip=None, floor_y=None, down=False, step_time=0.3, hunch=0.0):
-        """Climb a ladder or pull-down stair. treads = tread points bottom to top (the set's tread_0..), landing = the
-        floor point to stand on at the top, lip = hand-hold at the top edge (the attic set's "lip"). Facing the way the
-        stair rises: feet go tread to tread, alternating, the opposite hand moves up the rail with each step; at the
-        top both feet come onto the top tread, the hands go to the lip and the floor, one foot steps up, then the other.
-        Start (going up) standing about 0.55 short of tread_0 (climb_start()). down=True backs down the same way:
-        start standing at the landing facing the stair, end on the floor (floor_y, default one riser under tread_0)."""
+        """Climb a ladder or pull-down stair the right way: chest to the ladder, body close and parallel to the rails,
+        knees bending in toward it. treads = tread points bottom to top (the set's tread_0..), landing = the floor
+        point to stand on at the top, lip = hand-hold at the top edge (the attic set's "lip"). Feet go tread to tread,
+        alternating, the opposite hand moves up the rail with each step, eyes up the ladder; at the top both feet come
+        onto the top tread, the hands go to the lip and the floor, one foot steps up, then the other.
+        Going up, start standing at climb_start(treads) facing the ladder. down=True comes down the same way, still
+        facing the ladder (backing down, eyes down): start standing at the landing facing the ladder, end on the floor
+        (floor_y, default one riser under tread_0)."""
         T = [np.array(p[:2], dtype=float) for p in treads]
         sg = 1.0 if T[-1][0] >= T[0][0] else -1.0
         m = (T[-1][0] - T[0][0]) / (T[-1][1] - T[0][1])
+        lean = float(np.arctan(abs(m)))                   # ladder angle from vertical; the body leans the same
+        n = np.array([-sg * np.cos(lean), np.sin(lean)])  # off the ladder, toward the climber
         rise = T[1][1] - T[0][1]
         rail = lambda y: np.array([T[0][0] + (y - T[0][1]) * m, y])
         L = np.array(landing[:2], dtype=float)
         lip = np.array(lip[:2], dtype=float) if lip is not None else L + np.array([-sg * 0.35, 0.25])
         floor = floor_y if floor_y is not None else (self.ground_y() if not down else T[0][1] - rise)
-        x0 = self.v("x") if not down else T[0][0] - sg * 0.55
-        hip_on = lambda t: np.array([t[0] - sg * 0.36, t[1] + 1.02])
+        x0 = self.v("x") if not down else climb_start(treads)
+        hip_on = lambda t: rail(t[1] + 0.95) + n * 0.42  # hips tucked in close to the rails
         K = [dict(hip=np.array([x0, floor + S.STAND_HIP]), footL=np.array([x0 - sg * S.STANCE, floor]),
                   footR=np.array([x0 + sg * S.STANCE, floor]), handL=None, handR=None, spine=0.0, neck=0.0)]
 
@@ -730,23 +738,28 @@ class ActionsMixin:
             nxt.update({k: (np.array(v, dtype=float) if isinstance(v, (tuple, list, np.ndarray)) else v) for k, v in kw.items()})
             K.append(nxt)
 
-        h0 = hip_on(T[0])
-        step(footR=T[0], hip=h0, handL=rail(h0[1] + 1.6), handR=rail(h0[1] + 0.88), spine=0.3, neck=-0.15)
+        h0 = hip_on(T[0]) + np.array([-sg * 0.1, -0.12])  # first step: the other foot is still on the floor
+        step(footR=T[0], hip=h0, handL=rail(h0[1] + 1.65), handR=rail(h0[1] + 0.9), spine=lean, neck=-0.1)
         for j in range(1, len(T)):
             foot, hand = ("footL", "handR") if j % 2 else ("footR", "handL")
             h = hip_on(T[j])
-            step(**{foot: T[j], hand: rail(h[1] + 1.6), "hip": h})
+            step(**{foot: T[j], hand: rail(h[1] + 1.65), "hip": h})
         top = T[-1]
         lower = "footL" if (len(T) - 1) % 2 == 0 else "footR"   # the foot still on the tread below the top one
         upper = "footR" if lower == "footL" else "footL"
         A = np.array([L[0] - sg * S.STANCE, L[1]])
         B = np.array([L[0] + sg * S.STANCE, L[1]])
-        step(**{lower: top + np.array([-sg * 0.06, 0]), "hip": top + np.array([-sg * 0.25, 1.3]), "handL": lip,
-                "handR": np.array([A[0] - sg * 0.05, L[1] + 0.03]), "spine": 0.6, "neck": -0.2})
+        step(**{lower: top + np.array([-sg * 0.06, 0]), "hip": top + np.array([-sg * 0.12, 1.3]), "handL": lip,
+                "handR": np.array([A[0] - sg * 0.05, L[1] + 0.03]), "spine": 0.5, "neck": -0.2})
         step(**{lower: A, "hip": np.array([lip[0] - sg * 0.1, L[1] + 0.5]), "handL": None, "handR": None, "spine": 0.5})
         step(**{upper: B, "hip": np.array([L[0], L[1] + S.STAND_HIP]), "spine": hunch, "neck": 0.0})
         keys = K[1:] if not down else K[-2::-1]
-        return self.keyframes(keys, step_time=step_time * (0.85 if down else 1.0), creak=True)
+        rt = step_time * (0.85 if down else 1.0) * len(keys)
+        eyes = 0.3 if not down else -0.3
+        return Succession(self.turn(sg, 0.2, face_turn=0.65 * sg),   # chest to the ladder, always
+                          AnimationGroup(self.keyframes(keys, run_time=rt, creak=True),
+                                         Succession(self.face._to(0.25, up=eyes), Wait(max(0.0, rt - 0.5)),
+                                                    self.face._to(0.25, up=0.0))))
 
     # ------------------------------------------------------------ attic mishaps
     def fall_through(self, hole_x, floor_y=None, hole=None, depth=None, run_time=0.45):
@@ -801,6 +814,115 @@ class ActionsMixin:
             self.set(**{f"foot{k}_x": hx + 0.2 * np.sin(ph), f"foot{k}_y": st["y"] + 0.12 * (1 - np.cos(ph)) * 0.5})
 
         return RigAnim(update, setup, run_time, linear)
+
+    # ------------------------------------------------------------ bags and hand tools
+    def _back_spot(self):
+        """Where a slung bag's handle rides (middle of the back) and the angle it hangs at (flat against the back)."""
+        J = self.solve()
+        d = J["shoulder"] - J["hip"]
+        d = d / max(1e-6, float(np.linalg.norm(d)))
+        b = np.array([-self.sg * d[1], self.sg * d[0], 0.0])        # points out of his back
+        spot = J["hip"] + (J["shoulder"] - J["hip"]) * 0.72 + b * 0.1
+        return spot, float(np.arctan2(b[1], b[0])) + np.pi / 2
+
+    @staticmethod
+    def _hang_angle(obj, grip):
+        v = obj.pt("center") - obj.pt(grip)
+        return float(np.arctan2(v[1], v[0])) + np.pi / 2                # 0 = hanging upright from its handle
+
+    def sling(self, obj, grip="handle", side="R", run_time=0.5):
+        """Swing a bag onto his back by its handle (both hands free for a ladder): the hand lifts it over the shoulder
+        and it settles flat against his back like a pack, riding there (and leaning with him) until unsling().
+        Grabs it first unless it is already in a hand."""
+        st = {}
+
+        def setup():
+            detach(obj)
+            obj._z_before_grab = None
+            obj.set_z_index(S.Z_FIGURE - 0.4)
+            st["p0"], st["a0"] = obj.pt(grip).copy(), self._hang_angle(obj, grip)
+            self.pin(side, lambda: obj.pt(grip))
+
+        def update(a):
+            spot, ang = self._back_spot()
+            want = st["a0"] + _wrap(ang - st["a0"]) * a
+            obj.rotate(want - self._hang_angle(obj, grip), about_point=obj.pt(grip))
+            p = st["p0"] + (spot - st["p0"]) * a + np.array([0, 0.3 * np.sin(np.pi * a), 0])
+            obj.shift(p - obj.pt(grip))
+
+        def hang():
+            a0 = self._back_spot()[1]
+            attach_to(obj, grip, lambda: self._back_spot()[0], rotate_fn=lambda: _wrap(self._back_spot()[1] - a0),
+                      name=f"slung_{self.name}")
+
+        steps = [] if is_attached(obj) else [self.grab(obj, side, grip)]
+        steps += [RigAnim(update, setup, run_time, smooth), Do(hang), self.let_go((side,), 0.3)]
+        return Succession(*steps)
+
+    def unsling(self, obj, at, grip="handle", side="R", z=S.Z_PROP_FRONT, run_time=0.55):
+        """Take a slung bag off his back and set it down upright with its bottom centre at `at` (crouching)."""
+        st = {}
+
+        def setup():
+            detach(obj)
+            st["a0"], st["c0"] = self._hang_angle(obj, grip), obj.pt("center").copy()
+            upright = obj.copy().rotate(-st["a0"], about_point=obj.pt(grip))
+            st["c1"] = np.array([at[0], at[1] + upright.pt("center")[1] - upright.get_bottom()[1], 0.0])
+            obj.set_z_index(S.Z_HELD)
+            self.pin(side, lambda: obj.pt(grip))
+
+        def update(a):
+            obj.rotate(st["a0"] * (1 - a) - self._hang_angle(obj, grip), about_point=obj.pt("center"))
+            c = st["c0"] + (st["c1"] - st["c0"]) * a + np.array([0, 0.25 * np.sin(np.pi * a), 0])
+            obj.shift(c - obj.pt("center"))
+
+        return Succession(self.reach(side, lambda: obj.pt(grip), 0.3, lean=False),
+                          AnimationGroup(RigAnim(update, setup, run_time, smooth),
+                                         self.pose({"drop": 0.55, "spine": 0.45, "neck": -0.2}, run_time)),
+                          Do(lambda: obj.set_z_index(z)), Snd("thump", gain=-14),
+                          AnimationGroup(self.pose({"drop": 0.0, "spine": 0.0, "neck": 0.0}, 0.3), self.let_go((side,), 0.3)))
+
+    def fetch_tool(self, bag, tool, side="R", grip="grip"):
+        """Crouch, reach into the bag's opening and come up holding the tool (it appears in the hand at the opening)."""
+        def take():
+            tool.shift(self.hand(side) - tool.pt(grip))
+            attach_to(tool, grip, lambda: self.hand(side), name=f"held_{self.name}_{side}")
+            tool.set_z_index(S.Z_HELD)
+
+        return Succession(AnimationGroup(self.pose({"drop": 0.55, "spine": 0.5, "neck": -0.25}, 0.3),
+                                         self.reach(side, lambda: bag.pt("opening"), 0.3, lean=False)),
+                          Do(take), AnimationGroup(FadeIn(tool, scale=0.6, run_time=0.12), Snd("tools", gain=-10)),
+                          AnimationGroup(self.pose({"drop": 0.0, "spine": 0.1, "neck": 0.0}, 0.3),
+                                         self.reach(side, lambda: self.solve()["shoulder"] + np.array([self.sg * 0.55, -0.35, 0]),
+                                                    0.3, lean=False)))
+
+    def stow_tool(self, bag, tool, side="R"):
+        """Crouch and put the tool back in the bag; the hand comes back empty."""
+        return Succession(AnimationGroup(self.pose({"drop": 0.55, "spine": 0.5, "neck": -0.25}, 0.3),
+                                         self.reach(side, lambda: bag.pt("opening"), 0.3, lean=False)),
+                          Do(lambda: detach(tool)), AnimationGroup(FadeOut(tool, scale=0.6, run_time=0.12), Snd("tools", gain=-12)),
+                          AnimationGroup(self.pose({"drop": 0.0, "spine": 0.0, "neck": 0.0}, 0.3), self.let_go((side,), 0.3)))
+
+    def use_tool(self, tool, point, tip="tip", grip="grip", side="R", turns=3, run_time=0.9, sound="click", radius=0.05):
+        """Put the tool's working point on a spot and work it: the hand goes round in small circles (a tubing cutter
+        walking round a pipe, a screwdriver turning) with a sound each turn; turns=0 just holds it there (a torch
+        on a joint). The tool must be held in that hand (fetch_tool)."""
+        st = {}
+        P0 = np.array([point[0], point[1], 0.0])
+
+        def setup():
+            st["c"] = P0 - (tool.pt(tip) - tool.pt(grip))
+            for i in range(turns):
+                if sound:
+                    snd(sound, (i + 0.5) / max(turns, 1) * run_time, -6)
+
+        def update(a):
+            ang = 2 * np.pi * turns * a
+            p = st["c"] + radius * np.array([np.sin(ang), 0.5 * (1 - np.cos(ang)), 0]) * (1 if turns else 0)
+            self.set(**{f"hand{side}_x": p[0], f"hand{side}_y": p[1], f"arm{side}_lock": 1.0})
+
+        to_spot = self.reach(side, lambda: P0 - (tool.pt(tip) - tool.pt(grip)), 0.3, lean=False)
+        return Succession(AnimationGroup(to_spot, self.look_at(P0, 0.2)), RigAnim(update, setup, run_time, linear))
 
     # ------------------------------------------------------------ loads
     def slide_push(self, obj, x, grips=("grip_R_low", "grip_R"), run_time=None, lean=0.45, sound="creak"):
@@ -952,6 +1074,12 @@ class ActionsMixin:
 
     def hair_down(self, run_time=0.6):
         return self.t["hair"].animate(run_time=run_time).set_value(0.0)
+
+
+def climb_start(treads):
+    """Where to stand (hip x) facing a ladder or pull-down stair before climb(): right up against its foot."""
+    t0, t1 = np.array(treads[0][:2]), np.array(treads[-1][:2])
+    return float(t0[0] - (0.35 if t1[0] >= t0[0] else -0.35))
 
 
 # ---------------------------------------------------------------- helping someone out of a hole
