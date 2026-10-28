@@ -334,6 +334,6 @@ class Ep01PackageUnit(EpisodeScene):
             self.snd("hum", 0.1, gain=-2)
             self.play(clock.animate(run_time=1.8, rate_func=linear).set_value(1.8),
                       t1.look_at(new.pt("top_center"), 0.3), Succession(Wait(0.6), t2.expression("happy", 0.3)),
-                      Succession(Wait(0.3), t1.thumbs_up()))
+                      Succession(Wait(0.1), t1.thumbs_up(face=1)))
 
         self.finish()

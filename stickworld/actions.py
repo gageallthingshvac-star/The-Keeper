@@ -244,9 +244,10 @@ class ActionsMixin:
     def wink(self, hold=0.5):
         return self.face.wink(hold)
 
-    def thumbs_up(self, hold=0.7, wink=True, sound="ding"):
+    def thumbs_up(self, hold=0.7, wink=True, sound="ding", face=None):
         """Job-done signature: face to the camera, big smile, near hand comes up in front of the chest and pops into a
-        thumbs-up with a twinkle and a ding (and a wink), holds, then the arm drops back to rest."""
+        thumbs-up with a twinkle and a ding (and a wink), holds, then the arm drops back to rest. face=+1/-1 turns the
+        body first so the hand comes up clear of whatever he's standing next to."""
         from manim import Star, UpdateFromAlphaFunc
         proto = Star(4, outer_radius=0.3, inner_radius=0.08).set_fill(S.SPARK, 1).set_stroke(S.INK, 2).set_z_index(S.Z_FX)
         star = proto.copy().scale(0.01)
@@ -261,7 +262,8 @@ class ActionsMixin:
             show.append(Snd(sound, gain=-4))
         if wink:
             show.append(self.face.wink(hold * 0.7))
-        return Succession(AnimationGroup(self.pose({"shoulder_R": 0.55, "elbow_R": 2.05}, 0.3),
+        lead_in = [self.turn(face, 0.2)] if face is not None else []
+        return Succession(*lead_in, AnimationGroup(self.pose({"shoulder_R": 0.55, "elbow_R": 2.05}, 0.3),
                                          self.face._to(0.3, turn=0.0, up=0.05), self.expression("happy", 0.3)),
                           AnimationGroup(*show), Wait(max(0.0, hold - 0.5)),
                           AnimationGroup(self.t["thumb"].animate(run_time=0.15).set_value(0.0),
