@@ -316,6 +316,8 @@ class StickWorldTest(EpisodeScene):
             fur = Furnace(3.3, F, mirror=True)
             coil = EvapCoil(3.3, fur.pt("supply_top")[1] - 0.1, mirror=True, iced=True)
             tag, filt = LockoutTag(bp.pt("breaker_9")), Filter((-1.0, F + 3.0), dirty=True)
+            from stickworld.props.hvac_more import Icicle
+            ice = Icicle(coil.pt("icicle"), length=0.6, width=0.15)
             seat = couch.pt("seat")
             nb = StickFigure(x=seat[0], ground=F, face_dir=1, accessory="bun", name="neighbor")
             nb.set(y=seat[1] + 0.08, legL_lock=0.0, legR_lock=0.0, hip_L=1.4, knee_L=-1.45, hip_R=1.5, knee_R=-1.5)
@@ -323,7 +325,9 @@ class StickWorldTest(EpisodeScene):
             fl = Flashlight((0, 0), angle=PI, length=1.5).set_z_index(S.Z_FX - 0.6)
             dark = ValueTracker(0.0)
             night = lights_out(dark, (-4.65, F - 0.12, 4.65, st.pt("ceiling")[1] + 0.06), [nb, tech])
-            self.add(yard, st, couch, tv, clk, bp, fur, coil, filt, nb, tech, night)
+            self.add(yard, st, couch, tv, clk, bp, fur, coil, ice, filt, nb, tech, night)
+            self.play(tech.grab(ice, "R", "grip"))
+            self.play(tech.release(ice, "drop", ground=F, run_time=0.3, sound=False))
             self.play(bp.open_door(True, 0.3))
             self.play(tech.sweep_breakers(bp, on=False, each=lambda k, n: tween_value(dark, 0.6 * (k + 1) / n, 0.05),
                                           at_main=AnimationGroup(tween_value(dark, 1.0, 0.06), tv.screen(False, 0.06))))
@@ -333,4 +337,4 @@ class StickWorldTest(EpisodeScene):
                                           at_main=AnimationGroup(tween_value(dark, 0.0, 0.1), tv.screen(True, 0.1))))
             self.play(FadeIn(tag), fl.beam(False), Do(lambda: tech.remove_mark("dusty")), Do(lambda: tech.remove_mark("cap_tag")))
             self.play(clk.spin(2.0, 1.0), coil.melt(1.0), st.parts["room"].animate(run_time=1.0).set_fill(ROOM_COOL))
-            self.remove(yard, st, couch, tv, clk, bp, fur, coil, filt, nb, tech, night, fl, tag)
+            self.remove(yard, st, couch, tv, clk, bp, fur, coil, ice, filt, nb, tech, night, fl, tag)
