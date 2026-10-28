@@ -18,6 +18,7 @@ from stickworld import continuity as C
 from stickworld.actions import Do, climb_start, pull_out
 from stickworld.audio import Snd
 from stickworld.episode import EpisodeScene
+from stickworld.face import KEEP
 from stickworld.props import effects as FX
 from stickworld.props.base import attach_to, bundle, detach, ground_shadow, ride, turn_about, unbundle
 from stickworld.props.effects_more import glow, heat_waves, impact_burst, pop, spark_shower, squash_land
@@ -291,7 +292,7 @@ class Ep02AtticAirHandler(EpisodeScene):
             self.play(lead.fetch_tool(self.bag, self.torch))
             self.play(self.torch.flame(True), Snd("click", gain=-4), Snd("fizz", gain=-8))
             joint = stubs + np.array([0.04, 0.0, 0])
-            self.play(lead.use_tool(self.torch, joint, turns=0, run_time=1.3), lead.expression("squint", 0.2),
+            self.play(lead.use_tool(self.torch, joint, turns=0, run_time=1.3), lead.expression("squint", 0.2, hold=1.3),
                       Succession(Wait(0.3), AnimationGroup(
                           glow(joint, 1.2), spark_shower(lambda: self.torch.pt("tip"), 1.0, rate=34, speed=(1.0, 2.4)),
                           heat_waves(stubs + np.array([0, 0.15, 0]), 1.0, width=0.4, height=0.5), Snd("fizz", gain=-3))))
@@ -305,7 +306,8 @@ class Ep02AtticAirHandler(EpisodeScene):
 
         with self.block("thermostat"):
             btn = self.thermo.pt("button_down")
-            self.play(ho.turn(1), ho.reach("R", btn, 0.3), ho.look_at(self.thermo.pt("screen")), ho.expression("happy", 0.3))
+            self.play(ho.turn(1), ho.reach("R", btn, 0.3), ho.look_at(self.thermo.pt("screen")),
+                      ho.expression("happy", 0.3, hold=2.2))
             digits = self.thermo.parts["digits"]
             for t in range(77, 71, -1):
                 self.play(self.thermo.set_temp(t, run_time=0.04), Snd("click", gain=-6),
@@ -328,7 +330,7 @@ class Ep02AtticAirHandler(EpisodeScene):
             self.play(clock.animate(run_time=4.0, rate_func=linear).set_value(4.0), Snd("hum", gain=-6),
                       camera.punch_in(self, np.array([0.9, -0.9, 0]), 0.8, 2.2),
                       Succession(Wait(0.4), a.parts["room"].animate(run_time=2.4).set_fill(ROOM_COOL)),
-                      Succession(Wait(0.6), AnimationGroup(ho.expression("happy", 0.3), ho.face.close_eyes(0.3),
+                      Succession(Wait(0.6), AnimationGroup(ho.expression("happy", 0.3, hold=KEEP), ho.face.close_eyes(0.3, hold=KEEP),
                                                            ho.pose({"shoulder_L": 1.2, "elbow_L": 0.3, "shoulder_R": 1.3,
                                                                     "elbow_R": 0.3, "neck": -0.2}, 0.5))),
                       Succession(Wait(0.9), rookie.celebrate()),

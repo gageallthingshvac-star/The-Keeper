@@ -5,8 +5,8 @@ by trackers: turn (-1 left .. +1 right, 0 = facing camera) slides and squashes t
 turning; blinks squash the eyes fully flat; expressions tween a handful of feature trackers.
 """
 import numpy as np
-from manim import (AnimationGroup, Circle, Ellipse, Rectangle, Succession, ValueTracker, VGroup, VMobject, Wait,
-                   linear, smooth)
+from manim import (Animation, AnimationGroup, Circle, Ellipse, Mobject, Rectangle, Succession, ValueTracker, VGroup,
+                   VMobject, Wait, linear, smooth)
 from manim.utils.rate_functions import ease_in_out_sine
 
 from . import style as S
@@ -30,12 +30,40 @@ EXPRESSIONS = {
 }
 
 
+# Expressions are timed: after the tween an expression holds just long enough to read, then the face eases back to
+# the character's resting face on its own. Pass hold=... to change that (float("inf") keeps it until the next change).
+EXPR_KEYS = ("mouth_curve", "mouth_open", "smirk", "lid", "brow_angle", "brow_y", "eye_big", "squint", "tongue", "teeth",
+             "eyes_open", "xeyes", "wink")
+EXPRESSION_HOLD = dict(happy=1.1, smug=0.9, surprised=0.7, squint=1.0, disappointed=1.2, strain=0.9, tongue_out=1.4,
+                       dazed=1.0)
+DEFAULT_HOLD = 0.7
+KEEP = float("inf")
+
+
+class _Cue(Animation):
+    """Zero-length step that calls fn when it starts (arms the face's relax timer at the right moment)."""
+
+    def __init__(self, fn):
+        super().__init__(Mobject(), run_time=1e-3, remover=True)
+        self._fn = fn
+
+    def begin(self):
+        self._fn()
+        super().begin()
+
+    def interpolate_mobject(self, alpha):
+        pass
+
+
 class Face:
     def __init__(self, fig, turn=0.0, rest=None):
         """rest: this character's resting face (feature values that "neutral" returns to), e.g. a friendly
         resting smile dict(mouth_curve=0.45)."""
         self.fig = fig
         self.rest = dict(rest or {})
+        self._relax_at = None      # figure-clock time when the face starts easing back to rest (None = nothing pending)
+        self._pause_until = -1.0   # talking: don't relax the mouth mid-sentence
+        self._last_clock = 0.0
         self.t = {k: ValueTracker(v) for k, v in FEATURES.items()}
         self.t["turn"].set_value(turn)
         for k, v in self.rest.items():
@@ -57,7 +85,34 @@ class Face:
             self.t[k].set_value(val)
 
     # ------------------------------------------------------------ drawing
+    def rest_values(self):
+        vals = {k: FEATURES[k] for k in EXPR_KEYS}
+        vals.update({k: v for k, v in self.rest.items() if k in vals})
+        return vals
+
+    def _arm(self, delay):
+        self._relax_at = None if delay == KEEP else self.fig.clock + delay
+
+    def _relax(self):
+        now = self.fig.clock
+        dt = max(0.0, now - self._last_clock)
+        self._last_clock = now
+        if self._relax_at is None or now < self._relax_at or now < self._pause_until:
+            return
+        k = 1.0 - np.exp(-dt * 9.0)
+        settled = True
+        for key, rv in self.rest_values().items():
+            v = self.t[key].get_value()
+            if abs(v - rv) > 0.01:
+                self.t[key].set_value(v + (rv - v) * k)
+                settled = False
+            elif v != rv:
+                self.t[key].set_value(rv)
+        if settled:
+            self._relax_at = None
+
     def draw(self, J):
+        self._relax()
         R = S.HEAD_R
         c = J["head"]
         t, up = np.clip(self.v("turn"), -1, 1), self.v("up")
@@ -136,15 +191,22 @@ class Face:
                            .set_fill(S.TONGUE, tg).set_stroke(S.INK, 2, opacity=tg))
 
     # ------------------------------------------------------------ actions (each returns an Animation)
-    def _to(self, run_time=0.25, rate_func=smooth, **values):
-        return AnimationGroup(*[self.t[k].animate(run_time=run_time, rate_func=rate_func).set_value(v)
-                                for k, v in values.items()])
+    def _to(self, run_time=0.25, rate_func=smooth, hold=DEFAULT_HOLD, **values):
+        """Tween face trackers. If it changes the expression, the face relaxes back to rest `hold` seconds after the
+        tween ends (KEEP = stay until changed)."""
+        anims = [self.t[k].animate(run_time=run_time, rate_func=rate_func).set_value(v) for k, v in values.items()]
+        if any(k in EXPR_KEYS for k in values):
+            anims.append(_Cue(lambda: self._arm(run_time + hold)))
+        return AnimationGroup(*anims)
 
-    def expression(self, name, run_time=0.25):
+    def expression(self, name, run_time=0.25, hold=None):
+        """Change expression; it holds for its natural beat (EXPRESSION_HOLD) and then eases back to the resting face.
+        hold=seconds overrides, hold=KEEP keeps it until the next change."""
         values = dict(EXPRESSIONS[name])
         if name == "neutral":
             values.update(self.rest)
-        return self._to(run_time, **values)
+            return AnimationGroup(self._to(run_time, **values), _Cue(lambda: self._arm(KEEP)))
+        return self._to(run_time, hold=EXPRESSION_HOLD.get(name, DEFAULT_HOLD) if hold is None else hold, **values)
 
     def wink(self, hold=0.5):
         """Right eye shuts in a happy arc for a beat, with a little smile."""
@@ -157,8 +219,8 @@ class Face:
                           Wait(0.07),
                           self.t["blink"].animate(run_time=0.04, rate_func=linear).set_value(1.0))
 
-    def close_eyes(self, run_time=0.15):
-        return self._to(run_time, eyes_open=0.0)
+    def close_eyes(self, run_time=0.15, hold=DEFAULT_HOLD):
+        return self._to(run_time, hold=hold, eyes_open=0.0)
 
     def open_eyes(self, run_time=0.15):
         return self._to(run_time, eyes_open=1.0)
@@ -200,7 +262,7 @@ class Face:
 
     def talk(self, duration, seed=0):
         rng = np.random.default_rng(seed)
-        steps, t = [], 0.0
+        steps, t = [_Cue(lambda: setattr(self, "_pause_until", self.fig.clock + duration))], 0.0
         while t < duration - 0.12:
             d = float(rng.uniform(0.08, 0.17))
             steps.append(self.t["mouth_open"].animate(run_time=d, rate_func=smooth).set_value(float(rng.uniform(0.15, 0.6))))

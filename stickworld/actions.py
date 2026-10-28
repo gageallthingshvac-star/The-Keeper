@@ -236,8 +236,9 @@ class ActionsMixin:
         return AnimationGroup(self.t["face_dir"].animate(run_time=run_time).set_value(float(direction)),
                               self.face.turn_to(ft, run_time))
 
-    def expression(self, name, run_time=0.25):
-        return self.face.expression(name, run_time)
+    def expression(self, name, run_time=0.25, hold=None):
+        """Timed expression: holds for its beat, then the face eases back to rest (hold=KEEP to keep it)."""
+        return self.face.expression(name, run_time, hold)
 
     def look_at(self, target, run_time=0.2):
         return self.face.look_at(target, run_time)

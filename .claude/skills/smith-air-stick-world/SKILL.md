@@ -102,7 +102,8 @@ The head circle pivots at the neck and never slides sideways. The face is separa
 - `fig.blink()`: eyes squash fully flat (never partly open), hold two frames, reopen (~0.15 s).
 - `fig.nod(times=2)`, `fig.look_at(point)` (eyes lead, head tilt follows 0.1 s later), `fig.talk(duration)`.
 - `StickFigure(..., rest_face=dict(...))` gives a character its own resting face ("neutral" returns to it). `fig.wink(hold)`: the right eye shuts in a happy arc for a beat.
-- `fig.expression(name)`: neutral, happy, smug, surprised, squint, disappointed, strain, tongue_out, dazed (X eyes). Individual feature trackers: `face._to(run_time, mouth_open=..., ...)`.
+- Expressions are timed (Gage's rule): an expression lasts only as long as the moment needs. After its tween it holds for its natural beat (`face.EXPRESSION_HOLD`: surprised 0.7 s, happy 1.1 s, disappointed 1.2 s...) and then the face eases back on its own to the character's resting face (the lead's smile). Pass `hold=seconds` when the moment is longer (squinting through a whole brazing job), `hold=KEEP` (from stickworld.face) only for a final pose that must stay to the end. Talking pauses the relax.
+- `fig.expression(name, run_time, hold=None)`: neutral, happy, smug, surprised, squint, disappointed, strain, tongue_out, dazed (X eyes). Individual feature trackers: `face._to(run_time, mouth_open=..., ...)`.
 
 ## 8. Action library (actions.py)
 
