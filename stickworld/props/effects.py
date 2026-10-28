@@ -98,8 +98,10 @@ def effect_word(word, pos, height=1.0, angle=0.12, hold=S.GAG_HOLD):
                       FadeOut(t, scale=1.3, run_time=0.22))
 
 
-def cold_air(clock, lanes, x_from, x_to, period=2.6, length=0.95, amp=0.08):
-    """Wavy light-blue lines flowing from x_from toward x_to along each lane y; drive with clock (seconds)."""
+def cold_air(clock, lanes, x_from, x_to, period=2.6, length=0.95, amp=0.08, vertical=False):
+    """Wavy light-blue lines flowing from x_from toward x_to along each lane y; drive with clock (seconds).
+    vertical=True flows along y instead: lanes are x positions and x_from/x_to are heights (air pouring down
+    out of a ceiling register: cold_air(clock, [0.8, 1.0, 1.2], ceiling_y, floor_y, vertical=True))."""
     direction = np.sign(x_to - x_from)
     span = abs(x_to - x_from)
 
@@ -110,7 +112,10 @@ def cold_air(clock, lanes, x_from, x_to, period=2.6, length=0.95, amp=0.08):
             prog = ((t * 1.25 + i * 0.37) % period) / period
             head = x_from + direction * prog * (span + length)
             xs = np.linspace(head - direction * length, head, 24)
-            pts = [np.array([x, y + amp * np.sin(7 * x + t * 9 + i), 0]) for x in xs]
+            if vertical:
+                pts = [np.array([y + amp * np.sin(7 * x + t * 9 + i), x, 0]) for x in xs]
+            else:
+                pts = [np.array([x, y + amp * np.sin(7 * x + t * 9 + i), 0]) for x in xs]
             fade = min(1.0, t / 0.6) * float(np.clip((span + length - abs(head - x_from)) / 0.8, 0, 1)) * float(np.clip(prog * 6, 0, 1))
             g.add(VMobject().set_points_smoothly(pts).set_stroke(S.COLD_AIR, 10, opacity=fade))
         return g.set_z_index(S.Z_FX)

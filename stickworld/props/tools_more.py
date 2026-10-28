@@ -1,5 +1,5 @@
 """Extra hand tools and service gear for later episodes: screwdriver, multimeter, gauge manifold, recovery machine,
-refrigerant tank, level, hand truck, ladders, flashlight, mastic bucket and brush."""
+refrigerant tank, level, hand truck, ladders, flashlight, mastic bucket and brush, rope."""
 import numpy as np
 from manim import (
     BOLD, PI, UP, Arc, CapStyleType, Circle, Difference, Dot, Ellipse, Line, Polygon, Text, Union, VGroup,
@@ -20,6 +20,7 @@ HOSE_RED = "#D63A2F"
 FACE_DARK = "#3A3A3A"   # moulded dark-grey tool faces / rubber
 MASTIC = "#8E8E8E"
 VIAL = "#C8E66A"
+ROPE = "#C9A86A"
 
 
 def _cubic(s, c1, c2, e, n=40):
@@ -557,3 +558,80 @@ class MasticBrush(Prop):
         if angle:
             self.rotate(angle, about_point=P(gx, gy))
         self.set_z_index(Z_PROP)
+
+
+class Rope(Prop):
+    """A rope strung through anchors (points, or callables returning a point, e.g. a hand or a load's hook), redrawn
+    every frame so it stays taut between moving things. anchors[0] is the hauler's end: with tail_to, the slack
+    hangs from it down to a coil lying at that point. Methods: hold(fn) (the hauler's end follows a new point, e.g.
+    the other hand), throw(anchors, run_time) (the rope pays out from anchors[0] through the others and its far end
+    lands on the last one)."""
+
+    def __init__(self, *anchors, tail_to=None, width=4.5, color=ROPE, **kwargs):
+        super().__init__(**kwargs)
+        self.anchors = list(anchors)
+        self.tail_to = tail_to
+        self._reveal = None  # while thrown: (anchors, fraction of the path shown)
+        self.part("under", VMobject().set_stroke(INK, width + 3).set_fill(opacity=0))
+        self.part("rope", VMobject().set_stroke(color, width).set_fill(opacity=0))
+        self.part("tail_under", VMobject().set_stroke(INK, width + 3).set_fill(opacity=0))
+        self.part("tail", VMobject().set_stroke(color, width).set_fill(opacity=0))
+        self.part("coil", VGroup())
+        if tail_to is not None:
+            c = P(tail_to[0], tail_to[1])
+            self.parts["coil"].add(*[Ellipse(width=0.42 - 0.06 * k, height=0.13).move_to(c + P(0.03 * k, 0.05 + 0.045 * k))
+                                     .set_fill(color, 1).set_stroke(INK, DETAIL_W) for k in range(3)])
+        for k in ("under", "rope", "tail_under", "tail"):
+            self.parts[k].set_cap_style(CapStyleType.ROUND)
+        self.add_updater(lambda m: m._redraw())
+        self._redraw()
+        self.set_z_index(Z_PROP + 1.2)
+
+    @staticmethod
+    def _at(a):
+        p = a() if callable(a) else a
+        return P(p[0], p[1])
+
+    def _path(self):
+        if self._reveal is None:
+            return [self._at(a) for a in self.anchors]
+        anchors, frac = self._reveal
+        pts = [self._at(a) for a in anchors]
+        lens = [float(np.linalg.norm(b - a)) for a, b in zip(pts[:-1], pts[1:])]
+        want, out = frac * sum(lens), [pts[0]]
+        for (a, b), L in zip(zip(pts[:-1], pts[1:]), lens):
+            if want <= L:
+                out.append(a + (b - a) * (want / max(L, 1e-9)))
+                break
+            out.append(b)
+            want -= L
+        return out
+
+    def _redraw(self):
+        pts = self._path()
+        if len(pts) < 2:
+            pts = [pts[0], pts[0] + P(0, 0.001)]
+        for k in ("under", "rope"):
+            self.parts[k].set_points_as_corners(pts)
+        if self.tail_to is not None:
+            a, b = pts[0], P(self.tail_to[0], self.tail_to[1]) + P(0, 0.1)
+            mid = (a + b) / 2 + P(0, -0.25)
+            curve = VMobject().set_points_smoothly([a, (a + mid) / 2 + P(0, -0.12), mid, (mid + b) / 2, b])
+            for k in ("tail_under", "tail"):
+                self.parts[k].set_points(curve.points)
+
+    def hold(self, fn):
+        self.anchors[0] = fn
+
+    def throw(self, anchors, run_time=0.5):
+        """The rope pays out from anchors[0] through the others and its end lands on the last (callables allowed)."""
+        from manim import UpdateFromAlphaFunc
+        from manim.utils.rate_functions import ease_out_cubic
+
+        def setup(m, a):
+            m._reveal = (list(anchors), a)
+            if a >= 1.0:
+                m._reveal = None
+                m.anchors = list(anchors)
+
+        return UpdateFromAlphaFunc(self, setup, run_time=run_time, rate_func=ease_out_cubic)

@@ -101,3 +101,67 @@ def disconnect(child):
 
 def is_attached(mob):
     return getattr(mob, "_attachment", None) is not None
+
+
+# ---------------------------------------------------------------- loads made of several props
+class Bundle(Prop):
+    """Several props moving as one rigid load (an air handler standing on a hand truck). Add the bundle to the
+    scene instead of its props. pt(name) finds the named point in the bundle's props (first match), or
+    pt("prop_index.name") / pt((prop, name)) to pick one. Use unbundle() to hand a prop back to the scene."""
+
+    def __init__(self, *props, **kwargs):
+        super().__init__(**kwargs)
+        self.members = list(props)
+        for p in props:
+            self.add(p)
+
+    def pt(self, name):
+        if isinstance(name, tuple):
+            return name[0].pt(name[1])
+        if name in self._points:
+            return self._points[name].get_center()
+        for p in self.members:
+            if p.has_pt(name):
+                return p.pt(name)
+        raise KeyError(name)
+
+    def has_pt(self, name):
+        return name in self._points or any(p.has_pt(name) for p in self.members)
+
+
+def bundle(*props):
+    return Bundle(*props)
+
+
+def unbundle(scene, b, prop):
+    """Take prop out of bundle b and put it back in the scene on its own, where it is now."""
+    b.remove(prop)
+    b.members.remove(prop)
+    scene.add(prop)
+    return prop
+
+
+def ride(mob, point, path, angle=None, progress=None):
+    """Drive mob along a path with a progress tracker: every frame its named point (or callable) sits on
+    path(s) and it is turned to angle(s) radians (relative to how it is now), s = progress value (0..1 by
+    convention). Animate the returned ValueTracker (or pass your own) — e.g. a rope haul feeds it.
+    Stop with detach(mob)."""
+    from manim import ValueTracker
+    progress = progress if progress is not None else ValueTracker(0.0)
+    attach_to(mob, point, lambda: np.array([*path(progress.get_value())[:2], 0.0], dtype=float),
+              rotate_fn=(lambda: float(angle(progress.get_value()))) if angle is not None else None, name="ride")
+    return progress
+
+
+def turn_about(mob, angle, point, run_time=0.5, rate_func=None):
+    """Rotate mob by angle (radians, + = counter-clockwise) about one of its named points or a fixed (x, y): tip a
+    hand truck back onto its wheels, lay something down."""
+    from manim import UpdateFromAlphaFunc, smooth
+    st = {"a": 0.0}
+
+    def upd(m, a):
+        piv = m.pt(point) if isinstance(point, str) else np.array([point[0], point[1], 0.0])
+        m.rotate(angle * a - st["a"], about_point=piv)
+        st["a"] = angle * a
+
+    return UpdateFromAlphaFunc(mob, upd, run_time=run_time, rate_func=rate_func or smooth)

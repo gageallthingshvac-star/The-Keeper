@@ -233,3 +233,47 @@ class StickWorldTest(EpisodeScene):
             self.add(fig, box)
             self.play(heat_waves(P(1.5, -1.0), run_time=1.0), sweat(fig.head_center(), side=1), question_mark(fig.head_center() + P(0, S.HEAD_R)))
             self.play(motion_lines(box, RIGHT, run_time=0.8), box.animate.shift(RIGHT * 4), run_time=0.8)
+            self.remove(fig, box)
+
+        with self.block("attic_actions"):
+            from stickworld.actions import pull_out
+            from stickworld.props.base import bundle, detach, ride, turn_about, unbundle
+            from stickworld.props.effects_more import debris
+            from stickworld.props.tools_more import Rope
+            from stickworld.sets_more import CeilingHole
+            F, RF = 0.5, -5.1
+            st = attic(F, room_floor=RF, hatch_x=-2.0, walkway=(-1.2, 1.45), register_x=1.4, thermostat_x=2.45,
+                       work_x=0.0, plenum_x=0.0, plenum_y=AirHandler(0.0, F).pt("supply_top")[1])
+            treads, lip = [st.pt(n) for n in st.treads], st.pt("lip")
+            box = AirHandler(0.0, F, new=False, drain_side="right")
+            hole = CeilingHole(2.05, F - 0.05, st.pt("ceiling")[1])
+            dl = Dolly(-0.6, RF, facing=-1)
+            load = bundle(dl, AirHandler(-1.305, RF + 0.05, drain_side="right"))
+            rope = Rope((1.2, F + 0.12), tail_to=(1.2, F))
+            up = StickFigure(x=treads[0][0] - 0.55, ground=RF, face_dir=1, name="climber")
+            low = StickFigure(x=0.35, ground=RF, face_dir=-1, accessory="cap", name="pusher")
+            self.add(st, box, load, rope, up, low)
+            self.play(up.climb(treads, (-0.75, F), lip, hunch=0.15))
+            self.play(up.walk_to(1.0, spine=0.15), up.turn(-1))
+            self.play(up.slide_push(box, -0.3, run_time=1.2))
+            self.play(up.let_go(), up.walk_to(1.2, face=-1), FadeOut(box))
+            self.play(up.fall_through(2.05, F, hole=hole), debris(P(-3.0, -2.0), run_time=0.8))
+            self.play(up.kick_leg(2, 0.6))
+            helper = StickFigure(x=0.4, ground=F, face_dir=1, name="helper")
+            self.add(helper)
+            self.play(pull_out(helper, up, 1.15))
+            self.play(low.grab2(dl, "handle", "handle", keep_pinned=True), turn_about(load, -0.351, "axle", 0.4),
+                      low.walk_to(0.71, face=-1, run_time=0.4))
+            self.play(low.wheel_to(-2.0, load, run_time=1.2), up.reach("R", P(1.2, F + 0.15), 0.3))
+            self.play(Do(lambda: rope.hold(lambda: up.hand("R"))), up.walk_to(1.35, face=-1, run_time=0.4))
+            self.play(rope.throw([lambda: up.hand("R"), lip, lambda: dl.pt("handle")], 0.45))
+            haul = ValueTracker(0.0)
+            a0 = load.pt("axle")[:2].copy()
+            self.play(Do(lambda: ride(load, "axle", lambda s: a0 + np.array([0.344, 0.939]) * 3.0 * s, None, haul)),
+                      low.let_go(), up.haul(rope, haul, 1.0, pulls=4, toward=lip))
+            self.play(Do(lambda: detach(load)), Do(lambda: unbundle(self, load, dl)), turn_about(dl, -PI / 2, "axle", 0.4))
+            clock = ValueTracker(0.0)
+            air = FX.cold_air(clock, [1.15, 1.4, 1.65], st.pt("register")[1], RF + 2.5, vertical=True)
+            self.add(air)
+            self.play(clock.animate(run_time=1.5, rate_func=linear).set_value(1.5))
+            self.remove(air, st, load, dl, rope, up, low, helper, hole)

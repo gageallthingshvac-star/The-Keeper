@@ -584,6 +584,286 @@ class ActionsMixin:
                           switch.flip(on, run_time),
                           Do(lambda: self.unpin(side)))
 
+    # ------------------------------------------------------------ contact-to-contact motion (ladders, scrambling)
+    def _hand_goal(self, side):
+        """Where an IK-locked hand is being driven now (its pin or its target trackers), else None."""
+        if self.v(f"arm{side}_lock") < 0.5:
+            return None
+        pin = self.pins[side]
+        return pin if pin is not None else np.array([self.v(f"hand{side}_x"), self.v(f"hand{side}_y")])
+
+    def keyframes(self, keys, run_time=None, step_time=0.32, lift=0.16, creak=False, gain=-15.0):
+        """Pose-to-pose motion with planted contacts. keys: list of dicts with any of hip=(x, y), footL/footR=(x, y),
+        handL/handR=(x, y), a callable, or None (arm back to rest in FK), spine, neck and other joint angles.
+        Between keys every foot or hand that changes lifts off in a small arc and lands on its new point, so
+        nothing slides; the hips glide from stance to stance. Footstep cue on each foot landing (and a creak on
+        every other one with creak=True, for ladders)."""
+        n = len(keys)
+        rt = run_time or step_time * n
+        st = {}
+        res = lambda q: np.array((q() if callable(q) else q)[:2], dtype=float)
+
+        def setup():
+            if min(self.v("legL_lock"), self.v("legR_lock")) < 1:
+                self.plant_feet()
+            angles = sorted({k for key in keys for k in key if k in self.t and k not in ("x", "y")})
+            s0 = dict(hip=self.hip_point()[:2].copy(), footL=np.array([self.v("footL_x"), self.v("footL_y")]),
+                      footR=np.array([self.v("footR_x"), self.v("footR_y")]),
+                      handL=self._hand_goal("L"), handR=self._hand_goal("R"), **{k: self.v(k) for k in angles})
+            states = [s0]
+            for key in keys:
+                nxt = dict(states[-1])
+                for k, v in key.items():
+                    nxt[k] = v if (v is None or callable(v) or k not in ("hip", "footL", "footR", "handL", "handR")) \
+                        else np.array(v[:2], dtype=float)
+                states.append(nxt)
+            st.update(states=states, angles=angles, seg=-1)
+            for side in "LR":
+                self.pins[side] = None
+            rng = np.random.default_rng(n * 7 + len(self.name))
+            k_land = 0
+            for i in range(n):
+                for f in ("footL", "footR"):
+                    a, b = states[i][f], states[i + 1][f]
+                    if float(np.linalg.norm(b - a)) > 0.05:
+                        snd(f"step{rng.integers(1, 4)}", (i + 1) / n * rt, gain + rng.uniform(-2, 1))
+                        if creak and k_land % 2 == 0:
+                            snd("creak", (i + 0.6) / n * rt, gain + 2)
+                        k_land += 1
+
+        def begin_segment(i):
+            a = st["states"][i]
+            st["hand0"] = {}
+            for side in "LR":
+                cur, nxt = a[f"hand{side}"], st["states"][i + 1][f"hand{side}"]
+                st["hand0"][side] = self.hand(side)[:2].copy() if cur is None else None
+                if cur is not None and nxt is None:  # letting go: FK rest pose fades in under the IK
+                    self.set(**{f"shoulder_{side}": 0.12 if side == "R" else -0.12, f"elbow_{side}": 0.18})
+
+        def update(alpha):
+            seg = min(int(alpha * n), n - 1)
+            if seg != st["seg"]:
+                for j in range(st["seg"] + 1, seg + 1):
+                    begin_segment(j)
+                st["seg"] = seg
+            w = alpha * n - seg
+            e = smooth(w)
+            a, b = st["states"][seg], st["states"][seg + 1]
+            sg = self.sg
+            hip = a["hip"] + (b["hip"] - a["hip"]) * e
+            self.set(x=hip[0], y=hip[1])
+            for f in ("footL", "footR"):
+                p0, p1 = a[f], b[f]
+                p = p0 + (p1 - p0) * e
+                if float(np.linalg.norm(p1 - p0)) > 0.05:
+                    p = p + lift * np.sin(np.pi * w) * np.array([-0.45 * sg, 1.0])
+                self.set(**{f"{f}_x": p[0], f"{f}_y": p[1]})
+            for side in "LR":
+                h0, h1 = a[f"hand{side}"], b[f"hand{side}"]
+                if h0 is None and h1 is None:
+                    self.set(**{f"arm{side}_lock": 0.0})
+                    continue
+                if h1 is None:  # releasing: hold the old point while the FK rest pose takes over
+                    p, lock = res(h0), 1.0 - e
+                else:
+                    start = st["hand0"][side] if h0 is None else res(h0)
+                    p = start + (res(h1) - start) * e
+                    if h0 is not None and float(np.linalg.norm(res(h1) - res(h0))) > 0.05:
+                        p = p + 0.09 * np.sin(np.pi * w) * np.array([-0.6 * sg, 0.8])
+                    lock = e if h0 is None else 1.0
+                self.set(**{f"hand{side}_x": p[0], f"hand{side}_y": p[1], f"arm{side}_lock": lock})
+            for k in st["angles"]:
+                self.t[k].set_value(lerp(a[k], b[k], e))
+
+        return RigAnim(update, setup, rt, linear)
+
+    def climb(self, treads, landing, lip=None, floor_y=None, down=False, step_time=0.3, hunch=0.0):
+        """Climb a ladder or pull-down stair. treads = tread points bottom to top (the set's tread_0..), landing = the
+        floor point to stand on at the top, lip = hand-hold at the top edge (the attic set's "lip"). Facing the way the
+        stair rises: feet go tread to tread, alternating, the opposite hand moves up the rail with each step; at the
+        top both feet come onto the top tread, the hands go to the lip and the floor, one foot steps up, then the other.
+        Start (going up) standing about 0.55 short of tread_0 (climb_start()). down=True backs down the same way:
+        start standing at the landing facing the stair, end on the floor (floor_y, default one riser under tread_0)."""
+        T = [np.array(p[:2], dtype=float) for p in treads]
+        sg = 1.0 if T[-1][0] >= T[0][0] else -1.0
+        m = (T[-1][0] - T[0][0]) / (T[-1][1] - T[0][1])
+        rise = T[1][1] - T[0][1]
+        rail = lambda y: np.array([T[0][0] + (y - T[0][1]) * m, y])
+        L = np.array(landing[:2], dtype=float)
+        lip = np.array(lip[:2], dtype=float) if lip is not None else L + np.array([-sg * 0.35, 0.25])
+        floor = floor_y if floor_y is not None else (self.ground_y() if not down else T[0][1] - rise)
+        x0 = self.v("x") if not down else T[0][0] - sg * 0.55
+        hip_on = lambda t: np.array([t[0] - sg * 0.36, t[1] + 1.02])
+        K = [dict(hip=np.array([x0, floor + S.STAND_HIP]), footL=np.array([x0 - sg * S.STANCE, floor]),
+                  footR=np.array([x0 + sg * S.STANCE, floor]), handL=None, handR=None, spine=0.0, neck=0.0)]
+
+        def step(**kw):
+            nxt = dict(K[-1])
+            nxt.update({k: (np.array(v, dtype=float) if isinstance(v, (tuple, list, np.ndarray)) else v) for k, v in kw.items()})
+            K.append(nxt)
+
+        h0 = hip_on(T[0])
+        step(footR=T[0], hip=h0, handL=rail(h0[1] + 1.6), handR=rail(h0[1] + 0.88), spine=0.3, neck=-0.15)
+        for j in range(1, len(T)):
+            foot, hand = ("footL", "handR") if j % 2 else ("footR", "handL")
+            h = hip_on(T[j])
+            step(**{foot: T[j], hand: rail(h[1] + 1.6), "hip": h})
+        top = T[-1]
+        lower = "footL" if (len(T) - 1) % 2 == 0 else "footR"   # the foot still on the tread below the top one
+        upper = "footR" if lower == "footL" else "footL"
+        A = np.array([L[0] - sg * S.STANCE, L[1]])
+        B = np.array([L[0] + sg * S.STANCE, L[1]])
+        step(**{lower: top + np.array([-sg * 0.06, 0]), "hip": top + np.array([-sg * 0.25, 1.3]), "handL": lip,
+                "handR": np.array([A[0] - sg * 0.05, L[1] + 0.03]), "spine": 0.6, "neck": -0.2})
+        step(**{lower: A, "hip": np.array([lip[0] - sg * 0.1, L[1] + 0.5]), "handL": None, "handR": None, "spine": 0.5})
+        step(**{upper: B, "hip": np.array([L[0], L[1] + S.STAND_HIP]), "spine": hunch, "neck": 0.0})
+        keys = K[1:] if not down else K[-2::-1]
+        return self.keyframes(keys, step_time=step_time * (0.85 if down else 1.0), creak=True)
+
+    # ------------------------------------------------------------ attic mishaps
+    def fall_through(self, hole_x, floor_y=None, hole=None, depth=None, run_time=0.45):
+        """Step onto a gap between joists and plunge one leg through the ceiling up to the hip: the foot nearest
+        hole_x steps onto it, the leg drops straight through while the hips hit the floor and the other knee folds up;
+        arms fly up, surprised face, CRASH. hole: a CeilingHole prop that bursts open (with debris falling under
+        it) on impact. The stuck leg is remembered for kick_leg() and pull_out()."""
+        F = self.ground_y() if floor_y is None else floor_y
+        depth = depth if depth is not None else S.LEG * 0.92
+        st = {}
+
+        def setup():
+            feet = self.feet()
+            k = "L" if abs(feet[0][0] - hole_x) <= abs(feet[1][0] - hole_x) else "R"
+            st["k"] = k
+            st["f0"] = np.array([self.v(f"foot{k}_x"), self.v(f"foot{k}_y")])
+            st["hip0"] = self.hip_point()[:2].copy()
+            self._stuck = dict(side=k, hole_x=hole_x, floor=F)
+
+        def step_onto(a):
+            k = st["k"]
+            p = st["f0"] + (np.array([hole_x, F]) - st["f0"]) * a + np.array([0, 0.15 * np.sin(np.pi * a)])
+            hip = st["hip0"] + np.array([(hole_x - st["f0"][0]) * 0.45 * a, 0])
+            self.set(**{f"foot{k}_x": p[0], f"foot{k}_y": p[1]}, x=hip[0], y=hip[1])
+
+        def plunge(a):
+            k = st["k"]
+            hip1 = np.array([hole_x, F + 0.12])
+            hipA = st["hip0"] + np.array([(hole_x - st["f0"][0]) * 0.45, 0])
+            hip = hipA + (hip1 - hipA) * a
+            self.set(x=hip[0], y=hip[1], **{f"foot{k}_x": hole_x, f"foot{k}_y": F - (depth - 0.12) * a})
+
+        hit = [Snd("crash", gain=-3), Snd("rip", gain=-6)]
+        if hole is not None:
+            hit += [hole.burst(0.15), FX.debris(hole.pt("bottom"), run_time=1.1)]
+        flail = dict(shoulder_L=2.6, elbow_L=0.5, shoulder_R=2.8, elbow_R=0.4, spine=-0.1, neck=-0.2)
+        return Succession(RigAnim(step_onto, setup, run_time * 0.6, smooth),
+                          AnimationGroup(RigAnim(plunge, None, 0.16, rush_into), self.pose(flail, 0.16, rush_from),
+                                         self.face._to(0.1, mouth_open=0.7), self.expression("surprised", 0.1),
+                                         self.t["hair"].animate(run_time=0.1).set_value(0.6), *hit))
+
+    def kick_leg(self, times=3, run_time=0.9):
+        """Flail the leg stuck through the ceiling (after fall_through)."""
+        k, hx, F = self._stuck["side"], self._stuck["hole_x"], self._stuck["floor"]
+        st = {}
+
+        def setup():
+            st["y"] = self.v(f"foot{k}_y")
+
+        def update(a):
+            ph = 2 * np.pi * times * a
+            self.set(**{f"foot{k}_x": hx + 0.2 * np.sin(ph), f"foot{k}_y": st["y"] + 0.12 * (1 - np.cos(ph)) * 0.5})
+
+        return RigAnim(update, setup, run_time, linear)
+
+    # ------------------------------------------------------------ loads
+    def slide_push(self, obj, x, grips=("grip_R_low", "grip_R"), run_time=None, lean=0.45, sound="creak"):
+        """Push or drag a heavy box along the floor: both hands to its near side (grips: far hand, near hand), lean in
+        and walk to x; the box slides with the hands, flat on the floor (no bobbing), scraping."""
+        st = {}
+        gL, gR = (lambda: obj.pt(grips[0])), (lambda: obj.pt(grips[1]))
+
+        def hook():
+            st["off"] = obj.pt("base")[0] - self.v("x")
+            st["y"] = obj.pt("base")[1]
+            attach_to(obj, "base", lambda: np.array([self.v("x") + st["off"], st["y"], 0.0]), name=f"pushed_{self.name}")
+
+        walk = self.walk_to(x, face=self.sg, hands={"L": gL, "R": gR}, run_time=run_time, max_stride=0.55, spine=lean)
+        steps = [AnimationGroup(self.grab2(obj, grips[0], grips[1], keep_pinned=True),
+                                self.pose({"spine": lean}, 0.35)), Do(hook)]
+        steps.append(AnimationGroup(walk, Snd(sound, gain=-4)) if sound else walk)
+        steps += [Do(lambda: detach(obj))]
+        return Succession(*steps)
+
+    def wheel_to(self, x, load, pivot="axle", handle="handle", run_time=None, ground=None):
+        """Roll a hand-truck load: hands stay on the handle (take it first with grab2(load, handle, handle,
+        keep_pinned=True) and tip it back with tilt()), walk to x, and the load rolls along at the same distance
+        from the hips, its wheels on the floor."""
+        st = {}
+
+        def hook():
+            p = load.pt(pivot)
+            st["off"], st["y"] = p[0] - self.v("x"), p[1]
+            attach_to(load, pivot, lambda: np.array([self.v("x") + st["off"], st["y"], 0.0]), name=f"wheeled_{self.name}")
+
+        hd = lambda: load.pt(handle)
+        return Succession(Do(hook), self.walk_to(x, ground, face=self.sg, hands={"L": hd, "R": hd}, run_time=run_time,
+                                                 max_stride=0.6), Do(lambda: detach(load)))
+
+    def let_go(self, sides=("L", "R"), run_time=0.3):
+        """Hands that were pinned to something come away and drop back to rest."""
+        def free():
+            for s_ in sides:
+                self.bake_arm(s_)
+
+        return Succession(Do(free), AnimationGroup(*[self.pose({ARM_KEYS[s_][0]: 0.12 if s_ == "R" else -0.12,
+                                                               ARM_KEYS[s_][1]: 0.18}, run_time) for s_ in sides]))
+
+    def haul(self, rope, progress, amount, pulls=5, run_time=None, toward=None, lean=0.3):
+        """Hand-over-hand haul on a rope: the hands take turns reaching out along the rope toward `toward` (where the
+        rope comes from, e.g. the hatch lip), gripping and pulling it in to the belly, while the load's progress
+        tracker (see props.base.ride) gains `amount` with each pull. The rope's end follows whichever hand pulls."""
+        rt = run_time or 0.42 * pulls
+        st = {}
+        tw = np.array(toward[:2], dtype=float)
+
+        def far_near():
+            J = self.solve()
+            sh = J["shoulder"][:2]
+            d = tw - sh
+            d = d / max(1e-6, float(np.linalg.norm(d)))
+            far = sh + d * ARM_LEN * 0.92
+            near = self.hip_point()[:2] + np.array([self.sg * 0.3, 0.45])
+            return far, near
+
+        def setup():
+            st.update(p0=progress.get_value(), i=-1)
+            for side in "LR":
+                h = self.hand(side)
+                self.pins[side] = None
+                self.set(**{f"hand{side}_x": h[0], f"hand{side}_y": h[1], f"arm{side}_lock": 1.0})
+            st["s0"] = self.v("spine")
+
+        def update(alpha):
+            i = min(int(alpha * pulls), pulls - 1)
+            w = alpha * pulls - i
+            if i != st["i"]:
+                st["i"] = i
+                st["act"] = "R" if i % 2 == 0 else "L"
+                st["oth"] = "L" if st["act"] == "R" else "R"
+                st["a0"] = self.hand(st["act"])[:2].copy()
+                st["b0"] = self.hand(st["oth"])[:2].copy()
+                rope.hold(lambda s_=st["act"]: self.hand(s_))
+                snd("yank" if i % 2 == 0 else "creak", 0.05, -12)
+            far, near = far_near()
+            e = smooth(w)
+            pa = st["a0"] + (near - st["a0"]) * e                                  # the gripping hand pulls in
+            pb = st["b0"] + (far - st["b0"]) * e + np.array([0, 0.18 * np.sin(np.pi * w)])  # the other reaches out
+            self.set(**{f"hand{st['act']}_x": pa[0], f"hand{st['act']}_y": pa[1],
+                        f"hand{st['oth']}_x": pb[0], f"hand{st['oth']}_y": pb[1]})
+            self.set(spine=st["s0"] + lean * (0.5 - e) * 0.6)
+            progress.set_value(st["p0"] + amount * (i + e) / pulls)
+
+        return RigAnim(update, setup, rt, linear)
+
     # ------------------------------------------------------------ gestures
     def point_at(self, target, run_time=0.35):
         side = "R"
@@ -644,6 +924,49 @@ class ActionsMixin:
 
     def hair_down(self, run_time=0.6):
         return self.t["hair"].animate(run_time=run_time).set_value(0.0)
+
+
+# ---------------------------------------------------------------- helping someone out of a hole
+def pull_out(helper, stuck, stand_x, side="R", run_time=0.8):
+    """helper grabs the hand stuck raises and leans back; stuck comes up out of the hole (after fall_through): the
+    trapped foot rises straight out, then both feet land standing at stand_x on the same floor."""
+    k, hx, F = stuck._stuck["side"], stuck._stuck["hole_x"], stuck._stuck["floor"]
+    o = "R" if k == "L" else "L"
+    d = S.STANCE if hx > stand_x else -S.STANCE      # the trapped foot lands on the hole's side of stand_x
+    st = {}
+
+    def meet():
+        a, b = stuck.solve()["shoulder"], helper.solve()["shoulder"]
+        return (a + b) / 2 + np.array([0, 0.25, 0])
+
+    def link():
+        helper.bake_arm(side)                          # helper's hand now rides with his body (FK)...
+        stuck.pin("R", lambda: helper.hand(side))      # ...and the stuck one's hand rides with it
+
+    def setup():
+        st["hip0"] = stuck.hip_point()[:2].copy()
+        st["kf0"] = np.array([stuck.v(f"foot{k}_x"), stuck.v(f"foot{k}_y")])
+        st["of0"] = np.array([stuck.v(f"foot{o}_x"), stuck.v(f"foot{o}_y")])
+
+    def update(a):
+        stuck.set(x=lerp(st["hip0"][0], stand_x, a), y=lerp(st["hip0"][1], F + S.STAND_HIP, ease_out_cubic(a)))
+        up = smooth(min(1.0, a / 0.55))                   # the trapped foot comes straight up out of the hole first,
+        over = smooth(max(0.0, (a - 0.45) / 0.55))        # then swings over to stand
+        stuck.set(**{f"foot{k}_x": lerp(hx, stand_x + d, over),
+                     f"foot{k}_y": lerp(st["kf0"][1], F + 0.25, up) - 0.25 * over})
+        of = st["of0"] + (np.array([stand_x - d, F]) - st["of0"]) * over
+        stuck.set(**{f"foot{o}_x": of[0], f"foot{o}_y": of[1] + 0.12 * np.sin(np.pi * over)})
+
+    m = lambda: st.setdefault("meet", meet())          # fixed once the reach starts
+    reach = AnimationGroup(stuck.reach("R", m, 0.3, lean=False), helper.reach(side, m, 0.35))
+    heave = AnimationGroup(helper.pose({"spine": -0.35}, run_time * 0.6, rush_from), helper.expression("strain", 0.2),
+                           RigAnim(update, setup, run_time, smooth), Snd("yank", gain=-4),
+                           stuck.pose({"spine": 0.0, "neck": 0.0, "shoulder_L": -0.12, "elbow_L": 0.18}, run_time),
+                           stuck.t["hair"].animate(run_time=run_time).set_value(0.0))
+    settle = AnimationGroup(helper.pose({"spine": 0.0}, 0.3), helper.expression("neutral", 0.2),
+                            Succession(Do(lambda: stuck.unpin("R")), stuck.let_go(("R",), 0.3)),
+                            Succession(Do(lambda: helper.unpin(side)), helper.let_go((side,), 0.3)))
+    return Succession(reach, Do(link), heave, Do(lambda: stuck.plant_feet(F)), settle)
 
 
 # ---------------------------------------------------------------- two people, one object

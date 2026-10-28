@@ -10,7 +10,7 @@ from .props.base import Prop
 from .props.hvac_more import IN, mix, rect, seg, tube
 from .style import (
     CONCRETE, DETAIL_W, H, HARD_HAT, INK, INSULATION, METAL, METAL_DARK, METAL_HI, OLD_UNIT, PROP_W, ROOF,
-    SIDING, SPARK, WALL, WHITE, WOOD, Z_SET, P,
+    SIDING, SPARK, WALL, WHITE, WOOD, Z_PROP_FRONT, Z_SET, P,
 )
 
 DIRT = "#A68A64"
@@ -91,10 +91,17 @@ def _cloud(cx, cy, s=1.0):
 
 
 # ================================================================ attic
-def attic(floor_y=-2.4):
+def attic(floor_y=-2.4, room_floor=None, hatch_x=-2.6, stair_foot="left", walkway=None, light_x=2.0,
+          register_x=None, thermostat_x=3.1, work_x=1.4, plenum_x=None, plenum_y=None):
     """Gable attic over a room: rafters meeting at the ridge with a collar tie, joists with pink batts, a
     plywood walkway and a framed hatch with a pull-down stair into the room below.
-    Anchors: hatch, floor_left, floor_right, work_spot, peak, walkway_left, walkway_right."""
+    room_floor: draw the room's floor at that height (the stair lands on it); stair_foot "left"/"right": which way
+    the stair runs down from the hatch; walkway=(x0, x1); register_x: a supply register in the room ceiling;
+    plenum_x/plenum_y: a supply plenum hung from the rafters whose bottom sits at plenum_y (an air handler slides
+    in under it). The stair is drawn in front of props (Z_PROP_FRONT) so a load hauled up it sits between the rails.
+    Anchors: hatch, lip (top of the hatch curb on the stair-top side), floor_left, floor_right, work_spot, peak,
+    walkway_left, walkway_right, ceiling (underside), stair_top, stair_bottom, tread_0.. (bottom up; .treads = list
+    of names), and with room_floor: room_floor, thermostat_spot (60 in up); register; plenum_bottom."""
     F = floor_y
     s = Prop()
     peak, half_span, jd = 5.6, 7.5, 0.36
@@ -129,37 +136,106 @@ def attic(floor_y=-2.4):
     tx = (PY - ty - 0.3) / slope
     s.part("collar_tie", rect(-tx, ty, tx, ty + 0.3, WOOD, PROP_W))
     # floor: drywall ceiling below, joists + batts, plywood walkway; hatch opening on the left
-    hx0, hx1 = -3.3, -1.9
+    hx0, hx1 = hatch_x - 0.7, hatch_x + 0.7
     s.part("drywall", VGroup(rect(-xe, ceil, hx0 - 0.1, F - jd, WHITE, DETAIL_W),
                              rect(hx1 + 0.1, ceil, xe, F - jd, WHITE, DETAIL_W)))
     s.part("joists", _joists(-4.6, 4.7, F - 0.05, jd - 0.05, skip=[(hx0 - 0.05, hx1 + 0.05)]))
     s.part("hatch_frame", VGroup(rect(hx0 - 0.1, ceil, hx0, F + 0.28, WOOD, DETAIL_W),
                                  rect(hx1, ceil, hx1 + 0.1, F + 0.28, WOOD, DETAIL_W)))
-    wx0, wx1 = -1.55, 3.45
+    wx0, wx1 = walkway if walkway is not None else (hx1 + 0.35, 3.45)
     s.part("walkway", rect(wx0, F - 0.05, wx1, F, SHEATHING, DETAIL_W))
     # pull-down stair hanging from the hatch into the room
-    top, bot = P(hx1 - 0.05, ceil), P(hx0 - 0.55, Y0 - 0.3)
+    foot_y = room_floor if room_floor is not None else Y0 - 0.3
+    if stair_foot == "left":
+        top, bot = P(hx1 - 0.05, ceil), P(hx0 - 0.55, foot_y)
+    else:
+        top, bot = P(hx0 + 0.05, ceil), P(hx1 + 0.55, foot_y)
     treads = VGroup()
-    for y in np.arange(ceil - 0.7, Y0, -0.72):
+    tread_pts = []
+    n_rise = max(2, int(round((ceil - foot_y) / 0.72)))  # even risers of about 11 in from the floor to the hatch
+    for y in (foot_y + (ceil - foot_y) * np.arange(n_rise - 1, 0, -1) / n_rise):
         k = (ceil - y) / (ceil - bot[1])
         x = top[0] + (bot[0] - top[0]) * k
         treads.add(rect(x - 0.2, y - 0.05, x + 0.2, y, WOOD, DETAIL_W))
+        tread_pts.append((x, y))
     s.part("stair", VGroup(tube(np.array([top, bot]), 0.09, WOOD), treads,
                            rect(hx0, ceil - 0.06, hx1, ceil, SHEATHING, DETAIL_W)))
+    if room_floor is not None:
+        s.part("room_floor", VGroup(_fill(-xe, Y0 - BLEED, xe, room_floor - 0.25, CONCRETE),
+                                    rect(-xe, room_floor - 0.25, xe, room_floor, mix(WOOD, WHITE, 0.55), PROP_W),
+                                    rect(-xe, room_floor, xe, room_floor + 0.1, WHITE, DETAIL_W)))
+    if register_x is not None:
+        rx = register_x
+        s.part("register", VGroup(rect(rx - 0.42, ceil - 0.08, rx + 0.42, ceil, METAL, DETAIL_W),
+                                  *[seg((x, ceil - 0.07), (x, ceil - 0.01), w=1.5, color=METAL_DARK)
+                                    for x in np.arange(rx - 0.34, rx + 0.36, 0.085)]))
+        s.mark("register", (rx, ceil - 0.08))
     # a ceiling light in the room below
-    lx = 2.0
+    lx = light_x
     dome = Polygon(*[P(lx + 0.32 * np.cos(t), ceil - 0.06 + 0.2 * np.sin(t)) for t in np.linspace(np.pi, 2 * np.pi, 13)])
     s.part("light", VGroup(rect(lx - 0.2, ceil - 0.06, lx + 0.2, ceil, WHITE, DETAIL_W),
                            dome.set_fill(WHITE, 1).set_stroke(INK, DETAIL_W)))
     s.mark("hatch", ((hx0 + hx1) / 2, F))
     s.mark("floor_left", (-3.9, F - 0.05))
     s.mark("floor_right", (3.9, F - 0.05))
-    s.mark("work_spot", (1.4, F))
+    s.mark("work_spot", (work_x, F))
+    s.mark("ceiling", (0, ceil))
+    s.mark("stair_top", tuple(top[:2]))
+    s.mark("stair_bottom", tuple(bot[:2]))
+    s.treads = []
+    for i, (x, y) in enumerate(reversed(tread_pts)):
+        s.mark(f"tread_{i}", (x, y))
+        s.treads.append(f"tread_{i}")
+    if room_floor is not None:
+        s.mark("room_floor", (0, room_floor))
+        s.mark("thermostat_spot", (thermostat_x, room_floor + 60 * IN))
+    if plenum_x is not None:
+        px, py = plenum_x, plenum_y if plenum_y is not None else F + 3.3
+        pw, ph = 0.62, 0.55
+        box = rect(px - pw, py, px + pw, py + ph, METAL, PROP_W)
+        seams = VGroup(seg((px - pw + 0.08, py + ph - 0.1), (px + pw - 0.08, py + ph - 0.1), w=1.5, color=METAL_HI),
+                       seg((px - pw, py + 0.08), (px + pw, py + 0.08), w=DETAIL_W))
+        takeoff = VGroup(Circle(radius=0.2).move_to(P(px + 0.25, py + ph / 2)).set_fill(METAL_DARK, 1).set_stroke(INK, DETAIL_W),
+                         Circle(radius=0.12).move_to(P(px + 0.25, py + ph / 2)).set_fill(VAPOR, 1).set_stroke(INK, 1.5))
+        straps = VGroup(*[seg((x, py + ph), (x, y_in(x) - 0.02), w=DETAIL_W, color=METAL_DARK) for x in (px - pw + 0.12, px + pw - 0.12)])
+        s.part("plenum", VGroup(straps, box, seams, takeoff))
+        s.mark("plenum_bottom", (px, py))
+    s.mark("lip", ((hx1 + 0.05) if stair_foot == "left" else (hx0 - 0.05), F + 0.28))
     s.mark("walkway_left", (wx0, F))
     s.mark("walkway_right", (wx1, F))
     s.mark("peak", (0, PY))
     s.set_z_index(Z_SET)
+    s.parts["stair"].set_z_index(Z_PROP_FRONT)
     return s
+
+
+class CeilingHole(Prop):
+    """A foot-sized hole punched through the attic floor's drywall and batts, seen in section: a dark gap with
+    torn drywall edges and insulation fluff hanging into the room. Built at x between top_y (top of the batts) and
+    bottom_y (underside of the drywall). Points: center, bottom. Method: burst()."""
+
+    def __init__(self, x, top_y, bottom_y, width=0.55):
+        super().__init__()
+        w = width
+        rng = np.random.default_rng(int(abs(x) * 100) + 3)
+        jag = [P(x - w / 2 + w * t, bottom_y - rng.uniform(0.02, 0.12)) for t in np.linspace(0, 1, 7)]
+        gap = Polygon(P(x - w / 2, top_y), P(x + w / 2, top_y), *reversed(jag)).set_fill("#3A3128", 1).set_stroke(INK, DETAIL_W)
+        self.part("gap", gap)
+        flaps = VGroup(Polygon(P(x - w / 2, bottom_y + 0.02), P(x - w / 2 - 0.12, bottom_y - 0.22), P(x - w / 2 + 0.12, bottom_y - 0.05)),
+                       Polygon(P(x + w / 2, bottom_y + 0.02), P(x + w / 2 + 0.1, bottom_y - 0.18), P(x + w / 2 - 0.14, bottom_y - 0.04)))
+        self.part("flaps", flaps.set_fill(WHITE, 1).set_stroke(INK, DETAIL_W))
+        fluff = VGroup(*[VMobject().set_points_smoothly([P(x + dx, bottom_y - 0.02), P(x + dx + 0.04, bottom_y - 0.14 - 0.06 * k),
+                                                          P(x + dx - 0.03, bottom_y - 0.24 - 0.05 * k)])
+                         .set_stroke(INSULATION, 6) for k, dx in enumerate((-0.15, 0.02, 0.17))])
+        self.part("fluff", fluff)
+        self.mark("center", (x, (top_y + bottom_y) / 2))
+        self.mark("bottom", (x, bottom_y))
+        self.set_z_index(Z_SET + 0.5)
+
+    def burst(self, run_time=0.15):
+        from manim import GrowFromCenter
+        from manim.utils.rate_functions import ease_out_back
+        return GrowFromCenter(self, run_time=run_time, rate_func=ease_out_back)
 
 
 # ================================================================ crawlspace

@@ -1,4 +1,4 @@
-"""Extra cartoon effects: heat waves, speed lines, a flying sweat drop and a popping question mark.
+"""Extra cartoon effects: heat waves, speed lines, a flying sweat drop, a popping question mark and falling debris.
 
 Each function returns one Animation that adds its own mobjects and removes them again at the end (FadeOut),
 so a scene can just self.play(heat_waves(p)) alongside other animations.
@@ -163,3 +163,38 @@ def question_mark(point, run_time=1.0, height=0.55):
     return Succession(FadeIn(q, scale=0.2, run_time=0.25 * run_time, rate_func=rate_functions.ease_out_back),
                       UpdateFromAlphaFunc(q, wobble, run_time=0.5 * run_time, rate_func=smooth),
                       FadeOut(q, shift=0.2 * UP, run_time=0.25 * run_time))
+
+
+# ================================================================ falling debris
+def debris(pos, width=0.6, n=9, fall=2.2, run_time=1.0, seed=4, colors=None):
+    """Bits of drywall and insulation burst from `pos` and fall under gravity, tumbling and fading (a foot through
+    the ceiling, a panel ripped off). colors: fill colours to pick from (default white chips + pink fluff)."""
+    from ..style import INSULATION, SMOKE
+    rng = np.random.default_rng(seed)
+    colors = colors or [WHITE, WHITE, INSULATION]
+    p0 = P(pos[0], pos[1])
+    anims = []
+    for i in range(n):
+        size = rng.uniform(0.06, 0.13)
+        k = rng.integers(3, 6)
+        pts = [P(size * np.cos(a) * rng.uniform(0.6, 1.2), size * np.sin(a) * rng.uniform(0.6, 1.2))
+               for a in np.sort(rng.uniform(0, 2 * PI, k))]
+        chip = VMobject().set_points_as_corners(pts + [pts[0]])
+        chip.set_fill(colors[i % len(colors)], 1).set_stroke(INK, 1.5).set_z_index(Z_FX)
+        x0 = rng.uniform(-width / 2, width / 2)
+        vx = x0 * 0.8 + rng.uniform(-0.3, 0.3)
+        f = fall * rng.uniform(0.7, 1.15)
+        spin = rng.uniform(-6, 6)
+        chip.move_to(p0 + P(x0, 0))
+        proto = chip.copy()
+
+        def drop(m, a, proto=proto, x0=x0, vx=vx, f=f, spin=spin):
+            m.become(proto.copy().rotate(spin * a).move_to(p0 + P(x0 + vx * a, 0.15 * a - f * a * a)))
+            m.set_opacity(max(0.0, 1.0 - max(0.0, a - 0.7) / 0.3))
+
+        anims.append(UpdateFromAlphaFunc(chip, drop, run_time=run_time * rng.uniform(0.75, 1.0), rate_func=linear,
+                                         remover=True))
+    puff = Ellipse(width=width * 1.3, height=0.3).move_to(p0 + P(0, -0.1)).set_fill(SMOKE, 0.6).set_stroke(INK, 2, opacity=0.4)
+    puff.set_z_index(Z_FX)
+    anims.append(FadeOut(puff, shift=0.45 * DOWN, scale=1.8, run_time=0.6 * run_time))
+    return LaggedStart(*anims, lag_ratio=0.04)

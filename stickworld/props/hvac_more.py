@@ -311,10 +311,13 @@ class SplitCondenser(Prop):
 
 
 class AirHandler(Prop):
-    """Upright air handler at (x, floor_y); points supply_top, return_bottom, filter_slot, power_in, lineset_suction, lineset_liquid, lineset, drain, base."""
+    """Upright air handler at (x, floor_y); points supply_top, return_bottom, filter_slot, power_in, lineset_suction,
+    lineset_liquid, lineset, drain, base, grip_L/grip_R (cabinet sides at chest height of a figure on the same floor),
+    grip_L_low/grip_R_low (a little lower, for two-handed pushes), top_L/top_R (top corners)."""
 
-    def __init__(self, x=0.0, floor_y=0.0, new=True, mirror=False, **kwargs):
-        """new=False gives the old-unit colours; mirror=True swaps the sides."""
+    def __init__(self, x=0.0, floor_y=0.0, new=True, mirror=False, drain_side="left", **kwargs):
+        """new=False gives the old-unit colours; mirror=True swaps the sides; drain_side="right" puts the condensate
+        stub under the refrigerant stubs instead of on the left."""
         super().__init__(**kwargs)
         fill, dark = _palette(new)
         W, HH = 21.5 * IN, 50 * IN
@@ -347,8 +350,9 @@ class AirHandler(Prop):
         )
         self.part("stubs", stubs)
         dy = ym + 0.22
-        self.part("drain_stub", VGroup(tube(np.array([P(x0, dy), P(x0 - 0.16, dy)]), 0.075, WHITE, cap=CapStyleType.BUTT),
-                                       rect(x0 - 0.04, dy - 0.07, x0, dy + 0.07, WHITE, 1.5)))
+        dx0, dd = (x0, -1) if drain_side == "left" else (x1, 1)
+        self.part("drain_stub", VGroup(tube(np.array([P(dx0, dy), P(dx0 + dd * 0.16, dy)]), 0.075, WHITE, cap=CapStyleType.BUTT),
+                                       rect(min(dx0, dx0 + dd * 0.04), dy - 0.07, max(dx0, dx0 + dd * 0.04), dy + 0.07, WHITE, 1.5)))
         self.mark("supply_top", (x, y1 + 0.12))
         self.mark("return_bottom", (x, y0))
         self.mark("filter_slot", (x, fy))
@@ -356,8 +360,12 @@ class AirHandler(Prop):
         self.mark("lineset_suction", (x1 + 0.2, ys))
         self.mark("lineset_liquid", (x1 + 0.2, yl))
         self.mark("lineset", (x1 + 0.2, (ys + yl) / 2))
-        self.mark("drain", (x0 - 0.16, dy))
+        self.mark("drain", (dx0 + dd * 0.16, dy))
         self.mark("base", (x, y0))
+        for side, gx in (("L", x0), ("R", x1)):
+            self.mark(f"grip_{side}", (gx, y0 + 0.4 * H))
+            self.mark(f"grip_{side}_low", (gx, y0 + 0.28 * H))
+            self.mark(f"top_{side}", (gx, y1))
         if mirror:
             self.flip(about_point=P(x, floor_y))
         self.set_z_index(Z_PROP)

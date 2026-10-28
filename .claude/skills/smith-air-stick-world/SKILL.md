@@ -28,7 +28,7 @@ stickworld/
   style.py        colours, stroke widths, figure proportions, z layers, setup_frame()
   rig.py          StickFigure: tracker-driven jointed rig, FK/IK, idle breathing and blinks
   face.py         Face: turn, blink, nod, look_at, expressions, talk
-  actions.py      action library (walk, reach, grab, pull, yank_plug, peel, zapped...) + Gait + carry_together
+  actions.py      action library (walk, climb, reach, grab, pull, haul, yank_plug, zapped...) + Gait + carry_together, pull_out
   episode.py      EpisodeScene: TIMING blocks, background(), timing report, music
   audio.py        SoundScene, Snd/cue/snd, footsteps, music bed
   audio/          src/ (licensed recordings + CREDITS.md + licenses/), sfx/ (cut cues), prep_audio.py
@@ -39,6 +39,7 @@ stickworld/
   test_scene.py   exercises every action, expression, prop and set
 episodes/
   ep01_package_unit.py   one file per short; only scene logic + TIMING (writes <file>_timing.md)
+  ep02_attic_air_handler.py
 ```
 
 Episode files import from stickworld and contain NO custom drawing code. If an episode needs something new, add it to the library first (with a line in test_scene.py).
@@ -87,6 +88,8 @@ The figure is a jointed skeleton driven by ValueTrackers; an updater redraws it 
 - `fig.grab2(obj, grip_L, grip_R)`: both hands; the object follows the midpoint of the hands and turns with the line between them. `keep_pinned=True` pins the hands to the grips instead (the object drives the hands, for shared loads).
 - `fig.release(obj, settle="drop"|"place"|"throw", ...)`: drop falls with gravity, a small bounce and a THUD for heavy things; place moves it to a target with the hands still on it, then lets go; throw follows a parabolic arc with spin.
 - `carry_together([figs], obj, grips, run_time, path=|walk=|rise=|rot=)`: several figures move one object with their hands locked on its grip points, stepping with planted feet (`walk=(dx, dy)`) or standing up out of a squat (`rise=`).
+- Pinned hands (`grab2(obj, a, b, keep_pinned=True)`, `pin()`) stay on the object while it moves; `let_go(sides)` takes them off and drops the arms to rest. Pin hands to a point of the prop that owns it (`dolly.pt("handle")`), not of a Bundle that will later be split.
+- Loads made of several props (an air handler standing on a hand truck): `bundle(*props)` (props/base.py) moves them as one rigid Prop (add the bundle, not the props; `pt()` finds points in its members); `unbundle(scene, b, prop)` hands a prop back. `ride(mob, point, path, angle, progress)` drives a prop along a path with a ValueTracker (a rope haul or a slide feeds it); `turn_about(mob, angle, point)` tips it about one of its points (hand truck back onto its wheels, laying it down). Stop a ride with `detach(mob)`.
 - Nothing a figure interacts with may move unless a hand (or a clearly shown force like gravity, a thrown arc, or the explicit "rewind" gag) is moving it. If an object comes loose, the arm motion that causes it happens first.
 - Screws: unscrewing shows a drill held to the screw for a beat (`Screw.back_out()` + "drill" cue), then the screw pops out on a small arc (`fly_off`). Screwing in reverses it (`fly_in` loose, then `drive_in` with the drill).
 
@@ -118,6 +121,11 @@ Every action is a StickFigure method that returns an Animation and only moves tr
 - `point_at(target)`, `shrug()`, `facepalm()`, `hands_on_hips()`, `arms_crossed()`, `celebrate()` (fist pump), `wipe_brow()`.
 - `zapped(source=point)`: zap cue, arcs from the source to the hand, body jitters at 20 Hz for 0.5 s, hair/cap spikes straight up, X eyes, smoke off the head, dazed stars, then a recovery blink. `hair_down()` later.
 - `flinch()`: crouch, arms over the head, eyes squeezed; then slowly peek.
+- `keyframes(keys, run_time)`: pose-to-pose motion with planted contacts (keys of hip, footL/R, handL/R (point, callable or None = rest), joint angles); every changing foot or hand lifts in a small arc and lands, nothing slides. Base for climbing and scrambling.
+- `climb(treads, landing, lip, hunch=, down=False)`: ladder / pull-down stair. Stand 0.55 short of tread_0 facing the way the stair rises; feet go tread to tread, the opposite hand moves up the rail, at the top the hands go to the lip and the floor and the feet step off to `landing`. `down=True` backs down it (start standing at the landing facing the stair). Footsteps + creaks.
+- `fall_through(hole_x, floor, hole=CeilingHole)`: steps onto a gap between joists, one leg plunges through the ceiling to the hip, arms fly up, CRASH + rip, the hole bursts and debris falls into the room. Then `kick_leg(times)` and module-level `pull_out(helper, stuck, stand_x)` (hands meet, helper leans back, the stuck foot comes straight up out of the hole, both feet land standing).
+- `slide_push(obj, x, grips)`: both hands on a heavy box's near side, lean in, walk; it scrapes along flat on the floor. `wheel_to(x, load)`: walk a hand-truck load with both hands on the handle (take it with grab2 keep_pinned, tip it back with turn_about first).
+- `haul(rope, progress, amount, pulls, toward=lip)`: hand-over-hand on a Rope; each pull advances the load's ride tracker; the rope's hauler end follows the pulling hand.
 
 Timing rules: big actions 0.6–1.2 s; small gestures 0.3–0.5 s; holds of at least 0.3 s after a gag lands. Default rate_func smooth; there_and_back for nods, rush_from for snaps, ease_out_back for pops.
 
@@ -127,11 +135,13 @@ Scene helpers (episode.py): `with self.block("name"):` for each TIMING entry; `s
 
 Every prop is a `Prop` (props/base.py) with named sub-parts (`prop.parts`) and named points (`prop.pt(name)`) that move with it, so actions can target grip points and connection points.
 
-- hvac.py: `PackageUnit(cx, pad_top, old)` (points grip_L/R(+_low), supply_open, return_open, whip_terminal, lv_terminal, foot_spot, top_center, panel_screw_0..3; `arrive_sparkle()`), `Disconnect(center, on)` (handle, pivot, whip_out; `flip(on)`), `Duct(x_wall, x_unit, y)` (unit_end, wall_end, grip_L/R), `FlashingPanel(x_hinge, x_free, y0, y1, kind="top"|"side")` (free_end; `peel_to(p)`), `Screw(p)` (`back_out`, `drive_in`, `fly_off`, `fly_in`), `HighVoltageWhip(...)` / `LowVoltageWire(...)` (Cable: `connect_end(fn)`, `free_end()`, `strip(on)`, `reshape(c2)`; add `.mob` and `.end` to the scene). hvac_more.py: SplitCondenser, AirHandler, Furnace, EvapCoil, LineSet, Thermostat, CondensateDrain, FilterRack, BreakerPanel.
-- tools.py: `ToolBag(handle_top)` (handle, opening), `Drill(grip, face)` (grip, tip, `tip_offset`). tools_more.py: Screwdriver, Multimeter, GaugeSet, RecoveryMachine, RefrigerantTank, Level, Dolly, Ladder, Flashlight, MasticBucket, MasticBrush.
+- hvac.py: `PackageUnit(cx, pad_top, old)` (points grip_L/R(+_low), supply_open, return_open, whip_terminal, lv_terminal, foot_spot, top_center, panel_screw_0..3; `arrive_sparkle()`), `Disconnect(center, on)` (handle, pivot, whip_out; `flip(on)`), `Duct(x_wall, x_unit, y)` (unit_end, wall_end, grip_L/R), `FlashingPanel(x_hinge, x_free, y0, y1, kind="top"|"side")` (free_end; `peel_to(p)`), `Screw(p)` (`back_out`, `drive_in`, `fly_off`, `fly_in`), `HighVoltageWhip(...)` / `LowVoltageWire(...)` (Cable: `connect_end(fn)`, `free_end()`, `strip(on)`, `reshape(c2)`; add `.mob` and `.end` to the scene). hvac_more.py: SplitCondenser, AirHandler (`drain_side="left"|"right"`; points grip_L/R(+_low), top_L/R, lineset, drain, supply_top, base...), Furnace, EvapCoil, LineSet (`reshape(points)`), Thermostat (`set_temp`), CondensateDrain, FilterRack, BreakerPanel.
+- tools.py: `ToolBag(handle_top)` (handle, opening), `Drill(grip, face)` (grip, tip, `tip_offset`). tools_more.py: Screwdriver, Multimeter, GaugeSet, RecoveryMachine, RefrigerantTank, Level, Dolly (hand truck; `facing=-1` puts the nose plate on the left; points handle, axle, nose, load, base), Ladder, Flashlight, MasticBucket, MasticBrush, `Rope(*anchors, tail_to=)` (anchors are points or callables, anchors[0] is the hauler's end with the slack tail to a coil; `hold(fn)`, `throw(anchors)`).
 - vehicles.py: `WorkTruck(front_x, street_y)` (driver_seat, passenger_seat, door_step, door_hinge, bed_center, bed_floor, bed_rail, exhaust; `drive_in(dx, riders)` rolls in with turning wheels, a bounce and an exhaust puff; `open_door()`, `close_door()`, `bounce()`). No lettering unless asked. Riders sit behind the cab at `Z_FIGURE_HIDDEN` with tucked legs.
-- effects.py: `smoke`, `dust`, `sparkles`, `stars`, `bolt`, `zap_arcs`, `cold_air(clock, lanes, x_from, x_to)`, `vibration_lines(clock, anchors)`, `hum_shake(mob, clock)`, `effect_word` (on request only). effects_more.py: heat_waves, motion_lines, sweat, question_mark.
-- sets.py: `house_side(ground_y, wall_x, pad)` (ground, wall_face, disconnect_mount, pad_center, window, sky), `driveway(street_y, curb_y)` (street, curb, truck_front, lawn). sets_more.py: attic, crawlspace, rooftop, utility_closet.
+- effects.py: `smoke`, `dust`, `sparkles`, `stars`, `bolt`, `zap_arcs`, `cold_air(clock, lanes, x_from, x_to, vertical=False)` (vertical: lanes are x positions, air pours down out of a register), `vibration_lines(clock, anchors)`, `hum_shake(mob, clock)`, `effect_word` (on request only). effects_more.py: heat_waves, motion_lines, sweat, question_mark, debris (drywall chips + insulation falling).
+- sets.py: `house_side(ground_y, wall_x, pad)` (ground, wall_face, disconnect_mount, pad_center, window, sky), `driveway(street_y, curb_y)` (street, curb, truck_front, lawn). sets_more.py: attic, crawlspace, rooftop, utility_closet, CeilingHole.
+  - `attic(floor_y, room_floor=, hatch_x=, stair_foot="left", walkway=(x0, x1), register_x=, light_x=, thermostat_x=, work_x=, plenum_x=, plenum_y=)`: gable attic over a room in cutaway; the pull-down stair runs from the hatch to the room floor with even ~11 in risers and is drawn in front of props (a hauled load rides between its rails). Anchors: hatch, lip, ceiling, stair_top, stair_bottom, tread_0.. (`.treads`), room_floor, thermostat_spot (60 in up), register, plenum_bottom, work_spot, walkway_left/right, peak. Headroom is low toward the eaves (about 5.6 - 0.75|x| above the floor): keep standing figures within |x| < 1.4, hunch (spine 0.15) in the attic.
+  - `CeilingHole(x, top_y, bottom_y)`: the hole a foot leaves (dark gap, torn drywall flaps, insulation fluff); `burst()`.
 - camera.py: `punch_in(scene, point, zoom)`, `pan_to`, `reset`, `shake`.
 
 Connections: `connect(child, "point", parent, "point")` / `Cable.connect_end(fn)` keep things attached while they move, until a figure's action disconnects them.
@@ -188,3 +198,17 @@ Gage will describe the short in plain language as a list of scenes. For each epi
 10. rewind: tape-rewind sound; the ducts click back in, the flashing un-peels, the screws fly back loose and the techs drive them in with the drills.
 11. thread: punch-in; TECH1 kneels and thread_wire()s the low voltage into the grommet: tongue out, squint, misses twice, gets it; the conductors slide in; exhale.
 12. power_up: TECH1 flips the disconnect back on; the new unit hums and cold air flows into the house. End.
+
+## 13. Episode 02 reference (attic air handler swap)
+
+`episodes/ep02_attic_air_handler.py` (~46.7 s), one static cutaway (attic on top, the hot room below), camera punch-ins for the gag and the ending:
+
+1. arrive: the homeowner sweats at the thermostat (78) under heat waves; TECH1 walks in, TECH2 wheels the new BRRRIER air handler in on the hand truck and stands it up; the homeowner points at the hatch.
+2. climb: TECH1 climbs the pull-down stair and steps off onto the walkway; TECH2 follows once the stair is clear.
+3. joist: punch-in; TECH1 explains, TECH2 nods, steps back off the walkway end and puts a leg through the ceiling right beside the homeowner's face (crash, debris, shake); leg kicks; TECH1 shakes his head, pulls him out and points him back down the hatch.
+4. old_out: TECH2 backs down the stair; TECH1 cuts the line set, scrapes the old LEMONNOX unit to the hatch and it tips in, slides down the stair, slams the floor, topples and skids out of frame; TECH2 dives clear, the homeowner flinches.
+5. dolly_up: TECH2 tips the hand truck back and rolls it to the stair; TECH1 throws a rope down, TECH2 hooks it; TECH1 hauls hand over hand, then grabs the handle and swings the unit up and out onto its spot under the plenum; lays the empty hand truck down.
+6. connect: TECH1 bends the line set back onto the stubs and brazes (sparkles, fizz), clicks the condensate drain on, exhales.
+7. thermostat: the homeowner presses down 78 -> 72 (six clicks).
+8. cold_air: the unit hums, cold air pours out of the register over the homeowner (eyes closed, arms out); TECH2 fist-pumps; TECH1 crosses his arms, smug. Slow punch-in. End.
+
