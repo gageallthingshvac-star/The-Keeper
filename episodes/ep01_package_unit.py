@@ -21,7 +21,8 @@ from stickworld.actions import Do, carry_together
 from stickworld.audio import Snd
 from stickworld.episode import EpisodeScene
 from stickworld.props import effects as FX
-from stickworld.props.base import attach_to, detach
+from stickworld.props.base import attach_to, detach, ground_shadow
+from stickworld.props.effects_more import impact_burst, spark_shower
 from stickworld.props.hvac import Disconnect, Duct, FlashingPanel, HighVoltageWhip, LowVoltageWire, PackageUnit, Screw
 from stickworld.props.tools import Drill, ToolBag
 from stickworld.props.vehicles import WorkTruck
@@ -85,6 +86,9 @@ class Ep01PackageUnit(EpisodeScene):
                  self.truck, self.bag)
         self.whip.connect_end(lambda: self.unit.pt("whip_terminal"))
         self.lv.connect_end(lambda: self.unit.pt("lv_terminal"))
+        # soft contact shadows anchor the big props to the ground
+        self.add(ground_shadow(self.unit, G + 0.13), ground_shadow(self.truck, STREET, width=6.0, height=0.22),
+                 ground_shadow(self.bag, G - 0.62 - 0.33, width=1.2))
 
     # ------------------------------------------------------------ helpers built from library actions
     def fetch_drills(self, t1_x=-3.7, t2_x=-1.45):
@@ -160,6 +164,7 @@ class Ep01PackageUnit(EpisodeScene):
         t1, t2, truck, unit, bag = self.t1, self.t2, self.truck, self.unit, self.bag
 
         with self.block("arrive"):
+            self.background(camera.punch_in(self, P(-0.4, -0.9), 0.9, 8.5, rate_func=linear))   # slow push across the arrival
             self.snd("truck")
             self.snd("cough", 0.4, gain=-3)
             self.play(truck.drive_in(-9, 1.4, riders=(t1, t2)),
@@ -189,10 +194,13 @@ class Ep01PackageUnit(EpisodeScene):
                       t2.pose({"drop": 0.7, "spine": 0.55}, 0.4),
                       Succession(Wait(0.4), t2.reach("R", unit.pt("whip_terminal") + P(-0.25, 0.05), 0.35)))
             self.play(t2.zapped(source=unit.pt("whip_terminal")),
+                      spark_shower(unit.pt("whip_terminal"), 0.55, rate=48, speed=(1.6, 3.4), spread=(0.2, 2.9),
+                                   colors=("#FFFFFF", "#BFE8FF", "#FFD54A")),
+                      camera.punch_in(self, P(0.1, 0.4), 0.72, 0.25), Succession(Wait(0.25), camera.shake(self, 0.09, run_time=0.3)),
                       Succession(Wait(0.4), Do(lambda: t1.unpin("R")),
                                  AnimationGroup(t1.pose("stand", 0.3), t1.expression("neutral", 0.2), t1.look_at(t2.head_center())),
                                  Wait(0.1), t1.shake_head(2, slow=True)))
-            self.play(t1.walk_to(-2.9, G, face=-1, run_time=0.5))
+            self.play(t1.walk_to(-2.9, G, face=-1, run_time=0.5), camera.reset(self, 0.5))
             self.play(t1.push_switch(disc, False, run_time=0.2), Succession(Wait(0.25), Snd("clunk")))
 
         with self.block("drills"):
@@ -275,6 +283,7 @@ class Ep01PackageUnit(EpisodeScene):
                       t2.pose({"shoulder_R": 2.3, "elbow_R": 0.2, "shoulder_L": 2.1, "elbow_L": 0.2, "spine": 0.15}, 0.3))
             self.play(Snd("crash", gain=1), truck.bounce(depth=0.2), unit.animate(rate_func=there_and_back, run_time=0.32).shift(DOWN * 0.2),
                       camera.shake(self, 0.16), FX.dust(P(land[0], truck.pt("bed_rail")[1]), 4.0),
+                      impact_burst(P(land[0], truck.pt("bed_rail")[1] + 0.9), 1.5),
                       t1.pose("stand", 0.4), t2.pose("stand", 0.4))
 
         with self.block("new_unit"):
@@ -334,6 +343,7 @@ class Ep01PackageUnit(EpisodeScene):
             self.snd("hum", 0.1, gain=-2)
             self.play(clock.animate(run_time=1.8, rate_func=linear).set_value(1.8),
                       t1.look_at(new.pt("top_center"), 0.3), Succession(Wait(0.6), t2.expression("happy", 0.3)),
-                      Succession(Wait(0.1), t1.thumbs_up(face=1)))
+                      Succession(Wait(0.1), t1.thumbs_up(face=1)),
+                      camera.punch_in(self, P(-1.6, 0.7), 0.78, 1.8))
 
         self.finish()

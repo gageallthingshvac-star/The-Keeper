@@ -10,7 +10,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import numpy as np
-from manim import DOWN, PI, AnimationGroup, FadeIn, Succession, ValueTracker, Wait, linear
+from manim import DOWN, PI, AnimationGroup, FadeIn, Succession, ValueTracker, Wait, linear, there_and_back
 from manim.utils.rate_functions import ease_in_quad, ease_out_bounce
 
 from stickworld import camera
@@ -18,12 +18,14 @@ from stickworld.actions import Do, climb_start, pull_out
 from stickworld.audio import Snd
 from stickworld.episode import EpisodeScene
 from stickworld.props import effects as FX
-from stickworld.props.base import attach_to, bundle, detach, ride, turn_about, unbundle
+from stickworld.props.base import attach_to, bundle, detach, ground_shadow, ride, turn_about, unbundle
+from stickworld.props.effects_more import glow, heat_waves, impact_burst, pop, spark_shower, squash_land
 from stickworld.props.hvac_more import AirHandler, CondensateDrain, LineSet, Thermostat
 from stickworld.props.tools import ToolBag
 from stickworld.props.tools_more import Dolly, Rope, Torch, TubingCutter
 from stickworld.rig import StickFigure
-from stickworld.sets_more import CeilingHole, attic
+from stickworld.sets_more import ROOM_COOL, ROOM_HOT, CeilingHole, attic
+from stickworld.style import FRAME_H
 
 # ---------------------------------------------------------------- layout: attic on top, the hot room below
 F = 0.5             # attic floor (top of the joists)
@@ -47,8 +49,8 @@ class Ep02AtticAirHandler(EpisodeScene):
         "climb": 8.0,
         "joist": 6.6,
         "old_out": 9.3,
-        "dolly_up": 10.5,
-        "connect": 5.8,
+        "dolly_up": 11.2,
+        "connect": 6.8,
         "thermostat": 2.3,
         "cold_air": 4.2,
     }
@@ -57,7 +59,8 @@ class Ep02AtticAirHandler(EpisodeScene):
     def build(self):
         probe = AirHandler(AH_X, F)
         self.set_ = attic(F, room_floor=RF, hatch_x=HATCH_X, walkway=(-1.2, 1.45), register_x=HO_X - 0.05, light_x=-0.45,
-                          thermostat_x=2.45, work_x=AH_X, plenum_x=AH_X, plenum_y=probe.pt("supply_top")[1])
+                          thermostat_x=2.45, work_x=AH_X, plenum_x=AH_X, plenum_y=probe.pt("supply_top")[1],
+                          room_color=ROOM_HOT)
         a = self.set_
         self.treads = [a.pt(n) for n in a.treads]
         self.B, top = a.pt("stair_bottom")[:2], a.pt("stair_top")[:2]
@@ -88,6 +91,10 @@ class Ep02AtticAirHandler(EpisodeScene):
         self.add(a, self.drain, self.lineset, self.old, self.thermo, self.load, self.rope, self.ho, self.lead, self.rookie,
                  self.bag)
         attach_to(self.bag, "handle", lambda: self.lead.hand("R"))
+        attic_floor = (-1.15, 4.6)  # the attic floor, not over the hatch
+        self.add(ground_shadow(self.old, F, span=attic_floor), ground_shadow(self.new, RF), ground_shadow(self.new, F, span=attic_floor),
+                 ground_shadow(self.dolly, RF, width=0.7), ground_shadow(self.dolly, F, span=attic_floor),
+                 ground_shadow(self.bag, F, span=(-1.0, 4.6)))
         self.rookie.pin("L", lambda: self.dolly.pt("handle"))
         self.rookie.pin("R", lambda: self.dolly.pt("handle"))
 
@@ -136,17 +143,23 @@ class Ep02AtticAirHandler(EpisodeScene):
         landing = (LANDING_X, F)
         start_x = climb_start(self.treads)
 
+        self.camera.frame.set(height=FRAME_H * 0.48).move_to(np.array([1.8, -1.6, 0]))   # open on the problem
+        head = ho.head_center()
         with self.block("arrive"):
             self.play(lead.walk_to(start_x, speed=1.25, hold=("R",)),
                       rookie.wheel_to(DOLLY_X + 0.2 + 1.06, self.load, run_time=3.0),
-                      Succession(FX.heat_waves(ho.head_center() + np.array([0, 0.45, 0]), 1.2),
-                                 AnimationGroup(FX.sweat(ho.head_center(), side=-1), ho.wipe_brow()),
-                                 AnimationGroup(ho.turn(-1), ho.expression("disappointed"))))
+                      Succession(AnimationGroup(heat_waves(head + np.array([0, 0.45, 0]), 1.2),
+                                                heat_waves(head + np.array([-1.1, -1.4, 0]), 1.3, width=0.6),
+                                                heat_waves(head + np.array([1.2, -2.2, 0]), 1.3, width=0.6)),
+                                 AnimationGroup(FX.sweat(head, side=-1), ho.wipe_brow(), heat_waves(head + np.array([0.2, 0.5, 0]), 1.0)),
+                                 AnimationGroup(ho.turn(-1), ho.expression("disappointed"))),
+                      Succession(Wait(1.5), camera.reset(self, 1.5)))
             self.play(turn_about(self.load, 0.25, "axle", 0.4), rookie.walk_to(DOLLY_X + 0.65, face=-1, run_time=0.4),
                       ho.point_at(a.pt("hatch")), Snd("thump", gain=-14))
             self.play(rookie.let_go(), ho.pose("stand", 0.3), Wait(0.1))
 
         with self.block("climb"):
+            self.background(camera.punch_in(self, np.array([-1.3, -0.5, 0]), 0.84, 4.0))
             self.background(Succession(Wait(1.3), rookie.walk_to(start_x, speed=1.15),
                                        rookie.climb(self.treads, landing, lip, hunch=0.15),
                                        rookie.walk_to(ROOKIE_SPOT, spine=0.15), rookie.turn(-1)))
@@ -159,8 +172,11 @@ class Ep02AtticAirHandler(EpisodeScene):
         with self.block("joist"):
             self.play(lead.talk(0.8), lead.point_at(self.old.pt("top_R")), rookie.nod(2),
                       camera.punch_in(self, np.array([1.25, -0.3, 0]), 0.68, 0.8))
+            ceil = a.pt("ceiling")[1]
             self.play(lead.pose("stand", 0.3), rookie.fall_through(HOLE_X, F, hole=self.hole),
-                      Succession(Wait(0.27), camera.shake(self, 0.1, run_time=0.3)))
+                      Succession(Wait(0.4), AnimationGroup(camera.shake(self, 0.12, run_time=0.3),
+                                                           impact_burst((HOLE_X, ceil - 0.25), 0.9))))
+            self.wait(0.08)   # hit-stop: let the crunch land
             self.play(rookie.kick_leg(3, 0.9), rookie.expression("strain", 0.2),
                       Succession(AnimationGroup(ho.expression("surprised", 0.15), ho.pose({"spine": -0.25, "neck": -0.15}, 0.25),
                                                 ho.look_at(rookie.foot(rookie._stuck["side"]))),
@@ -187,7 +203,8 @@ class Ep02AtticAirHandler(EpisodeScene):
                       lead.expression("squint", 0.2),
                       Succession(Wait(0.1), AnimationGroup(rookie.look_at(a.pt("hatch")), rookie.expression("surprised", 0.1)),
                                  Wait(0.1), AnimationGroup(rookie.run_to(-1.65, run_time=0.35), rookie.flinch(peek=False))),
-                      Succession(Wait(0.82), AnimationGroup(Snd("crash"), FX.dust(np.array([-3.4, RF, 0]), 1.4),
+                      Succession(Wait(0.82), AnimationGroup(Snd("crash"), FX.dust(np.array([-3.4, RF, 0]), 1.8),
+                                                            impact_burst((-3.3, RF + 0.5), 1.3), camera.shake(self, 0.15, run_time=0.4),
                                                             ho.flinch(), FX.sweat(ho.head_center(), side=1))),
                       Succession(Wait(1.2), Snd("thud", gain=-4), Snd("clatter", gain=-8)))
             self.play(Do(lambda: detach(self.old)), lead.shrug())
@@ -219,6 +236,7 @@ class Ep02AtticAirHandler(EpisodeScene):
                 k = min(1.0, s / 0.1)
                 return axle0 + (p - axle0) * k
 
+            self.background(camera.punch_in(self, np.array([-1.1, -0.9, 0]), 0.8, 3.0))
             self.play(Do(lambda: ride(self.load, "axle", stair_path, None, haul)),
                       rookie.let_go(), rookie.step_back(0.55, run_time=0.5),
                       lead.haul(self.rope, haul, 1.0, pulls=4, run_time=1.9, toward=lip),
@@ -244,7 +262,8 @@ class Ep02AtticAirHandler(EpisodeScene):
                       Succession(lead.pose({"drop": 0.0, "spine": 0.2}, 0.62),
                                  lead.walk_to(HAUL_X, face=-1, run_time=0.78, spine=0.15)),
                       Succession(Wait(1.38), Snd("thud", gain=-6)))
-            self.play(Do(lambda: detach(self.load)), lead.let_go(run_time=0.25), lead.expression("neutral", 0.2))
+            self.play(Do(lambda: detach(self.load)), squash_land(self.load, 0.07, 0.4), FX.dust(np.array([AH_X + 0.2, F, 0]), 1.7),
+                      lead.let_go(run_time=0.25), lead.expression("neutral", 0.2), camera.reset(self, 0.9))
             self.play(Do(lambda: unbundle(self, self.load, self.new)), Do(lambda: unbundle(self, self.load, self.dolly)))
             self.play(self.new.animate(run_time=0.12).shift(0.05 * DOWN),
                       turn_about(self.dolly, -PI / 2, "axle", 0.55, ease_in_quad),
@@ -254,27 +273,35 @@ class Ep02AtticAirHandler(EpisodeScene):
             self.background(Succession(rookie.walk_to(HO_X - 1.25), rookie.turn(1)))
             end = lambda: self.lineset.pt("end_a")
             stubs = self.new.pt("lineset")
-            self.play(lead.reach("R", end, 0.3), lead.look_at(stubs))
+            self.play(lead.reach("R", end, 0.3), lead.look_at(stubs),
+                      camera.punch_in(self, stubs + np.array([0.3, 0.2, 0]), 0.34, 0.7), Snd("whoosh", gain=-16))
             self.play(Do(lambda: lead.pin("R", end)), self.lineset.reshape(self.LS_ON, 0.55))
             self.play(lead.let_go(("R",)))
             self.play(lead.fetch_tool(self.bag, self.torch))
             self.play(self.torch.flame(True), Snd("click", gain=-4), Snd("fizz", gain=-8))
             joint = stubs + np.array([0.04, 0.0, 0])
-            self.play(lead.use_tool(self.torch, joint, turns=0, run_time=1.1), lead.expression("squint", 0.2),
-                      Succession(Wait(0.35), AnimationGroup(
-                          FX.sparkles([stubs + np.array([0.05, 0.1, 0]), stubs + np.array([-0.04, -0.08, 0])], 0.7),
-                          FX.heat_waves(stubs + np.array([0, 0.12, 0]), 0.7, width=0.4, height=0.5), Snd("fizz", gain=-3))))
+            self.play(lead.use_tool(self.torch, joint, turns=0, run_time=1.3), lead.expression("squint", 0.2),
+                      Succession(Wait(0.3), AnimationGroup(
+                          glow(joint, 1.2), spark_shower(lambda: self.torch.pt("tip"), 1.0, rate=34, speed=(1.0, 2.4)),
+                          heat_waves(stubs + np.array([0, 0.15, 0]), 1.0, width=0.4, height=0.5), Snd("fizz", gain=-3))))
             self.play(self.torch.flame(False), lead.expression("neutral", 0.2))
             self.play(lead.stow_tool(self.bag, self.torch))
             self.play(lead.reach("L", self.drain.pt("inlet"), 0.3), lead.look_at(self.drain.pt("inlet")))
-            self.play(Snd("click"), Wait(0.12))
-            self.play(lead.let_go(("L",)), lead.exhale())
+            self.play(Snd("click"), FX.sparkles([self.drain.pt("inlet") + np.array([0.08, 0.12, 0])], 0.45, 3))
+            self.play(lead.let_go(("L",)), lead.exhale(),
+                      camera.punch_in(self, self.thermo.pt("screen") + np.array([-0.35, -0.25, 0]), 0.3, 0.8),
+                      Succession(Wait(0.15), Snd("whoosh", gain=-12)))
 
         with self.block("thermostat"):
             btn = self.thermo.pt("button_down")
-            self.play(ho.turn(1), ho.reach("R", btn, 0.35), ho.look_at(self.thermo.pt("screen")))
-            clicks = [Succession(Wait(0.2 * i), Snd("click", gain=-6)) for i in range(6)]
-            self.play(self.thermo.set_temp(72, run_time=1.2, rate_func=linear), *clicks, ho.expression("smug", 0.3))
+            self.play(ho.turn(1), ho.reach("R", btn, 0.3), ho.look_at(self.thermo.pt("screen")), ho.expression("happy", 0.3))
+            digits = self.thermo.parts["digits"]
+            for t in range(77, 71, -1):
+                self.play(self.thermo.set_temp(t, run_time=0.04), Snd("click", gain=-6),
+                          ho.reach("R", btn + np.array([0.025, -0.01, 0]), 0.08, rate_func=there_and_back, lean=False),
+                          pop(digits, 1.18, 0.17))
+            self.play(self.thermo.parts["screen"].animate(run_time=0.3).set_fill("#BFE6FF"), Snd("ding", gain=-10),
+                      FX.sparkles([self.thermo.pt("screen") + np.array([0.28, 0.2, 0])], 0.5, 5))
             self.play(ho.let_go(("R",)))
 
         with self.block("cold_air"):
@@ -288,7 +315,8 @@ class Ep02AtticAirHandler(EpisodeScene):
             FX.hum_shake(ah, clock)
             self.add(hum, air)
             self.play(clock.animate(run_time=4.0, rate_func=linear).set_value(4.0), Snd("hum", gain=-6),
-                      camera.punch_in(self, np.array([0.9, -0.9, 0]), 0.8, 3.6),
+                      camera.punch_in(self, np.array([0.9, -0.9, 0]), 0.8, 2.2),
+                      Succession(Wait(0.4), a.parts["room"].animate(run_time=2.4).set_fill(ROOM_COOL)),
                       Succession(Wait(0.6), AnimationGroup(ho.expression("happy", 0.3), ho.face.close_eyes(0.3),
                                                            ho.pose({"shoulder_L": 1.2, "elbow_L": 0.3, "shoulder_R": 1.3,
                                                                     "elbow_R": 0.3, "neck": -0.2}, 0.5))),

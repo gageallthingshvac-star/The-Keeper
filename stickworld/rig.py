@@ -15,7 +15,7 @@ can move or crouch while the feet stay put. Hands work the same way: a lock trac
 target (a tracker pair, or a pinned callable that follows a moving object).
 """
 import numpy as np
-from manim import TAU, CapStyleType, Circle, Polygon, RoundedRectangle, ValueTracker, VGroup, VMobject
+from manim import TAU, CapStyleType, Circle, Ellipse, Polygon, RoundedRectangle, ValueTracker, VGroup, VMobject
 
 from . import style as S
 from .face import Face
@@ -127,6 +127,8 @@ class StickFigure(ActionsMixin, VGroup):
         for n in ("upper_R", "fore_R"):
             self.parts[n] = self._seg()
         self.parts["fist"] = VGroup()
+        self.parts["shadow"] = Ellipse(width=0.8, height=0.12).set_fill(S.INK, S.SHADOW_OPACITY).set_stroke(width=0)
+        self.add(self.parts["shadow"])  # contact shadow, drawn first so the body is over it
         for n in order:
             self.add(self.parts[n])
         self.add(self.parts["hair"], self.parts["head"])
@@ -199,9 +201,23 @@ class StickFigure(ActionsMixin, VGroup):
         J["hair"] = tv["hair"]
         return J
 
+    def _draw_shadow(self, J):
+        """Soft contact shadow on the surface under the feet; fades when the feet are on different levels (ladders,
+        a leg through the ceiling) or the body leaves the ground."""
+        fL, fR = J["foot_L"], J["foot_R"]
+        g = min(fL[1], fR[1])
+        level = float(np.clip(1.0 - (abs(fL[1] - fR[1]) - 0.08) / 0.25, 0.0, 1.0))
+        air = float(np.clip(1.0 - (J["hip"][1] - g - S.STAND_HIP - 0.15) / 0.8, 0.0, 1.0))
+        k = level * air * (self.shadow_on if hasattr(self, "shadow_on") else 1.0)
+        w = max(0.62, abs(fL[0] - fR[0]) + 0.5)
+        sh = self.parts["shadow"]
+        sh.stretch_to_fit_width(w).stretch_to_fit_height(0.12).move_to(np.array([(fL[0] + fR[0]) / 2, g, 0.0]))
+        sh.set_fill(S.INK, S.SHADOW_OPACITY * k)
+
     def _redraw(self):
         J = self.joints = self.solve()
         P = self.parts
+        self._draw_shadow(J)
         for side in "LR":
             P[f"thigh_{side}"].set_points_as_corners([J["hip"], J[f"knee_{side}"]])
             P[f"shin_{side}"].set_points_as_corners([J[f"knee_{side}"], J[f"foot_{side}"]])

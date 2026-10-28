@@ -52,6 +52,8 @@ LV_STRANDS = ["#D63A2F", "#FFFFFF", "#2E9E44", "#F2D21B"]  # low-voltage cable l
 LV_CONDUCTORS = ["#111111", "#7B4A1E", "#2E9E44", "#2F6FD6", "#F2D21B", "#D63A2F", "#FFFFFF", "#F28C1B"]
 WHIP_CONDUCTORS = ["#111111", "#111111", "#2E9E44"]
 
+SHADOW_OPACITY = 0.17   # soft contact shadows under figures and props (anchor them to the ground)
+
 # ---------------------------------------------------------------- strokes
 LIMB_W = 8      # figure limbs, body and head outline
 PROP_W = 5      # prop outlines

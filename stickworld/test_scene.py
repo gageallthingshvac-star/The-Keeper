@@ -234,6 +234,15 @@ class StickWorldTest(EpisodeScene):
             self.add(fig, box)
             self.play(heat_waves(P(1.5, -1.0), run_time=1.0), sweat(fig.head_center(), side=1), question_mark(fig.head_center() + P(0, S.HEAD_R)))
             self.play(motion_lines(box, RIGHT, run_time=0.8), box.animate.shift(RIGHT * 4), run_time=0.8)
+            from stickworld.props.base import ground_shadow
+            from stickworld.props.effects_more import glow, impact_burst, pop, spark_shower, squash_land
+            self.add(ground_shadow(box, -4.9))
+            self.play(spark_shower(P(1.0, -2.5), 0.8), glow(P(1.0, -2.5), 0.8), impact_burst(P(-2.0, -3.0), 1.0),
+                      squash_land(box, 0.1, 0.4), pop(fig, 1.1, 0.3))
+            camera.follow(self, lambda: fig.hip_point(), stiffness=3.0)
+            self.play(fig.walk_to(1.5))
+            camera.unfollow(self)
+            self.play(camera.reset(self, 0.4))
             self.remove(fig, box)
 
         with self.block("attic_actions"):

@@ -17,6 +17,8 @@ DIRT = "#A68A64"
 VAPOR = "#2B2B2B"                                 # black poly vapour barrier
 SHEATHING = mix(WOOD, WHITE, 0.35)  # plywood / OSB, lighter than framing lumber
 CLOSET_WALL = mix(WALL, CONCRETE, 0.35)
+ROOM_HOT = "#F9DCC0"    # a hot room: warm peach walls
+ROOM_COOL = "#E3F0F8"   # the same room once the AC is on
 
 X0, X1, Y0, Y1 = -4.5, 4.5, -8.0, 8.0
 BLEED = 0.15  # draw backgrounds a little past the frame edge
@@ -92,13 +94,14 @@ def _cloud(cx, cy, s=1.0):
 
 # ================================================================ attic
 def attic(floor_y=-2.4, room_floor=None, hatch_x=-2.6, stair_foot="left", walkway=None, light_x=2.0,
-          register_x=None, thermostat_x=3.1, work_x=1.4, plenum_x=None, plenum_y=None):
+          register_x=None, thermostat_x=3.1, work_x=1.4, plenum_x=None, plenum_y=None, room_color=WALL):
     """Gable attic over a room: rafters meeting at the ridge with a collar tie, joists with pink batts, a
     plywood walkway and a framed hatch with a pull-down stair into the room below.
     room_floor: draw the room's floor at that height (the stair lands on it); stair_foot "left"/"right": which way
     the stair runs down from the hatch; walkway=(x0, x1); register_x: a supply register in the room ceiling;
     plenum_x/plenum_y: a supply plenum hung from the rafters whose bottom sits at plenum_y (an air handler slides
-    in under it). The stair is drawn in front of props (Z_PROP_FRONT) so a load hauled up it sits between the rails.
+    in under it). room_color: the room's wall colour (start a hot room warm, ROOM_HOT, and tween parts["room"] to
+    ROOM_COOL when the AC comes on). The stair is drawn in front of props (Z_PROP_FRONT) so a load hauled up it sits between the rails.
     Anchors: hatch, lip (top of the hatch curb on the stair-top side), floor_left, floor_right, work_spot, peak,
     walkway_left, walkway_right, ceiling (underside), stair_top, stair_bottom, tread_0.. (bottom up; .treads = list
     of names), and with room_floor: room_floor, thermostat_spot (60 in up); register; plenum_bottom."""
@@ -114,7 +117,7 @@ def attic(floor_y=-2.4, room_floor=None, hatch_x=-2.6, stair_foot="left", walkwa
     xe = X1 + BLEED
     ceil = F - jd - 0.05
     # room below and the attic air (pale, wood-toned)
-    s.part("room", _fill(X0 - BLEED, Y0 - BLEED, X1 + BLEED, ceil, WALL))
+    s.part("room", _fill(X0 - BLEED, Y0 - BLEED, X1 + BLEED, ceil, room_color))
     s.part("air", Polygon(P(-xe, F), P(-xe, y_in(xe)), P(0, PY), P(xe, y_in(xe)), P(xe, F))
            .set_fill(WOOD, 0.16).set_stroke(width=0))
     # gable-end vent on the far wall

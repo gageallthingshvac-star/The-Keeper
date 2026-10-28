@@ -1,4 +1,5 @@
-"""Extra cartoon effects: heat waves, speed lines, a flying sweat drop, a popping question mark and falling debris.
+"""Extra cartoon effects: heat waves, speed lines, a flying sweat drop, a popping question mark, falling debris,
+spark showers, impact bursts and squash-on-landing.
 
 Each function returns one Animation that adds its own mobjects and removes them again at the end (FadeOut),
 so a scene can just self.play(heat_waves(p)) alongside other animations.
@@ -198,3 +199,112 @@ def debris(pos, width=0.6, n=9, fall=2.2, run_time=1.0, seed=4, colors=None):
     puff.set_z_index(Z_FX)
     anims.append(FadeOut(puff, shift=0.45 * DOWN, scale=1.8, run_time=0.6 * run_time))
     return LaggedStart(*anims, lag_ratio=0.04)
+
+
+# ================================================================ spark shower
+def spark_shower(point, run_time=1.0, rate=26, speed=(1.4, 3.0), spread=(0.35, 2.8), gravity=6.0, life=0.45,
+                 seed=7, colors=("#FFF4B0", "#FFD54A", "#FF9A3C")):
+    """Hot sparks spraying out of `point` (a point or a callable, e.g. a torch tip or a drill bit) for run_time:
+    each spark is a short bright streak along its velocity that arcs down under gravity, cools from white-yellow to
+    orange and fades. spread = (min, max) launch angle in radians from +x (default: up and to both sides)."""
+    rng = np.random.default_rng(seed)
+    n = max(1, int(rate * run_time))
+    births = np.sort(rng.uniform(0, run_time * 0.9, n))
+    angs = rng.uniform(spread[0], spread[1], n)
+    spd = rng.uniform(speed[0], speed[1], n)
+    lives = life * rng.uniform(0.6, 1.2, n)
+    src = point if callable(point) else (lambda p=np.array([point[0], point[1], 0.0]): p)
+    origins = [None] * n
+    group = VGroup(*[VMobject().set_stroke(colors[0], 4) for _ in range(n)]).set_z_index(Z_FX)
+
+    def upd(g, a):
+        t = a * run_time
+        here = np.array(src(), dtype=float)
+        for i, m in enumerate(g):
+            age = t - births[i]
+            if age < 0 or age > lives[i]:
+                m.set_stroke(opacity=0)
+                continue
+            if origins[i] is None:
+                origins[i] = here.copy()
+            v = np.array([np.cos(angs[i]), np.sin(angs[i]), 0.0]) * spd[i]
+            p = origins[i] + v * age + np.array([0, -0.5 * gravity * age * age, 0])
+            vel = v + np.array([0, -gravity * age, 0])
+            tail = p - vel * 0.035
+            m.set_points_as_corners([tail, p])
+            k = age / lives[i]
+            col = colors[0] if k < 0.3 else (colors[1] if k < 0.65 else colors[2])
+            m.set_stroke(col, 4 * (1 - 0.5 * k), opacity=1 - k * k)
+
+    return UpdateFromAlphaFunc(group, upd, run_time=run_time, rate_func=linear, introducer=True, remover=True)
+
+
+# ================================================================ impact burst
+def impact_burst(point, size=1.0, run_time=0.35, n=8, color=INK):
+    """Comic impact star: short radial strokes shoot out from `point` and vanish (pair with a camera shake, a
+    hit-stop Wait and a thud for a heavy landing)."""
+    c = P(point[0], point[1])
+    lines = VGroup(*[VMobject().set_stroke(color, 6) for _ in range(n)]).set_z_index(Z_FX)
+    angs = [PI / 2 + (i - (n - 1) / 2) * (PI * 0.9 / n) * 2 for i in range(n)]
+
+    def upd(g, a):
+        e = rate_functions.ease_out_cubic(a)
+        for i, m in enumerate(g):
+            d = np.array([np.cos(angs[i]), np.sin(angs[i]), 0.0])
+            r0, r1 = size * (0.25 + 0.5 * e), size * (0.45 + 0.75 * e)
+            m.set_points_as_corners([c + d * r0, c + d * r1]).set_stroke(color, 6 * (1 - a) + 1, opacity=1 - a)
+
+    return UpdateFromAlphaFunc(lines, upd, run_time=run_time, rate_func=linear, introducer=True, remover=True)
+
+
+# ================================================================ squash on landing
+def squash_land(mob, amount=0.1, run_time=0.32, about=None):
+    """Something heavy lands: it squashes down and spreads about its bottom, then springs back with a little
+    overshoot and settles (mass you can feel). about: the point to squash about (default: bottom centre)."""
+    st = {"sx": 1.0, "sy": 1.0}
+
+    def upd(m, a):
+        w = np.exp(-4.5 * a) * np.cos(2.6 * PI * a)          # damped wobble: squash, overshoot, settle
+        sy = 1 - amount * w
+        sx = 1 + 0.6 * amount * w
+        piv = m.get_bottom() if about is None else np.array([about[0], about[1], 0.0])
+        m.stretch(sx / st["sx"], 0, about_point=piv).stretch(sy / st["sy"], 1, about_point=piv)
+        st["sx"], st["sy"] = sx, sy
+        if a >= 1.0:
+            m.stretch(1 / st["sx"], 0, about_point=piv).stretch(1 / st["sy"], 1, about_point=piv)
+            st["sx"], st["sy"] = 1.0, 1.0
+
+    return UpdateFromAlphaFunc(mob, upd, run_time=run_time, rate_func=linear)
+
+
+# ================================================================ glow
+def glow(point, run_time=1.0, radius=0.14, color="#FF8A2B", peak=0.85):
+    """Metal heating up: a soft hot spot at `point` (point or callable) brightens from dull red to bright orange,
+    holds, then cools and fades (copper taking the heat under a torch)."""
+    src = point if callable(point) else (lambda p=np.array([point[0], point[1], 0.0]): p)
+    rings = VGroup(*[Dot(radius=radius * k).set_fill(color, 0).set_stroke(width=0) for k in (1.6, 1.0, 0.55)]).set_z_index(Z_FX - 0.5)
+
+    def upd(g, a):
+        heat = float(np.sin(np.pi * a)) ** 0.6
+        c = np.array(src(), dtype=float)
+        for i, (m, op) in enumerate(zip(g, (0.25, 0.55, 0.9))):
+            m.move_to(c).set_fill(["#C0392B", color, "#FFE08A"][i], peak * op * heat)
+
+    return UpdateFromAlphaFunc(rings, upd, run_time=run_time, rate_func=linear, introducer=True, remover=True)
+
+
+# ================================================================ pop
+def pop(mob, scale=1.18, run_time=0.17):
+    """Quick in-place pop (grow and settle back) that never resets the mobject's content, so it can run while the
+    thing changes (digits ticking, a part snapping on)."""
+    st = {"k": 1.0}
+
+    def upd(m, a):
+        k = 1.0 + (scale - 1.0) * float(np.sin(np.pi * a))
+        m.scale(k / st["k"], about_point=m.get_center())
+        st["k"] = k
+        if a >= 1.0:
+            m.scale(1.0 / st["k"], about_point=m.get_center())
+            st["k"] = 1.0
+
+    return UpdateFromAlphaFunc(mob, upd, run_time=run_time, rate_func=linear)

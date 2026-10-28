@@ -165,3 +165,24 @@ def turn_about(mob, angle, point, run_time=0.5, rate_func=None):
         st["a"] = angle * a
 
     return UpdateFromAlphaFunc(mob, upd, run_time=run_time, rate_func=rate_func or smooth)
+
+
+def ground_shadow(mob, ground_y, width=None, height=0.14, fade=0.9, span=None):
+    """Soft contact shadow on the floor at ground_y under a prop, following it every frame; it shrinks and fades as
+    the prop leaves the floor (lifted, thrown, sliding away down a ladder). span=(x0, x1): only where that floor
+    exists (not over a hatch opening). Add the returned mobject to the scene."""
+    from manim import Ellipse, always_redraw
+    from ..style import INK, SHADOW_OPACITY, Z_SET
+
+    def build():
+        lo, hi = mob.get_bottom()[1], mob.get_top()[1]
+        gap = abs(lo - ground_y)
+        k = float(np.clip(1.0 - gap / fade, 0.0, 1.0))
+        cx = mob.get_center()[0]
+        if span is not None and not (span[0] <= cx <= span[1]):
+            k = 0.0
+        w = (width or mob.width * 1.05) * (0.75 + 0.25 * k)
+        e = Ellipse(width=max(w, 0.01), height=height).move_to(np.array([mob.get_center()[0], ground_y, 0.0]))
+        return e.set_fill(INK, SHADOW_OPACITY * k).set_stroke(width=0).set_z_index(Z_SET + 0.6)
+
+    return always_redraw(build)

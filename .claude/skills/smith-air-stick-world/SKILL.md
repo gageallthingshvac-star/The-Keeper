@@ -10,10 +10,10 @@ You are building short, funny stick figure animations about HVAC work. The owner
 ## 1. Output standards (never change unless asked)
 
 - Engine: Python + Manim Community Edition 0.22, in the existing venv (`/home/user/manim-venv`; run `manim` and `python` from its `bin/`). Install into it if anything is missing (Manim needs the pango/cairo dev libraries on a fresh machine).
-- Format: vertical 1080x1920, 30 fps, MP4 with audio (recorded effects + music bed, mixed with headroom for the voiceover).
+- Format: vertical 1080x1920, 60 fps (smoother motion reads as more satisfying; Gage asked for maximum polish), MP4 with audio (recorded effects + music bed, mixed with headroom for the voiceover).
 - Workflow: render a low-quality preview first, check it, then the final:
   - preview: `manim -ql -r 540,960 episodes/<file>.py <SceneName>`
-  - final: `manim -qh --fps 30 -r 1080,1920 episodes/<file>.py <SceneName>`
+  - final: `manim -qh --fps 60 -r 1080,1920 episodes/<file>.py <SceneName>`
 - Length: under 60 seconds. Every scene duration lives in a TIMING dict at the top of the episode file so it can be retimed to the voiceover (a scene that finishes early holds to its TIMING value).
 - No text overlays, titles, outros, "subscribe" or calls to action, and no on-screen effect words by default: gags are sold with recorded sound (section 9b). Comic effect words (`effects.effect_word`) exist and are used only when Gage asks. End the video on the final action.
 - Shorts-safe framing: keep faces and gags out of the bottom ~20% of the frame (y < -4.8, where the YouTube title and buttons sit) and the right ~10% (x > 3.6).
@@ -162,6 +162,16 @@ Prop-building notes:
 - Music: `audio/src/music.mp3` ("Happy Whistling Ukulele", Rafael Krux, CC0), laid under everything by `finish()`, trimmed and faded to the running time at about -13 dB below the effects.
 - New sounds: only CC0 / public domain / CC BY (record the credit line). Never NC/ND, "personal use", or sounds ripped from games, films or YouTube. Add the file to audio/src, a line to CREDITS.md, a cue to prep_audio.py, and rerun it. The video description must carry the CC BY credit lines listed in CREDITS.md.
 
+## 9c. Polish: make it satisfying (researched; apply on every episode)
+
+Game "juice" and classic animation principles, layered with restraint (big beats only):
+- Contact shadows anchor everything (figures draw their own; add `ground_shadow(prop, floor_y, span=)` for big props, one per floor they touch). Without them nothing has weight.
+- Impacts stack 4-6 responses inside ~0.1 s: the sound, `impact_burst(point)`, `camera.shake`, dust, squash (`squash_land(prop)` on landings), and a 0.08 s hit-stop `self.wait(0.08)` after the biggest hits. Never on routine actions.
+- Particles sell heat and power: `spark_shower(point_or_fn)` for torches, zaps and grinding; `glow(point)` for metal taking heat; `heat_waves` for hot rooms. `pop(mob)` for things snapping/ticking (never `.animate` + there_and_back on something that changes during the pop).
+- Ease everything (smooth in/out); overshoot (`ease_out_back`) only for pops and arrivals; damped wobble to settle.
+- The camera works: open close on the problem (the first frame must show tension: sweat, a broken unit, the 78), pull back to reveal as the heroes arrive, slow drifts under calm beats (`self.background(camera.punch_in(..., run_time=4))`), punch in on the satisfying details (a torch on copper, digits ticking down, a screw driving home), `camera.follow(scene, fn)` for a moving subject, swoop between close-ups with a quiet whoosh, and end on a gentle push-in on the payoff. Keep the focal point centred so it stays out of the Shorts UI zones.
+- Completion payoffs ("just right"): things click into place with a click and a small pop/sparkle; a colour change that resolves the problem (`attic(room_color=ROOM_HOT)` -> tween parts["room"] to ROOM_COOL when the AC comes on); one degree per click on a thermostat.
+
 ## 10. Quality checklist (check before every handoff)
 
 - Every moving object is held by a hand, attached by a connection, or obviously under gravity, a throw or a gag.
@@ -173,7 +183,7 @@ Prop-building notes:
 - Each gag has anticipation, the action, and a hold of at least 0.3 s.
 - Props are in proportion; nothing clips through the ground or the wall; nothing important sits in the Shorts UI zones.
 - Sound cues land on their actions; the mix leaves room for the voiceover (peaks around -4 dB).
-- Frame is 1080x1920 at 30 fps, video under 60 s, no text overlays.
+- Frame is 1080x1920 at 60 fps, video under 60 s, no text overlays.
 - Report: the output file path, total length, and the scene-by-scene timing table (scene, start, end; written to `episodes/<file>_timing.md`) so Gage can record his voiceover to it.
 
 ## 11. How episodes are requested and written
@@ -204,9 +214,9 @@ Gage will describe the short in plain language as a list of scenes. For each epi
 
 ## 13. Episode 02 reference (attic air handler swap)
 
-`episodes/ep02_attic_air_handler.py` (~51.6 s), one static cutaway (attic on top, the hot room below), camera punch-ins for the gag and the ending:
+`episodes/ep02_attic_air_handler.py` (~53.4 s), one static cutaway (attic on top, the hot room below), camera punch-ins for the gag and the ending:
 
-1. arrive: the homeowner sweats at the thermostat (78) under heat waves; TECH1 walks in, TECH2 wheels the new BRRRIER air handler in on the hand truck and stands it up; the homeowner points at the hatch.
+1. arrive: opens close on the homeowner sweating in a warm room at the thermostat (78) under heat waves, then pulls back as TECH1 walks in with the bag and TECH2 wheels the new BRRRIER air handler in on the hand truck; the homeowner points at the hatch.
 2. climb: TECH1 slings the MILWACKO bag on his back, climbs the pull-down stair facing it, steps off and sets the bag down by the unit; TECH2 follows once the stair is clear.
 3. joist: punch-in; TECH1 explains, TECH2 nods, steps back off the walkway end and puts a leg through the ceiling right beside the homeowner's face (crash, debris, shake); leg kicks; TECH1 shakes his head, pulls him out and points him back down the hatch.
 4. old_out: TECH2 backs down the stair facing it; TECH1 takes the tubing cutter from the bag and cuts the line set, scrapes the old LEMONNOX unit to the hatch and it tips in, slides down the stair, slams the floor, topples and skids out of frame; TECH2 dives clear, the homeowner flinches.
