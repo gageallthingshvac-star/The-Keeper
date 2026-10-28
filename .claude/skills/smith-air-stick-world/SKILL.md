@@ -62,7 +62,7 @@ Episode files import from stickworld and contain NO custom drawing code. If an e
 
 Two recurring techs, both StickFigure instances.
 
-- TECH1 ("Lead", `name="lead", mustache=True`): THE MAIN CHARACTER, in every episode. Signature: a big black handlebar mustache, the one thing no other character ever gets (never give a mustache, or anything like it, to anyone else). It follows the face turn, lifts when he talks, curls up when he's happy or smug, droops when he's disappointed or dazed, and `twitch_mustache()` flicks the tips: his tell when he's pleased with himself; give him at least one twitch per episode, usually on the final smug beat. The competent one: carries the tool bag, calm, deliberate timing, a little smug.
+- TECH1 ("Lead", `name="lead", rest_face=dict(mouth_curve=0.45)`): THE MAIN CHARACTER, in every episode, and the likeable one. Warm, easy resting smile (his "neutral" face returns to it), calm and competent, patient with the rookie (he helps him up, he doesn't gloat). Signature: when the job is done he turns to the camera and gives a thumbs-up with a wink, a twinkle and a ding (`thumbs_up()`); end every episode on it. No facial hair and no blush on anyone (Gage's call). Carries the tool bag; deliberate timing.
 - TECH2 ("Rookie", `name="rookie", accessory="cap"`): the goofy one. Red ball cap with a brim that follows the face turn. Slightly faster, twitchier timing; overreacts.
 - Optional extras (same class): HOMEOWNER (`accessory="hair_tuft"`), GC/BUILDER (`accessory="hard_hat"`). Add new accessories in rig.py `_draw_accessory`.
 - Hair spikes (`hair` tracker) and the cap attach to the head and turn with it.
@@ -101,7 +101,7 @@ The head circle pivots at the neck and never slides sideways. The face is separa
 - `fig.shake_head(times=3, slow=False, eyes_closed=False)`: sweeps -0.8 <-> +0.8 with ease in-out, ending at 0; slow = 0.6 s per sweep; eyes_closed shuts the eyes BEFORE the first sweep and opens them after a 0.2 s hold.
 - `fig.blink()`: eyes squash fully flat (never partly open), hold two frames, reopen (~0.15 s).
 - `fig.nod(times=2)`, `fig.look_at(point)` (eyes lead, head tilt follows 0.1 s later), `fig.talk(duration)`.
-- Mustache (lead only, `StickFigure(..., mustache=True)`): `stache` tracker sets the tip curl (rest 0.35; every expression sets it), `stache_tw` / `fig.twitch_mustache(times, run_time)` flicks the tips.
+- `StickFigure(..., rest_face=dict(...))` gives a character its own resting face ("neutral" returns to it). `fig.wink(hold)`: the right eye shuts in a happy arc for a beat.
 - `fig.expression(name)`: neutral, happy, smug, surprised, squint, disappointed, strain, tongue_out, dazed (X eyes). Individual feature trackers: `face._to(run_time, mouth_open=..., ...)`.
 
 ## 8. Action library (actions.py)
@@ -122,6 +122,7 @@ Every action is a StickFigure method that returns an Animation and only moves tr
 - `point_at(target)`, `shrug()`, `facepalm()`, `hands_on_hips()`, `arms_crossed()`, `celebrate()` (fist pump), `wipe_brow()`.
 - `zapped(source=point)`: zap cue, arcs from the source to the hand, body jitters at 20 Hz for 0.5 s, hair/cap spikes straight up, X eyes, smoke off the head, dazed stars, then a recovery blink. `hair_down()` later.
 - `flinch()`: crouch, arms over the head, eyes squeezed; then slowly peek.
+- `thumbs_up(hold, wink=True)`: face to camera, near hand pops into a thumbs-up (fist + thumb drawn by the `thumb` tracker) with a twinkle star and a ding, big smile and a wink, then the arm drops. The lead's job-done signature.
 - `keyframes(keys, run_time)`: pose-to-pose motion with planted contacts (keys of hip, footL/R, handL/R (point, callable or None = rest), joint angles); every changing foot or hand lifts in a small arc and lands, nothing slides. Base for climbing and scrambling.
 - `climb(treads, landing, lip, hunch=, down=False)`: ladder / pull-down stair. Stand 0.55 short of tread_0 facing the way the stair rises; feet go tread to tread, the opposite hand moves up the rail, at the top the hands go to the lip and the floor and the feet step off to `landing`. `down=True` backs down it (start standing at the landing facing the stair). Footsteps + creaks.
 - `fall_through(hole_x, floor, hole=CeilingHole)`: steps onto a gap between joists, one leg plunges through the ceiling to the hip, arms fly up, CRASH + rip, the hole bursts and debris falls into the room. Then `kick_leg(times)` and module-level `pull_out(helper, stuck, stand_x)` (hands meet, helper leans back, the stuck foot comes straight up out of the hole, both feet land standing).
@@ -155,7 +156,7 @@ Prop-building notes:
 
 ### 9b. Sound
 
-- Effects are real recordings (stickworld/audio/src, credits and licenses in src/CREDITS.md), cut into cues in stickworld/audio/sfx by `prep_audio.py`. Cue names: truck, squeak, cough, whoosh, whoosh_long, thump, thud, crash, tools, rattle, zap, fizz, clunk, drill, ping, catch, creak, chomp, pop_big, pop, pop_small, clatter, yank, crickets, rip, chime, ding, tink, click, rewind, hum, step1–3.
+- Effects are real recordings (stickworld/audio/src, credits and licenses in src/CREDITS.md), cut into cues in stickworld/audio/sfx by `prep_audio.py`. Cue names: truck, squeak, cough, whoosh, whoosh_long, thump, thud, crash, tools, rattle, zap, fizz, clunk, drill, ping, catch, creak, pop_big, pop, pop_small, clatter, yank, crickets, rip, chime, ding, tink, click, rewind, hum, step1–3.
 - Trigger with `Snd("name")` inside an animation group, `self.snd("name", delay)` in a scene, or let actions do it (footsteps, zap, pop, tink...). Cues land on the exact frame even mid-animation.
 - Music: `audio/src/music.mp3` ("Happy Whistling Ukulele", Rafael Krux, CC0), laid under everything by `finish()`, trimmed and faded to the running time at about -13 dB below the effects.
 - New sounds: only CC0 / public domain / CC BY (record the credit line). Never NC/ND, "personal use", or sounds ripped from games, films or YouTube. Add the file to audio/src, a line to CREDITS.md, a cue to prep_audio.py, and rerun it. The video description must carry the CC BY credit lines listed in CREDITS.md.
@@ -191,14 +192,14 @@ Gage will describe the short in plain language as a list of scenes. For each epi
 2. hop_out: TECH1 opens the door and steps out; TECH2 tumbles out face-first and gets up. TECH1 lifts the MILWACKO bag out of the truck bed and walks up to the unit; TECH2 wanders to the yard.
 3. zap: TECH1 fights the screwed-down flashing (rattle) while TECH2 crouches and grabs the live whip: zapped(). TECH1 slowly shakes his head, then pulls the disconnect (clunk).
 4. drills: TECH1 pulls two drills from the bag, tosses one to TECH2; they drive the flashing screws out row by row (crouching for the bottom row); drills back in the bag.
-5. peel: TECH1 peels the top panel, then the side panel, back toward the house like a banana (hand on the edge, stepping back), and pretends to take a bite (chomp).
+5. peel: TECH1 peels the top panel, then the side panel, back toward the house like a banana (hand on the edge, stepping back), and pretends to take a bite (no sound: Gage cut the chomp).
 6. ducts: TECH1 yank_plug()s each duct off the unit, foot on the cabinet: POP, stumble, throws it on the pile.
 7. pull_start: TECH1 grabs the whip and the low voltage low on the unit and rips them out in one lawnmower pull (conductors out). Nothing happens (crickets, two blinks). TECH2 stares and slowly shakes his head, eyes closed.
 8. carry_toss: both squat, grip the old unit, rattle it loose, RIIIP, carry it down to the truck and toss it in the bed (crash, bounce, camera shake).
 9. new_unit: the new unit slides in with sparkles while they walk back.
 10. rewind: tape-rewind sound; the ducts click back in, the flashing un-peels, the screws fly back loose and the techs drive them in with the drills.
 11. thread: punch-in; TECH1 kneels and thread_wire()s the low voltage into the grommet: tongue out, squint, misses twice, gets it; the conductors slide in; exhale.
-12. power_up: TECH1 flips the disconnect back on; the new unit hums and cold air flows into the house. End.
+12. power_up: TECH1 flips the disconnect back on; the new unit hums and cold air flows into the house; TECH1 gives the camera his thumbs-up and wink. End.
 
 ## 13. Episode 02 reference (attic air handler swap)
 
@@ -211,5 +212,5 @@ Gage will describe the short in plain language as a list of scenes. For each epi
 5. dolly_up: TECH2 tips the hand truck back and rolls it to the stair; TECH1 throws a rope down, TECH2 hooks it; TECH1 hauls hand over hand, then grabs the handle and swings the unit up and out onto its spot under the plenum; lays the empty hand truck down.
 6. connect: TECH1 bends the line set back onto the stubs and brazes (sparkles, fizz), clicks the condensate drain on, exhales.
 7. thermostat: the homeowner presses down 78 -> 72 (six clicks).
-8. cold_air: the unit hums, cold air pours out of the register over the homeowner (eyes closed, arms out); TECH2 fist-pumps; TECH1 crosses his arms, smug. Slow punch-in. End.
+8. cold_air: the unit hums, cold air pours out of the register over the homeowner (eyes closed, arms out); TECH2 fist-pumps; TECH1 gives the camera his thumbs-up and wink. Slow punch-in. End.
 

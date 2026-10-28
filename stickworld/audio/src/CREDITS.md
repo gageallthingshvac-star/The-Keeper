@@ -6,23 +6,21 @@ Each license was checked against the credit or license file that ships with the 
 Copies of those files are in `licenses/`.
 All GitHub sources are pinned to the exact commit the files were downloaded from.
 
-**Licenses used:** CC0 1.0 (public domain dedication), public domain, CC BY 3.0 and CC BY 4.0.
+**Licenses used:** CC0 1.0 (public domain dedication), public domain and CC BY 4.0.
 No NC, ND or SA material and no "personal use only" material is included.
 
 - CC0 1.0: https://creativecommons.org/publicdomain/zero/1.0/
-- CC BY 3.0: https://creativecommons.org/licenses/by/3.0/
 - CC BY 4.0: https://creativecommons.org/licenses/by/4.0/
 
 ---
 
 ## Attribution you MUST include (video description)
 
-Only three files need attribution. They are all CC BY. If you trim or edit them further, keep the words "edited".
+Only two files need attribution. Both are CC BY 4.0. If you trim or edit them further, keep the words "edited".
 
 ```
 "Balloon Pop" by Aesterial-Arts (freesound.org/s/633835), CC BY 4.0, edited
 Chainsaw pull-cord sound by SonoFxAudio (freesound.org/s/656676), CC BY 4.0, edited
-Eating sound by sonictechtonic (freesound.org/s/242215), CC BY 3.0, edited
 ```
 
 ### Optional courtesy credits (CC0 / public domain: credit not required, but appreciated)
@@ -111,7 +109,6 @@ The files are 48 kHz / 24-bit WAV, trimmed and peak-normalised.
 |---|---|---|---|---|---|
 | fizz / `fizz.ogg` | `sparkler_fuse_nm.wav` ([fs 316682](https://freesound.org/s/316682/)), renamed to `tnt_ignite.ogg`, edited and converted by Minetest Game | theneedle.tv | CC0 1.0. [luanti-org/minetest_game mods/tnt/README.md](https://github.com/luanti-org/minetest_game/blob/f6b2792eac2afbe81cf640f9d245d41fa87b0f2c/mods/tnt/README.md) and `mods/tnt/license.txt` | https://raw.githubusercontent.com/luanti-org/minetest_game/f6b2792eac2afbe81cf640f9d245d41fa87b0f2c/mods/tnt/sounds/tnt_ignite.ogg | 3.57 s |
 | rewind / `rewind.flac` | `vinyl_rewind` sample, from [fs 162493](http://freesound.org/people/TasmanianPower/sounds/162493/) | TasmanianPower | CC0 1.0. [sonic-pi etc/samples/README.md](https://github.com/sonic-pi-net/sonic-pi/blob/df6f17e4625b0451fa2af8accf2e1e641c7ad458/etc/samples/README.md) and the "Samples" section of LICENSE.md | https://raw.githubusercontent.com/sonic-pi-net/sonic-pi/df6f17e4625b0451fa2af8accf2e1e641c7ad458/etc/samples/vinyl_rewind.flac | 2.68 s |
-| chomp / `chomp.ogg` | `stamina_eat.1.ogg`, an eating/bite sound from [fs 242215](http://www.freesound.org/people/sonictechtonic/sounds/242215/). The repo does not give the original title. | sonictechtonic | **CC BY 3.0**. [minetest-mods/stamina README.txt](https://github.com/minetest-mods/stamina/blob/c1280064bcd87819ebc7be3ebdea476896bf3cf4/README.txt) | https://raw.githubusercontent.com/minetest-mods/stamina/c1280064bcd87819ebc7be3ebdea476896bf3cf4/sounds/stamina_eat.1.ogg | 0.62 s |
 | crickets / `crickets.ogg` | "Crickets Chirping At Night" ([soundbible.com/2083](https://soundbible.com/2083-Crickets-Chirping-At-Night.html)), the "Summer night" loop in the Blanket app | Lisa Redfern | Public Domain. [rafaelmardojai/blanket SOUNDS_LICENSING.md](https://github.com/rafaelmardojai/blanket/blob/775f2a767230a9681850d1b1e085be58656f1382/SOUNDS_LICENSING.md) | https://raw.githubusercontent.com/rafaelmardojai/blanket/775f2a767230a9681850d1b1e085be58656f1382/data/resources/sounds/summer-night.ogg | 49.3 s (trim 1–2 s) |
 | hum / `hum.mp3` | "Fridge buzz (loop)" ([fs 524598](https://freesound.org/people/Matislav/sounds/524598/)), a compressor hum | Matislav | CC0. [karoldepka/ComRev fe/utils/ambience-tracks.ts](https://github.com/karoldepka/ComRev/blob/dd92f101c60a20a8ca431a9031fa777de2f02041/fe/utils/ambience-tracks.ts) (entry `fs-524598`) | https://raw.githubusercontent.com/karoldepka/ComRev/dd92f101c60a20a8ca431a9031fa777de2f02041/fe/assets/sounds/bulk-fridge-buzz-loop-524598.mp3 | 11.05 s (loop) |
 

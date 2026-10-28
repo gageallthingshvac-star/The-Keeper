@@ -15,7 +15,7 @@ can move or crouch while the feet stay put. Hands work the same way: a lock trac
 target (a tracker pair, or a pinned callable that follows a moving object).
 """
 import numpy as np
-from manim import TAU, CapStyleType, Circle, Polygon, ValueTracker, VGroup, VMobject
+from manim import TAU, CapStyleType, Circle, Polygon, RoundedRectangle, ValueTracker, VGroup, VMobject
 
 from . import style as S
 from .face import Face
@@ -61,7 +61,7 @@ def wrap(a):
 
 
 class StickFigure(ActionsMixin, VGroup):
-    def __init__(self, x=0.0, ground=0.0, face_dir=1.0, accessory=None, name="", turn=None, mustache=False, **pose):
+    def __init__(self, x=0.0, ground=0.0, face_dir=1.0, accessory=None, name="", turn=None, rest_face=None, **pose):
         super().__init__()
         self.name = name
         self.accessory = accessory
@@ -74,13 +74,13 @@ class StickFigure(ActionsMixin, VGroup):
         for k in JOINTS:
             self.t.setdefault(k, ValueTracker(REST[k]))
         hip_y = ground + S.STAND_HIP
-        extra = dict(x=x, y=hip_y, face_dir=face_dir, hair=0.0, sy=1.0, jitter=0.0,
+        extra = dict(x=x, y=hip_y, face_dir=face_dir, hair=0.0, sy=1.0, jitter=0.0, thumb=0.0,
                      legL_lock=1.0, legR_lock=1.0, armL_lock=0.0, armR_lock=0.0,
                      footL_x=x - face_dir * S.STANCE, footL_y=ground, footR_x=x + face_dir * S.STANCE, footR_y=ground,
                      handL_x=x, handL_y=hip_y, handR_x=x, handR_y=hip_y)
         for k, v in extra.items():
             self.t[k] = ValueTracker(v)
-        self.face = Face(self, turn=0.45 * face_dir if turn is None else turn, mustache=mustache)
+        self.face = Face(self, turn=0.45 * face_dir if turn is None else turn, rest=rest_face)
         self._build()
         self.add_updater(self._tick)
         self._redraw()
@@ -126,11 +126,13 @@ class StickFigure(ActionsMixin, VGroup):
         self.parts["acc_brim"] = self._seg(7)
         for n in ("upper_R", "fore_R"):
             self.parts[n] = self._seg()
+        self.parts["fist"] = VGroup()
         for n in order:
             self.add(self.parts[n])
         self.add(self.parts["hair"], self.parts["head"])
         self.add(self.face.group)
-        self.add(self.parts["acc"], self.parts["acc_brim"], self.parts["upper_R"], self.parts["fore_R"])
+        self.add(self.parts["acc"], self.parts["acc_brim"], self.parts["upper_R"], self.parts["fore_R"],
+                 self.parts["fist"])
 
     def _tick(self, m, dt):
         self.clock += dt
@@ -213,6 +215,7 @@ class StickFigure(ActionsMixin, VGroup):
             head.stretch(J["head_scale"][0], 0).stretch(J["head_scale"][1], 1)
         self._draw_hair(J)
         self._draw_accessory(J)
+        self._draw_thumb(J)
         self.face.draw(J)
 
     def _draw_hair(self, J):
@@ -224,6 +227,26 @@ class StickFigure(ActionsMixin, VGroup):
             base = c + d * S.HEAD_R
             spoke.set_points_as_corners([base, base + d * (0.02 + 0.55 * S.HEAD_R * 2.2 * hair)])
             spoke.set_stroke(opacity=1.0 if hair > 0.03 else 0.0)
+
+    def _draw_thumb(self, J):
+        """Near hand closed in a fist with the thumb straight up (thumbs-up), popped in by the `thumb` tracker."""
+        k = self.v("thumb")
+        fist = self.parts["fist"]
+        if k < 0.02:
+            if len(fist.submobjects):
+                fist.become(VGroup())
+            return
+        k *= 1.25  # big enough to read on a phone
+        h, sg = J["hand_R"], J["sg"]
+        c = h + np.array([sg * 0.04, 0.03, 0])
+        w, hh = 0.24 * k, 0.2 * k
+        block = RoundedRectangle(width=w, height=hh, corner_radius=0.07 * k).move_to(c)
+        thumb = RoundedRectangle(width=0.085 * k, height=0.2 * k, corner_radius=0.04 * k)
+        thumb.move_to(c + np.array([-sg * 0.06 * k, hh / 2 + 0.085 * k, 0]))
+        creases = [VMobject().set_points_as_corners([c + np.array([sg * 0.02 * k, dy * k, 0]), c + np.array([sg * 0.11 * k, dy * k, 0])])
+                   .set_stroke(S.INK, 3) for dy in (-0.045, 0.0, 0.045)]
+        fist.become(VGroup(thumb.set_fill(S.WHITE, 1).set_stroke(S.INK, 5), block.set_fill(S.WHITE, 1).set_stroke(S.INK, 5),
+                           *creases).set_z_index(self.z_index))
 
     def _draw_accessory(self, J):
         acc, brim = self.parts["acc"], self.parts["acc_brim"]

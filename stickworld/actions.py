@@ -241,8 +241,31 @@ class ActionsMixin:
     def blink(self):
         return self.face.blink()
 
-    def twitch_mustache(self, times=2, run_time=0.4):
-        return self.face.twitch_mustache(times, run_time)
+    def wink(self, hold=0.5):
+        return self.face.wink(hold)
+
+    def thumbs_up(self, hold=0.7, wink=True, sound="ding"):
+        """Job-done signature: face to the camera, big smile, near hand comes up in front of the chest and pops into a
+        thumbs-up with a twinkle and a ding (and a wink), holds, then the arm drops back to rest."""
+        from manim import Star, UpdateFromAlphaFunc
+        proto = Star(4, outer_radius=0.3, inner_radius=0.08).set_fill(S.SPARK, 1).set_stroke(S.INK, 2).set_z_index(S.Z_FX)
+        star = proto.copy().scale(0.01)
+
+        def twinkle(m, a):
+            tip = self.hand("R") + np.array([0.3 * self.sg, 0.38, 0])
+            m.become(proto.copy().scale(max(0.01, float(np.sin(np.pi * a)))).rotate(1.5 * a).move_to(tip))
+
+        show = [self.t["thumb"].animate(run_time=0.15, rate_func=ease_out_back).set_value(1.0),
+                UpdateFromAlphaFunc(star, twinkle, run_time=0.5, rate_func=linear, introducer=True, remover=True)]
+        if sound:
+            show.append(Snd(sound, gain=-4))
+        if wink:
+            show.append(self.face.wink(hold * 0.7))
+        return Succession(AnimationGroup(self.pose({"shoulder_R": 0.55, "elbow_R": 2.05}, 0.3),
+                                         self.face._to(0.3, turn=0.0, up=0.05), self.expression("happy", 0.3)),
+                          AnimationGroup(*show), Wait(max(0.0, hold - 0.5)),
+                          AnimationGroup(self.t["thumb"].animate(run_time=0.15).set_value(0.0),
+                                         self.pose({"shoulder_R": 0.12, "elbow_R": 0.18}, 0.3)))
 
     def shake_head(self, times=3, slow=False, eyes_closed=False):
         return self.face.shake_head(times, slow, eyes_closed)

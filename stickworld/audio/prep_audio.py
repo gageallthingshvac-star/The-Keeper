@@ -72,7 +72,6 @@ def build():
         "ping": cue("ping"),
         "catch": cue("catch", max_ms=300, fade_out=120),
         "creak": cue("creak"),
-        "chomp": cue("chomp"),
         "pop_big": cue("pop_big"),
         "pop": cue("pop"),
         "pop_small": cue("pop_small"),

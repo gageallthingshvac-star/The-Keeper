@@ -75,7 +75,7 @@ class Ep02AtticAirHandler(EpisodeScene):
         self.load = bundle(self.dolly, self.new)
         self.rope = Rope((1.2, F + 0.12), tail_to=(1.2, F))
         self.ho = StickFigure(HO_X, RF, 1, accessory="hair_tuft", name="homeowner")
-        self.lead = StickFigure(5.4, RF, -1, name="lead", mustache=True)
+        self.lead = StickFigure(5.4, RF, -1, name="lead", rest_face=dict(mouth_curve=0.45))
         # the rookie comes in rolling the new unit on the hand truck, tipped back onto its wheels
         self.load.shift(np.array([6.0, 0, 0]))
         self.load.rotate(-0.25, about_point=self.load.pt("axle"))
@@ -251,7 +251,7 @@ class Ep02AtticAirHandler(EpisodeScene):
             self.play(lead.let_go(("R",)), lead.expression("neutral", 0.2))
             self.play(lead.reach("L", self.drain.pt("inlet"), 0.3), lead.look_at(self.drain.pt("inlet")))
             self.play(Snd("click"), Wait(0.12))
-            self.play(lead.let_go(("L",)), lead.exhale(), Succession(Wait(0.45), lead.twitch_mustache(2, 0.3)))
+            self.play(lead.let_go(("L",)), lead.exhale())
 
         with self.block("thermostat"):
             btn = self.thermo.pt("button_down")
@@ -276,7 +276,6 @@ class Ep02AtticAirHandler(EpisodeScene):
                                                            ho.pose({"shoulder_L": 1.2, "elbow_L": 0.3, "shoulder_R": 1.3,
                                                                     "elbow_R": 0.3, "neck": -0.2}, 0.5))),
                       Succession(Wait(0.9), rookie.celebrate()),
-                      Succession(Wait(1.2), AnimationGroup(lead.arms_crossed(), lead.expression("smug", 0.3)),
-                                 Wait(0.4), lead.twitch_mustache()))
+                      Succession(Wait(1.2), lead.thumbs_up()))
 
         self.finish()
