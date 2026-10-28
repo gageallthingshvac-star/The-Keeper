@@ -63,7 +63,7 @@ class Ep03MovieNight(EpisodeScene):
         "hook": 3.0,
         "arrive": 8.8,
         "diagnose": 5.7,
-        "breakers": 10.4,
+        "breakers": 10.6,
         "filter": 8.2,
         "power_on": 7.7,
         "finale": 3.5,
@@ -201,10 +201,10 @@ class Ep03MovieNight(EpisodeScene):
             self.flash.hold(lambda: lead.hand("L"), aim=panel_c + np.array([-0.15, 0.1, 0]))   # beam stays on the panel
             self.play(Do(lambda: lead.bake_arm("L")), Do(lambda: self.light(True)), FadeIn(self.flash, scale=0.6, run_time=0.12),
                       self.flash.beam(True, 0.1), Snd("click", gain=-4), lead.pose({"shoulder_L": 0.25, "elbow_L": 2.2}, 0.2))
-            self.play(lead.walk_to(2.45, F, face=-1, run_time=0.3))
+            self.play(lead.walk_to(2.45, F, face=-1, run_time=0.3), camera.punch_in(self, np.array([1.8, 2.3, 0]), 0.4, 0.4))
             # every circuit back on except the furnace's; the main brings the house back
             back_on = [i for i in range(panel.n_breakers) if i != FURNACE_BREAKER]
-            self.play(lead.sweep_breakers(panel, on=True, per=0.08, order=back_on,
+            self.play(lead.sweep_breakers(panel, on=True, per=0.1, order=back_on,
                                           at_main=AnimationGroup(tween_value(self.dark, 0.0, 0.1), self.tv.screen(True, 0.1),
                                                                  self.flash.beam(False, 0.1), Do(lambda: self.light(False)))))
             # flashlight away; the lockout tag out of his shirt pocket and onto the furnace's breaker
@@ -300,12 +300,13 @@ class Ep03MovieNight(EpisodeScene):
             self.play(rookie.let_go(("R",)), camera.reset(self, 0.6), air_t.animate(run_time=3.4, rate_func=linear).set_value(3.4),
                       Succession(Wait(0.3), self.house.parts["room"].animate(run_time=2.6).set_fill(ROOM_COOL)),
                       Succession(Wait(0.8), AnimationGroup(nb.expression("happy", 0.3, hold=KEEP), nb.face.close_eyes(0.3, hold=KEEP))),
-                      Succession(Wait(0.4), rookie.walk_to(0.7, F, face=-1, run_time=0.5)),
+                      Succession(Wait(0.2), rookie.walk_to(1.55, F, face=-1, run_time=0.4)),   # clear of the thermostat
                       *ticks)
 
         with self.block("finale"):
             # job done: the lead walks out to the cooled-off customer and gives the camera his thumbs-up beside her
-            self.play(lead.walk_to(-0.95, F, run_time=1.2), camera.punch_in(self, np.array([-1.75, 2.1, 0]), 0.5, 1.2))
-            self.play(lead.thumbs_up(hold=1.0))
+            self.play(lead.walk_to(-0.95, F, run_time=1.2), camera.punch_in(self, np.array([-1.75, 2.3, 0]), 0.44, 1.2),
+                      Succession(Wait(0.8), AnimationGroup(nb.face.open_eyes(0.2), nb.look_at(np.array([-0.95, F + 3.6, 0]), 0.2))))
+            self.play(lead.thumbs_up(hold=1.0), Succession(Wait(0.3), nb.expression("happy", 0.2, hold=KEEP)))
 
         self.finish()
