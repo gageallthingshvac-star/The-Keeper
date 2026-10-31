@@ -18,18 +18,19 @@ from manim.utils.rate_functions import ease_out_back, ease_out_bounce
 from stickworld import camera
 from stickworld import continuity as C
 from stickworld import style as S
-from stickworld.actions import Do, carry_together
+from stickworld.actions import Do, carry_together, tween_value
 from stickworld.audio import Snd
 from stickworld.episode import EpisodeScene
 from stickworld.props import effects as FX
 from stickworld.props.base import attach_to, detach, ground_shadow
 from stickworld.props.effects_more import impact_burst, spark_shower
+from stickworld.props.home import LockoutTag
 from stickworld.props.hvac import Disconnect, Duct, FlashingPanel, HighVoltageWhip, LowVoltageWire, PackageUnit, Screw
 from stickworld.props.tools import Drill, ToolBag
 from stickworld.props.vehicles import WorkTruck
 from stickworld.rig import StickFigure
 from stickworld.sets import driveway, house_side
-from stickworld.style import P
+from stickworld.style import FRAME_H, P
 
 # ---------------------------------------------------------------- layout (kept clear of the Shorts UI along the bottom)
 G = -0.4            # yard ground
@@ -38,23 +39,25 @@ UCX = -0.1          # unit centre
 STREET = -5.8
 TRUCK_FRONT = -3.95
 T2_HOME = 3.0
+BOOKEND = (P(-0.3, G + 1.7), 0.62)   # opening and closing shot: close on the unit (the replay reads as after -> before)
+WORK = (P(-0.6, 0.7), 0.75)           # the working frame: house wall to unit, truck mostly out of shot
 
 
 class Ep01PackageUnit(EpisodeScene):
     EPISODE = 1
     TIMING = {
         "arrive": 2.95,
-        "hop_out": 5.75,
-        "zap": 6.35,
-        "drills": 4.45,
-        "peel": 4.2,
-        "ducts": 6.1,
-        "pull_start": 4.6,
-        "carry_toss": 7.55,
+        "hop_out": 4.55,
+        "zap": 7.5,
+        "drills": 4.85,
+        "peel": 4.55,
+        "ducts": 6.25,
+        "pull_start": 4.7,
+        "carry_toss": 7.85,
         "new_unit": 2.5,
-        "rewind": 5.5,
-        "thread": 4.5,
-        "power_up": 3.7,
+        "rewind": 2.45,
+        "thread": 4.2,
+        "power_up": 6.1,
     }
 
     # ------------------------------------------------------------ set up the world
@@ -91,7 +94,7 @@ class Ep01PackageUnit(EpisodeScene):
         self.lv.connect_end(lambda: self.unit.pt("lv_terminal"))
         # soft contact shadows anchor the big props to the ground
         self.add(ground_shadow(self.unit, G + 0.13), ground_shadow(self.truck, STREET, width=6.0, height=0.22),
-                 ground_shadow(self.bag, G - 0.62 - 0.33, width=1.2))
+                 ground_shadow(self.bag, G, width=1.2))
 
     # ------------------------------------------------------------ helpers built from library actions
     def fetch_drills(self, t1_x=-3.7, t2_x=-1.45):
@@ -168,27 +171,32 @@ class Ep01PackageUnit(EpisodeScene):
         t1, t2, truck, unit, bag = self.t1, self.t2, self.truck, self.unit, self.bag
 
         with self.block("arrive"):
-            self.background(camera.punch_in(self, P(-0.4, -0.9), 0.9, 8.5, rate_func=linear))   # slow push across the arrival
-            self.snd("truck")
-            self.snd("cough", 0.4, gain=-3)
+            # frame 1 is the problem: close on the old LEMONNOX coughing smoke; pull back as the truck rolls up
+            self.camera.frame.set(height=FRAME_H * BOOKEND[1]).move_to(BOOKEND[0])
+            self.snd("cough", 0.0, gain=-2)
+            self.snd("cough", 0.5, gain=-4)
+            self.snd("truck", 0.05)
+            self.background(FX.smoke(unit.pt("top_center") + P(0.5, 0.25), n=5, seed=1, run_time=0.8))
+            self.background(Succession(Wait(0.5), FX.smoke(unit.pt("top_center") + P(0.2, 0.2), n=5, seed=2, run_time=0.8)))
             self.play(truck.drive_in(-9, 1.4, riders=(t1, t2)),
-                      Succession(Wait(0.4), FX.smoke(unit.pt("top_center") + P(0.8, 0.2), n=4, seed=1, run_time=1.0)))
+                      Succession(Wait(0.7), camera.reset(self, 1.1)))
 
         with self.block("hop_out"):
             self.play(t1.hop_out(truck, truck.pt("door_step")[0] - 0.35, STREET))
             bag_x = bag.pt("handle")[0]
             self.play(
-                Succession(t2.hop_out(truck, TRUCK_FRONT + 0.6, STREET, run_time=0.65, tumble=True),
+                Succession(t2.hop_out(truck, TRUCK_FRONT + 1.3, STREET, run_time=0.65, tumble=True),
                            t2.get_up(STREET, 0.45),
-                           t2.walk_to(T2_HOME, G, speed=1.35, run_time=2.4)),
-                Succession(t1.walk_to(bag_x - 0.55, STREET, face=1, run_time=1.15),
+                           t2.walk_to(T2_HOME, G, speed=1.35, run_time=1.4)),
+                Succession(t1.walk_to(bag_x - 0.55, STREET, face=1, run_time=0.85),
                            t1.grab(bag, "R", "handle", run_time=0.3),
                            t1.pose({"shoulder_R": 0.15, "elbow_R": 0.1}, 0.2),
-                           t1.walk_to(-2.75, G, speed=1.3, hold=("R",), run_time=2.25)))
+                           t1.walk_to(-2.75, G, speed=1.3, hold=("R",), run_time=1.35)),
+                Succession(Wait(1.2), camera.punch_in(self, WORK[0], WORK[1], 1.0)))
 
         with self.block("zap"):
             side, disc = self.side, self.disc
-            self.play(t1.release(bag, "place", target=P(-3.1, G - 0.62), run_time=0.35), t1.turn(1, 0.2))
+            self.play(t1.release(bag, "place", target=P(-3.1, G + 0.33), run_time=0.35), t1.turn(1, 0.2))
             # Tech 1 fights the screwed-down flashing while Tech 2 wanders over to unhook the whip
             self.play(t1.reach("R", lambda: side.pt("free_end"), 0.3), t1.expression("strain", 0.2),
                       t2.walk_to(unit.pt("whip_terminal")[0] + 0.85, G, face=-1, run_time=1.3),
@@ -205,8 +213,17 @@ class Ep01PackageUnit(EpisodeScene):
                       Succession(Wait(0.4), Do(lambda: t1.unpin("R")),
                                  AnimationGroup(t1.pose("stand", 0.3), t1.expression("neutral", 0.2), t1.look_at(t2.head_center())),
                                  Wait(0.1), t1.shake_head(2, slow=True)))
-            self.play(t1.walk_to(-2.9, G, face=-1, run_time=0.5), camera.reset(self, 0.5))
+            # power off at the disconnect, close up, and locked out with a tag from his shirt pocket
+            self.play(t1.walk_to(-2.9, G, face=-1, run_time=0.5), camera.punch_in(self, disc.get_center() + P(0.35, -0.25), 0.3, 0.5))
             self.play(t1.push_switch(disc, False, run_time=0.2), Succession(Wait(0.25), Snd("clunk")))
+            chest = lambda: t1.hip_point() + P(0.18 * t1.sg, 1.0)
+            self.lockout = tag = LockoutTag(disc.pt("handle")).set_z_index(S.Z_PROP_FRONT + 0.5)
+            self.play(t1.reach("R", chest, 0.2, lean=False))
+            attach_to(tag, "hang", lambda: t1.hand("R"))
+            self.play(FadeIn(tag, scale=0.5, run_time=0.12))
+            self.play(t1.reach("R", lambda: disc.pt("handle"), 0.25, lean=False), Succession(Wait(0.22), Snd("tink", gain=-4)))
+            detach(tag)
+            self.play(t1.let_go(("R",)), camera.punch_in(self, WORK[0], WORK[1], 0.45))
 
         with self.block("drills"):
             drills = self.fetch_drills()
@@ -275,7 +292,8 @@ class Ep01PackageUnit(EpisodeScene):
             self.play(Snd("rip"), carry_together([t1, t2], unit, grips, 0.45, path=lambda e: c + UP * 0.45 * e, rise=0.45))
             c1 = unit.get_center()
             walk = (1.15, -3.8)
-            self.play(carry_together([t1, t2], unit, grips, 2.2, walk=walk), t1.expression("neutral"), t2.expression("neutral"))
+            self.play(carry_together([t1, t2], unit, grips, 2.2, walk=walk), t1.expression("neutral"), t2.expression("neutral"),
+                      camera.reset(self, 1.2))
             c2 = unit.get_center()
             self.play(carry_together([t1, t2], unit, grips, 0.35, path=lambda e: c2 + P(-0.4, -0.35) * e, leans=(-0.3, 0.3)))
             for f in (t1, t2):
@@ -308,7 +326,7 @@ class Ep01PackageUnit(EpisodeScene):
             self.add(new)
             self.snd("whoosh_long", gain=-3)
             self.play(new.animate(rate_func=ease_out_back, run_time=1.1).shift(LEFT * 8),
-                      t1.walk_to(-2.9, G, speed=1.6), t2.walk_to(T2_HOME, G, speed=1.6))
+                      t1.walk_to(-2.9, G, speed=1.6), t2.walk_to(T2_HOME, G, speed=1.6), camera.punch_in(self, WORK[0], WORK[1], 1.0))
             for f in (t1, t2):
                 f.set_z_index(S.Z_FIGURE)
             self.snd("chime", gain=-4)
@@ -325,12 +343,12 @@ class Ep01PackageUnit(EpisodeScene):
                                          self.whip.end.animate(path_arc=-1.0, run_time=0.55).move_to(new.pt("whip_terminal")),
                                          self.whip.strip(False, 0.55)),
                           LaggedStart(self.side.peel_to(0.0, 0.4, ease_out_back), self.top.peel_to(0.0, 0.4, ease_out_back), lag_ratio=0.4),
-                          LaggedStart(*[s.fly_in(run_time=0.3) for row in self.screw_rows for s in row], lag_ratio=0.1)),
-                      t2.walk_to(-1.45, G, face=-1, run_time=1.8), t1.walk_to(-3.7, G, face=1, run_time=1.2))
+                          LaggedStart(*[s.fly_in(run_time=0.3) for row in self.screw_rows for s in row], lag_ratio=0.1),
+                          AnimationGroup(LaggedStart(*[s.drive_in(0.25) for row in self.screw_rows for s in row], lag_ratio=0.15),
+                                         Snd("drill", 0.6))),   # the rewind runs the drilling backwards too: screws home
+                      t1.look_at(new.get_center(), 0.3), t2.look_at(new.get_center(), 0.3),
+                      Succession(Wait(1.6), AnimationGroup(t1.expression("surprised", 0.2), t2.expression("surprised", 0.2))))
             self.whip.connect_end(lambda: new.pt("whip_terminal"))
-            drills = self.fetch_drills()
-            self.drill_rows(drills, driving_in=True)
-            self.stow_drills(drills)
 
         with self.block("thread"):
             lv = self.lv
@@ -345,21 +363,34 @@ class Ep01PackageUnit(EpisodeScene):
             self.play(lv.strip(False, 0.3), FX.sparkles([new.pt("lv_terminal") + P(-0.3, 0.3), new.pt("lv_terminal") + P(0.25, 0.35)], 0.6, 12))
             lv.connect_end(lambda: new.pt("lv_terminal"))
             self.play(lv.reshape((-1.0, -0.4), 0.4), t1.exhale(), t1.pose("stand", 0.4))
-            self.play(camera.reset(self, 0.5))
 
         with self.block("power_up"):
-            self.play(t1.walk_to(-2.9, G, face=-1, speed=2.0))
-            self.play(t1.push_switch(self.disc, True, run_time=0.2), Succession(Wait(0.25), Snd("clunk")))
+            # tag off, power on (close up), then the payoff in the opening's framing: cold air, hum, thumbs-up
+            tag, disc = self.lockout, self.disc
+            chest = lambda: t1.hip_point() + P(0.18 * t1.sg, 1.0)
+            self.background(t2.walk_to(1.15, G, face=-1, run_time=1.4))   # the rookie takes his place by the unit
+            self.play(t1.walk_to(-2.9, G, face=-1, speed=2.0), camera.punch_in(self, disc.get_center() + P(0.35, -0.25), 0.3, 0.5))
+            self.play(t1.reach("R", lambda: tag.pt("hang"), 0.2, lean=False))
+            attach_to(tag, "hang", lambda: t1.hand("R"))
+            self.play(t1.reach("R", chest, 0.2, lean=False), Succession(Wait(0.12), FadeOut(tag, run_time=0.08)))
+            detach(tag)
+            self.play(t1.push_switch(disc, True, run_time=0.2), Succession(Wait(0.25), Snd("clunk")))
             clock = ValueTracker(0.0)
             sup = self.duct_home[0].pt("center")[1]
             air = FX.cold_air(clock, [sup - 0.17, sup, sup + 0.17], new.pt("supply_open")[0] + 0.05, WX - 1.3)
             hum = FX.vibration_lines(clock, [(P(new.get_right()[0] + 0.05, G + 1.1), 0.0), (new.pt("top_center") + P(0.4, 0.1), PI / 2)])
-            buzz = FX.hum_shake(new, clock)
+            FX.hum_shake(new, clock)
             self.add(air, hum)
+            self.background(tween_value(clock, 6.0, 6.0, rate_func=linear))
             self.snd("hum", 0.1, gain=-2)
-            self.play(clock.animate(run_time=1.8, rate_func=linear).set_value(1.8),
-                      t1.look_at(new.pt("top_center"), 0.3), Succession(Wait(0.6), t2.expression("happy", 0.3)),
-                      Succession(Wait(0.1), t1.thumbs_up(face=1)),
-                      camera.punch_in(self, P(-1.6, 0.7), 0.78, 1.8))
+            self.play(camera.punch_in(self, BOOKEND[0], BOOKEND[1], 0.75), t1.walk_to(-1.9, G, face=1, run_time=0.75),
+                      Succession(Wait(0.4), t2.expression("happy", 0.3)))
+            self.play(t1.thumbs_up(hold=0.65))
+            # the rookie's own try: a leftover static spark off his thumb
+            self.play(t2.thumb_try())
+            self.play(t2.thumb_spoiled(AnimationGroup(Snd("zap", gain=-10),
+                                                      spark_shower(t2.hand("R") + P(0, 0.2), 0.35, rate=90, speed=(1.2, 2.6),
+                                                                   spread=(0.2, 2.9), colors=("#FFFFFF", "#BFE8FF", "#FFD54A")),
+                                                      t2.t["hair"].animate(rate_func=there_and_back, run_time=0.6).set_value(1.0))))
 
         self.finish()
