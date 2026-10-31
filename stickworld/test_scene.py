@@ -55,6 +55,8 @@ class StickWorldTest(EpisodeScene):
             self.play(a.expression("neutral"), b.expression("neutral"), c.expression("neutral"), d.expression("neutral"))
             self.play(a.shake_head(3, slow=True, eyes_closed=True), b.nod(2), c.blink(), d.look_at(P(4, 4)))
             self.play(a.thumbs_up(), b.wink())
+            self.play(b.thumb_try())
+            self.play(b.thumb_spoiled(FX.sparkles([b.hand("R")], 0.3, 4)))
             self.play(a.talk(1.0), b.face.turn_to(0.9), c.turn(-1), d.turn(1))
 
         with self.block("locomotion"):
@@ -203,7 +205,7 @@ class StickWorldTest(EpisodeScene):
             fur = Furnace(-3.0, g2)
             coil = EvapCoil(-3.0, fur.pt("supply_top")[1])
             th = Thermostat((0.2, 0.6))
-            drn = CondensateDrain(coil.pt("drain"))
+            drn = CondensateDrain(coil.pt("drain"), drop=0.6, floor_drain=coil.pt("drain")[1] - 0.95)
             rack = FilterRack((0.3, -4.0))
             bp = BreakerPanel((2.9, -3.2))
             self.add(cond, ah, ls, fur, coil, th, drn, rack, bp)
@@ -225,6 +227,7 @@ class StickWorldTest(EpisodeScene):
             self.add(mm, gs, lvl, fl, drv, brush, *yard, *tall, fig)
             self.play(mm.reading(240), gs.needles(118, 340), lvl.tilt(0.12), fl.beam(True))
             self.play(mm.probes_to((-2.0, 2.6), (-1.6, 2.5)), gs.hoses_to(low=(0.6, 2.4), high=(2.0, 2.5)), lvl.tilt(-0.12), fl.beam(False))
+            self.play(gs.needles(-0.12, 0, fraction=True, run_time=0.5))   # vacuum
             self.play(fig.grab(fl, "R", "grip"))
             self.play(fl.beam(True), fig.pose("point", 0.4))
             self.remove(mm, gs, lvl, fl, drv, brush, *yard, *tall, fig)
@@ -286,6 +289,7 @@ class StickWorldTest(EpisodeScene):
             helper = StickFigure(x=0.4, ground=F, face_dir=1, name="helper")
             self.add(helper)
             self.play(pull_out(helper, up, 1.15))
+            self.play(hole.tape())
             self.play(low.grab2(dl, "handle", "handle", keep_pinned=True), turn_about(load, -0.351, "axle", 0.4),
                       low.walk_to(0.71, face=-1, run_time=0.4))
             self.play(low.wheel_to(-2.0, load, run_time=1.2), up.reach("R", P(1.2, F + 0.15), 0.3))
