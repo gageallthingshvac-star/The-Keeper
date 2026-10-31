@@ -16,11 +16,13 @@ The memory between episodes lives in `stickworld/continuity.py`. Episodes read t
 
 ## How each short works on its own
 
-1. **Hook in the first second**: the problem on screen (smoke, sweat, a dead unit, water). The `EP n` tag pops in at the top left.
-2. **Arrival**: the truck pulls up, its badge row showing the season so far, or the techs walk in.
-3. **The job, with the rookie's one mistake** (the gag). The lead reacts, then helps; the lesson is shown, not said.
-4. **The payoff**: the fix works, with something satisfying (cold air, a room going from hot orange to cool blue, a click into place).
-5. **The lead's thumbs-up and wink.** End.
+1. **Hook in the first second**: the problem already happening on screen, in motion (smoke, sweat, a dead unit, water), framed close. The `EP n` tag pops in at the top left.
+2. **Arrival, fast** (under ~3 s of travel): the truck pulls up, its badge row showing the season so far, or the techs walk in.
+3. **The job, with the rookie's one mistake** (the gag), the cause found on screen before the fix. The lead reacts, then helps; the lesson is shown, not said. Small frustrations and small satisfactions alternate.
+4. **The payoff**: the fix works, with something satisfying (cold air, a room going from hot orange to cool blue, a click into place), in the same framing as the hook so a replay reads as after -> before.
+5. **The lead's thumbs-up and wink, then the rookie's attempt at his own**, which goes wrong (the running gag below). End.
+
+Retention rules for every episode: skill section 9e.
 
 ## How the series remembers (rewards watching in order)
 
@@ -28,6 +30,7 @@ The memory between episodes lives in `stickworld/continuity.py`. Episodes read t
 - **The truck keeps score**: one LEMONNOX badge per lemon hauled off (`WorkTruck(..., trophies=C.trophies(ep))`). Only jobs that haul a LEMONNOX add one.
 - **Every episode includes one callback**: the rookie visibly applying an earlier lesson (EP2: he kills the power first, EP1's lesson), sometimes overdoing it (EP3: he kills *all* the power).
 - **The finale mirrors the pilot**: EP10 is EP1's job done right, beat for beat.
+- **The season question: will the rookie earn his own thumbs-up?** Every episode ends with the rookie trying to copy the lead's thumbs-up, and it goes wrong in a way born from that episode: EP1 a leftover static spark off his thumb, EP2 a last chunk of insulation dropping out of his ceiling hole onto his head, EP3 a puff of filter dust. It escalates through the season (later: a glove stuck on, a gauge hose in the way, the lead out sick in EP9 so nobody to copy) until EP10, where he lands it, wink and all.
 
 ## Episode guide
 

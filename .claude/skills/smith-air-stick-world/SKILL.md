@@ -14,7 +14,7 @@ You are building short, funny stick figure animations about HVAC work. The owner
 - Workflow: render a low-quality preview first, check it, then the final:
   - preview: `manim -ql -r 540,960 episodes/<file>.py <SceneName>`
   - final: `manim -qh --fps 60 -r 1080,1920 episodes/<file>.py <SceneName>`
-- Length: under 60 seconds. Every scene duration lives in a TIMING dict at the top of the episode file so it can be retimed to the voiceover (a scene that finishes early holds to its TIMING value).
+- Length: under 60 seconds; shorter is better when nothing is lost (aim 35-55 s). Every scene duration lives in a TIMING dict at the top of the episode file so it can be retimed to the voiceover (a scene that finishes early holds to its TIMING value).
 - The only on-screen text is the series tag: `self.episode_tag()` pops a small "EP n" work-order ticket into the top-left corner for the first ~2.5 s (Gage asked for numbered episodes). Otherwise no text overlays, titles, outros, "subscribe" or calls to action, and no on-screen effect words by default: gags are sold with recorded sound (section 9b). Comic effect words (`effects.effect_word`) exist and are used only when Gage asks. End the video on the final action.
 - Shorts-safe framing: keep faces and gags out of the bottom ~20% of the frame (y < -4.8, where the YouTube title and buttons sit) and the right ~10% (x > 3.6).
 - Before handing back, scrub the preview at each scene boundary (save stills with ffmpeg or `-s`) and check the Quality checklist in section 10.
@@ -192,8 +192,35 @@ The shorts form one season-long story (`episodes/SERIES.md`, "The Rookie's First
 - `WorkTruck(..., trophies=n)` shows n LEMONNOX badges on the bed side; `truck.add_trophy()` slaps on the next one.
 - Every episode: one rookie mistake, one lesson, one callback to an earlier lesson, the lead's thumbs-up at the end.
 
+## 9e. Retention and satisfaction (keep them watching, keep them coming back)
+
+Gage's brief: realistic, but built to hold attention, satisfy, and bring viewers back, with one clear story. Researched (Shorts retention guides, loop/rewatch structure, series and cliffhanger studies, "oddly satisfying" psychology). The specific percentages online are vendor rules of thumb; the principles below are what they agree on.
+
+Hold attention
+1. Second 0 is the problem, already happening, in motion, with sound: a sweating customer at 81, a smoking unit. Never open on an establishing shot or a truck driving in. The first frame must read as a question ("why is she sweating?"). The swipe-away decision happens in the first 1-2 s.
+2. Plant the payoff in the hook: show the exact thing the ending will reverse (81 / hot orange room / smoke). The ending answers the first frame.
+3. Something new every ~2-3 s: an action, a reveal, a sound, a camera move. A hold longer than ~1 s only right after a gag lands (the reaction) or on the final payoff. Travel (driving, walking between rooms) is where viewers leave: keep it under ~3 s, cut it with an off-screen `relocate`, or put a gag inside it.
+4. Chain beats with "but" / "therefore", never "and then" (each beat caused by the last: see the story rule in the checklist). Each beat raises a small question the next one answers.
+5. One focal point at a time, big enough on a phone (punch in on small things: icons, tags, screws).
+
+Satisfy
+6. Tension and release in waves: small frustrations (a stuck screw, the wrong breaker, ice) alternate with small satisfactions (a click, a pop, a clean reveal) every ~5-10 s; the biggest release comes last.
+7. Satisfying = precise and complete: one clean motion, a crisp sound (click, clunk, ding), a snap into place, a before/after readable in one frame (hot orange -> cool blue). Let it land (0.5-1 s), then move on.
+8. Leave nothing unresolved on screen at the end (old parts hauled off, panels closed, tools stowed).
+9. Bookend for the loop: the last shot uses the opening framing (same camera spot and zoom), now resolved. On replay, end -> start reads as after -> before, which invites the rewatch.
+
+Bring them back
+10. Same faces, same look, same rituals every episode: the EP tag, the lead's thumbs-up and wink, the rookie's cap and scars, the LEMONNOX badge row on the truck. Recognition is the reward for coming back.
+11. Callbacks reward loyal viewers without confusing new ones: each callback must also read on its own (the rookie touching his scorched cap reads as "nervous" to a newcomer).
+12. Running gag with escalation, carrying the season question ("will the rookie earn his own thumbs-up?"): right after the lead's thumbs-up, the rookie tries his own and it goes wrong in a way born from that episode's mistake (EP1: a leftover static spark off his thumb; EP2: a last chunk of ceiling insulation drops on him; EP3: a puff of filter dust). It escalates across the season until EP10, where he lands it with a wink. It is the final action: no outro, no text, no call to action.
+13. Close the small loop, keep the big one open: every episode resolves its own job completely; only the season arc (badges, scars, the thumbs-up) carries over.
+
+Stay real
+14. Real failure causes, real procedure in the right order, real tools; compress time only for travel and routine repetition (never spin a clock to fake a wait). A tech watching should find nothing to mock; a homeowner should be able to follow it with the sound off.
+
 ## 10. Quality checklist (check before every handoff)
 
+- Retention (9e): the problem is on screen in frame 1; no stretch over ~2.5 s without a new event; travel compressed; the payoff answers the first frame; the last shot bookends the first; the rookie's running-gag attempt follows the lead's thumbs-up.
 - The story makes sense with the sound off (Gage: "EP 3 doesn't make sense"). Every beat is caused by the one before it: the problem is shown, then found on screen (someone discovers the cause: a frozen coil, a dead wire) before anyone fixes it; every character action has a visible reason (someone asks, points, reacts); every prop a figure uses comes from somewhere (bag, pocket, truck). Watch the preview as a stranger would: if a beat needs the voiceover to make sense, restage it.
 - Every moving object is held by a hand, attached by a connection, or obviously under gravity, a throw or a gag.
 - Hands actually reach objects before grabbing; no grabbing from a distance.
