@@ -689,8 +689,9 @@ class Thermostat(Prop):
 class CondensateDrain(Prop):
     """PVC condensate drain with a vented P-trap, starting at inlet; points inlet, trap, vent, outlet; method drip()."""
 
-    def __init__(self, inlet=(0, 0), direction=1, stub=0.3, run=1.4, drop=1.0, slope=0.06, **kwargs):
-        """direction=-1 runs it left; stub, run (sloped by slope) and drop set the lengths."""
+    def __init__(self, inlet=(0, 0), direction=1, stub=0.3, run=1.4, drop=1.0, slope=0.06, floor_drain=None, **kwargs):
+        """direction=-1 runs it left; stub, run (sloped by slope) and drop set the lengths. floor_drain=y draws a floor
+        drain grate at that floor height under the outlet (end the drop a little above it: drips land in it)."""
         super().__init__(**kwargs)
         d = 1 if direction >= 0 else -1
         x, y = inlet[0], inlet[1]
@@ -710,6 +711,11 @@ class CondensateDrain(Prop):
         self.mark("trap", ((xa + xd) / 2, y - depth))
         self.mark("vent", (xd, y + 0.37))
         self.mark("outlet", (xe, ye - drop))
+        if floor_drain is not None:
+            g = floor_drain
+            self.part("floor_drain", VGroup(rect(xe - 0.17, g - 0.02, xe + 0.17, g + 0.035, METAL_DARK, DETAIL_W, r=0.01),
+                                            *[seg((gx, g - 0.005), (gx, g + 0.02), w=1.5, color=INK)
+                                              for gx in np.linspace(xe - 0.11, xe + 0.11, 5)]))
         self.set_z_index(Z_BEHIND)
 
     def drip(self, n=3, run_time=1.5, fall=0.8):

@@ -46,8 +46,9 @@ class Couch(Prop):
 
 
 class TV(Prop):
-    """Flat-screen TV on a low cabinet, seen from the side, screen facing `facing`: the picture shows as the light it
-    throws, a soft flickering glow cone toward the viewer's side. Points: screen, base. Methods: screen(on)."""
+    """Flat-screen TV on a low cabinet, turned three-quarters toward `facing` so its lit screen reads on a phone (a
+    black bar edge-on doesn't), throwing a soft flickering glow cone toward the viewer's side. Points: screen, base.
+    Methods: screen(on)."""
 
     def __init__(self, x=0.0, floor_y=0.0, facing=-1, on=True, reach=4.0, **kwargs):
         super().__init__(**kwargs)
@@ -58,6 +59,9 @@ class TV(Prop):
         sy0, sy1 = g + 0.85, g + 2.05
         self.part("stand", rect(x - 0.05, g + 0.62, x + 0.05, sy0, "#2B2B2B", DETAIL_W))
         self.part("panel", rect(x - 0.07, sy0, x + 0.07, sy1, "#1E1E1E", PROP_W, r=0.03))
+        ex = x + facing * 0.62                      # the screen face, turned toward the room
+        self.part("face", Polygon(P(x + facing * 0.07, sy0), P(ex, sy0 + 0.1), P(ex, sy1 - 0.1), P(x + facing * 0.07, sy1))
+                  .set_fill("#1E1E1E", 1).set_stroke(INK, PROP_W))
         sx = x + facing * 0.08
         glow = Polygon(P(sx, sy1 - 0.05), P(sx, sy0 + 0.05), P(sx + facing * reach, g + 0.1), P(sx + facing * reach, g + 3.4))
         self.part("glow", glow.set_fill(TV_GLOW[0], 0.0).set_stroke(width=0))
@@ -77,6 +81,7 @@ class TV(Prop):
         col = TV_GLOW[(k // 9) % len(TV_GLOW)]
         wobble = 0.8 + 0.2 * np.sin(k * 0.9) * np.sin(k * 0.37)
         m.set_fill(col, 0.22 * self._level * wobble)
+        self.parts["face"].set_fill(mix("#1E1E1E", col, 0.85 * self._level * wobble), 1)
 
     def screen(self, on=True, run_time=0.15):
         target = 1.0 if on else 0.0
