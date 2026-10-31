@@ -15,17 +15,18 @@ from manim.utils.rate_functions import ease_in_quad, ease_out_bounce
 
 from stickworld import camera
 from stickworld import continuity as C
-from stickworld.actions import Do, climb_start, pull_out
+from stickworld import style as S
+from stickworld.actions import Do, climb_start, pull_out, tween_value
 from stickworld.audio import Snd
 from stickworld.episode import EpisodeScene
 from stickworld.face import KEEP
 from stickworld.props import effects as FX
 from stickworld.props.base import attach_to, bundle, detach, ground_shadow, ride, turn_about, unbundle
-from stickworld.props.effects_more import glow, heat_waves, impact_burst, pop, spark_shower, squash_land
+from stickworld.props.effects_more import debris, glow, heat_waves, impact_burst, pop, spark_shower, squash_land
 from stickworld.props.hvac import Disconnect
 from stickworld.props.hvac_more import AirHandler, CondensateDrain, LineSet, Thermostat
 from stickworld.props.tools import ToolBag
-from stickworld.props.tools_more import Dolly, Rope, Torch, TubingCutter
+from stickworld.props.tools_more import Dolly, GaugeSet, Rope, Torch, TubingCutter
 from stickworld.rig import StickFigure
 from stickworld.sets_more import ROOM_COOL, ROOM_HOT, CeilingHole, attic
 from stickworld.style import FRAME_H
@@ -44,25 +45,27 @@ LEAD_SPOT = 0.25
 ROOKIE_SPOT = 1.15
 HAUL_X = 1.35
 TILT = 0.351        # stair angle from vertical; a loaded hand truck rides it lying back at this tilt
+REG_X = 0.55        # ceiling register, well clear of the hole (the cold air must come out of the vent)
+BOOKEND = (np.array([1.8, -1.6, 0]), 0.48)   # opening and closing shot: the homeowner, thermostat, register, hole
 
 
 class Ep02AtticAirHandler(EpisodeScene):
     EPISODE = 2
     TIMING = {
-        "arrive": 4.8,
-        "climb": 9.3,
-        "joist": 7.7,
-        "old_out": 9.3,
-        "dolly_up": 11.2,
-        "connect": 9.1,
+        "arrive": 3.9,
+        "climb": 8.55,
+        "joist": 8.15,
+        "old_out": 10.3,
+        "dolly_up": 10.5,
+        "connect": 10.6,
         "thermostat": 2.3,
-        "cold_air": 4.2,
+        "cold_air": 4.6,
     }
 
     # ------------------------------------------------------------ set up the world
     def build(self):
         probe = AirHandler(AH_X, F)
-        self.set_ = attic(F, room_floor=RF, hatch_x=HATCH_X, walkway=(-1.2, 1.45), register_x=HO_X - 0.05, light_x=-0.45,
+        self.set_ = attic(F, room_floor=RF, hatch_x=HATCH_X, walkway=(-1.2, 1.45), register_x=REG_X, light_x=-0.45,
                           thermostat_x=2.45, work_x=AH_X, plenum_x=AH_X, plenum_y=probe.pt("supply_top")[1],
                           room_color=ROOM_HOT, stud_x=-1.05)
         a = self.set_
@@ -88,6 +91,7 @@ class Ep02AtticAirHandler(EpisodeScene):
         self.lead = StickFigure(5.4, RF, -1, name="lead", rest_face=dict(mouth_curve=0.45))
         self.bag = ToolBag(self.lead.hand("R"), scale=0.8)        # the lead carries the MILWACKO bag in
         self.cutter = TubingCutter((0, 0), face=-1)
+        self.gauges = GaugeSet((1.95, F + 1.35))          # hung on the line set; hoses down along it to the condenser
         self.torch = Torch((0, 0), face=-1)
         # the rookie comes in rolling the new unit on the hand truck, tipped back onto its wheels
         self.load.shift(np.array([6.0, 0, 0]))
@@ -153,42 +157,44 @@ class Ep02AtticAirHandler(EpisodeScene):
         self.camera.frame.set(height=FRAME_H * 0.48).move_to(np.array([1.8, -1.6, 0]))   # open on the problem
         head = ho.head_center()
         with self.block("arrive"):
-            self.play(lead.walk_to(start_x, speed=1.25, hold=("R",)),
-                      rookie.wheel_to(DOLLY_X + 0.2 + 1.06, self.load, run_time=3.0),
+            self.play(lead.walk_to(start_x, speed=1.6, hold=("R",)),
+                      rookie.wheel_to(DOLLY_X + 0.2 + 1.06, self.load, run_time=2.4),
                       Succession(AnimationGroup(heat_waves(head + np.array([0, 0.45, 0]), 1.2),
                                                 heat_waves(head + np.array([-1.1, -1.4, 0]), 1.3, width=0.6),
                                                 heat_waves(head + np.array([1.2, -2.2, 0]), 1.3, width=0.6)),
                                  AnimationGroup(FX.sweat(head, side=-1), ho.wipe_brow(), heat_waves(head + np.array([0.2, 0.5, 0]), 1.0)),
                                  AnimationGroup(ho.turn(-1), ho.expression("disappointed"))),
-                      Succession(Wait(1.5), camera.reset(self, 1.5)))
+                      Succession(Wait(1.2), camera.reset(self, 1.2)))
             self.play(turn_about(self.load, 0.25, "axle", 0.4), rookie.walk_to(DOLLY_X + 0.65, face=-1, run_time=0.4),
                       ho.point_at(a.pt("hatch")), Snd("thump", gain=-14))
-            self.play(rookie.let_go(), ho.pose("stand", 0.3), Wait(0.1))
+            self.play(rookie.let_go(), ho.pose("stand", 0.3))
 
         with self.block("climb"):
-            self.background(camera.punch_in(self, np.array([-1.3, -0.5, 0]), 0.84, 4.0))
-            # callback to EP1: first thing up the stair, the rookie kills the power. He's learned. He's very proud.
-            self.background(Succession(Wait(1.3), rookie.walk_to(start_x, speed=1.15),
-                                       rookie.climb(self.treads, landing, lip, hunch=0.15),
-                                       rookie.turn(-1, 0.2), rookie.push_switch(self.disc, False), Snd("clunk", gain=-2),
-                                       AnimationGroup(rookie.expression("happy", 0.2), rookie.pose({"neck": -0.25}, 0.25)),
-                                       rookie.walk_to(ROOKIE_SPOT, spine=0.15), rookie.turn(-1)))
-            self.play(lead.sling(self.bag), lead.face._to(0.3, turn=0.6))
-            self.play(lead.climb(self.treads, landing, lip, hunch=0.15), ho.turn(1), ho.look_at(a.pt("hatch")))
+            # the lead goes up first, bag on his back; the rookie starts up behind him (no waiting at the foot)
+            self.play(lead.sling(self.bag), lead.face._to(0.3, turn=0.6), rookie.walk_to(start_x + 0.9, speed=1.4),
+                      camera.punch_in(self, np.array([-1.3, -0.5, 0]), 0.84, 0.8))
+            self.background(Succession(Wait(1.3), rookie.walk_to(start_x, run_time=0.35),
+                                       rookie.climb(self.treads, landing, lip, hunch=0.15, step_time=0.22)))
+            self.play(lead.climb(self.treads, landing, lip, hunch=0.15, step_time=0.22), ho.turn(1), ho.look_at(a.pt("hatch")))
             self.play(lead.walk_to(LEAD_SPOT, spine=0.15), ho.expression("neutral"))
             self.play(lead.unsling(self.bag, (BAG_X, F)))
-            self.wait(2.2)
+            self.wait(0.25)   # the rookie reaches the top
+            # callback to EP1: first thing at the top, the rookie kills the power. Close on it: he's learned, he's proud.
+            self.play(rookie.turn(-1, 0.2), camera.punch_in(self, self.disc.get_center() + np.array([0.45, -0.35, 0]), 0.32, 0.45))
+            self.play(rookie.push_switch(self.disc, False), Succession(Wait(0.2), Snd("clunk", gain=-2)))
+            self.play(rookie.expression("happy", 0.2), rookie.pose({"neck": -0.25}, 0.25), Wait(0.1))
+            self.play(rookie.walk_to(ROOKIE_SPOT, spine=0.15), camera.punch_in(self, np.array([1.25, -0.3, 0]), 0.68, 0.8))
+            self.play(rookie.turn(-1, 0.2))
 
         with self.block("joist"):
             self.play(rookie.hands_on_hips(), rookie.expression("happy", 0.2, hold=1.0), rookie.pose({"neck": -0.25}, 0.3),
-                      lead.nod(1), lead.expression("happy", 0.2),
-                      camera.punch_in(self, np.array([1.25, -0.3, 0]), 0.68, 0.8))
+                      lead.nod(1), lead.expression("happy", 0.2))
             ceil = a.pt("ceiling")[1]
             self.play(lead.pose("stand", 0.3), rookie.fall_through(HOLE_X, F, hole=self.hole),
                       Succession(Wait(0.4), AnimationGroup(camera.shake(self, 0.12, run_time=0.3),
                                                            impact_burst((HOLE_X, ceil - 0.25), 0.9))))
             self.wait(0.08)   # hit-stop: let the crunch land
-            self.play(rookie.kick_leg(3, 0.9), rookie.expression("strain", 0.2),
+            self.play(rookie.kick_leg(2, 0.6), rookie.expression("strain", 0.2),
                       Succession(AnimationGroup(ho.expression("surprised", 0.15), ho.pose({"spine": -0.25, "neck": -0.15}, 0.25),
                                                 ho.look_at(rookie.foot(rookie._stuck["side"]))),
                                  FX.sweat(ho.head_center(), side=1)),
@@ -202,6 +208,12 @@ class Ep02AtticAirHandler(EpisodeScene):
             self.play(Do(lambda: rookie.add_mark("shin_bandage")), Snd("pop_small", gain=-8),
                       FX.sparkles([shin() + np.array([0.15, 0.12, 0])], 0.4, 4), rookie.expression("happy", 0.2))
             self.play(lead.pose({"drop": 0.0, "spine": 0.0, "neck": 0.0}, 0.3), lead.let_go(("R",), 0.3))
+            # and the ceiling: a duct-tape X over the hole for now (it stays taped like that, the series remembers)
+            self.play(lead.walk_to(1.45, face=1, spine=0.15, run_time=0.4))
+            self.play(lead.pose({"drop": 0.75, "spine": 0.7, "neck": -0.2}, 0.25),
+                      lead.reach("R", np.array([HOLE_X - 0.1, F + 0.05, 0]), 0.25, lean=False), Snd("rip", gain=-8))
+            self.play(self.hole.tape(0.2), Snd("thump", gain=-10), FX.sparkles([np.array([HOLE_X + 0.25, F - 0.1, 0])], 0.35, 4))
+            self.play(lead.pose({"drop": 0.0, "spine": 0.15, "neck": 0.0}, 0.3), lead.let_go(("R",), 0.3))
             self.play(lead.point_at(a.pt("hatch")), lead.talk(0.5), rookie.expression("disappointed"), camera.reset(self, 0.6))
 
         with self.block("old_out"):
@@ -209,7 +221,15 @@ class Ep02AtticAirHandler(EpisodeScene):
                                        rookie.climb(self.treads, landing, lip, floor_y=RF, down=True),
                                        rookie.expression("neutral")))
             self.play(lead.pose("stand", 0.2), lead.walk_to(1.05, face=-1, spine=0.15))
-            self.play(lead.fetch_tool(self.bag, self.cutter))
+            # refrigerant first: gauges on, and the system pumped down to zero before anything gets cut
+            g = self.gauges
+            self.add(g)
+            g.set_opacity(0)
+            self.play(g.animate(run_time=0.2).set_opacity(1), g.hoses_to(low=(1.52, F - 0.06), high=(1.4, F - 0.06), run_time=0.4),
+                      g.needles(118, 300, run_time=0.4), camera.punch_in(self, np.array([1.6, F + 1.0, 0]), 0.3, 0.45),
+                      lead.look_at(g.pt("grip")))
+            self.play(g.needles(0, 0, run_time=0.6), Snd("fizz", gain=-14), Succession(Wait(0.55), Snd("click", gain=-10)))
+            self.play(lead.fetch_tool(self.bag, self.cutter), camera.reset(self, 0.5))
             cut = (self.LS_ON[0][0] + 0.1, self.LS_ON[0][1])
             self.play(lead.use_tool(self.cutter, cut, turns=3, run_time=0.9))
             self.play(self.lineset.reshape(self.LS_OFF, 0.3), Snd("tink"), Snd("fizz", gain=-12))
@@ -243,7 +263,7 @@ class Ep02AtticAirHandler(EpisodeScene):
             wheel_x = self.B[0] - 0.09 + 1.31
             hook = lambda: self.dolly.pt("handle")
             via = lambda: lip if hook()[1] < lip[1] + 0.05 else (hook() + lead.hand("R")) / 2
-            self.play(rookie.wheel_to(wheel_x, self.load, run_time=1.6),
+            self.play(rookie.wheel_to(wheel_x, self.load, run_time=1.1),
                       Succession(Wait(1.1), lead.point_at(lip, 0.25),
                                  AnimationGroup(self.rope.throw([lambda: lead.hand("R"), via, hook], 0.45), Snd("whoosh", gain=-6))))
             self.play(Snd("click", gain=-2), Wait(0.15))
@@ -257,7 +277,7 @@ class Ep02AtticAirHandler(EpisodeScene):
             self.background(camera.punch_in(self, np.array([-1.1, -0.9, 0]), 0.8, 3.0))
             self.play(Do(lambda: ride(self.load, "axle", stair_path, None, haul)),
                       rookie.let_go(), rookie.step_back(0.55, run_time=0.5),
-                      lead.haul(self.rope, haul, 1.0, pulls=4, run_time=1.9, toward=lip),
+                      lead.haul(self.rope, haul, 1.0, pulls=3, run_time=1.45, toward=lip),
                       rookie.expression("happy", 0.3))
             self.play(Do(lambda: (detach(self.load), self.rope.hold(hook))), lead.let_go(run_time=0.2),
                       lead.walk_to(LEAD_SPOT - 0.05, face=-1, spine=0.3, run_time=0.55))
@@ -275,11 +295,11 @@ class Ep02AtticAirHandler(EpisodeScene):
                 return p_hi + (p_end - p_hi) * w + np.array([0, 0.25 * np.sin(PI * w)])
 
             self.play(Do(lambda: ride(self.load, "axle", out_path, lambda s: TILT * max(0.0, (s - 0.45) / 0.55), up)),
-                      up.animate(run_time=1.4, rate_func=linear).set_value(1.0),
+                      up.animate(run_time=1.15, rate_func=linear).set_value(1.0),
                       lead.expression("strain", 0.2),
                       Succession(lead.pose({"drop": 0.0, "spine": 0.2}, 0.62),
-                                 lead.walk_to(HAUL_X, face=-1, run_time=0.78, spine=0.15)),
-                      Succession(Wait(1.38), Snd("thud", gain=-6)))
+                                 lead.walk_to(HAUL_X, face=-1, run_time=0.53, spine=0.15)),
+                      Succession(Wait(1.13), Snd("thud", gain=-6)))
             self.play(Do(lambda: detach(self.load)), squash_land(self.load, 0.07, 0.4), FX.dust(np.array([AH_X + 0.2, F, 0]), 1.7),
                       lead.let_go(run_time=0.25), lead.expression("neutral", 0.2), camera.reset(self, 0.9))
             self.play(Do(lambda: unbundle(self, self.load, self.new)), Do(lambda: unbundle(self, self.load, self.dolly)))
@@ -304,10 +324,18 @@ class Ep02AtticAirHandler(EpisodeScene):
                           heat_waves(stubs + np.array([0, 0.15, 0]), 1.0, width=0.4, height=0.5), Snd("fizz", gain=-3))))
             self.play(self.torch.flame(False), lead.expression("neutral", 0.2))
             self.play(lead.stow_tool(self.bag, self.torch))
+            # brazed: pull a vacuum before any power goes on; the needle drops below zero and holds (no leaks)
+            self.play(camera.punch_in(self, np.array([1.6, F + 1.0, 0]), 0.3, 0.4), lead.look_at(g.pt("grip")),
+                      Snd("hum", gain=-16))
+            self.play(g.needles(-0.12, 0, run_time=0.7, fraction=True),
+                      Succession(Wait(0.6), AnimationGroup(Snd("ding", gain=-10),
+                                                           FX.sparkles([g.pt("gauge_low") + np.array([0.2, 0.2, 0])], 0.4, 5))))
+            self.play(g.animate(run_time=0.2).set_opacity(0), camera.punch_in(self, stubs + np.array([0.3, 0.2, 0]), 0.34, 0.4))
+            self.remove(g)
             self.play(lead.reach("L", self.drain.pt("inlet"), 0.3), lead.look_at(self.drain.pt("inlet")))
             self.play(Snd("click"), FX.sparkles([self.drain.pt("inlet") + np.array([0.08, 0.12, 0])], 0.45, 3))
             self.play(lead.let_go(("L",)), lead.exhale(), camera.reset(self, 0.8))
-            self.play(lead.walk_to(-0.4, face=-1, spine=0.15, run_time=0.9))
+            self.play(lead.walk_to(-0.4, face=-1, spine=0.15, run_time=0.7))
             self.play(lead.push_switch(self.disc, True), Succession(Wait(0.2), Snd("clunk", gain=-2)))
             self.play(camera.punch_in(self, self.thermo.pt("screen") + np.array([-0.35, -0.25, 0]), 0.3, 0.8),
                       Succession(Wait(0.15), Snd("whoosh", gain=-12)))
@@ -335,13 +363,20 @@ class Ep02AtticAirHandler(EpisodeScene):
             air = FX.cold_air(clock, [reg[0] - 0.25, reg[0], reg[0] + 0.25], reg[1] - 0.05, RF + 2.6, vertical=True)
             FX.hum_shake(ah, clock)
             self.add(hum, air)
-            self.play(clock.animate(run_time=4.0, rate_func=linear).set_value(4.0), Snd("hum", gain=-6),
-                      camera.punch_in(self, np.array([0.9, -0.9, 0]), 0.8, 2.2),
-                      Succession(Wait(0.4), a.parts["room"].animate(run_time=2.4).set_fill(ROOM_COOL)),
-                      Succession(Wait(0.6), AnimationGroup(ho.expression("happy", 0.3, hold=KEEP), ho.face.close_eyes(0.3, hold=KEEP),
+            self.background(tween_value(clock, 9.0, 9.0, rate_func=linear))
+            self.play(Snd("hum", gain=-6), camera.punch_in(self, np.array([0.9, -0.9, 0]), 0.8, 1.6),
+                      Succession(Wait(0.3), a.parts["room"].animate(run_time=1.8).set_fill(ROOM_COOL)),
+                      ho.let_go(("R",)), Succession(Wait(0.2), ho.walk_to(REG_X + 0.15, face=-1, run_time=0.8)),
+                      Succession(Wait(1.0), AnimationGroup(ho.expression("happy", 0.3, hold=KEEP), ho.face.close_eyes(0.3, hold=KEEP),
                                                            ho.pose({"shoulder_L": 1.2, "elbow_L": 0.3, "shoulder_R": 1.3,
                                                                     "elbow_R": 0.3, "neck": -0.2}, 0.5))),
-                      Succession(Wait(0.9), rookie.celebrate()),
-                      Succession(Wait(1.2), lead.thumbs_up()))
+                      rookie.walk_to(HOLE_X - 0.3, face=-1, run_time=1.0),   # under the taped hole, clear of the thermostat
+                      Succession(Wait(0.7), lead.thumbs_up(hold=0.6)))
+            # back to the opening shot for the rookie's own try: a last chunk of insulation slips out past the tape
+            self.play(camera.punch_in(self, BOOKEND[0], BOOKEND[1], 0.6), rookie.thumb_try())
+            chunk = self.hole.pt("bottom") + np.array([-0.2, 0, 0])
+            self.play(rookie.thumb_spoiled(hold=0.3, mishap=AnimationGroup(Snd("thump", gain=-10), FX.dust(chunk, 0.6),
+                                                          debris(chunk, width=0.3, n=6, fall=1.5, run_time=0.7,
+                                                                 seed=7, colors=[S.INSULATION, S.INSULATION, S.WHITE]))))
 
         self.finish()

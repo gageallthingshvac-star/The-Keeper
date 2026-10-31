@@ -311,7 +311,7 @@ def house_night(floor_y=-0.6, room_color=WALL, partition_x=1.0, register_x=-2.2,
 class CeilingHole(Prop):
     """A foot-sized hole punched through the attic floor's drywall and batts, seen in section: a dark gap with
     torn drywall edges and insulation fluff hanging into the room. Built at x between top_y (top of the batts) and
-    bottom_y (underside of the drywall). Points: center, bottom. Method: burst()."""
+    bottom_y (underside of the drywall). Points: center, bottom. Methods: burst(), tape() (the temporary fix)."""
 
     def __init__(self, x, top_y, bottom_y, width=0.55):
         super().__init__()
@@ -327,6 +327,13 @@ class CeilingHole(Prop):
                                                           P(x + dx - 0.03, bottom_y - 0.24 - 0.05 * k)])
                          .set_stroke(INSULATION, 6) for k, dx in enumerate((-0.15, 0.02, 0.17))])
         self.part("fluff", fluff)
+        # the temporary fix, hidden until tape(): a silver duct-tape X over the gap
+        cy = (top_y + bottom_y) / 2
+        strips = VGroup()
+        for ang in (0.45, -0.45):
+            strip = Polygon(P(x - w * 0.75, cy - 0.06), P(x + w * 0.75, cy - 0.06), P(x + w * 0.75, cy + 0.06), P(x - w * 0.75, cy + 0.06))
+            strips.add(strip.rotate(ang, about_point=P(x, cy)).set_fill("#B9BEC4", 0).set_stroke(INK, DETAIL_W, opacity=0))
+        self.part("tape", strips)
         self.mark("center", (x, (top_y + bottom_y) / 2))
         self.mark("bottom", (x, bottom_y))
         self.set_z_index(Z_SET + 0.5)
@@ -335,6 +342,19 @@ class CeilingHole(Prop):
         from manim import GrowFromCenter
         from manim.utils.rate_functions import ease_out_back
         return GrowFromCenter(self, run_time=run_time, rate_func=ease_out_back)
+
+    def tape(self, run_time=0.25):
+        """The temporary fix: the torn flaps and fluff pushed back up and a duct-tape X slapped over the hole (pair
+        with a "rip" and a "thump"). It stays taped like that for the rest of the series."""
+        from manim import UpdateFromAlphaFunc
+
+        def apply(m, a):
+            for part in (self.parts["flaps"], self.parts["fluff"]):
+                part.set_fill(opacity=(1 - a) if part is self.parts["flaps"] else 0).set_stroke(opacity=1 - a)
+            for strip in self.parts["tape"]:
+                strip.set_fill(opacity=a).set_stroke(opacity=a)
+
+        return UpdateFromAlphaFunc(self, apply, run_time=run_time)
 
 
 # ================================================================ crawlspace

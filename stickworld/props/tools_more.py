@@ -216,10 +216,11 @@ class GaugeSet(Prop):
 
     def _to_angle(self, v, vmax, fraction):
         f = v if fraction else v / vmax
-        return 1.25 * PI - self.SWEEP * float(np.clip(f, 0, 1))
+        return 1.25 * PI - self.SWEEP * float(np.clip(f, -0.15, 1))   # below 0: the compound gauge's vacuum range
 
     def needles(self, low, high, run_time=1.0, fraction=False, **kwargs):
-        """Animate the needles to low/high psig (low dial 0-250, high 0-800), or to 0..1 of the sweep with fraction=True."""
+        """Animate the needles to low/high psig (low dial 0-250, high 0-800), or to 0..1 of the sweep with fraction=True.
+        A negative low reading swings the needle below zero: pulling a vacuum."""
         lo, hi = self._to_angle(low, self.LOW_MAX, fraction), self._to_angle(high, self.HIGH_MAX, fraction)
 
         def apply(s, a):
