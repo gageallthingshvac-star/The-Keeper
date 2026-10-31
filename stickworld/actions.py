@@ -295,6 +295,27 @@ class ActionsMixin:
                           AnimationGroup(self.t["thumb"].animate(run_time=0.15).set_value(0.0),
                                          self.pose({"shoulder_R": 0.12, "elbow_R": 0.18}, 0.3)))
 
+    def thumb_try(self, face=None):
+        """The rookie's attempt at the lead's signature (the season's running gag), part 1: same pose and thumb pop
+        as thumbs_up(), but no twinkle, no ding, no wink. Follow with thumb_spoiled(mishap) in the next play, so the
+        mishap can be built at the raised hand."""
+        lead_in = [self.turn(face, 0.2)] if face is not None else []
+        return Succession(*lead_in, AnimationGroup(self.pose({"shoulder_R": 0.55, "elbow_R": 2.05}, 0.3),
+                                                   self.face._to(0.3, turn=0.0, up=0.05), self.expression("happy", 0.3)),
+                          self.t["thumb"].animate(run_time=0.15, rate_func=ease_out_back).set_value(1.0))
+
+    def thumb_spoiled(self, mishap=None, hold=0.45):
+        """Part 2: the episode's mishap spoils it (an animation built at self.hand("R"): a static spark, a chunk of
+        insulation, a dust puff); he flinches, the thumb folds, a beat, and the arm drops, deflated."""
+        hit = [Succession(Wait(0.08), AnimationGroup(self.expression("surprised", 0.08),
+                                                     self.t["thumb"].animate(run_time=0.12).set_value(0.0),
+                                                     self.pose({"shoulder_R": 0.85, "elbow_R": 2.4, "neck": -0.1}, 0.12)))]
+        if mishap is not None:
+            hit.append(mishap)
+        return Succession(AnimationGroup(*hit), Wait(hold),
+                          AnimationGroup(self.expression("disappointed", 0.2),
+                                         self.pose({"shoulder_R": 0.12, "elbow_R": 0.18, "neck": 0.0}, 0.3)))
+
     def shake_head(self, times=3, slow=False, eyes_closed=False):
         return self.face.shake_head(times, slow, eyes_closed)
 
