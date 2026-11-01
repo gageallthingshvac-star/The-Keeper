@@ -8,7 +8,7 @@ The memory between episodes lives in `stickworld/continuity.py`. Episodes read t
 
 | Who | Look | Role |
 | --- | --- | --- |
-| **The Lead** (main character) | Plain head, warm resting smile, MILWACKO bag | Calm, competent, kind. He shakes his head at the rookie, then helps him up and patches him up. He never gloats. Signature: thumbs-up and wink to camera when the job is done. |
+| **The Lead** (main character) | Plain head, warm resting smile, MILWACKO bag, sunglasses in his shirt pocket | Calm, competent, kind, and effortlessly cool: the work goes smoothly in his hands. He shakes his head at the rookie, then helps him up and patches him up. He never gloats. Signature: when the cold air comes on, the shades go on ("it's cool now"), then the thumbs-up with a wink over the top of them. |
 | **The Rookie** | Red cap | Eager and twitchy. Makes exactly **one big mistake per episode** and learns from it. A lesson, once learned, never fails again. Later episodes show him using it, sometimes overdoing it. |
 | **The Sweaty Neighbor** | Hair tuft | The EP2 homeowner, who comes back as a repeat customer (EP6, EP8). The hole the rookie put in their ceiling in EP2 is still taped over. |
 | **The Movie-Night Neighbor** | Hair bun | The EP3 customer, sweating through movie night on the couch. Their lights went out because of the rookie. |
@@ -20,7 +20,7 @@ The memory between episodes lives in `stickworld/continuity.py`. Episodes read t
 2. **Arrival, fast** (under ~3 s of travel): the truck pulls up, its badge row showing the season so far, or the techs walk in.
 3. **The job, with the rookie's one mistake** (the gag), the cause found on screen before the fix. The lead reacts, then helps; the lesson is shown, not said. Small frustrations and small satisfactions alternate.
 4. **The payoff**: the fix works, with something satisfying (cold air, a room going from hot orange to cool blue, a click into place), in the same framing as the hook so a replay reads as after -> before.
-5. **The lead's thumbs-up and wink, then the rookie's attempt at his own**, which goes wrong (the running gag below). End.
+5. **The lead's shades and thumbs-up (wink over the shades), then the rookie's attempt at his own**, which goes wrong (the running gag below). End.
 
 Retention rules for every episode: skill section 9e.
 
@@ -30,7 +30,7 @@ Retention rules for every episode: skill section 9e.
 - **The truck keeps score**: one LEMONNOX badge per lemon hauled off (`WorkTruck(..., trophies=C.trophies(ep))`). Only jobs that haul a LEMONNOX add one.
 - **Every episode includes one callback**: the rookie visibly applying an earlier lesson (EP2: he kills the power first, EP1's lesson), sometimes overdoing it (EP3: he kills *all* the power).
 - **The finale mirrors the pilot**: EP10 is EP1's job done right, beat for beat.
-- **The season question: will the rookie earn his own thumbs-up?** Every episode ends with the rookie trying to copy the lead's thumbs-up, and it goes wrong in a way born from that episode: EP1 a leftover static spark off his thumb, EP2 a last chunk of insulation dropping out of his ceiling hole onto his head, EP3 a puff of filter dust. It escalates through the season (later: a glove stuck on, a gauge hose in the way, the lead out sick in EP9 so nobody to copy) until EP10, where he lands it, wink and all.
+- **The season question: will the rookie earn his own thumbs-up?** Every episode ends with the rookie trying to copy the lead's thumbs-up, and it goes wrong in a way born from that episode: EP1 a leftover static spark off his thumb, EP2 a last chunk of insulation dropping out of his ceiling hole onto his head, EP3 a puff of filter dust. It escalates through the season (later: a glove stuck on, a gauge hose in the way, the lead out sick in EP9 so nobody to copy) until EP10, where he lands it, wink and all, with his own first pair of shades.
 
 ## Episode guide
 

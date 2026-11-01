@@ -55,7 +55,8 @@ class StickWorldTest(EpisodeScene):
             self.play(a.expression("neutral"), b.expression("neutral"), c.expression("neutral"), d.expression("neutral"))
             self.play(a.shake_head(3, slow=True, eyes_closed=True), b.nod(2), c.blink(), d.look_at(P(4, 4)))
             self.play(a.thumbs_up(), b.wink())
-            self.play(b.thumb_try())
+            self.play(a.put_on_shades())
+            self.play(a.face.peek(0.3), b.thumb_try())
             self.play(b.thumb_spoiled(FX.sparkles([b.hand("R")], 0.3, 4)))
             self.play(a.talk(1.0), b.face.turn_to(0.9), c.turn(-1), d.turn(1))
 
@@ -230,6 +231,7 @@ class StickWorldTest(EpisodeScene):
             self.play(gs.needles(-0.12, 0, fraction=True, run_time=0.5))   # vacuum
             self.play(fig.grab(fl, "R", "grip"))
             self.play(fl.beam(True), fig.pose("point", 0.4))
+            self.play(fig.twirl(fl))
             self.remove(mm, gs, lvl, fl, drv, brush, *yard, *tall, fig)
 
         with self.block("effects_more"):
@@ -241,6 +243,8 @@ class StickWorldTest(EpisodeScene):
             from stickworld.props.base import ground_shadow
             from stickworld.props.effects_more import glow, impact_burst, pop, spark_shower, squash_land
             self.add(ground_shadow(box, -4.9))
+            from stickworld.props.effects_more import impact_frame
+            self.play(impact_frame(P(0.0, -2.0), 0.35))
             self.play(spark_shower(P(1.0, -2.5), 0.8), glow(P(1.0, -2.5), 0.8), impact_burst(P(-2.0, -3.0), 1.0),
                       squash_land(box, 0.1, 0.4), pop(fig, 1.1, 0.3))
             camera.follow(self, lambda: fig.hip_point(), stiffness=3.0)
