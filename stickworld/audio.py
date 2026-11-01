@@ -85,7 +85,8 @@ class SoundScene:
         """Lay the music under everything, trimmed and faded to the exact running time. Call last."""
         from pydub import AudioSegment, effects
         total = self.renderer.time
-        bed = effects.normalize(AudioSegment.from_file(os.path.join(MUSIC_DIR, filename))[:int(total * 1000)])
+        src = filename if os.path.isabs(filename) else os.path.join(MUSIC_DIR, filename)
+        bed = effects.normalize(AudioSegment.from_file(src)[:int(total * 1000)])
         bed = bed.apply_gain(level).fade_in(400).fade_out(int(fade_out * 1000))
         path = os.path.join(SFX_DIR, "_music_bed.wav")
         bed.export(path, format="wav")

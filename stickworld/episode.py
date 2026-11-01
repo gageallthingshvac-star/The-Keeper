@@ -25,9 +25,10 @@ setup_frame()
 
 class EpisodeScene(SoundScene, MovingCameraScene):
     TIMING = {}
-    MUSIC = "music.mp3"
+    MUSIC = "beat"      # "beat" = our own lo-fi bed arranged to MUSIC_CUES (stickworld/audio_beat.py); or a file in audio/src
+    MUSIC_CUES = [(0.0, "full")]   # [(when, section)]: when = seconds, a block name (its start) or (block name, offset)
     EPISODE = None      # series episode number (shown by episode_tag(); see stickworld/continuity.py)
-    MUSIC_LEVEL = -13.0
+    MUSIC_LEVEL = -12.0
     PEAK_DB = -5.5      # mix peak ceiling; AAC encoding adds up to ~3 dB on sharp transients, so the MP4 lands near -3
 
     def setup(self):
@@ -100,8 +101,25 @@ class EpisodeScene(SoundScene, MovingCameraScene):
         holder.add_updater(advance)
         self.add(holder)
 
+    def music_sections(self):
+        """MUSIC_CUES resolved to [(seconds, section)] against the blocks as they actually played."""
+        starts = {name: t0 for name, t0, *_ in self.timeline}
+        out = []
+        for when, section in self.MUSIC_CUES:
+            if isinstance(when, str):
+                t = starts[when]
+            elif isinstance(when, tuple):
+                t = starts[when[0]] + when[1]
+            else:
+                t = float(when)
+            out.append((max(0.0, t), section))
+        return sorted(out)
+
     def finish(self, music=True, tail_fade=0.35):
-        if music and self.MUSIC:
+        if music and self.MUSIC == "beat":
+            from .audio_beat import make_track
+            self.add_music(make_track(self.renderer.time, self.music_sections()), self.MUSIC_LEVEL, fade_out=0.6)
+        elif music and self.MUSIC:
             self.add_music(self.MUSIC, self.MUSIC_LEVEL)
         # cues that ring past the last frame would make the file longer than the picture: cut the mix to length
         fw = self.renderer.file_writer
