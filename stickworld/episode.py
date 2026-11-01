@@ -26,7 +26,7 @@ setup_frame()
 class EpisodeScene(SoundScene, MovingCameraScene):
     TIMING = {}
     MUSIC = "beat"      # "beat" = our own lo-fi bed arranged to MUSIC_CUES (stickworld/audio_beat.py); or a file in audio/src
-    MUSIC_CUES = [(0.0, "full")]   # [(when, section)]: when = seconds, a block name (its start) or (block name, offset)
+    MUSIC_CUES = [(0.0, "full")]   # [(when, section)]: when = seconds, a block name (its start), a mark() or (name, offset)
     EPISODE = None      # series episode number (shown by episode_tag(); see stickworld/continuity.py)
     MUSIC_LEVEL = -12.0
     PEAK_DB = -5.5      # mix peak ceiling; AAC encoding adds up to ~3 dB on sharp transients, so the MP4 lands near -3
@@ -101,9 +101,16 @@ class EpisodeScene(SoundScene, MovingCameraScene):
         holder.add_updater(advance)
         self.add(holder)
 
+    def mark(self, name):
+        """Remember this moment by name (a music cue can then land exactly on it: the zap, the breaker going off)."""
+        if not hasattr(self, "_marks"):
+            self._marks = {}
+        self._marks[name] = self.renderer.time
+
     def music_sections(self):
-        """MUSIC_CUES resolved to [(seconds, section)] against the blocks as they actually played."""
+        """MUSIC_CUES resolved to [(seconds, section)] against the blocks as they actually played (or mark()s)."""
         starts = {name: t0 for name, t0, *_ in self.timeline}
+        starts.update(getattr(self, "_marks", {}))
         out = []
         for when, section in self.MUSIC_CUES:
             if isinstance(when, str):

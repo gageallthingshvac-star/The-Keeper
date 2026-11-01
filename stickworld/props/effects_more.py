@@ -6,7 +6,7 @@ so a scene can just self.play(heat_waves(p)) alongside other animations.
 """
 import numpy as np
 from manim import (
-    BOLD, DOWN, LEFT, ORIGIN, PI, RIGHT, UP, Dot, Ellipse, FadeIn, FadeOut, LaggedStart, Succession, Text,
+    BOLD, DOWN, LEFT, ORIGIN, PI, RIGHT, UP, Dot, Ellipse, FadeIn, FadeOut, LaggedStart, Polygon, Succession, Text,
     UpdateFromAlphaFunc, VGroup, VMobject, linear, rate_functions, smooth,
 )
 
@@ -339,3 +339,34 @@ def lights_out(level, region, figures):
     group.add_updater(update)
     update(group)
     return group
+
+
+def impact_frame(center, run_time=0.4, n=28, r_in=1.2, r_out=9.0, flash=0.8, seed=3):
+    """The big-hit frame (anime style, used sparingly: the zap, the crash, the dust bomb): a white flash and manga
+    focus lines rushing in on `center` for a few frames, then gone. Pair with Snd("boom"), camera.shake and a
+    hit-stop wait."""
+    from manim import AnimationGroup, Rectangle, UpdateFromAlphaFunc
+    rng = np.random.default_rng(seed)
+    c = P(center[0], center[1])
+    lines = VGroup()
+    for i in range(n):
+        a = 2 * PI * i / n + rng.uniform(-0.08, 0.08)
+        w = rng.uniform(0.012, 0.035)
+        ri = r_in * rng.uniform(0.85, 1.5)
+        tip = c + ri * np.array([np.cos(a), np.sin(a), 0])
+        b1 = c + r_out * np.array([np.cos(a - w), np.sin(a - w), 0])
+        b2 = c + r_out * np.array([np.cos(a + w), np.sin(a + w), 0])
+        lines.add(Polygon(tip, b1, b2).set_fill(INK, 0).set_stroke(width=0))
+    lines.set_z_index(Z_FX + 0.6)
+    sheet = Rectangle(width=60, height=60).move_to(c).set_fill(WHITE, 0).set_stroke(width=0).set_z_index(Z_FX + 0.5)
+
+    def lines_fn(m, a):
+        k = 1.0 if a < 0.45 else max(0.0, 1 - (a - 0.45) / 0.55)
+        m.set_fill(INK, 0.95 * k)
+
+    def flash_fn(m, a):
+        m.set_fill(WHITE, flash * max(0.0, 1 - a / 0.3))
+
+    return AnimationGroup(UpdateFromAlphaFunc(lines, lines_fn, run_time=run_time, introducer=True, remover=True),
+                          UpdateFromAlphaFunc(sheet, flash_fn, run_time=run_time, introducer=True, remover=True))
+

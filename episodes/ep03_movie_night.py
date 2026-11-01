@@ -29,7 +29,7 @@ from stickworld.episode import EpisodeScene
 from stickworld.face import KEEP
 from stickworld.props import effects as FX
 from stickworld.props.base import attach_to, detach, ground_shadow
-from stickworld.props.effects_more import debris, heat_waves, lights_out, pop
+from stickworld.props.effects_more import debris, heat_waves, impact_frame, lights_out, pop
 from stickworld.props.home import TV, Couch, Filter, LockoutTag, WallClock
 from stickworld.props.hvac import Duct
 from stickworld.props.hvac_more import (ICE, BreakerPanel, CondensateDrain, EvapCoil, FilterRack, Furnace, Icicle, LineSet,
@@ -60,14 +60,17 @@ BOOKEND = (np.array([-0.75, 1.9, 0]), 0.56)   # opening and closing shot: couch,
 
 class Ep03MovieNight(EpisodeScene):
     EPISODE = 3
+    # the music lives on the house's power: muffled in the hook, drops when the techs arrive, dies with a tape-stop
+    # when the rookie kills the main, comes back with the lights; the rookie's failed thumbs-up stops it again
+    MUSIC_CUES = [(0.0, "intro"), ("arrive", "drop"), ("main_off", "break"), ("main_on", "full"), ("rookie_try", "break")]
     TIMING = {
         "hook": 4.35,
         "arrive": 4.3,
         "diagnose": 6.0,
-        "breakers": 10.05,
+        "breakers": 10.45,
         "filter": 8.0,
         "power_on": 8.5,
-        "finale": 5.45,
+        "finale": 6.5,
     }
 
     # ------------------------------------------------------------ set up the world
@@ -153,6 +156,7 @@ class Ep03MovieNight(EpisodeScene):
             # they hop out; the camera rises into the house (the street drops out of shot) and they come in the front
             # door at the left: no walk along the street (travel loses viewers)
             door = truck.pt("door_step")[0]
+            self.snd("boom", 0.05, gain=-8)
             self.play(lead.hop_out(truck, door - 0.35, STREET),
                       Succession(Wait(0.25), rookie.hop_out(truck, door + 0.25, STREET, run_time=0.6)),
                       Succession(Wait(0.55), Do(lambda: self.bag.set_z_index(S.Z_FIGURE - 0.4))),
@@ -199,7 +203,9 @@ class Ep03MovieNight(EpisodeScene):
             steps = lambda k, n: (AnimationGroup(tween_value(self.dark, 0.15 * (k // 4 + 1), 0.03),
                                                  *([self.tv.screen(False, 0.03)] if k == 7 else []))
                                   if k % 4 == 3 else Wait(0.01))
-            self.play(rookie.sweep_breakers(panel, on=False, per=0.11, each=steps, at_main=tween_value(self.dark, 1.0, 0.02)))
+            self.play(rookie.sweep_breakers(panel, on=False, per=0.11, each=steps,
+                                            at_main=AnimationGroup(tween_value(self.dark, 1.0, 0.02), Snd("boom", gain=-10),
+                                                                   Do(lambda: self.mark("main_off")))))
             # pitch dark: just eyes. The rookie backs away from the panel, pleased with himself
             self.play(Snd("crickets", gain=-6), rookie.let_go(("R",)), rookie.step_back(0.7, run_time=0.4),
                       rookie.expression("happy", 0.2), Succession(Wait(0.25), lead.expression("squint", 0.2, hold=1.1)),
@@ -207,15 +213,18 @@ class Ep03MovieNight(EpisodeScene):
             # the lead's flashlight from his back pocket: it lights him and the panel
             self.play(lead.reach("L", pocket, 0.2, lean=False))
             self.flash.set_z_index(S.Z_FX - 0.6)
-            self.flash.hold(lambda: lead.hand("L"), aim=panel_c + np.array([-0.15, 0.1, 0]))   # beam stays on the panel
+            self.flash.hold(lambda: lead.hand("L"))
             self.play(Do(lambda: lead.bake_arm("L")), Do(lambda: self.light(True)), FadeIn(self.flash, scale=0.6, run_time=0.12),
                       self.flash.beam(True, 0.1), Snd("click", gain=-4), lead.pose({"shoulder_L": 0.25, "elbow_L": 2.2}, 0.2))
+            self.play(lead.twirl(self.flash, turns=1, run_time=0.4))          # the beam sweeps the dark room: cool
+            self.flash.hold(lambda: lead.hand("L"), aim=panel_c + np.array([-0.15, 0.1, 0]))   # beam stays on the panel
             self.play(lead.walk_to(2.45, F, face=-1, run_time=0.3), camera.punch_in(self, np.array([1.8, 2.3, 0]), 0.4, 0.4))
             # every circuit back on except the furnace's; the main brings the house back
             back_on = [i for i in range(panel.n_breakers) if i != FURNACE_BREAKER]
             self.play(lead.sweep_breakers(panel, on=True, per=0.1, order=back_on,
                                           at_main=AnimationGroup(tween_value(self.dark, 0.0, 0.1), self.tv.screen(True, 0.1),
-                                                                 self.flash.beam(False, 0.1), Do(lambda: self.light(False)))))
+                                                                 self.flash.beam(False, 0.1), Do(lambda: self.light(False)),
+                                                                 Do(lambda: self.mark("main_on")))))
             # flashlight away; the lockout tag out of his shirt pocket and onto the furnace's breaker
             self.play(lead.reach("L", pocket, 0.25, lean=False), Succession(Wait(0.15), FadeOut(self.flash, run_time=0.1)),
                       lead.reach("R", chest, 0.25, lean=False), nb.expression("happy", 0.2),
@@ -243,7 +252,8 @@ class Ep03MovieNight(EpisodeScene):
             self.play(lead.pose({"drop": 0.0, "spine": -0.05, "neck": 0.0}, 0.45), rookie.pose({"spine": 0.45, "neck": -0.1}, 0.4),
                       Succession(Wait(0.25), Snd("rip", gain=-10)))
             puff = filt.get_center() + np.array([-0.3, 0.3, 0])
-            self.play(FX.smoke(puff, n=9, r=0.4, spread=0.7, rise=0.6, run_time=1.0, color="#9E968A", seed=4),
+            self.play(impact_frame(puff, run_time=0.35), Snd("boom", gain=-10), camera.shake(self, 0.08, run_time=0.25),
+                      FX.smoke(puff, n=9, r=0.4, spread=0.7, rise=0.6, run_time=1.0, color="#9E968A", seed=4),
                       Do(lambda: rookie.add_mark("dusty")), Snd("cough", gain=-2), rookie.face.close_eyes(0.1, hold=0.5),
                       lead.turn(1, 0.2), lead.face.close_eyes(0.1, hold=0.4), rookie.pose({"spine": -0.1, "neck": 0.1}, 0.3))
             # that's why it froze: he holds the filthy filter up, looks from it to the iced coil, and nods
@@ -319,11 +329,13 @@ class Ep03MovieNight(EpisodeScene):
 
         with self.block("finale"):
             # job done: the lead walks out to the cooled-off customer and gives the camera his thumbs-up beside her
-            self.play(lead.walk_to(-0.95, F, run_time=1.2),
+            self.play(lead.walk_to(-1.3, F, run_time=1.0),   # beside her, clear of the thermostat
                       Succession(Wait(0.8), AnimationGroup(nb.face.open_eyes(0.2), nb.look_at(np.array([-0.95, F + 3.6, 0]), 0.2))))
-            self.play(lead.thumbs_up(hold=1.0), Succession(Wait(0.3), nb.expression("happy", 0.2, hold=KEEP)))
+            self.play(lead.put_on_shades())                                  # it's cool in here now
+            self.play(lead.thumbs_up(hold=0.9), Succession(Wait(0.3), nb.expression("happy", 0.2, hold=KEEP)))
             # the rookie's own try: a puff of filter dust off his hand
             self.play(rookie.thumb_try())
+            self.mark("rookie_try")
             self.play(rookie.thumb_spoiled(AnimationGroup(Snd("cough", gain=-4),
                                                           FX.smoke(rookie.hand("R") + np.array([0, 0.15, 0]), n=5, r=0.22, spread=0.35,
                                                                    rise=0.35, run_time=0.6, color="#9E968A", seed=9))))

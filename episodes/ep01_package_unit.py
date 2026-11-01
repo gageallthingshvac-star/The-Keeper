@@ -23,7 +23,7 @@ from stickworld.audio import Snd
 from stickworld.episode import EpisodeScene
 from stickworld.props import effects as FX
 from stickworld.props.base import attach_to, detach, ground_shadow
-from stickworld.props.effects_more import impact_burst, spark_shower
+from stickworld.props.effects_more import impact_burst, impact_frame, spark_shower
 from stickworld.props.home import LockoutTag
 from stickworld.props.hvac import Disconnect, Duct, FlashingPanel, HighVoltageWhip, LowVoltageWire, PackageUnit, Screw
 from stickworld.props.tools import Drill, ToolBag
@@ -45,11 +45,15 @@ WORK = (P(-0.6, 0.7), 0.75)           # the working frame: house wall to unit, t
 
 class Ep01PackageUnit(EpisodeScene):
     EPISODE = 1
+    # muffled in the hook, drops as the techs step out, dies with a tape-stop at the zap and at the pull that does
+    # nothing, back in for the work, and stops on the rookie's failed thumbs-up
+    MUSIC_CUES = [(0.0, "intro"), ("hop_out", "drop"), ("zap_hit", "break"), ("drills", "full"), ("nothing", "break"),
+                  ("carry_toss", "full"), ("rookie_try", "break")]
     TIMING = {
         "arrive": 2.95,
         "hop_out": 4.55,
         "zap": 7.5,
-        "drills": 4.85,
+        "drills": 4.95,
         "peel": 4.55,
         "ducts": 6.25,
         "pull_start": 4.7,
@@ -57,7 +61,7 @@ class Ep01PackageUnit(EpisodeScene):
         "new_unit": 2.5,
         "rewind": 2.45,
         "thread": 4.2,
-        "power_up": 6.1,
+        "power_up": 6.45,
     }
 
     # ------------------------------------------------------------ set up the world
@@ -112,7 +116,7 @@ class Ep01PackageUnit(EpisodeScene):
         attach_to(d2, "grip", lambda: t1.hand("L"))
         self.play(FadeIn(d1, scale=0.6), FadeIn(d2, scale=0.6), Snd("tools", gain=-10), run_time=0.1)
         self.play(t1.pose({"drop": 0.0, "spine": 0.0, "neck": 0.0, "shoulder_R": 0.9, "elbow_R": 0.7,
-                           "shoulder_L": 1.7, "elbow_L": 0.4}, 0.25))
+                           "shoulder_L": 1.7, "elbow_L": 0.4}, 0.25), t1.twirl(d1, turns=1, run_time=0.35))   # gunslinger spin
         catch = t2.shoulder_point() + P(-0.95, -0.45)
         self.play(Succession(Do(lambda: detach(d2)), AnimationGroup(t2.reach("R", catch, 0.4),
                   Succession(Snd("whoosh", gain=-8), d2.animate(path_arc=-1.3, run_time=0.4).move_to(catch).rotate(2 * PI)))),
@@ -182,6 +186,7 @@ class Ep01PackageUnit(EpisodeScene):
                       Succession(Wait(0.7), camera.reset(self, 1.1)))
 
         with self.block("hop_out"):
+            self.snd("boom", 0.05, gain=-8)
             self.play(t1.hop_out(truck, truck.pt("door_step")[0] - 0.35, STREET))
             bag_x = bag.pt("handle")[0]
             self.play(
@@ -205,7 +210,9 @@ class Ep01PackageUnit(EpisodeScene):
             self.play(Succession(*[t1.pose({"spine": -0.32 if k % 2 == 0 else 0.05}, 0.2) for k in range(4)]),
                       t2.pose({"drop": 0.7, "spine": 0.55}, 0.4),
                       Succession(Wait(0.4), t2.reach("R", unit.pt("whip_terminal") + P(-0.25, 0.05), 0.35)))
-            self.play(t2.zapped(source=unit.pt("whip_terminal")),
+            self.mark("zap_hit")
+            self.play(t2.zapped(source=unit.pt("whip_terminal")), impact_frame(unit.pt("whip_terminal"), run_time=0.35),
+                      Snd("boom", gain=-8),
                       Succession(Wait(0.55), Do(lambda: (t2.remove_mark("cap_tag"), t2.add_mark("scorched_cap")))),  # price tag burns off; the cap stays scorched for the series
                       spark_shower(unit.pt("whip_terminal"), 0.55, rate=48, speed=(1.6, 3.4), spread=(0.2, 2.9),
                                    colors=("#FFFFFF", "#BFE8FF", "#FFD54A")),
@@ -265,6 +272,7 @@ class Ep01PackageUnit(EpisodeScene):
             self.play(t1.pose({"drop": 0.0, "spine": -0.4}, 0.22, rush_from),
                       t1.reach("R", t1.hip_point() + P(-1.7 * t1.sg, 3.2), 0.22, rate_func=rush_from, lean=False),
                       whip.strip(True, 0.15), lv.strip(True, 0.15), t1.expression("neutral", 0.2))
+            self.mark("nothing")
             self.snd("crickets", 0.1, gain=-2)
             self.play(Succession(Wait(0.1), t1.blink(), Wait(0.12), t1.blink()))
             whip.free_end()
@@ -304,7 +312,8 @@ class Ep01PackageUnit(EpisodeScene):
             self.play(t1.release(unit, "throw", target=land, spin=-0.25, run_time=0.65, sides=("L", "R"), rest=False),
                       t1.pose({"shoulder_R": 2.3, "elbow_R": 0.2, "shoulder_L": 2.1, "elbow_L": 0.2, "spine": 0.15}, 0.3),
                       t2.pose({"shoulder_R": 2.3, "elbow_R": 0.2, "shoulder_L": 2.1, "elbow_L": 0.2, "spine": 0.15}, 0.3))
-            self.play(Snd("crash", gain=1), truck.bounce(depth=0.2), unit.animate(rate_func=there_and_back, run_time=0.32).shift(DOWN * 0.2),
+            self.play(Snd("crash", gain=1), Snd("boom", gain=-8), impact_frame(P(land[0], truck.pt("bed_rail")[1] + 0.6), run_time=0.35),
+                      truck.bounce(depth=0.2), unit.animate(rate_func=there_and_back, run_time=0.32).shift(DOWN * 0.2),
                       camera.shake(self, 0.16), FX.dust(P(land[0], truck.pt("bed_rail")[1]), 4.0),
                       impact_burst(P(land[0], truck.pt("bed_rail")[1] + 0.9), 1.5),
                       t1.pose("stand", 0.4), t2.pose("stand", 0.4))
@@ -383,12 +392,13 @@ class Ep01PackageUnit(EpisodeScene):
             self.add(air, hum)
             self.background(tween_value(clock, 6.0, 6.0, rate_func=linear))
             self.snd("hum", 0.1, gain=-2)
-            self.play(camera.punch_in(self, BOOKEND[0], BOOKEND[1], 0.75), t1.walk_to(-1.9, G, face=1, run_time=0.75),
-                      Succession(Wait(0.4), t2.expression("happy", 0.3)))
-            self.play(t1.thumbs_up(hold=0.65))
+            self.play(camera.punch_in(self, BOOKEND[0], BOOKEND[1], 0.75), t1.walk_to(-1.9, G, face=1, run_time=0.75, hold=("R",)),
+                      t1.put_on_shades(), Succession(Wait(0.4), t2.expression("happy", 0.3)))   # it's cool now
+            self.play(t1.thumbs_up(hold=0.5))
             # the rookie's own try: a leftover static spark off his thumb
             self.play(t2.thumb_try())
-            self.play(t2.thumb_spoiled(AnimationGroup(Snd("zap", gain=-10),
+            self.mark("rookie_try")
+            self.play(t2.thumb_spoiled(hold=0.3, mishap=AnimationGroup(Snd("zap", gain=-10),
                                                       spark_shower(t2.hand("R") + P(0, 0.2), 0.35, rate=90, speed=(1.2, 2.6),
                                                                    spread=(0.2, 2.9), colors=("#FFFFFF", "#BFE8FF", "#FFD54A")),
                                                       t2.t["hair"].animate(rate_func=there_and_back, run_time=0.6).set_value(1.0))))

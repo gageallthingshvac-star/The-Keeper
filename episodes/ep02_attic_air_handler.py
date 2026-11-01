@@ -22,7 +22,7 @@ from stickworld.episode import EpisodeScene
 from stickworld.face import KEEP
 from stickworld.props import effects as FX
 from stickworld.props.base import attach_to, bundle, detach, ground_shadow, ride, turn_about, unbundle
-from stickworld.props.effects_more import debris, glow, heat_waves, impact_burst, pop, spark_shower, squash_land
+from stickworld.props.effects_more import debris, glow, heat_waves, impact_burst, impact_frame, pop, spark_shower, squash_land
 from stickworld.props.hvac import Disconnect
 from stickworld.props.hvac_more import AirHandler, CondensateDrain, LineSet, Thermostat
 from stickworld.props.tools import ToolBag
@@ -51,6 +51,10 @@ BOOKEND = (np.array([1.8, -1.6, 0]), 0.48)   # opening and closing shot: the hom
 
 class Ep02AtticAirHandler(EpisodeScene):
     EPISODE = 2
+    # muffled on the sweating homeowner, drops as the camera pulls back on the crew, stops dead when the rookie's leg
+    # comes through the ceiling, back in when the old unit comes out, and stops again on the rookie's failed thumbs-up
+    MUSIC_CUES = [(0.0, "intro"), (("arrive", 1.2), "drop"), ("leg_through", "break"), ("old_out", "full"),
+                  ("rookie_try", "break")]
     TIMING = {
         "arrive": 3.9,
         "climb": 8.55,
@@ -164,7 +168,7 @@ class Ep02AtticAirHandler(EpisodeScene):
                                                 heat_waves(head + np.array([1.2, -2.2, 0]), 1.3, width=0.6)),
                                  AnimationGroup(FX.sweat(head, side=-1), ho.wipe_brow(), heat_waves(head + np.array([0.2, 0.5, 0]), 1.0)),
                                  AnimationGroup(ho.turn(-1), ho.expression("disappointed"))),
-                      Succession(Wait(1.2), camera.reset(self, 1.2)))
+                      Succession(Wait(1.2), camera.reset(self, 1.2)), Succession(Wait(1.2), Snd("boom", gain=-9)))
             self.play(turn_about(self.load, 0.25, "axle", 0.4), rookie.walk_to(DOLLY_X + 0.65, face=-1, run_time=0.4),
                       ho.point_at(a.pt("hatch")), Snd("thump", gain=-14))
             self.play(rookie.let_go(), ho.pose("stand", 0.3))
@@ -191,7 +195,8 @@ class Ep02AtticAirHandler(EpisodeScene):
                       lead.nod(1), lead.expression("happy", 0.2))
             ceil = a.pt("ceiling")[1]
             self.play(lead.pose("stand", 0.3), rookie.fall_through(HOLE_X, F, hole=self.hole),
-                      Succession(Wait(0.4), AnimationGroup(camera.shake(self, 0.12, run_time=0.3),
+                      Succession(Wait(0.4), AnimationGroup(camera.shake(self, 0.12, run_time=0.3), Do(lambda: self.mark("leg_through")),
+                                                           impact_frame((HOLE_X, ceil - 0.25), run_time=0.35), Snd("boom", gain=-8),
                                                            impact_burst((HOLE_X, ceil - 0.25), 0.9))))
             self.wait(0.08)   # hit-stop: let the crunch land
             self.play(rookie.kick_leg(2, 0.6), rookie.expression("strain", 0.2),
@@ -241,7 +246,8 @@ class Ep02AtticAirHandler(EpisodeScene):
                       lead.expression("squint", 0.2),
                       Succession(Wait(0.1), AnimationGroup(rookie.look_at(a.pt("hatch")), rookie.expression("surprised", 0.1)),
                                  Wait(0.1), AnimationGroup(rookie.run_to(-1.65, run_time=0.35), rookie.flinch(peek=False))),
-                      Succession(Wait(0.82), AnimationGroup(Snd("crash"), FX.dust(np.array([-3.4, RF, 0]), 1.8),
+                      Succession(Wait(0.82), AnimationGroup(Snd("crash"), Snd("boom", gain=-9), impact_frame((-3.3, RF + 0.6), run_time=0.35),
+                                                            FX.dust(np.array([-3.4, RF, 0]), 1.8),
                                                             impact_burst((-3.3, RF + 0.5), 1.3), camera.shake(self, 0.15, run_time=0.4),
                                                             ho.flinch(), FX.sweat(ho.head_center(), side=1))),
                       Succession(Wait(1.2), Snd("thud", gain=-4), Snd("clatter", gain=-8)))
@@ -371,9 +377,10 @@ class Ep02AtticAirHandler(EpisodeScene):
                                                            ho.pose({"shoulder_L": 1.2, "elbow_L": 0.3, "shoulder_R": 1.3,
                                                                     "elbow_R": 0.3, "neck": -0.2}, 0.5))),
                       rookie.walk_to(HOLE_X - 0.3, face=-1, run_time=1.0),   # under the taped hole, clear of the thermostat
-                      Succession(Wait(0.7), lead.thumbs_up(hold=0.6)))
+                      Succession(Wait(0.2), lead.put_on_shades(), lead.thumbs_up(hold=0.45)))   # it's cool up here now
             # back to the opening shot for the rookie's own try: a last chunk of insulation slips out past the tape
             self.play(camera.punch_in(self, BOOKEND[0], BOOKEND[1], 0.6), rookie.thumb_try())
+            self.mark("rookie_try")
             chunk = self.hole.pt("bottom") + np.array([-0.2, 0, 0])
             self.play(rookie.thumb_spoiled(hold=0.3, mishap=AnimationGroup(Snd("thump", gain=-10), FX.dust(chunk, 0.6),
                                                           debris(chunk, width=0.3, n=6, fall=1.5, run_time=0.7,

@@ -286,14 +286,50 @@ class ActionsMixin:
                 UpdateFromAlphaFunc(star, twinkle, run_time=0.5, rate_func=linear, introducer=True, remover=True)]
         if sound:
             show.append(Snd(sound, gain=-4))
-        if wink:
-            show.append(self.face.wink(hold * 0.7))
+        if wink:   # with shades on he winks over the top of them
+            show.append(self.face.peek(hold * 0.7) if self.face.v("shades") > 0.5 else self.face.wink(hold * 0.7))
         lead_in = [self.turn(face, 0.2)] if face is not None else []
         return Succession(*lead_in, AnimationGroup(self.pose({"shoulder_R": 0.55, "elbow_R": 2.05}, 0.3),
                                          self.face._to(0.3, turn=0.0, up=0.05), self.expression("happy", 0.3)),
                           AnimationGroup(*show), Wait(max(0.0, hold - 0.5)),
                           AnimationGroup(self.t["thumb"].animate(run_time=0.15).set_value(0.0),
                                          self.pose({"shoulder_R": 0.12, "elbow_R": 0.18}, 0.3)))
+
+    def twirl(self, tool, grip="grip", turns=1, run_time=0.35):
+        """Spin a held tool once around its grip, gunslinger style, with a whoosh (the cool flourish on drawing a
+        drill, a cutter, a flashlight). The tool stays attached to the hand and ends the way it started."""
+        from manim import UpdateFromAlphaFunc
+        st = {"a": 0.0}
+
+        def spin(m, a):
+            ang = 2 * np.pi * turns * a
+            m.rotate(ang - st["a"], about_point=m.pt(grip))
+            st["a"] = ang
+
+        return AnimationGroup(UpdateFromAlphaFunc(tool, spin, run_time=run_time, rate_func=smooth), Snd("whoosh", gain=-12))
+
+    def put_on_shades(self, side="R"):
+        """The lead's cool move (it's the cold air coming on: things just got cool): sunglasses out of his shirt pocket,
+        up to his brow, and on, sliding down from the forehead, with a glint off a lens. face._to(shades=0) takes them
+        off; with them on, thumbs_up() winks over the top of them."""
+        from manim import Star, UpdateFromAlphaFunc
+        chest = lambda: self.hip_point() + np.array([0.18 * self.sg, 1.0, 0])
+        brow = lambda: self.head_center() + np.array([0.32 * self.sg, 0.36, 0])
+        temple = lambda: self.head_center() + np.array([0.36 * self.sg, 0.02, 0])
+        proto = Star(4, outer_radius=0.26, inner_radius=0.07).set_fill(S.SPARK, 1).set_stroke(S.INK, 2).set_z_index(S.Z_FX)
+        star = proto.copy().scale(0.01)
+
+        def glint(m, a):   # grows from nothing (an introducer: nothing shows before it starts)
+            m.become(proto.copy().scale(max(0.01, float(np.sin(np.pi * a)))).rotate(1.2 * a)
+                     .move_to(self.head_center() + np.array([0.24, 0.1, 0])))
+
+        return Succession(self.reach(side, chest, 0.16, lean=False),
+                          self.reach(side, brow, 0.2, lean=False),
+                          AnimationGroup(tween_value(self.face.t["shades"], 1.0, 0.22), self.reach(side, temple, 0.22, lean=False),
+                                         self.face._to(0.2, turn=0.0, up=0.05)),
+                          AnimationGroup(Snd("glint", gain=-8), UpdateFromAlphaFunc(star, glint, run_time=0.45, introducer=True, remover=True),
+                                         self.expression("smug", 0.15, hold=0.6),
+                                         self.let_go((side,), 0.3)))
 
     def thumb_try(self, face=None):
         """The rookie's attempt at the lead's signature (the season's running gag), part 1: same pose and thumb pop

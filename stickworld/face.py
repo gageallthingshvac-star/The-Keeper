@@ -5,15 +5,15 @@ by trackers: turn (-1 left .. +1 right, 0 = facing camera) slides and squashes t
 turning; blinks squash the eyes fully flat; expressions tween a handful of feature trackers.
 """
 import numpy as np
-from manim import (Animation, AnimationGroup, Circle, Ellipse, Mobject, Rectangle, Succession, ValueTracker, VGroup,
-                   VMobject, Wait, linear, smooth)
+from manim import (Animation, AnimationGroup, Circle, Ellipse, Mobject, Rectangle, RoundedRectangle, Succession, ValueTracker,
+                   VGroup, VMobject, Wait, linear, smooth)
 from manim.utils.rate_functions import ease_in_out_sine
 
 from . import style as S
 
 FEATURES = dict(turn=0.0, up=0.0, tilt=0.0, eyes_open=1.0, blink=1.0, xeyes=0.0, mouth_curve=0.0, mouth_open=0.0,
                 smirk=0.0, lid=0.0, brow_angle=0.0, brow_y=0.0, eye_big=0.0, squint=0.0, tongue=0.0, teeth=0.0,
-                wink=0.0)
+                wink=0.0, shades=0.0, shades_dip=0.0)
 
 # Expression presets: only the feature trackers listed here change; turn/up/tilt/blink are left alone.
 EXPRESSIONS = {
@@ -75,7 +75,10 @@ class Face:
         self.mouth = seg(4)
         self.teeth = VMobject()
         self.tongue = Ellipse(width=0.1, height=0.1).set_fill(S.TONGUE, 0).set_stroke(S.INK, 2, opacity=0)
-        self.group = VGroup(*self.eyes, *self.lids, *self.brows, self.tongue, self.mouth, self.teeth)
+        # sunglasses (the lead's cool move): two dark lenses, a bridge, white glints; shades=1 on, 0 up off the face
+        self.shades = VGroup(*[VMobject() for _ in range(5)])
+        self._shades_shown = True
+        self.group = VGroup(*self.eyes, *self.lids, *self.brows, self.tongue, self.mouth, self.teeth, self.shades)
 
     def v(self, key):
         return self.t[key].get_value()
@@ -165,6 +168,7 @@ class Face:
             inner, outer = (ex - k * bw, ex + k * bw)
             self.brows[i].set_points_as_corners([[outer, byy + ba * 0.07 * R, 0], [inner, byy - ba * 0.07 * R, 0]])
             self.brows[i].set_stroke(opacity=1.0 if show else 0.0)
+        self._draw_shades(eye_pts, R, sq, t)
         # mouth
         mx, my = cx, c[1] - 0.42 * R + 0.12 * R * up
         w = 0.36 * R * sq
@@ -190,6 +194,31 @@ class Face:
         self.tongue.become(Ellipse(width=0.13 * R, height=0.17 * R).move_to([mx + sside * 0.13 * R, my - 0.1 * R, 0])
                            .set_fill(S.TONGUE, tg).set_stroke(S.INK, 2, opacity=tg))
 
+    def _draw_shades(self, eye_pts, R, sq, t):
+        sh, dip = self.v("shades"), self.v("shades_dip")
+        if sh < 0.02:
+            if self._shades_shown:
+                for m in self.shades:
+                    m.become(VMobject().set_points_as_corners([[0, 0, 0], [1e-4, 0, 0]]).set_stroke(opacity=0).set_fill(opacity=0))
+                self._shades_shown = False
+            return
+        self._shades_shown = True
+        vis = min(1.0, sh * 4)
+        dy = (1 - sh) * 0.55 * R - dip * 0.17 * R          # slides down from the forehead; dips down the nose to peek
+        inner = []
+        for i, (ex, ey) in enumerate(eye_pts):
+            far = abs(t) > 0.02 and (-1 if i == 0 else 1) == -np.sign(t)
+            w = 0.5 * R * sq * (1 - 0.25 * abs(t) if far else 1.0)
+            lens = RoundedRectangle(width=w, height=0.32 * R, corner_radius=0.09 * R).move_to([ex, ey + dy, 0])
+            self.shades[i].become(lens.set_fill("#14181E", vis).set_stroke(S.INK, 3, opacity=vis))
+            gx, gy = ex + 0.09 * R, ey + dy + 0.06 * R
+            self.shades[3 + i].become(VMobject().set_points_as_corners([[gx - 0.07 * R, gy - 0.06 * R, 0], [gx + 0.04 * R, gy + 0.05 * R, 0]])
+                                      .set_stroke(S.WHITE, 3, opacity=0.85 * vis))
+            inner.append(ex + (w / 2 if i == 0 else -w / 2))
+        by = eye_pts[0][1] + dy + 0.06 * R
+        self.shades[2].become(VMobject().set_points_smoothly([[inner[0], by, 0], [(inner[0] + inner[1]) / 2, by + 0.025 * R, 0],
+                                                              [inner[1], by, 0]]).set_stroke(S.INK, 3.5, opacity=vis).set_fill(opacity=0))
+
     # ------------------------------------------------------------ actions (each returns an Animation)
     def _to(self, run_time=0.25, rate_func=smooth, hold=DEFAULT_HOLD, **values):
         """Tween face trackers. If it changes the expression, the face relaxes back to rest `hold` seconds after the
@@ -212,6 +241,10 @@ class Face:
         """Right eye shuts in a happy arc for a beat, with a little smile."""
         return Succession(self._to(0.08, wink=1.0, mouth_curve=max(0.8, self.v("mouth_curve"))), Wait(hold),
                           self._to(0.1, wink=0.0))
+
+    def peek(self, hold=0.5):
+        """With shades on: they slide down the nose, the eyes look over the top with a wink, then back up."""
+        return Succession(self._to(0.1, shades_dip=1.0), self.wink(hold), self._to(0.12, shades_dip=0.0))
 
     def blink(self):
         """Eyes squash fully flat, hold two frames, reopen (~0.15 s)."""
