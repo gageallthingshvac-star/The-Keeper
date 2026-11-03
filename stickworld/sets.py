@@ -20,7 +20,7 @@ def house_side(ground_y=-2.2, wall_x=-3.35, pad=None, window=True):
     left = -4.8
     wall_top = ground_y + 7.4
     s.part("wall", Rectangle(width=wall_x - left, height=wall_top - ground_y).move_to(P((left + wall_x) / 2, (ground_y + wall_top) / 2))
-           .set_fill(S.WALL, 1).set_stroke(S.INK, 6))
+           .set_fill(S.HOUSE, 1).set_stroke(S.INK, 6))
     s.part("siding", VGroup(*[line((left, y), (wall_x, y), 2, S.SIDING) for y in np.arange(ground_y + 0.5, wall_top, 0.5)]))
     s.part("roof", Polygon(P(left, wall_top), P(wall_x + 0.45, wall_top), P(wall_x + 0.45, wall_top + 0.35), P(left, wall_top + 1.7))
            .set_fill(S.ROOF, 1).set_stroke(S.INK, 5))

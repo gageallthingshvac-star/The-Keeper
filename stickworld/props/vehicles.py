@@ -17,7 +17,7 @@ class WorkTruck(Prop):
 
     LENGTH = 8.3
 
-    def __init__(self, front_x, street_y, colour=S.WHITE, trophies=0):
+    def __init__(self, front_x, street_y, colour=S.TRUCK, trophies=0):
         """trophies: LEMONNOX badges already stuck on the bed side (series continuity: one per lemon hauled off)."""
         super().__init__()
         x0, g = front_x, street_y
@@ -39,7 +39,7 @@ class WorkTruck(Prop):
                   .move_to(P((door_x0 + door_x1) / 2, (hood_top + 0.15 + body_y0 + 0.12) / 2)).set_fill("#2B2B2B", 1).set_stroke(S.INK, 3).set_opacity(0))
         door = VGroup(Rectangle(width=door_x1 - door_x0, height=hood_top + 0.15 - body_y0 - 0.12)
                       .move_to(P((door_x0 + door_x1) / 2, (hood_top + 0.15 + body_y0 + 0.12) / 2)).set_fill(colour, 1).set_stroke(S.INK, 4),
-                      line((door_x1 - 0.55, hood_top - 0.25), (door_x1 - 0.25, hood_top - 0.25), 5))
+                      line((door_x1 - 0.55, hood_top - 0.25), (door_x1 - 0.25, hood_top - 0.25), 5, S.METAL))
         self.part("door", door)
         self._door_open = False
         self.part("rack", VGroup(line((cab_x1 + 0.3, rail), (cab_x1 + 0.3, cab_top - 0.25), 6), line((bed_x1 - 0.3, rail), (bed_x1 - 0.3, cab_top - 0.25), 6),

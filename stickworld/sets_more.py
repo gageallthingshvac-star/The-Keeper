@@ -17,8 +17,8 @@ DIRT = "#A68A64"
 VAPOR = "#2B2B2B"                                 # black poly vapour barrier
 SHEATHING = mix(WOOD, WHITE, 0.35)  # plywood / OSB, lighter than framing lumber
 CLOSET_WALL = mix(WALL, CONCRETE, 0.35)
-ROOM_HOT = "#F9DCC0"    # a hot room: warm peach walls
-ROOM_COOL = "#E3F0F8"   # the same room once the AC is on
+ROOM_HOT = "#E2B184"    # a hot room: baked tan walls
+ROOM_COOL = "#B4C8D6"   # the same room once the AC is on: steel blue
 
 X0, X1, Y0, Y1 = -4.5, 4.5, -8.0, 8.0
 BLEED = 0.15  # draw backgrounds a little past the frame edge
@@ -265,7 +265,7 @@ def house_night(floor_y=-0.6, room_color=WALL, partition_x=1.0, register_x=-2.2,
                             rect(wx0 - 0.1, wy0 - 0.12, wx1 + 0.1, wy0, WHITE, DETAIL_W)))
     s.part("curtains", VGroup(Polygon(P(wx0 - 0.3, wy1 + 0.2), P(wx0 + 0.25, wy1 + 0.2), P(wx0 - 0.05, wy0 - 0.3), P(wx0 - 0.3, wy0 - 0.3)),
                               Polygon(P(wx1 + 0.3, wy1 + 0.2), P(wx1 - 0.25, wy1 + 0.2), P(wx1 + 0.05, wy0 - 0.3), P(wx1 + 0.3, wy0 - 0.3)))
-           .set_fill("#C96F5B", 1).set_stroke(INK, DETAIL_W))
+           .set_fill("#2E3C52", 1).set_stroke(INK, DETAIL_W))   # navy curtains
     # floor + foundation
     s.part("floor", VGroup(rect(xa, F - 0.45, xb, F - 0.12, mix(CONCRETE, INK, 0.12), PROP_W),
                            rect(xa, F - 0.12, xb, F, WOOD, PROP_W)))

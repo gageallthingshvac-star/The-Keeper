@@ -16,36 +16,41 @@ def setup_frame():
         config.pixel_width, config.pixel_height = config.pixel_height, config.pixel_width
     config.frame_height = FRAME_H
     config.frame_width = FRAME_W
-    config.background_color = WHITE
+    config.background_color = BG
 
 
 # ---------------------------------------------------------------- colours
+# Workwear palette (Gage: "more manly"): gunmetal, slate, steel, leather, lumber; no pastels. Light enough behind the
+# figures that black lines and white heads always read.
+BG = "#E6E9EC"          # sky / empty frame: light steel grey, not paper white
 WHITE = "#FFFFFF"
 INK = "#111111"
 OLD_UNIT = "#C9B79C"
 OLD_UNIT_DARK = "#B3A184"
 RUST = "#8B4513"
 RUST_LIGHT = "#A0522D"
-NEW_UNIT = "#9FB4C7"
-NEW_UNIT_DARK = "#7F98AF"
+NEW_UNIT = "#6C7C8C"     # gunmetal steel
+NEW_UNIT_DARK = "#55636F"
 METAL = "#BFBFBF"
 METAL_DARK = "#9C9C9C"
 METAL_BACK = "#A9A9A9"  # underside of peeled sheet metal
 METAL_HI = "#E4E4E4"    # thin sheet-metal highlight lines
-COLD_AIR = "#7EC8F0"
-HEAT = "#F5A15A"
+COLD_AIR = "#1E9BE0"     # electric blue
+HEAT = "#D9481F"         # burnt red-orange
 SMOKE = "#9E9E9E"
 WORD_FILL = "#FFD23F"
 CAP_RED = "#C0392B"
 HARD_HAT = "#F2C230"
 TOOL_RED = "#C8102E"   # drills / tool bag accents
-CONCRETE = "#D2D2D2"
-WALL = "#F3F0EA"
-SIDING = "#D8D2C8"
-ROOF = "#5E5E5E"
-GRASS = "#7A9A6A"
-WOOD = "#C69C6D"
-INSULATION = "#F4C2A1"
+CONCRETE = "#B5B5B0"
+WALL = "#DCD8D0"         # interior drywall, concrete-grey
+HOUSE = "#7F8A94"        # exterior siding: slate
+SIDING = "#66707A"       # siding lap lines, block courses
+ROOF = "#34383D"
+GRASS = "#56753F"
+WOOD = "#A9784A"         # framing lumber
+INSULATION = "#DDB75A"   # yellow fibreglass batts
+TRUCK = "#6E7985"        # the work truck: gunmetal steel (light enough that black limbs read over it)
 TONGUE = "#E87A8A"
 SPARK = "#FFD54A"
 LV_STRANDS = ["#D63A2F", "#FFFFFF", "#2E9E44", "#F2D21B"]  # low-voltage cable look (red/white/green/yellow)

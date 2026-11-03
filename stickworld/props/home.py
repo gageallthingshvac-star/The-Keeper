@@ -10,10 +10,10 @@ from ..style import DETAIL_W, INK, METAL_DARK, OLD_UNIT, PROP_W, TOOL_RED, WHITE
 from .base import Prop
 from .hvac_more import Tween, mix, rect, seg
 
-COUCH = "#6F9C9A"
-COUCH_DARK = "#56807E"
-CABINET = "#8A6A4F"
-TV_GLOW = ("#9FD3FF", "#C9E8FF", "#B9B4FF", "#FFF2C2")
+COUCH = "#6A4530"        # brown leather
+COUCH_DARK = "#4C3021"
+CABINET = "#5B4636"      # dark walnut
+TV_GLOW = ("#7FC4FF", "#A6D6FF", "#8FAEFF", "#FFE2A0")
 
 
 class Couch(Prop):

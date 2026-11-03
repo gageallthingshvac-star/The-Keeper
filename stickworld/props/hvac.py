@@ -32,7 +32,7 @@ class PackageUnit(Prop):
         top = rail_top + CH
         fill = S.OLD_UNIT if old else S.NEW_UNIT
         dark = S.OLD_UNIT_DARK if old else S.NEW_UNIT_DARK
-        coil_c = "#8F877A" if old else "#5F7D98"
+        coil_c = "#8F877A" if old else "#46525E"
         coil_x = x0 + 1.75
         self.part("rail", Rectangle(width=W + 0.06, height=0.12).move_to(P(cx, pad_top + 0.06)).set_fill("#4A4A4A", 1).set_stroke(S.INK, 4))
         self.part("cabinet", Rectangle(width=W, height=CH).move_to(P(cx, rail_top + CH / 2)).set_fill(fill, 1).set_stroke(S.INK, S.PROP_W + 1))

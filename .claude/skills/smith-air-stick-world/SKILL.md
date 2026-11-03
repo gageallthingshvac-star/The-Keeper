@@ -50,16 +50,21 @@ Episode files import from stickworld and contain NO custom drawing code. If an e
 
 ## 3. Style
 
-- Background: plain white. Ground line: one black line across the frame.
+- Palette: workwear, not pastel (Gage: "more manly"): gunmetal, slate, steel, leather, lumber, with electric-blue cold air and burnt red-orange heat as the accents. All colours are constants in style.py (and the *_more files); change them there, never inline. Keep everything behind a figure light or mid-tone so black limbs and white heads always read (check figures in front of the truck and the new unit).
+- Background (sky / empty frame): light steel grey `BG` (#E6E9EC). Ground line: one black line across the frame.
 - Figures: black (#111111) lines, stroke width 8 for limbs and body, head circle stroke 8, filled white.
-- Props: flat shapes, black outlines stroke 5, minimal fill colour (constants in style.py):
-  - old unit: dull beige (#C9B79C) with rust (#8B4513) spots and streaks, parody brand badge "LEMONNOX"
-  - new unit: clean gray-blue (#9FB4C7) with a shine, badge "BRRRIER", sparkle on arrival
+- Props: flat shapes, black outlines stroke 5, colour fills from style.py:
+  - old unit: dull beige (#C9B79C) with rust (#8B4513) spots and streaks, parody brand badge "LEMONNOX" (the lemon stays beige: it's the gag)
+  - new unit: gunmetal steel (#6C7C8C) with a shine, badge "BRRRIER", sparkle on arrival
+  - work truck: gunmetal steel (#6E7985), LEMONNOX badge row on the bed
+  - house exterior: slate siding (#7F8A94) with darker lap lines; roof charcoal; interior drywall concrete-grey (#DCD8D0)
+  - hot room: baked tan (#E2B184) -> cool room: steel blue (#B4C8D6)
+  - furniture: brown leather couch, dark walnut cabinet, navy curtains; insulation: yellow fibreglass
   - ducts and flashing: light gray (#BFBFBF), sheet-metal look (thin highlight lines; darker underside when peeled)
   - high voltage whip: thick gray conduit with a black outline; 2 black + 1 green conductors when pulled
   - low voltage wire: thin bundled red/white/green/yellow strands; 8 conductors (black, brown, green, blue, yellow, red, white, orange) when stripped
-  - tools: red drills, black "MILWACKO" tool bag with a red band (deliberately garbled brand)
-  - cold air: light blue (#7EC8F0) wavy lines; heat: light orange (#F5A15A); smoke: gray puffs that drift up and fade
+  - tools: red drills, black "MILWACKO" tool bag with a red band (deliberately garbled brand); R-410A jugs stay rose (that's their real colour)
+  - cold air: electric blue (#1E9BE0) wavy lines; heat: burnt red-orange (#D9481F); smoke: gray puffs that drift up and fade
 - Scale: a figure stands about 520 px tall (H ~ 4.33 units) in the 1920 px frame. A package unit is about as tall as a figure's chest. Keep props in believable proportion to the figures.
 
 ## 4. Characters
