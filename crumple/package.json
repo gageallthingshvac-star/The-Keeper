@@ -1,0 +1,15 @@
+{
+  "name": "crumple-league",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Crumple League: a 3D paper-toss game. Source for ../crumple.html",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test test/"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "three": "0.160.1"
+  }
+}

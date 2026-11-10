@@ -1,3 +1,7 @@
 
 # test harnesses that run without an output dir land here
 undefined/
+
+# Crumple League build output and deps
+node_modules/
+crumple/dist/
